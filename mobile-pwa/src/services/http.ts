@@ -16,12 +16,14 @@ type RequestOptions<TBody> = {
 
 const DEFAULT_TIMEOUT_MS = 15000
 
-const baseURL = import.meta.env.VITE_API_BASE_URL?.toString().replace(/\/+$/, '')
+const baseURL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000')
+  .toString()
+  .replace(/\/+$/, '')
 
 function buildUrl(path: string) {
   if (!baseURL) {
     throw {
-      message: 'Missing VITE_API_BASE_URL',
+      message: 'Missing VITE_API_URL',
       code: 'NETWORK',
     } satisfies HttpError
   }

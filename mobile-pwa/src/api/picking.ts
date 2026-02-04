@@ -100,7 +100,7 @@ async function fetchJSON<TResponse, TBody = unknown>(
 }
 
 export async function getPickingDocument(documentId: string) {
-  return fetchJSON<PickingDocument>(`/api/picking/documents/${documentId}`)
+  return fetchJSON<PickingDocument>(`/api/v1/picking/documents/${documentId}`)
 }
 
 export async function pickLine(
@@ -109,7 +109,7 @@ export async function pickLine(
   requestId: string
 ) {
   return fetchJSON<{ line: PickingLine; progress: PickingProgress; document_status: string }>(
-    `/api/picking/lines/${lineId}/pick`,
+    `/api/v1/picking/lines/${lineId}/pick`,
     {
       method: 'POST',
       body: {
@@ -121,7 +121,7 @@ export async function pickLine(
 }
 
 export async function completePickingDocument(documentId: string) {
-  return fetchJSON<PickingDocument>(`/api/picking/documents/${documentId}/complete`, {
+  return fetchJSON<PickingDocument>(`/api/v1/picking/documents/${documentId}/complete`, {
     method: 'POST',
   })
 }
