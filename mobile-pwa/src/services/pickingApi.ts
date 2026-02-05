@@ -16,7 +16,6 @@ export type PickLineStatus = 'NEW' | 'IN_PROGRESS' | 'DONE' | 'ERROR'
 export type PickLine = {
   id: string
   product_name: string
-  sku?: string
   location_code: string
   qty_required: number
   qty_picked: number
@@ -38,7 +37,6 @@ type BackendDocumentListItem = {
 type BackendDocumentLine = {
   line_id: string
   product_name: string
-  sku?: string
   location_code: string
   qty_required: number
   qty_picked: number
@@ -83,7 +81,6 @@ function mapDetails(doc: BackendDocumentDetails): PickListDetails {
     lines: doc.lines.map((line) => ({
       id: line.line_id,
       product_name: line.product_name,
-      sku: line.sku,
       location_code: line.location_code,
       qty_required: line.qty_required,
       qty_picked: line.qty_picked,
@@ -102,6 +99,10 @@ export async function listPickLists(limit = 50, offset = 0) {
 export async function getPickListDetails(id: string) {
   const data = await fetchJSON<BackendDocumentDetails>(`/api/v1/documents/${id}`)
   return mapDetails(data)
+}
+
+export async function getPickListDetailsForPicker(id: string) {
+  return getPickListDetails(id)
 }
 
 function createRequestId() {

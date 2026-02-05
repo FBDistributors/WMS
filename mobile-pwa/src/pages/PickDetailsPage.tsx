@@ -8,7 +8,11 @@ import { Button } from '../components/ui/button'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Progress } from '../components/ui/progress'
 import { Separator } from '../components/ui/separator'
-import { completePick, getPickListDetails, type PickListDetails } from '../services/pickingApi'
+import {
+  completePick,
+  getPickListDetailsForPicker,
+  type PickListDetails,
+} from '../services/pickingApi'
 
 export function PickDetailsPage() {
   const { documentId } = useParams()
@@ -27,7 +31,7 @@ export function PickDetailsPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const details = await getPickListDetails(documentId)
+      const details = await getPickListDetailsForPicker(documentId)
       setData(details)
     } catch (err) {
       setError('Hujjat yuklanmadi. Qayta urinib ko‘ring.')

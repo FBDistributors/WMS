@@ -31,7 +31,6 @@ export function PickLineRow({ line, onClick }: PickLineRowProps) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-base font-semibold text-slate-900">{line.product_name}</div>
-          <div className="text-xs text-slate-500">{line.sku ?? 'SKU —'}</div>
         </div>
         <Badge variant={statusVariant[line.status]}>{line.status}</Badge>
       </div>

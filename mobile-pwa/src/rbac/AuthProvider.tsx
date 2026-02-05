@@ -1,7 +1,14 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 
 import { getMe, login as loginRequest, clearToken, getToken } from '../services/authApi'
-import { ROLE_PERMISSIONS, type PermissionKey, type Role } from './permissions'
+import {
+  ROLE_PERMISSIONS,
+  isAdmin,
+  isManager,
+  isPicker,
+  type PermissionKey,
+  type Role,
+} from './permissions'
 
 type User = {
   id: string
@@ -14,6 +21,9 @@ type AuthContextValue = {
   user: User | null
   isLoading: boolean
   isMock: boolean
+  isAdmin: boolean
+  isManager: boolean
+  isPicker: boolean
   login: (username: string, password: string) => Promise<void>
   logout: () => void
   setRole: (role: Role) => void
@@ -109,6 +119,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       isLoading,
       isMock,
+      isAdmin: user ? isAdmin(user.role) : false,
+      isManager: user ? isManager(user.role) : false,
+      isPicker: user ? isPicker(user.role) : false,
       login,
       logout,
       setRole,

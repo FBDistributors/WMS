@@ -28,3 +28,15 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
 export function hasPermission(role: Role, permission: PermissionKey) {
   return ROLE_PERMISSIONS[role]?.includes(permission) ?? false
 }
+
+export function isAdmin(role: Role) {
+  return role === 'admin'
+}
+
+export function isManager(role: Role) {
+  return role === 'manager'
+}
+
+export function isPicker(role: Role) {
+  return role === 'picker'
+}

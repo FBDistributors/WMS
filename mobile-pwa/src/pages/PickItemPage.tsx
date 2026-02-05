@@ -5,7 +5,12 @@ import { Minus, Plus, ScanLine, SkipForward } from 'lucide-react'
 import { AppHeader } from '../components/layout/AppHeader'
 import { Button } from '../components/ui/button'
 import { EmptyState } from '../components/ui/EmptyState'
-import { getPickListDetails, pickLineDelta, type PickLine } from '../services/pickingApi'
+import {
+  getPickListDetailsForPicker,
+  pickLineDelta,
+  type PickLine,
+} from '../services/pickingApi'
+import { PickItemCard } from '../picking/components/PickItemCard'
 
 export function PickItemPage() {
   const { documentId, lineId } = useParams()
@@ -25,7 +30,7 @@ export function PickItemPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const details = await getPickListDetails(documentId)
+      const details = await getPickListDetailsForPicker(documentId)
       const found = details.lines.find((item) => item.id === lineId) ?? null
       setLine(found)
       if (!found) {
@@ -91,17 +96,13 @@ export function PickItemPage() {
     <div className="min-h-screen bg-slate-50 px-4 pb-10">
       <AppHeader title="Pick item" onBack={() => navigate(-1)} />
 
-      <div className="rounded-2xl bg-white p-5 shadow-sm">
-        <div className="text-sm text-slate-500">Product</div>
-        <div className="text-xl font-semibold text-slate-900">{line.product_name}</div>
-        <div className="mt-4 rounded-2xl bg-slate-100 p-6 text-center">
-          <div className="text-xs uppercase text-slate-500">Location</div>
-          <div className="text-3xl font-bold text-slate-900">{line.location_code}</div>
-        </div>
-        <div className="mt-4 text-sm text-slate-600">
-          Qty remaining: <span className="font-semibold">{remaining}</span>
-        </div>
-      </div>
+      <PickItemCard
+        productName={line.product_name}
+        locationCode={line.location_code}
+        qtyPicked={line.qty_picked}
+        qtyRequired={line.qty_required}
+        status={line.status}
+      />
 
       <div className="mt-6 rounded-2xl bg-white p-4 shadow-sm">
         <div className="mb-3 text-sm font-semibold text-slate-700">Qty</div>
