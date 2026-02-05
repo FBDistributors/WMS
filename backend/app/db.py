@@ -1,7 +1,10 @@
 import os
+from functools import lru_cache
+from typing import Generator
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session, sessionmaker
 
 
 def _normalize_database_url(url: str) -> str:
@@ -22,3 +25,19 @@ def get_database_url() -> str:
 def create_engine_from_env() -> Engine:
     url = get_database_url()
     return create_engine(url, pool_pre_ping=True)
+
+
+@lru_cache
+def get_engine() -> Engine:
+    return create_engine_from_env()
+
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=get_engine())
+
+
+def get_db() -> Generator[Session, None, None]:
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

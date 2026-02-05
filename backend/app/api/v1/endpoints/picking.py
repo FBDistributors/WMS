@@ -1,9 +1,15 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from typing import Dict, List, Literal, Optional
+from typing import List, Literal, Optional
 from uuid import UUID
 
-from app.api.v1.endpoints.documents import DocumentDetails, DocumentLine, _FAKE_DOCS
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, selectinload
+
+from app.db import get_db
+from app.models.document import Document as DocumentModel
+from app.models.document import DocumentLine as DocumentLineModel
+from app.models.picking import PickRequest
 
 router = APIRouter()
 
@@ -42,62 +48,51 @@ class PickLineResponse(BaseModel):
     document_status: str
 
 
-_REQUEST_IDS: Dict[str, UUID] = {}
-
-
-def _find_document(document_id: UUID) -> DocumentDetails:
-    for doc in _FAKE_DOCS:
-        if doc.id == document_id:
-            return doc
-    raise HTTPException(status_code=404, detail="Document not found")
-
-
-def _find_line(line_id: UUID) -> tuple[DocumentDetails, DocumentLine]:
-    for doc in _FAKE_DOCS:
-        for line in doc.lines:
-            if line.line_id == line_id:
-                return doc, line
-    raise HTTPException(status_code=404, detail="Line not found")
-
-
-def _calculate_progress(lines: List[DocumentLine]) -> PickingProgress:
-    required = sum(line.qty_required for line in lines)
-    picked = sum(line.qty_picked for line in lines)
+def _calculate_progress(lines: List[DocumentLineModel]) -> PickingProgress:
+    required = sum(line.required_qty for line in lines)
+    picked = sum(line.picked_qty for line in lines)
     return PickingProgress(picked=picked, required=required)
 
 
-def _to_picking_line(line: DocumentLine) -> PickingLine:
+def _to_picking_line(line: DocumentLineModel) -> PickingLine:
     return PickingLine(
-        id=line.line_id,
+        id=line.id,
         product_name=line.product_name,
         sku=line.sku,
         barcode=line.barcode,
         location_code=line.location_code,
-        qty_required=line.qty_required,
-        qty_picked=line.qty_picked,
+        qty_required=line.required_qty,
+        qty_picked=line.picked_qty,
     )
 
 
-def _to_picking_document(doc: DocumentDetails) -> PickingDocument:
+def _to_picking_document(doc: DocumentModel) -> PickingDocument:
     return PickingDocument(
         id=doc.id,
-        reference_number=doc.reference_number,
+        reference_number=doc.doc_no,
         status=doc.status,
         lines=[_to_picking_line(line) for line in doc.lines],
         progress=_calculate_progress(doc.lines),
     )
 
 
-def _refresh_document_status(doc: DocumentDetails) -> None:
-    if all(line.qty_picked >= line.qty_required for line in doc.lines):
+def _refresh_document_status(doc: DocumentModel, lines: List[DocumentLineModel]) -> None:
+    if all(line.picked_qty >= line.required_qty for line in lines):
         doc.status = "completed"
-    elif any(line.qty_picked > 0 for line in doc.lines):
+    elif any(line.picked_qty > 0 for line in lines):
         doc.status = "in_progress"
 
 
 @router.get("/documents/{document_id}", response_model=PickingDocument, summary="Picking document")
-async def get_picking_document(document_id: UUID):
-    document = _find_document(document_id)
+async def get_picking_document(document_id: UUID, db: Session = Depends(get_db)):
+    document = (
+        db.query(DocumentModel)
+        .options(selectinload(DocumentModel.lines))
+        .filter(DocumentModel.id == document_id)
+        .one_or_none()
+    )
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
     return _to_picking_document(document)
 
 
@@ -106,31 +101,104 @@ async def get_picking_document(document_id: UUID):
     response_model=PickLineResponse,
     summary="Pick line qty",
 )
-async def pick_line(line_id: UUID, payload: PickLineRequest):
-    # Idempotent: repeat request_id returns current state without re-applying.
-    if payload.request_id in _REQUEST_IDS:
-        stored_line_id = _REQUEST_IDS[payload.request_id]
-        document, existing_line = _find_line(stored_line_id)
+async def pick_line(line_id: UUID, payload: PickLineRequest, db: Session = Depends(get_db)):
+    existing_request = (
+        db.query(PickRequest).filter(PickRequest.request_id == payload.request_id).one_or_none()
+    )
+    if existing_request:
+        line = (
+            db.query(DocumentLineModel)
+            .options(selectinload(DocumentLineModel.document))
+            .filter(DocumentLineModel.id == existing_request.line_id)
+            .one_or_none()
+        )
+        if not line:
+            raise HTTPException(status_code=404, detail="Line not found")
+        document = (
+            db.query(DocumentModel)
+            .options(selectinload(DocumentModel.lines))
+            .filter(DocumentModel.id == line.document_id)
+            .one_or_none()
+        )
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
         return PickLineResponse(
-            line=_to_picking_line(existing_line),
+            line=_to_picking_line(line),
             progress=_calculate_progress(document.lines),
             document_status=document.status,
         )
 
-    document, line = _find_line(line_id)
-    next_qty = line.qty_picked + payload.delta
+    line = (
+        db.query(DocumentLineModel)
+        .filter(DocumentLineModel.id == line_id)
+        .with_for_update()
+        .one_or_none()
+    )
+    if not line:
+        raise HTTPException(status_code=404, detail="Line not found")
+
+    document = (
+        db.query(DocumentModel)
+        .filter(DocumentModel.id == line.document_id)
+        .with_for_update()
+        .one_or_none()
+    )
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    next_qty = line.picked_qty + payload.delta
     if next_qty < 0:
         raise HTTPException(status_code=400, detail="qty_picked cannot be below 0")
-    if next_qty > line.qty_required:
+    if next_qty > line.required_qty:
         raise HTTPException(status_code=400, detail="qty_picked cannot exceed qty_required")
 
-    line.qty_picked = next_qty
-    _refresh_document_status(document)
-    _REQUEST_IDS[payload.request_id] = line_id
+    line.picked_qty = next_qty
+    try:
+        db.add(PickRequest(request_id=payload.request_id, line_id=line.id))
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        stored = (
+            db.query(PickRequest)
+            .filter(PickRequest.request_id == payload.request_id)
+            .one_or_none()
+        )
+        if stored:
+            line = (
+                db.query(DocumentLineModel)
+                .options(selectinload(DocumentLineModel.document))
+                .filter(DocumentLineModel.id == stored.line_id)
+                .one_or_none()
+            )
+            if not line:
+                raise HTTPException(status_code=404, detail="Line not found")
+            document = (
+                db.query(DocumentModel)
+                .options(selectinload(DocumentModel.lines))
+                .filter(DocumentModel.id == line.document_id)
+                .one_or_none()
+            )
+            if not document:
+                raise HTTPException(status_code=404, detail="Document not found")
+            return PickLineResponse(
+                line=_to_picking_line(line),
+                progress=_calculate_progress(document.lines),
+                document_status=document.status,
+            )
+        raise
+
+    lines = (
+        db.query(DocumentLineModel)
+        .filter(DocumentLineModel.document_id == document.id)
+        .with_for_update()
+        .all()
+    )
+    _refresh_document_status(document, lines)
+    db.commit()
 
     return PickLineResponse(
         line=_to_picking_line(line),
-        progress=_calculate_progress(document.lines),
+        progress=_calculate_progress(lines),
         document_status=document.status,
     )
 
@@ -140,18 +208,31 @@ async def pick_line(line_id: UUID, payload: PickLineRequest):
     response_model=PickingDocument,
     summary="Complete picking document",
 )
-async def complete_picking_document(document_id: UUID):
-    document = _find_document(document_id)
-    incomplete = [
-        line.line_id
-        for line in document.lines
-        if line.qty_picked < line.qty_required
-    ]
+async def complete_picking_document(document_id: UUID, db: Session = Depends(get_db)):
+    document = (
+        db.query(DocumentModel)
+        .filter(DocumentModel.id == document_id)
+        .with_for_update()
+        .one_or_none()
+    )
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    lines = (
+        db.query(DocumentLineModel)
+        .filter(DocumentLineModel.document_id == document.id)
+        .with_for_update()
+        .all()
+    )
+    incomplete = [line.id for line in lines if line.picked_qty < line.required_qty]
     if incomplete:
         raise HTTPException(
-            status_code=409,
+            status_code=status.HTTP_409_CONFLICT,
             detail={"message": "Incomplete lines", "lines": incomplete},
         )
 
     document.status = "completed"
+    db.commit()
+
+    document.lines = lines
     return _to_picking_document(document)

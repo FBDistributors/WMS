@@ -1,9 +1,12 @@
+import logging
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+from sqlalchemy.engine.url import make_url
 
-from app.db import create_engine_from_env
+from app.db import get_engine, get_database_url
 
 app = FastAPI(
     title="WMS Backend",
@@ -33,9 +36,25 @@ async def health_check():
     return {"status": "ok"}
 
 
+@app.get("/health/db")
+async def health_db_check():
+    try:
+        engine = get_engine()
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+        return {"status": "ok"}
+    except Exception as exc:  # pragma: no cover - safety net
+        logging.getLogger("uvicorn").warning("Database health check failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Database unavailable") from exc
+
+
 @app.on_event("startup")
 def on_startup() -> None:
-    app.state.db_engine = create_engine_from_env()
+    engine = get_engine()
+    app.state.db_engine = engine
+    url = make_url(get_database_url())
+    safe_target = f"{url.drivername}://{url.host}:{url.port}/{url.database}"
+    logging.getLogger("uvicorn").info("Database configured: %s", safe_target)
 
 # Keyinchalik shu yerga routerlar ulanadi:
 # from app.api.v1.router import router as api_router
