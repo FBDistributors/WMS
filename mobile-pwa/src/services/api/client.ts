@@ -9,14 +9,27 @@ type RequestOptions<TBody> = {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   body?: TBody
   headers?: Record<string, string>
+  query?: Record<string, string | number | boolean | undefined>
 }
 
-const rawBaseUrl = import.meta.env.VITE_API_URL ?? 'https://wms-ngdm.onrender.com'
+const rawBaseUrl =
+  import.meta.env.VITE_API_BASE_URL ?? 'https://wms-ngdm.onrender.com'
 const baseUrl = rawBaseUrl.toString().replace(/\/+$/, '')
 
-function buildUrl(path: string) {
-  const normalizedPath = path.replace(/\/\?/, '?')
-  return `${baseUrl}${normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`}`
+export function buildApiUrl(
+  path: string,
+  query?: Record<string, string | number | boolean | undefined>
+) {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  const url = new URL(normalizedPath, `${baseUrl}/`)
+  if (query) {
+    Object.entries(query).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        url.searchParams.set(key, String(value))
+      }
+    })
+  }
+  return url.toString()
 }
 
 export async function fetchJSON<TResponse, TBody = unknown>(
@@ -24,7 +37,11 @@ export async function fetchJSON<TResponse, TBody = unknown>(
   options: RequestOptions<TBody> = {}
 ): Promise<TResponse> {
   try {
-    const response = await fetch(buildUrl(path), {
+    const url = buildApiUrl(path, options.query)
+    if (import.meta.env.DEV && path.startsWith('/api/v1/documents')) {
+      console.debug('Documents API URL:', url)
+    }
+    const response = await fetch(url, {
       method: options.method ?? (options.body ? 'POST' : 'GET'),
       headers: {
         'Content-Type': 'application/json',

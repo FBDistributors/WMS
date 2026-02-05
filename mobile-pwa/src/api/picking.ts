@@ -36,12 +36,13 @@ type RequestOptions<TBody> = {
 }
 
 const DEFAULT_TIMEOUT_MS = 15000
-const rawBaseUrl = import.meta.env.VITE_API_URL ?? 'https://wms-ngdm.onrender.com'
+const rawBaseUrl =
+  import.meta.env.VITE_API_BASE_URL ?? 'https://wms-ngdm.onrender.com'
 const baseUrl = rawBaseUrl.toString().replace(/\/+$/, '')
 
 function buildUrl(path: string) {
-  const normalizedPath = path.replace(/\/\?/, '?')
-  return `${baseUrl}${normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`}`
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  return new URL(normalizedPath, `${baseUrl}/`).toString()
 }
 
 // API helper with timeout + JSON error handling.

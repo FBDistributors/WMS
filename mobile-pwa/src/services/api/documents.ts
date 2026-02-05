@@ -16,19 +16,14 @@ export async function listDocuments(params: ListDocumentsParams = {}) {
     offset = 0,
   } = params
 
-  const searchParams = new URLSearchParams()
-  if (doc_type) {
-    searchParams.set('doc_type', doc_type)
-  }
-  if (status) {
-    searchParams.set('status', status)
-  }
-  searchParams.set('limit', String(limit))
-  searchParams.set('offset', String(offset))
-
-  return fetchJSON<DocumentListItem[]>(
-    `/api/v1/documents?${searchParams.toString()}`
-  )
+  return fetchJSON<DocumentListItem[]>('/api/v1/documents', {
+    query: {
+      doc_type,
+      status,
+      limit,
+      offset,
+    },
+  })
 }
 
 export async function getDocument(id: string) {
