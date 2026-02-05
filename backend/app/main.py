@@ -18,13 +18,22 @@ app = FastAPI(
 
 def _get_cors_config() -> tuple[list[str], str | None]:
     cors_env = os.getenv("CORS_ORIGINS")
+    allow_all = False
+    origins: list[str] = []
+
     if cors_env:
         if cors_env.strip() == "*":
-            return ["*"], None
-        origins = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
-        return origins, r"^https://.*\.vercel\.app$"
+            allow_all = True
+        else:
+            origins = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
 
-    return ["https://wms-opal.vercel.app"], r"^https://.*\.vercel\.app$"
+    if not origins:
+        origins = ["https://wms-opal.vercel.app"]
+
+    if allow_all:
+        origins = ["*"]
+
+    return origins, r"^https://.*\.vercel\.app$"
 
 
 # CORS (frontend ulanishi uchun)
