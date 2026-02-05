@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import type { Result } from '@zxing/library'
+import type { BrowserMultiFormatReader, IScannerControls } from '@zxing/browser'
 
 type CameraScannerProps = {
   onDetected: (code: string) => void
@@ -13,19 +15,22 @@ export default function CameraScanner({ onDetected, onError, active }: CameraSca
   useEffect(() => {
     if (!active) return
     let isCancelled = false
-    let reader: { reset: () => void } | null = null
+    let reader: BrowserMultiFormatReader | null = null
+    let controls: IScannerControls | null = null
 
     const start = async () => {
       try {
         const { BrowserMultiFormatReader } = await import('@zxing/browser')
         if (isCancelled) return
         reader = new BrowserMultiFormatReader()
-        await reader.decodeFromVideoDevice(undefined, videoRef.current ?? undefined, (result) => {
+        controls = await reader.decodeFromVideoDevice(undefined, videoRef.current ?? undefined, (
+          result: Result | undefined
+        ) => {
           if (!result) return
           const text = result.getText()
           if (!text) return
           onDetected(text)
-          reader?.reset()
+          controls?.stop()
         })
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Camera error'
@@ -38,7 +43,7 @@ export default function CameraScanner({ onDetected, onError, active }: CameraSca
 
     return () => {
       isCancelled = true
-      reader?.reset()
+      controls?.stop()
     }
   }, [active, onDetected, onError])
 
