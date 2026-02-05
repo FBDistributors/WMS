@@ -11,7 +11,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.db import get_database_url  # noqa: E402
 from app.models.base import Base  # noqa: E402
-from app.models import document, picking  # noqa: F401,E402
+from app.models import document, picking, product, user  # noqa: F401,E402
 
 config = context.config
 

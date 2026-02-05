@@ -82,7 +82,9 @@ export function ProductDetailsPage() {
         </div>
         <div>
           <div className="text-sm text-slate-500">Status</div>
-          <div className="text-base text-slate-900">{product.status}</div>
+          <div className="text-base text-slate-900">
+            {product.is_active ? 'active' : 'inactive'}
+          </div>
         </div>
       </Card>
     </AdminLayout>

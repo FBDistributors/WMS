@@ -41,10 +41,12 @@ export async function fetchJSON<TResponse, TBody = unknown>(
     if (import.meta.env.DEV && path.startsWith('/api/v1/documents')) {
       console.debug('Documents API URL:', url)
     }
+    const token = localStorage.getItem('wms_token')
     const response = await fetch(url, {
       method: options.method ?? (options.body ? 'POST' : 'GET'),
       headers: {
         'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(options.headers ?? {}),
       },
       body: options.body ? JSON.stringify(options.body) : undefined,

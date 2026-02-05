@@ -14,7 +14,7 @@ type AdminLayoutProps = {
 
 export function AdminLayout({ title, actionSlot, children }: AdminLayoutProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const { user, setRole } = useAuth()
+  const { user, setRole, isMock } = useAuth()
 
   return (
     <div className="min-h-screen bg-slate-50 md:flex">
@@ -46,10 +46,12 @@ export function AdminLayout({ title, actionSlot, children }: AdminLayoutProps) {
             <div className="text-lg font-semibold text-slate-900">{title}</div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="hidden text-sm text-slate-500 sm:block">
-              {user.name} · {user.role}
-            </div>
-            {import.meta.env.DEV ? (
+            {user ? (
+              <div className="hidden text-sm text-slate-500 sm:block">
+                {user.name} · {user.role}
+              </div>
+            ) : null}
+            {user && import.meta.env.DEV && isMock ? (
               <select
                 className="rounded-xl border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600"
                 value={user.role}

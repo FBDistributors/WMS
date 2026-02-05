@@ -9,34 +9,37 @@ import { Button } from '../../components/ui/button'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { getProducts, type Product } from '../../services/productsApi'
 
-const statusVariant: Record<Product['status'], 'success' | 'neutral'> = {
-  active: 'success',
-  inactive: 'neutral',
-}
+const statusVariant = (isActive: boolean) => (isActive ? 'success' : 'neutral')
 
 export function ProductsListPage() {
   const navigate = useNavigate()
   const [items, setItems] = useState<Product[]>([])
   const [query, setQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (search: string) => {
     setIsLoading(true)
     setError(null)
     try {
-      const data = await getProducts({ q: query })
-      setItems(data)
+      const data = await getProducts({ q: search })
+      setItems(data.items)
     } catch (err) {
       setError('Mahsulotlar yuklanmadi. Qayta urinib ko‘ring.')
     } finally {
       setIsLoading(false)
     }
+  }, [])
+
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedQuery(query.trim()), 300)
+    return () => clearTimeout(handle)
   }, [query])
 
   useEffect(() => {
-    void load()
-  }, [load])
+    void load(debouncedQuery)
+  }, [debouncedQuery, load])
 
   const content = useMemo(() => {
     if (isLoading) {
@@ -87,8 +90,8 @@ export function ProductsListPage() {
                 SKU: {item.sku} · {item.barcode ?? 'Barcode —'}
               </div>
             </div>
-            <Badge variant={statusVariant[item.status]}>
-              {item.status === 'active' ? 'ACTIVE' : 'INACTIVE'}
+            <Badge variant={statusVariant(item.is_active)}>
+              {item.is_active ? 'ACTIVE' : 'INACTIVE'}
             </Badge>
           </Card>
         ))}
@@ -100,7 +103,7 @@ export function ProductsListPage() {
     <AdminLayout
       title="Products"
       actionSlot={
-        <Button variant="secondary" onClick={load}>
+        <Button variant="secondary" onClick={() => load(debouncedQuery)}>
           Yangilash
         </Button>
       }
