@@ -42,7 +42,15 @@ async def health_db_check():
         engine = get_engine()
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
-        return {"status": "ok"}
+            documents = connection.execute(
+                text("SELECT to_regclass('public.documents')")
+            ).scalar()
+            lines = connection.execute(
+                text("SELECT to_regclass('public.document_lines')")
+            ).scalar()
+        if not documents or not lines:
+            raise HTTPException(status_code=500, detail="Database tables missing")
+        return {"status": "ok", "documents": True, "document_lines": True}
     except Exception as exc:  # pragma: no cover - safety net
         logging.getLogger("uvicorn").warning("Database health check failed: %s", exc)
         raise HTTPException(status_code=500, detail="Database unavailable") from exc
