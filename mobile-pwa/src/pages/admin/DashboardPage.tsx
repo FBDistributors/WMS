@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   ClipboardList,
-  CheckCircle2,
   AlertTriangle,
   Boxes,
   PackageCheck,
