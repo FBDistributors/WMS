@@ -26,7 +26,7 @@ type SidebarProps = {
 export function Sidebar({ onNavigate }: SidebarProps) {
   const location = useLocation()
   const { user } = useAuth()
-  const items = filterMenuByPermissions(MENU_ITEMS, user.permissions)
+  const items = filterMenuByPermissions(MENU_ITEMS, user?.permissions ?? [])
 
   return (
     <aside className="w-64 border-r border-slate-200 bg-white p-4">

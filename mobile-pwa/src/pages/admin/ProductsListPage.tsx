@@ -32,6 +32,10 @@ export function ProductsListPage() {
     }
   }, [])
 
+  const handleRetry = useCallback(() => {
+    void load(debouncedQuery)
+  }, [debouncedQuery, load])
+
   useEffect(() => {
     const handle = setTimeout(() => setDebouncedQuery(query.trim()), 300)
     return () => clearTimeout(handle)
@@ -57,7 +61,7 @@ export function ProductsListPage() {
           icon={<Boxes size={32} />}
           title={error}
           actionLabel="Qayta urinib ko‘rish"
-          onAction={load}
+          onAction={handleRetry}
         />
       )
     }
@@ -69,7 +73,7 @@ export function ProductsListPage() {
           title="Mahsulotlar topilmadi"
           description="Hozircha mahsulotlar yo‘q."
           actionLabel="Yangilash"
-          onAction={load}
+          onAction={handleRetry}
         />
       )
     }
@@ -103,7 +107,7 @@ export function ProductsListPage() {
     <AdminLayout
       title="Products"
       actionSlot={
-        <Button variant="secondary" onClick={() => load(debouncedQuery)}>
+        <Button variant="secondary" onClick={handleRetry}>
           Yangilash
         </Button>
       }
