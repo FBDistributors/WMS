@@ -1,10 +1,11 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 
-import { AdminRoute } from '../components/admin/AdminRoute'
+import { RequirePermission } from '../rbac/RequirePermission'
 import { DashboardPage } from '../pages/admin/DashboardPage'
 import { NotAuthorizedPage } from '../pages/admin/NotAuthorizedPage'
 import { ProductDetailsPage } from '../pages/admin/ProductDetailsPage'
 import { ProductsListPage } from '../pages/admin/ProductsListPage'
+import { UsersPage } from '../pages/admin/UsersPage'
 import { OfflineQueuePage } from '../pages/offline/OfflineQueuePage'
 import { PickCompletePage } from '../pages/PickCompletePage'
 import { PickDetailsPage } from '../pages/PickDetailsPage'
@@ -33,25 +34,33 @@ export function App() {
         <Route
           path="/admin"
           element={
-            <AdminRoute permission="admin:read">
+            <RequirePermission permission="admin:access">
               <DashboardPage />
-            </AdminRoute>
+            </RequirePermission>
           }
         />
         <Route
           path="/admin/products"
           element={
-            <AdminRoute permission="products:read">
+            <RequirePermission permission="products:read">
               <ProductsListPage />
-            </AdminRoute>
+            </RequirePermission>
           }
         />
         <Route
           path="/admin/products/:id"
           element={
-            <AdminRoute permission="products:read">
+            <RequirePermission permission="products:read">
               <ProductDetailsPage />
-            </AdminRoute>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <RequirePermission permission="users:manage">
+              <UsersPage />
+            </RequirePermission>
           }
         />
         <Route path="/admin/not-authorized" element={<NotAuthorizedPage />} />

@@ -3,8 +3,8 @@ import { useState } from 'react'
 
 import { Menu, X } from 'lucide-react'
 import { Sidebar } from './Sidebar'
-import { Button } from '../ui/button'
-import { useAuth } from '../../auth/AuthContext'
+import { Button } from '../../components/ui/button'
+import { useAuth } from '../../rbac/AuthProvider'
 
 type AdminLayoutProps = {
   title: string
@@ -49,15 +49,17 @@ export function AdminLayout({ title, actionSlot, children }: AdminLayoutProps) {
             <div className="hidden text-sm text-slate-500 sm:block">
               {user.name} · {user.role}
             </div>
-            <select
-              className="rounded-xl border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600"
-              value={user.role}
-              onChange={(event) => setRole(event.target.value as typeof user.role)}
-            >
-              <option value="admin">admin</option>
-              <option value="manager">manager</option>
-              <option value="picker">picker</option>
-            </select>
+            {import.meta.env.DEV ? (
+              <select
+                className="rounded-xl border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600"
+                value={user.role}
+                onChange={(event) => setRole(event.target.value as typeof user.role)}
+              >
+                <option value="admin">admin</option>
+                <option value="manager">manager</option>
+                <option value="picker">picker</option>
+              </select>
+            ) : null}
             {actionSlot}
           </div>
         </header>

@@ -1,6 +1,6 @@
 import { Package, ClipboardList, CheckCircle2, AlertTriangle } from 'lucide-react'
 
-import { AdminLayout } from '../../components/admin/AdminLayout'
+import { AdminLayout } from '../../admin/components/AdminLayout'
 import { Card } from '../../components/ui/card'
 import { Separator } from '../../components/ui/separator'
 

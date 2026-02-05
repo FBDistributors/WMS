@@ -1,27 +1,14 @@
-import { ShieldAlert } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
-import { AdminLayout } from '../../components/admin/AdminLayout'
-import { Button } from '../../components/ui/button'
-import { EmptyState } from '../../components/ui/EmptyState'
+import { AdminLayout } from '../../admin/components/AdminLayout'
+import { NotAuthorized } from '../../rbac/NotAuthorized'
 
 export function NotAuthorizedPage() {
   const navigate = useNavigate()
 
   return (
     <AdminLayout title="Not authorized">
-      <EmptyState
-        icon={<ShieldAlert size={32} />}
-        title="Ruxsat yo‘q"
-        description="Bu sahifani ko‘rish uchun ruxsatingiz yetarli emas."
-        actionLabel="Pick listga qaytish"
-        onAction={() => navigate('/picking/mobile-pwa')}
-      />
-      <div className="mt-4 flex justify-center">
-        <Button variant="outline" onClick={() => navigate(-1)}>
-          Orqaga
-        </Button>
-      </div>
+      <NotAuthorized onHome={() => navigate('/picking/mobile-pwa')} onBack={() => navigate(-1)} />
     </AdminLayout>
   )
 }

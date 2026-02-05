@@ -6,12 +6,13 @@ type User = {
   id: string
   name: string
   role: Role
+  permissions: PermissionKey[]
 }
 
 type AuthContextValue = {
   user: User
-  hasPermission: (permission: PermissionKey) => boolean
   setRole: (role: Role) => void
+  has: (permission: PermissionKey) => boolean
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -20,9 +21,10 @@ const DEFAULT_USER: User = {
   id: 'mock-user',
   name: 'Operator',
   role: 'admin',
+  permissions: ROLE_PERMISSIONS.admin,
 }
 
-const ROLE_STORAGE_KEY = 'wms.role'
+const ROLE_STORAGE_KEY = 'wms_role'
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User>(DEFAULT_USER)
@@ -30,24 +32,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const stored = localStorage.getItem(ROLE_STORAGE_KEY) as Role | null
     if (stored && ROLE_PERMISSIONS[stored]) {
-      setUser((prev) => ({ ...prev, role: stored }))
+      setUser((prev) => ({
+        ...prev,
+        role: stored,
+        permissions: ROLE_PERMISSIONS[stored],
+      }))
     }
   }, [])
 
   const setRole = (role: Role) => {
     localStorage.setItem(ROLE_STORAGE_KEY, role)
-    setUser((prev) => ({ ...prev, role }))
+    setUser((prev) => ({
+      ...prev,
+      role,
+      permissions: ROLE_PERMISSIONS[role],
+    }))
   }
 
-  const hasPermission = (permission: PermissionKey) => {
-    return ROLE_PERMISSIONS[user.role]?.includes(permission) ?? false
+  const has = (permission: PermissionKey) => {
+    return user.permissions.includes(permission)
   }
 
   const value = useMemo(
     () => ({
       user,
-      hasPermission,
       setRole,
+      has,
     }),
     [user]
   )
