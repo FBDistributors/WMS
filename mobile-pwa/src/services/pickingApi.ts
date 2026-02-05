@@ -1,0 +1,125 @@
+import { fetchJSON } from './api/client'
+
+export type PickListStatus = 'NEW' | 'IN_PROGRESS' | 'DONE' | 'ERROR'
+
+export type PickList = {
+  id: string
+  document_no: string
+  created_at?: string
+  status: PickListStatus
+  total_lines: number
+  picked_lines: number
+}
+
+export type PickLineStatus = 'NEW' | 'IN_PROGRESS' | 'DONE' | 'ERROR'
+
+export type PickLine = {
+  id: string
+  product_name: string
+  sku?: string
+  location_code: string
+  qty_required: number
+  qty_picked: number
+  status: PickLineStatus
+}
+
+export type PickListDetails = PickList & {
+  lines: PickLine[]
+}
+
+type BackendDocumentListItem = {
+  id: string
+  reference_number: string
+  status: string
+  lines_total: number
+  lines_done: number
+}
+
+type BackendDocumentLine = {
+  line_id: string
+  product_name: string
+  sku?: string
+  location_code: string
+  qty_required: number
+  qty_picked: number
+}
+
+type BackendDocumentDetails = BackendDocumentListItem & {
+  lines: BackendDocumentLine[]
+}
+
+const STATUS_MAP: Record<string, PickListStatus> = {
+  draft: 'NEW',
+  confirmed: 'NEW',
+  in_progress: 'IN_PROGRESS',
+  partial: 'IN_PROGRESS',
+  completed: 'DONE',
+  cancelled: 'ERROR',
+}
+
+function mapStatus(status: string): PickListStatus {
+  return STATUS_MAP[status] ?? 'ERROR'
+}
+
+function mapLineStatus(line: BackendDocumentLine): PickLineStatus {
+  if (line.qty_picked >= line.qty_required) return 'DONE'
+  if (line.qty_picked > 0) return 'IN_PROGRESS'
+  return 'NEW'
+}
+
+function mapList(item: BackendDocumentListItem): PickList {
+  return {
+    id: item.id,
+    document_no: item.reference_number,
+    status: mapStatus(item.status),
+    total_lines: item.lines_total,
+    picked_lines: item.lines_done,
+  }
+}
+
+function mapDetails(doc: BackendDocumentDetails): PickListDetails {
+  return {
+    ...mapList(doc),
+    lines: doc.lines.map((line) => ({
+      id: line.line_id,
+      product_name: line.product_name,
+      sku: line.sku,
+      location_code: line.location_code,
+      qty_required: line.qty_required,
+      qty_picked: line.qty_picked,
+      status: mapLineStatus(line),
+    })),
+  }
+}
+
+export async function listPickLists(limit = 50, offset = 0) {
+  const data = await fetchJSON<BackendDocumentListItem[]>('/api/v1/documents', {
+    query: { limit, offset },
+  })
+  return data.map(mapList)
+}
+
+export async function getPickListDetails(id: string) {
+  const data = await fetchJSON<BackendDocumentDetails>(`/api/v1/documents/${id}`)
+  return mapDetails(data)
+}
+
+function createRequestId() {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID()
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+export async function pickLineDelta(lineId: string, delta: 1 | -1) {
+  return fetchJSON(`/api/v1/picking/lines/${lineId}/pick`, {
+    method: 'POST',
+    body: { delta, request_id: createRequestId() },
+  })
+}
+
+export async function completePick(documentId: string) {
+  return fetchJSON(`/api/v1/picking/documents/${documentId}/complete`, {
+    method: 'POST',
+  })
+}
