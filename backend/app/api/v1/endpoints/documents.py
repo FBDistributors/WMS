@@ -121,6 +121,7 @@ def _parse_status_filter(status: Optional[str]) -> Optional[List[DocumentStatus]
     return tokens  # type: ignore[return-value]
 
 
+@router.post("", response_model=DocumentDetails, summary="Create Document")
 @router.post("/", response_model=DocumentDetails, summary="Create Document")
 async def create_document(payload: CreateDocumentRequest, db: Session = Depends(get_db)):
     if not payload.doc_type or not payload.doc_type.strip():
@@ -189,6 +190,7 @@ async def create_document(payload: CreateDocumentRequest, db: Session = Depends(
     return _to_document(document)
 
 
+@router.get("", response_model=List[DocumentListItem], summary="List Documents")
 @router.get("/", response_model=List[DocumentListItem], summary="List Documents")
 async def list_documents(
     status: Optional[str] = None,
