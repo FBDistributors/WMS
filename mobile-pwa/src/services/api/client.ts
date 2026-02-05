@@ -11,7 +11,7 @@ type RequestOptions<TBody> = {
   headers?: Record<string, string>
 }
 
-const rawBaseUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
+const rawBaseUrl = import.meta.env.VITE_API_URL ?? 'https://wms-ngdm.onrender.com'
 const baseUrl = rawBaseUrl.toString().replace(/\/+$/, '')
 
 function buildUrl(path: string) {

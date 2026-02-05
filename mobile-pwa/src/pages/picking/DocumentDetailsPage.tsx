@@ -12,7 +12,20 @@ import {
 
 function formatError(error: unknown) {
   if (typeof error === 'object' && error !== null && 'message' in error) {
-    return (error as ApiError).message
+    const apiError = error as ApiError
+    const details = apiError.details
+    if (typeof details === 'string') {
+      return details
+    }
+    if (details && typeof details === 'object') {
+      if ('detail' in details && typeof details.detail === 'string') {
+        return details.detail
+      }
+      if ('message' in details && typeof details.message === 'string') {
+        return details.message
+      }
+    }
+    return apiError.message
   }
   return 'Serverga ulanishda xato yuz berdi. Internetni tekshiring.'
 }
@@ -109,6 +122,18 @@ export function DocumentDetailsPage() {
 
   const handlePick = useCallback(
     async (lineId: string, delta: 1 | -1) => {
+      const target = lines.find((line) => line.id === lineId)
+      if (!target) {
+        return
+      }
+      if (delta === 1 && target.qty_picked >= target.qty_required) {
+        setErrorMessage('Qty required dan oshib ketdi.')
+        return
+      }
+      if (delta === -1 && target.qty_picked <= 0) {
+        setErrorMessage('Qty 0 dan past bo‘lolmaydi.')
+        return
+      }
       const previous = lines
       updatePicked(lineId, delta)
       try {

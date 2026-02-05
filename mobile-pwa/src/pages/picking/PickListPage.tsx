@@ -7,7 +7,20 @@ import type { ApiError } from '../../services/api/client'
 
 function formatError(error: unknown) {
   if (typeof error === 'object' && error !== null && 'message' in error) {
-    return (error as ApiError).message
+    const apiError = error as ApiError
+    const details = apiError.details
+    if (typeof details === 'string') {
+      return details
+    }
+    if (details && typeof details === 'object') {
+      if ('detail' in details && typeof details.detail === 'string') {
+        return details.detail
+      }
+      if ('message' in details && typeof details.message === 'string') {
+        return details.message
+      }
+    }
+    return apiError.message
   }
   return 'Serverga ulanishda xato yuz berdi. Internetni tekshiring.'
 }

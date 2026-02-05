@@ -16,7 +16,7 @@ type RequestOptions<TBody> = {
 
 const DEFAULT_TIMEOUT_MS = 15000
 
-const baseURL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000')
+const baseURL = (import.meta.env.VITE_API_URL ?? 'https://wms-ngdm.onrender.com')
   .toString()
   .replace(/\/+$/, '')
 
