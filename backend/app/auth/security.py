@@ -9,7 +9,8 @@ from passlib.context import CryptContext
 
 from app.auth.permissions import ROLE_PERMISSIONS
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Use PBKDF2 to avoid bcrypt backend issues in deployment.
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 8
