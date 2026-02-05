@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Minus, Plus, ScanLine, SkipForward } from 'lucide-react'
+import { Minus, Plus, SkipForward } from 'lucide-react'
 
 import { AppHeader } from '../components/layout/AppHeader'
 import { Button } from '../components/ui/button'
@@ -11,6 +11,10 @@ import {
   type PickLine,
 } from '../services/pickingApi'
 import { PickItemCard } from '../picking/components/PickItemCard'
+import { ScanInput } from '../picking/components/ScanInput'
+import { cn } from '../lib/utils'
+
+const CameraScanner = lazy(() => import('../picking/components/CameraScanner'))
 
 export function PickItemPage() {
   const { documentId, lineId } = useParams()
@@ -20,6 +24,15 @@ export function PickItemPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isPicking, setIsPicking] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isCameraActive, setIsCameraActive] = useState(false)
+  const [lastScan, setLastScan] = useState<{ code: string; found: boolean } | null>(null)
+
+  const isMobile = useMemo(() => {
+    if (typeof navigator === 'undefined') return false
+    return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+  }, [])
+
+  const normalizeScan = useCallback((value: string) => value.trim().replace(/\s+/g, ''), [])
 
   const load = useCallback(async () => {
     if (!documentId || !lineId) {
@@ -70,6 +83,25 @@ export function PickItemPage() {
     }
   }, [documentId, line, navigate, qty, remaining])
 
+  const handleScan = useCallback(
+    (code: string) => {
+      if (!line) return
+      const normalized = normalizeScan(code)
+      if (!normalized) return
+      const candidates = [
+        line.location_code,
+        line.product_name,
+        (line as { sku?: string }).sku,
+        (line as { barcode?: string }).barcode,
+      ]
+        .filter(Boolean)
+        .map((value) => normalizeScan(String(value)))
+      const found = candidates.includes(normalized)
+      setLastScan({ code: normalized, found })
+    },
+    [line, normalizeScan]
+  )
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 px-4">
@@ -95,6 +127,38 @@ export function PickItemPage() {
   return (
     <div className="min-h-screen bg-slate-50 px-4 pb-10">
       <AppHeader title="Pick item" onBack={() => navigate(-1)} />
+
+      <div className="mb-4 space-y-3">
+        <ScanInput onScan={handleScan} />
+        {lastScan ? (
+          <div
+            className={cn(
+              'rounded-xl px-3 py-2 text-xs font-semibold',
+              lastScan.found ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+            )}
+          >
+            Last scan: {lastScan.code} — {lastScan.found ? 'Found' : 'Not found'}
+          </div>
+        ) : null}
+        <Button fullWidth variant="secondary" onClick={() => setIsCameraActive((prev) => !prev)}>
+          {isCameraActive
+            ? 'Stop camera'
+            : isMobile
+              ? 'Scan with camera'
+              : 'Camera scan (optional)'}
+        </Button>
+        <Suspense
+          fallback={<div className="rounded-2xl bg-white p-4 text-sm text-slate-500">Loading camera...</div>}
+        >
+          <CameraScanner
+            active={isCameraActive}
+            onDetected={(code) => {
+              handleScan(code)
+              setIsCameraActive(false)
+            }}
+          />
+        </Suspense>
+      </div>
 
       <PickItemCard
         productName={line.product_name}
@@ -131,10 +195,6 @@ export function PickItemPage() {
         <Button fullWidth variant="outline" onClick={() => navigate(-1)}>
           <SkipForward size={18} />
           Skip
-        </Button>
-        <Button fullWidth variant="secondary" onClick={() => alert('Scan coming soon')}>
-          <ScanLine size={18} />
-          Scan
         </Button>
       </div>
 
