@@ -1,27 +1,79 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Package, MapPin, Boxes } from 'lucide-react'
+import {
+  LayoutDashboard,
+  Package,
+  MapPin,
+  Boxes,
+  ClipboardList,
+  Users,
+} from 'lucide-react'
 
-const navItems = [
-  { label: 'Dashboard', to: '/admin', icon: LayoutDashboard },
-  { label: 'Products', to: '/admin/products', icon: Package },
-  { label: 'Locations', to: '/admin/locations', icon: MapPin },
-  { label: 'Inventory', to: '/admin/inventory', icon: Boxes },
+import { useAuth } from '../../auth/AuthContext'
+import type { PermissionKey } from '../../auth/permissions'
+
+type NavItem = {
+  label: string
+  to: string
+  icon: typeof LayoutDashboard
+  requiredPermission: PermissionKey
+}
+
+const navItems: NavItem[] = [
+  { label: 'Dashboard', to: '/admin', icon: LayoutDashboard, requiredPermission: 'admin:read' },
+  {
+    label: 'Products',
+    to: '/admin/products',
+    icon: Package,
+    requiredPermission: 'products:read',
+  },
+  {
+    label: 'Locations',
+    to: '/admin/locations',
+    icon: MapPin,
+    requiredPermission: 'inventory:read',
+  },
+  {
+    label: 'Inventory',
+    to: '/admin/inventory',
+    icon: Boxes,
+    requiredPermission: 'inventory:read',
+  },
+  {
+    label: 'Picking',
+    to: '/picking/mobile-pwa',
+    icon: ClipboardList,
+    requiredPermission: 'picking:read',
+  },
+  {
+    label: 'Users & Access',
+    to: '/admin/users',
+    icon: Users,
+    requiredPermission: 'users:manage',
+  },
 ]
 
-export function Sidebar() {
+type SidebarProps = {
+  onNavigate?: () => void
+}
+
+export function Sidebar({ onNavigate }: SidebarProps) {
   const location = useLocation()
+  const { hasPermission } = useAuth()
+
+  const allowedItems = navItems.filter((item) => hasPermission(item.requiredPermission))
 
   return (
     <aside className="w-64 border-r border-slate-200 bg-white p-4">
       <div className="mb-6 text-lg font-semibold text-slate-900">WMS Admin</div>
       <nav className="space-y-1">
-        {navItems.map(({ label, to, icon: Icon }) => {
+        {allowedItems.map(({ label, to, icon: Icon }) => {
           const isActive =
             location.pathname === to || (to !== '/admin' && location.pathname.startsWith(to))
           return (
             <Link
               key={to}
               to={to}
+              onClick={onNavigate}
               className={[
                 'flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
                 isActive

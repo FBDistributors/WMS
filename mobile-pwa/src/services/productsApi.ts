@@ -1,4 +1,5 @@
 import { fetchJSON } from './api/client'
+import { getProductMock, getProductsMock } from './productsApi.mock'
 
 export type ProductStatus = 'active' | 'inactive'
 
@@ -16,37 +17,11 @@ export type ProductsQuery = {
   offset?: number
 }
 
-const USE_MOCK_ADMIN = import.meta.env.VITE_USE_MOCK_ADMIN === 'true'
-
-const mockProducts: Product[] = [
-  {
-    id: 'mock-1',
-    name: 'Shampun 250ml',
-    sku: 'SKU-0001',
-    barcode: '8600000000011',
-    status: 'active',
-  },
-  {
-    id: 'mock-2',
-    name: 'Krem 50ml',
-    sku: 'SKU-0002',
-    barcode: '8600000000028',
-    status: 'inactive',
-  },
-]
+const USE_MOCK_ADMIN = import.meta.env.VITE_USE_MOCK_ADMIN !== 'false'
 
 export async function getProducts(query: ProductsQuery = {}) {
   if (USE_MOCK_ADMIN) {
-    const term = query.q?.toLowerCase()
-    const filtered = term
-      ? mockProducts.filter(
-          (item) =>
-            item.name.toLowerCase().includes(term) ||
-            item.sku.toLowerCase().includes(term) ||
-            item.barcode?.includes(term)
-        )
-      : mockProducts
-    return filtered
+    return getProductsMock(query)
   }
 
   // TODO: replace with real backend endpoint when available.
@@ -61,11 +36,7 @@ export async function getProducts(query: ProductsQuery = {}) {
 
 export async function getProduct(id: string) {
   if (USE_MOCK_ADMIN) {
-    const product = mockProducts.find((item) => item.id === id)
-    if (!product) {
-      throw new Error('Product not found')
-    }
-    return product
+    return getProductMock(id)
   }
 
   // TODO: replace with real backend endpoint when available.

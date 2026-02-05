@@ -1,6 +1,8 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 
+import { AdminRoute } from '../components/admin/AdminRoute'
 import { DashboardPage } from '../pages/admin/DashboardPage'
+import { NotAuthorizedPage } from '../pages/admin/NotAuthorizedPage'
 import { ProductDetailsPage } from '../pages/admin/ProductDetailsPage'
 import { ProductsListPage } from '../pages/admin/ProductsListPage'
 import { OfflineQueuePage } from '../pages/offline/OfflineQueuePage'
@@ -28,9 +30,31 @@ export function App() {
           element={<PickCompletePage />}
         />
         <Route path="/offline-queue" element={<OfflineQueuePage />} />
-        <Route path="/admin" element={<DashboardPage />} />
-        <Route path="/admin/products" element={<ProductsListPage />} />
-        <Route path="/admin/products/:id" element={<ProductDetailsPage />} />
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute permission="admin:read">
+              <DashboardPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/products"
+          element={
+            <AdminRoute permission="products:read">
+              <ProductsListPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/products/:id"
+          element={
+            <AdminRoute permission="products:read">
+              <ProductDetailsPage />
+            </AdminRoute>
+          }
+        />
+        <Route path="/admin/not-authorized" element={<NotAuthorizedPage />} />
       </Routes>
     </BrowserRouter>
   )

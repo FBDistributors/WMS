@@ -2,6 +2,7 @@ import { Package, ClipboardList, CheckCircle2, AlertTriangle } from 'lucide-reac
 
 import { AdminLayout } from '../../components/admin/AdminLayout'
 import { Card } from '../../components/ui/card'
+import { Separator } from '../../components/ui/separator'
 
 const stats = [
   {
@@ -44,6 +45,18 @@ export function DashboardPage() {
             </Card>
           )
         })}
+      </div>
+
+      <div className="mt-6">
+        <Card>
+          <div className="text-base font-semibold text-slate-900">Recent activity</div>
+          <Separator className="my-3" />
+          <ul className="space-y-3 text-sm text-slate-600">
+            <li>SO-0001 created · 5 mins ago</li>
+            <li>Pick list SO-0002 completed · 12 mins ago</li>
+            <li>Inventory adjusted · 30 mins ago</li>
+          </ul>
+        </Card>
       </div>
     </AdminLayout>
   )
