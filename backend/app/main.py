@@ -12,21 +12,28 @@ app = FastAPI(
     title="WMS Backend",
     version="0.1.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    redirect_slashes=False,
 )
 
-def _get_cors_origins() -> list[str]:
-    cors_env = os.getenv("CORS_ORIGINS", "*")
-    if cors_env.strip() == "*":
-        return ["*"]
-    return [origin.strip() for origin in cors_env.split(",") if origin.strip()]
+def _get_cors_config() -> tuple[list[str], str | None]:
+    cors_env = os.getenv("CORS_ORIGINS")
+    if cors_env:
+        if cors_env.strip() == "*":
+            return ["*"], None
+        origins = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
+        return origins, r"^https://.*\.vercel\.app$"
+
+    return ["https://wms-opal.vercel.app"], r"^https://.*\.vercel\.app$"
 
 
 # CORS (frontend ulanishi uchun)
+cors_origins, cors_origin_regex = _get_cors_config()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_get_cors_origins(),
-    allow_credentials=True,
+    allow_origins=cors_origins,
+    allow_origin_regex=cors_origin_regex,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

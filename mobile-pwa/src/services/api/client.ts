@@ -15,7 +15,8 @@ const rawBaseUrl = import.meta.env.VITE_API_URL ?? 'https://wms-ngdm.onrender.co
 const baseUrl = rawBaseUrl.toString().replace(/\/+$/, '')
 
 function buildUrl(path: string) {
-  return `${baseUrl}${path.startsWith('/') ? path : `/${path}`}`
+  const normalizedPath = path.replace(/\/\?/, '?')
+  return `${baseUrl}${normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`}`
 }
 
 export async function fetchJSON<TResponse, TBody = unknown>(
