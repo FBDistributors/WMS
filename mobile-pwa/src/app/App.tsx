@@ -1,5 +1,8 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 
+import { DashboardPage } from '../pages/admin/DashboardPage'
+import { ProductDetailsPage } from '../pages/admin/ProductDetailsPage'
+import { ProductsListPage } from '../pages/admin/ProductsListPage'
 import { OfflineQueuePage } from '../pages/offline/OfflineQueuePage'
 import { PickCompletePage } from '../pages/PickCompletePage'
 import { PickDetailsPage } from '../pages/PickDetailsPage'
@@ -25,6 +28,9 @@ export function App() {
           element={<PickCompletePage />}
         />
         <Route path="/offline-queue" element={<OfflineQueuePage />} />
+        <Route path="/admin" element={<DashboardPage />} />
+        <Route path="/admin/products" element={<ProductsListPage />} />
+        <Route path="/admin/products/:id" element={<ProductDetailsPage />} />
       </Routes>
     </BrowserRouter>
   )
