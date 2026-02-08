@@ -44,9 +44,13 @@
     "menu": "Profile menu",
     "title": "Profile",
     "my_profile": "My Profile",
+    "avatar_alt": "Profile photo",
+    "upload_photo": "Upload photo",
+    "remove_photo": "Remove photo",
     "fields": {
       "username": "Username",
-      "full_name": "Full name",
+      "first_name": "First name",
+      "last_name": "Last name",
       "role": "Role",
       "permissions": "Permissions"
     },

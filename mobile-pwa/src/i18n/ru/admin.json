@@ -44,9 +44,13 @@
     "menu": "Меню профиля",
     "title": "Профиль",
     "my_profile": "Мой профиль",
+    "avatar_alt": "Фото профиля",
+    "upload_photo": "Загрузить фото",
+    "remove_photo": "Удалить фото",
     "fields": {
       "username": "Имя пользователя",
-      "full_name": "ФИО",
+      "first_name": "Имя",
+      "last_name": "Фамилия",
       "role": "Роль",
       "permissions": "Права"
     },

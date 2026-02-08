@@ -44,9 +44,13 @@
     "menu": "Profil menyusi",
     "title": "Profil",
     "my_profile": "Mening profilim",
+    "avatar_alt": "Profil rasmi",
+    "upload_photo": "Rasm yuklash",
+    "remove_photo": "Rasmni olib tashlash",
     "fields": {
       "username": "Username",
-      "full_name": "To‘liq ism",
+      "first_name": "Ism",
+      "last_name": "Familya",
       "role": "Rol",
       "permissions": "Ruxsatlar"
     },
