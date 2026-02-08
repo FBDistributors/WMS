@@ -6,9 +6,8 @@ import {
   ClipboardList,
   Users,
   UserCircle2,
-  Settings,
-  PanelLeftClose,
-  PanelLeftOpen,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -27,7 +26,6 @@ const MENU_ITEMS: Array<MenuItem & { key: string }> = [
   { key: 'inventory', label: 'Inventory', path: '/admin/inventory', icon: Boxes, required: 'inventory:read' },
   { key: 'picking', label: 'Picking', path: '/picking/mobile-pwa', icon: ClipboardList, required: 'picking:read' },
   { key: 'users', label: 'Users & Access', path: '/admin/users', icon: Users, required: 'users:manage' },
-  { key: 'profile', label: 'Profile', path: '/admin/profile', icon: Settings, required: 'admin:access' },
 ]
 
 type SidebarProps = {
@@ -43,11 +41,8 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
   const effectivePermissions = user
     ? Array.from(new Set([...(ROLE_PERMISSIONS[user.role] ?? []), ...user.permissions]))
     : []
-  const items = filterMenuByPermissions(MENU_ITEMS, effectivePermissions).filter((item) => {
-    if (item.key !== 'profile') return true
-    if (!user) return false
-    return isWarehouseAdmin(user.role) || isSupervisor(user.role)
-  })
+  const items = filterMenuByPermissions(MENU_ITEMS, effectivePermissions)
+  const canSeeProfile = user ? isWarehouseAdmin(user.role) || isSupervisor(user.role) : false
 
   const roleLabel = useMemo(() => {
     if (!user) return ''
@@ -89,7 +84,7 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
           onClick={onToggleCollapse}
           aria-label={collapsed ? t('common:sidebar.expand') : t('common:sidebar.collapse')}
         >
-          {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
         </Button>
       </div>
       <TooltipProvider>
@@ -146,9 +141,34 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
                 <Badge variant="neutral">{roleLabel}</Badge>
               </div>
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 dark:border-slate-800 dark:text-slate-300">
-              <UserCircle2 size={18} />
-            </div>
+            {canSeeProfile ? (
+              collapsed ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Link
+                      to="/admin/profile"
+                      className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition-colors hover:bg-slate-100 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
+                    >
+                      <UserCircle2 size={18} />
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">{t('admin:menu.profile')}</TooltipContent>
+                </Tooltip>
+              ) : (
+                <Link
+                  to="/admin/profile"
+                  className={[
+                    'flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-colors',
+                    location.pathname.startsWith('/admin/profile')
+                      ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200'
+                      : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+                  ].join(' ')}
+                >
+                  <UserCircle2 size={18} />
+                  <span>{t('admin:menu.profile')}</span>
+                </Link>
+              )
+            ) : null}
           </div>
         </div>
       </div>
