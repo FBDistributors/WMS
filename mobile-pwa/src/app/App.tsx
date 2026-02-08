@@ -10,6 +10,8 @@ import { NotAuthorizedPage } from '../pages/admin/NotAuthorizedPage'
 import { ProductDetailsPage } from '../pages/admin/ProductDetailsPage'
 import { ProductsListPage } from '../pages/admin/ProductsListPage'
 import { UsersPage } from '../pages/admin/UsersPage'
+import { UserCreatePage } from '../pages/admin/users/UserCreatePage'
+import { UserDetailsPage } from '../pages/admin/users/UserDetailsPage'
 import { OfflineQueuePage } from '../pages/offline/OfflineQueuePage'
 import { PickCompletePage } from '../pages/PickCompletePage'
 import { PickDetailsPage } from '../pages/PickDetailsPage'
@@ -112,6 +114,26 @@ export function App() {
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">
               <RequirePermission permission="users:manage">
                 <UsersPage />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/users/new"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="users:manage">
+                <UserCreatePage />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/users/:id"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="users:manage">
+                <UserDetailsPage />
               </RequirePermission>
             </RequirePermission>
           }

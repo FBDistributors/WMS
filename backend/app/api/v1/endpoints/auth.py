@@ -1,4 +1,5 @@
 from typing import Optional
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -44,6 +45,8 @@ async def login(payload: LoginRequest, db: Session = Depends(get_db)):
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
+    user.last_login_at = datetime.utcnow()
+    db.commit()
     token = create_access_token({"sub": str(user.id), "role": user.role})
     return TokenResponse(access_token=token)
 
