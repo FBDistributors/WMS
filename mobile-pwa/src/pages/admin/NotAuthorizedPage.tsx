@@ -21,7 +21,11 @@ export function NotAuthorizedPage() {
 
   return (
     <AdminLayout title="Not authorized">
-      <NotAuthorized onHome={() => navigate(home)} onBack={handleBack} />
+      <NotAuthorized
+        onHome={() => navigate(home)}
+        onBack={handleBack}
+        onLogin={() => window.location.assign('/login')}
+      />
     </AdminLayout>
   )
 }

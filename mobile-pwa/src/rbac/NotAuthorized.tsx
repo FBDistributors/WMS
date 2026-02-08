@@ -5,9 +5,10 @@ import { EmptyState } from '../components/ui/EmptyState'
 type NotAuthorizedProps = {
   onBack?: () => void
   onHome?: () => void
+  onLogin?: () => void
 }
 
-export function NotAuthorized({ onBack, onHome }: NotAuthorizedProps) {
+export function NotAuthorized({ onBack, onHome, onLogin }: NotAuthorizedProps) {
   return (
     <div className="mx-auto max-w-lg">
       <EmptyState
@@ -17,8 +18,8 @@ export function NotAuthorized({ onBack, onHome }: NotAuthorizedProps) {
         actionLabel={onHome ? 'Bosh sahifa' : undefined}
         onAction={onHome}
       />
-      {onBack ? (
-        <div className="mt-4 flex justify-center">
+      {(onBack || onLogin) ? (
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
           <button
             type="button"
             onClick={onBack}
@@ -26,6 +27,15 @@ export function NotAuthorized({ onBack, onHome }: NotAuthorizedProps) {
           >
             Orqaga
           </button>
+          {onLogin ? (
+            <button
+              type="button"
+              onClick={onLogin}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
+            >
+              Login
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>
