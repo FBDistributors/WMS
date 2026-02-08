@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 import { NotAuthorized } from '../rbac/NotAuthorized'
 import { useAuth } from '../rbac/AuthProvider'
@@ -6,14 +6,16 @@ import { getHomeRouteForRole } from '../rbac/routes'
 
 export function NotAuthorizedPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user } = useAuth()
   const home = user ? getHomeRouteForRole(user.role) : '/login'
   const handleBack = () => {
-    if (window.history.length <= 1) {
-      navigate('/login', { replace: true })
+    const from = (location.state as { from?: Location })?.from?.pathname
+    if (from && from !== location.pathname && from !== '/not-authorized') {
+      navigate(from, { replace: true })
       return
     }
-    navigate(-1)
+    navigate('/login', { replace: true })
   }
 
   return (
