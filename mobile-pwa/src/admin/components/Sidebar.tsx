@@ -16,7 +16,6 @@ import { useAuth } from '../../rbac/AuthProvider'
 import type { MenuItem } from '../../rbac/menu'
 import { filterMenuByPermissions } from '../../rbac/menu'
 import { ROLE_PERMISSIONS, isSupervisor, isWarehouseAdmin } from '../../rbac/permissions'
-import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip'
 
