@@ -79,11 +79,11 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
         </div>
         <Button
           variant="secondary"
-          className="h-9 w-9 p-0 text-slate-700 dark:text-slate-200"
+          className="h-11 w-11 p-0 text-slate-700 dark:text-slate-200"
           onClick={onToggleCollapse}
           aria-label={collapsed ? t('common:sidebar.expand') : t('common:sidebar.collapse')}
         >
-          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+          {collapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
         </Button>
       </div>
       <TooltipProvider>
