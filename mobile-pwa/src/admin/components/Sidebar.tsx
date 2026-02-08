@@ -41,9 +41,7 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
   const { user } = useAuth()
   const { t } = useTranslation(['admin', 'common'])
   const effectivePermissions = user
-    ? user.permissions.length > 0
-      ? user.permissions
-      : ROLE_PERMISSIONS[user.role]
+    ? Array.from(new Set([...(ROLE_PERMISSIONS[user.role] ?? []), ...user.permissions]))
     : []
   const items = filterMenuByPermissions(MENU_ITEMS, effectivePermissions).filter((item) => {
     if (item.key !== 'profile') return true
@@ -79,15 +77,15 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
       <div className="mb-6 flex items-center justify-between">
         <div
           className={[
-            'text-lg font-semibold text-slate-900 transition-opacity dark:text-slate-100',
-            collapsed ? 'opacity-0' : 'opacity-100',
+            'text-lg font-semibold text-slate-900 dark:text-slate-100',
+            collapsed ? 'sr-only' : '',
           ].join(' ')}
         >
           {t('admin:sidebar_title')}
         </div>
         <Button
           variant="secondary"
-          className={collapsed ? 'mx-auto' : ''}
+          className="h-9 w-9 p-0"
           onClick={onToggleCollapse}
           aria-label={collapsed ? t('common:sidebar.expand') : t('common:sidebar.collapse')}
         >
