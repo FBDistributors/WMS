@@ -105,12 +105,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const has = (permission: PermissionKey) => {
-    return user?.permissions.includes(permission) ?? false
+    if (!user) return false
+    if (user.permissions.includes(permission)) return true
+    return ROLE_PERMISSIONS[user.role]?.includes(permission) ?? false
   }
 
   const hasAny = (permissions: PermissionKey[]) => {
     if (!user) return false
-    return permissions.some((permission) => user.permissions.includes(permission))
+    return permissions.some((permission) => has(permission))
   }
 
   const signIn = async (username: string, password: string) => {
