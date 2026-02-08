@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 
-export type ThemeMode = 'light' | 'dark' | 'system'
+export type ThemeMode = 'light' | 'dark'
 
 type ThemeContextValue = {
   theme: ThemeMode
@@ -19,19 +19,13 @@ function applyTheme(theme: ThemeMode) {
     root.classList.add('dark')
     return
   }
-  if (theme === 'system') {
-    const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches
-    if (prefersDark) {
-      root.classList.add('dark')
-    }
-  }
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<ThemeMode>(() => {
-    if (typeof window === 'undefined') return 'system'
+    if (typeof window === 'undefined') return 'light'
     const stored = window.localStorage.getItem(STORAGE_KEY) as ThemeMode | null
-    return stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'system'
+    return stored === 'light' || stored === 'dark' ? stored : 'light'
   })
 
   useEffect(() => {
@@ -39,19 +33,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(STORAGE_KEY, theme)
     }
-  }, [theme])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    if (!window.matchMedia) return
-    const media = window.matchMedia('(prefers-color-scheme: dark)')
-    const handler = () => {
-      if (theme === 'system') {
-        applyTheme('system')
-      }
-    }
-    media.addEventListener?.('change', handler)
-    return () => media.removeEventListener?.('change', handler)
   }, [theme])
 
   const value = useMemo(
