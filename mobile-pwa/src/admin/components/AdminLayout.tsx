@@ -57,9 +57,11 @@ export function AdminLayout({ title, actionSlot, children }: AdminLayoutProps) {
                 value={user.role}
                 onChange={(event) => setRole(event.target.value as typeof user.role)}
               >
-                <option value="admin">admin</option>
-                <option value="manager">manager</option>
                 <option value="picker">picker</option>
+                <option value="receiver">receiver</option>
+                <option value="inventory_controller">inventory_controller</option>
+                <option value="supervisor">supervisor</option>
+                <option value="warehouse_admin">warehouse_admin</option>
               </select>
             ) : null}
             {actionSlot}

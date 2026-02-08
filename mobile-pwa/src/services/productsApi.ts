@@ -1,4 +1,4 @@
-import { fetchJSON } from './api/client'
+import { fetchJSON } from './apiClient'
 
 export type Product = {
   id: string

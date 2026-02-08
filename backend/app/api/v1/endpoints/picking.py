@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
+from app.auth.deps import require_permission
 from app.db import get_db
 from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
@@ -35,6 +36,14 @@ class PickingDocument(BaseModel):
     status: str
     lines: List[PickingLine]
     progress: PickingProgress
+
+
+class PickingListItem(BaseModel):
+    id: UUID
+    reference_number: str
+    status: str
+    lines_total: int
+    lines_done: int
 
 
 class PickLineRequest(BaseModel):
@@ -76,6 +85,18 @@ def _to_picking_document(doc: DocumentModel) -> PickingDocument:
     )
 
 
+def _to_picking_list_item(doc: DocumentModel) -> PickingListItem:
+    lines_total = len(doc.lines)
+    lines_done = sum(1 for line in doc.lines if line.picked_qty >= line.required_qty)
+    return PickingListItem(
+        id=doc.id,
+        reference_number=doc.doc_no,
+        status=doc.status,
+        lines_total=lines_total,
+        lines_done=lines_done,
+    )
+
+
 def _refresh_document_status(doc: DocumentModel, lines: List[DocumentLineModel]) -> None:
     if all(line.picked_qty >= line.required_qty for line in lines):
         doc.status = "completed"
@@ -84,7 +105,11 @@ def _refresh_document_status(doc: DocumentModel, lines: List[DocumentLineModel])
 
 
 @router.get("/documents/{document_id}", response_model=PickingDocument, summary="Picking document")
-async def get_picking_document(document_id: UUID, db: Session = Depends(get_db)):
+async def get_picking_document(
+    document_id: UUID,
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("picking:read")),
+):
     document = (
         db.query(DocumentModel)
         .options(selectinload(DocumentModel.lines))
@@ -96,12 +121,35 @@ async def get_picking_document(document_id: UUID, db: Session = Depends(get_db))
     return _to_picking_document(document)
 
 
+@router.get("/documents", response_model=List[PickingListItem], summary="Picking documents")
+@router.get("/documents/", response_model=List[PickingListItem], summary="Picking documents")
+async def list_picking_documents(
+    limit: int = 50,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("picking:read")),
+):
+    docs = (
+        db.query(DocumentModel)
+        .options(selectinload(DocumentModel.lines))
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    return [_to_picking_list_item(doc) for doc in docs]
+
+
 @router.post(
     "/lines/{line_id}/pick",
     response_model=PickLineResponse,
     summary="Pick line qty",
 )
-async def pick_line(line_id: UUID, payload: PickLineRequest, db: Session = Depends(get_db)):
+async def pick_line(
+    line_id: UUID,
+    payload: PickLineRequest,
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("picking:pick")),
+):
     existing_request = (
         db.query(PickRequest).filter(PickRequest.request_id == payload.request_id).one_or_none()
     )
@@ -208,7 +256,11 @@ async def pick_line(line_id: UUID, payload: PickLineRequest, db: Session = Depen
     response_model=PickingDocument,
     summary="Complete picking document",
 )
-async def complete_picking_document(document_id: UUID, db: Session = Depends(get_db)):
+async def complete_picking_document(
+    document_id: UUID,
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("picking:complete")),
+):
     document = (
         db.query(DocumentModel)
         .filter(DocumentModel.id == document_id)

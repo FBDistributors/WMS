@@ -6,10 +6,11 @@ import type { PermissionKey } from './permissions'
 
 type RequirePermissionProps = {
   permission: PermissionKey
+  redirectTo?: string
   children: ReactNode
 }
 
-export function RequirePermission({ permission, children }: RequirePermissionProps) {
+export function RequirePermission({ permission, redirectTo, children }: RequirePermissionProps) {
   const { has, user, isLoading } = useAuth()
   const location = useLocation()
 
@@ -22,7 +23,13 @@ export function RequirePermission({ permission, children }: RequirePermissionPro
   }
 
   if (!has(permission)) {
-    return <Navigate to="/admin/not-authorized" replace state={{ from: location }} />
+    return (
+      <Navigate
+        to={redirectTo ?? '/admin/not-authorized'}
+        replace
+        state={{ from: location }}
+      />
+    )
   }
 
   return <>{children}</>

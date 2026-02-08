@@ -74,7 +74,11 @@ def _ensure_product(
 def _ensure_admin_user() -> User | None:
     username = os.getenv("ADMIN_USERNAME")
     password = os.getenv("ADMIN_PASSWORD")
-    role = os.getenv("ADMIN_ROLE", "admin")
+    role = os.getenv("ADMIN_ROLE", "warehouse_admin")
+    role = {
+        "admin": "warehouse_admin",
+        "manager": "supervisor",
+    }.get(role, role)
     if not username or not password:
         return None
 

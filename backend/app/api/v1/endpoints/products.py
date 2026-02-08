@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
+from app.auth.deps import require_permission
 from app.db import get_db
 from app.models.product import Product as ProductModel
 
@@ -44,6 +45,7 @@ async def list_products(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
+    _user=Depends(require_permission("products:read")),
 ):
     query = db.query(ProductModel)
     if q:
@@ -68,7 +70,11 @@ async def list_products(
 
 
 @router.get("/{product_id}", response_model=ProductOut, summary="Get Product")
-async def get_product(product_id: UUID, db: Session = Depends(get_db)):
+async def get_product(
+    product_id: UUID,
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("products:read")),
+):
     product = db.query(ProductModel).filter(ProductModel.id == product_id).one_or_none()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")

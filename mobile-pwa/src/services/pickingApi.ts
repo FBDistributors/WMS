@@ -1,4 +1,4 @@
-import { fetchJSON } from './api/client'
+import { fetchJSON } from './apiClient'
 
 export type PickListStatus = 'NEW' | 'IN_PROGRESS' | 'DONE' | 'ERROR'
 
@@ -26,7 +26,7 @@ export type PickListDetails = PickList & {
   lines: PickLine[]
 }
 
-type BackendDocumentListItem = {
+type BackendPickingListItem = {
   id: string
   reference_number: string
   status: string
@@ -42,8 +42,15 @@ type BackendDocumentLine = {
   qty_picked: number
 }
 
-type BackendDocumentDetails = BackendDocumentListItem & {
+type BackendPickingDetails = {
+  id: string
+  reference_number: string
+  status: string
   lines: BackendDocumentLine[]
+  progress: {
+    picked: number
+    required: number
+  }
 }
 
 const STATUS_MAP: Record<string, PickListStatus> = {
@@ -65,7 +72,18 @@ function mapLineStatus(line: BackendDocumentLine): PickLineStatus {
   return 'NEW'
 }
 
-function mapList(item: BackendDocumentListItem): PickList {
+function mapPickingLineToPickerViewModel(line: BackendDocumentLine): PickLine {
+  return {
+    id: line.line_id,
+    product_name: line.product_name,
+    location_code: line.location_code,
+    qty_required: line.qty_required,
+    qty_picked: line.qty_picked,
+    status: mapLineStatus(line),
+  }
+}
+
+function mapList(item: BackendPickingListItem): PickList {
   return {
     id: item.id,
     document_no: item.reference_number,
@@ -75,29 +93,28 @@ function mapList(item: BackendDocumentListItem): PickList {
   }
 }
 
-function mapDetails(doc: BackendDocumentDetails): PickListDetails {
+function mapDetails(doc: BackendPickingDetails): PickListDetails {
+  const totalLines = doc.lines.length
+  const pickedLines = doc.lines.filter((line) => line.qty_picked >= line.qty_required).length
   return {
-    ...mapList(doc),
-    lines: doc.lines.map((line) => ({
-      id: line.line_id,
-      product_name: line.product_name,
-      location_code: line.location_code,
-      qty_required: line.qty_required,
-      qty_picked: line.qty_picked,
-      status: mapLineStatus(line),
-    })),
+    id: doc.id,
+    document_no: doc.reference_number,
+    status: mapStatus(doc.status),
+    total_lines: totalLines,
+    picked_lines: pickedLines,
+    lines: doc.lines.map(mapPickingLineToPickerViewModel),
   }
 }
 
 export async function listPickLists(limit = 50, offset = 0) {
-  const data = await fetchJSON<BackendDocumentListItem[]>('/api/v1/documents', {
+  const data = await fetchJSON<BackendPickingListItem[]>('/api/v1/picking/documents', {
     query: { limit, offset },
   })
   return data.map(mapList)
 }
 
 export async function getPickListDetails(id: string) {
-  const data = await fetchJSON<BackendDocumentDetails>(`/api/v1/documents/${id}`)
+  const data = await fetchJSON<BackendPickingDetails>(`/api/v1/picking/documents/${id}`)
   return mapDetails(data)
 }
 

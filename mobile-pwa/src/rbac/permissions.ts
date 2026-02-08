@@ -1,42 +1,138 @@
-export type Role = 'admin' | 'manager' | 'picker'
+export type Role =
+  | 'warehouse_admin'
+  | 'supervisor'
+  | 'picker'
+  | 'receiver'
+  | 'inventory_controller'
 
 export type PermissionKey =
   | 'admin:access'
+  | 'users:manage'
+  | 'roles:manage'
+  | 'audit:read'
+  | 'reports:read'
   | 'products:read'
   | 'products:write'
-  | 'inventory:read'
-  | 'inventory:write'
+  | 'documents:read'
+  | 'documents:create'
+  | 'documents:edit_status'
+  | 'receiving:read'
+  | 'receiving:write'
   | 'picking:read'
-  | 'picking:write'
-  | 'users:manage'
+  | 'picking:pick'
+  | 'picking:complete'
+  | 'picking:exception'
+  | 'inventory:read'
+  | 'inventory:count'
+  | 'inventory:adjust'
+
+export const PERMISSION_KEYS: PermissionKey[] = [
+  'admin:access',
+  'users:manage',
+  'roles:manage',
+  'audit:read',
+  'reports:read',
+  'products:read',
+  'products:write',
+  'documents:read',
+  'documents:create',
+  'documents:edit_status',
+  'receiving:read',
+  'receiving:write',
+  'picking:read',
+  'picking:pick',
+  'picking:complete',
+  'picking:exception',
+  'inventory:read',
+  'inventory:count',
+  'inventory:adjust',
+]
+
+const PERMISSION_ALIASES: Record<string, PermissionKey> = {
+  'admin:access': 'documents:read',
+  'picking:write': 'picking:pick',
+  'inventory:write': 'inventory:adjust',
+}
 
 export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
-  admin: [
+  warehouse_admin: [
     'admin:access',
+    'users:manage',
+    'roles:manage',
     'products:read',
     'products:write',
-    'inventory:read',
-    'inventory:write',
+    'documents:read',
+    'documents:create',
+    'documents:edit_status',
+    'receiving:read',
+    'receiving:write',
     'picking:read',
-    'picking:write',
-    'users:manage',
+    'picking:pick',
+    'picking:complete',
+    'picking:exception',
+    'inventory:read',
+    'inventory:count',
+    'inventory:adjust',
+    'reports:read',
+    'audit:read',
   ],
-  manager: ['admin:access', 'products:read', 'inventory:read', 'picking:read'],
-  picker: ['picking:read', 'picking:write'],
+  supervisor: [
+    'admin:access',
+    'documents:read',
+    'receiving:read',
+    'picking:read',
+    'picking:pick',
+    'picking:complete',
+    'picking:exception',
+    'inventory:read',
+    'inventory:count',
+    'reports:read',
+  ],
+  picker: ['picking:read', 'picking:pick', 'picking:complete', 'picking:exception'],
+  receiver: [
+    'admin:access',
+    'receiving:read',
+    'receiving:write',
+    'documents:read',
+    'products:read',
+  ],
+  inventory_controller: [
+    'admin:access',
+    'inventory:read',
+    'inventory:count',
+    'inventory:adjust',
+    'documents:read',
+    'products:read',
+    'reports:read',
+  ],
+}
+
+export function normalizePermissions(permissions: string[]): PermissionKey[] {
+  return permissions
+    .map((key) => PERMISSION_ALIASES[key] ?? key)
+    .filter((key): key is PermissionKey => PERMISSION_KEYS.includes(key as PermissionKey))
 }
 
 export function hasPermission(role: Role, permission: PermissionKey) {
   return ROLE_PERMISSIONS[role]?.includes(permission) ?? false
 }
 
-export function isAdmin(role: Role) {
-  return role === 'admin'
+export function isWarehouseAdmin(role: Role) {
+  return role === 'warehouse_admin'
 }
 
-export function isManager(role: Role) {
-  return role === 'manager'
+export function isSupervisor(role: Role) {
+  return role === 'supervisor'
 }
 
 export function isPicker(role: Role) {
   return role === 'picker'
+}
+
+export function isReceiver(role: Role) {
+  return role === 'receiver'
+}
+
+export function isInventoryController(role: Role) {
+  return role === 'inventory_controller'
 }

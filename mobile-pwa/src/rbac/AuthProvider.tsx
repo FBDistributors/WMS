@@ -3,9 +3,12 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { getMe, login as loginRequest, clearToken, getToken } from '../services/authApi'
 import {
   ROLE_PERMISSIONS,
-  isAdmin,
-  isManager,
+  isInventoryController,
   isPicker,
+  isReceiver,
+  isSupervisor,
+  isWarehouseAdmin,
+  normalizePermissions,
   type PermissionKey,
   type Role,
 } from './permissions'
@@ -21,13 +24,19 @@ type AuthContextValue = {
   user: User | null
   isLoading: boolean
   isMock: boolean
-  isAdmin: boolean
-  isManager: boolean
   isPicker: boolean
-  login: (username: string, password: string) => Promise<void>
+  isReceiver: boolean
+  isInventoryController: boolean
+  isSupervisor: boolean
+  isWarehouseAdmin: boolean
+  signIn: (username: string, password: string) => Promise<User>
+  signOut: () => void
+  login: (username: string, password: string) => Promise<User>
   logout: () => void
   setRole: (role: Role) => void
   has: (permission: PermissionKey) => boolean
+  can: (permission: PermissionKey) => boolean
+  hasAny: (permissions: PermissionKey[]) => boolean
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -35,11 +44,13 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 const DEFAULT_USER: User = {
   id: 'mock-user',
   name: 'Operator',
-  role: 'admin',
-  permissions: ROLE_PERMISSIONS.admin,
+  role: 'warehouse_admin',
+  permissions: ROLE_PERMISSIONS.warehouse_admin,
 }
 
 const ROLE_STORAGE_KEY = 'wms_role'
+const ALLOW_MOCK_AUTH =
+  import.meta.env.DEV && import.meta.env.VITE_ENABLE_MOCK_AUTH === 'true'
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -56,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             id: me.id,
             name: me.username,
             role: me.role as Role,
-            permissions: me.permissions as PermissionKey[],
+            permissions: normalizePermissions(me.permissions),
           })
         } catch {
           clearToken()
@@ -67,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      if (import.meta.env.DEV) {
+      if (ALLOW_MOCK_AUTH) {
         const stored = localStorage.getItem(ROLE_STORAGE_KEY) as Role | null
         const role = stored && ROLE_PERMISSIONS[stored] ? stored : 'admin'
         setUser({ ...DEFAULT_USER, role, permissions: ROLE_PERMISSIONS[role] })
@@ -79,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const setRole = (role: Role) => {
-    if (!import.meta.env.DEV) return
+    if (!ALLOW_MOCK_AUTH) return
     localStorage.setItem(ROLE_STORAGE_KEY, role)
     setUser((prev) =>
       prev
@@ -97,19 +108,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return user?.permissions.includes(permission) ?? false
   }
 
-  const login = async (username: string, password: string) => {
+  const hasAny = (permissions: PermissionKey[]) => {
+    if (!user) return false
+    return permissions.some((permission) => user.permissions.includes(permission))
+  }
+
+  const signIn = async (username: string, password: string) => {
     await loginRequest(username, password)
     const me = await getMe()
-    setUser({
+    const nextUser = {
       id: me.id,
       name: me.username,
       role: me.role as Role,
-      permissions: me.permissions as PermissionKey[],
-    })
+      permissions: normalizePermissions(me.permissions),
+    }
+    setUser(nextUser)
     setIsMock(false)
+    return nextUser
   }
 
-  const logout = () => {
+  const signOut = () => {
     clearToken()
     setUser(null)
   }
@@ -119,13 +137,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       isLoading,
       isMock,
-      isAdmin: user ? isAdmin(user.role) : false,
-      isManager: user ? isManager(user.role) : false,
       isPicker: user ? isPicker(user.role) : false,
-      login,
-      logout,
+      isReceiver: user ? isReceiver(user.role) : false,
+      isInventoryController: user ? isInventoryController(user.role) : false,
+      isSupervisor: user ? isSupervisor(user.role) : false,
+      isWarehouseAdmin: user ? isWarehouseAdmin(user.role) : false,
+      signIn,
+      signOut,
+      login: signIn,
+      logout: signOut,
       setRole,
       has,
+      can: has,
+      hasAny,
     }),
     [user, isLoading, isMock]
   )

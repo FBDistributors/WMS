@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
+from app.auth.deps import require_permission
 from app.db import get_db
 from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
@@ -123,7 +124,11 @@ def _parse_status_filter(status: Optional[str]) -> Optional[List[DocumentStatus]
 
 @router.post("", response_model=DocumentDetails, summary="Create Document")
 @router.post("/", response_model=DocumentDetails, summary="Create Document")
-async def create_document(payload: CreateDocumentRequest, db: Session = Depends(get_db)):
+async def create_document(
+    payload: CreateDocumentRequest,
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("documents:create")),
+):
     if not payload.doc_type or not payload.doc_type.strip():
         raise HTTPException(status_code=400, detail="doc_type must not be empty")
     if payload.doc_type not in DOCUMENT_TYPES:
@@ -199,6 +204,7 @@ async def list_documents(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
+    _user=Depends(require_permission("documents:read")),
 ):
     query = db.query(DocumentModel).options(selectinload(DocumentModel.lines))
     status_filter = _parse_status_filter(status)
@@ -216,7 +222,11 @@ async def list_documents(
 
 
 @router.get("/{document_id}", response_model=DocumentDetails, summary="Get Document")
-async def get_document(document_id: UUID, db: Session = Depends(get_db)):
+async def get_document(
+    document_id: UUID,
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("documents:read")),
+):
     doc = (
         db.query(DocumentModel)
         .options(selectinload(DocumentModel.lines))

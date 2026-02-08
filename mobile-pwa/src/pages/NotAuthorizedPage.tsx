@@ -1,9 +1,8 @@
 import { useNavigate } from 'react-router-dom'
 
-import { AdminLayout } from '../../admin/components/AdminLayout'
-import { NotAuthorized } from '../../rbac/NotAuthorized'
-import { useAuth } from '../../rbac/AuthProvider'
-import { getHomeRouteForRole } from '../../rbac/routes'
+import { NotAuthorized } from '../rbac/NotAuthorized'
+import { useAuth } from '../rbac/AuthProvider'
+import { getHomeRouteForRole } from '../rbac/routes'
 
 export function NotAuthorizedPage() {
   const navigate = useNavigate()
@@ -11,8 +10,8 @@ export function NotAuthorizedPage() {
   const home = user ? getHomeRouteForRole(user.role) : '/login'
 
   return (
-    <AdminLayout title="Not authorized">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
       <NotAuthorized onHome={() => navigate(home)} onBack={() => navigate(-1)} />
-    </AdminLayout>
+    </div>
   )
 }

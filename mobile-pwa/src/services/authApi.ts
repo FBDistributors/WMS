@@ -1,4 +1,4 @@
-import { fetchJSON } from './api/client'
+import { fetchJSON } from './apiClient'
 
 const TOKEN_KEY = 'wms_token'
 

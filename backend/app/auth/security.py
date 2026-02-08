@@ -7,7 +7,6 @@ from typing import Any
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-from app.auth.permissions import ROLE_PERMISSIONS
 
 # Use PBKDF2 to avoid bcrypt backend issues in deployment.
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
@@ -43,5 +42,3 @@ def decode_token(token: str) -> dict[str, Any]:
     return jwt.decode(token, get_secret_key(), algorithms=[ALGORITHM])
 
 
-def get_permissions_for_role(role: str) -> list[str]:
-    return ROLE_PERMISSIONS.get(role, [])
