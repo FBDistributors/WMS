@@ -119,45 +119,45 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
             )
           })}
         </nav>
-      </TooltipProvider>
 
-      <div className="mt-auto pt-4">
-        <div className="border-t border-slate-200 pt-4 dark:border-slate-800">
-          {canSeeProfile ? (
-            collapsed ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Link
-                    to="/admin/profile"
-                    className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition-colors hover:bg-slate-100 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
-                  >
+        <div className="mt-auto pt-4">
+          <div className="border-t border-slate-200 pt-4 dark:border-slate-800">
+            {canSeeProfile ? (
+              collapsed ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Link
+                      to="/admin/profile"
+                      className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition-colors hover:bg-slate-100 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
+                    >
+                      {initials || <UserCircle2 size={18} />}
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">{t('admin:menu.profile')}</TooltipContent>
+                </Tooltip>
+              ) : (
+                <Link
+                  to="/admin/profile"
+                  className={[
+                    'flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition-colors',
+                    location.pathname.startsWith('/admin/profile')
+                      ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200'
+                      : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+                  ].join(' ')}
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700 dark:bg-blue-950 dark:text-blue-200">
                     {initials || <UserCircle2 size={18} />}
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent side="right">{t('admin:menu.profile')}</TooltipContent>
-              </Tooltip>
-            ) : (
-              <Link
-                to="/admin/profile"
-                className={[
-                  'flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition-colors',
-                  location.pathname.startsWith('/admin/profile')
-                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200'
-                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
-                ].join(' ')}
-              >
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700 dark:bg-blue-950 dark:text-blue-200">
-                  {initials || <UserCircle2 size={18} />}
-                </div>
-                <div className="flex flex-col">
-                  <span>{t('admin:menu.profile')}</span>
-                  <span className="text-xs text-slate-400">{roleLabel}</span>
-                </div>
-              </Link>
-            )
-          ) : null}
+                  </div>
+                  <div className="flex flex-col">
+                    <span>{t('admin:menu.profile')}</span>
+                    <span className="text-xs text-slate-400">{roleLabel}</span>
+                  </div>
+                </Link>
+              )
+            ) : null}
+          </div>
         </div>
-      </div>
+      </TooltipProvider>
     </aside>
   )
 }
