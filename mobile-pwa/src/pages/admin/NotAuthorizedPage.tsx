@@ -1,4 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { NotAuthorized } from '../../rbac/NotAuthorized'
@@ -8,6 +9,7 @@ import { clearToken } from '../../services/authApi'
 
 export function NotAuthorizedPage() {
   const navigate = useNavigate()
+  const { t } = useTranslation('common')
   const location = useLocation()
   const { user } = useAuth()
   const home = user ? getHomeRouteForRole(user.role) : '/login'
@@ -21,7 +23,7 @@ export function NotAuthorizedPage() {
   }
 
   return (
-    <AdminLayout title="Not authorized">
+    <AdminLayout title={t('messages.not_authorized_title')}>
       <NotAuthorized
         onHome={() => navigate(home)}
         onBack={handleBack}

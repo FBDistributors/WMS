@@ -1,4 +1,5 @@
 import { ShieldAlert } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { EmptyState } from '../components/ui/EmptyState'
 
@@ -9,13 +10,14 @@ type NotAuthorizedProps = {
 }
 
 export function NotAuthorized({ onBack, onHome, onLogin }: NotAuthorizedProps) {
+  const { t } = useTranslation('common')
   return (
     <div className="mx-auto max-w-lg">
       <EmptyState
         icon={<ShieldAlert size={32} />}
-        title="Ruxsat yo‘q"
-        description="Bu sahifani ko‘rish uchun ruxsatingiz yetarli emas."
-        actionLabel={onHome ? 'Bosh sahifa' : undefined}
+        title={t('messages.not_authorized_title')}
+        description={t('messages.not_authorized_desc')}
+        actionLabel={onHome ? t('buttons.home') : undefined}
         onAction={onHome}
       />
       {(onBack || onLogin) ? (
@@ -25,7 +27,7 @@ export function NotAuthorized({ onBack, onHome, onLogin }: NotAuthorizedProps) {
             onClick={onBack}
             className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
           >
-            Orqaga
+            {t('buttons.back')}
           </button>
           {onLogin ? (
             <button
@@ -33,7 +35,7 @@ export function NotAuthorized({ onBack, onHome, onLogin }: NotAuthorizedProps) {
               onClick={onLogin}
               className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
             >
-              Login
+              {t('buttons.login')}
             </button>
           ) : null}
         </div>

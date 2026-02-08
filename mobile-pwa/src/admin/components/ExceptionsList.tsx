@@ -2,6 +2,7 @@ import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import type { ExceptionItem } from '../../types/dashboard'
+import { useTranslation } from 'react-i18next'
 
 const statusVariant: Record<ExceptionItem['status'], 'danger' | 'neutral'> = {
   open: 'danger',
@@ -14,10 +15,11 @@ type ExceptionsListProps = {
 }
 
 export function ExceptionsList({ items, onView }: ExceptionsListProps) {
+  const { t } = useTranslation('admin')
   if (items.length === 0) {
     return (
       <Card>
-        <div className="text-sm text-slate-500">No exceptions reported today.</div>
+        <div className="text-sm text-slate-500">{t('exceptions.empty')}</div>
       </Card>
     )
   }
@@ -35,9 +37,11 @@ export function ExceptionsList({ items, onView }: ExceptionsListProps) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant={statusVariant[item.status]}>{item.status}</Badge>
+            <Badge variant={statusVariant[item.status]}>
+              {t(`exceptions.status.${item.status}`)}
+            </Badge>
             <Button variant="outline" onClick={() => onView(item.id)}>
-              View
+              {t('exceptions.view')}
             </Button>
           </div>
         </Card>

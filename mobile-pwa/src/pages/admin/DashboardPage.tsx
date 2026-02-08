@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   ClipboardList,
   AlertTriangle,
@@ -21,6 +22,7 @@ import {
 import type { ActivePick, DashboardSummary, ExceptionItem, TodayOverviewItem } from '../../types/dashboard'
 
 export function DashboardPage() {
+  const { t } = useTranslation(['admin', 'common'])
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [activePicks, setActivePicks] = useState<ActivePick[]>([])
   const [overview, setOverview] = useState<TodayOverviewItem[]>([])
@@ -43,46 +45,46 @@ export function DashboardPage() {
       setOverview(overviewData)
       setExceptions(exceptionsData)
     } catch {
-      setError('Dashboard yuklanmadi. Qayta urinib ko‘ring.')
+      setError(t('admin:dashboard.load_error'))
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     void load()
   }, [load])
 
   return (
-    <AdminLayout title="Dashboard">
+    <AdminLayout title={t('admin:dashboard.title')}>
       {error ? (
-        <EmptyState title={error} actionLabel="Qayta urinib ko‘rish" onAction={load} />
+        <EmptyState title={error} actionLabel={t('common:buttons.retry')} onAction={load} />
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <KpiCard
-              title="Open pick lists"
+              title={t('admin:dashboard.open_pick_lists')}
               value={summary?.openPickLists ?? '—'}
               delta={summary?.deltas?.openPickLists}
               icon={ClipboardList}
               href="/admin/picking"
             />
             <KpiCard
-              title="Completed today"
+              title={t('admin:dashboard.completed_today')}
               value={summary?.completedToday ?? '—'}
               delta={summary?.deltas?.completedToday}
               icon={PackageCheck}
               href="/admin/picking"
             />
             <KpiCard
-              title="Exceptions"
+              title={t('admin:dashboard.exceptions')}
               value={summary?.exceptions ?? '—'}
               delta={summary?.deltas?.exceptions}
               icon={AlertTriangle}
               href="/admin/exceptions"
             />
             <KpiCard
-              title="Low stock alerts"
+              title={t('admin:dashboard.low_stock')}
               value={summary?.lowStock ?? '—'}
               delta={summary?.deltas?.lowStock}
               icon={Boxes}
@@ -92,7 +94,9 @@ export function DashboardPage() {
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">
             <Card>
-              <div className="text-base font-semibold text-slate-900">Active picks</div>
+              <div className="text-base font-semibold text-slate-900">
+                {t('admin:dashboard.active_picks')}
+              </div>
               <div className="mt-3">
                 {isLoading ? (
                   <div className="h-28 animate-pulse rounded-2xl bg-slate-200" />
@@ -102,10 +106,12 @@ export function DashboardPage() {
               </div>
             </Card>
             <Card>
-              <div className="text-base font-semibold text-slate-900">Today overview</div>
+              <div className="text-base font-semibold text-slate-900">
+                {t('admin:dashboard.today_overview')}
+              </div>
               <div className="mt-3 space-y-2 text-sm text-slate-600">
                 {overview.length === 0 && !isLoading ? (
-                  <div>No activity yet.</div>
+                  <div>{t('common:messages.no_activity')}</div>
                 ) : (
                   overview.map((item) => (
                     <div key={item.id} className="flex items-center justify-between">

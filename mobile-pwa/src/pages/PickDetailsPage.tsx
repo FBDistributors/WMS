@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { CheckCircle2, PackageSearch } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { AppHeader } from '../components/layout/AppHeader'
 import { PickLineRow } from '../components/picking/PickLineRow'
@@ -17,6 +18,7 @@ import {
 export function PickDetailsPage() {
   const { documentId } = useParams()
   const navigate = useNavigate()
+  const { t } = useTranslation('picking')
   const [data, setData] = useState<PickListDetails | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -24,7 +26,7 @@ export function PickDetailsPage() {
 
   const load = useCallback(async () => {
     if (!documentId) {
-      setError('Document topilmadi.')
+      setError(t('document_not_found'))
       setIsLoading(false)
       return
     }
@@ -34,11 +36,11 @@ export function PickDetailsPage() {
       const details = await getPickListDetailsForPicker(documentId)
       setData(details)
     } catch (err) {
-      setError('Hujjat yuklanmadi. Qayta urinib ko‘ring.')
+      setError(t('load_failed'))
     } finally {
       setIsLoading(false)
     }
-  }, [documentId])
+  }, [documentId, t])
 
   useEffect(() => {
     void load()
@@ -59,16 +61,16 @@ export function PickDetailsPage() {
       await completePick(documentId)
       navigate(`/picking/mobile-pwa/${documentId}/complete`, { replace: true })
     } catch (err) {
-      setError('Yakunlashda xato. Qayta urinib ko‘ring.')
+      setError(t('complete_error'))
     } finally {
       setIsCompleting(false)
     }
-  }, [data, documentId, navigate])
+  }, [data, documentId, navigate, t])
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 px-4">
-        <AppHeader title="Pick details" onBack={() => navigate(-1)} />
+        <AppHeader title={t('details_title')} onBack={() => navigate(-1)} />
         <div className="space-y-4">
           <div className="h-20 w-full animate-pulse rounded-2xl bg-slate-200" />
           <div className="h-24 w-full animate-pulse rounded-2xl bg-slate-200" />
@@ -81,11 +83,11 @@ export function PickDetailsPage() {
   if (!data || error) {
     return (
       <div className="min-h-screen bg-slate-50 px-4">
-        <AppHeader title="Pick details" onBack={() => navigate(-1)} />
+        <AppHeader title={t('details_title')} onBack={() => navigate(-1)} />
         <EmptyState
           icon={<PackageSearch size={32} />}
-          title={error ?? 'Hujjat topilmadi'}
-          actionLabel="Qayta urinib ko‘rish"
+          title={error ?? t('document_not_found')}
+          actionLabel={t('refresh')}
           onAction={load}
         />
       </div>
@@ -96,10 +98,13 @@ export function PickDetailsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 pb-24">
-      <AppHeader title={`Hujjat № ${data.document_no}`} onBack={() => navigate(-1)} />
+      <AppHeader
+        title={t('document_number', { number: data.document_no })}
+        onBack={() => navigate(-1)}
+      />
       <div className="rounded-2xl bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between text-sm text-slate-600">
-          <span>{progress.picked} / {progress.total} picked</span>
+          <span>{t('progress_picked', { picked: progress.picked, total: progress.total })}</span>
           <span>{progress.percent}%</span>
         </div>
         <Progress value={progress.percent} className="mt-2" />
@@ -125,7 +130,7 @@ export function PickDetailsPage() {
           onClick={handleComplete}
         >
           <CheckCircle2 size={18} />
-          {isCompleting ? 'Yakunlanmoqda...' : 'Complete pick'}
+          {isCompleting ? t('completing') : t('complete_button')}
         </Button>
       </div>
     </div>

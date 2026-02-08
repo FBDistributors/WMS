@@ -1,0 +1,17 @@
+{
+  "title": "Products",
+  "search_placeholder": "Product name, SKU or barcode",
+  "empty_title": "No products found",
+  "empty_desc": "There are no products yet.",
+  "load_error": "Failed to load products. Please try again.",
+  "refresh": "Refresh",
+  "details_title": "Product details",
+  "not_found": "Product not found.",
+  "load_failed": "Failed to load product.",
+  "fields": {
+    "name": "Name",
+    "sku": "SKU",
+    "barcode": "Barcode",
+    "status": "Status"
+  }
+}

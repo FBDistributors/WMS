@@ -2,8 +2,10 @@ import type { ReactNode } from 'react'
 import { useState } from 'react'
 
 import { Menu, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Sidebar } from './Sidebar'
 import { Button } from '../../components/ui/button'
+import { LanguageSwitcher } from '../../components/LanguageSwitcher'
 import { useAuth } from '../../rbac/AuthProvider'
 
 type AdminLayoutProps = {
@@ -15,6 +17,7 @@ type AdminLayoutProps = {
 export function AdminLayout({ title, actionSlot, children }: AdminLayoutProps) {
   const [isOpen, setIsOpen] = useState(false)
   const { user, setRole, isMock } = useAuth()
+  const { t } = useTranslation('admin')
 
   return (
     <div className="min-h-screen bg-slate-50 md:flex">
@@ -28,7 +31,7 @@ export function AdminLayout({ title, actionSlot, children }: AdminLayoutProps) {
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-center justify-between px-4 py-3">
-              <div className="text-sm font-semibold text-slate-900">Menu</div>
+              <div className="text-sm font-semibold text-slate-900">{t('header.menu')}</div>
               <Button variant="ghost" onClick={() => setIsOpen(false)}>
                 <X size={18} />
               </Button>
@@ -46,6 +49,7 @@ export function AdminLayout({ title, actionSlot, children }: AdminLayoutProps) {
             <div className="text-lg font-semibold text-slate-900">{title}</div>
           </div>
           <div className="flex items-center gap-3">
+            <LanguageSwitcher />
             {user ? (
               <div className="hidden text-sm text-slate-500 sm:block">
                 {user.name} · {user.role}

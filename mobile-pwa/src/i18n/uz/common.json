@@ -1,0 +1,46 @@
+{
+  "buttons": {
+    "save": "Saqlash",
+    "cancel": "Bekor qilish",
+    "back": "Orqaga",
+    "refresh": "Yangilash",
+    "retry": "Qayta urinib ko‘rish",
+    "create": "Yaratish",
+    "edit": "Tahrirlash",
+    "disable": "O‘chirish",
+    "login": "Kirish",
+    "logout": "Chiqish",
+    "home": "Bosh sahifa",
+    "close": "Yopish"
+  },
+  "status": {
+    "active": "Faol",
+    "inactive": "Faol emas",
+    "new": "Yangi",
+    "in_progress": "Jarayonda",
+    "done": "Bajarildi",
+    "error": "Xato",
+    "exception": "Istisno"
+  },
+  "labels": {
+    "search": "Qidirish",
+    "username": "Username",
+    "password": "Parol",
+    "confirm_password": "Parolni tasdiqlash",
+    "language": "Til",
+    "menu": "Menyu",
+    "qty": "Miqdor",
+    "offline_queue": "Offline navbat"
+  },
+  "messages": {
+    "not_authorized_title": "Ruxsat yo‘q",
+    "not_authorized_desc": "Bu sahifani ko‘rish uchun ruxsatingiz yetarli emas.",
+    "no_activity": "Hozircha faoliyat yo‘q.",
+    "loading": "Yuklanmoqda..."
+  },
+  "errors": {
+    "unknown": "Noma'lum xatolik yuz berdi.",
+    "network": "Tarmoq xatosi.",
+    "unauthorized": "Ruxsat yo‘q."
+  }
+}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, RefreshCcw, Boxes } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { AppHeader } from '../components/layout/AppHeader'
 import { PickListCard } from '../components/picking/PickListCard'
@@ -10,6 +11,7 @@ import { listPickLists, type PickList } from '../services/pickingApi'
 
 export function PickListPage() {
   const navigate = useNavigate()
+  const { t } = useTranslation('picking')
   const [items, setItems] = useState<PickList[]>([])
   const [query, setQuery] = useState('')
   const [isLoading, setIsLoading] = useState(true)
@@ -22,11 +24,11 @@ export function PickListPage() {
       const data = await listPickLists()
       setItems(data)
     } catch (err) {
-      setError('Pick list yuklanmadi. Qayta urinib ko‘ring.')
+      setError(t('load_error'))
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     void load()
@@ -41,7 +43,7 @@ export function PickListPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 px-4">
-        <AppHeader title="Pick listlar" onRefresh={load} />
+        <AppHeader title={t('list_title')} onRefresh={load} />
         <div className="space-y-4">
           <div className="h-12 w-full animate-pulse rounded-2xl bg-slate-200" />
           <div className="h-24 w-full animate-pulse rounded-2xl bg-slate-200" />
@@ -54,10 +56,10 @@ export function PickListPage() {
   return (
     <div className="min-h-screen bg-slate-50 px-4 pb-6">
       <AppHeader
-        title="Pick listlar"
+        title={t('list_title')}
         onRefresh={load}
         actionSlot={
-          <Button variant="ghost" onClick={load} aria-label="Reload list">
+          <Button variant="ghost" onClick={load} aria-label={t('refresh')}>
             <RefreshCcw size={18} />
           </Button>
         }
@@ -66,7 +68,7 @@ export function PickListPage() {
         <Search size={18} className="text-slate-400" />
         <input
           className="w-full bg-transparent text-sm text-slate-900 outline-none"
-          placeholder="Hujjat raqami bo‘yicha qidirish"
+          placeholder={t('search_placeholder')}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
@@ -76,15 +78,15 @@ export function PickListPage() {
         <EmptyState
           icon={<Boxes size={32} />}
           title={error}
-          actionLabel="Qayta urinib ko‘rish"
+          actionLabel={t('refresh')}
           onAction={load}
         />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={<Boxes size={32} />}
-          title="Hujjatlar topilmadi"
-          description="Hozircha pick listlar yo‘q."
-          actionLabel="Yangilash"
+          title={t('empty_title')}
+          description={t('empty_desc')}
+          actionLabel={t('refresh')}
           onAction={load}
         />
       ) : (

@@ -1,4 +1,5 @@
 import { MapPin } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Badge } from '../ui/badge'
 import { Card } from '../ui/card'
 import type { PickLine } from '../../services/pickingApi'
@@ -17,6 +18,8 @@ const statusVariant: Record<PickLine['status'], 'neutral' | 'primary' | 'success
   }
 
 export function PickLineRow({ line, onClick }: PickLineRowProps) {
+  const { t } = useTranslation('picking')
+  const statusKey = line.status.toLowerCase()
   return (
     <Card
       className={[
@@ -32,7 +35,7 @@ export function PickLineRow({ line, onClick }: PickLineRowProps) {
         <div>
           <div className="text-base font-semibold text-slate-900">{line.product_name}</div>
         </div>
-        <Badge variant={statusVariant[line.status]}>{line.status}</Badge>
+        <Badge variant={statusVariant[line.status]}>{t(`status.${statusKey}`)}</Badge>
       </div>
       <div className="flex items-center gap-2 text-sm text-slate-600">
         <MapPin size={14} />
@@ -41,7 +44,7 @@ export function PickLineRow({ line, onClick }: PickLineRowProps) {
         </span>
       </div>
       <div className="flex items-center justify-between text-sm text-slate-700">
-        <span>Qty</span>
+        <span>{t('qty')}</span>
         <span className="font-semibold">
           {line.qty_picked}/{line.qty_required}
         </span>

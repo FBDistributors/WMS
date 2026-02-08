@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Boxes } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { Card } from '../../components/ui/card'
@@ -13,6 +14,7 @@ const statusVariant = (isActive: boolean) => (isActive ? 'success' : 'neutral')
 
 export function ProductsListPage() {
   const navigate = useNavigate()
+  const { t } = useTranslation(['products', 'common'])
   const [items, setItems] = useState<Product[]>([])
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
@@ -26,11 +28,11 @@ export function ProductsListPage() {
       const data = await getProducts({ q: search })
       setItems(data.items)
     } catch (err) {
-      setError('Mahsulotlar yuklanmadi. Qayta urinib ko‘ring.')
+      setError(t('products:load_error'))
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [t])
 
   const handleRetry = useCallback(() => {
     void load(debouncedQuery)
@@ -60,7 +62,7 @@ export function ProductsListPage() {
         <EmptyState
           icon={<Boxes size={32} />}
           title={error}
-          actionLabel="Qayta urinib ko‘rish"
+          actionLabel={t('common:buttons.retry')}
           onAction={handleRetry}
         />
       )
@@ -70,9 +72,9 @@ export function ProductsListPage() {
       return (
         <EmptyState
           icon={<Boxes size={32} />}
-          title="Mahsulotlar topilmadi"
-          description="Hozircha mahsulotlar yo‘q."
-          actionLabel="Yangilash"
+          title={t('products:empty_title')}
+          description={t('products:empty_desc')}
+          actionLabel={t('products:refresh')}
           onAction={handleRetry}
         />
       )
@@ -91,24 +93,24 @@ export function ProductsListPage() {
             <div>
               <div className="text-base font-semibold text-slate-900">{item.name}</div>
               <div className="text-xs text-slate-500">
-                SKU: {item.sku} · {item.barcode ?? 'Barcode —'}
+                SKU: {item.sku} · {item.barcode ?? `${t('products:fields.barcode')} —`}
               </div>
             </div>
             <Badge variant={statusVariant(item.is_active)}>
-              {item.is_active ? 'ACTIVE' : 'INACTIVE'}
+              {item.is_active ? t('common:status.active') : t('common:status.inactive')}
             </Badge>
           </Card>
         ))}
       </div>
     )
-  }, [error, isLoading, items, load, navigate])
+  }, [error, isLoading, items, load, navigate, t])
 
   return (
     <AdminLayout
-      title="Products"
+      title={t('products:title')}
       actionSlot={
         <Button variant="secondary" onClick={handleRetry}>
-          Yangilash
+          {t('products:refresh')}
         </Button>
       }
     >
@@ -116,7 +118,7 @@ export function ProductsListPage() {
         <Search size={18} className="text-slate-400" />
         <input
           className="w-full bg-transparent text-sm text-slate-900 outline-none"
-          placeholder="Mahsulot nomi, SKU yoki barcode"
+          placeholder={t('products:search_placeholder')}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />

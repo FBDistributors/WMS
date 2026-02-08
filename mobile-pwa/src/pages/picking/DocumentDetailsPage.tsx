@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 import {
   completePickingDocument,
@@ -10,31 +11,12 @@ import {
   type PickingLine,
 } from '../../api/picking'
 
-function formatError(error: unknown) {
-  if (typeof error === 'object' && error !== null && 'message' in error) {
-    const apiError = error as ApiError
-    const details = apiError.details
-    if (typeof details === 'string') {
-      return details
-    }
-    if (details && typeof details === 'object') {
-      if ('detail' in details && typeof details.detail === 'string') {
-        return details.detail
-      }
-      if ('message' in details && typeof details.message === 'string') {
-        return details.message
-      }
-    }
-    return apiError.message
-  }
-  return 'Serverga ulanishda xato yuz berdi. Internetni tekshiring.'
-}
-
 const BASE_PATH = '/picking/mobile-pwa'
 
 export function DocumentDetailsPage() {
   const { documentId } = useParams()
   const navigate = useNavigate()
+  const { t } = useTranslation(['picking', 'common'])
   const [document, setDocument] = useState<PickingDocument | null>(null)
   const [lines, setLines] = useState<PickingLine[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -43,9 +25,32 @@ export function DocumentDetailsPage() {
   const [barcodeValue, setBarcodeValue] = useState('')
   const barcodeInputRef = useRef<HTMLInputElement | null>(null)
 
+  const formatError = useCallback(
+    (error: unknown) => {
+      if (typeof error === 'object' && error !== null && 'message' in error) {
+        const apiError = error as ApiError
+        const details = apiError.details
+        if (typeof details === 'string') {
+          return details
+        }
+        if (details && typeof details === 'object') {
+          if ('detail' in details && typeof details.detail === 'string') {
+            return details.detail
+          }
+          if ('message' in details && typeof details.message === 'string') {
+            return details.message
+          }
+        }
+        return apiError.message
+      }
+      return t('common:errors.network')
+    },
+    [t]
+  )
+
   const loadDocument = useCallback(async () => {
     if (!documentId) {
-      setErrorMessage('Hujjat ID topilmadi.')
+      setErrorMessage(t('picking:document_id_missing'))
       setIsLoading(false)
       return
     }
@@ -55,11 +60,11 @@ export function DocumentDetailsPage() {
       const data = await getPickingDocument(documentId)
       setDocument(data)
     } catch (error) {
-      setErrorMessage(`Hujjat yuklanmadi. ${formatError(error)}`)
+      setErrorMessage(`${t('picking:load_failed')} ${formatError(error)}`)
     } finally {
       setIsLoading(false)
     }
-  }, [documentId])
+  }, [documentId, formatError, t])
 
   useEffect(() => {
     void loadDocument()
@@ -76,7 +81,7 @@ export function DocumentDetailsPage() {
   }, [isLoading, document])
 
   if (isLoading) {
-    return <div>Yuklanmoqda...</div>
+    return <div>{t('common:messages.loading')}</div>
   }
 
   if (errorMessage) {
@@ -84,17 +89,17 @@ export function DocumentDetailsPage() {
       <div>
         <p>{errorMessage}</p>
         <button type="button" onClick={loadDocument}>
-          Qayta urinib ko‘rish
+          {t('common:buttons.retry')}
         </button>
         <div>
-          <Link to={BASE_PATH}>Orqaga</Link>
+          <Link to={BASE_PATH}>{t('common:buttons.back')}</Link>
         </div>
       </div>
     )
   }
 
   if (!document) {
-    return <div>Hujjat topilmadi.</div>
+    return <div>{t('picking:document_not_found')}</div>
   }
 
   const progress = useMemo(() => {
@@ -127,11 +132,11 @@ export function DocumentDetailsPage() {
         return
       }
       if (delta === 1 && target.qty_picked >= target.qty_required) {
-        setErrorMessage('Qty required dan oshib ketdi.')
+        setErrorMessage(t('picking:qty_overflow'))
         return
       }
       if (delta === -1 && target.qty_picked <= 0) {
-        setErrorMessage('Qty 0 dan past bo‘lolmaydi.')
+        setErrorMessage(t('picking:qty_below_zero'))
         return
       }
       const previous = lines
@@ -153,10 +158,10 @@ export function DocumentDetailsPage() {
         }
       } catch (error) {
         setLines(previous)
-        setErrorMessage(`Picking muvaffaqiyatsiz. ${formatError(error)}`)
+        setErrorMessage(`${t('picking:pick_failed')} ${formatError(error)}`)
       }
     },
-    [lines, updatePicked]
+    [formatError, lines, t, updatePicked]
   )
 
   const handleBarcodeSubmit = useCallback(() => {
@@ -166,7 +171,7 @@ export function DocumentDetailsPage() {
       (line) => line.barcode === value || line.sku === value
     )
     if (!matched) {
-      alert('Topilmadi')
+      alert(t('picking:not_found_alert'))
       setBarcodeValue('')
       return
     }
@@ -182,26 +187,28 @@ export function DocumentDetailsPage() {
       await completePickingDocument(documentId)
       navigate(BASE_PATH)
     } catch (error) {
-      setErrorMessage(`Yakunlashda xato. ${formatError(error)}`)
+      setErrorMessage(`${t('picking:complete_error_alt')} ${formatError(error)}`)
     } finally {
       setIsCompleting(false)
     }
-  }, [documentId, navigate])
+  }, [documentId, formatError, navigate, t])
 
   return (
     <div style={{ padding: '16px' }}>
-      <Link to={BASE_PATH}>← Pick list</Link>
+      <Link to={BASE_PATH}>← {t('picking:list_title')}</Link>
       <h1 style={{ marginTop: '12px' }}>{document.reference_number}</h1>
-      <div>Status: {document.status}</div>
+      <div>
+        {t('picking:status_label')}: {document.status}
+      </div>
       <div style={{ marginTop: '8px' }}>
-        Progress: {progress.picked}/{progress.required} qty
+        {t('picking:progress_qty', { picked: progress.picked, required: progress.required })}
       </div>
       <div style={{ marginTop: '4px' }}>
-        Lines: {progress.linesDone}/{progress.linesTotal}
+        {t('picking:lines_label', { done: progress.linesDone, total: progress.linesTotal })}
       </div>
       <div style={{ marginTop: '12px' }}>
         <label style={{ display: 'block', marginBottom: '6px' }}>
-          Barcode (scan):
+          {t('picking:barcode_label')}
         </label>
         <input
           ref={barcodeInputRef}
@@ -215,7 +222,7 @@ export function DocumentDetailsPage() {
             }
           }}
           onBlur={() => barcodeInputRef.current?.focus()}
-          placeholder="Barcode skan qiling"
+          placeholder={t('picking:barcode_placeholder')}
           style={{
             width: '100%',
             padding: '12px',
@@ -230,7 +237,7 @@ export function DocumentDetailsPage() {
           {errorMessage}
         </div>
       ) : null}
-      <h2>Lines</h2>
+      <h2>{t('picking:lines_title')}</h2>
       <ul>
         {lines.map((line) => {
           const remaining = line.qty_required - line.qty_picked
@@ -249,13 +256,26 @@ export function DocumentDetailsPage() {
               <div>
                 <strong>{line.product_name}</strong>
               </div>
-              <div>Location: {line.location_code}</div>
-              <div>Barcode: {line.barcode ?? '—'}</div>
-              <div>Required: {line.qty_required}</div>
-              <div>Picked: {line.qty_picked}</div>
-              <div>Remaining: {remaining}</div>
+              <div>
+                {t('picking:location_label')}: {line.location_code}
+              </div>
+              <div>
+                {t('picking:barcode_field')}: {line.barcode ?? '—'}
+              </div>
+              <div>
+                {t('picking:required_label')}: {line.qty_required}
+              </div>
+              <div>
+                {t('picking:picked_label')}: {line.qty_picked}
+              </div>
+              <div>
+                {t('picking:remaining_label')}: {remaining}
+              </div>
               <div style={{ marginTop: '8px', fontWeight: 600 }}>
-                Progress: {line.qty_picked}/{line.qty_required}
+                {t('picking:progress_line', {
+                  picked: line.qty_picked,
+                  required: line.qty_required,
+                })}
               </div>
               <div
                 style={{
@@ -291,7 +311,7 @@ export function DocumentDetailsPage() {
               </div>
               {isDone ? (
                 <div style={{ marginTop: '8px', color: '#2e7d32' }}>
-                  Done
+                  {t('picking:done_label')}
                 </div>
               ) : null}
             </li>
@@ -312,7 +332,7 @@ export function DocumentDetailsPage() {
           border: 'none',
         }}
       >
-        {isCompleting ? 'Yakunlanmoqda...' : 'Done / Complete'}
+        {isCompleting ? t('picking:completing') : t('picking:complete_button')}
       </button>
     </div>
   )

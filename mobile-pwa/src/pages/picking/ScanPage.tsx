@@ -1,3 +1,6 @@
+import { useTranslation } from 'react-i18next'
+
 export function ScanPage() {
-  return <div>Scan</div>
+  const { t } = useTranslation('picking')
+  return <div>{t('scan_title')}</div>
 }

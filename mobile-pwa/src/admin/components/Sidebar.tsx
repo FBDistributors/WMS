@@ -6,17 +6,18 @@ import {
   ClipboardList,
   Users,
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { useAuth } from '../../rbac/AuthProvider'
 import type { MenuItem } from '../../rbac/menu'
 import { filterMenuByPermissions } from '../../rbac/menu'
 
-const MENU_ITEMS: MenuItem[] = [
-  { label: 'Dashboard', path: '/admin', icon: LayoutDashboard, required: 'admin:access' },
-  { label: 'Products', path: '/admin/products', icon: Package, required: 'products:read' },
-  { label: 'Inventory', path: '/admin/inventory', icon: Boxes, required: 'inventory:read' },
-  { label: 'Picking', path: '/picking/mobile-pwa', icon: ClipboardList, required: 'picking:read' },
-  { label: 'Users & Access', path: '/admin/users', icon: Users, required: 'users:manage' },
+const MENU_ITEMS: Array<MenuItem & { key: string }> = [
+  { key: 'dashboard', label: 'Dashboard', path: '/admin', icon: LayoutDashboard, required: 'admin:access' },
+  { key: 'products', label: 'Products', path: '/admin/products', icon: Package, required: 'products:read' },
+  { key: 'inventory', label: 'Inventory', path: '/admin/inventory', icon: Boxes, required: 'inventory:read' },
+  { key: 'picking', label: 'Picking', path: '/picking/mobile-pwa', icon: ClipboardList, required: 'picking:read' },
+  { key: 'users', label: 'Users & Access', path: '/admin/users', icon: Users, required: 'users:manage' },
 ]
 
 type SidebarProps = {
@@ -26,13 +27,14 @@ type SidebarProps = {
 export function Sidebar({ onNavigate }: SidebarProps) {
   const location = useLocation()
   const { user } = useAuth()
+  const { t } = useTranslation('admin')
   const items = filterMenuByPermissions(MENU_ITEMS, user?.permissions ?? [])
 
   return (
     <aside className="w-64 border-r border-slate-200 bg-white p-4">
-      <div className="mb-6 text-lg font-semibold text-slate-900">WMS Admin</div>
+      <div className="mb-6 text-lg font-semibold text-slate-900">{t('sidebar_title')}</div>
       <nav className="space-y-1">
-        {items.map(({ label, path, icon: Icon }) => {
+        {items.map(({ label, path, icon: Icon, key }) => {
           const isActive =
             location.pathname === path || (path !== '/admin' && location.pathname.startsWith(path))
           return (
@@ -48,7 +50,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
               ].join(' ')}
             >
               <Icon size={18} />
-              {label}
+              {t(`menu.${key}`, label)}
             </Link>
           )
         })}

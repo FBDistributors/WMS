@@ -1,0 +1,46 @@
+{
+  "buttons": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "back": "Back",
+    "refresh": "Refresh",
+    "retry": "Try again",
+    "create": "Create",
+    "edit": "Edit",
+    "disable": "Disable",
+    "login": "Login",
+    "logout": "Logout",
+    "home": "Home",
+    "close": "Close"
+  },
+  "status": {
+    "active": "Active",
+    "inactive": "Inactive",
+    "new": "New",
+    "in_progress": "In progress",
+    "done": "Done",
+    "error": "Error",
+    "exception": "Exception"
+  },
+  "labels": {
+    "search": "Search",
+    "username": "Username",
+    "password": "Password",
+    "confirm_password": "Confirm password",
+    "language": "Language",
+    "menu": "Menu",
+    "qty": "Qty",
+    "offline_queue": "Offline queue"
+  },
+  "messages": {
+    "not_authorized_title": "Not authorized",
+    "not_authorized_desc": "You do not have permission to view this page.",
+    "no_activity": "No activity yet.",
+    "loading": "Loading..."
+  },
+  "errors": {
+    "unknown": "Something went wrong.",
+    "network": "Network error.",
+    "unauthorized": "Unauthorized."
+  }
+}

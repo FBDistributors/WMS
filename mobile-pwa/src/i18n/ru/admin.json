@@ -1,0 +1,36 @@
+{
+  "menu": {
+    "dashboard": "Дашборд",
+    "products": "Товары",
+    "inventory": "Запасы",
+    "picking": "Подбор",
+    "users": "Пользователи и доступ"
+  },
+  "dashboard": {
+    "title": "Дашборд",
+    "open_pick_lists": "Открытые списки подбора",
+    "completed_today": "Завершено сегодня",
+    "exceptions": "Исключения",
+    "low_stock": "Низкий остаток",
+    "active_picks": "Активный подбор",
+    "today_overview": "Сводка за день",
+    "load_error": "Не удалось загрузить дашборд. Попробуйте снова."
+  },
+  "active_picks": {
+    "empty": "Нет активного подбора.",
+    "open": "Открыть",
+    "picked": "{{picked}}/{{total}} подобрано"
+  },
+  "exceptions": {
+    "empty": "Сегодня исключений нет.",
+    "view": "Просмотр",
+    "status": {
+      "open": "Открыто",
+      "resolved": "Решено"
+    }
+  },
+  "header": {
+    "menu": "Меню"
+  },
+  "sidebar_title": "WMS Admin"
+}

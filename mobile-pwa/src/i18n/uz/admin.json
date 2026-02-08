@@ -1,0 +1,36 @@
+{
+  "menu": {
+    "dashboard": "Dashboard",
+    "products": "Mahsulotlar",
+    "inventory": "Inventar",
+    "picking": "Picking",
+    "users": "Users & Access"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "open_pick_lists": "Ochiq pick listlar",
+    "completed_today": "Bugun yakunlangan",
+    "exceptions": "Istisnolar",
+    "low_stock": "Past qoldiq ogohlantirishlari",
+    "active_picks": "Faol pickinglar",
+    "today_overview": "Bugungi ko‘rinish",
+    "load_error": "Dashboard yuklanmadi. Qayta urinib ko‘ring."
+  },
+  "active_picks": {
+    "empty": "Hozircha faol picking yo‘q.",
+    "open": "Ochish",
+    "picked": "{{picked}}/{{total}} picked"
+  },
+  "exceptions": {
+    "empty": "Bugun istisnolar yo‘q.",
+    "view": "Ko‘rish",
+    "status": {
+      "open": "Ochiq",
+      "resolved": "Yechilgan"
+    }
+  },
+  "header": {
+    "menu": "Menyu"
+  },
+  "sidebar_title": "WMS Admin"
+}

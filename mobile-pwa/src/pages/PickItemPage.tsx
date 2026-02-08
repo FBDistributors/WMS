@@ -1,6 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Minus, Plus, SkipForward } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { AppHeader } from '../components/layout/AppHeader'
 import { Button } from '../components/ui/button'
@@ -19,6 +20,7 @@ const CameraScanner = lazy(() => import('../picking/components/CameraScanner'))
 export function PickItemPage() {
   const { documentId, lineId } = useParams()
   const navigate = useNavigate()
+  const { t } = useTranslation('picking')
   const [line, setLine] = useState<PickLine | null>(null)
   const [qty, setQty] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
@@ -36,7 +38,7 @@ export function PickItemPage() {
 
   const load = useCallback(async () => {
     if (!documentId || !lineId) {
-      setError('Mahsulot topilmadi.')
+      setError(t('item_not_found'))
       setIsLoading(false)
       return
     }
@@ -47,14 +49,14 @@ export function PickItemPage() {
       const found = details.lines.find((item) => item.id === lineId) ?? null
       setLine(found)
       if (!found) {
-        setError('Mahsulot topilmadi.')
+        setError(t('item_not_found'))
       }
     } catch (err) {
-      setError('Mahsulot yuklanmadi.')
+      setError(t('item_load_failed'))
     } finally {
       setIsLoading(false)
     }
-  }, [documentId, lineId])
+  }, [documentId, lineId, t])
 
   useEffect(() => {
     void load()
@@ -77,11 +79,11 @@ export function PickItemPage() {
       }
       navigate(`/picking/mobile-pwa/${documentId}`, { replace: true })
     } catch (err) {
-      setError('Pick qilishda xato. Qayta urinib ko‘ring.')
+      setError(t('pick_error'))
     } finally {
       setIsPicking(false)
     }
-  }, [documentId, line, navigate, qty, remaining])
+  }, [documentId, line, navigate, qty, remaining, t])
 
   const handleScan = useCallback(
     (code: string) => {
@@ -105,7 +107,7 @@ export function PickItemPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 px-4">
-        <AppHeader title="Pick item" onBack={() => navigate(-1)} />
+        <AppHeader title={t('item_title')} onBack={() => navigate(-1)} />
         <div className="h-40 w-full animate-pulse rounded-2xl bg-slate-200" />
       </div>
     )
@@ -114,10 +116,10 @@ export function PickItemPage() {
   if (!line || error) {
     return (
       <div className="min-h-screen bg-slate-50 px-4">
-        <AppHeader title="Pick item" onBack={() => navigate(-1)} />
+        <AppHeader title={t('item_title')} onBack={() => navigate(-1)} />
         <EmptyState
-          title={error ?? 'Mahsulot topilmadi'}
-          actionLabel="Qayta urinib ko‘rish"
+          title={error ?? t('item_not_found')}
+          actionLabel={t('refresh')}
           onAction={load}
         />
       </div>
@@ -126,10 +128,10 @@ export function PickItemPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 pb-10">
-      <AppHeader title="Pick item" onBack={() => navigate(-1)} />
+      <AppHeader title={t('item_title')} onBack={() => navigate(-1)} />
 
       <div className="mb-4 space-y-3">
-        <ScanInput onScan={handleScan} />
+        <ScanInput onScan={handleScan} placeholder={t('scan_placeholder')} />
         {lastScan ? (
           <div
             className={cn(
@@ -137,18 +139,25 @@ export function PickItemPage() {
               lastScan.found ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
             )}
           >
-            Last scan: {lastScan.code} — {lastScan.found ? 'Found' : 'Not found'}
+            {t('last_scan', {
+              code: lastScan.code,
+              result: lastScan.found ? t('found') : t('not_found'),
+            })}
           </div>
         ) : null}
         <Button fullWidth variant="secondary" onClick={() => setIsCameraActive((prev) => !prev)}>
           {isCameraActive
-            ? 'Stop camera'
+            ? t('stop_camera')
             : isMobile
-              ? 'Scan with camera'
-              : 'Camera scan (optional)'}
+              ? t('scan_camera')
+              : t('camera_optional')}
         </Button>
         <Suspense
-          fallback={<div className="rounded-2xl bg-white p-4 text-sm text-slate-500">Loading camera...</div>}
+          fallback={
+            <div className="rounded-2xl bg-white p-4 text-sm text-slate-500">
+              {t('loading_camera')}
+            </div>
+          }
         >
           <CameraScanner
             active={isCameraActive}
@@ -169,7 +178,7 @@ export function PickItemPage() {
       />
 
       <div className="mt-6 rounded-2xl bg-white p-4 shadow-sm">
-        <div className="mb-3 text-sm font-semibold text-slate-700">Qty</div>
+        <div className="mb-3 text-sm font-semibold text-slate-700">{t('qty')}</div>
         <div className="flex items-center justify-between gap-2">
           <Button variant="secondary" onClick={() => setQty((prev) => Math.max(1, prev - 1))}>
             <Minus size={18} />
@@ -190,11 +199,11 @@ export function PickItemPage() {
 
       <div className="mt-6 grid gap-3">
         <Button fullWidth onClick={handlePick} disabled={isPicking || remaining === 0}>
-          {isPicking ? 'Picking...' : 'Pick'}
+          {isPicking ? t('picking') : t('pick')}
         </Button>
         <Button fullWidth variant="outline" onClick={() => navigate(-1)}>
           <SkipForward size={18} />
-          Skip
+          {t('skip')}
         </Button>
       </div>
 

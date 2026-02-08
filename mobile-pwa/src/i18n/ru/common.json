@@ -1,0 +1,46 @@
+{
+  "buttons": {
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "back": "Назад",
+    "refresh": "Обновить",
+    "retry": "Повторить",
+    "create": "Создать",
+    "edit": "Редактировать",
+    "disable": "Отключить",
+    "login": "Войти",
+    "logout": "Выйти",
+    "home": "Главная",
+    "close": "Закрыть"
+  },
+  "status": {
+    "active": "Активен",
+    "inactive": "Неактивен",
+    "new": "Новый",
+    "in_progress": "В процессе",
+    "done": "Готово",
+    "error": "Ошибка",
+    "exception": "Исключение"
+  },
+  "labels": {
+    "search": "Поиск",
+    "username": "Имя пользователя",
+    "password": "Пароль",
+    "confirm_password": "Подтвердите пароль",
+    "language": "Язык",
+    "menu": "Меню",
+    "qty": "Кол-во",
+    "offline_queue": "Оффлайн очередь"
+  },
+  "messages": {
+    "not_authorized_title": "Нет доступа",
+    "not_authorized_desc": "У вас нет прав для просмотра этой страницы.",
+    "no_activity": "Пока нет активности.",
+    "loading": "Загрузка..."
+  },
+  "errors": {
+    "unknown": "Произошла ошибка.",
+    "network": "Ошибка сети.",
+    "unauthorized": "Нет доступа."
+  }
+}

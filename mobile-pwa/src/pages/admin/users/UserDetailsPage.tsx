@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../../admin/components/AdminLayout'
 import { Button } from '../../../components/ui/button'
@@ -8,18 +9,11 @@ import { useAuth } from '../../../rbac/AuthProvider'
 import { disableUser, getUser, resetPassword, updateUser } from '../../../services/usersApi'
 import type { UserRecord, UserRole } from '../../../types/users'
 
-const ROLE_OPTIONS: Array<{ value: UserRole; label: string }> = [
-  { value: 'warehouse_admin', label: 'Warehouse Admin' },
-  { value: 'supervisor', label: 'Supervisor' },
-  { value: 'picker', label: 'Picker' },
-  { value: 'receiver', label: 'Receiver' },
-  { value: 'inventory_controller', label: 'Inventory Controller' },
-]
-
 export function UserDetailsPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user: currentUser } = useAuth()
+  const { t } = useTranslation(['users', 'common'])
   const [user, setUser] = useState<UserRecord | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -42,11 +36,11 @@ export function UserDetailsPage() {
       setRole(data.role)
       setIsActive(data.is_active)
     } catch {
-      setError('User yuklanmadi.')
+      setError(t('users:messages.load_failed'))
     } finally {
       setIsLoading(false)
     }
-  }, [id])
+  }, [id, t])
 
   useEffect(() => {
     void load()
@@ -56,9 +50,7 @@ export function UserDetailsPage() {
     event.preventDefault()
     if (!user) return
     if (isSelf && (!isActive || role !== 'warehouse_admin')) {
-      const confirmed = window.confirm(
-        'Bu amal sizni admin huquqidan mahrum qilishi yoki hisobingizni bloklashi mumkin. Davom etasizmi?'
-      )
+      const confirmed = window.confirm(t('users:messages.self_lockout'))
       if (!confirmed) return
     }
     setIsSaving(true)
@@ -71,7 +63,7 @@ export function UserDetailsPage() {
       })
       setUser(updated)
     } catch {
-      setError('User yangilanmadi.')
+      setError(t('users:messages.update_failed'))
     } finally {
       setIsSaving(false)
     }
@@ -80,7 +72,7 @@ export function UserDetailsPage() {
   const handleResetPassword = async () => {
     if (!user) return
     if (newPassword !== confirmPassword) {
-      setError('Parollar mos emas.')
+      setError(t('users:messages.password_mismatch'))
       return
     }
     setIsSaving(true)
@@ -89,9 +81,9 @@ export function UserDetailsPage() {
       await resetPassword(user.id, { new_password: newPassword })
       setNewPassword('')
       setConfirmPassword('')
-      alert('Parol yangilandi.')
+      alert(t('users:messages.reset_success'))
     } catch {
-      setError('Parol yangilanmadi.')
+      setError(t('users:messages.reset_failed'))
     } finally {
       setIsSaving(false)
     }
@@ -99,7 +91,7 @@ export function UserDetailsPage() {
 
   const handleDisable = async () => {
     if (!user) return
-    const confirmed = window.confirm('Foydalanuvchini o‘chirib qo‘ymoqchimisiz?')
+    const confirmed = window.confirm(t('users:messages.disable_confirm'))
     if (!confirmed) return
     setIsSaving(true)
     setError(null)
@@ -108,7 +100,7 @@ export function UserDetailsPage() {
       setUser(updated)
       setIsActive(updated.is_active)
     } catch {
-      setError('User bloklanmadi.')
+      setError(t('users:messages.update_failed'))
     } finally {
       setIsSaving(false)
     }
@@ -116,30 +108,34 @@ export function UserDetailsPage() {
 
   if (isLoading) {
     return (
-      <AdminLayout title="User details">
-        <div>Yuklanmoqda...</div>
+      <AdminLayout title={t('users:form.details_title')}>
+        <div>{t('common:messages.loading')}</div>
       </AdminLayout>
     )
   }
 
   if (!user) {
     return (
-      <AdminLayout title="User details">
-        <div>{error ?? 'User topilmadi.'}</div>
+      <AdminLayout title={t('users:form.details_title')}>
+        <div>{error ?? t('users:messages.not_found')}</div>
       </AdminLayout>
     )
   }
 
   return (
-    <AdminLayout title="User details">
+    <AdminLayout title={t('users:form.details_title')}>
       <Card className="max-w-xl p-6">
         <form className="space-y-4" onSubmit={handleSave}>
           <div>
-            <div className="text-sm font-semibold text-slate-700">Username</div>
+            <div className="text-sm font-semibold text-slate-700">
+              {t('users:form.username')}
+            </div>
             <div className="mt-1 text-sm text-slate-600">{user.username}</div>
           </div>
           <div>
-            <label className="text-sm font-semibold text-slate-700">Full name</label>
+            <label className="text-sm font-semibold text-slate-700">
+              {t('users:form.full_name')}
+            </label>
             <input
               className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
               value={fullName}
@@ -147,15 +143,25 @@ export function UserDetailsPage() {
             />
           </div>
           <div>
-            <label className="text-sm font-semibold text-slate-700">Role</label>
+            <label className="text-sm font-semibold text-slate-700">
+              {t('users:form.role')}
+            </label>
             <select
               className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
               value={role}
               onChange={(event) => setRole(event.target.value as UserRole)}
             >
-              {ROLE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
+              {(
+                [
+                  'warehouse_admin',
+                  'supervisor',
+                  'picker',
+                  'receiver',
+                  'inventory_controller',
+                ] as UserRole[]
+              ).map((item) => (
+                <option key={item} value={item}>
+                  {t(`users:roles.${item}`)}
                 </option>
               ))}
             </select>
@@ -166,42 +172,44 @@ export function UserDetailsPage() {
               checked={isActive}
               onChange={(event) => setIsActive(event.target.checked)}
             />
-            Active
+            {t('users:form.active')}
           </label>
           {error ? <div className="text-sm text-red-600">{error}</div> : null}
           <div className="flex items-center gap-2">
             <Button type="submit" disabled={isSaving}>
-              {isSaving ? 'Saving...' : 'Save changes'}
+              {isSaving ? t('common:messages.loading') : t('users:form.save')}
             </Button>
             <Button type="button" variant="ghost" onClick={() => navigate('/admin/users')}>
-              Back
+              {t('users:form.back')}
             </Button>
             <Button type="button" variant="ghost" onClick={handleDisable} disabled={isSaving}>
-              Disable
+              {t('users:actions.disable')}
             </Button>
           </div>
         </form>
       </Card>
 
       <Card className="mt-6 max-w-xl p-6">
-        <div className="text-sm font-semibold text-slate-700">Reset password</div>
+        <div className="text-sm font-semibold text-slate-700">
+          {t('users:actions.reset_password')}
+        </div>
         <div className="mt-3 space-y-3">
           <input
             type="password"
             className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-            placeholder="New password"
+            placeholder={t('users:form.password')}
             value={newPassword}
             onChange={(event) => setNewPassword(event.target.value)}
           />
           <input
             type="password"
             className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-            placeholder="Confirm password"
+            placeholder={t('users:form.confirm_password')}
             value={confirmPassword}
             onChange={(event) => setConfirmPassword(event.target.value)}
           />
           <Button type="button" onClick={handleResetPassword} disabled={isSaving}>
-            Reset password
+            {t('users:actions.reset_password')}
           </Button>
         </div>
       </Card>

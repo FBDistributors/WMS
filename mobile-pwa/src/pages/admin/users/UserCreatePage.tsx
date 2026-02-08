@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../../admin/components/AdminLayout'
 import { Button } from '../../../components/ui/button'
@@ -7,16 +8,9 @@ import { Card } from '../../../components/ui/card'
 import { createUser } from '../../../services/usersApi'
 import type { UserRole } from '../../../types/users'
 
-const ROLE_OPTIONS: Array<{ value: UserRole; label: string }> = [
-  { value: 'warehouse_admin', label: 'Warehouse Admin' },
-  { value: 'supervisor', label: 'Supervisor' },
-  { value: 'picker', label: 'Picker' },
-  { value: 'receiver', label: 'Receiver' },
-  { value: 'inventory_controller', label: 'Inventory Controller' },
-]
-
 export function UserCreatePage() {
   const navigate = useNavigate()
+  const { t } = useTranslation(['users', 'common'])
   const [username, setUsername] = useState('')
   const [fullName, setFullName] = useState('')
   const [role, setRole] = useState<UserRole>('picker')
@@ -29,7 +23,7 @@ export function UserCreatePage() {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     if (password !== confirmPassword) {
-      setError('Parollar mos emas.')
+      setError(t('users:messages.password_mismatch'))
       return
     }
     setIsSaving(true)
@@ -44,18 +38,20 @@ export function UserCreatePage() {
       })
       navigate(`/admin/users/${created.id}`, { replace: true })
     } catch (err) {
-      setError('User yaratilmadi. Parol kuchli ekanini tekshiring.')
+      setError(t('users:messages.create_failed'))
     } finally {
       setIsSaving(false)
     }
   }
 
   return (
-    <AdminLayout title="Create user">
+    <AdminLayout title={t('users:form.create_title')}>
       <Card className="max-w-xl p-6">
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div>
-            <label className="text-sm font-semibold text-slate-700">Username</label>
+            <label className="text-sm font-semibold text-slate-700">
+              {t('users:form.username')}
+            </label>
             <input
               className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
               value={username}
@@ -64,7 +60,9 @@ export function UserCreatePage() {
             />
           </div>
           <div>
-            <label className="text-sm font-semibold text-slate-700">Full name</label>
+            <label className="text-sm font-semibold text-slate-700">
+              {t('users:form.full_name')}
+            </label>
             <input
               className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
               value={fullName}
@@ -72,21 +70,33 @@ export function UserCreatePage() {
             />
           </div>
           <div>
-            <label className="text-sm font-semibold text-slate-700">Role</label>
+            <label className="text-sm font-semibold text-slate-700">
+              {t('users:form.role')}
+            </label>
             <select
               className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
               value={role}
               onChange={(event) => setRole(event.target.value as UserRole)}
             >
-              {ROLE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
+              {(
+                [
+                  'warehouse_admin',
+                  'supervisor',
+                  'picker',
+                  'receiver',
+                  'inventory_controller',
+                ] as UserRole[]
+              ).map((item) => (
+                <option key={item} value={item}>
+                  {t(`users:roles.${item}`)}
                 </option>
               ))}
             </select>
           </div>
           <div>
-            <label className="text-sm font-semibold text-slate-700">Password</label>
+            <label className="text-sm font-semibold text-slate-700">
+              {t('users:form.password')}
+            </label>
             <input
               type="password"
               className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
@@ -96,7 +106,9 @@ export function UserCreatePage() {
             />
           </div>
           <div>
-            <label className="text-sm font-semibold text-slate-700">Confirm password</label>
+            <label className="text-sm font-semibold text-slate-700">
+              {t('users:form.confirm_password')}
+            </label>
             <input
               type="password"
               className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
@@ -111,15 +123,15 @@ export function UserCreatePage() {
               checked={isActive}
               onChange={(event) => setIsActive(event.target.checked)}
             />
-            Active
+            {t('users:form.active')}
           </label>
           {error ? <div className="text-sm text-red-600">{error}</div> : null}
           <div className="flex items-center gap-2">
             <Button type="submit" disabled={isSaving}>
-              {isSaving ? 'Saving...' : 'Create user'}
+              {isSaving ? t('common:messages.loading') : t('users:form.create')}
             </Button>
             <Button type="button" variant="ghost" onClick={() => navigate('/admin/users')}>
-              Cancel
+              {t('users:form.cancel')}
             </Button>
           </div>
         </form>

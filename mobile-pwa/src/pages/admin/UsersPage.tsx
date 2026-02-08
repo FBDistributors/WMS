@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Users } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -10,16 +11,9 @@ import { Badge } from '../../components/ui/badge'
 import { listUsers } from '../../services/usersApi'
 import type { UserRecord, UserRole } from '../../types/users'
 
-const ROLE_LABELS: Record<UserRole, string> = {
-  warehouse_admin: 'Warehouse Admin',
-  supervisor: 'Supervisor',
-  picker: 'Picker',
-  receiver: 'Receiver',
-  inventory_controller: 'Inventory Controller',
-}
-
 export function UsersPage() {
   const navigate = useNavigate()
+  const { t } = useTranslation(['users', 'common'])
   const [items, setItems] = useState<UserRecord[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -33,11 +27,11 @@ export function UsersPage() {
       const data = await listUsers({ q: query || undefined, limit: 100, offset: 0 })
       setItems(data.items)
     } catch {
-      setError('Foydalanuvchilar yuklanmadi. Qayta urinib ko‘ring.')
+      setError(t('users:load_error'))
     } finally {
       setIsLoading(false)
     }
-  }, [query])
+  }, [query, t])
 
   useEffect(() => {
     const handle = setTimeout(() => {
@@ -53,10 +47,10 @@ export function UsersPage() {
 
   return (
     <AdminLayout
-      title="Users & Access"
+      title={t('users:title')}
       actionSlot={
         <Button variant="secondary" onClick={() => navigate('/admin/users/new')}>
-          + New user
+          + {t('users:new_user')}
         </Button>
       }
     >
@@ -65,7 +59,7 @@ export function UsersPage() {
           <Search size={18} className="text-slate-400" />
           <input
             className="w-full bg-transparent text-sm text-slate-900 outline-none"
-            placeholder="Username yoki full name bo‘yicha qidirish"
+            placeholder={t('users:search_placeholder')}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
@@ -75,15 +69,23 @@ export function UsersPage() {
           value={roleFilter}
           onChange={(event) => setRoleFilter(event.target.value as UserRole | 'all')}
         >
-          <option value="all">All roles</option>
-          {Object.entries(ROLE_LABELS).map(([key, label]) => (
-            <option key={key} value={key}>
-              {label}
+          <option value="all">{t('users:roles.all')}</option>
+          {(
+            [
+              'warehouse_admin',
+              'supervisor',
+              'picker',
+              'receiver',
+              'inventory_controller',
+            ] as UserRole[]
+          ).map((role) => (
+            <option key={role} value={role}>
+              {t(`users:roles.${role}`)}
             </option>
           ))}
         </select>
         <Button variant="ghost" onClick={load}>
-          Refresh
+          {t('common:buttons.refresh')}
         </Button>
       </div>
 
@@ -93,13 +95,18 @@ export function UsersPage() {
           <div className="h-14 w-full animate-pulse rounded-2xl bg-slate-200" />
         </div>
       ) : error ? (
-        <EmptyState icon={<Users size={32} />} title={error} actionLabel="Qayta urinib ko‘rish" onAction={load} />
+        <EmptyState
+          icon={<Users size={32} />}
+          title={error}
+          actionLabel={t('common:buttons.retry')}
+          onAction={load}
+        />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={<Users size={32} />}
-          title="No users found"
-          description="Hozircha foydalanuvchi yo‘q."
-          actionLabel="Yaratish"
+          title={t('users:empty_title')}
+          description={t('users:empty_desc')}
+          actionLabel={t('common:buttons.create')}
           onAction={() => navigate('/admin/users/new')}
         />
       ) : (
@@ -112,15 +119,15 @@ export function UsersPage() {
               <div>
                 <div className="text-sm font-semibold text-slate-900">{user.username}</div>
                 <div className="text-xs text-slate-500">
-                  {user.full_name || '—'} · {ROLE_LABELS[user.role]}
+                  {user.full_name || '—'} · {t(`users:roles.${user.role}`)}
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant={user.is_active ? 'success' : 'neutral'}>
-                  {user.is_active ? 'ACTIVE' : 'INACTIVE'}
+                  {user.is_active ? t('common:status.active') : t('common:status.inactive')}
                 </Badge>
                 <Button variant="ghost" onClick={() => navigate(`/admin/users/${user.id}`)}>
-                  Edit
+                  {t('users:actions.edit')}
                 </Button>
               </div>
             </Card>

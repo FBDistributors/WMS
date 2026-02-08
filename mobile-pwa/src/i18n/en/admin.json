@@ -1,0 +1,36 @@
+{
+  "menu": {
+    "dashboard": "Dashboard",
+    "products": "Products",
+    "inventory": "Inventory",
+    "picking": "Picking",
+    "users": "Users & Access"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "open_pick_lists": "Open pick lists",
+    "completed_today": "Completed today",
+    "exceptions": "Exceptions",
+    "low_stock": "Low stock alerts",
+    "active_picks": "Active picks",
+    "today_overview": "Today overview",
+    "load_error": "Failed to load dashboard. Please try again."
+  },
+  "active_picks": {
+    "empty": "No active picks right now.",
+    "open": "Open",
+    "picked": "{{picked}}/{{total}} picked"
+  },
+  "exceptions": {
+    "empty": "No exceptions reported today.",
+    "view": "View",
+    "status": {
+      "open": "Open",
+      "resolved": "Resolved"
+    }
+  },
+  "header": {
+    "menu": "Menu"
+  },
+  "sidebar_title": "WMS Admin"
+}

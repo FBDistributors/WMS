@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 import { listPickLists, type PickList } from '../../services/pickingApi'
 import type { ApiError } from '../../services/apiClient'
@@ -26,6 +27,7 @@ function formatError(error: unknown) {
 
 const BASE_PATH = '/picking/mobile-pwa'
 export function PickListPage() {
+  const { t } = useTranslation(['picking', 'common'])
   const [documents, setDocuments] = useState<PickList[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -37,18 +39,18 @@ export function PickListPage() {
       const data = await listPickLists()
       setDocuments(data)
     } catch (error) {
-      setErrorMessage(`Pick list yuklanmadi. ${formatError(error)}`)
+      setErrorMessage(`${t('picking:load_error')} ${formatError(error)}`)
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     void loadDocuments()
   }, [loadDocuments])
 
   if (isLoading) {
-    return <div>Yuklanmoqda...</div>
+    return <div>{t('common:messages.loading')}</div>
   }
 
   if (errorMessage) {
@@ -56,7 +58,7 @@ export function PickListPage() {
       <div>
         <p>{errorMessage}</p>
         <button type="button" onClick={loadDocuments}>
-          Qayta urinib ko‘rish
+          {t('common:buttons.retry')}
         </button>
       </div>
     )
@@ -64,14 +66,14 @@ export function PickListPage() {
 
   return (
     <div>
-      <h1>Pick List</h1>
+      <h1>{t('picking:list_title')}</h1>
       <div>
         <button type="button" onClick={loadDocuments}>
-          Yangilash
+          {t('picking:refresh')}
         </button>
       </div>
       {documents.length === 0 ? (
-        <div>Hujjatlar topilmadi.</div>
+        <div>{t('picking:empty_title')}</div>
       ) : (
         <ul>
           {documents.map((doc) => (
@@ -81,7 +83,10 @@ export function PickListPage() {
                   <strong>{doc.document_no}</strong>
                 </div>
                 <div>
-                  Progress: {doc.picked_lines}/{doc.total_lines} lines
+                  {t('picking:progress_picked', {
+                    picked: doc.picked_lines,
+                    total: doc.total_lines,
+                  })}
                 </div>
               </Link>
             </li>

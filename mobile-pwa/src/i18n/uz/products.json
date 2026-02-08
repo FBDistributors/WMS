@@ -1,0 +1,17 @@
+{
+  "title": "Mahsulotlar",
+  "search_placeholder": "Mahsulot nomi, SKU yoki barcode",
+  "empty_title": "Mahsulotlar topilmadi",
+  "empty_desc": "Hozircha mahsulotlar yo‘q.",
+  "load_error": "Mahsulotlar yuklanmadi. Qayta urinib ko‘ring.",
+  "refresh": "Yangilash",
+  "details_title": "Mahsulot tafsilotlari",
+  "not_found": "Mahsulot topilmadi.",
+  "load_failed": "Mahsulot yuklanmadi.",
+  "fields": {
+    "name": "Nomi",
+    "sku": "SKU",
+    "barcode": "Barcode",
+    "status": "Holat"
+  }
+}

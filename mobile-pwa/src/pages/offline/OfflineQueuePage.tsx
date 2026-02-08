@@ -1,3 +1,6 @@
+import { useTranslation } from 'react-i18next'
+
 export function OfflineQueuePage() {
-  return <div>Offline Queue</div>
+  const { t } = useTranslation('common')
+  return <div>{t('labels.offline_queue')}</div>
 }

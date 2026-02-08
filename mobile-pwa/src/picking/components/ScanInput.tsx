@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 type ScanInputProps = {
   onScan: (code: string) => void
@@ -10,6 +11,7 @@ function normalizeScan(value: string) {
 }
 
 export function ScanInput({ onScan, placeholder = 'Scan or type barcode/SKU' }: ScanInputProps) {
+  const { t } = useTranslation('picking')
   const inputRef = useRef<HTMLInputElement | null>(null)
   const [value, setValue] = useState('')
 
@@ -32,7 +34,7 @@ export function ScanInput({ onScan, placeholder = 'Scan or type barcode/SKU' }: 
       <input
         ref={inputRef}
         className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400"
-        placeholder={placeholder}
+        placeholder={placeholder || t('scan_placeholder')}
         value={value}
         onChange={(event) => setValue(event.target.value)}
         onKeyDown={handleKeyDown}

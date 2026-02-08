@@ -1,0 +1,47 @@
+{
+  "title": "Users & Access",
+  "new_user": "Yangi foydalanuvchi",
+  "search_placeholder": "Username yoki full name bo‘yicha qidirish",
+  "load_error": "Foydalanuvchilar yuklanmadi. Qayta urinib ko‘ring.",
+  "empty_title": "Foydalanuvchi topilmadi",
+  "empty_desc": "Hozircha foydalanuvchi yo‘q.",
+  "actions": {
+    "edit": "Tahrirlash",
+    "refresh": "Yangilash",
+    "disable": "O‘chirish",
+    "reset_password": "Parolni yangilash"
+  },
+  "form": {
+    "create_title": "Foydalanuvchi yaratish",
+    "details_title": "Foydalanuvchi ma'lumoti",
+    "username": "Username",
+    "full_name": "Full name",
+    "role": "Role",
+    "password": "Parol",
+    "confirm_password": "Parolni tasdiqlash",
+    "active": "Faol",
+    "save": "Saqlash",
+    "create": "Yaratish",
+    "cancel": "Bekor qilish",
+    "back": "Orqaga"
+  },
+  "roles": {
+    "all": "Barcha rollar",
+    "warehouse_admin": "Warehouse Admin",
+    "supervisor": "Supervisor",
+    "picker": "Picker",
+    "receiver": "Receiver",
+    "inventory_controller": "Inventory Controller"
+  },
+  "messages": {
+    "password_mismatch": "Parollar mos emas.",
+    "create_failed": "User yaratilmadi. Parol kuchli ekanini tekshiring.",
+    "update_failed": "User yangilanmadi.",
+    "reset_failed": "Parol yangilanmadi.",
+    "reset_success": "Parol yangilandi.",
+    "load_failed": "User yuklanmadi.",
+    "not_found": "User topilmadi.",
+    "disable_confirm": "Foydalanuvchini o‘chirib qo‘ymoqchimisiz?",
+    "self_lockout": "Bu amal sizni admin huquqidan mahrum qilishi yoki hisobingizni bloklashi mumkin. Davom etasizmi?"
+  }
+}

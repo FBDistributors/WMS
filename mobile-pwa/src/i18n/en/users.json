@@ -1,0 +1,47 @@
+{
+  "title": "Users & Access",
+  "new_user": "New user",
+  "search_placeholder": "Search by username or full name",
+  "load_error": "Failed to load users. Please try again.",
+  "empty_title": "No users found",
+  "empty_desc": "There are no users yet.",
+  "actions": {
+    "edit": "Edit",
+    "refresh": "Refresh",
+    "disable": "Disable",
+    "reset_password": "Reset password"
+  },
+  "form": {
+    "create_title": "Create user",
+    "details_title": "User details",
+    "username": "Username",
+    "full_name": "Full name",
+    "role": "Role",
+    "password": "Password",
+    "confirm_password": "Confirm password",
+    "active": "Active",
+    "save": "Save changes",
+    "create": "Create user",
+    "cancel": "Cancel",
+    "back": "Back"
+  },
+  "roles": {
+    "all": "All roles",
+    "warehouse_admin": "Warehouse Admin",
+    "supervisor": "Supervisor",
+    "picker": "Picker",
+    "receiver": "Receiver",
+    "inventory_controller": "Inventory Controller"
+  },
+  "messages": {
+    "password_mismatch": "Passwords do not match.",
+    "create_failed": "Failed to create user. Check password strength.",
+    "update_failed": "Failed to update user.",
+    "reset_failed": "Failed to reset password.",
+    "reset_success": "Password updated.",
+    "load_failed": "Failed to load user.",
+    "not_found": "User not found.",
+    "disable_confirm": "Do you want to disable this user?",
+    "self_lockout": "This may remove your admin access or disable your account. Continue?"
+  }
+}

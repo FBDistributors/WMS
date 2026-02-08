@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { Button } from '../../components/ui/button'
@@ -11,13 +12,14 @@ import { getProduct, type Product } from '../../services/productsApi'
 export function ProductDetailsPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { t } = useTranslation(['products', 'common'])
   const [product, setProduct] = useState<Product | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!id) {
-      setError('Mahsulot topilmadi.')
+      setError(t('products:not_found'))
       setIsLoading(false)
       return
     }
@@ -27,11 +29,11 @@ export function ProductDetailsPage() {
       const data = await getProduct(id)
       setProduct(data)
     } catch (err) {
-      setError('Mahsulot yuklanmadi.')
+      setError(t('products:load_failed'))
     } finally {
       setIsLoading(false)
     }
-  }, [id])
+  }, [id, t])
 
   useEffect(() => {
     void load()
@@ -39,7 +41,7 @@ export function ProductDetailsPage() {
 
   if (isLoading) {
     return (
-      <AdminLayout title="Product details">
+      <AdminLayout title={t('products:details_title')}>
         <div className="h-32 w-full animate-pulse rounded-2xl bg-slate-200" />
       </AdminLayout>
     )
@@ -47,10 +49,10 @@ export function ProductDetailsPage() {
 
   if (!product || error) {
     return (
-      <AdminLayout title="Product details">
+      <AdminLayout title={t('products:details_title')}>
         <EmptyState
-          title={error ?? 'Mahsulot topilmadi'}
-          actionLabel="Qayta urinib ko‘rish"
+          title={error ?? t('products:not_found')}
+          actionLabel={t('common:buttons.retry')}
           onAction={load}
         />
       </AdminLayout>
@@ -59,31 +61,31 @@ export function ProductDetailsPage() {
 
   return (
     <AdminLayout
-      title="Product details"
+      title={t('products:details_title')}
       actionSlot={
         <Button variant="ghost" onClick={() => navigate(-1)}>
           <ArrowLeft size={16} />
-          Back
+          {t('common:buttons.back')}
         </Button>
       }
     >
       <Card className="space-y-3">
         <div>
-          <div className="text-sm text-slate-500">Name</div>
+          <div className="text-sm text-slate-500">{t('products:fields.name')}</div>
           <div className="text-lg font-semibold text-slate-900">{product.name}</div>
         </div>
         <div>
-          <div className="text-sm text-slate-500">SKU</div>
+          <div className="text-sm text-slate-500">{t('products:fields.sku')}</div>
           <div className="text-base text-slate-900">{product.sku}</div>
         </div>
         <div>
-          <div className="text-sm text-slate-500">Barcode</div>
+          <div className="text-sm text-slate-500">{t('products:fields.barcode')}</div>
           <div className="text-base text-slate-900">{product.barcode ?? '—'}</div>
         </div>
         <div>
-          <div className="text-sm text-slate-500">Status</div>
+          <div className="text-sm text-slate-500">{t('products:fields.status')}</div>
           <div className="text-base text-slate-900">
-            {product.is_active ? 'active' : 'inactive'}
+            {product.is_active ? t('common:status.active') : t('common:status.inactive')}
           </div>
         </div>
       </Card>
