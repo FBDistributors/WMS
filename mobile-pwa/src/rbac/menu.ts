@@ -9,8 +9,8 @@ export type MenuItem = {
   required?: PermissionKey
 }
 
-export function filterMenuByPermissions(
-  items: MenuItem[],
+export function filterMenuByPermissions<T extends MenuItem>(
+  items: T[],
   permissions: PermissionKey[]
 ) {
   return items.filter((item) => !item.required || permissions.includes(item.required))
