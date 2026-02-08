@@ -9,6 +9,7 @@ import {
   Users,
   UserCircle2,
   LogOut,
+  Settings,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -16,6 +17,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../rbac/AuthProvider'
 import type { MenuItem } from '../../rbac/menu'
 import { filterMenuByPermissions } from '../../rbac/menu'
+import { isSupervisor, isWarehouseAdmin } from '../../rbac/permissions'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip'
@@ -26,6 +28,7 @@ const MENU_ITEMS: Array<MenuItem & { key: string }> = [
   { key: 'inventory', label: 'Inventory', path: '/admin/inventory', icon: Boxes, required: 'inventory:read' },
   { key: 'picking', label: 'Picking', path: '/picking/mobile-pwa', icon: ClipboardList, required: 'picking:read' },
   { key: 'users', label: 'Users & Access', path: '/admin/users', icon: Users, required: 'users:manage' },
+  { key: 'profile', label: 'Profile', path: '/admin/profile', icon: Settings, required: 'admin:access' },
 ]
 
 type SidebarProps = {
@@ -39,7 +42,11 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
   const navigate = useNavigate()
   const { user, signOut } = useAuth()
   const { t } = useTranslation(['admin', 'common'])
-  const items = filterMenuByPermissions(MENU_ITEMS, user?.permissions ?? [])
+  const items = filterMenuByPermissions(MENU_ITEMS, user?.permissions ?? []).filter((item) => {
+    if (item.key !== 'profile') return true
+    if (!user) return false
+    return isWarehouseAdmin(user.role) || isSupervisor(user.role)
+  })
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const profileRef = useRef<HTMLDivElement | null>(null)
 

@@ -4,7 +4,18 @@
     "products": "Товары",
     "inventory": "Запасы",
     "picking": "Подбор",
-    "users": "Пользователи и доступ"
+    "users": "Пользователи и доступ",
+    "profile": "Профиль"
+  },
+  "settings": {
+    "title": "Настройки",
+    "tabs": {
+      "profile": "Профиль",
+      "notifications": "Уведомления",
+      "integrations": "Интеграции",
+      "security": "Безопасность"
+    },
+    "coming_soon": "Скоро"
   },
   "dashboard": {
     "title": "Дашборд",
@@ -42,19 +53,25 @@
   },
   "profile": {
     "menu": "Меню профиля",
-    "title": "Профиль",
+    "title": "Настройки",
     "my_profile": "Мой профиль",
     "avatar_alt": "Фото профиля",
-    "upload_photo": "Загрузить фото",
+    "update_picture": "Обновить фото",
     "remove_photo": "Удалить фото",
     "fields": {
-      "username": "Имя пользователя",
-      "first_name": "Имя",
-      "last_name": "Фамилия",
+      "full_name": "Полное имя",
+      "email": "Email",
       "role": "Роль",
-      "permissions": "Права"
+      "department": "Отдел"
     },
-    "permissions_count": "Права: {{count}}",
-    "change_password": "Сменить пароль"
+    "placeholders": {
+      "email": "admin@company.com",
+      "department": "—"
+    },
+    "password_title": "Пароль",
+    "change_password": "Сменить пароль",
+    "password_soon": "Смена пароля скоро будет доступна.",
+    "security_title": "Безопасность",
+    "enable_2fa": "Включить двухфакторную аутентификацию"
   }
 }

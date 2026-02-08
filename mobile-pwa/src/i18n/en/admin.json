@@ -4,7 +4,18 @@
     "products": "Products",
     "inventory": "Inventory",
     "picking": "Picking",
-    "users": "Users & Access"
+    "users": "Users & Access",
+    "profile": "Profile"
+  },
+  "settings": {
+    "title": "Settings",
+    "tabs": {
+      "profile": "Profile",
+      "notifications": "Notifications",
+      "integrations": "Integrations",
+      "security": "Security"
+    },
+    "coming_soon": "Coming soon"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -42,19 +53,25 @@
   },
   "profile": {
     "menu": "Profile menu",
-    "title": "Profile",
+    "title": "Settings",
     "my_profile": "My Profile",
     "avatar_alt": "Profile photo",
-    "upload_photo": "Upload photo",
+    "update_picture": "Update picture",
     "remove_photo": "Remove photo",
     "fields": {
-      "username": "Username",
-      "first_name": "First name",
-      "last_name": "Last name",
+      "full_name": "Full name",
+      "email": "Email",
       "role": "Role",
-      "permissions": "Permissions"
+      "department": "Department"
     },
-    "permissions_count": "{{count}} permissions",
-    "change_password": "Change password"
+    "placeholders": {
+      "email": "admin@company.com",
+      "department": "—"
+    },
+    "password_title": "Password",
+    "change_password": "Change my password",
+    "password_soon": "Password change is coming soon.",
+    "security_title": "Security",
+    "enable_2fa": "Enable Two-Factor Authentication"
   }
 }

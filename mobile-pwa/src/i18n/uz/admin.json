@@ -4,7 +4,18 @@
     "products": "Mahsulotlar",
     "inventory": "Inventar",
     "picking": "Picking",
-    "users": "Users & Access"
+    "users": "Users & Access",
+    "profile": "Profil"
+  },
+  "settings": {
+    "title": "Sozlamalar",
+    "tabs": {
+      "profile": "Profil",
+      "notifications": "Bildirishnomalar",
+      "integrations": "Integratsiyalar",
+      "security": "Xavfsizlik"
+    },
+    "coming_soon": "Tez orada"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -42,19 +53,25 @@
   },
   "profile": {
     "menu": "Profil menyusi",
-    "title": "Profil",
+    "title": "Sozlamalar",
     "my_profile": "Mening profilim",
     "avatar_alt": "Profil rasmi",
-    "upload_photo": "Rasm yuklash",
+    "update_picture": "Rasmni yangilash",
     "remove_photo": "Rasmni olib tashlash",
     "fields": {
-      "username": "Username",
-      "first_name": "Ism",
-      "last_name": "Familya",
+      "full_name": "To‘liq ism",
+      "email": "Email",
       "role": "Rol",
-      "permissions": "Ruxsatlar"
+      "department": "Bo‘lim"
     },
-    "permissions_count": "{{count}} ta ruxsat",
-    "change_password": "Parolni o‘zgartirish"
+    "placeholders": {
+      "email": "admin@company.com",
+      "department": "—"
+    },
+    "password_title": "Parol",
+    "change_password": "Parolimni o‘zgartirish",
+    "password_soon": "Parolni o‘zgartirish tez orada.",
+    "security_title": "Xavfsizlik",
+    "enable_2fa": "Ikki bosqichli autentifikatsiyani yoqish"
   }
 }
