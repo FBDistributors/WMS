@@ -11,9 +11,11 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 
 const variantStyles: Record<ButtonVariant, string> = {
   default: 'bg-blue-600 text-white hover:bg-blue-700',
-  secondary: 'bg-slate-100 text-slate-900 hover:bg-slate-200',
-  outline: 'border border-slate-200 text-slate-900 hover:bg-slate-50',
-  ghost: 'text-slate-700 hover:bg-slate-100',
+  secondary:
+    'bg-slate-100 text-slate-900 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700',
+  outline:
+    'border border-slate-200 text-slate-900 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-100 dark:hover:bg-slate-800',
+  ghost: 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800',
   danger: 'bg-red-600 text-white hover:bg-red-700',
 }
 

@@ -32,5 +32,25 @@
   "header": {
     "menu": "Menyu"
   },
-  "sidebar_title": "WMS Admin"
+  "sidebar_title": "WMS Admin",
+  "roles": {
+    "warehouse_admin": "Ombor administratori",
+    "supervisor": "Supervayzer",
+    "picker": "Teruvchi",
+    "receiver": "Qabulchi",
+    "inventory_controller": "Inventar nazoratchisi"
+  },
+  "profile": {
+    "menu": "Profil menyusi",
+    "title": "Profil",
+    "my_profile": "Mening profilim",
+    "fields": {
+      "username": "Username",
+      "full_name": "To‘liq ism",
+      "role": "Rol",
+      "permissions": "Ruxsatlar"
+    },
+    "permissions_count": "{{count}} ta ruxsat",
+    "change_password": "Parolni o‘zgartirish"
+  }
 }

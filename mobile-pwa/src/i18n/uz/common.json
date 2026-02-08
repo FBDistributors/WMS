@@ -13,6 +13,19 @@
     "home": "Bosh sahifa",
     "close": "Yopish"
   },
+  "actions": {
+    "sign_out": "Chiqish"
+  },
+  "theme": {
+    "label": "Mavzu",
+    "light": "Yorug‘",
+    "dark": "Qorong‘i",
+    "system": "Tizim"
+  },
+  "sidebar": {
+    "collapse": "Sidebarni yig‘ish",
+    "expand": "Sidebarni kengaytirish"
+  },
   "status": {
     "active": "Faol",
     "inactive": "Faol emas",

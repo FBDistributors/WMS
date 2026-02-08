@@ -13,6 +13,19 @@
     "home": "Главная",
     "close": "Закрыть"
   },
+  "actions": {
+    "sign_out": "Выйти"
+  },
+  "theme": {
+    "label": "Тема",
+    "light": "Светлая",
+    "dark": "Тёмная",
+    "system": "Системная"
+  },
+  "sidebar": {
+    "collapse": "Свернуть меню",
+    "expand": "Развернуть меню"
+  },
   "status": {
     "active": "Активен",
     "inactive": "Неактивен",

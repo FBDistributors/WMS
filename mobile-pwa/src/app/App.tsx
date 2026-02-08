@@ -7,6 +7,7 @@ import { useAuth } from '../rbac/AuthProvider'
 import { getHomeRouteForRole } from '../rbac/routes'
 import { DashboardPage } from '../pages/admin/DashboardPage'
 import { NotAuthorizedPage } from '../pages/admin/NotAuthorizedPage'
+import { ProfilePage } from '../pages/admin/ProfilePage'
 import { ProductDetailsPage } from '../pages/admin/ProductDetailsPage'
 import { ProductsListPage } from '../pages/admin/ProductsListPage'
 import { UsersPage } from '../pages/admin/UsersPage'
@@ -135,6 +136,14 @@ export function App() {
               <RequirePermission permission="users:manage">
                 <UserDetailsPage />
               </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/profile"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <ProfilePage />
             </RequirePermission>
           }
         />

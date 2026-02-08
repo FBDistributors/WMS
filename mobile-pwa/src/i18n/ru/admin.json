@@ -32,5 +32,25 @@
   "header": {
     "menu": "Меню"
   },
-  "sidebar_title": "WMS Admin"
+  "sidebar_title": "WMS Admin",
+  "roles": {
+    "warehouse_admin": "Администратор склада",
+    "supervisor": "Супервайзер",
+    "picker": "Сборщик",
+    "receiver": "Приёмщик",
+    "inventory_controller": "Контролёр запасов"
+  },
+  "profile": {
+    "menu": "Меню профиля",
+    "title": "Профиль",
+    "my_profile": "Мой профиль",
+    "fields": {
+      "username": "Имя пользователя",
+      "full_name": "ФИО",
+      "role": "Роль",
+      "permissions": "Права"
+    },
+    "permissions_count": "Права: {{count}}",
+    "change_password": "Сменить пароль"
+  }
 }

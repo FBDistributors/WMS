@@ -14,10 +14,10 @@ export function LanguageSwitcher({ compact }: LanguageSwitcherProps) {
   const { i18n, t } = useTranslation('common')
 
   return (
-    <label className="flex items-center gap-2 text-xs text-slate-600">
+    <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
       {compact ? null : <span>{t('labels.language')}</span>}
       <select
-        className="rounded-xl border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700"
+        className="rounded-xl border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
         value={i18n.language}
         onChange={(event) => {
           void i18n.changeLanguage(event.target.value)

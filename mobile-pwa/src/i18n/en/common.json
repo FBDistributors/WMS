@@ -13,6 +13,19 @@
     "home": "Home",
     "close": "Close"
   },
+  "actions": {
+    "sign_out": "Sign out"
+  },
+  "theme": {
+    "label": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "sidebar": {
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar"
+  },
   "status": {
     "active": "Active",
     "inactive": "Inactive",

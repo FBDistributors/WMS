@@ -21,11 +21,19 @@ export function EmptyState({
   className,
 }: EmptyStateProps) {
   return (
-    <div className={cn('flex flex-col items-center gap-3 rounded-2xl bg-white p-6', className)}>
-      {icon ? <div className="text-slate-400">{icon}</div> : null}
-      <div className="text-base font-semibold text-slate-900">{title}</div>
+    <div
+      className={cn(
+        'flex flex-col items-center gap-3 rounded-2xl bg-white p-6',
+        'dark:bg-slate-900',
+        className
+      )}
+    >
+      {icon ? <div className="text-slate-400 dark:text-slate-500">{icon}</div> : null}
+      <div className="text-base font-semibold text-slate-900 dark:text-slate-100">{title}</div>
       {description ? (
-        <div className="text-sm text-slate-500 text-center">{description}</div>
+        <div className="text-sm text-slate-500 text-center dark:text-slate-400">
+          {description}
+        </div>
       ) : null}
       {actionLabel && onAction ? (
         <Button variant="secondary" onClick={onAction}>

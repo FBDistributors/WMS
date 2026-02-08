@@ -32,5 +32,25 @@
   "header": {
     "menu": "Menu"
   },
-  "sidebar_title": "WMS Admin"
+  "sidebar_title": "WMS Admin",
+  "roles": {
+    "warehouse_admin": "Warehouse Admin",
+    "supervisor": "Supervisor",
+    "picker": "Picker",
+    "receiver": "Receiver",
+    "inventory_controller": "Inventory Controller"
+  },
+  "profile": {
+    "menu": "Profile menu",
+    "title": "Profile",
+    "my_profile": "My Profile",
+    "fields": {
+      "username": "Username",
+      "full_name": "Full name",
+      "role": "Role",
+      "permissions": "Permissions"
+    },
+    "permissions_count": "{{count}} permissions",
+    "change_password": "Change password"
+  }
 }
