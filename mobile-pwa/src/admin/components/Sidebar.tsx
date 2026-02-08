@@ -1,7 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
 import {
-  ChevronLeft,
-  ChevronRight,
   LayoutDashboard,
   Package,
   Boxes,
@@ -9,6 +7,8 @@ import {
   Users,
   UserCircle2,
   Settings,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -16,7 +16,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../rbac/AuthProvider'
 import type { MenuItem } from '../../rbac/menu'
 import { filterMenuByPermissions } from '../../rbac/menu'
-import { isSupervisor, isWarehouseAdmin } from '../../rbac/permissions'
+import { ROLE_PERMISSIONS, isSupervisor, isWarehouseAdmin } from '../../rbac/permissions'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip'
@@ -40,7 +40,12 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
   const location = useLocation()
   const { user } = useAuth()
   const { t } = useTranslation(['admin', 'common'])
-  const items = filterMenuByPermissions(MENU_ITEMS, user?.permissions ?? []).filter((item) => {
+  const effectivePermissions = user
+    ? user.permissions.length > 0
+      ? user.permissions
+      : ROLE_PERMISSIONS[user.role]
+    : []
+  const items = filterMenuByPermissions(MENU_ITEMS, effectivePermissions).filter((item) => {
     if (item.key !== 'profile') return true
     if (!user) return false
     return isWarehouseAdmin(user.role) || isSupervisor(user.role)
@@ -81,12 +86,12 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
           {t('admin:sidebar_title')}
         </div>
         <Button
-          variant="ghost"
+          variant="secondary"
           className={collapsed ? 'mx-auto' : ''}
           onClick={onToggleCollapse}
           aria-label={collapsed ? t('common:sidebar.expand') : t('common:sidebar.collapse')}
         >
-          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+          {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
         </Button>
       </div>
       <TooltipProvider>
