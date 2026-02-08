@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { NotAuthorized } from '../rbac/NotAuthorized'
 import { useAuth } from '../rbac/AuthProvider'
 import { getHomeRouteForRole } from '../rbac/routes'
+import { clearToken } from '../services/authApi'
 
 export function NotAuthorizedPage() {
   const navigate = useNavigate()
@@ -23,7 +24,10 @@ export function NotAuthorizedPage() {
       <NotAuthorized
         onHome={() => navigate(home)}
         onBack={handleBack}
-        onLogin={() => window.location.assign('/login')}
+        onLogin={() => {
+          clearToken()
+          window.location.assign('/login')
+        }}
       />
     </div>
   )
