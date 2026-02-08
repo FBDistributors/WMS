@@ -15,7 +15,7 @@ export function NotAuthorizedPage() {
       navigate(from, { replace: true })
       return
     }
-    navigate('/login', { replace: true })
+    window.location.assign('/login')
   }
 
   return (
