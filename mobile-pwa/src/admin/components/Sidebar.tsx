@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import {
   ChevronLeft,
   ChevronRight,
@@ -8,10 +8,9 @@ import {
   ClipboardList,
   Users,
   UserCircle2,
-  LogOut,
   Settings,
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useAuth } from '../../rbac/AuthProvider'
@@ -39,27 +38,13 @@ type SidebarProps = {
 
 export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProps) {
   const location = useLocation()
-  const navigate = useNavigate()
-  const { user, signOut } = useAuth()
+  const { user } = useAuth()
   const { t } = useTranslation(['admin', 'common'])
   const items = filterMenuByPermissions(MENU_ITEMS, user?.permissions ?? []).filter((item) => {
     if (item.key !== 'profile') return true
     if (!user) return false
     return isWarehouseAdmin(user.role) || isSupervisor(user.role)
   })
-  const [isProfileOpen, setIsProfileOpen] = useState(false)
-  const profileRef = useRef<HTMLDivElement | null>(null)
-
-  useEffect(() => {
-    const handleClick = (event: MouseEvent) => {
-      if (!profileRef.current) return
-      if (!profileRef.current.contains(event.target as Node)) {
-        setIsProfileOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
 
   const roleLabel = useMemo(() => {
     if (!user) return ''
@@ -158,41 +143,8 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
                 <Badge variant="neutral">{roleLabel}</Badge>
               </div>
             </div>
-            <div className="relative" ref={profileRef}>
-              <Button
-                variant="ghost"
-                onClick={() => setIsProfileOpen((prev) => !prev)}
-                aria-label={t('admin:profile.menu')}
-              >
-                <UserCircle2 size={18} />
-              </Button>
-              {isProfileOpen ? (
-                <div className="absolute right-0 mt-2 w-44 rounded-xl border border-slate-200 bg-white p-1 text-sm shadow-lg dark:border-slate-800 dark:bg-slate-900">
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
-                    onClick={() => {
-                      navigate('/admin/profile')
-                      setIsProfileOpen(false)
-                      onNavigate?.()
-                    }}
-                  >
-                    <UserCircle2 size={16} />
-                    {t('admin:profile.my_profile')}
-                  </button>
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
-                    onClick={() => {
-                      signOut()
-                      navigate('/login')
-                    }}
-                  >
-                    <LogOut size={16} />
-                    {t('common:actions.sign_out')}
-                  </button>
-                </div>
-              ) : null}
+            <div className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 dark:border-slate-800 dark:text-slate-300">
+              <UserCircle2 size={18} />
             </div>
           </div>
         </div>

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 
-import { ChevronLeft, ChevronRight, Menu, Moon, Sun, X } from 'lucide-react'
+import { Menu, Moon, Sun, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Sidebar } from './Sidebar'
 import { Button } from '../../components/ui/button'
@@ -65,14 +65,6 @@ export function AdminLayout({ title, actionSlot, children }: AdminLayoutProps) {
           <div className="flex items-center gap-2">
             <Button variant="ghost" className="md:hidden" onClick={() => setIsOpen(true)}>
               <Menu size={18} />
-            </Button>
-            <Button
-              variant="ghost"
-              className="hidden md:inline-flex"
-              onClick={() => setIsCollapsed((prev) => !prev)}
-              aria-label={isCollapsed ? t('common:sidebar.expand') : t('common:sidebar.collapse')}
-            >
-              {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
             </Button>
             <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               {title}
