@@ -80,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (ALLOW_MOCK_AUTH) {
         const stored = localStorage.getItem(ROLE_STORAGE_KEY) as Role | null
-        const role = stored && ROLE_PERMISSIONS[stored] ? stored : 'admin'
+        const role = stored && ROLE_PERMISSIONS[stored] ? stored : 'warehouse_admin'
         setUser({ ...DEFAULT_USER, role, permissions: ROLE_PERMISSIONS[role] })
         setIsMock(true)
       }
