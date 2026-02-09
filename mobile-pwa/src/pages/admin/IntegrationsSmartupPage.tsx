@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
-import { fetchJSON } from '../../services/apiClient'
+import { fetchJSON, type ApiError } from '../../services/apiClient'
 
 type SmartupImportResponse = {
   created: number
@@ -38,6 +38,11 @@ export function IntegrationsSmartupPage() {
       })
       setResult(data)
     } catch (err) {
+      const apiError = err as ApiError
+      if (apiError?.details && typeof apiError.details === 'object' && 'detail' in apiError.details) {
+        setError(String((apiError.details as { detail: string }).detail))
+        return
+      }
       const message = err instanceof Error ? err.message : t('admin:integrations.smartup.error')
       setError(message)
     } finally {

@@ -64,7 +64,10 @@ async def import_smartup_orders(
         run.errors_json = [{"external_id": "smartup", "reason": str(exc)}]
         db.add(run)
         db.commit()
-        raise HTTPException(status_code=500, detail="Smartup import failed") from exc
+        raise HTTPException(
+            status_code=500,
+            detail=f"Smartup import failed: {exc}",
+        ) from exc
 
     run.finished_at = datetime.utcnow()
     run.success_count = created + updated
