@@ -6,6 +6,7 @@
     "picking": "Подбор",
     "users": "Пользователи и доступ",
     "integrations": "Интеграции",
+    "smartup_orders": "Заказы Smartup",
     "profile": "Профиль"
   },
   "settings": {
@@ -62,9 +63,31 @@
       "filial_placeholder": "Необязательно",
       "run": "Запустить импорт",
       "running": "Импорт...",
+      "view_orders": "Посмотреть заказы",
       "summary": "Создано {{created}}, обновлено {{updated}}, пропущено {{skipped}}.",
       "row_error": "Заказ {{external_id}}: {{reason}}",
       "error": "Импорт не удался. Попробуйте снова."
+    },
+    "smartup_orders": {
+      "title": "Заказы Smartup",
+      "subtitle": "Заказы, импортированные из Smartup.",
+      "empty": "Заказов Smartup пока нет.",
+      "empty_desc": "Запустите импорт, чтобы загрузить заказы.",
+      "error": "Не удалось загрузить заказы Smartup.",
+      "columns": {
+        "doc_no": "Документ",
+        "external_id": "Внешний ID",
+        "status": "Статус",
+        "lines": "Строки",
+        "created": "Создано"
+      },
+      "status": {
+        "all": "Все",
+        "smartup_created": "Создано Smartup",
+        "confirmed": "Подтверждено",
+        "in_progress": "В процессе",
+        "completed": "Завершено"
+      }
     }
   },
   "profile": {

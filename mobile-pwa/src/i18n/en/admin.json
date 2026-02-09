@@ -6,6 +6,7 @@
     "picking": "Picking",
     "users": "Users & Access",
     "integrations": "Integrations",
+    "smartup_orders": "Smartup Orders",
     "profile": "Profile"
   },
   "settings": {
@@ -62,9 +63,31 @@
       "filial_placeholder": "Optional",
       "run": "Run import",
       "running": "Importing...",
+      "view_orders": "View orders",
       "summary": "Created {{created}}, updated {{updated}}, skipped {{skipped}}.",
       "row_error": "Order {{external_id}}: {{reason}}",
       "error": "Import failed. Please try again."
+    },
+    "smartup_orders": {
+      "title": "Smartup Orders",
+      "subtitle": "Orders imported from Smartup.",
+      "empty": "No Smartup orders yet.",
+      "empty_desc": "Run import to load Smartup orders.",
+      "error": "Failed to load Smartup orders.",
+      "columns": {
+        "doc_no": "Document",
+        "external_id": "External ID",
+        "status": "Status",
+        "lines": "Lines",
+        "created": "Created"
+      },
+      "status": {
+        "all": "All",
+        "smartup_created": "Smartup created",
+        "confirmed": "Confirmed",
+        "in_progress": "In progress",
+        "completed": "Completed"
+      }
     }
   },
   "profile": {

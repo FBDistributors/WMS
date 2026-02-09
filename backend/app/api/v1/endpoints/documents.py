@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Literal, Optional
 from uuid import UUID
 
@@ -45,6 +46,9 @@ class DocumentListItem(BaseModel):
     status: DocumentStatus
     lines_total: int
     lines_done: int = 0
+    source: Optional[str] = None
+    source_external_id: Optional[str] = None
+    created_at: datetime
 
 
 class DocumentLine(BaseModel):
@@ -91,6 +95,9 @@ def _to_list_item(doc: DocumentModel) -> DocumentListItem:
         status=doc.status,
         lines_total=lines_total,
         lines_done=lines_done,
+        source=doc.source,
+        source_external_id=doc.source_external_id,
+        created_at=doc.created_at,
     )
 
 
@@ -212,6 +219,7 @@ async def list_documents(
     status: Optional[str] = None,
     doc_type: Optional[str] = None,
     type_: Optional[str] = Query(None, alias="type"),
+    source: Optional[str] = None,
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -227,6 +235,9 @@ async def list_documents(
         if resolved_type not in DOCUMENT_TYPES:
             raise HTTPException(status_code=400, detail=f"Invalid doc_type: {resolved_type}")
         query = query.filter(DocumentModel.doc_type == resolved_type)
+
+    if source:
+        query = query.filter(DocumentModel.source == source)
 
     docs = query.offset(offset).limit(limit).all()
     return [_to_list_item(doc) for doc in docs]

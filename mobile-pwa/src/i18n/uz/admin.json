@@ -6,6 +6,7 @@
     "picking": "Picking",
     "users": "Users & Access",
     "integrations": "Integratsiyalar",
+    "smartup_orders": "Smartup buyurtmalar",
     "profile": "Profil"
   },
   "settings": {
@@ -62,9 +63,31 @@
       "filial_placeholder": "Ixtiyoriy",
       "run": "Importni ishga tushirish",
       "running": "Import qilinmoqda...",
+      "view_orders": "Buyurtmalarni ko‘rish",
       "summary": "{{created}} ta yaratildi, {{updated}} ta yangilandi, {{skipped}} ta o‘tkazib yuborildi.",
       "row_error": "Buyurtma {{external_id}}: {{reason}}",
       "error": "Import muvaffaqiyatsiz. Qayta urinib ko‘ring."
+    },
+    "smartup_orders": {
+      "title": "Smartup buyurtmalar",
+      "subtitle": "Smartupdan import qilingan buyurtmalar.",
+      "empty": "Hozircha Smartup buyurtmalar yo‘q.",
+      "empty_desc": "Importni ishga tushirib buyurtmalarni yuklang.",
+      "error": "Smartup buyurtmalari yuklanmadi.",
+      "columns": {
+        "doc_no": "Hujjat",
+        "external_id": "Tashqi ID",
+        "status": "Holat",
+        "lines": "Qatorlar",
+        "created": "Yaratilgan"
+      },
+      "status": {
+        "all": "Barchasi",
+        "smartup_created": "Smartupdan kelgan",
+        "confirmed": "Tasdiqlangan",
+        "in_progress": "Jarayonda",
+        "completed": "Yakunlangan"
+      }
     }
   },
   "profile": {

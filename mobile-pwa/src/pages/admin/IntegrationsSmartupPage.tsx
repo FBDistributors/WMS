@@ -95,7 +95,10 @@ export function IntegrationsSmartupPage() {
             />
           </label>
         </div>
-        <div className="flex justify-end">
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button variant="secondary" onClick={() => window.location.assign('/admin/integrations/smartup/orders')}>
+            {t('admin:integrations.smartup.view_orders')}
+          </Button>
           <Button onClick={handleSubmit} disabled={isSubmitting}>
             {isSubmitting ? t('admin:integrations.smartup.running') : t('admin:integrations.smartup.run')}
           </Button>
