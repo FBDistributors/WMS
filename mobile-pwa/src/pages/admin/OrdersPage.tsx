@@ -26,8 +26,8 @@ export function OrdersPage() {
   const [status, setStatus] = useState('all')
   const [search, setSearch] = useState('')
   const [filialId, setFilialId] = useState('')
-  const [dateFrom, setDateFrom] = useState(today)
-  const [dateTo, setDateTo] = useState(today)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isSyncing, setIsSyncing] = useState(false)
@@ -68,9 +68,11 @@ export function OrdersPage() {
     setIsSyncing(true)
     setError(null)
     try {
+      const begin = dateFrom || today
+      const end = dateTo || today
       await syncSmartupOrders({
-        begin_deal_date: dateFrom,
-        end_deal_date: dateTo,
+        begin_deal_date: begin,
+        end_deal_date: end,
         filial_code: filialId || null,
       })
       await load()
