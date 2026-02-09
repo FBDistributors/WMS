@@ -6,7 +6,6 @@ import {
   ClipboardList,
   Users,
   UserCircle2,
-  Plug,
   MapPin,
   ChevronLeft,
   ChevronRight,
@@ -29,8 +28,6 @@ const MENU_ITEMS: Array<MenuItem & { key: string }> = [
   { key: 'inventory', label: 'Inventory', path: '/admin/inventory', icon: Boxes, required: 'inventory:read' },
   { key: 'picking', label: 'Picking', path: '/picking/mobile-pwa', icon: ClipboardList, required: 'picking:read' },
   { key: 'users', label: 'Users & Access', path: '/admin/users', icon: Users, required: 'users:manage' },
-  { key: 'integrations', label: 'Integrations', path: '/admin/integrations/smartup', icon: Plug, required: 'admin:access' },
-  { key: 'smartup_orders', label: 'Smartup Orders', path: '/admin/integrations/smartup/orders', icon: ClipboardList, required: 'documents:read' },
 ]
 
 type SidebarProps = {

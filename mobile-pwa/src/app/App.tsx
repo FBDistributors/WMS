@@ -10,8 +10,6 @@ import { NotAuthorizedPage } from '../pages/admin/NotAuthorizedPage'
 import { ProfilePage } from '../pages/admin/ProfilePage'
 import { ProductDetailsPage } from '../pages/admin/ProductDetailsPage'
 import { ProductsPage } from '../pages/admin/ProductsPage'
-import { IntegrationsSmartupPage } from '../pages/admin/IntegrationsSmartupPage'
-import { SmartupOrdersPage } from '../pages/admin/SmartupOrdersPage'
 import { OrdersPage } from '../pages/admin/OrdersPage'
 import { OrderDetailsPage } from '../pages/admin/OrderDetailsPage'
 import { LocationsPage } from '../pages/admin/LocationsPage'
@@ -110,24 +108,6 @@ export function App() {
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">
               <RequirePermission permission="products:read">
                 <ProductDetailsPage />
-              </RequirePermission>
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/admin/integrations/smartup"
-          element={
-            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
-              <IntegrationsSmartupPage />
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/admin/integrations/smartup/orders"
-          element={
-            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
-              <RequirePermission permission="documents:read">
-                <SmartupOrdersPage />
               </RequirePermission>
             </RequirePermission>
           }
