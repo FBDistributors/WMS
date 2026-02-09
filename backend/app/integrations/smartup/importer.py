@@ -24,10 +24,6 @@ def import_orders(db: Session, orders: Iterable[SmartupOrder]) -> Tuple[int, int
 
     for order in orders:
         payload = map_order_to_wms_order(order)
-        if not payload.lines:
-            skipped += 1
-            continue
-
         try:
             existing = (
                 db.query(Order)
@@ -42,7 +38,8 @@ def import_orders(db: Session, orders: Iterable[SmartupOrder]) -> Tuple[int, int
                 existing.customer_name = payload.customer_name
                 if existing.status in ("imported", "ready_for_picking"):
                     existing.status = payload.status
-                _upsert_lines(existing, payload.lines)
+                if payload.lines:
+                    _upsert_lines(existing, payload.lines)
                 db.commit()
                 updated += 1
                 continue

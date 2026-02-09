@@ -248,6 +248,9 @@ async def send_order_to_picking(
     if order.status not in {"imported", "ready_for_picking"}:
         raise HTTPException(status_code=409, detail="Order cannot be sent to picking")
 
+    if not order.lines:
+        raise HTTPException(status_code=409, detail="Order has no lines")
+
     existing = db.query(DocumentModel).filter(DocumentModel.order_id == order.id).one_or_none()
     if existing:
         raise HTTPException(status_code=409, detail="Picking task already created")

@@ -19,6 +19,13 @@ class SmartupOrderLine(BaseModel):
             return values
         if "qty" in values:
             values["quantity"] = values.get("qty")
+        if "amount" in values and "quantity" not in values:
+            values["quantity"] = values.get("amount")
+        if "name" not in values:
+            for key in ("product_name", "item_name", "title"):
+                if key in values:
+                    values["name"] = values.get(key)
+                    break
         return values
 
 
@@ -56,7 +63,7 @@ class SmartupOrder(BaseModel):
 
     @root_validator(pre=True)
     def _normalize_lines(cls, values):  # noqa: N805
-        for key in ("lines", "items", "goods", "positions"):
+        for key in ("lines", "order_lines", "items", "goods", "positions", "details"):
             if key in values and isinstance(values[key], list):
                 values["lines"] = values[key]
                 break
@@ -70,6 +77,14 @@ class SmartupOrder(BaseModel):
 class SmartupOrderExportResponse(BaseModel):
     items: List[SmartupOrder] = Field(default_factory=list, alias="order")
     total: Optional[int] = None
+
+    @root_validator(pre=True)
+    def _normalize_order_list(cls, values):  # noqa: N805
+        if "order" in values and isinstance(values["order"], dict):
+            values["order"] = [values["order"]]
+        if "order" not in values and "data" in values:
+            values["order"] = values["data"]
+        return values
 
     class Config:
         extra = "allow"
