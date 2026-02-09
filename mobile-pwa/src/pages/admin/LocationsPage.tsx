@@ -12,12 +12,13 @@ import {
   getLocations,
   updateLocation,
   type Location,
+  type LocationType,
 } from '../../services/locationsApi'
 
 type TreeNode = Location & { children: TreeNode[] }
 
-const LOCATION_TYPES = ['zone', 'rack', 'shelf', 'bin'] as const
-const PARENT_BY_TYPE: Record<(typeof LOCATION_TYPES)[number], string | null> = {
+const LOCATION_TYPES: LocationType[] = ['zone', 'rack', 'shelf', 'bin']
+const PARENT_BY_TYPE: Record<LocationType, string | null> = {
   zone: null,
   rack: 'zone',
   shelf: 'rack',
@@ -197,7 +198,7 @@ function LocationDialog({ mode, target, locations, onClose, onSaved }: DialogPro
   const { t } = useTranslation(['locations', 'common'])
   const [code, setCode] = useState(target?.code ?? '')
   const [name, setName] = useState(target?.name ?? '')
-  const [type, setType] = useState<(typeof LOCATION_TYPES)[number]>(target?.type ?? 'zone')
+  const [type, setType] = useState<LocationType>(target?.type ?? 'zone')
   const [parentId, setParentId] = useState<string>(target?.parent_id ?? '')
   const [isActive, setIsActive] = useState(target?.is_active ?? true)
   const [error, setError] = useState<string | null>(null)
@@ -289,7 +290,7 @@ function LocationDialog({ mode, target, locations, onClose, onSaved }: DialogPro
               className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
               value={type}
               onChange={(event) => {
-                const nextType = event.target.value as (typeof LOCATION_TYPES)[number]
+                const nextType = event.target.value as LocationType
                 setType(nextType)
                 setParentId('')
               }}

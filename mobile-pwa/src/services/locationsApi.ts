@@ -1,10 +1,12 @@
 import { fetchJSON } from './apiClient'
 
+export type LocationType = 'zone' | 'rack' | 'shelf' | 'bin'
+
 export type Location = {
   id: string
   code: string
   name: string
-  type: string
+  type: LocationType
   parent_id?: string | null
   is_active: boolean
 }
@@ -12,7 +14,7 @@ export type Location = {
 export type LocationCreateInput = {
   code: string
   name: string
-  type: string
+  type: LocationType
   parent_id?: string | null
   is_active?: boolean
 }
@@ -20,7 +22,7 @@ export type LocationCreateInput = {
 export type LocationUpdateInput = {
   code?: string
   name?: string
-  type?: string
+  type?: LocationType
   parent_id?: string | null
   is_active?: boolean
 }
