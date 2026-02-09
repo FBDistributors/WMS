@@ -140,27 +140,36 @@ export function ProductsPage() {
     <AdminLayout
       title={t('products:title')}
       actionSlot={
-        <div className="flex items-center gap-2">
+        <Button variant="secondary" onClick={handleRetry}>
+          {t('products:refresh')}
+        </Button>
+      }
+    >
+      <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center">
+        <div className="flex flex-1 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <Search size={18} className="text-slate-400" />
+          <input
+            className="w-full bg-transparent text-sm text-slate-900 outline-none dark:text-slate-100"
+            placeholder={t('products:search_placeholder')}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2 md:flex-nowrap">
           {canManageSettings && (
-            <Button variant="secondary" onClick={() => setIsSettingsOpen(true)}>
-              <Settings size={16} className="mr-2" />
+            <Button
+              variant="secondary"
+              className="w-full md:w-auto"
+              onClick={() => setIsSettingsOpen(true)}
+            >
+              <Settings size={16} />
               {t('products:table.settings_button')}
             </Button>
           )}
-          <Button variant="secondary" onClick={handleRetry}>
+          <Button variant="secondary" className="w-full md:w-auto" onClick={handleRetry}>
             {t('products:refresh')}
           </Button>
         </div>
-      }
-    >
-      <div className="mb-4 flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <Search size={18} className="text-slate-400" />
-        <input
-          className="w-full bg-transparent text-sm text-slate-900 outline-none dark:text-slate-100"
-          placeholder={t('products:search_placeholder')}
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
       </div>
       {content}
       {canManageSettings && (

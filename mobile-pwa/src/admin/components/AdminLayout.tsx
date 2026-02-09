@@ -79,11 +79,6 @@ export function AdminLayout({ title, actionSlot, children }: AdminLayoutProps) {
             >
               {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
             </Button>
-            {user ? (
-              <div className="hidden text-sm text-slate-500 sm:block dark:text-slate-400">
-                {user.name} · {user.role}
-              </div>
-            ) : null}
             {user && import.meta.env.DEV && isMock ? (
               <select
                 className="rounded-xl border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
