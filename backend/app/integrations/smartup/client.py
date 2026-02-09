@@ -25,10 +25,10 @@ class SmartupClient:
         filial_id: str | None = None,
     ) -> None:
         self.base_url = (base_url or os.getenv("SMARTUP_BASE_URL") or "").strip()
-        self.username = username or os.getenv("SMARTUP_BASIC_USER")
-        self.password = password or os.getenv("SMARTUP_BASIC_PASS")
-        self.project_code = project_code or os.getenv("SMARTUP_PROJECT_CODE", "trade")
-        self.filial_id = filial_id or os.getenv("SMARTUP_FILIAL_ID", "3788131")
+        self.username = (username or os.getenv("SMARTUP_BASIC_USER") or "").strip() or None
+        self.password = (password or os.getenv("SMARTUP_BASIC_PASS") or "").strip() or None
+        self.project_code = (project_code or os.getenv("SMARTUP_PROJECT_CODE", "trade")).strip()
+        self.filial_id = (filial_id or os.getenv("SMARTUP_FILIAL_ID", "3788131")).strip()
 
     def export_orders(
         self,

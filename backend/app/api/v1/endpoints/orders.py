@@ -205,14 +205,17 @@ async def sync_orders_from_smartup(
     if payload.begin_deal_date > payload.end_deal_date:
         raise HTTPException(status_code=400, detail="begin_deal_date must be <= end_deal_date")
 
-    client = SmartupClient()
-    response = client.export_orders(
-        begin_deal_date=payload.begin_deal_date.strftime("%d.%m.%Y"),
-        end_deal_date=payload.end_deal_date.strftime("%d.%m.%Y"),
-        filial_code=payload.filial_code,
-    )
-    created, updated, skipped, _errors = import_orders(db, response.items)
-    return SmartupSyncResponse(created=created, updated=updated, skipped=skipped)
+    try:
+        client = SmartupClient()
+        response = client.export_orders(
+            begin_deal_date=payload.begin_deal_date.strftime("%d.%m.%Y"),
+            end_deal_date=payload.end_deal_date.strftime("%d.%m.%Y"),
+            filial_code=payload.filial_code,
+        )
+        created, updated, skipped, _errors = import_orders(db, response.items)
+        return SmartupSyncResponse(created=created, updated=updated, skipped=skipped)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"Smartup export failed: {exc}") from exc
 
 
 @router.get("/pickers", response_model=List[PickerUser], summary="List picker users")
