@@ -5,6 +5,7 @@
     "inventory": "Inventar",
     "picking": "Picking",
     "users": "Users & Access",
+    "integrations": "Integratsiyalar",
     "profile": "Profil"
   },
   "settings": {
@@ -50,6 +51,21 @@
     "picker": "Teruvchi",
     "receiver": "Qabulchi",
     "inventory_controller": "Inventar nazoratchisi"
+  },
+  "integrations": {
+    "smartup": {
+      "title": "Smartup import",
+      "subtitle": "Smartupdan savdo buyurtmalarini WMSga yuklash.",
+      "begin_deal_date": "Boshlanish sanasi",
+      "end_deal_date": "Tugash sanasi",
+      "filial_code": "Filial kodi",
+      "filial_placeholder": "Ixtiyoriy",
+      "run": "Importni ishga tushirish",
+      "running": "Import qilinmoqda...",
+      "summary": "{{created}} ta yaratildi, {{updated}} ta yangilandi, {{skipped}} ta o‘tkazib yuborildi.",
+      "row_error": "Buyurtma {{external_id}}: {{reason}}",
+      "error": "Import muvaffaqiyatsiz. Qayta urinib ko‘ring."
+    }
   },
   "profile": {
     "menu": "Profil menyusi",

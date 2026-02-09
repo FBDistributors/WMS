@@ -5,6 +5,7 @@
     "inventory": "Запасы",
     "picking": "Подбор",
     "users": "Пользователи и доступ",
+    "integrations": "Интеграции",
     "profile": "Профиль"
   },
   "settings": {
@@ -50,6 +51,21 @@
     "picker": "Сборщик",
     "receiver": "Приёмщик",
     "inventory_controller": "Контролёр запасов"
+  },
+  "integrations": {
+    "smartup": {
+      "title": "Smartup импорт",
+      "subtitle": "Загрузка заказов из Smartup в WMS.",
+      "begin_deal_date": "Дата начала",
+      "end_deal_date": "Дата окончания",
+      "filial_code": "Код филиала",
+      "filial_placeholder": "Необязательно",
+      "run": "Запустить импорт",
+      "running": "Импорт...",
+      "summary": "Создано {{created}}, обновлено {{updated}}, пропущено {{skipped}}.",
+      "row_error": "Заказ {{external_id}}: {{reason}}",
+      "error": "Импорт не удался. Попробуйте снова."
+    }
   },
   "profile": {
     "menu": "Меню профиля",

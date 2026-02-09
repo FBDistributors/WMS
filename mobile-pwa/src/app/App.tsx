@@ -10,6 +10,7 @@ import { NotAuthorizedPage } from '../pages/admin/NotAuthorizedPage'
 import { ProfilePage } from '../pages/admin/ProfilePage'
 import { ProductDetailsPage } from '../pages/admin/ProductDetailsPage'
 import { ProductsPage } from '../pages/admin/ProductsPage'
+import { IntegrationsSmartupPage } from '../pages/admin/IntegrationsSmartupPage'
 import { UsersPage } from '../pages/admin/UsersPage'
 import { UserCreatePage } from '../pages/admin/users/UserCreatePage'
 import { UserDetailsPage } from '../pages/admin/users/UserDetailsPage'
@@ -106,6 +107,14 @@ export function App() {
               <RequirePermission permission="products:read">
                 <ProductDetailsPage />
               </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/integrations/smartup"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <IntegrationsSmartupPage />
             </RequirePermission>
           }
         />

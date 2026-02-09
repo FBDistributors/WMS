@@ -17,7 +17,11 @@ class Document(Base):
     doc_no: Mapped[str] = mapped_column(String(64), nullable=False)
     doc_type: Mapped[str] = mapped_column(String(32), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="draft")
+    source: Mapped[str | None] = mapped_column(String(32), nullable=True)
     source_external_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    source_document_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    source_customer_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_filial_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -40,6 +44,7 @@ class Document(Base):
         ),
         Index("ix_documents_doc_no", "doc_no"),
         Index("ix_documents_status", "status"),
+        Index("ix_documents_source", "source"),
         Index("ix_documents_source_external_id", "source_external_id"),
     )
 

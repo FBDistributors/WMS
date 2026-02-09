@@ -15,6 +15,7 @@ router = APIRouter()
 
 DocumentStatus = Literal[
     "new",
+    "smartup_created",
     "draft",
     "confirmed",
     "in_progress",
@@ -26,6 +27,7 @@ DocumentType = str
 
 DOCUMENT_STATUSES = {
     "new",
+    "smartup_created",
     "draft",
     "confirmed",
     "in_progress",

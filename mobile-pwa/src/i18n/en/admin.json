@@ -5,6 +5,7 @@
     "inventory": "Inventory",
     "picking": "Picking",
     "users": "Users & Access",
+    "integrations": "Integrations",
     "profile": "Profile"
   },
   "settings": {
@@ -50,6 +51,21 @@
     "picker": "Picker",
     "receiver": "Receiver",
     "inventory_controller": "Inventory Controller"
+  },
+  "integrations": {
+    "smartup": {
+      "title": "Smartup Import",
+      "subtitle": "Pull sales orders from Smartup into WMS.",
+      "begin_deal_date": "Begin deal date",
+      "end_deal_date": "End deal date",
+      "filial_code": "Filial code",
+      "filial_placeholder": "Optional",
+      "run": "Run import",
+      "running": "Importing...",
+      "summary": "Created {{created}}, updated {{updated}}, skipped {{skipped}}.",
+      "row_error": "Order {{external_id}}: {{reason}}",
+      "error": "Import failed. Please try again."
+    }
   },
   "profile": {
     "menu": "Profile menu",
