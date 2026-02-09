@@ -78,6 +78,8 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
   ],
   supervisor: [
     'admin:access',
+    'products:read',
+    'products:write',
     'documents:read',
     'receiving:read',
     'picking:read',

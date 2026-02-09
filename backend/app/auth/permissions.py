@@ -44,6 +44,8 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
     ],
     "supervisor": [
         "admin:access",
+        "products:read",
+        "products:write",
         "documents:read",
         "receiving:read",
         "picking:read",

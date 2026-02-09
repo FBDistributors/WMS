@@ -44,10 +44,49 @@
     "category": "Category",
     "group": "Group"
   },
+  "add": {
+    "button": "+ Add product",
+    "title": "Add product",
+    "subtitle": "Create a new SKU for the catalog.",
+    "add_barcode": "Add barcode",
+    "save": "Save product",
+    "saving": "Saving..."
+  },
+  "import": {
+    "button": "Import CSV",
+    "title": "Import products",
+    "subtitle": "Upload a CSV file and import in bulk.",
+    "download_template": "Download template",
+    "choose_file": "Choose CSV file",
+    "template_hint": "Template columns: sku,name,brand,category,status,barcode (multiple barcodes separated by |).",
+    "missing_columns": "CSV template columns are missing.",
+    "empty": "CSV file is empty.",
+    "failed": "Import failed. Please try again.",
+    "import": "Start import",
+    "importing": "Importing...",
+    "progress": "Importing... {{progress}}%",
+    "summary": "Imported {{inserted}} items. Failed: {{failed}}.",
+    "row_error": "Row {{row}} ({{sku}}): {{reason}}"
+  },
+  "pagination": {
+    "summary": "{{from}}-{{to}} of {{total}}",
+    "prev": "Previous",
+    "next": "Next"
+  },
+  "validation": {
+    "sku_required": "SKU is required.",
+    "name_required": "Name is required.",
+    "barcode_format": "Barcode must be numeric and 8-14 digits.",
+    "submit_failed": "Failed to save product."
+  },
   "fields": {
     "name": "Name",
     "sku": "SKU",
     "barcode": "Barcode",
-    "status": "Status"
+    "status": "Status",
+    "brand": "Brand",
+    "category": "Category",
+    "photo_url": "Photo URL",
+    "barcodes": "Barcodes"
   }
 }

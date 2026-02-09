@@ -44,10 +44,49 @@
     "category": "Категория",
     "group": "Группа"
   },
+  "add": {
+    "button": "+ Добавить товар",
+    "title": "Добавить товар",
+    "subtitle": "Создайте новый SKU для каталога.",
+    "add_barcode": "Добавить штрих‑код",
+    "save": "Сохранить товар",
+    "saving": "Сохранение..."
+  },
+  "import": {
+    "button": "Импорт CSV",
+    "title": "Импорт товаров",
+    "subtitle": "Загрузите CSV и импортируйте массово.",
+    "download_template": "Скачать шаблон",
+    "choose_file": "Выберите CSV файл",
+    "template_hint": "Колонки шаблона: sku,name,brand,category,status,barcode (несколько через |).",
+    "missing_columns": "В CSV отсутствуют нужные колонки.",
+    "empty": "CSV файл пуст.",
+    "failed": "Импорт не удался. Попробуйте снова.",
+    "import": "Начать импорт",
+    "importing": "Импорт...",
+    "progress": "Импорт... {{progress}}%",
+    "summary": "Импортировано {{inserted}}. Ошибок: {{failed}}.",
+    "row_error": "Строка {{row}} ({{sku}}): {{reason}}"
+  },
+  "pagination": {
+    "summary": "{{from}}-{{to}} из {{total}}",
+    "prev": "Назад",
+    "next": "Вперед"
+  },
+  "validation": {
+    "sku_required": "SKU обязателен.",
+    "name_required": "Название обязательно.",
+    "barcode_format": "Штрих‑код должен быть числом из 8-14 цифр.",
+    "submit_failed": "Не удалось сохранить товар."
+  },
   "fields": {
     "name": "Название",
     "sku": "SKU",
     "barcode": "Штрих‑код",
-    "status": "Статус"
+    "status": "Статус",
+    "brand": "Бренд",
+    "category": "Категория",
+    "photo_url": "URL фото",
+    "barcodes": "Штрих‑коды"
   }
 }

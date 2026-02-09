@@ -80,7 +80,9 @@ export function ProductDetailsPage() {
         </div>
         <div>
           <div className="text-sm text-slate-500">{t('products:fields.barcode')}</div>
-          <div className="text-base text-slate-900">{product.barcode ?? '—'}</div>
+          <div className="text-base text-slate-900">
+            {product.barcode ?? product.barcodes?.join(' | ') ?? '—'}
+          </div>
         </div>
         <div>
           <div className="text-sm text-slate-500">{t('products:fields.status')}</div>

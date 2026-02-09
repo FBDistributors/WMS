@@ -5,7 +5,7 @@ import os
 from app.auth.security import get_password_hash
 from app.db import SessionLocal
 from app.models.document import Document, DocumentLine
-from app.models.product import Product
+from app.models.product import Product, ProductBarcode
 from app.models.user import User
 
 
@@ -48,7 +48,7 @@ def _ensure_document(
 def _ensure_product(
     name: str,
     sku: str,
-    barcode: str | None,
+    barcodes: list[str] | None,
     is_active: bool,
 ) -> Product:
     db = SessionLocal()
@@ -60,9 +60,9 @@ def _ensure_product(
         product = Product(
             name=name,
             sku=sku,
-            barcode=barcode,
             is_active=is_active,
         )
+        product.barcodes = [ProductBarcode(barcode=value) for value in (barcodes or [])]
         db.add(product)
         db.commit()
         db.refresh(product)
@@ -107,19 +107,19 @@ def seed() -> None:
     _ensure_product(
         name="Shampun 250ml",
         sku="SKU-0001",
-        barcode="8600000000011",
+        barcodes=["8600000000011"],
         is_active=True,
     )
     _ensure_product(
         name="Krem 50ml",
         sku="SKU-0002",
-        barcode="8600000000028",
+        barcodes=["8600000000028"],
         is_active=True,
     )
     _ensure_product(
         name="Gel 200ml",
         sku="SKU-0003",
-        barcode="8600000000035",
+        barcodes=["8600000000035"],
         is_active=True,
     )
 

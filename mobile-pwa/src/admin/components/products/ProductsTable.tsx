@@ -130,7 +130,12 @@ export function ProductsTable({
         id: 'barcode',
         label: t('products:columns.barcode'),
         className: 'min-w-[180px] text-slate-600 dark:text-slate-300',
-        render: (item) => item.barcode || '—',
+        render: (item) => {
+          const primary = item.barcode ?? item.barcodes?.[0]
+          if (!primary) return '—'
+          const extra = item.barcodes && item.barcodes.length > 1 ? ` +${item.barcodes.length - 1}` : ''
+          return `${primary}${extra}`
+        },
       },
       {
         id: 'internal_id',

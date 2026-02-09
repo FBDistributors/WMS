@@ -44,10 +44,49 @@
     "category": "Kategoriya",
     "group": "Guruh"
   },
+  "add": {
+    "button": "+ Mahsulot qo‘shish",
+    "title": "Mahsulot qo‘shish",
+    "subtitle": "Katalog uchun yangi SKU yarating.",
+    "add_barcode": "Barcode qo‘shish",
+    "save": "Mahsulotni saqlash",
+    "saving": "Saqlanmoqda..."
+  },
+  "import": {
+    "button": "Import CSV",
+    "title": "Mahsulotlarni import qilish",
+    "subtitle": "CSV faylni yuklang va ommaviy import qiling.",
+    "download_template": "Shablonni yuklab olish",
+    "choose_file": "CSV fayl tanlang",
+    "template_hint": "Shablon ustunlari: sku,name,brand,category,status,barcode (bir nechta barcode | bilan).",
+    "missing_columns": "CSV shablon ustunlari yetishmaydi.",
+    "empty": "CSV fayl bo‘sh.",
+    "failed": "Import muvaffaqiyatsiz. Qayta urinib ko‘ring.",
+    "import": "Importni boshlash",
+    "importing": "Import qilinmoqda...",
+    "progress": "Import qilinmoqda... {{progress}}%",
+    "summary": "{{inserted}} ta import qilindi. Xatolar: {{failed}}.",
+    "row_error": "{{row}}-qator ({{sku}}): {{reason}}"
+  },
+  "pagination": {
+    "summary": "{{from}}-{{to}} / {{total}}",
+    "prev": "Oldingi",
+    "next": "Keyingi"
+  },
+  "validation": {
+    "sku_required": "SKU majburiy.",
+    "name_required": "Nomi majburiy.",
+    "barcode_format": "Barcode 8-14 raqamli bo‘lishi kerak.",
+    "submit_failed": "Mahsulotni saqlab bo‘lmadi."
+  },
   "fields": {
     "name": "Nomi",
     "sku": "SKU",
     "barcode": "Barcode",
-    "status": "Holat"
+    "status": "Holat",
+    "brand": "Brend",
+    "category": "Kategoriya",
+    "photo_url": "Foto URL",
+    "barcodes": "Barcodelar"
   }
 }
