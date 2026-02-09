@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, Field, field_validator, root_validator
 
 
 class SmartupOrderLine(BaseModel):
@@ -34,6 +34,25 @@ class SmartupOrder(BaseModel):
     modified_on: Optional[datetime] = Field(default=None, alias="modified_on")
     customer_name: Optional[str] = Field(default=None, alias="customer_name")
     lines: List[SmartupOrderLine] = Field(default_factory=list)
+
+    @field_validator("deal_time", "delivery_date", "created_on", "modified_on", mode="before")
+    @classmethod
+    def _parse_smartup_datetime(cls, value):  # noqa: N805
+        if value is None or isinstance(value, datetime):
+            return value
+        if isinstance(value, date) and not isinstance(value, datetime):
+            return datetime.combine(value, datetime.min.time())
+        if isinstance(value, str):
+            raw = value.strip()
+            if not raw:
+                return None
+            for fmt in ("%d.%m.%Y %H:%M:%S", "%d.%m.%Y"):
+                try:
+                    parsed = datetime.strptime(raw, fmt)
+                    return parsed
+                except ValueError:
+                    continue
+        return value
 
     @root_validator(pre=True)
     def _normalize_lines(cls, values):  # noqa: N805
