@@ -8,6 +8,42 @@
   "details_title": "Product details",
   "not_found": "Product not found.",
   "load_failed": "Failed to load product.",
+  "table": {
+    "settings_button": "Table settings",
+    "settings_title": "Table settings",
+    "columns_title": "Column settings",
+    "search_title": "Search settings",
+    "columns_hint": "Drag to reorder, uncheck to hide.",
+    "search_hint": "Choose fields for quick search.",
+    "save_settings": "Save settings",
+    "reset_default": "Reset to default",
+    "no_columns": "No columns selected."
+  },
+  "columns": {
+    "sku": "SKU / Code",
+    "photo": "Photo",
+    "name": "Name",
+    "category": "Category",
+    "brand": "Brand",
+    "status": "Status",
+    "quantity": "Quantity",
+    "created_by": "Created by",
+    "article_code": "Article code",
+    "barcode": "Barcode(s)",
+    "internal_id": "Internal ID",
+    "manufacturer": "Manufacturer",
+    "group": "Group",
+    "qty_cases": "Qty in cases",
+    "qty_units": "Qty in units"
+  },
+  "search_fields": {
+    "sku": "SKU",
+    "barcode": "Barcode",
+    "name": "Name",
+    "alt_name": "Alternative name",
+    "category": "Category",
+    "group": "Group"
+  },
   "fields": {
     "name": "Name",
     "sku": "SKU",

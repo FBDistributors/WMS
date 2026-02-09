@@ -8,6 +8,42 @@
   "details_title": "Mahsulot tafsilotlari",
   "not_found": "Mahsulot topilmadi.",
   "load_failed": "Mahsulot yuklanmadi.",
+  "table": {
+    "settings_button": "Jadval sozlamalari",
+    "settings_title": "Jadval sozlamalari",
+    "columns_title": "Ustun sozlamalari",
+    "search_title": "Qidiruv sozlamalari",
+    "columns_hint": "Ustunlarni sudrab tartiblang, yashirish uchun belgini o‘chiring.",
+    "search_hint": "Tezkor qidiruv uchun maydonlarni tanlang.",
+    "save_settings": "Sozlamalarni saqlash",
+    "reset_default": "Standartga qaytarish",
+    "no_columns": "Ustunlar tanlanmagan."
+  },
+  "columns": {
+    "sku": "SKU / Kod",
+    "photo": "Foto",
+    "name": "Nomi",
+    "category": "Kategoriya",
+    "brand": "Brend",
+    "status": "Holat",
+    "quantity": "Miqdor",
+    "created_by": "Kim yaratgan",
+    "article_code": "Artikul kodi",
+    "barcode": "Shtrix‑kod(lar)",
+    "internal_id": "Ichki ID",
+    "manufacturer": "Ishlab chiqaruvchi",
+    "group": "Guruh",
+    "qty_cases": "Qutilar bo‘yicha",
+    "qty_units": "Dona bo‘yicha"
+  },
+  "search_fields": {
+    "sku": "SKU",
+    "barcode": "Shtrix‑kod",
+    "name": "Nomi",
+    "alt_name": "Muqobil nom",
+    "category": "Kategoriya",
+    "group": "Guruh"
+  },
   "fields": {
     "name": "Nomi",
     "sku": "SKU",

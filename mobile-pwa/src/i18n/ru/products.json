@@ -8,6 +8,42 @@
   "details_title": "Детали товара",
   "not_found": "Товар не найден.",
   "load_failed": "Не удалось загрузить товар.",
+  "table": {
+    "settings_button": "Настройки таблицы",
+    "settings_title": "Настройки таблицы",
+    "columns_title": "Настройки колонок",
+    "search_title": "Настройки поиска",
+    "columns_hint": "Перетаскивайте, чтобы менять порядок, снимите галочку, чтобы скрыть.",
+    "search_hint": "Выберите поля для быстрого поиска.",
+    "save_settings": "Сохранить настройки",
+    "reset_default": "Сбросить по умолчанию",
+    "no_columns": "Колонки не выбраны."
+  },
+  "columns": {
+    "sku": "SKU / Код",
+    "photo": "Фото",
+    "name": "Название",
+    "category": "Категория",
+    "brand": "Бренд",
+    "status": "Статус",
+    "quantity": "Количество",
+    "created_by": "Кем создано",
+    "article_code": "Артикул",
+    "barcode": "Штрих‑коды",
+    "internal_id": "Внутренний ID",
+    "manufacturer": "Производитель",
+    "group": "Группа",
+    "qty_cases": "Кол-во в коробках",
+    "qty_units": "Кол-во в штуках"
+  },
+  "search_fields": {
+    "sku": "SKU",
+    "barcode": "Штрих‑код",
+    "name": "Название",
+    "alt_name": "Альтернативное название",
+    "category": "Категория",
+    "group": "Группа"
+  },
   "fields": {
     "name": "Название",
     "sku": "SKU",

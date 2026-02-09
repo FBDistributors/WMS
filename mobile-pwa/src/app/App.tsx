@@ -9,7 +9,7 @@ import { DashboardPage } from '../pages/admin/DashboardPage'
 import { NotAuthorizedPage } from '../pages/admin/NotAuthorizedPage'
 import { ProfilePage } from '../pages/admin/ProfilePage'
 import { ProductDetailsPage } from '../pages/admin/ProductDetailsPage'
-import { ProductsListPage } from '../pages/admin/ProductsListPage'
+import { ProductsPage } from '../pages/admin/ProductsPage'
 import { UsersPage } from '../pages/admin/UsersPage'
 import { UserCreatePage } from '../pages/admin/users/UserCreatePage'
 import { UserDetailsPage } from '../pages/admin/users/UserDetailsPage'
@@ -94,7 +94,7 @@ export function App() {
           element={
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">
               <RequirePermission permission="products:read">
-                <ProductsListPage />
+                <ProductsPage />
               </RequirePermission>
             </RequirePermission>
           }
