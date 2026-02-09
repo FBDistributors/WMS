@@ -47,7 +47,8 @@ def upgrade():
     shelf_b1_1 = uuid.uuid4()
     bin_b1_1_1 = uuid.uuid4()
 
-    op.execute(
+    bind = op.get_bind()
+    bind.execute(
         sa.text(
             """
             INSERT INTO locations (id, code, name, type, parent_id, is_active)
