@@ -1,55 +1,52 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
 from typing import List, Optional
 
 from app.integrations.smartup.schemas import SmartupOrder
 
 
 @dataclass
-class DocumentLinePayload:
+class OrderLinePayload:
     sku: Optional[str]
     barcode: Optional[str]
-    product_name: str
-    required_qty: float
+    name: str
+    qty: float
+    uom: Optional[str]
+    raw_json: Optional[dict]
 
 
 @dataclass
-class DocumentPayload:
-    doc_no: str
-    doc_type: str
-    status: str
+class OrderPayload:
     source: str
     source_external_id: str
-    source_document_date: Optional[datetime]
-    source_customer_name: Optional[str]
-    source_filial_id: Optional[str]
-    lines: List[DocumentLinePayload]
+    order_number: str
+    filial_id: Optional[str]
+    customer_name: Optional[str]
+    status: str
+    lines: List[OrderLinePayload]
 
 
-def map_order_to_document(order: SmartupOrder) -> DocumentPayload:
+def map_order_to_wms_order(order: SmartupOrder) -> OrderPayload:
     external_id = _resolve_external_id(order)
-    doc_no = order.order_no or order.deal_id or external_id
     lines = [
-        DocumentLinePayload(
+        OrderLinePayload(
             sku=line.sku,
             barcode=line.barcode,
-            product_name=line.name or "Unknown item",
-            required_qty=line.qty or 0,
+            name=line.name or "Unknown item",
+            qty=line.qty or 0,
+            uom=line.uom,
+            raw_json=line.model_dump(by_alias=True),
         )
         for line in order.lines
     ]
-    # TODO: Add mapping for locations when Smartup provides them.
-    return DocumentPayload(
-        doc_no=doc_no,
-        doc_type="SO",
-        status="smartup_created",
+    return OrderPayload(
         source="smartup",
         source_external_id=external_id,
-        source_document_date=order.delivery_date or order.deal_time or order.created_on,
-        source_customer_name=order.customer_name,
-        source_filial_id=order.filial_id,
+        order_number=order.order_no or order.deal_id or external_id,
+        filial_id=order.filial_id,
+        customer_name=order.customer_name,
+        status="imported",
         lines=lines,
     )
 

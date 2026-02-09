@@ -1,0 +1,58 @@
+{
+  "title": "Buyurtmalar",
+  "subtitle": "Smartupdan import qilingan buyurtmalar.",
+  "load_failed": "Buyurtmalar yuklanmadi.",
+  "sync": "Smartupni sinxronlash",
+  "syncing": "Sinxronlanmoqda...",
+  "sync_failed": "Smartup sinxronlash muvaffaqiyatsiz.",
+  "empty": "Buyurtmalar topilmadi",
+  "empty_desc": "Buyurtmalarni yuklash uchun Smartupni sinxronlang.",
+  "view_details": "Tafsilotlarni ko‘rish",
+  "details_title": "Buyurtma tafsilotlari",
+  "not_found": "Buyurtma topilmadi.",
+  "send_to_picking": {
+    "button": "Pickingga yuborish",
+    "title": "Pickingga yuborish",
+    "picker": "Picker biriktirish",
+    "select_picker": "Picker tanlang",
+    "picker_required": "Avval picker tanlang.",
+    "send": "Yuborish",
+    "sending": "Yuborilmoqda...",
+    "failed": "Pickingga yuborib bo‘lmadi.",
+    "load_failed": "Pickerlar ro‘yxati yuklanmadi."
+  },
+  "filters": {
+    "status": "Holat",
+    "all": "Barchasi",
+    "search": "Qidiruv",
+    "search_placeholder": "Buyurtma raqami yoki ID",
+    "filial": "Filial",
+    "date_from": "Boshlanish sanasi",
+    "date_to": "Tugash sanasi"
+  },
+  "status": {
+    "imported": "Import qilingan",
+    "ready_for_picking": "Pickingga tayyor",
+    "picking": "Pickingda",
+    "picked": "Terildi",
+    "packed": "Qadoqlandi",
+    "shipped": "Yuborildi",
+    "cancelled": "Bekor qilingan"
+  },
+  "columns": {
+    "order_number": "Buyurtma",
+    "external_id": "Tashqi ID",
+    "customer": "Mijoz",
+    "status": "Holat",
+    "lines": "Qatorlar",
+    "created": "Yaratilgan",
+    "actions": "Amallar"
+  },
+  "lines": {
+    "sku": "SKU",
+    "barcode": "Barcode",
+    "name": "Nomi",
+    "qty": "Miqdor",
+    "uom": "O‘lchov"
+  }
+}

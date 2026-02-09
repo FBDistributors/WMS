@@ -1,0 +1,58 @@
+{
+  "title": "Заказы",
+  "subtitle": "Заказы, импортированные из Smartup.",
+  "load_failed": "Не удалось загрузить заказы.",
+  "sync": "Синхронизировать Smartup",
+  "syncing": "Синхронизация...",
+  "sync_failed": "Синхронизация Smartup не удалась.",
+  "empty": "Заказы не найдены",
+  "empty_desc": "Запустите синхронизацию Smartup, чтобы загрузить заказы.",
+  "view_details": "Посмотреть детали",
+  "details_title": "Детали заказа",
+  "not_found": "Заказ не найден.",
+  "send_to_picking": {
+    "button": "Отправить в подбор",
+    "title": "Отправить в подбор",
+    "picker": "Назначить сборщика",
+    "select_picker": "Выберите сборщика",
+    "picker_required": "Сначала выберите сборщика.",
+    "send": "Отправить",
+    "sending": "Отправка...",
+    "failed": "Не удалось отправить в подбор.",
+    "load_failed": "Не удалось загрузить список сборщиков."
+  },
+  "filters": {
+    "status": "Статус",
+    "all": "Все",
+    "search": "Поиск",
+    "search_placeholder": "Номер заказа или ID",
+    "filial": "Филиал",
+    "date_from": "Дата с",
+    "date_to": "Дата по"
+  },
+  "status": {
+    "imported": "Импортировано",
+    "ready_for_picking": "Готово к подбору",
+    "picking": "В подборе",
+    "picked": "Собрано",
+    "packed": "Упаковано",
+    "shipped": "Отгружено",
+    "cancelled": "Отменено"
+  },
+  "columns": {
+    "order_number": "Заказ",
+    "external_id": "Внешний ID",
+    "customer": "Клиент",
+    "status": "Статус",
+    "lines": "Строки",
+    "created": "Создано",
+    "actions": "Действия"
+  },
+  "lines": {
+    "sku": "SKU",
+    "barcode": "Штрих-код",
+    "name": "Название",
+    "qty": "Кол-во",
+    "uom": "Ед."
+  }
+}

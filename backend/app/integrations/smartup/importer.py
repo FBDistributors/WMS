@@ -5,9 +5,9 @@ from typing import Iterable, List, Tuple
 
 from sqlalchemy.orm import Session, selectinload
 
-from app.integrations.smartup.mapper import map_order_to_document
+from app.integrations.smartup.mapper import map_order_to_wms_order
 from app.integrations.smartup.schemas import SmartupOrder
-from app.models.document import Document, DocumentLine
+from app.models.order import Order, OrderLine
 
 
 @dataclass
@@ -23,57 +23,50 @@ def import_orders(db: Session, orders: Iterable[SmartupOrder]) -> Tuple[int, int
     errors: List[ImportError] = []
 
     for order in orders:
-        payload = map_order_to_document(order)
+        payload = map_order_to_wms_order(order)
         if not payload.lines:
             skipped += 1
             continue
 
         try:
             existing = (
-                db.query(Document)
-                .options(selectinload(Document.lines))
-                .filter(
-                    Document.source_external_id == payload.source_external_id,
-                    Document.doc_type == payload.doc_type,
-                )
+                db.query(Order)
+                .options(selectinload(Order.lines))
+                .filter(Order.source_external_id == payload.source_external_id)
                 .one_or_none()
             )
 
             if existing:
-                existing.doc_no = payload.doc_no
-                existing.source = payload.source
-                existing.source_document_date = payload.source_document_date
-                existing.source_customer_name = payload.source_customer_name
-                existing.source_filial_id = payload.source_filial_id
-                if existing.status == "smartup_created":
+                existing.order_number = payload.order_number
+                existing.filial_id = payload.filial_id
+                existing.customer_name = payload.customer_name
+                if existing.status in ("imported", "ready_for_picking"):
                     existing.status = payload.status
                 _upsert_lines(existing, payload.lines)
                 db.commit()
                 updated += 1
                 continue
 
-            document = Document(
-                doc_no=payload.doc_no,
-                doc_type=payload.doc_type,
-                status=payload.status,
+            record = Order(
                 source=payload.source,
                 source_external_id=payload.source_external_id,
-                source_document_date=payload.source_document_date,
-                source_customer_name=payload.source_customer_name,
-                source_filial_id=payload.source_filial_id,
+                order_number=payload.order_number,
+                filial_id=payload.filial_id,
+                customer_name=payload.customer_name,
+                status=payload.status,
             )
-            document.lines = [
-                DocumentLine(
+            record.lines = [
+                OrderLine(
                     sku=line.sku,
                     barcode=line.barcode,
-                    product_name=line.product_name,
-                    location_code="",
-                    required_qty=line.required_qty,
-                    picked_qty=0,
+                    name=line.name,
+                    qty=line.qty,
+                    uom=line.uom,
+                    raw_json=line.raw_json,
                 )
                 for line in payload.lines
             ]
-            db.add(document)
+            db.add(record)
             db.commit()
             created += 1
         except Exception as exc:  # noqa: BLE001
@@ -84,16 +77,16 @@ def import_orders(db: Session, orders: Iterable[SmartupOrder]) -> Tuple[int, int
     return created, updated, skipped, errors
 
 
-def _line_key(line: DocumentLine) -> Tuple[str, str, str]:
-    return (line.sku or "", line.barcode or "", line.product_name or "")
+def _line_key(line: OrderLine) -> Tuple[str, str, str]:
+    return (line.sku or "", line.barcode or "", line.name or "")
 
 
 def _payload_key(payload_line) -> Tuple[str, str, str]:
-    return (payload_line.sku or "", payload_line.barcode or "", payload_line.product_name or "")
+    return (payload_line.sku or "", payload_line.barcode or "", payload_line.name or "")
 
 
-def _upsert_lines(document: Document, payload_lines) -> None:
-    existing = { _line_key(line): line for line in document.lines }
+def _upsert_lines(order: Order, payload_lines) -> None:
+    existing = {_line_key(line): line for line in order.lines}
     incoming_keys = set()
 
     for payload in payload_lines:
@@ -103,20 +96,22 @@ def _upsert_lines(document: Document, payload_lines) -> None:
             line = existing[key]
             line.sku = payload.sku
             line.barcode = payload.barcode
-            line.product_name = payload.product_name
-            line.required_qty = payload.required_qty
+            line.name = payload.name
+            line.qty = payload.qty
+            line.uom = payload.uom
+            line.raw_json = payload.raw_json
             continue
-        document.lines.append(
-            DocumentLine(
+        order.lines.append(
+            OrderLine(
                 sku=payload.sku,
                 barcode=payload.barcode,
-                product_name=payload.product_name,
-                location_code="",
-                required_qty=payload.required_qty,
-                picked_qty=0,
+                name=payload.name,
+                qty=payload.qty,
+                uom=payload.uom,
+                raw_json=payload.raw_json,
             )
         )
 
-    for line in list(document.lines):
+    for line in list(order.lines):
         if _line_key(line) not in incoming_keys:
-            document.lines.remove(line)
+            order.lines.remove(line)

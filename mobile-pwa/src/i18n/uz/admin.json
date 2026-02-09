@@ -2,6 +2,7 @@
   "menu": {
     "dashboard": "Dashboard",
     "products": "Mahsulotlar",
+    "orders": "Buyurtmalar",
     "inventory": "Inventar",
     "picking": "Picking",
     "users": "Users & Access",

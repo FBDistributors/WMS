@@ -23,6 +23,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../
 const MENU_ITEMS: Array<MenuItem & { key: string }> = [
   { key: 'dashboard', label: 'Dashboard', path: '/admin', icon: LayoutDashboard, required: 'admin:access' },
   { key: 'products', label: 'Products', path: '/admin/products', icon: Package, required: 'products:read' },
+  { key: 'orders', label: 'Orders', path: '/admin/orders', icon: ClipboardList, required: 'orders:read' },
   { key: 'inventory', label: 'Inventory', path: '/admin/inventory', icon: Boxes, required: 'inventory:read' },
   { key: 'picking', label: 'Picking', path: '/picking/mobile-pwa', icon: ClipboardList, required: 'picking:read' },
   { key: 'users', label: 'Users & Access', path: '/admin/users', icon: Users, required: 'users:manage' },

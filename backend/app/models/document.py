@@ -22,6 +22,12 @@ class Document(Base):
     source_document_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     source_customer_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     source_filial_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    order_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("orders.id", ondelete="SET NULL"), nullable=True
+    )
+    assigned_to_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -46,6 +52,7 @@ class Document(Base):
         Index("ix_documents_status", "status"),
         Index("ix_documents_source", "source"),
         Index("ix_documents_source_external_id", "source_external_id"),
+        Index("ix_documents_assigned_to_user_id", "assigned_to_user_id"),
     )
 
 

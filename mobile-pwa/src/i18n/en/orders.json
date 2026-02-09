@@ -1,0 +1,58 @@
+{
+  "title": "Orders",
+  "subtitle": "Smartup orders imported into WMS.",
+  "load_failed": "Failed to load orders.",
+  "sync": "Sync Smartup",
+  "syncing": "Syncing...",
+  "sync_failed": "Smartup sync failed.",
+  "empty": "No orders found",
+  "empty_desc": "Sync Smartup to load orders.",
+  "view_details": "View details",
+  "details_title": "Order details",
+  "not_found": "Order not found.",
+  "send_to_picking": {
+    "button": "Send to picking",
+    "title": "Send to picking",
+    "picker": "Assign picker",
+    "select_picker": "Select picker",
+    "picker_required": "Select a picker first.",
+    "send": "Send",
+    "sending": "Sending...",
+    "failed": "Failed to send to picking.",
+    "load_failed": "Failed to load picker list."
+  },
+  "filters": {
+    "status": "Status",
+    "all": "All",
+    "search": "Search",
+    "search_placeholder": "Order number or external ID",
+    "filial": "Filial",
+    "date_from": "Date from",
+    "date_to": "Date to"
+  },
+  "status": {
+    "imported": "Imported",
+    "ready_for_picking": "Ready for picking",
+    "picking": "Picking",
+    "picked": "Picked",
+    "packed": "Packed",
+    "shipped": "Shipped",
+    "cancelled": "Cancelled"
+  },
+  "columns": {
+    "order_number": "Order",
+    "external_id": "External ID",
+    "customer": "Customer",
+    "status": "Status",
+    "lines": "Lines",
+    "created": "Created",
+    "actions": "Actions"
+  },
+  "lines": {
+    "sku": "SKU",
+    "barcode": "Barcode",
+    "name": "Name",
+    "qty": "Qty",
+    "uom": "UOM"
+  }
+}

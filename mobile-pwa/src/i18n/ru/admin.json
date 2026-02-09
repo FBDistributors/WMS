@@ -2,6 +2,7 @@
   "menu": {
     "dashboard": "Дашборд",
     "products": "Товары",
+    "orders": "Заказы",
     "inventory": "Запасы",
     "picking": "Подбор",
     "users": "Пользователи и доступ",

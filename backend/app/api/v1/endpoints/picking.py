@@ -108,7 +108,7 @@ def _refresh_document_status(doc: DocumentModel, lines: List[DocumentLineModel])
 async def get_picking_document(
     document_id: UUID,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("picking:read")),
+    user=Depends(require_permission("picking:read")),
 ):
     document = (
         db.query(DocumentModel)
@@ -117,6 +117,8 @@ async def get_picking_document(
         .one_or_none()
     )
     if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if user.role == "picker" and document.assigned_to_user_id != user.id:
         raise HTTPException(status_code=404, detail="Document not found")
     return _to_picking_document(document)
 
@@ -127,15 +129,12 @@ async def list_picking_documents(
     limit: int = 50,
     offset: int = 0,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("picking:read")),
+    user=Depends(require_permission("picking:read")),
 ):
-    docs = (
-        db.query(DocumentModel)
-        .options(selectinload(DocumentModel.lines))
-        .offset(offset)
-        .limit(limit)
-        .all()
-    )
+    query = db.query(DocumentModel).options(selectinload(DocumentModel.lines))
+    if user.role == "picker":
+        query = query.filter(DocumentModel.assigned_to_user_id == user.id)
+    docs = query.offset(offset).limit(limit).all()
     return [_to_picking_list_item(doc) for doc in docs]
 
 
@@ -148,7 +147,7 @@ async def pick_line(
     line_id: UUID,
     payload: PickLineRequest,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("picking:pick")),
+    user=Depends(require_permission("picking:pick")),
 ):
     existing_request = (
         db.query(PickRequest).filter(PickRequest.request_id == payload.request_id).one_or_none()
@@ -170,6 +169,8 @@ async def pick_line(
         )
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
+        if user.role == "picker" and document.assigned_to_user_id != user.id:
+            raise HTTPException(status_code=403, detail="Forbidden")
         return PickLineResponse(
             line=_to_picking_line(line),
             progress=_calculate_progress(document.lines),
@@ -193,6 +194,8 @@ async def pick_line(
     )
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
+    if user.role == "picker" and document.assigned_to_user_id != user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
 
     next_qty = line.picked_qty + payload.delta
     if next_qty < 0:

@@ -13,6 +13,10 @@ export type PermissionKey =
   | 'reports:read'
   | 'products:read'
   | 'products:write'
+  | 'orders:read'
+  | 'orders:sync'
+  | 'orders:send_to_picking'
+  | 'picking:assign'
   | 'documents:read'
   | 'documents:create'
   | 'documents:edit_status'
@@ -34,6 +38,10 @@ export const PERMISSION_KEYS: PermissionKey[] = [
   'reports:read',
   'products:read',
   'products:write',
+  'orders:read',
+  'orders:sync',
+  'orders:send_to_picking',
+  'picking:assign',
   'documents:read',
   'documents:create',
   'documents:edit_status',
@@ -61,6 +69,10 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     'roles:manage',
     'products:read',
     'products:write',
+    'orders:read',
+    'orders:sync',
+    'orders:send_to_picking',
+    'picking:assign',
     'documents:read',
     'documents:create',
     'documents:edit_status',
@@ -80,6 +92,10 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     'admin:access',
     'products:read',
     'products:write',
+    'orders:read',
+    'orders:sync',
+    'orders:send_to_picking',
+    'picking:assign',
     'documents:read',
     'receiving:read',
     'picking:read',
