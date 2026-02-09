@@ -7,6 +7,7 @@ import adminUz from './uz/admin.json'
 import pickingUz from './uz/picking.json'
 import productsUz from './uz/products.json'
 import ordersUz from './uz/orders.json'
+import locationsUz from './uz/locations.json'
 import usersUz from './uz/users.json'
 
 import commonEn from './en/common.json'
@@ -15,6 +16,7 @@ import adminEn from './en/admin.json'
 import pickingEn from './en/picking.json'
 import productsEn from './en/products.json'
 import ordersEn from './en/orders.json'
+import locationsEn from './en/locations.json'
 import usersEn from './en/users.json'
 
 import commonRu from './ru/common.json'
@@ -23,6 +25,7 @@ import adminRu from './ru/admin.json'
 import pickingRu from './ru/picking.json'
 import productsRu from './ru/products.json'
 import ordersRu from './ru/orders.json'
+import locationsRu from './ru/locations.json'
 import usersRu from './ru/users.json'
 
 const SUPPORTED_LANGS = ['uz', 'en', 'ru'] as const
@@ -42,6 +45,7 @@ i18n.use(initReactI18next).init({
       picking: pickingUz,
       products: productsUz,
       orders: ordersUz,
+      locations: locationsUz,
       users: usersUz,
     },
     en: {
@@ -51,6 +55,7 @@ i18n.use(initReactI18next).init({
       picking: pickingEn,
       products: productsEn,
       orders: ordersEn,
+      locations: locationsEn,
       users: usersEn,
     },
     ru: {
@@ -60,6 +65,7 @@ i18n.use(initReactI18next).init({
       picking: pickingRu,
       products: productsRu,
       orders: ordersRu,
+      locations: locationsRu,
       users: usersRu,
     },
   },
@@ -69,7 +75,7 @@ i18n.use(initReactI18next).init({
   fallbackLng: 'en',
   supportedLngs: SUPPORTED_LANGS,
   defaultNS: 'common',
-  ns: ['common', 'auth', 'admin', 'picking', 'products', 'orders', 'users'],
+    ns: ['common', 'auth', 'admin', 'picking', 'products', 'orders', 'locations', 'users'],
   interpolation: {
     escapeValue: false,
   },

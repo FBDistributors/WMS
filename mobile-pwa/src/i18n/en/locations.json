@@ -1,0 +1,32 @@
+{
+  "title": "Locations",
+  "subtitle": "Manage warehouse locations hierarchy.",
+  "add": "Add location",
+  "edit": "Edit",
+  "deactivate": "Deactivate",
+  "save": "Save location",
+  "saving": "Saving...",
+  "load_failed": "Failed to load locations.",
+  "save_failed": "Failed to save location.",
+  "empty": "No locations found",
+  "empty_desc": "Create the first location to build a hierarchy.",
+  "show_inactive": "Show inactive",
+  "inactive": "Inactive",
+  "no_parent": "No parent",
+  "validation": {
+    "required": "Code and name are required."
+  },
+  "fields": {
+    "code": "Code",
+    "name": "Name",
+    "type": "Type",
+    "parent": "Parent",
+    "active": "Active"
+  },
+  "types": {
+    "zone": "Zone",
+    "rack": "Rack",
+    "shelf": "Shelf",
+    "bin": "Bin"
+  }
+}

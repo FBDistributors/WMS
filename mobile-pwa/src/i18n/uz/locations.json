@@ -1,0 +1,32 @@
+{
+  "title": "Joylashuvlar",
+  "subtitle": "Ombor joylashuvlar ierarxiyasini boshqaring.",
+  "add": "Joylashuv qo‘shish",
+  "edit": "Tahrirlash",
+  "deactivate": "Faolsizlantirish",
+  "save": "Joylashuvni saqlash",
+  "saving": "Saqlanmoqda...",
+  "load_failed": "Joylashuvlar yuklanmadi.",
+  "save_failed": "Joylashuvni saqlab bo‘lmadi.",
+  "empty": "Joylashuvlar topilmadi",
+  "empty_desc": "Ierarxiyani yaratish uchun birinchi joylashuvni qo‘shing.",
+  "show_inactive": "Faol emaslarni ko‘rsatish",
+  "inactive": "Faol emas",
+  "no_parent": "Ota yo‘q",
+  "validation": {
+    "required": "Kod va nom majburiy."
+  },
+  "fields": {
+    "code": "Kod",
+    "name": "Nom",
+    "type": "Tur",
+    "parent": "Ota",
+    "active": "Faol"
+  },
+  "types": {
+    "zone": "Zona",
+    "rack": "Stellaj",
+    "shelf": "Raf",
+    "bin": "Yacheyka"
+  }
+}

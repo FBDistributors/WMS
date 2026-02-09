@@ -1,5 +1,6 @@
 from app.models.base import Base
 from app.models.document import Document, DocumentLine
+from app.models.location import Location
 from app.models.order import Order, OrderLine
 from app.models.picking import PickRequest
 from app.models.product import Product, ProductBarcode
@@ -10,6 +11,7 @@ __all__ = [
     "Base",
     "Document",
     "DocumentLine",
+    "Location",
     "Order",
     "OrderLine",
     "PickRequest",
