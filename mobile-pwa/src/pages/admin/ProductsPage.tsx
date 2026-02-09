@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Settings, Upload } from 'lucide-react'
+import { Search, Settings, Upload } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -179,7 +179,6 @@ export function ProductsPage() {
               className="w-full md:w-auto"
               onClick={() => setIsAddOpen(true)}
             >
-              <Plus size={16} />
               {t('products:add.button')}
             </Button>
           )}
