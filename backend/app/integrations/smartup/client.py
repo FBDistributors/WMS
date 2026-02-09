@@ -24,7 +24,7 @@ class SmartupClient:
         project_code: str | None = None,
         filial_id: str | None = None,
     ) -> None:
-        self.base_url = (base_url or os.getenv("SMARTUP_BASE_URL") or "").rstrip("/") + "/"
+        self.base_url = (base_url or os.getenv("SMARTUP_BASE_URL") or "").strip()
         self.username = username or os.getenv("SMARTUP_BASIC_USER")
         self.password = password or os.getenv("SMARTUP_BASIC_PASS")
         self.project_code = project_code or os.getenv("SMARTUP_PROJECT_CODE", "trade")
@@ -41,7 +41,11 @@ class SmartupClient:
         if not self.username or not self.password:
             raise RuntimeError("SMARTUP_BASIC_USER or SMARTUP_BASIC_PASS is not configured")
 
-        url = urljoin(self.base_url, "b/trade/txs/tdeal/order$export")
+        raw_base = self.base_url.rstrip("/")
+        if "order$export" in raw_base:
+            url = raw_base
+        else:
+            url = urljoin(f"{raw_base}/", "b/trade/txs/tdeal/order$export")
         payload = {
             "filial_codes": [{"filial_code": filial_code or ""}],
             "filial_code": filial_code or "",
@@ -68,6 +72,7 @@ class SmartupClient:
 
         # TODO: Confirm Smartup timeout and retry policies with ERP vendor.
         last_error: Exception | None = None
+        last_detail: str | None = None
         for attempt in range(1, 4):
             request = urllib.request.Request(url, data=data, headers=headers, method="POST")
             try:
@@ -87,9 +92,11 @@ class SmartupClient:
             except urllib.error.HTTPError as exc:
                 last_error = exc
                 response_text = exc.read().decode("utf-8")
+                last_detail = response_text
                 logger.error("Smartup export failed (HTTP %s): %s", exc.code, response_text)
             except Exception as exc:  # noqa: BLE001
                 last_error = exc
                 logger.error("Smartup export failed: %s", exc)
             time.sleep(0.5 * attempt)
-        raise RuntimeError("Smartup export failed") from last_error
+        detail = f": {last_detail}" if last_detail else ""
+        raise RuntimeError(f"Smartup export failed{detail}") from last_error
