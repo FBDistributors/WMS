@@ -14,6 +14,7 @@ from app.models.document import DocumentLine as DocumentLineModel
 router = APIRouter()
 
 DocumentStatus = Literal[
+    "new",
     "draft",
     "confirmed",
     "in_progress",
@@ -23,7 +24,15 @@ DocumentStatus = Literal[
 ]
 DocumentType = str
 
-DOCUMENT_STATUSES = {"draft", "confirmed", "in_progress", "partial", "completed", "cancelled"}
+DOCUMENT_STATUSES = {
+    "new",
+    "draft",
+    "confirmed",
+    "in_progress",
+    "partial",
+    "completed",
+    "cancelled",
+}
 DOCUMENT_TYPES = {"SO", "PO", "TRANSFER"}
 
 
