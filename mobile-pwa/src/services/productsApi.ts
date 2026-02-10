@@ -85,3 +85,43 @@ export async function importProducts(payload: ProductImportItem[]) {
     body: payload,
   })
 }
+
+export type SmartupProductsSyncInput = {
+  code?: string
+  begin_created_on?: string
+  end_created_on?: string
+  begin_modified_on?: string
+  end_modified_on?: string
+}
+
+export type SmartupProductsSyncResult = {
+  run_id: string
+  inserted: number
+  updated: number
+  skipped: number
+  errors_count: number
+  status: string
+}
+
+export type SmartupSyncRun = {
+  id: string
+  run_type: string
+  started_at: string
+  finished_at?: string | null
+  inserted_count: number
+  updated_count: number
+  skipped_count: number
+  error_count: number
+  status: string
+}
+
+export async function syncProductsFromSmartup(payload: SmartupProductsSyncInput = {}) {
+  return fetchJSON<SmartupProductsSyncResult>('/api/v1/products/sync-smartup', {
+    method: 'POST',
+    body: payload,
+  })
+}
+
+export async function listProductsSyncRuns() {
+  return fetchJSON<SmartupSyncRun[]>('/api/v1/products/sync-smartup/runs')
+}

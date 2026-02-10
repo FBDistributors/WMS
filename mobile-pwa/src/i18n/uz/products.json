@@ -8,6 +8,13 @@
   "details_title": "Mahsulot tafsilotlari",
   "not_found": "Mahsulot topilmadi.",
   "load_failed": "Mahsulot yuklanmadi.",
+  "sync_from_smartup": "Smartup'dan yangilash",
+  "syncing": "Yangilanmoqda...",
+  "sync_completed": "Yangilash yakunlandi.",
+  "sync_summary": "{{inserted}} ta qo'shildi, {{updated}} ta yangilandi, {{skipped}} ta o'tkazib yuborildi.",
+  "sync_failed": "Smartup yangilash muvaffaqiyatsiz.",
+  "last_sync": "Oxirgi yangilash",
+  "last_sync_none": "Hali yangilash yo'q",
   "table": {
     "settings_button": "Jadval sozlamalari",
     "settings_title": "Jadval sozlamalari",

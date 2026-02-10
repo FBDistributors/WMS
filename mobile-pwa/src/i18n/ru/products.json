@@ -8,6 +8,13 @@
   "details_title": "Детали товара",
   "not_found": "Товар не найден.",
   "load_failed": "Не удалось загрузить товар.",
+  "sync_from_smartup": "Синхронизировать Smartup",
+  "syncing": "Синхронизация...",
+  "sync_completed": "Синхронизация завершена.",
+  "sync_summary": "Добавлено {{inserted}}, обновлено {{updated}}, пропущено {{skipped}}.",
+  "sync_failed": "Синхронизация Smartup не удалась.",
+  "last_sync": "Последняя синхронизация",
+  "last_sync_none": "Синхронизации ещё не было",
   "table": {
     "settings_button": "Настройки таблицы",
     "settings_title": "Настройки таблицы",

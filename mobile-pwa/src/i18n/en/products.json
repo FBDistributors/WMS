@@ -8,6 +8,13 @@
   "details_title": "Product details",
   "not_found": "Product not found.",
   "load_failed": "Failed to load product.",
+  "sync_from_smartup": "Sync from Smartup",
+  "syncing": "Syncing...",
+  "sync_completed": "Sync completed.",
+  "sync_summary": "Inserted {{inserted}}, updated {{updated}}, skipped {{skipped}}.",
+  "sync_failed": "Smartup sync failed.",
+  "last_sync": "Last sync",
+  "last_sync_none": "No sync yet",
   "table": {
     "settings_button": "Table settings",
     "settings_title": "Table settings",

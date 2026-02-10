@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
@@ -9,6 +10,8 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.auth.deps import require_permission
 from app.db import get_db
+from app.integrations.smartup.products_sync import sync_smartup_products
+from app.models.smartup_sync import SmartupSyncRun
 from app.models.product import Product as ProductModel
 from app.models.product import ProductBarcode
 from app.schemas.product import ProductCreateIn, ProductImportItem, ProductListOut, ProductOut
@@ -27,6 +30,35 @@ class ProductImportResult(BaseModel):
     failed: List[ProductImportFailure]
 
 
+class SmartupProductsSyncRequest(BaseModel):
+    code: Optional[str] = None
+    begin_created_on: Optional[str] = None
+    end_created_on: Optional[str] = None
+    begin_modified_on: Optional[str] = None
+    end_modified_on: Optional[str] = None
+
+
+class SmartupProductsSyncResponse(BaseModel):
+    run_id: str
+    inserted: int
+    updated: int
+    skipped: int
+    errors_count: int
+    status: str
+
+
+class SmartupSyncRunOut(BaseModel):
+    id: str
+    run_type: str
+    started_at: datetime
+    finished_at: Optional[datetime] = None
+    inserted_count: int
+    updated_count: int
+    skipped_count: int
+    error_count: int
+    status: str
+
+
 def _to_product(product: ProductModel) -> ProductOut:
     barcodes = [barcode.barcode for barcode in product.barcodes]
     return ProductOut(
@@ -41,6 +73,66 @@ def _to_product(product: ProductModel) -> ProductOut:
         barcode=barcodes[0] if barcodes else None,
         created_at=product.created_at,
     )
+
+
+@router.post(
+    "/sync-smartup",
+    response_model=SmartupProductsSyncResponse,
+    summary="Sync products from Smartup",
+)
+async def sync_products_from_smartup(
+    payload: SmartupProductsSyncRequest,
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("products:write")),
+):
+    run, inserted, updated, skipped, errors = sync_smartup_products(
+        db,
+        code=payload.code,
+        begin_created_on=payload.begin_created_on,
+        end_created_on=payload.end_created_on,
+        begin_modified_on=payload.begin_modified_on,
+        end_modified_on=payload.end_modified_on,
+    )
+    return SmartupProductsSyncResponse(
+        run_id=str(run.id),
+        inserted=inserted,
+        updated=updated,
+        skipped=skipped,
+        errors_count=len(errors),
+        status=run.status,
+    )
+
+
+@router.get(
+    "/sync-smartup/runs",
+    response_model=List[SmartupSyncRunOut],
+    summary="List Smartup sync runs",
+)
+async def list_smartup_sync_runs(
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("products:write")),
+):
+    runs = (
+        db.query(SmartupSyncRun)
+        .filter(SmartupSyncRun.run_type == "products")
+        .order_by(SmartupSyncRun.started_at.desc())
+        .limit(20)
+        .all()
+    )
+    return [
+        SmartupSyncRunOut(
+            id=str(run.id),
+            run_type=run.run_type,
+            started_at=run.started_at,
+            finished_at=run.finished_at,
+            inserted_count=run.inserted_count,
+            updated_count=run.updated_count,
+            skipped_count=run.skipped_count,
+            error_count=run.error_count,
+            status=run.status,
+        )
+        for run in runs
+    ]
 
 
 @router.get("", response_model=ProductListOut, summary="List Products")
@@ -152,6 +244,9 @@ async def create_product(
             raise HTTPException(status_code=409, detail="Barcode already assigned")
 
     product = ProductModel(
+        external_source="manual",
+        external_id=payload.sku,
+        smartup_code=payload.sku,
         sku=payload.sku,
         name=payload.name,
         brand=payload.brand,
@@ -222,6 +317,9 @@ async def import_products(
         try:
             with db.begin_nested():
                 product = ProductModel(
+                    external_source="manual",
+                    external_id=item.sku,
+                    smartup_code=item.sku,
                     sku=item.sku,
                     name=item.name,
                     brand=item.brand,

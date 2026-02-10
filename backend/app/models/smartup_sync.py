@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, Integer, JSON, String, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -23,3 +24,10 @@ class SmartupSyncRun(Base):
     error_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     errors_json: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     source: Mapped[str] = mapped_column(String(32), nullable=False, default="smartup")
+    run_type: Mapped[str] = mapped_column(String(32), nullable=False, default="orders")
+    request_payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    inserted_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    updated_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    skipped_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="success")
+    error_message: Mapped[str | None] = mapped_column(String(512), nullable=True)

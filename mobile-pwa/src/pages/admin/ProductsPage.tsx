@@ -11,7 +11,14 @@ import { ProductsTableSettings } from '../../admin/components/products/ProductsT
 import { useTableConfig } from '../../admin/hooks/useTableConfig'
 import { Button } from '../../components/ui/button'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { getProducts, type Product } from '../../services/productsApi'
+import {
+  getProducts,
+  listProductsSyncRuns,
+  syncProductsFromSmartup,
+  type Product,
+  type SmartupProductsSyncResult,
+  type SmartupSyncRun,
+} from '../../services/productsApi'
 import { getInventorySummary } from '../../services/inventoryApi'
 import { useAuth } from '../../rbac/AuthProvider'
 
@@ -65,6 +72,10 @@ export function ProductsPage() {
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [syncError, setSyncError] = useState<string | null>(null)
+  const [syncResult, setSyncResult] = useState<SmartupProductsSyncResult | null>(null)
+  const [lastRun, setLastRun] = useState<SmartupSyncRun | null>(null)
+  const [isSyncing, setIsSyncing] = useState(false)
 
   const load = useCallback(
     async (search: string, nextOffset: number) => {
@@ -110,6 +121,15 @@ export function ProductsPage() {
     void load(debouncedQuery, offset)
   }, [debouncedQuery, load, offset])
 
+  const loadRuns = useCallback(async () => {
+    try {
+      const runs = await listProductsSyncRuns()
+      setLastRun(runs[0] ?? null)
+    } catch {
+      setLastRun(null)
+    }
+  }, [])
+
   useEffect(() => {
     const handle = setTimeout(() => setDebouncedQuery(query.trim()), 300)
     return () => clearTimeout(handle)
@@ -127,6 +147,10 @@ export function ProductsPage() {
     prevQueryRef.current = debouncedQuery
     void load(debouncedQuery, offset)
   }, [debouncedQuery, load, offset])
+
+  useEffect(() => {
+    void loadRuns()
+  }, [loadRuns])
 
   const columnOptions = useMemo(
     () => COLUMN_OPTIONS.map((column) => ({ id: column.id, label: t(column.labelKey) })),
@@ -182,15 +206,65 @@ export function ProductsPage() {
     )
   }, [config.columnOrder, config.visibleColumns, error, handleRetry, isLoading, items, navigate, t])
 
+  const handleSync = async () => {
+    setIsSyncing(true)
+    setSyncError(null)
+    setSyncResult(null)
+    try {
+      const result = await syncProductsFromSmartup({
+        code: '',
+        begin_created_on: '',
+        end_created_on: '',
+        begin_modified_on: '',
+        end_modified_on: '',
+      })
+      setSyncResult(result)
+      await loadRuns()
+      await load(debouncedQuery, offset)
+    } catch (err) {
+      setSyncError(err instanceof Error ? err.message : t('products:sync_failed'))
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
   return (
     <AdminLayout
       title={t('products:title')}
       actionSlot={
-        <Button variant="secondary" onClick={handleRetry}>
-          {t('products:refresh')}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={handleSync} disabled={isSyncing}>
+            {isSyncing ? t('products:syncing') : t('products:sync_from_smartup')}
+          </Button>
+          <Button variant="secondary" onClick={handleRetry}>
+            {t('products:refresh')}
+          </Button>
+        </div>
       }
     >
+      {syncError ? (
+        <Card className="mb-4 border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-500/30 dark:bg-red-500/10">
+          {syncError}
+        </Card>
+      ) : null}
+      {syncResult ? (
+        <Card className="mb-4 border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700 dark:border-green-500/30 dark:bg-green-500/10">
+          {t('products:sync_completed')}{' '}
+          {t('products:sync_summary', {
+            inserted: syncResult.inserted,
+            updated: syncResult.updated,
+            skipped: syncResult.skipped,
+          })}
+        </Card>
+      ) : null}
+      {lastRun ? (
+        <div className="mb-4 text-sm text-slate-600 dark:text-slate-300">
+          {t('products:last_sync')}: {new Date(lastRun.started_at).toLocaleString()} ·{' '}
+          {lastRun.status}
+        </div>
+      ) : (
+        <div className="mb-4 text-sm text-slate-500">{t('products:last_sync_none')}</div>
+      )}
       <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center">
         <div className="flex flex-1 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <Search size={18} className="text-slate-400" />
