@@ -33,6 +33,12 @@ def _normalize_barcode(raw: str | None) -> tuple[str | None, list[str]]:
     return primary, normalized
 
 
+def _is_active_state(value: object) -> bool:
+    if value is None:
+        return False
+    return str(value).strip().upper() == "A"
+
+
 def _extract_brand_code(groups: list | None) -> str | None:
     if not groups:
         return None
@@ -74,14 +80,12 @@ def _sync_products(
             if not code or not name:
                 skipped += 1
                 continue
-            if item.get("state") != "A":
-                skipped += 1
-                continue
+            is_active = _is_active_state(item.get("state"))
             barcode_primary, barcode_list = _normalize_barcode(item.get("barcodes"))
             brand_code = _extract_brand_code(item.get("groups"))
             brand_id = None
             brand_name = None
-            if brand_code:
+            if brand_code and is_active:
                 brand = (
                     db.query(Brand)
                     .filter(Brand.code == brand_code, Brand.is_active.is_(True))
@@ -113,19 +117,19 @@ def _sync_products(
                     "short_name": item.get("short_name"),
                     "barcode": barcode_primary,
                     "article_code": item.get("article_code"),
-                    "is_active": item.get("state") == "A",
+                    "is_active": is_active,
                     "smartup_groups": item.get("groups", []),
                     "raw_payload": item,
-                    "brand_id": brand_id,
-                    "brand_code": brand_code,
-                    "brand": brand_name,
+                    "brand_id": brand_id if is_active else None,
+                    "brand_code": brand_code if is_active else None,
+                    "brand": brand_name if is_active else None,
                 }
                 for key, value in fields.items():
                     if getattr(existing, key) != value:
                         setattr(existing, key, value)
                         changed = True
 
-                if barcode_list:
+                if barcode_list and is_active:
                     existing_codes = {b.barcode for b in existing.barcodes}
                     for code_value in barcode_list:
                         if code_value not in existing_codes:
@@ -139,6 +143,10 @@ def _sync_products(
                     skipped += 1
                 continue
 
+            if not is_active:
+                skipped += 1
+                continue
+
             record = Product(
                 external_source="smartup",
                 external_id=external_id,
@@ -148,7 +156,7 @@ def _sync_products(
                 short_name=item.get("short_name"),
                 barcode=barcode_primary,
                 article_code=item.get("article_code"),
-                is_active=item.get("state") == "A",
+                is_active=is_active,
                 smartup_groups=item.get("groups", []),
                 raw_payload=item,
                 brand_id=brand_id,

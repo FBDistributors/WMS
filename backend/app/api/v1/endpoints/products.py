@@ -144,12 +144,15 @@ async def list_smartup_sync_runs(
 async def list_products(
     search: Optional[str] = Query(None, alias="search"),
     q: Optional[str] = None,
+    include_inactive: bool = Query(False),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     _user=Depends(require_permission("products:read")),
 ):
     query = db.query(ProductModel).options(selectinload(ProductModel.barcodes))
+    if not include_inactive:
+        query = query.filter(ProductModel.is_active.is_(True))
     term_value = (search or q or "").strip()
     if term_value:
         term = f"%{term_value}%"
