@@ -10,6 +10,7 @@ import { ProductsTable } from '../../admin/components/products/ProductsTable'
 import { ProductsTableSettings } from '../../admin/components/products/ProductsTableSettings'
 import { useTableConfig } from '../../admin/hooks/useTableConfig'
 import { Button } from '../../components/ui/button'
+import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import {
   getProducts,
