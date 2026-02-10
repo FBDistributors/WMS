@@ -31,6 +31,8 @@ MOVEMENT_TYPES = (
 
 
 def upgrade():
+    op.execute("DROP VIEW IF EXISTS inventory_by_lot_location")
+    op.execute("DROP VIEW IF EXISTS stock_balances")
     op.alter_column(
         "stock_movements",
         "qty_change",
@@ -79,4 +81,16 @@ def downgrade():
         type_=sa.Numeric(14, 3),
         existing_type=sa.Numeric(18, 3),
         nullable=False,
+    )
+    op.execute(
+        """
+        CREATE VIEW stock_balances AS
+        SELECT
+            lot_id,
+            location_id,
+            SUM(qty_change) AS qty
+        FROM stock_movements
+        WHERE movement_type <> 'pick'
+        GROUP BY lot_id, location_id
+        """
     )
