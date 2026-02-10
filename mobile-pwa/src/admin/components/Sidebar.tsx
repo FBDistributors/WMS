@@ -6,6 +6,7 @@ import {
   ClipboardList,
   Users,
   UserCircle2,
+  Inbox,
   MapPin,
   ChevronLeft,
   ChevronRight,
@@ -27,6 +28,7 @@ const MENU_ITEMS: Array<MenuItem & { key: string }> = [
   { key: 'locations', label: 'Locations', path: '/admin/locations', icon: MapPin, required: 'locations:manage' },
   { key: 'inventory', label: 'Inventory', path: '/admin/inventory', icon: Boxes, required: 'inventory:read' },
   { key: 'picking', label: 'Picking', path: '/picking/mobile-pwa', icon: ClipboardList, required: 'picking:read' },
+  { key: 'receiving', label: 'Receiving', path: '/admin/receiving', icon: Inbox, required: 'receiving:read' },
   { key: 'users', label: 'Users & Access', path: '/admin/users', icon: Users, required: 'users:manage' },
 ]
 

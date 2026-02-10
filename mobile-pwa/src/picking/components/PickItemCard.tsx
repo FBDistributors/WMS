@@ -6,6 +6,8 @@ import type { PickLineStatus } from '../../services/pickingApi'
 type PickItemCardProps = {
   productName: string
   locationCode: string
+  batch?: string | null
+  expiryDate?: string | null
   qtyPicked: number
   qtyRequired: number
   status: PickLineStatus
@@ -14,6 +16,8 @@ type PickItemCardProps = {
 export function PickItemCard({
   productName,
   locationCode,
+  batch,
+  expiryDate,
   qtyPicked,
   qtyRequired,
   status,
@@ -34,6 +38,16 @@ export function PickItemCard({
         <div className="text-xs uppercase text-slate-500">{t('location_label')}</div>
         <div className="text-5xl font-bold tracking-widest text-slate-900">
           {locationCode}
+        </div>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-slate-600">
+        <div>
+          <div className="text-xs uppercase text-slate-500">{t('batch_label')}</div>
+          <div className="font-semibold text-slate-900">{batch || '—'}</div>
+        </div>
+        <div>
+          <div className="text-xs uppercase text-slate-500">{t('expiry_label')}</div>
+          <div className="font-semibold text-slate-900">{expiryDate || '—'}</div>
         </div>
       </div>
       <div className="mt-4 flex items-center justify-between text-sm text-slate-600">

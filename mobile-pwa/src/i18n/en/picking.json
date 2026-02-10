@@ -20,6 +20,8 @@
   "pick_error": "Pick failed. Please try again.",
   "product_label": "Product",
   "location_label": "Location",
+  "batch_label": "Batch",
+  "expiry_label": "Expiry",
   "picked_label": "Picked",
   "picked_progress": "Picked: {{picked}} / {{required}}",
   "last_scan": "Last scan: {{code}} — {{result}}",

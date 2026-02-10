@@ -20,6 +20,8 @@
   "pick_error": "Pick qilishda xato. Qayta urinib ko‘ring.",
   "product_label": "Mahsulot",
   "location_label": "Joylashuv",
+  "batch_label": "Partiya",
+  "expiry_label": "Yaroqlilik",
   "picked_label": "Terilgan",
   "picked_progress": "Terilgan: {{picked}} / {{required}}",
   "last_scan": "Oxirgi skan: {{code}} — {{result}}",

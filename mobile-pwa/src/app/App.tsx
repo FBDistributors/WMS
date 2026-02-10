@@ -13,6 +13,7 @@ import { ProductsPage } from '../pages/admin/ProductsPage'
 import { OrdersPage } from '../pages/admin/OrdersPage'
 import { OrderDetailsPage } from '../pages/admin/OrderDetailsPage'
 import { LocationsPage } from '../pages/admin/LocationsPage'
+import { ReceivingPage } from '../pages/admin/ReceivingPage'
 import { UsersPage } from '../pages/admin/UsersPage'
 import { UserCreatePage } from '../pages/admin/users/UserCreatePage'
 import { UserDetailsPage } from '../pages/admin/users/UserDetailsPage'
@@ -138,6 +139,16 @@ export function App() {
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">
               <RequirePermission permission="locations:manage">
                 <LocationsPage />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/receiving"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="receiving:read">
+                <ReceivingPage />
               </RequirePermission>
             </RequirePermission>
           }

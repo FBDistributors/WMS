@@ -20,6 +20,8 @@
   "pick_error": "Ошибка подбора. Попробуйте снова.",
   "product_label": "Товар",
   "location_label": "Локация",
+  "batch_label": "Партия",
+  "expiry_label": "Срок годности",
   "picked_label": "Подобрано",
   "picked_progress": "Подобрано: {{picked}} / {{required}}",
   "last_scan": "Последний скан: {{code}} — {{result}}",

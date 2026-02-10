@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import List, Literal, Optional
 from uuid import UUID
 
@@ -10,7 +11,9 @@ from app.auth.deps import require_permission
 from app.db import get_db
 from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
+from app.models.order import Order as OrderModel
 from app.models.picking import PickRequest
+from app.models.stock import StockMovement as StockMovementModel
 
 router = APIRouter()
 
@@ -21,6 +24,8 @@ class PickingLine(BaseModel):
     sku: Optional[str] = None
     barcode: Optional[str] = None
     location_code: str
+    batch: Optional[str] = None
+    expiry_date: Optional[str] = None
     qty_required: float
     qty_picked: float
 
@@ -70,6 +75,8 @@ def _to_picking_line(line: DocumentLineModel) -> PickingLine:
         sku=line.sku,
         barcode=line.barcode,
         location_code=line.location_code,
+        batch=line.batch,
+        expiry_date=line.expiry_date.isoformat() if line.expiry_date else None,
         qty_required=line.required_qty,
         qty_picked=line.picked_qty,
     )
@@ -204,6 +211,30 @@ async def pick_line(
         raise HTTPException(status_code=400, detail="qty_picked cannot exceed qty_required")
 
     line.picked_qty = next_qty
+    if not line.product_id or not line.lot_id or not line.location_id:
+        raise HTTPException(status_code=409, detail="Pick line missing allocation details")
+    qty_delta = Decimal(str(payload.delta))
+    db.add(
+        StockMovementModel(
+            product_id=line.product_id,
+            lot_id=line.lot_id,
+            location_id=line.location_id,
+            qty_change=-qty_delta,
+            movement_type="pick",
+            source_document_type="document",
+            source_document_id=document.id,
+            created_by=user.id,
+        )
+    )
+    if document.order_id:
+        order = (
+            db.query(OrderModel)
+            .filter(OrderModel.id == document.order_id)
+            .with_for_update()
+            .one_or_none()
+        )
+        if order and order.status in {"allocated", "ready_for_picking"}:
+            order.status = "picking"
     try:
         db.add(PickRequest(request_id=payload.request_id, line_id=line.id))
         db.flush()
@@ -287,6 +318,15 @@ async def complete_picking_document(
         )
 
     document.status = "completed"
+    if document.order_id:
+        order = (
+            db.query(OrderModel)
+            .filter(OrderModel.id == document.order_id)
+            .with_for_update()
+            .one_or_none()
+        )
+        if order and order.status in {"picking", "allocated"}:
+            order.status = "picked"
     db.commit()
 
     document.lines = lines

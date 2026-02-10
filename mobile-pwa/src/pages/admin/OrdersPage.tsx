@@ -186,6 +186,7 @@ export function OrdersPage() {
             >
               <option value="all">{t('orders:filters.all')}</option>
               <option value="imported">{t('orders:status.imported')}</option>
+              <option value="allocated">{t('orders:status.allocated')}</option>
               <option value="ready_for_picking">{t('orders:status.ready_for_picking')}</option>
               <option value="picking">{t('orders:status.picking')}</option>
               <option value="picked">{t('orders:status.picked')}</option>

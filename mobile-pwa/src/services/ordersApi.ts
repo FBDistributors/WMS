@@ -93,3 +93,15 @@ export async function sendOrderToPicking(orderId: string, assignedToUserId: stri
     }
   )
 }
+
+export async function packOrder(orderId: string) {
+  return fetchJSON<OrderDetails>(`/api/v1/orders/${orderId}/pack`, {
+    method: 'POST',
+  })
+}
+
+export async function shipOrder(orderId: string) {
+  return fetchJSON<OrderDetails>(`/api/v1/orders/${orderId}/ship`, {
+    method: 'POST',
+  })
+}

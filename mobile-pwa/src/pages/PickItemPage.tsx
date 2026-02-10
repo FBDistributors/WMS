@@ -172,6 +172,8 @@ export function PickItemPage() {
       <PickItemCard
         productName={line.product_name}
         locationCode={line.location_code}
+        batch={line.batch}
+        expiryDate={line.expiry_date}
         qtyPicked={line.qty_picked}
         qtyRequired={line.qty_required}
         status={line.status}

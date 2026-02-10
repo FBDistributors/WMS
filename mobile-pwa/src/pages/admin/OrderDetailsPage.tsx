@@ -7,15 +7,21 @@ import { AdminLayout } from '../../admin/components/AdminLayout'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { getOrder, type OrderDetails } from '../../services/ordersApi'
+import { getOrder, packOrder, shipOrder, type OrderDetails } from '../../services/ordersApi'
+import { useAuth } from '../../rbac/AuthProvider'
 
 export function OrderDetailsPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { t } = useTranslation(['orders', 'common'])
+  const { has } = useAuth()
   const [order, setOrder] = useState<OrderDetails | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [isUpdating, setIsUpdating] = useState(false)
+
+  const canEditStatus = has('documents:edit_status')
 
   const load = useCallback(async () => {
     if (!id) {
@@ -24,16 +30,45 @@ export function OrderDetailsPage() {
       return
     }
     setIsLoading(true)
-    setError(null)
+    setLoadError(null)
+    setActionError(null)
     try {
       const data = await getOrder(id)
       setOrder(data)
     } catch (err) {
-      setError(t('orders:load_failed'))
+      setLoadError(t('orders:load_failed'))
     } finally {
       setIsLoading(false)
     }
   }, [id, t])
+
+  const handlePack = async () => {
+    if (!order) return
+    setIsUpdating(true)
+    setActionError(null)
+    try {
+      await packOrder(order.id)
+      await load()
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : t('orders:pack_failed'))
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  const handleShip = async () => {
+    if (!order) return
+    setIsUpdating(true)
+    setActionError(null)
+    try {
+      await shipOrder(order.id)
+      await load()
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : t('orders:ship_failed'))
+    } finally {
+      setIsUpdating(false)
+    }
+  }
 
   useEffect(() => {
     void load()
@@ -47,11 +82,11 @@ export function OrderDetailsPage() {
     )
   }
 
-  if (!order || error) {
+  if (!order || loadError) {
     return (
       <AdminLayout title={t('orders:details_title')}>
         <EmptyState
-          title={error ?? t('orders:not_found')}
+          title={loadError ?? t('orders:not_found')}
           actionLabel={t('common:buttons.retry')}
           onAction={load}
         />
@@ -63,13 +98,30 @@ export function OrderDetailsPage() {
     <AdminLayout
       title={t('orders:details_title')}
       actionSlot={
-        <Button variant="ghost" onClick={() => navigate(-1)}>
-          <ArrowLeft size={16} />
-          {t('common:buttons.back')}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {canEditStatus && order.status === 'picked' ? (
+            <Button onClick={handlePack} disabled={isUpdating}>
+              {isUpdating ? t('orders:packing') : t('orders:pack')}
+            </Button>
+          ) : null}
+          {canEditStatus && order.status === 'packed' ? (
+            <Button onClick={handleShip} disabled={isUpdating}>
+              {isUpdating ? t('orders:shipping') : t('orders:ship')}
+            </Button>
+          ) : null}
+          <Button variant="ghost" onClick={() => navigate(-1)}>
+            <ArrowLeft size={16} />
+            {t('common:buttons.back')}
+          </Button>
+        </div>
       }
     >
       <Card className="space-y-4">
+        {actionError ? (
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-500/30 dark:bg-red-500/10">
+            {actionError}
+          </div>
+        ) : null}
         <div className="grid gap-3 md:grid-cols-3">
           <div>
             <div className="text-xs text-slate-500">{t('orders:columns.order_number')}</div>
@@ -83,7 +135,9 @@ export function OrderDetailsPage() {
           </div>
           <div>
             <div className="text-xs text-slate-500">{t('orders:columns.status')}</div>
-            <div className="text-sm text-slate-700 dark:text-slate-200">{order.status}</div>
+            <div className="text-sm text-slate-700 dark:text-slate-200">
+              {t(`orders:status.${order.status}`, order.status)}
+            </div>
           </div>
           <div>
             <div className="text-xs text-slate-500">{t('orders:columns.customer')}</div>

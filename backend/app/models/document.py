@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Index, String, UniqueConstraint, func
+from sqlalchemy import Date, DateTime, Float, ForeignKey, Index, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -63,13 +63,29 @@ class DocumentLine(Base):
     document_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False
     )
+    product_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("products.id", ondelete="RESTRICT"), nullable=True
+    )
+    lot_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("stock_lots.id", ondelete="RESTRICT"), nullable=True
+    )
+    location_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("locations.id", ondelete="RESTRICT"), nullable=True
+    )
     sku: Mapped[str | None] = mapped_column(String(64), nullable=True)
     product_name: Mapped[str] = mapped_column(String(128), nullable=False)
     barcode: Mapped[str | None] = mapped_column(String(64), nullable=True)
     location_code: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    batch: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    expiry_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     required_qty: Mapped[float] = mapped_column(Float, nullable=False)
     picked_qty: Mapped[float] = mapped_column(Float, nullable=False, server_default="0")
 
     document: Mapped[Document] = relationship("Document", back_populates="lines")
 
-    __table_args__ = (Index("ix_document_lines_document_id", "document_id"),)
+    __table_args__ = (
+        Index("ix_document_lines_document_id", "document_id"),
+        Index("ix_document_lines_product_id", "product_id"),
+        Index("ix_document_lines_lot_id", "lot_id"),
+        Index("ix_document_lines_location_id", "location_id"),
+    )

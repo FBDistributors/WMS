@@ -6,10 +6,11 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
+from decimal import Decimal
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, selectinload
 
-from app.auth.deps import require_permission
+from app.auth.deps import get_current_user, require_permission
 from app.db import get_db
 from app.integrations.smartup.client import SmartupClient
 from app.integrations.smartup.importer import import_orders
@@ -17,6 +18,11 @@ from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
 from app.models.order import Order as OrderModel
 from app.models.order import OrderLine as OrderLineModel
+from app.models.product import Product as ProductModel
+from app.models.product import ProductBarcode
+from app.models.location import Location as LocationModel
+from app.models.stock import StockLot as StockLotModel
+from app.models.stock import StockMovement as StockMovementModel
 from app.auth.permissions import get_permissions_for_role
 from app.models.user import User
 
@@ -24,6 +30,7 @@ router = APIRouter()
 
 ORDER_STATUSES = {
     "imported",
+    "allocated",
     "ready_for_picking",
     "picking",
     "picked",
@@ -95,6 +102,162 @@ class SendToPickingResponse(BaseModel):
 class PickerUser(BaseModel):
     id: UUID
     name: str
+
+
+class AllocationShortage(BaseModel):
+    line_id: UUID
+    sku: Optional[str] = None
+    barcode: Optional[str] = None
+    required_qty: float
+    allocated_qty: float
+
+
+def _resolve_product_id(db: Session, line: OrderLineModel) -> UUID | None:
+    if line.sku:
+        product = db.query(ProductModel.id).filter(ProductModel.sku == line.sku).one_or_none()
+        if product:
+            return product.id
+    if line.barcode:
+        product = (
+            db.query(ProductModel.id)
+            .join(ProductBarcode, ProductBarcode.product_id == ProductModel.id)
+            .filter(ProductBarcode.barcode == line.barcode)
+            .one_or_none()
+        )
+        if product:
+            return product.id
+    return None
+
+
+def _fefo_available_lots(db: Session, product_id: UUID):
+    return (
+        db.query(
+            StockMovementModel.lot_id,
+            StockMovementModel.location_id,
+            func.sum(StockMovementModel.qty_change).label("qty"),
+            StockLotModel.batch,
+            StockLotModel.expiry_date,
+            LocationModel.code.label("location_code"),
+        )
+        .join(StockLotModel, StockLotModel.id == StockMovementModel.lot_id)
+        .join(LocationModel, LocationModel.id == StockMovementModel.location_id)
+        .filter(
+            StockLotModel.product_id == product_id,
+            StockMovementModel.movement_type != "pick",
+        )
+        .group_by(
+            StockMovementModel.lot_id,
+            StockMovementModel.location_id,
+            StockLotModel.batch,
+            StockLotModel.expiry_date,
+            LocationModel.code,
+        )
+        .having(func.sum(StockMovementModel.qty_change) > 0)
+        .order_by(StockLotModel.expiry_date.asc().nullslast(), LocationModel.code.asc())
+        .all()
+    )
+
+
+def _to_order_details(order: OrderModel) -> OrderDetails:
+    return OrderDetails(
+        id=order.id,
+        order_number=order.order_number,
+        source_external_id=order.source_external_id,
+        status=order.status,
+        filial_id=order.filial_id,
+        customer_name=order.customer_name,
+        created_at=order.created_at.date(),
+        lines=[
+            OrderLineOut(
+                id=line.id,
+                sku=line.sku,
+                barcode=line.barcode,
+                name=line.name,
+                qty=line.qty,
+                uom=line.uom,
+            )
+            for line in order.lines
+        ],
+    )
+
+
+def _allocate_order(
+    db: Session,
+    order: OrderModel,
+    user_id: UUID,
+) -> tuple[list[DocumentLineModel], list[AllocationShortage]]:
+    shortages: list[AllocationShortage] = []
+    document_lines: list[DocumentLineModel] = []
+
+    for line in order.lines:
+        product_id = _resolve_product_id(db, line)
+        if not product_id:
+            shortages.append(
+                AllocationShortage(
+                    line_id=line.id,
+                    sku=line.sku,
+                    barcode=line.barcode,
+                    required_qty=line.qty,
+                    allocated_qty=0,
+                )
+            )
+            continue
+
+        remaining = Decimal(str(line.qty))
+        allocated_total = Decimal("0")
+        available_lots = _fefo_available_lots(db, product_id)
+
+        for lot_row in available_lots:
+            if remaining <= 0:
+                break
+            available_qty = Decimal(str(lot_row.qty))
+            if available_qty <= 0:
+                continue
+            allocate_qty = min(available_qty, remaining)
+
+            document_lines.append(
+                DocumentLineModel(
+                    product_id=product_id,
+                    lot_id=lot_row.lot_id,
+                    location_id=lot_row.location_id,
+                    sku=line.sku,
+                    product_name=line.name,
+                    barcode=line.barcode,
+                    location_code=lot_row.location_code or "",
+                    batch=lot_row.batch,
+                    expiry_date=lot_row.expiry_date,
+                    required_qty=float(allocate_qty),
+                    picked_qty=0,
+                )
+            )
+            db.add(
+                StockMovementModel(
+                    product_id=product_id,
+                    lot_id=lot_row.lot_id,
+                    location_id=lot_row.location_id,
+                    qty_change=-allocate_qty,
+                    movement_type="allocate",
+                    source_document_type="order",
+                    source_document_id=order.id,
+                    created_by=user_id,
+                )
+            )
+
+            allocated_total += allocate_qty
+            remaining -= allocate_qty
+
+        if allocated_total < Decimal(str(line.qty)):
+            shortages.append(
+                AllocationShortage(
+                    line_id=line.id,
+                    sku=line.sku,
+                    barcode=line.barcode,
+                    required_qty=line.qty,
+                    allocated_qty=float(allocated_total),
+                )
+            )
+
+    return document_lines, shortages
 
 
 @router.get("", response_model=OrdersListResponse, summary="List orders")
@@ -174,26 +337,7 @@ async def get_order(
     )
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    return OrderDetails(
-        id=order.id,
-        order_number=order.order_number,
-        source_external_id=order.source_external_id,
-        status=order.status,
-        filial_id=order.filial_id,
-        customer_name=order.customer_name,
-        created_at=order.created_at.date(),
-        lines=[
-            OrderLineOut(
-                id=line.id,
-                sku=line.sku,
-                barcode=line.barcode,
-                name=line.name,
-                qty=line.qty,
-                uom=line.uom,
-            )
-            for line in order.lines
-        ],
-    )
+    return _to_order_details(order)
 
 
 @router.post("/sync-smartup", response_model=SmartupSyncResponse, summary="Sync orders from Smartup")
@@ -245,7 +389,7 @@ async def send_order_to_picking(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    if order.status not in {"imported", "ready_for_picking"}:
+    if order.status not in {"imported", "ready_for_picking", "allocated"}:
         raise HTTPException(status_code=409, detail="Order cannot be sent to picking")
 
     if not order.lines:
@@ -259,30 +403,121 @@ async def send_order_to_picking(
     if not assigned_user or assigned_user.role != "picker":
         raise HTTPException(status_code=400, detail="Invalid picker selection")
 
+    document_lines, shortages = _allocate_order(db, order, user.id)
+    if not document_lines:
+        raise HTTPException(status_code=409, detail="Insufficient stock to allocate")
+
     document = DocumentModel(
         doc_no=order.order_number,
         doc_type="SO",
-        status="new",
+        status="partial" if shortages else "new",
         source="orders",
         source_external_id=order.source_external_id,
         order_id=order.id,
         assigned_to_user_id=payload.assigned_to_user_id,
     )
-    document.lines = [
-        DocumentLineModel(
-            sku=line.sku,
-            product_name=line.name,
-            barcode=line.barcode,
-            location_code="",
-            required_qty=line.qty,
-            picked_qty=0,
-        )
-        for line in order.lines
-    ]
+    document.lines = document_lines
 
     db.add(document)
-    order.status = "picking"
+    order.status = "allocated"
     db.commit()
     db.refresh(document)
 
     return SendToPickingResponse(pick_task_id=document.id, assigned_to=payload.assigned_to_user_id)
+
+
+@router.post("/{order_id}/pack", response_model=OrderDetails, summary="Mark order as packed")
+async def pack_order(
+    order_id: UUID,
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("documents:edit_status")),
+):
+    order = (
+        db.query(OrderModel)
+        .options(selectinload(OrderModel.lines))
+        .filter(OrderModel.id == order_id)
+        .one_or_none()
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if order.status != "picked":
+        raise HTTPException(status_code=409, detail="Order must be picked before packing")
+
+    document = (
+        db.query(DocumentModel)
+        .filter(DocumentModel.order_id == order.id)
+        .one_or_none()
+    )
+    if not document or document.status != "completed":
+        raise HTTPException(status_code=409, detail="Picking document is not completed")
+
+    order.status = "packed"
+    db.commit()
+    return _to_order_details(order)
+
+
+@router.post("/{order_id}/ship", response_model=OrderDetails, summary="Ship order")
+async def ship_order(
+    order_id: UUID,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+    _guard=Depends(require_permission("documents:edit_status")),
+):
+    order = (
+        db.query(OrderModel)
+        .options(selectinload(OrderModel.lines))
+        .filter(OrderModel.id == order_id)
+        .one_or_none()
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if order.status != "packed":
+        raise HTTPException(status_code=409, detail="Order must be packed before shipping")
+
+    document = (
+        db.query(DocumentModel)
+        .options(selectinload(DocumentModel.lines))
+        .filter(DocumentModel.order_id == order.id)
+        .one_or_none()
+    )
+    if not document or not document.lines:
+        raise HTTPException(status_code=409, detail="Picking document not found")
+
+    existing_ship = (
+        db.query(StockMovementModel.id)
+        .filter(
+            StockMovementModel.movement_type == "ship",
+            StockMovementModel.source_document_type == "order",
+            StockMovementModel.source_document_id == order.id,
+        )
+        .first()
+    )
+    if existing_ship:
+        raise HTTPException(status_code=409, detail="Order already shipped")
+
+    shipped_any = False
+    for line in document.lines:
+        if line.picked_qty <= 0:
+            continue
+        if not line.product_id or not line.lot_id or not line.location_id:
+            raise HTTPException(status_code=409, detail="Picking line missing allocation details")
+        shipped_any = True
+        db.add(
+            StockMovementModel(
+                product_id=line.product_id,
+                lot_id=line.lot_id,
+                location_id=line.location_id,
+                qty_change=-Decimal(str(line.picked_qty)),
+                movement_type="ship",
+                source_document_type="order",
+                source_document_id=order.id,
+                created_by=user.id,
+            )
+        )
+
+    if not shipped_any:
+        raise HTTPException(status_code=409, detail="No picked quantities to ship")
+
+    order.status = "shipped"
+    db.commit()
+    return _to_order_details(order)

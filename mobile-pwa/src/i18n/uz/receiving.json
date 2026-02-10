@@ -1,0 +1,38 @@
+{
+  "title": "Qabul",
+  "create_title": "Qabul hujjati yaratish",
+  "create_subtitle": "Kirimlarni kiriting va joylashuvni belgilang.",
+  "list_title": "Qabul hujjatlari",
+  "create": "Qabulni yaratish",
+  "complete": "Yakunlash",
+  "saving": "Saqlanmoqda...",
+  "load_failed": "Qabul ma'lumotlarini yuklab bo'lmadi.",
+  "save_failed": "Qabul hujjatini yaratib bo'lmadi.",
+  "complete_failed": "Qabulni yakunlab bo'lmadi.",
+  "empty": "Qabul hujjatlari yo'q",
+  "empty_desc": "Birinchi qabul hujjatini yarating.",
+  "line": "Qator",
+  "add_line": "Qator qo'shish",
+  "status": "Holat",
+  "lines_count": "{{count}} qator",
+  "statuses": {
+    "draft": "Qoralama",
+    "completed": "Yakunlangan",
+    "cancelled": "Bekor qilingan"
+  },
+  "fields": {
+    "doc_no": "Qabul raqami",
+    "doc_no_placeholder": "Ixtiyoriy (bo'sh bo'lsa avtomatik)",
+    "product": "Mahsulot",
+    "select_product": "Mahsulotni tanlang",
+    "location": "Joylashuv",
+    "select_location": "Joylashuvni tanlang",
+    "qty": "Miqdor",
+    "batch": "Partiya",
+    "expiry_date": "Yaroqlilik"
+  },
+  "validation": {
+    "lines_required": "Kamida bitta qator kerak.",
+    "line_invalid": "Har qator uchun mahsulot, joylashuv, partiya va miqdorni kiriting."
+  }
+}

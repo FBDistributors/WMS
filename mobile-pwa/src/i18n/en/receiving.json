@@ -1,0 +1,38 @@
+{
+  "title": "Receiving",
+  "create_title": "Create receipt",
+  "create_subtitle": "Enter received stock and assign putaway location.",
+  "list_title": "Receipts",
+  "create": "Create receipt",
+  "complete": "Complete",
+  "saving": "Saving...",
+  "load_failed": "Failed to load receiving data.",
+  "save_failed": "Failed to create receipt.",
+  "complete_failed": "Failed to complete receipt.",
+  "empty": "No receipts yet",
+  "empty_desc": "Create the first receipt to post stock.",
+  "line": "Line",
+  "add_line": "Add line",
+  "status": "Status",
+  "lines_count": "{{count}} lines",
+  "statuses": {
+    "draft": "Draft",
+    "completed": "Completed",
+    "cancelled": "Cancelled"
+  },
+  "fields": {
+    "doc_no": "Receipt No",
+    "doc_no_placeholder": "Optional (auto-generated if empty)",
+    "product": "Product",
+    "select_product": "Select product",
+    "location": "Location",
+    "select_location": "Select location",
+    "qty": "Qty",
+    "batch": "Batch",
+    "expiry_date": "Expiry date"
+  },
+  "validation": {
+    "lines_required": "At least one line is required.",
+    "line_invalid": "Fill product, location, batch and qty for each line."
+  }
+}

@@ -17,6 +17,8 @@ export type PickLine = {
   id: string
   product_name: string
   location_code: string
+  batch?: string | null
+  expiry_date?: string | null
   qty_required: number
   qty_picked: number
   status: PickLineStatus
@@ -38,6 +40,8 @@ type BackendDocumentLine = {
   line_id: string
   product_name: string
   location_code: string
+  batch?: string | null
+  expiry_date?: string | null
   qty_required: number
   qty_picked: number
 }
@@ -77,6 +81,8 @@ function mapPickingLineToPickerViewModel(line: BackendDocumentLine): PickLine {
     id: line.line_id,
     product_name: line.product_name,
     location_code: line.location_code,
+    batch: line.batch ?? null,
+    expiry_date: line.expiry_date ?? null,
     qty_required: line.qty_required,
     qty_picked: line.qty_picked,
     status: mapLineStatus(line),

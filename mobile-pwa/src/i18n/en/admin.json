@@ -6,6 +6,7 @@
     "locations": "Locations",
     "inventory": "Inventory",
     "picking": "Picking",
+    "receiving": "Receiving",
     "users": "Users & Access",
     "integrations": "Integrations",
     "smartup_orders": "Smartup Orders",
