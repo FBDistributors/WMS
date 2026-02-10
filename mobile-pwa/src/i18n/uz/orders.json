@@ -36,6 +36,22 @@
     "date_from": "Boshlanish sanasi",
     "date_to": "Tugash sanasi"
   },
+  "table": {
+    "settings_title": "Jadval sozlamalari",
+    "columns_hint": "Ko‘rinadigan ustunlarni tanlang va tartibini o‘rnating.",
+    "columns_title": "Ustunlar",
+    "search_title": "Qidiruv maydonlari",
+    "search_hint": "Qidiruv uchun maydonlarni tanlang.",
+    "reset_default": "Tiklash",
+    "save_settings": "Saqlash"
+  },
+  "search_fields": {
+    "order_number": "Buyurtma raqami",
+    "external_id": "Tashqi ID",
+    "customer": "Mijoz",
+    "customer_id": "Mijoz ID",
+    "agent": "Agent"
+  },
   "status": {
     "b#s": "B#S",
     "imported": "Import qilingan",

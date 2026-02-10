@@ -23,6 +23,9 @@ def import_orders(db: Session, orders: Iterable[SmartupOrder]) -> Tuple[int, int
     errors: List[ImportError] = []
 
     for order in orders:
+        if order.status != "B#S":
+            skipped += 1
+            continue
         payload = map_order_to_wms_order(order)
         try:
             existing = (

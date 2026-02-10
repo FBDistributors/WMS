@@ -88,8 +88,8 @@ class OrdersListResponse(BaseModel):
 
 
 class SmartupSyncRequest(BaseModel):
-    begin_deal_date: date = Field(..., description="YYYY-MM-DD")
-    end_deal_date: date = Field(..., description="YYYY-MM-DD")
+    begin_deal_date: Optional[date] = Field(None, description="YYYY-MM-DD")
+    end_deal_date: Optional[date] = Field(None, description="YYYY-MM-DD")
     filial_code: Optional[str] = None
 
 
@@ -281,6 +281,7 @@ async def list_orders(
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
     filial_id: Optional[str] = None,
+    search_fields: Optional[str] = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -294,14 +295,27 @@ async def list_orders(
         query = query.filter(OrderModel.status == status)
 
     if q:
+        allowed_fields = {
+            "order_number": OrderModel.order_number,
+            "external_id": OrderModel.source_external_id,
+            "customer": OrderModel.customer_name,
+            "customer_id": OrderModel.customer_id,
+            "agent": OrderModel.agent_name,
+        }
+        if search_fields:
+            requested_fields = [field.strip() for field in search_fields.split(",") if field.strip()]
+            invalid = [field for field in requested_fields if field not in allowed_fields]
+            if invalid:
+                raise HTTPException(status_code=400, detail="Invalid search fields")
+            fields = [allowed_fields[field] for field in requested_fields]
+        else:
+            fields = [
+                OrderModel.order_number,
+                OrderModel.source_external_id,
+                OrderModel.customer_name,
+            ]
         term = f"%{q.strip()}%"
-        query = query.filter(
-            or_(
-                OrderModel.order_number.ilike(term),
-                OrderModel.source_external_id.ilike(term),
-                OrderModel.customer_name.ilike(term),
-            )
-        )
+        query = query.filter(or_(*[field.ilike(term) for field in fields]))
 
     if filial_id:
         query = query.filter(OrderModel.filial_id == filial_id)
@@ -363,14 +377,17 @@ async def sync_orders_from_smartup(
     db: Session = Depends(get_db),
     _user=Depends(require_permission("orders:sync")),
 ):
-    if payload.begin_deal_date > payload.end_deal_date:
+    today = date.today()
+    begin_date = payload.begin_deal_date or today
+    end_date = payload.end_deal_date or today
+    if begin_date > end_date:
         raise HTTPException(status_code=400, detail="begin_deal_date must be <= end_deal_date")
 
     try:
         client = SmartupClient()
         response = client.export_orders(
-            begin_deal_date=payload.begin_deal_date.strftime("%d.%m.%Y"),
-            end_deal_date=payload.end_deal_date.strftime("%d.%m.%Y"),
+            begin_deal_date=begin_date.strftime("%d.%m.%Y"),
+            end_deal_date=end_date.strftime("%d.%m.%Y"),
             filial_code=payload.filial_code,
         )
         created, updated, skipped, _errors = import_orders(db, response.items)

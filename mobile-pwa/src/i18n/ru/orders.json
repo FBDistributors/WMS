@@ -36,6 +36,22 @@
     "date_from": "Дата с",
     "date_to": "Дата по"
   },
+  "table": {
+    "settings_title": "Настройки таблицы",
+    "columns_hint": "Выберите колонки и их порядок.",
+    "columns_title": "Колонки",
+    "search_title": "Поля поиска",
+    "search_hint": "Выберите поля для поиска.",
+    "reset_default": "Сбросить",
+    "save_settings": "Сохранить"
+  },
+  "search_fields": {
+    "order_number": "Номер заказа",
+    "external_id": "Внешний ID",
+    "customer": "Клиент",
+    "customer_id": "ID клиента",
+    "agent": "Агент"
+  },
   "status": {
     "b#s": "B#S",
     "imported": "Импортировано",

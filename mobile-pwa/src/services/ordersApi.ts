@@ -52,6 +52,7 @@ export type OrdersQuery = {
   date_from?: string
   date_to?: string
   filial_id?: string
+  search_fields?: string
   limit?: number
   offset?: number
 }
@@ -65,8 +66,8 @@ export async function getOrder(id: string) {
 }
 
 export type SmartupSyncInput = {
-  begin_deal_date: string
-  end_deal_date: string
+  begin_deal_date?: string
+  end_deal_date?: string
   filial_code?: string | null
 }
 
@@ -76,7 +77,7 @@ export type SmartupSyncResult = {
   skipped: number
 }
 
-export async function syncSmartupOrders(payload: SmartupSyncInput) {
+export async function syncSmartupOrders(payload: SmartupSyncInput = {}) {
   return fetchJSON<SmartupSyncResult>('/api/v1/orders/sync-smartup', {
     method: 'POST',
     body: payload,

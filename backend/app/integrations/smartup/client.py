@@ -54,6 +54,7 @@ class SmartupClient:
             "filial_code": normalized_filial_code,
             "external_id": "",
             "deal_id": "",
+            "status": "B#S",
             "begin_deal_date": begin_deal_date,
             "end_deal_date": end_deal_date,
             "delivery_date": "",
