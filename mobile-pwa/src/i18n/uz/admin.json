@@ -2,6 +2,7 @@
   "menu": {
     "dashboard": "Dashboard",
     "products": "Mahsulotlar",
+    "brands": "Brendlar",
     "orders": "Buyurtmalar",
     "locations": "Joylashuvlar",
     "inventory": "Inventar",

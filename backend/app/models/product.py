@@ -24,6 +24,10 @@ class Product(Base):
     barcode: Mapped[str | None] = mapped_column(String(64), nullable=True)
     article_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
     brand: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    brand_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("brands.id", ondelete="SET NULL"), nullable=True
+    )
+    brand_code: Mapped[str | None] = mapped_column(String(3), nullable=True)
     category: Mapped[str | None] = mapped_column(String(128), nullable=True)
     photo_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
@@ -39,6 +43,7 @@ class Product(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+    brand_ref = relationship("Brand", lazy="joined")
 
     __table_args__ = (
         Index("ix_products_sku", "sku"),
@@ -47,6 +52,8 @@ class Product(Base):
         Index("ix_products_smartup_code", "smartup_code"),
         Index("ix_products_barcode", "barcode"),
         Index("ix_products_is_active", "is_active"),
+        Index("ix_products_brand_id", "brand_id"),
+        Index("ix_products_brand_code", "brand_code"),
         Index("uq_products_external_source_external_id", "external_source", "external_id", unique=True),
     )
 

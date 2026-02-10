@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.integrations.smartup.inventory_client import SmartupInventoryExportClient
+from app.models.brand import Brand
 from app.models.product import Product, ProductBarcode
 from app.models.smartup_sync import SmartupSyncRun
 
@@ -32,6 +33,25 @@ def _normalize_barcode(raw: str | None) -> tuple[str | None, list[str]]:
     return primary, normalized
 
 
+def _extract_brand_code(groups: list | None) -> str | None:
+    if not groups:
+        return None
+    for group in groups:
+        if not isinstance(group, dict):
+            continue
+        group_id = group.get("group_id") or group.get("id")
+        if str(group_id) != "31426":
+            continue
+        raw_code = group.get("type_code") or group.get("code")
+        if raw_code is None:
+            return None
+        code = "".join(ch for ch in str(raw_code).strip() if ch.isdigit())
+        if not code:
+            return None
+        return code.zfill(3)
+    return None
+
+
 def _sync_products(
     db: Session,
     items: Iterable[dict],
@@ -41,6 +61,7 @@ def _sync_products(
     updated = 0
     skipped = 0
     errors: list[SyncError] = []
+    unknown_codes: set[str] = set()
 
     for item in items:
         external_id = str(item.get("product_id") or "").strip()
@@ -54,6 +75,24 @@ def _sync_products(
                 skipped += 1
                 continue
             barcode_primary, barcode_list = _normalize_barcode(item.get("barcodes"))
+            brand_code = _extract_brand_code(item.get("groups"))
+            brand_id = None
+            brand_name = None
+            if brand_code:
+                brand = (
+                    db.query(Brand)
+                    .filter(Brand.code == brand_code, Brand.is_active.is_(True))
+                    .one_or_none()
+                )
+                if brand:
+                    brand_id = brand.id
+                    brand_name = brand.display_name or brand.name
+                else:
+                    if brand_code not in unknown_codes and len(errors) < max_errors:
+                        unknown_codes.add(brand_code)
+                        errors.append(
+                            SyncError(external_id=external_id, reason=f"Unknown brand code: {brand_code}")
+                        )
 
             existing = (
                 db.query(Product)
@@ -74,6 +113,9 @@ def _sync_products(
                     "is_active": item.get("state") == "A",
                     "smartup_groups": item.get("groups", []),
                     "raw_payload": item,
+                    "brand_id": brand_id,
+                    "brand_code": brand_code,
+                    "brand": brand_name,
                 }
                 for key, value in fields.items():
                     if getattr(existing, key) != value:
@@ -106,6 +148,9 @@ def _sync_products(
                 is_active=item.get("state") == "A",
                 smartup_groups=item.get("groups", []),
                 raw_payload=item,
+                brand_id=brand_id,
+                brand_code=brand_code,
+                brand=brand_name,
             )
             if barcode_list:
                 record.barcodes = [ProductBarcode(barcode=code_value) for code_value in barcode_list]

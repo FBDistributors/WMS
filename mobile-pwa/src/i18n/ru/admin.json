@@ -2,6 +2,7 @@
   "menu": {
     "dashboard": "Дашборд",
     "products": "Товары",
+    "brands": "Бренды",
     "orders": "Заказы",
     "locations": "Локации",
     "inventory": "Запасы",

@@ -61,11 +61,15 @@ class SmartupSyncRunOut(BaseModel):
 
 def _to_product(product: ProductModel) -> ProductOut:
     barcodes = [barcode.barcode for barcode in product.barcodes]
+    brand_ref = getattr(product, "brand_ref", None)
     return ProductOut(
         id=product.id,
         name=product.name,
         sku=product.sku,
         brand=product.brand,
+        brand_id=product.brand_id,
+        brand_name=brand_ref.name if brand_ref else None,
+        brand_display_name=brand_ref.display_name if brand_ref else None,
         category=product.category,
         photo_url=product.photo_url,
         is_active=product.is_active,

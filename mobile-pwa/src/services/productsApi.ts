@@ -7,6 +7,9 @@ export type Product = {
   barcode?: string
   barcodes?: string[]
   brand?: string
+  brand_id?: string | null
+  brand_name?: string | null
+  brand_display_name?: string | null
   category?: string
   photo_url?: string
   is_active: boolean

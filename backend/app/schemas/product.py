@@ -34,6 +34,9 @@ class ProductOut(BaseModel):
     name: str
     sku: str
     brand: Optional[str] = None
+    brand_id: Optional[UUID] = None
+    brand_name: Optional[str] = None
+    brand_display_name: Optional[str] = None
     category: Optional[str] = None
     photo_url: Optional[str] = None
     is_active: bool

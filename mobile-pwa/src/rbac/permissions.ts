@@ -31,6 +31,7 @@ export type PermissionKey =
   | 'inventory:adjust'
   | 'locations:manage'
   | 'movements:read'
+  | 'brands:manage'
 
 export const PERMISSION_KEYS: PermissionKey[] = [
   'admin:access',
@@ -58,6 +59,7 @@ export const PERMISSION_KEYS: PermissionKey[] = [
   'inventory:adjust',
   'locations:manage',
   'movements:read',
+  'brands:manage',
 ]
 
 const PERMISSION_ALIASES: Record<string, PermissionKey> = {
@@ -91,6 +93,7 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     'inventory:adjust',
     'locations:manage',
     'movements:read',
+    'brands:manage',
     'reports:read',
     'audit:read',
   ],
@@ -115,6 +118,7 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     'reports:read',
     'locations:manage',
     'movements:read',
+    'brands:manage',
   ],
   picker: ['picking:read', 'picking:pick', 'picking:complete', 'picking:exception'],
   receiver: [

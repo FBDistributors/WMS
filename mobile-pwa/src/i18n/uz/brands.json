@@ -1,0 +1,36 @@
+{
+  "title": "Brendlar",
+  "subtitle": "Mahsulot brendlarini boshqaring.",
+  "add": "Brend qo‘shish",
+  "edit": "Tahrirlash",
+  "deactivate": "Faolsizlantirish",
+  "save": "Brendni saqlash",
+  "saving": "Saqlanmoqda...",
+  "load_failed": "Brendlar yuklanmadi.",
+  "save_failed": "Brendni saqlab bo‘lmadi.",
+  "empty": "Brendlar topilmadi",
+  "empty_desc": "Birinchi brendni yarating.",
+  "search": "Qidiruv",
+  "show_inactive": "Faol emaslarni ko‘rsatish",
+  "unknown_codes": "Noma’lum brend kodlari",
+  "validation": {
+    "required": "Kod va nom majburiy."
+  },
+  "fields": {
+    "code": "Kod",
+    "name": "Nom",
+    "display_name": "Ko‘rsatish nomi",
+    "active": "Faol"
+  },
+  "columns": {
+    "code": "Kod",
+    "name": "Nom",
+    "display_name": "Ko‘rsatish nomi",
+    "status": "Holat",
+    "actions": "Amallar"
+  },
+  "status": {
+    "active": "Faol",
+    "inactive": "Faol emas"
+  }
+}

@@ -10,6 +10,7 @@ import ordersUz from './uz/orders.json'
 import locationsUz from './uz/locations.json'
 import receivingUz from './uz/receiving.json'
 import inventoryUz from './uz/inventory.json'
+import brandsUz from './uz/brands.json'
 import usersUz from './uz/users.json'
 
 import commonEn from './en/common.json'
@@ -21,6 +22,7 @@ import ordersEn from './en/orders.json'
 import locationsEn from './en/locations.json'
 import receivingEn from './en/receiving.json'
 import inventoryEn from './en/inventory.json'
+import brandsEn from './en/brands.json'
 import usersEn from './en/users.json'
 
 import commonRu from './ru/common.json'
@@ -32,6 +34,7 @@ import ordersRu from './ru/orders.json'
 import locationsRu from './ru/locations.json'
 import receivingRu from './ru/receiving.json'
 import inventoryRu from './ru/inventory.json'
+import brandsRu from './ru/brands.json'
 import usersRu from './ru/users.json'
 
 const SUPPORTED_LANGS = ['uz', 'en', 'ru'] as const
@@ -54,6 +57,7 @@ i18n.use(initReactI18next).init({
       locations: locationsUz,
       receiving: receivingUz,
       inventory: inventoryUz,
+      brands: brandsUz,
       users: usersUz,
     },
     en: {
@@ -66,6 +70,7 @@ i18n.use(initReactI18next).init({
       locations: locationsEn,
       receiving: receivingEn,
       inventory: inventoryEn,
+      brands: brandsEn,
       users: usersEn,
     },
     ru: {
@@ -78,6 +83,7 @@ i18n.use(initReactI18next).init({
       locations: locationsRu,
       receiving: receivingRu,
       inventory: inventoryRu,
+      brands: brandsRu,
       users: usersRu,
     },
   },
@@ -87,7 +93,7 @@ i18n.use(initReactI18next).init({
   fallbackLng: 'en',
   supportedLngs: SUPPORTED_LANGS,
   defaultNS: 'common',
-    ns: ['common', 'auth', 'admin', 'picking', 'products', 'orders', 'locations', 'receiving', 'inventory', 'users'],
+    ns: ['common', 'auth', 'admin', 'picking', 'products', 'orders', 'locations', 'receiving', 'inventory', 'brands', 'users'],
   interpolation: {
     escapeValue: false,
   },

@@ -1,0 +1,36 @@
+{
+  "title": "Brands",
+  "subtitle": "Manage product brands.",
+  "add": "Add brand",
+  "edit": "Edit",
+  "deactivate": "Deactivate",
+  "save": "Save brand",
+  "saving": "Saving...",
+  "load_failed": "Failed to load brands.",
+  "save_failed": "Failed to save brand.",
+  "empty": "No brands found",
+  "empty_desc": "Create the first brand.",
+  "search": "Search",
+  "show_inactive": "Show inactive",
+  "unknown_codes": "Unknown brand codes",
+  "validation": {
+    "required": "Code and name are required."
+  },
+  "fields": {
+    "code": "Code",
+    "name": "Name",
+    "display_name": "Display name",
+    "active": "Active"
+  },
+  "columns": {
+    "code": "Code",
+    "name": "Name",
+    "display_name": "Display name",
+    "status": "Status",
+    "actions": "Actions"
+  },
+  "status": {
+    "active": "Active",
+    "inactive": "Inactive"
+  }
+}

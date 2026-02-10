@@ -1,4 +1,5 @@
 from app.models.base import Base
+from app.models.brand import Brand
 from app.models.document import Document, DocumentLine
 from app.models.location import Location
 from app.models.order import Order, OrderLine
@@ -11,6 +12,7 @@ from app.models.user import User
 
 __all__ = [
     "Base",
+    "Brand",
     "Document",
     "DocumentLine",
     "Location",

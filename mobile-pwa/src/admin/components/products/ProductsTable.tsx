@@ -97,7 +97,7 @@ export function ProductsTable({
         id: 'brand',
         label: t('products:columns.brand'),
         className: 'min-w-[160px] text-slate-600 dark:text-slate-300',
-        render: (item) => item.brand || '—',
+        render: (item) => item.brand_display_name || item.brand_name || item.brand || '—',
       },
       {
         id: 'status',
