@@ -12,6 +12,7 @@ import { useTableConfig } from '../../admin/hooks/useTableConfig'
 import { Button } from '../../components/ui/button'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { getProducts, type Product } from '../../services/productsApi'
+import { getInventorySummary } from '../../services/inventoryApi'
 import { useAuth } from '../../rbac/AuthProvider'
 
 const COLUMN_OPTIONS = [
@@ -22,6 +23,9 @@ const COLUMN_OPTIONS = [
   { id: 'brand', labelKey: 'products:columns.brand' },
   { id: 'status', labelKey: 'products:columns.status' },
   { id: 'quantity', labelKey: 'products:columns.quantity' },
+  { id: 'on_hand_total', labelKey: 'products:columns.on_hand_total' },
+  { id: 'available_total', labelKey: 'products:columns.available_total' },
+  { id: 'inventory_link', labelKey: 'products:columns.inventory' },
   { id: 'created_by', labelKey: 'products:columns.created_by' },
   { id: 'article_code', labelKey: 'products:columns.article_code' },
   { id: 'barcode', labelKey: 'products:columns.barcode' },
@@ -68,7 +72,30 @@ export function ProductsPage() {
       setError(null)
       try {
         const data = await getProducts({ search, limit, offset: nextOffset })
-        setItems(data.items)
+        let summaryMap = new Map<string, { on_hand_total: number; available_total: number }>()
+        try {
+          const summary = await getInventorySummary({
+            product_ids: data.items.map((item) => item.id),
+          })
+          summaryMap = new Map(
+            summary.map((row) => [
+              row.product_id,
+              { on_hand_total: row.on_hand_total, available_total: row.available_total },
+            ])
+          )
+        } catch {
+          summaryMap = new Map()
+        }
+        setItems(
+          data.items.map((item) => {
+            const totals = summaryMap.get(item.id)
+            return {
+              ...item,
+              on_hand_total: totals?.on_hand_total,
+              available_total: totals?.available_total,
+            }
+          })
+        )
         setTotal(data.total)
       } catch {
         setError(t('products:load_error'))
@@ -150,6 +177,7 @@ export function ProductsPage() {
         columnOrder={config.columnOrder}
         visibleColumns={config.visibleColumns}
         onRowClick={(item) => navigate(`/admin/products/${item.id}`)}
+        onInventoryClick={(item) => navigate(`/admin/inventory/${item.id}`)}
       />
     )
   }, [config.columnOrder, config.visibleColumns, error, handleRetry, isLoading, items, navigate, t])

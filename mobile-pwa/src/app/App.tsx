@@ -14,6 +14,9 @@ import { OrdersPage } from '../pages/admin/OrdersPage'
 import { OrderDetailsPage } from '../pages/admin/OrderDetailsPage'
 import { LocationsPage } from '../pages/admin/LocationsPage'
 import { ReceivingPage } from '../pages/admin/ReceivingPage'
+import { InventorySummaryPage } from '../pages/admin/InventorySummaryPage'
+import { InventoryDetailsPage } from '../pages/admin/InventoryDetailsPage'
+import { InventoryMovementsPage } from '../pages/admin/InventoryMovementsPage'
 import { UsersPage } from '../pages/admin/UsersPage'
 import { UserCreatePage } from '../pages/admin/users/UserCreatePage'
 import { UserDetailsPage } from '../pages/admin/users/UserDetailsPage'
@@ -139,6 +142,36 @@ export function App() {
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">
               <RequirePermission permission="locations:manage">
                 <LocationsPage />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/inventory"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="inventory:read">
+                <InventorySummaryPage />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/inventory/movements"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="movements:read">
+                <InventoryMovementsPage />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/inventory/:productId"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="inventory:read">
+                <InventoryDetailsPage />
               </RequirePermission>
             </RequirePermission>
           }

@@ -23,6 +23,7 @@ PERMISSIONS: set[str] = {
     "inventory:count",
     "inventory:adjust",
     "locations:manage",
+    "movements:read",
 }
 
 ROLE_PERMISSIONS: dict[str, list[str]] = {
@@ -49,6 +50,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "inventory:count",
         "inventory:adjust",
         "locations:manage",
+        "movements:read",
         "reports:read",
         "audit:read",
     ],
@@ -72,6 +74,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "inventory:count",
         "reports:read",
         "locations:manage",
+        "movements:read",
     ],
     "picker": [
         "picking:read",
@@ -88,12 +91,8 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
     ],
     "inventory_controller": [
         "admin:access",
-        "inventory:read",
-        "inventory:count",
-        "inventory:adjust",
         "documents:read",
         "products:read",
-        "reports:read",
     ],
 }
 

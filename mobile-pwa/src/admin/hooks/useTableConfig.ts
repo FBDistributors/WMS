@@ -16,6 +16,9 @@ export const PRODUCTS_TABLE_COLUMN_IDS = [
   'brand',
   'status',
   'quantity',
+  'on_hand_total',
+  'available_total',
+  'inventory_link',
   'created_by',
   'article_code',
   'barcode',
@@ -34,6 +37,9 @@ export const DEFAULT_VISIBLE_COLUMNS = [
   'brand',
   'status',
   'quantity',
+  'on_hand_total',
+  'available_total',
+  'inventory_link',
 ]
 
 export const PRODUCTS_TABLE_SEARCH_FIELDS = [

@@ -27,6 +27,9 @@
     "brand": "Бренд",
     "status": "Статус",
     "quantity": "Количество",
+    "on_hand_total": "В наличии",
+    "available_total": "Доступно",
+    "inventory": "Остатки",
     "created_by": "Кем создано",
     "article_code": "Артикул",
     "barcode": "Штрих‑коды",
@@ -36,6 +39,7 @@
     "qty_cases": "Кол-во в коробках",
     "qty_units": "Кол-во в штуках"
   },
+  "view_inventory": "Смотреть остатки",
   "search_fields": {
     "sku": "SKU",
     "barcode": "Штрих‑код",

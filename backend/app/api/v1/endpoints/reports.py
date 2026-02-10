@@ -61,7 +61,7 @@ def _stock_summary_query(db: Session):
         .join(StockLotModel, StockLotModel.id == StockMovementModel.lot_id)
         .join(ProductModel, ProductModel.id == StockLotModel.product_id)
         .join(LocationModel, LocationModel.id == StockMovementModel.location_id)
-        .filter(StockMovementModel.movement_type != "pick")
+        .filter(StockMovementModel.movement_type.notin_(("allocate", "unallocate")))
         .group_by(
             StockLotModel.product_id,
             ProductModel.sku,
@@ -127,15 +127,15 @@ async def picker_performance(
 ):
     query = (
         db.query(
-            StockMovementModel.created_by.label("picker_id"),
+            StockMovementModel.created_by_user_id.label("picker_id"),
             UserModel.full_name.label("picker_name"),
             func.sum(-StockMovementModel.qty_change).label("total_picked_qty"),
             func.count(StockMovementModel.id).label("movements_count"),
             func.count(func.distinct(StockMovementModel.source_document_id)).label("documents_count"),
         )
-        .join(UserModel, UserModel.id == StockMovementModel.created_by)
+        .join(UserModel, UserModel.id == StockMovementModel.created_by_user_id)
         .filter(StockMovementModel.movement_type == "pick")
-        .group_by(StockMovementModel.created_by, UserModel.full_name)
+        .group_by(StockMovementModel.created_by_user_id, UserModel.full_name)
     )
     if date_from:
         query = query.filter(func.date(StockMovementModel.created_at) >= date_from)

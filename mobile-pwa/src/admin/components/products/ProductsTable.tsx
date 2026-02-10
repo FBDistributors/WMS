@@ -17,6 +17,8 @@ type ProductRow = Product & {
   internal_id?: string
   qty_cases?: number
   qty_units?: number
+  on_hand_total?: number
+  available_total?: number
   quantity_summary?: string | number
   photo_url?: string
   photoUrl?: string
@@ -34,6 +36,7 @@ type ProductsTableProps = {
   columnOrder: string[]
   visibleColumns: string[]
   onRowClick?: (item: ProductRow) => void
+  onInventoryClick?: (item: ProductRow) => void
 }
 
 const statusVariant = (isActive: boolean) => (isActive ? 'success' : 'neutral')
@@ -43,6 +46,7 @@ export function ProductsTable({
   columnOrder,
   visibleColumns,
   onRowClick,
+  onInventoryClick,
 }: ProductsTableProps) {
   const { t } = useTranslation(['products', 'common'])
 
@@ -113,6 +117,35 @@ export function ProductsTable({
           const summary = item.quantity_summary ?? '—'
           return <span>{summary}</span>
         },
+      },
+      {
+        id: 'on_hand_total',
+        label: t('products:columns.on_hand_total'),
+        className: 'w-[140px] text-slate-600 dark:text-slate-300',
+        render: (item) => item.on_hand_total ?? '—',
+      },
+      {
+        id: 'available_total',
+        label: t('products:columns.available_total'),
+        className: 'w-[140px] text-slate-600 dark:text-slate-300',
+        render: (item) => item.available_total ?? '—',
+      },
+      {
+        id: 'inventory_link',
+        label: t('products:columns.inventory'),
+        className: 'w-[160px]',
+        render: (item) => (
+          <button
+            type="button"
+            className="text-sm font-semibold text-blue-600 hover:text-blue-700"
+            onClick={(event) => {
+              event.stopPropagation()
+              onInventoryClick?.(item)
+            }}
+          >
+            {t('products:view_inventory')}
+          </button>
+        ),
       },
       {
         id: 'created_by',

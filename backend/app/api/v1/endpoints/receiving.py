@@ -233,7 +233,7 @@ async def complete_receipt(
             movement_type="receipt",
             source_document_type="receipt",
             source_document_id=receipt.id,
-            created_by=user.id,
+            created_by_user_id=user.id,
         )
         db.add(movement)
 

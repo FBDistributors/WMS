@@ -143,7 +143,7 @@ def _fefo_available_lots(db: Session, product_id: UUID):
         .join(LocationModel, LocationModel.id == StockMovementModel.location_id)
         .filter(
             StockLotModel.product_id == product_id,
-            StockMovementModel.movement_type != "pick",
+            StockMovementModel.movement_type.notin_(("allocate", "unallocate")),
         )
         .group_by(
             StockMovementModel.lot_id,
@@ -235,11 +235,11 @@ def _allocate_order(
                     product_id=product_id,
                     lot_id=lot_row.lot_id,
                     location_id=lot_row.location_id,
-                    qty_change=-allocate_qty,
+                    qty_change=allocate_qty,
                     movement_type="allocate",
                     source_document_type="order",
                     source_document_id=order.id,
-                    created_by=user_id,
+                    created_by_user_id=user_id,
                 )
             )
 
@@ -511,7 +511,7 @@ async def ship_order(
                 movement_type="ship",
                 source_document_type="order",
                 source_document_id=order.id,
-                created_by=user.id,
+                created_by_user_id=user.id,
             )
         )
 

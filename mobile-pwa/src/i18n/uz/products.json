@@ -27,6 +27,9 @@
     "brand": "Brend",
     "status": "Holat",
     "quantity": "Miqdor",
+    "on_hand_total": "Mavjud",
+    "available_total": "Erkin",
+    "inventory": "Qoldiq",
     "created_by": "Kim yaratgan",
     "article_code": "Artikul kodi",
     "barcode": "Shtrix‑kod(lar)",
@@ -36,6 +39,7 @@
     "qty_cases": "Qutilar bo‘yicha",
     "qty_units": "Dona bo‘yicha"
   },
+  "view_inventory": "Qoldiqni ko‘rish",
   "search_fields": {
     "sku": "SKU",
     "barcode": "Shtrix‑kod",

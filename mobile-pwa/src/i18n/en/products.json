@@ -27,6 +27,9 @@
     "brand": "Brand",
     "status": "Status",
     "quantity": "Quantity",
+    "on_hand_total": "On-hand",
+    "available_total": "Available",
+    "inventory": "Inventory",
     "created_by": "Created by",
     "article_code": "Article code",
     "barcode": "Barcode(s)",
@@ -36,6 +39,7 @@
     "qty_cases": "Qty in cases",
     "qty_units": "Qty in units"
   },
+  "view_inventory": "View inventory",
   "search_fields": {
     "sku": "SKU",
     "barcode": "Barcode",

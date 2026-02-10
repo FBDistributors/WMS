@@ -30,6 +30,7 @@ export type PermissionKey =
   | 'inventory:count'
   | 'inventory:adjust'
   | 'locations:manage'
+  | 'movements:read'
 
 export const PERMISSION_KEYS: PermissionKey[] = [
   'admin:access',
@@ -56,6 +57,7 @@ export const PERMISSION_KEYS: PermissionKey[] = [
   'inventory:count',
   'inventory:adjust',
   'locations:manage',
+  'movements:read',
 ]
 
 const PERMISSION_ALIASES: Record<string, PermissionKey> = {
@@ -88,6 +90,7 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     'inventory:count',
     'inventory:adjust',
     'locations:manage',
+    'movements:read',
     'reports:read',
     'audit:read',
   ],
@@ -111,6 +114,7 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     'inventory:count',
     'reports:read',
     'locations:manage',
+    'movements:read',
   ],
   picker: ['picking:read', 'picking:pick', 'picking:complete', 'picking:exception'],
   receiver: [
@@ -120,15 +124,7 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     'documents:read',
     'products:read',
   ],
-  inventory_controller: [
-    'admin:access',
-    'inventory:read',
-    'inventory:count',
-    'inventory:adjust',
-    'documents:read',
-    'products:read',
-    'reports:read',
-  ],
+  inventory_controller: ['admin:access', 'documents:read', 'products:read'],
 }
 
 export function normalizePermissions(permissions: string[]): PermissionKey[] {

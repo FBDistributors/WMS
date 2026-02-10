@@ -54,14 +54,14 @@ class StockMovement(Base):
         ForeignKey("locations.id", ondelete="RESTRICT"),
         nullable=False,
     )
-    qty_change: Mapped[Decimal] = mapped_column(Numeric(14, 3), nullable=False)
+    qty_change: Mapped[Decimal] = mapped_column(Numeric(18, 3), nullable=False)
     movement_type: Mapped[str] = mapped_column(String(32), nullable=False)
     source_document_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
     source_document_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-    created_by: Mapped[uuid.UUID | None] = mapped_column(
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
@@ -76,4 +76,5 @@ class StockMovement(Base):
         Index("ix_stock_movements_type", "movement_type"),
         Index("ix_stock_movements_created_at", "created_at"),
         Index("ix_stock_movements_source_doc", "source_document_type", "source_document_id"),
+        Index("ix_stock_movements_product_lot_location", "product_id", "lot_id", "location_id"),
     )

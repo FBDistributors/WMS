@@ -223,7 +223,19 @@ async def pick_line(
             movement_type="pick",
             source_document_type="document",
             source_document_id=document.id,
-            created_by=user.id,
+            created_by_user_id=user.id,
+        )
+    )
+    db.add(
+        StockMovementModel(
+            product_id=line.product_id,
+            lot_id=line.lot_id,
+            location_id=line.location_id,
+            qty_change=-qty_delta,
+            movement_type="unallocate",
+            source_document_type="document",
+            source_document_id=document.id,
+            created_by_user_id=user.id,
         )
     )
     if document.order_id:

@@ -7,20 +7,32 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func
+from sqlalchemy import case, distinct, exists, func, select
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user, require_permission
 from app.db import get_db
 from app.models.location import Location as LocationModel
 from app.models.product import Product as ProductModel
+from app.models.product import ProductBarcode
 from app.models.stock import StockLot as StockLotModel
 from app.models.stock import StockMovement as StockMovementModel
 from app.models.user import User as UserModel
 
 router = APIRouter()
 
-MOVEMENT_TYPES = {"receipt", "putaway", "allocate", "pick", "ship", "adjust"}
+MOVEMENT_TYPES = {
+    "opening_balance",
+    "receipt",
+    "putaway",
+    "allocate",
+    "unallocate",
+    "pick",
+    "ship",
+    "adjust",
+    "transfer_in",
+    "transfer_out",
+}
 
 
 class StockLotOut(BaseModel):
@@ -47,7 +59,7 @@ class StockMovementOut(BaseModel):
     source_document_type: Optional[str] = None
     source_document_id: Optional[UUID] = None
     created_at: datetime
-    created_by: Optional[UUID] = None
+    created_by_user_id: Optional[UUID] = None
 
 
 class StockMovementCreate(BaseModel):
@@ -67,6 +79,75 @@ class StockBalanceOut(BaseModel):
     qty: Decimal
     batch: str
     expiry_date: Optional[date] = None
+
+
+class InventorySummaryRow(BaseModel):
+    product_id: UUID
+    product_code: str
+    name: str
+    on_hand_total: Decimal
+    reserved_total: Decimal
+    available_total: Decimal
+    lots_count: int
+    locations_count: int
+
+
+class InventoryDetailRow(BaseModel):
+    product_id: UUID
+    lot_id: UUID
+    batch: str
+    expiry_date: Optional[date] = None
+    location_id: UUID
+    location_code: str
+    location_path: str
+    on_hand: Decimal
+    reserved: Decimal
+    available: Decimal
+
+
+def _build_location_path_map(locations: list[LocationModel]) -> dict[UUID, str]:
+    by_id = {location.id: location for location in locations}
+    cache: dict[UUID, str] = {}
+
+    def _path(location_id: UUID) -> str:
+        if location_id in cache:
+            return cache[location_id]
+        location = by_id.get(location_id)
+        if not location:
+            return ""
+        if location.parent_id:
+            parent_path = _path(location.parent_id)
+            path = f"{parent_path} / {location.code}" if parent_path else location.code
+        else:
+            path = location.code
+        cache[location_id] = path
+        return path
+
+    for location_id in by_id:
+        _path(location_id)
+    return cache
+
+
+def _descendant_location_ids(db: Session, root_id: UUID) -> list[UUID]:
+    location_cte = select(LocationModel.id).where(LocationModel.id == root_id).cte(recursive=True)
+    location_cte = location_cte.union_all(
+        select(LocationModel.id).where(LocationModel.parent_id == location_cte.c.id)
+    )
+    return [row[0] for row in db.execute(select(location_cte.c.id)).all()]
+
+
+def _apply_product_search(query, search: str):
+    term = f"%{search.strip()}%"
+    barcode_exists = (
+        exists()
+        .where(ProductBarcode.product_id == ProductModel.id)
+        .where(ProductBarcode.barcode.ilike(term))
+    )
+    return query.filter(
+        func.lower(ProductModel.name).ilike(func.lower(term))
+        | func.lower(ProductModel.sku).ilike(func.lower(term))
+        | barcode_exists
+    )
 
 
 def _to_lot(lot: StockLotModel) -> StockLotOut:
@@ -90,7 +171,7 @@ def _to_movement(movement: StockMovementModel) -> StockMovementOut:
         source_document_type=movement.source_document_type,
         source_document_id=movement.source_document_id,
         created_at=movement.created_at,
-        created_by=movement.created_by,
+        created_by_user_id=movement.created_by_user_id,
     )
 
 
@@ -149,12 +230,14 @@ async def list_stock_movements(
     lot_id: Optional[UUID] = None,
     location_id: Optional[UUID] = None,
     movement_type: Optional[str] = None,
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
     source_document_type: Optional[str] = None,
     source_document_id: Optional[UUID] = None,
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("inventory:read")),
+    _user=Depends(require_permission("movements:read")),
 ):
     query = db.query(StockMovementModel)
     if product_id:
@@ -164,7 +247,12 @@ async def list_stock_movements(
     if location_id:
         query = query.filter(StockMovementModel.location_id == location_id)
     if movement_type:
-        query = query.filter(StockMovementModel.movement_type == movement_type)
+        tokens = [token.strip() for token in movement_type.split(",") if token.strip()]
+        query = query.filter(StockMovementModel.movement_type.in_(tokens))
+    if date_from:
+        query = query.filter(func.date(StockMovementModel.created_at) >= date_from)
+    if date_to:
+        query = query.filter(func.date(StockMovementModel.created_at) <= date_to)
     if source_document_type:
         query = query.filter(StockMovementModel.source_document_type == source_document_type)
     if source_document_id:
@@ -219,12 +307,144 @@ async def create_stock_movement(
         movement_type=payload.movement_type,
         source_document_type=payload.source_document_type,
         source_document_id=payload.source_document_id,
-        created_by=user.id,
+        created_by_user_id=user.id,
     )
     db.add(movement)
     db.commit()
     db.refresh(movement)
     return _to_movement(movement)
+
+
+@router.get("/summary", response_model=List[InventorySummaryRow], summary="Inventory summary")
+@router.get("/summary/", response_model=List[InventorySummaryRow], summary="Inventory summary")
+async def inventory_summary(
+    search: Optional[str] = None,
+    product_ids: Optional[str] = Query(default=None, description="Comma-separated product UUIDs"),
+    only_available: bool = Query(False),
+    low_stock_threshold: Optional[Decimal] = Query(default=None, ge=0),
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("inventory:read")),
+):
+    on_hand_expr = func.sum(
+        case(
+            (StockMovementModel.movement_type.in_(("allocate", "unallocate")), 0),
+            else_=StockMovementModel.qty_change,
+        )
+    )
+    reserved_expr = func.sum(
+        case(
+            (StockMovementModel.movement_type.in_(("allocate", "unallocate")), StockMovementModel.qty_change),
+            else_=0,
+        )
+    )
+
+    query = (
+        db.query(
+            ProductModel.id.label("product_id"),
+            ProductModel.sku.label("product_code"),
+            ProductModel.name.label("name"),
+            on_hand_expr.label("on_hand_total"),
+            reserved_expr.label("reserved_total"),
+            (on_hand_expr - reserved_expr).label("available_total"),
+            func.count(distinct(StockMovementModel.lot_id)).label("lots_count"),
+            func.count(distinct(StockMovementModel.location_id)).label("locations_count"),
+        )
+        .join(StockLotModel, StockLotModel.product_id == ProductModel.id)
+        .join(StockMovementModel, StockMovementModel.lot_id == StockLotModel.id)
+        .group_by(ProductModel.id, ProductModel.sku, ProductModel.name)
+    )
+
+    if search:
+        query = _apply_product_search(query, search)
+    if product_ids:
+        ids = [UUID(token.strip()) for token in product_ids.split(",") if token.strip()]
+        if ids:
+            query = query.filter(ProductModel.id.in_(ids))
+    if only_available:
+        query = query.having(on_hand_expr - reserved_expr > 0)
+    if low_stock_threshold is not None:
+        query = query.having(on_hand_expr <= low_stock_threshold)
+
+    rows = query.order_by(ProductModel.sku.asc()).all()
+    return [InventorySummaryRow(**row._asdict()) for row in rows]
+
+
+@router.get("/details", response_model=List[InventoryDetailRow], summary="Inventory details")
+@router.get("/details/", response_model=List[InventoryDetailRow], summary="Inventory details")
+async def inventory_details(
+    product_id: Optional[UUID] = None,
+    location_id: Optional[UUID] = None,
+    expiry_before: Optional[date] = None,
+    show_zero: bool = Query(False),
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("inventory:read")),
+):
+    on_hand_expr = func.sum(
+        case(
+            (StockMovementModel.movement_type.in_(("allocate", "unallocate")), 0),
+            else_=StockMovementModel.qty_change,
+        )
+    )
+    reserved_expr = func.sum(
+        case(
+            (StockMovementModel.movement_type.in_(("allocate", "unallocate")), StockMovementModel.qty_change),
+            else_=0,
+        )
+    )
+
+    query = (
+        db.query(
+            StockLotModel.product_id.label("product_id"),
+            StockLotModel.id.label("lot_id"),
+            StockLotModel.batch.label("batch"),
+            StockLotModel.expiry_date.label("expiry_date"),
+            StockMovementModel.location_id.label("location_id"),
+            LocationModel.code.label("location_code"),
+            on_hand_expr.label("on_hand"),
+            reserved_expr.label("reserved"),
+            (on_hand_expr - reserved_expr).label("available"),
+        )
+        .join(StockLotModel, StockLotModel.id == StockMovementModel.lot_id)
+        .join(LocationModel, LocationModel.id == StockMovementModel.location_id)
+        .group_by(
+            StockLotModel.product_id,
+            StockLotModel.id,
+            StockLotModel.batch,
+            StockLotModel.expiry_date,
+            StockMovementModel.location_id,
+            LocationModel.code,
+        )
+    )
+
+    if product_id:
+        query = query.filter(StockLotModel.product_id == product_id)
+    if location_id:
+        location_ids = _descendant_location_ids(db, location_id)
+        if location_ids:
+            query = query.filter(StockMovementModel.location_id.in_(location_ids))
+    if expiry_before:
+        query = query.filter(StockLotModel.expiry_date.is_not(None))
+        query = query.filter(StockLotModel.expiry_date <= expiry_before)
+    if not show_zero:
+        query = query.having(on_hand_expr - reserved_expr != 0)
+
+    rows = query.order_by(StockLotModel.expiry_date.asc().nullslast()).all()
+    location_map = _build_location_path_map(db.query(LocationModel).all())
+    return [
+        InventoryDetailRow(
+            product_id=row.product_id,
+            lot_id=row.lot_id,
+            batch=row.batch,
+            expiry_date=row.expiry_date,
+            location_id=row.location_id,
+            location_code=row.location_code,
+            location_path=location_map.get(row.location_id, row.location_code),
+            on_hand=row.on_hand,
+            reserved=row.reserved,
+            available=row.available,
+        )
+        for row in rows
+    ]
 
 
 @router.get("/balances", response_model=List[StockBalanceOut], summary="List stock balances")
@@ -241,7 +461,12 @@ async def list_stock_balances(
         db.query(
             StockMovementModel.lot_id,
             StockMovementModel.location_id,
-            func.sum(StockMovementModel.qty_change).label("qty"),
+            func.sum(
+                case(
+                    (StockMovementModel.movement_type.in_(("allocate", "unallocate")), 0),
+                    else_=StockMovementModel.qty_change,
+                )
+            ).label("qty"),
             StockLotModel.product_id,
             StockLotModel.batch,
             StockLotModel.expiry_date,
