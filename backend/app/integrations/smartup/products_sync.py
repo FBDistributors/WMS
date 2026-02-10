@@ -74,6 +74,9 @@ def _sync_products(
             if not code or not name:
                 skipped += 1
                 continue
+            if item.get("state") != "A":
+                skipped += 1
+                continue
             barcode_primary, barcode_list = _normalize_barcode(item.get("barcodes"))
             brand_code = _extract_brand_code(item.get("groups"))
             brand_id = None
