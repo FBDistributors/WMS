@@ -25,7 +25,7 @@ export function OrderDetailsPage() {
 
   const load = useCallback(async () => {
     if (!id) {
-      setError(t('orders:not_found'))
+      setLoadError(t('orders:not_found'))
       setIsLoading(false)
       return
     }

@@ -281,7 +281,6 @@ export function ReceivingPage() {
                     </span>
                     {receipt.status === 'draft' ? (
                       <Button
-                        size="sm"
                         onClick={() => handleComplete(receipt.id)}
                         disabled={!canWrite || isSubmitting}
                       >
