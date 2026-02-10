@@ -136,7 +136,7 @@ export function OrderDetailsPage() {
           <div>
             <div className="text-xs text-slate-500">{t('orders:columns.status')}</div>
             <div className="text-sm text-slate-700 dark:text-slate-200">
-              {t(`orders:status.${order.status}`, order.status)}
+              {t(`orders:status.${order.status === 'B#S' ? 'b#s' : order.status}`, order.status)}
             </div>
           </div>
           <div>

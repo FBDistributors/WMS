@@ -36,7 +36,7 @@ def import_orders(db: Session, orders: Iterable[SmartupOrder]) -> Tuple[int, int
                 existing.order_number = payload.order_number
                 existing.filial_id = payload.filial_id
                 existing.customer_name = payload.customer_name
-                if existing.status in ("imported", "ready_for_picking"):
+                if existing.status in ("imported", "ready_for_picking", "B#S"):
                     existing.status = payload.status
                 if payload.lines:
                     _upsert_lines(existing, payload.lines)

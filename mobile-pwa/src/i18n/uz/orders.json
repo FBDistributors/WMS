@@ -37,6 +37,7 @@
     "date_to": "Tugash sanasi"
   },
   "status": {
+    "b#s": "B#S",
     "imported": "Import qilingan",
     "allocated": "Ajratilgan",
     "ready_for_picking": "Pickingga tayyor",

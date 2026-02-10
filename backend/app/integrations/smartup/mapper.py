@@ -46,7 +46,7 @@ def map_order_to_wms_order(order: SmartupOrder) -> OrderPayload:
         order_number=order.order_no or order.deal_id or external_id,
         filial_id=order.filial_id,
         customer_name=order.customer_name,
-        status="imported",
+        status="B#S",
         lines=lines,
     )
 

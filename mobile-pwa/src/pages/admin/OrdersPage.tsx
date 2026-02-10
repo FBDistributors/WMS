@@ -129,7 +129,9 @@ export function OrdersPage() {
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                   {order.customer_name ?? '—'}
                 </td>
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{order.status}</td>
+                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                  {t(`orders:status.${order.status === 'B#S' ? 'b#s' : order.status}`, order.status)}
+                </td>
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{order.lines_total}</td>
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                   {new Date(order.created_at).toLocaleDateString()}
@@ -185,6 +187,7 @@ export function OrdersPage() {
               onChange={(event) => setStatus(event.target.value)}
             >
               <option value="all">{t('orders:filters.all')}</option>
+              <option value="B#S">{t('orders:status.b#s')}</option>
               <option value="imported">{t('orders:status.imported')}</option>
               <option value="allocated">{t('orders:status.allocated')}</option>
               <option value="ready_for_picking">{t('orders:status.ready_for_picking')}</option>

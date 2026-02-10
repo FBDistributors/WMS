@@ -37,6 +37,7 @@
     "date_to": "Date to"
   },
   "status": {
+    "b#s": "B#S",
     "imported": "Imported",
     "allocated": "Allocated",
     "ready_for_picking": "Ready for picking",

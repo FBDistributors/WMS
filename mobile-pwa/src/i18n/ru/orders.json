@@ -37,6 +37,7 @@
     "date_to": "Дата по"
   },
   "status": {
+    "b#s": "B#S",
     "imported": "Импортировано",
     "allocated": "Резервировано",
     "ready_for_picking": "Готово к подбору",

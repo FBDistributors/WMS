@@ -30,6 +30,7 @@ router = APIRouter()
 
 ORDER_STATUSES = {
     "imported",
+    "B#S",
     "allocated",
     "ready_for_picking",
     "picking",
@@ -389,7 +390,7 @@ async def send_order_to_picking(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    if order.status not in {"imported", "ready_for_picking", "allocated"}:
+    if order.status not in {"imported", "B#S", "ready_for_picking", "allocated"}:
         raise HTTPException(status_code=409, detail="Order cannot be sent to picking")
 
     if not order.lines:
