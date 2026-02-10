@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import List, Optional
 
 from app.integrations.smartup.schemas import SmartupOrder
@@ -22,7 +23,11 @@ class OrderPayload:
     source_external_id: str
     order_number: str
     filial_id: Optional[str]
+    customer_id: Optional[str]
     customer_name: Optional[str]
+    agent_id: Optional[str]
+    agent_name: Optional[str]
+    total_amount: Optional[Decimal]
     status: str
     lines: List[OrderLinePayload]
 
@@ -43,9 +48,13 @@ def map_order_to_wms_order(order: SmartupOrder) -> OrderPayload:
     return OrderPayload(
         source="smartup",
         source_external_id=external_id,
-        order_number=order.order_no or order.deal_id or external_id,
+        order_number=order.order_no or order.delivery_number or order.deal_id or external_id,
         filial_id=order.filial_id,
+        customer_id=order.customer_id,
         customer_name=order.customer_name,
+        agent_id=order.agent_id,
+        agent_name=order.agent_name,
+        total_amount=order.total_amount,
         status="B#S",
         lines=lines,
     )

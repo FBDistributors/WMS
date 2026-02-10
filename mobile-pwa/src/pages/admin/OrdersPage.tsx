@@ -111,6 +111,9 @@ export function OrdersPage() {
               <th className="px-4 py-3 text-left">{t('orders:columns.order_number')}</th>
               <th className="px-4 py-3 text-left">{t('orders:columns.external_id')}</th>
               <th className="px-4 py-3 text-left">{t('orders:columns.customer')}</th>
+              <th className="px-4 py-3 text-left">{t('orders:columns.customer_id')}</th>
+              <th className="px-4 py-3 text-left">{t('orders:columns.agent')}</th>
+              <th className="px-4 py-3 text-left">{t('orders:columns.total_amount')}</th>
               <th className="px-4 py-3 text-left">{t('orders:columns.status')}</th>
               <th className="px-4 py-3 text-left">{t('orders:columns.lines')}</th>
               <th className="px-4 py-3 text-left">{t('orders:columns.created')}</th>
@@ -128,6 +131,15 @@ export function OrdersPage() {
                 </td>
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                   {order.customer_name ?? '—'}
+                </td>
+                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                  {order.customer_id ?? '—'}
+                </td>
+                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                  {order.agent_name ?? '—'}
+                </td>
+                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                  {order.total_amount == null ? '—' : Number(order.total_amount).toLocaleString()}
                 </td>
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                   {t(`orders:status.${order.status === 'B#S' ? 'b#s' : order.status}`, order.status)}

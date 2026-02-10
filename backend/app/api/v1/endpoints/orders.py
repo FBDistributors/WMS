@@ -47,7 +47,11 @@ class OrderListItem(BaseModel):
     source_external_id: str
     status: str
     filial_id: Optional[str] = None
+    customer_id: Optional[str] = None
     customer_name: Optional[str] = None
+    agent_id: Optional[str] = None
+    agent_name: Optional[str] = None
+    total_amount: Optional[Decimal] = None
     created_at: date
     lines_total: int
 
@@ -67,7 +71,11 @@ class OrderDetails(BaseModel):
     source_external_id: str
     status: str
     filial_id: Optional[str] = None
+    customer_id: Optional[str] = None
     customer_name: Optional[str] = None
+    agent_id: Optional[str] = None
+    agent_name: Optional[str] = None
+    total_amount: Optional[Decimal] = None
     created_at: date
     lines: List[OrderLineOut]
 
@@ -166,7 +174,11 @@ def _to_order_details(order: OrderModel) -> OrderDetails:
         source_external_id=order.source_external_id,
         status=order.status,
         filial_id=order.filial_id,
+        customer_id=order.customer_id,
         customer_name=order.customer_name,
+        agent_id=order.agent_id,
+        agent_name=order.agent_name,
+        total_amount=order.total_amount,
         created_at=order.created_at.date(),
         lines=[
             OrderLineOut(
@@ -314,7 +326,11 @@ async def list_orders(
             source_external_id=order.source_external_id,
             status=order.status,
             filial_id=order.filial_id,
+            customer_id=order.customer_id,
             customer_name=order.customer_name,
+            agent_id=order.agent_id,
+            agent_name=order.agent_name,
+            total_amount=order.total_amount,
             created_at=order.created_at.date(),
             lines_total=len(order.lines),
         )

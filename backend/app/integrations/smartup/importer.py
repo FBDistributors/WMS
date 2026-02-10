@@ -35,7 +35,11 @@ def import_orders(db: Session, orders: Iterable[SmartupOrder]) -> Tuple[int, int
             if existing:
                 existing.order_number = payload.order_number
                 existing.filial_id = payload.filial_id
+                existing.customer_id = payload.customer_id
                 existing.customer_name = payload.customer_name
+                existing.agent_id = payload.agent_id
+                existing.agent_name = payload.agent_name
+                existing.total_amount = payload.total_amount
                 if existing.status in ("imported", "ready_for_picking", "B#S"):
                     existing.status = payload.status
                 if payload.lines:
@@ -49,7 +53,11 @@ def import_orders(db: Session, orders: Iterable[SmartupOrder]) -> Tuple[int, int
                 source_external_id=payload.source_external_id,
                 order_number=payload.order_number,
                 filial_id=payload.filial_id,
+                customer_id=payload.customer_id,
                 customer_name=payload.customer_name,
+                agent_id=payload.agent_id,
+                agent_name=payload.agent_name,
+                total_amount=payload.total_amount,
                 status=payload.status,
             )
             record.lines = [

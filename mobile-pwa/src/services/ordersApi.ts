@@ -6,7 +6,11 @@ export type OrderListItem = {
   source_external_id: string
   status: string
   filial_id?: string | null
+  customer_id?: string | null
   customer_name?: string | null
+  agent_id?: string | null
+  agent_name?: string | null
+  total_amount?: number | null
   created_at: string
   lines_total: number
 }
@@ -33,7 +37,11 @@ export type OrderDetails = {
   source_external_id: string
   status: string
   filial_id?: string | null
+  customer_id?: string | null
   customer_name?: string | null
+  agent_id?: string | null
+  agent_name?: string | null
+  total_amount?: number | null
   created_at: string
   lines: OrderLine[]
 }

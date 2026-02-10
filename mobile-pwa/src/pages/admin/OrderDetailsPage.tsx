@@ -146,6 +146,30 @@ export function OrderDetailsPage() {
             </div>
           </div>
           <div>
+            <div className="text-xs text-slate-500">{t('orders:columns.customer_id')}</div>
+            <div className="text-sm text-slate-700 dark:text-slate-200">
+              {order.customer_id ?? '—'}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">{t('orders:columns.agent')}</div>
+            <div className="text-sm text-slate-700 dark:text-slate-200">
+              {order.agent_name ?? '—'}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">{t('orders:columns.agent_id')}</div>
+            <div className="text-sm text-slate-700 dark:text-slate-200">
+              {order.agent_id ?? '—'}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">{t('orders:columns.total_amount')}</div>
+            <div className="text-sm text-slate-700 dark:text-slate-200">
+              {order.total_amount == null ? '—' : Number(order.total_amount).toLocaleString()}
+            </div>
+          </div>
+          <div>
             <div className="text-xs text-slate-500">{t('orders:columns.created')}</div>
             <div className="text-sm text-slate-700 dark:text-slate-200">
               {new Date(order.created_at).toLocaleString()}
