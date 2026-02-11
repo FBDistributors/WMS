@@ -55,6 +55,15 @@
     "qty": "Кол-во",
     "offline_queue": "Оффлайн очередь"
   },
+  "user_menu": "Меню пользователя",
+  "logout": "Выйти",
+  "roles": {
+    "picker": "Комплектовщик",
+    "receiver": "Приёмщик",
+    "inventory_controller": "Контролёр",
+    "supervisor": "Супервайзер",
+    "warehouse_admin": "Администратор склада"
+  },
   "messages": {
     "not_authorized_title": "Нет доступа",
     "not_authorized_desc": "У вас нет прав для просмотра этой страницы.",

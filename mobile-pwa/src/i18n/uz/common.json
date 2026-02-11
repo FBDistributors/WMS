@@ -55,6 +55,15 @@
     "qty": "Miqdor",
     "offline_queue": "Offline navbat"
   },
+  "user_menu": "Foydalanuvchi menyusi",
+  "logout": "Chiqish",
+  "roles": {
+    "picker": "Yig'uvchi",
+    "receiver": "Qabul qiluvchi",
+    "inventory_controller": "Inventar nazoratchi",
+    "supervisor": "Nazoratchi",
+    "warehouse_admin": "Ombor admin"
+  },
   "messages": {
     "not_authorized_title": "Ruxsat yo‘q",
     "not_authorized_desc": "Bu sahifani ko‘rish uchun ruxsatingiz yetarli emas.",

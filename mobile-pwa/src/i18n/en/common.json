@@ -55,6 +55,15 @@
     "qty": "Qty",
     "offline_queue": "Offline queue"
   },
+  "user_menu": "User menu",
+  "logout": "Logout",
+  "roles": {
+    "picker": "Picker",
+    "receiver": "Receiver",
+    "inventory_controller": "Inventory Controller",
+    "supervisor": "Supervisor",
+    "warehouse_admin": "Warehouse Admin"
+  },
   "messages": {
     "not_authorized_title": "Not authorized",
     "not_authorized_desc": "You do not have permission to view this page.",
