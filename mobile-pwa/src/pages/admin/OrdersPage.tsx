@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Settings } from 'lucide-react'
+import { Settings, Eye } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -184,8 +184,14 @@ export function OrdersPage() {
         case 'view_details':
           return (
             <td className="px-4 py-3">
-              <Button variant="ghost" onClick={() => navigate(`/admin/orders/${order.id}`)}>
-                {t('orders:view_details')}
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={() => navigate(`/admin/orders/${order.id}`)}
+                aria-label={t('orders:view_details')}
+              >
+                <Eye size={18} className="text-slate-600 dark:text-slate-400" />
               </Button>
             </td>
           )

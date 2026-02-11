@@ -74,7 +74,7 @@
     "status": "Статус",
     "lines": "Строки",
     "created": "Создано",
-    "view_details": "Посмотреть",
+    "view_details": "",
     "send_to_picking": "В подбор"
   },
   "lines": {

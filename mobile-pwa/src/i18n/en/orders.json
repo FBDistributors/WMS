@@ -74,7 +74,7 @@
     "status": "Status",
     "lines": "Lines",
     "created": "Created",
-    "view_details": "View Details",
+    "view_details": "",
     "send_to_picking": "Send to Picking"
   },
   "lines": {

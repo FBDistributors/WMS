@@ -74,7 +74,7 @@
     "status": "Holat",
     "lines": "Qatorlar",
     "created": "Yaratilgan",
-    "view_details": "Tafsilotlar",
+    "view_details": "",
     "send_to_picking": "Pickingga yuborish"
   },
   "lines": {
