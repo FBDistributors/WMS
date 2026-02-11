@@ -2,7 +2,7 @@ from typing import Optional
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -40,15 +40,38 @@ def _get_user_by_username(db: Session, username: str) -> Optional[User]:
 
 
 @router.post("/login", response_model=TokenResponse, summary="Login")
-async def login(payload: LoginRequest, db: Session = Depends(get_db)):
+async def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
     user = _get_user_by_username(db, payload.username)
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
-    user.last_login_at = datetime.utcnow()
-    db.commit()
+    # Generate new token
     token = create_access_token({"sub": str(user.id), "role": user.role})
+    
+    # Invalidate previous session (if exists) - implements single-device login
+    # Previous token becomes invalid when new login happens
+    user.active_session_token = token
+    user.last_login_at = datetime.utcnow()
+    user.session_started_at = datetime.utcnow()
+    
+    # Store device info for audit trail
+    user_agent = request.headers.get("user-agent", "Unknown")
+    user.last_device_info = user_agent[:500]  # Truncate to fit column
+    
+    db.commit()
     return TokenResponse(access_token=token)
+
+
+@router.post("/logout", summary="Logout")
+async def logout(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Clear active session token"""
+    current_user.active_session_token = None
+    current_user.session_started_at = None
+    db.commit()
+    return {"status": "ok", "message": "Logged out successfully"}
 
 
 @router.get("/me", response_model=MeResponse, summary="Current user")

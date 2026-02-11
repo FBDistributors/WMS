@@ -23,8 +23,15 @@ class User(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    
+    # Session tracking for single-device login
+    active_session_token: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    last_device_info: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    session_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         Index("ix_users_username", "username"),
         Index("ix_users_full_name", "full_name"),
+        Index("ix_users_active_session", "active_session_token", 
+              postgresql_where="active_session_token IS NOT NULL"),
     )

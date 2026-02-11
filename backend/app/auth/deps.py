@@ -35,6 +35,14 @@ def get_current_user(
     user = db.query(User).filter(User.id == user_id).one_or_none()
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Inactive user")
+    
+    # Session validation: check if this token is still the active session
+    if user.active_session_token and user.active_session_token != token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Session expired: logged in from another device"
+        )
+    
     return user
 
 
