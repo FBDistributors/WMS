@@ -16,9 +16,19 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [sessionExpiredMessage, setSessionExpiredMessage] = useState<string | null>(null)
   const isSubmittingRef = useRef(false)
 
   const from = (location.state as { from?: Location })?.from?.pathname
+
+  // Check for session expired message
+  useEffect(() => {
+    const reason = sessionStorage.getItem('session_expired_reason')
+    if (reason === 'another_device') {
+      setSessionExpiredMessage(t('session_expired_another_device'))
+      sessionStorage.removeItem('session_expired_reason')
+    }
+  }, [])
 
   useEffect(() => {
     if (isSubmittingRef.current) {
@@ -33,6 +43,7 @@ export function LoginPage() {
     event.preventDefault()
     setIsLoading(true)
     setError(null)
+    setSessionExpiredMessage(null)
     isSubmittingRef.current = true
     try {
       const nextUser = await signIn(username, password)
@@ -55,6 +66,11 @@ export function LoginPage() {
       <Card className="w-full max-w-sm p-6">
         <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
         <p className="mt-1 text-sm text-slate-500">{t('subtitle')}</p>
+        {sessionExpiredMessage ? (
+          <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
+            {sessionExpiredMessage}
+          </div>
+        ) : null}
         <form className="mt-4 space-y-3" onSubmit={handleSubmit}>
           <input
             className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"

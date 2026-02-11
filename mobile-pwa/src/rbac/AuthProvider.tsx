@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 
-import { getMe, login as loginRequest, clearToken, getToken } from '../services/authApi'
+import { getMe, login as loginRequest, logout as logoutRequest, clearToken, getToken } from '../services/authApi'
 import {
   ROLE_PERMISSIONS,
   isInventoryController,
@@ -129,8 +129,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return nextUser
   }
 
-  const signOut = () => {
-    clearToken()
+  const signOut = async () => {
+    await logoutRequest()
     setUser(null)
   }
 

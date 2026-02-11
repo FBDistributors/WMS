@@ -62,6 +62,16 @@ export async function fetchJSON<TResponse, TBody = unknown>(
     const payload = isJson ? await response.json() : await response.text()
 
     if (response.status === 401 && path !== '/api/v1/auth/login') {
+      // Check if it's a session expired error
+      const errorDetail = isJson && payload && typeof payload === 'object' && 'detail' in payload 
+        ? String(payload.detail) 
+        : ''
+      
+      if (errorDetail.includes('logged in from another device')) {
+        // Store session expired flag for user-friendly message
+        sessionStorage.setItem('session_expired_reason', 'another_device')
+      }
+      
       clearTokenAndRedirect()
     }
 

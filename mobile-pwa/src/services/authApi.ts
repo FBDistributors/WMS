@@ -38,3 +38,12 @@ export async function login(username: string, password: string) {
 export async function getMe() {
   return fetchJSON<AuthUser>('/api/v1/auth/me')
 }
+
+export async function logout() {
+  try {
+    await fetchJSON('/api/v1/auth/logout', { method: 'POST' })
+  } catch {
+    // Ignore errors, clear token anyway
+  }
+  clearToken()
+}
