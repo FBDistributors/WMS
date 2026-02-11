@@ -95,28 +95,26 @@ export function OrderDetailsPage() {
   }
 
   return (
-    <AdminLayout
-      title={t('orders:details_title')}
-      actionSlot={
-        <div className="flex flex-wrap items-center gap-2">
-          {canEditStatus && order.status === 'picked' ? (
-            <Button onClick={handlePack} disabled={isUpdating}>
-              {isUpdating ? t('orders:packing') : t('orders:pack')}
-            </Button>
-          ) : null}
-          {canEditStatus && order.status === 'packed' ? (
-            <Button onClick={handleShip} disabled={isUpdating}>
-              {isUpdating ? t('orders:shipping') : t('orders:ship')}
-            </Button>
-          ) : null}
+    <AdminLayout title={t('orders:details_title')}>
+      <Card className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <Button variant="ghost" onClick={() => navigate(-1)}>
             <ArrowLeft size={16} />
             {t('common:buttons.back')}
           </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {canEditStatus && order.status === 'picked' ? (
+              <Button onClick={handlePack} disabled={isUpdating}>
+                {isUpdating ? t('orders:packing') : t('orders:pack')}
+              </Button>
+            ) : null}
+            {canEditStatus && order.status === 'packed' ? (
+              <Button onClick={handleShip} disabled={isUpdating}>
+                {isUpdating ? t('orders:shipping') : t('orders:ship')}
+              </Button>
+            ) : null}
+          </div>
         </div>
-      }
-    >
-      <Card className="space-y-4">
         {actionError ? (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-500/30 dark:bg-red-500/10">
             {actionError}
