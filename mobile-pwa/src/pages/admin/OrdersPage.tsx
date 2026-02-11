@@ -24,7 +24,8 @@ const COLUMN_OPTIONS = [
   { id: 'status', labelKey: 'orders:columns.status' },
   { id: 'lines', labelKey: 'orders:columns.lines' },
   { id: 'created', labelKey: 'orders:columns.created' },
-  { id: 'actions', labelKey: 'orders:columns.actions' },
+  { id: 'view_details', labelKey: 'orders:columns.view_details' },
+  { id: 'send_to_picking', labelKey: 'orders:columns.send_to_picking' },
 ]
 
 const SEARCH_FIELD_OPTIONS = [
@@ -180,19 +181,24 @@ export function OrdersPage() {
               {new Date(order.created_at).toLocaleDateString()}
             </td>
           )
-        case 'actions':
+        case 'view_details':
           return (
             <td className="px-4 py-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <Button variant="ghost" onClick={() => navigate(`/admin/orders/${order.id}`)}>
-                  {t('orders:view_details')}
+              <Button variant="ghost" onClick={() => navigate(`/admin/orders/${order.id}`)}>
+                {t('orders:view_details')}
+              </Button>
+            </td>
+          )
+        case 'send_to_picking':
+          return (
+            <td className="px-4 py-3">
+              {canSend ? (
+                <Button variant="secondary" onClick={() => setSelectedOrderId(order.id)}>
+                  {t('orders:send_to_picking.button')}
                 </Button>
-                {canSend ? (
-                  <Button variant="secondary" onClick={() => setSelectedOrderId(order.id)}>
-                    {t('orders:send_to_picking.button')}
-                  </Button>
-                ) : null}
-              </div>
+              ) : (
+                <span className="text-slate-400 dark:text-slate-600">—</span>
+              )}
             </td>
           )
         default:

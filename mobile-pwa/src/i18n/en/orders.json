@@ -74,7 +74,8 @@
     "status": "Status",
     "lines": "Lines",
     "created": "Created",
-    "actions": "Actions"
+    "view_details": "View Details",
+    "send_to_picking": "Send to Picking"
   },
   "lines": {
     "sku": "SKU",

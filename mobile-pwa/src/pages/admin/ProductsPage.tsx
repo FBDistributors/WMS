@@ -232,16 +232,6 @@ export function ProductsPage() {
   return (
     <AdminLayout
       title={t('products:title')}
-      actionSlot={
-        <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={handleSync} disabled={isSyncing}>
-            {isSyncing ? t('products:syncing') : t('products:sync_from_smartup')}
-          </Button>
-          <Button variant="secondary" onClick={handleRetry}>
-            {t('products:refresh')}
-          </Button>
-        </div>
-      }
     >
       {syncError ? (
         <Card className="mb-4 border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-500/30 dark:bg-red-500/10">
@@ -285,6 +275,13 @@ export function ProductsPage() {
               {t('products:add.button')}
             </Button>
           )}
+          <Button 
+            className="w-full md:w-auto" 
+            onClick={handleSync} 
+            disabled={isSyncing}
+          >
+            {isSyncing ? t('products:syncing') : t('products:sync_from_smartup')}
+          </Button>
           {canManageProducts && (
             <Button
               variant="secondary"
