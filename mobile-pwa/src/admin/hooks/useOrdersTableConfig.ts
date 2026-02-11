@@ -18,7 +18,8 @@ export const ORDERS_TABLE_COLUMN_IDS = [
   'status',
   'lines',
   'created',
-  'actions',
+  'view_details',
+  'send_to_picking',
 ]
 
 export const DEFAULT_VISIBLE_COLUMNS = [
@@ -31,7 +32,8 @@ export const DEFAULT_VISIBLE_COLUMNS = [
   'status',
   'lines',
   'created',
-  'actions',
+  'view_details',
+  'send_to_picking',
 ]
 
 export const ORDERS_TABLE_SEARCH_FIELDS = [
