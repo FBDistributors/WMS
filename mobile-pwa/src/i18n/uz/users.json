@@ -19,6 +19,8 @@
     "role": "Role",
     "password": "Parol",
     "confirm_password": "Parolni tasdiqlash",
+    "generate_password": "Parol yaratish",
+    "password_hint": "Kamida 6 ta belgi (harflar, raqamlar)",
     "active": "Faol",
     "save": "Saqlash",
     "create": "Yaratish",
@@ -35,7 +37,7 @@
   },
   "messages": {
     "password_mismatch": "Parollar mos emas.",
-    "create_failed": "User yaratilmadi. Parol kuchli ekanini tekshiring.",
+    "create_failed": "User yaratilmadi. Qaytadan urinib ko'ring.",
     "update_failed": "User yangilanmadi.",
     "reset_failed": "Parol yangilanmadi.",
     "reset_success": "Parol yangilandi.",

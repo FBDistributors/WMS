@@ -22,16 +22,12 @@ VALID_ROLES = set(ROLE_PERMISSIONS.keys())
 
 
 def _validate_password(password: str) -> None:
-    if len(password) < 12:
-        raise HTTPException(status_code=400, detail="Password must be at least 12 characters.")
-    if not re.search(r"[A-Z]", password):
-        raise HTTPException(status_code=400, detail="Password must include an uppercase letter.")
-    if not re.search(r"[a-z]", password):
-        raise HTTPException(status_code=400, detail="Password must include a lowercase letter.")
-    if not re.search(r"[0-9]", password):
-        raise HTTPException(status_code=400, detail="Password must include a digit.")
-    if not re.search(r"[^A-Za-z0-9]", password):
-        raise HTTPException(status_code=400, detail="Password must include a symbol.")
+    """
+    Simplified password validation for internal warehouse users.
+    Minimum 6 characters - easy to remember for operators.
+    """
+    if len(password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
 
 
 class UserOut(BaseModel):
@@ -54,7 +50,7 @@ class UserListOut(BaseModel):
 class UserCreateIn(BaseModel):
     username: str = Field(..., min_length=3, max_length=128)
     full_name: Optional[str] = Field(default=None, max_length=255)
-    password: str = Field(..., min_length=12)
+    password: str = Field(..., min_length=6)
     role: str
     is_active: bool = True
 
@@ -66,7 +62,7 @@ class UserUpdateIn(BaseModel):
 
 
 class ResetPasswordIn(BaseModel):
-    new_password: str = Field(..., min_length=12)
+    new_password: str = Field(..., min_length=6)
 
 
 def _to_user_out(user: User) -> UserOut:

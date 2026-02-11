@@ -19,6 +19,8 @@
     "role": "Role",
     "password": "Password",
     "confirm_password": "Confirm password",
+    "generate_password": "Generate",
+    "password_hint": "Minimum 6 characters (letters, numbers)",
     "active": "Active",
     "save": "Save changes",
     "create": "Create user",
@@ -35,7 +37,7 @@
   },
   "messages": {
     "password_mismatch": "Passwords do not match.",
-    "create_failed": "Failed to create user. Check password strength.",
+    "create_failed": "Failed to create user. Please try again.",
     "update_failed": "Failed to update user.",
     "reset_failed": "Failed to reset password.",
     "reset_success": "Password updated.",
