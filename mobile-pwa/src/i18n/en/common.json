@@ -36,6 +36,15 @@
     "error": "Error",
     "exception": "Exception"
   },
+  "expiry": {
+    "expiry_date": "Expiry Date",
+    "batch": "Batch",
+    "expired": "Expired",
+    "expiring_soon": "Expiring Soon",
+    "warning": "Warning",
+    "days_left": "days left",
+    "no_expiry": "No Expiry"
+  },
   "labels": {
     "search": "Search",
     "username": "Username",

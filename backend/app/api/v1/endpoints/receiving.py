@@ -132,6 +132,16 @@ async def create_receipt(
 ):
     if not payload.lines:
         raise HTTPException(status_code=400, detail="Receipt lines must not be empty")
+    
+    # Validate expiry dates
+    today = date.today()
+    for line in payload.lines:
+        if line.expiry_date and line.expiry_date < today:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Expiry date {line.expiry_date} is in the past for product {line.product_id}"
+            )
+    
     doc_no = payload.doc_no.strip() if payload.doc_no else _generate_doc_no()
 
     existing = db.query(ReceiptModel).filter(ReceiptModel.doc_no == doc_no).one_or_none()

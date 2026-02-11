@@ -36,6 +36,15 @@
     "error": "Xato",
     "exception": "Istisno"
   },
+  "expiry": {
+    "expiry_date": "Yaroqlilik muddati",
+    "batch": "Partiya",
+    "expired": "Muddati o'tgan",
+    "expiring_soon": "Tez orada tugaydi",
+    "warning": "Ogohlantirish",
+    "days_left": "kun qoldi",
+    "no_expiry": "Muddat yo'q"
+  },
   "labels": {
     "search": "Qidirish",
     "username": "Username",

@@ -36,6 +36,15 @@
     "error": "Ошибка",
     "exception": "Исключение"
   },
+  "expiry": {
+    "expiry_date": "Срок годности",
+    "batch": "Партия",
+    "expired": "Просрочено",
+    "expiring_soon": "Скоро истекает",
+    "warning": "Предупреждение",
+    "days_left": "дней осталось",
+    "no_expiry": "Без срока"
+  },
   "labels": {
     "search": "Поиск",
     "username": "Имя пользователя",
