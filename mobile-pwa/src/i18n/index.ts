@@ -6,6 +6,7 @@ import authUz from './uz/auth.json'
 import adminUz from './uz/admin.json'
 import pickingUz from './uz/picking.json'
 import pickerUz from './uz/picker.json'
+import controllerUz from './uz/controller.json'
 import productsUz from './uz/products.json'
 import ordersUz from './uz/orders.json'
 import locationsUz from './uz/locations.json'
@@ -19,6 +20,7 @@ import authEn from './en/auth.json'
 import adminEn from './en/admin.json'
 import pickingEn from './en/picking.json'
 import pickerEn from './en/picker.json'
+import controllerEn from './en/controller.json'
 import productsEn from './en/products.json'
 import ordersEn from './en/orders.json'
 import locationsEn from './en/locations.json'
@@ -32,6 +34,7 @@ import authRu from './ru/auth.json'
 import adminRu from './ru/admin.json'
 import pickingRu from './ru/picking.json'
 import pickerRu from './ru/picker.json'
+import controllerRu from './ru/controller.json'
 import productsRu from './ru/products.json'
 import ordersRu from './ru/orders.json'
 import locationsRu from './ru/locations.json'
@@ -56,6 +59,7 @@ i18n.use(initReactI18next).init({
       admin: adminUz,
       picking: pickingUz,
       picker: pickerUz,
+      controller: controllerUz,
       products: productsUz,
       orders: ordersUz,
       locations: locationsUz,
@@ -70,6 +74,7 @@ i18n.use(initReactI18next).init({
       admin: adminEn,
       picking: pickingEn,
       picker: pickerEn,
+      controller: controllerEn,
       products: productsEn,
       orders: ordersEn,
       locations: locationsEn,
@@ -84,6 +89,7 @@ i18n.use(initReactI18next).init({
       admin: adminRu,
       picking: pickingRu,
       picker: pickerRu,
+      controller: controllerRu,
       products: productsRu,
       orders: ordersRu,
       locations: locationsRu,
@@ -99,7 +105,7 @@ i18n.use(initReactI18next).init({
   fallbackLng: 'en',
   supportedLngs: SUPPORTED_LANGS,
   defaultNS: 'common',
-    ns: ['common', 'auth', 'admin', 'picking', 'picker', 'products', 'orders', 'locations', 'receiving', 'inventory', 'brands', 'users'],
+    ns: ['common', 'auth', 'admin', 'picking', 'picker', 'controller', 'products', 'orders', 'locations', 'receiving', 'inventory', 'brands', 'users'],
   interpolation: {
     escapeValue: false,
   },

@@ -27,10 +27,16 @@ import { PickDetailsPage } from '../pages/PickDetailsPage'
 import { PickItemPage } from '../pages/PickItemPage'
 import { PickListPage } from '../pages/PickListPage'
 import { PickerLayout } from '../components/picker/PickerLayout'
+import { ControllerLayout } from '../components/controller/ControllerLayout'
 import { PickerHomePage } from '../pages/picker/PickerHomePage'
 import { PickerInventoryPage } from '../pages/picker/PickerInventoryPage'
 import { PickerInventoryDetailPage } from '../pages/picker/PickerInventoryDetailPage'
 import { PickerSettingsPage } from '../pages/picker/PickerSettingsPage'
+import { ControllerHomePage } from '../pages/controller/ControllerHomePage'
+import { ControllerDocumentsPage } from '../pages/controller/ControllerDocumentsPage'
+import { ControllerProductsPage } from '../pages/controller/ControllerProductsPage'
+import { ControllerProductDetailPage } from '../pages/controller/ControllerProductDetailPage'
+import { ControllerSettingsPage } from '../pages/controller/ControllerSettingsPage'
 import { LoginPage } from '../pages/LoginPage'
 import { NotAuthorizedPage as AppNotAuthorizedPage } from '../pages/NotAuthorizedPage'
 
@@ -124,6 +130,57 @@ export function App() {
               <PickerLayout>
                 <PickerSettingsPage />
               </PickerLayout>
+            </RequireRoleOrPermission>
+          }
+        />
+        {/* Controller profile (inventory_controller) */}
+        <Route
+          path="/controller"
+          element={
+            <RequireRoleOrPermission permissions={['documents:read', 'products:read']}>
+              <ControllerLayout>
+                <ControllerHomePage />
+              </ControllerLayout>
+            </RequireRoleOrPermission>
+          }
+        />
+        <Route
+          path="/controller/documents"
+          element={
+            <RequireRoleOrPermission permissions={['documents:read', 'products:read']}>
+              <ControllerLayout>
+                <ControllerDocumentsPage />
+              </ControllerLayout>
+            </RequireRoleOrPermission>
+          }
+        />
+        <Route
+          path="/controller/products"
+          element={
+            <RequireRoleOrPermission permissions={['documents:read', 'products:read']}>
+              <ControllerLayout>
+                <ControllerProductsPage />
+              </ControllerLayout>
+            </RequireRoleOrPermission>
+          }
+        />
+        <Route
+          path="/controller/products/:productId"
+          element={
+            <RequireRoleOrPermission permissions={['documents:read', 'products:read']}>
+              <ControllerLayout>
+                <ControllerProductDetailPage />
+              </ControllerLayout>
+            </RequireRoleOrPermission>
+          }
+        />
+        <Route
+          path="/controller/settings"
+          element={
+            <RequireRoleOrPermission permissions={['documents:read', 'products:read']}>
+              <ControllerLayout>
+                <ControllerSettingsPage />
+              </ControllerLayout>
             </RequireRoleOrPermission>
           }
         />

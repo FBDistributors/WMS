@@ -128,7 +128,13 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     'documents:read',
     'products:read',
   ],
-  inventory_controller: ['admin:access', 'documents:read', 'products:read'],
+  inventory_controller: [
+    'admin:access',
+    'documents:read',
+    'products:read',
+    'picking:read',
+    'inventory:read',
+  ],
 }
 
 export function normalizePermissions(permissions: string[]): PermissionKey[] {

@@ -96,6 +96,8 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "admin:access",
         "documents:read",
         "products:read",
+        "picking:read",
+        "inventory:read",
     ],
 }
 
