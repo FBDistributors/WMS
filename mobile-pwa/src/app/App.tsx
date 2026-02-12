@@ -26,6 +26,7 @@ import { PickCompletePage } from '../pages/PickCompletePage'
 import { PickDetailsPage } from '../pages/PickDetailsPage'
 import { PickItemPage } from '../pages/PickItemPage'
 import { PickListPage } from '../pages/PickListPage'
+import { PickerHomePage } from '../pages/picker/PickerHomePage'
 import { PickerInventoryPage } from '../pages/picker/PickerInventoryPage'
 import { PickerInventoryDetailPage } from '../pages/picker/PickerInventoryDetailPage'
 import { LoginPage } from '../pages/LoginPage'
@@ -50,6 +51,14 @@ export function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<SmartRedirect />} />
+        <Route
+          path="/picker"
+          element={
+            <RequireRoleOrPermission permissions={['picking:read', 'inventory:read']}>
+              <PickerHomePage />
+            </RequireRoleOrPermission>
+          }
+        />
         <Route
           path="/picking/mobile-pwa"
           element={

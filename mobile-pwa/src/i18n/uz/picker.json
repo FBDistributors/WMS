@@ -1,4 +1,18 @@
 {
+  "home": {
+    "title": "Picker",
+    "scan_button": "Skaner",
+    "offline_warning": "Offline – ma'lumot eski bo'lishi mumkin",
+    "locations": "Joylar",
+    "nearest_expiry": "Yaqin muddat",
+    "total_available": "Jami mavjud",
+    "back_to_scan": "Orqaga",
+    "view_details": "Tafsilotlar",
+    "retry": "Qayta urinish",
+    "my_pick_tasks": "Mening pick vazifalarim",
+    "inventory": "Inventar",
+    "offline_queue": "Offline navbat"
+  },
   "inventory": {
     "title": "Inventar",
     "search_placeholder": "Mahsulot nomi yoki SKU bo'yicha qidirish",

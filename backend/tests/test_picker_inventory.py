@@ -103,7 +103,7 @@ def test_scanner_resolve_product(
     picker_user: User,
     test_product_with_barcode: Product,
 ):
-    """Test POST /scanner/resolve returns PRODUCT for product barcode"""
+    """Test POST /scanner/resolve returns PRODUCT with full product object"""
     login = client.post("/api/v1/auth/login", json={"username": "picker_test", "password": "testpass123"})
     token = login.json()["access_token"]
 
@@ -116,7 +116,10 @@ def test_scanner_resolve_product(
     data = resp.json()
     assert data["type"] == "PRODUCT"
     assert data["entity_id"] == str(test_product_with_barcode.id)
-    assert "Test Product" in (data["display_label"] or "")
+    assert "product" in data
+    assert data["product"]["id"] == str(test_product_with_barcode.id)
+    assert data["product"]["name"] == "Test Product"
+    assert data["product"]["barcode"] == "123456789"
 
 
 def test_scanner_resolve_location(
@@ -139,6 +142,53 @@ def test_scanner_resolve_location(
     assert data["entity_id"] == str(test_location.id)
 
 
+def test_inventory_by_barcode(
+    client: TestClient,
+    picker_user: User,
+    test_product_with_barcode: Product,
+    test_location: Location,
+    db_session: Session,
+):
+    """Test GET /inventory/by-barcode/{barcode} returns available qty and FEFO order"""
+    from app.models.stock import StockLot, StockMovement
+    from decimal import Decimal
+    from datetime import date, timedelta
+
+    lot = StockLot(
+        product_id=test_product_with_barcode.id,
+        batch="B1",
+        expiry_date=date.today() + timedelta(days=30),
+    )
+    db_session.add(lot)
+    db_session.flush()
+    StockMovement(
+        product_id=test_product_with_barcode.id,
+        lot_id=lot.id,
+        location_id=test_location.id,
+        qty_change=Decimal("15"),
+        movement_type="receipt",
+    )
+    db_session.commit()
+
+    login = client.post("/api/v1/auth/login", json={"username": "picker_test", "password": "testpass123"})
+    token = login.json()["access_token"]
+
+    resp = client.get(
+        "/api/v1/inventory/by-barcode/123456789",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["product_id"] == str(test_product_with_barcode.id)
+    assert data["name"] == "Test Product"
+    assert data["total_available"] == 15
+    assert "best_locations" in data
+    assert "fefo_lots" in data
+    assert len(data["fefo_lots"]) >= 1
+    assert data["fefo_lots"][0]["batch_no"] == "B1"
+    assert data["fefo_lots"][0]["available_qty"] == 15
+
+
 def test_scanner_resolve_unknown(client: TestClient, picker_user: User):
     """Test POST /scanner/resolve returns UNKNOWN for unknown barcode"""
     login = client.post("/api/v1/auth/login", json={"username": "picker_test", "password": "testpass123"})
@@ -150,8 +200,10 @@ def test_scanner_resolve_unknown(client: TestClient, picker_user: User):
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 200
-    assert resp.json()["type"] == "UNKNOWN"
-    assert resp.json()["entity_id"] is None
+    data = resp.json()
+    assert data["type"] == "UNKNOWN"
+    assert data.get("entity_id") is None
+    assert data.get("product") is None
 
 
 def test_picker_inventory_detail(

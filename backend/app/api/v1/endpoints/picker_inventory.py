@@ -76,6 +76,26 @@ class PickerLocationOption(BaseModel):
     name: str
 
 
+class ByBarcodeLocationInfo(BaseModel):
+    location_code: str
+    available_qty: Decimal
+
+
+class ByBarcodeLotInfo(BaseModel):
+    batch_no: str
+    expiry_date: date | None
+    available_qty: Decimal
+
+
+class InventoryByBarcodeResponse(BaseModel):
+    product_id: str
+    name: str
+    barcode: str | None
+    brand: str | None
+    best_locations: list[ByBarcodeLocationInfo]
+    fefo_lots: list[ByBarcodeLotInfo]
+    total_available: Decimal
+
 
 def _get_product_main_barcode(db: Session, product: ProductModel) -> str | None:
     if product.barcode:
@@ -86,7 +106,7 @@ def _get_product_main_barcode(db: Session, product: ProductModel) -> str | None:
 
 def _get_lot_level_balances(
     db: Session,
-    product_ids: list[UUID],
+    product_ids: list[UUID] | None,
     location_id: Optional[UUID] = None,
 ) -> list[dict[str, Any]]:
     on_hand_expr = func.sum(
@@ -121,7 +141,6 @@ def _get_lot_level_balances(
         )
         .join(StockLotModel, StockLotModel.id == StockMovementModel.lot_id)
         .join(LocationModel, LocationModel.id == StockMovementModel.location_id)
-        .filter(StockLotModel.product_id.in_(product_ids))
         .group_by(
             StockLotModel.product_id,
             StockLotModel.id,
@@ -130,8 +149,10 @@ def _get_lot_level_balances(
             StockMovementModel.location_id,
             LocationModel.code,
         )
-        .having(on_hand_expr - reserved_expr != 0)
+        .having(on_hand_expr - reserved_expr != 0        )
     )
+    if product_ids is not None:
+        query = query.filter(StockLotModel.product_id.in_(product_ids))
     if location_id:
         query = query.filter(StockMovementModel.location_id == location_id)
     rows = (
@@ -185,6 +206,128 @@ def _build_picker_items(
             )
         )
     return items
+
+
+def _get_product_by_barcode(db: Session, barcode: str) -> ProductModel | None:
+    barcode = (barcode or "").strip()
+    if not barcode:
+        return None
+    product = (
+        db.query(ProductModel)
+        .filter(
+            (ProductModel.barcode == barcode)
+            | ProductModel.id.in_(
+                db.query(ProductBarcode.product_id).filter(ProductBarcode.barcode == barcode)
+            )
+        )
+        .filter(ProductModel.is_active == True)
+        .first()
+    )
+    return product
+
+
+@router.get(
+    "/by-barcode/{barcode}",
+    response_model=InventoryByBarcodeResponse,
+    summary="Inventory by barcode (picker-friendly)",
+)
+async def get_inventory_by_barcode(
+    barcode: str,
+    db: Session = Depends(get_db),
+    _user: UserModel = Depends(get_current_user),
+    _guard=Depends(PICKER_INVENTORY_PERMISSION),
+):
+    product = _get_product_by_barcode(db, barcode)
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    main_barcode = _get_product_main_barcode(db, product)
+    lot_data = _get_lot_level_balances(db, [product.id])
+    total = sum(Decimal(str(r["available"])) for r in lot_data)
+    loc_map: dict[str, Decimal] = {}
+    fefo_lots: list[dict] = []
+    for r in lot_data:
+        loc_map[r["location_code"]] = loc_map.get(r["location_code"], Decimal(0)) + Decimal(
+            str(r["available"])
+        )
+        fefo_lots.append(
+            {
+                "batch_no": r["batch"],
+                "expiry_date": r["expiry_date"],
+                "available_qty": Decimal(str(r["available"])),
+            }
+        )
+    best_locations = [
+        ByBarcodeLocationInfo(location_code=code, available_qty=qty)
+        for code, qty in sorted(loc_map.items(), key=lambda x: -x[1])[:3]
+    ]
+    return InventoryByBarcodeResponse(
+        product_id=str(product.id),
+        name=product.name,
+        barcode=main_barcode,
+        brand=product.brand,
+        best_locations=best_locations,
+        fefo_lots=[ByBarcodeLotInfo(**lot) for lot in fefo_lots],
+        total_available=total,
+    )
+
+
+class LocationContentsItem(BaseModel):
+    product_id: str
+    product_name: str
+    barcode: str | None
+    batch_no: str
+    expiry_date: date | None
+    available_qty: Decimal
+
+
+class LocationContentsResponse(BaseModel):
+    location_id: str
+    location_code: str
+    items: list[LocationContentsItem]
+
+
+@router.get(
+    "/location/{location_code_or_barcode}",
+    response_model=LocationContentsResponse,
+    summary="Contents of location by code or barcode",
+)
+async def get_location_contents(
+    location_code_or_barcode: str,
+    db: Session = Depends(get_db),
+    _user: UserModel = Depends(get_current_user),
+    _guard=Depends(PICKER_INVENTORY_PERMISSION),
+):
+    code = (location_code_or_barcode or "").strip()
+    location = (
+        db.query(LocationModel)
+        .filter(LocationModel.code == code)
+        .filter(LocationModel.is_active == True)
+        .first()
+    )
+    if not location:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Location not found")
+    lot_data = _get_lot_level_balances(db, product_ids=None, location_id=location.id)
+    product_ids = list({r["product_id"] for r in lot_data})
+    products = {p.id: p for p in db.query(ProductModel).filter(ProductModel.id.in_(product_ids)).all()}
+    items = []
+    for r in lot_data:
+        p = products.get(r["product_id"])
+        main_barcode = _get_product_main_barcode(db, p) if p else None
+        items.append(
+            LocationContentsItem(
+                product_id=str(r["product_id"]),
+                product_name=p.name if p else "?",
+                barcode=main_barcode,
+                batch_no=r["batch"],
+                expiry_date=r["expiry_date"],
+                available_qty=Decimal(str(r["available"])),
+            )
+        )
+    return LocationContentsResponse(
+        location_id=str(location.id),
+        location_code=location.code,
+        items=items,
+    )
 
 
 @router.get(

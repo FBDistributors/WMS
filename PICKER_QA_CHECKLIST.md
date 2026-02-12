@@ -1,18 +1,29 @@
-# Picker Inventory & Scan Flow – QA Checklist
+# Picker Inventory & Scan Flow – QA Checklist (Barcode-First)
 
 ## Backend API
 
-- [ ] **GET /api/v1/inventory/picker** – List returns items with product_id, name, main_barcode, best_location, available_qty, nearest_expiry, top_locations
-- [ ] **GET /api/v1/inventory/picker?q=...** – Search by product name/SKU works
-- [ ] **GET /api/v1/inventory/picker?barcode=...** – Exact barcode match works
-- [ ] **GET /api/v1/inventory/picker?location_id=...** – Location filter works
-- [ ] **GET /api/v1/inventory/picker?limit=20&cursor=...** – Pagination works
-- [ ] **GET /api/v1/inventory/picker/{product_id}** – Detail returns locations → lots with on_hand, reserved, available
-- [ ] **POST /api/v1/scanner/resolve** – Product barcode returns type=PRODUCT, entity_id
-- [ ] **POST /api/v1/scanner/resolve** – Location code returns type=LOCATION, entity_id
-- [ ] **POST /api/v1/scanner/resolve** – Unknown barcode returns type=UNKNOWN
+- [ ] **POST /api/v1/scanner/resolve** – Returns type, product {id,name,barcode,brand}, location {id,code}, message
+- [ ] **POST /api/v1/scanner/resolve** – Product barcode → type=PRODUCT, full product object
+- [ ] **POST /api/v1/scanner/resolve** – Location code → type=LOCATION, full location object
+- [ ] **POST /api/v1/scanner/resolve** – Unknown barcode → type=UNKNOWN, message
+- [ ] **GET /api/v1/inventory/by-barcode/{barcode}** – Returns product, best_locations, fefo_lots, total_available
+- [ ] **GET /api/v1/inventory/location/{code}** – Returns location contents (optional)
+- [ ] **GET /api/v1/inventory/picker** – List returns items with FEFO ordering
+- [ ] **GET /api/v1/inventory/picker/{product_id}** – Detail returns locations → lots with available_qty
 - [ ] **RBAC** – Picker can access /inventory/picker and /scanner/resolve
 - [ ] **RBAC** – Picker cannot access /inventory/summary, /inventory/details (admin endpoints)
+
+## Frontend – Picker Home (Barcode-First)
+
+- [ ] **Route /picker** – Picker home with center scan button (default landing for picker)
+- [ ] **Center scan button** – Big scan button like banking app
+- [ ] **Scan → PRODUCT** – Calls resolve, then getInventoryByBarcode, shows Result Card
+- [ ] **Scan → LOCATION** – Navigates to inventory filtered by location
+- [ ] **Scan → UNKNOWN** – Shows error + Retry button
+- [ ] **Result Card** – Product name, barcode, locations (top 1–3), nearest expiry lot, total available
+- [ ] **Result Card** – Buttons: Back to Scan, View Details (no price/cost)
+- [ ] **Quick links** – My pick tasks, Inventory, Offline queue
+- [ ] **Offline** – Uses cached barcode→inventory when offline
 
 ## Frontend – Picker Inventory UI
 
@@ -36,10 +47,10 @@
 
 ## Offline-First
 
-- [ ] **Cache** – Last successful /inventory/picker response cached (localStorage)
+- [ ] **Barcode cache** – barcode→inventory responses cached in localStorage
 - [ ] **TTL** – Cache expires after ~20 minutes
-- [ ] **Offline display** – Cached items shown with clear "Data may be outdated" warning
-- [ ] **Search offline** – Search works against cached items when offline
+- [ ] **Offline scan** – Scan works against cached barcode entries when offline
+- [ ] **Offline display** – "Offline – data may be outdated" warning
 
 ## Security & RBAC
 

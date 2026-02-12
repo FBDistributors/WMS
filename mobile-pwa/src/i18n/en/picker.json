@@ -1,4 +1,18 @@
 {
+  "home": {
+    "title": "Picker",
+    "scan_button": "Scan",
+    "offline_warning": "Offline – data may be outdated",
+    "locations": "Locations",
+    "nearest_expiry": "Nearest expiry",
+    "total_available": "Total available",
+    "back_to_scan": "Back to Scan",
+    "view_details": "View Details",
+    "retry": "Retry",
+    "my_pick_tasks": "My pick tasks",
+    "inventory": "Inventory",
+    "offline_queue": "Offline queue"
+  },
   "inventory": {
     "title": "Inventory",
     "search_placeholder": "Search by product name or SKU",

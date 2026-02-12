@@ -1,4 +1,18 @@
 {
+  "home": {
+    "title": "Picker",
+    "scan_button": "Сканировать",
+    "offline_warning": "Оффлайн – данные могут быть устаревшими",
+    "locations": "Места",
+    "nearest_expiry": "Ближайший срок",
+    "total_available": "Всего в наличии",
+    "back_to_scan": "Назад",
+    "view_details": "Подробнее",
+    "retry": "Повторить",
+    "my_pick_tasks": "Мои задачи",
+    "inventory": "Инвентарь",
+    "offline_queue": "Оффлайн очередь"
+  },
   "inventory": {
     "title": "Инвентарь",
     "search_placeholder": "Поиск по названию или SKU",

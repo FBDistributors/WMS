@@ -51,7 +51,7 @@ export function LoginPage() {
       const shouldUseFrom =
         from &&
         ((home === '/admin' && from.startsWith('/admin')) ||
-          (home === '/picking/mobile-pwa' && from.startsWith('/picking')))
+          (home === '/picker' && (from.startsWith('/picker') || from.startsWith('/picking'))))
       navigate(shouldUseFrom ? from : home, { replace: true })
     } catch {
       setError(t('invalid_credentials'))

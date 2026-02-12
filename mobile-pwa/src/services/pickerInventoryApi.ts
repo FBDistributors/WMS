@@ -64,6 +64,21 @@ export async function getPickerProductDetail(productId: string): Promise<PickerP
   return fetchJSON<PickerProductDetailResponse>(`/api/v1/inventory/picker/${productId}`)
 }
 
+export type InventoryByBarcodeResponse = {
+  product_id: string
+  name: string
+  barcode: string | null
+  brand: string | null
+  best_locations: { location_code: string; available_qty: number }[]
+  fefo_lots: { batch_no: string; expiry_date: string | null; available_qty: number }[]
+  total_available: number
+}
+
+export async function getInventoryByBarcode(barcode: string): Promise<InventoryByBarcodeResponse> {
+  const encoded = encodeURIComponent(barcode.trim())
+  return fetchJSON<InventoryByBarcodeResponse>(`/api/v1/inventory/by-barcode/${encoded}`)
+}
+
 export type PickerLocationOption = {
   id: string
   code: string

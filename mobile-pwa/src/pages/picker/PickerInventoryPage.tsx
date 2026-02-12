@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Search, Scan, Boxes, ChevronDown, ChevronUp } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -39,8 +39,10 @@ function formatError(err: unknown): string {
 export function PickerInventoryPage() {
   const { t } = useTranslation('picker')
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const locationFromUrl = searchParams.get('location')
   const [query, setQuery] = useState('')
-  const [locationId, setLocationId] = useState<string>('')
+  const [locationId, setLocationId] = useState<string>(locationFromUrl ?? '')
   const [locations, setLocations] = useState<PickerLocationOption[]>([])
   const [items, setItems] = useState<PickerInventoryItem[]>([])
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
