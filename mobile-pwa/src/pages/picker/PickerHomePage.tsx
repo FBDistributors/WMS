@@ -4,9 +4,6 @@ import { ClipboardList, Package, WifiOff } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AppHeader } from '../../components/layout/AppHeader'
-import { resolveBarcode } from '../../services/scannerApi'
-import { getInventoryByBarcode } from '../../services/pickerInventoryApi'
-import { getBarcodeCache, setBarcodeCache } from '../../lib/barcodeCache'
 
 type ScanResult = 'idle' | 'product' | 'location' | 'unknown' | 'loading'
 
