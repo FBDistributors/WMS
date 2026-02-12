@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { useState } from 'react'
 
 import { ArrowLeft, LogOut, RefreshCcw, User } from 'lucide-react'
+import { BRAND } from '../../config/branding'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../ui/button'
@@ -28,12 +29,14 @@ export function AppHeader({ title, onBack, onRefresh, actionSlot }: AppHeaderPro
   return (
     <header className="sticky top-0 z-10 -mx-4 mb-4 bg-slate-50/95 px-4 py-3 backdrop-blur dark:bg-slate-900/95">
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {onBack ? (
             <Button variant="ghost" onClick={onBack} aria-label={t('buttons.back')}>
               <ArrowLeft size={18} />
             </Button>
-          ) : null}
+          ) : (
+            <img src={BRAND.logoMain} alt="" className="h-8 w-auto object-contain" aria-hidden />
+          )}
           <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{title}</h1>
         </div>
         <div className="flex items-center gap-2">

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '../components/ui/button'
 import { Card } from '../components/ui/card'
 import { useAuth } from '../rbac/AuthProvider'
+import { BRAND } from '../config/branding'
 import { getHomeRouteForRole } from '../rbac/routes'
 
 export function LoginPage() {
@@ -62,10 +63,14 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 px-4 dark:bg-slate-950">
+      <div className="mb-6 flex flex-col items-center gap-2">
+        <img src={BRAND.logoMain} alt={BRAND.name} className="h-16 w-auto object-contain" />
+        <span className="text-center text-sm font-medium text-slate-600 dark:text-slate-400">{BRAND.name}</span>
+      </div>
       <Card className="w-full max-w-sm p-6">
-        <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
-        <p className="mt-1 text-sm text-slate-500">{t('subtitle')}</p>
+        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{t('title')}</h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('subtitle')}</p>
         {sessionExpiredMessage ? (
           <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
             {sessionExpiredMessage}

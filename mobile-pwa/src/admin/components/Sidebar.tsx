@@ -16,6 +16,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useAuth } from '../../rbac/AuthProvider'
+import { BRAND } from '../../config/branding'
 import type { MenuItem } from '../../rbac/menu'
 import { filterMenuByPermissions } from '../../rbac/menu'
 import { ROLE_PERMISSIONS, isSupervisor, isWarehouseAdmin } from '../../rbac/permissions'
@@ -75,15 +76,13 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
         collapsed ? 'w-20' : 'w-64',
       ].join(' ')}
     >
-      <div className="mb-6 flex items-center justify-between">
-        <div
-          className={[
-            'text-lg font-semibold text-slate-900 dark:text-slate-100',
-            collapsed ? 'sr-only' : '',
-          ].join(' ')}
-        >
-          {t('admin:sidebar_title')}
-        </div>
+      <div className="mb-6 flex items-center justify-between gap-2">
+        <Link to="/admin" className="flex items-center gap-2" onClick={onNavigate}>
+          <img src={BRAND.logoMain} alt="" className="h-9 w-auto shrink-0 object-contain" aria-hidden />
+          {!collapsed && (
+            <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{BRAND.shortName}</span>
+          )}
+        </Link>
         <Button
           variant="secondary"
           className="h-11 w-11 p-0 text-slate-700 dark:text-slate-200"
