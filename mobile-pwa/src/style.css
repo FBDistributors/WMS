@@ -19,3 +19,17 @@
     min-height: 100vh;
   }
 }
+
+/* Safe area for notched devices (iOS, etc.) */
+@layer utilities {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  /* Bottom nav + scan button + safe area */
+  .pb-nav {
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+  }
+}
