@@ -81,6 +81,22 @@ export function OrdersPage() {
     void load()
   }, [load])
 
+  // Avtoyangilash: faqat sahifa ko‘rinayotganda har 1 daqiqada (tab aktiv bo‘lganda)
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') void load()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') void load()
+    }, 60_000)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility)
+      clearInterval(interval)
+    }
+  }, [load])
+
   useEffect(() => {
     setOffset(0)
   }, [status, search])
