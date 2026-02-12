@@ -18,10 +18,26 @@ export type InventoryDetailRow = {
   expiry_date?: string | null
   location_id: string
   location_code: string
+  location_type?: string | null
+  sector?: string | null
   location_path: string
   on_hand: number
   reserved: number
   available: number
+}
+
+/** One row per (product, location) for inventory table with expandable location rows */
+export type InventorySummaryWithLocationRow = {
+  product_id: string
+  product_code: string
+  name: string
+  brand?: string | null
+  on_hand: number
+  available: number
+  location_id: string
+  location_code: string
+  location_type?: string | null
+  sector?: string | null
 }
 
 export type InventoryMovement = {
@@ -65,6 +81,22 @@ export type InventoryDetailsQuery = {
 export async function getInventoryDetails(query: InventoryDetailsQuery = {}) {
   return fetchJSON<InventoryDetailRow[]>('/api/v1/inventory/details', {
     query,
+  })
+}
+
+export type InventorySummaryByLocationQuery = {
+  search?: string
+  product_ids?: string[]
+  only_available?: boolean
+}
+
+export async function getInventorySummaryByLocation(query: InventorySummaryByLocationQuery = {}) {
+  return fetchJSON<InventorySummaryWithLocationRow[]>('/api/v1/inventory/summary-by-location', {
+    query: {
+      search: query.search,
+      product_ids: query.product_ids?.join(','),
+      only_available: query.only_available,
+    },
   })
 }
 

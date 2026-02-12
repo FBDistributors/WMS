@@ -101,10 +101,26 @@ class InventoryDetailRow(BaseModel):
     expiry_date: Optional[date] = None
     location_id: UUID
     location_code: str
+    location_type: Optional[str] = None
+    sector: Optional[str] = None
     location_path: str
     on_hand: Decimal
     reserved: Decimal
     available: Decimal
+
+
+class InventorySummaryWithLocationRow(BaseModel):
+    """One row per (product, location) for inventory table with expandable location rows."""
+    product_id: UUID
+    product_code: str
+    name: str
+    brand: Optional[str] = None
+    on_hand: Decimal
+    available: Decimal
+    location_id: UUID
+    location_code: str
+    location_type: Optional[str] = None
+    sector: Optional[str] = None
 
 
 def _build_location_path_map(locations: list[LocationModel]) -> dict[UUID, str]:
@@ -402,6 +418,8 @@ async def inventory_details(
             StockLotModel.expiry_date.label("expiry_date"),
             StockMovementModel.location_id.label("location_id"),
             LocationModel.code.label("location_code"),
+            LocationModel.location_type.label("location_type"),
+            LocationModel.sector.label("sector"),
             on_hand_expr.label("on_hand"),
             reserved_expr.label("reserved"),
             (on_hand_expr - reserved_expr).label("available"),
@@ -415,6 +433,8 @@ async def inventory_details(
             StockLotModel.expiry_date,
             StockMovementModel.location_id,
             LocationModel.code,
+            LocationModel.location_type,
+            LocationModel.sector,
         )
     )
 
@@ -440,10 +460,98 @@ async def inventory_details(
             expiry_date=row.expiry_date,
             location_id=row.location_id,
             location_code=row.location_code,
+            location_type=row.location_type,
+            sector=row.sector,
             location_path=location_map.get(row.location_id, row.location_code),
             on_hand=row.on_hand,
             reserved=row.reserved,
             available=row.available,
+        )
+        for row in rows
+    ]
+
+
+@router.get(
+    "/summary-by-location",
+    response_model=List[InventorySummaryWithLocationRow],
+    summary="Inventory summary per product and location (for table with Location column)",
+)
+@router.get(
+    "/summary-by-location/",
+    response_model=List[InventorySummaryWithLocationRow],
+    summary="Inventory summary per product and location",
+)
+async def inventory_summary_by_location(
+    search: Optional[str] = None,
+    product_ids: Optional[str] = Query(default=None, description="Comma-separated product UUIDs"),
+    only_available: bool = Query(False),
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("inventory:read")),
+):
+    on_hand_expr = func.sum(
+        case(
+            (StockMovementModel.movement_type.in_(("allocate", "unallocate")), 0),
+            else_=StockMovementModel.qty_change,
+        )
+    )
+    reserved_expr = func.sum(
+        case(
+            (StockMovementModel.movement_type.in_(("allocate", "unallocate")), StockMovementModel.qty_change),
+            else_=0,
+        )
+    )
+    available_expr = on_hand_expr - reserved_expr
+
+    query = (
+        db.query(
+            ProductModel.id.label("product_id"),
+            ProductModel.sku.label("product_code"),
+            ProductModel.name.label("name"),
+            func.coalesce(ProductModel.brand, "").label("brand"),
+            on_hand_expr.label("on_hand"),
+            available_expr.label("available"),
+            LocationModel.id.label("location_id"),
+            LocationModel.code.label("location_code"),
+            LocationModel.location_type.label("location_type"),
+            LocationModel.sector.label("sector"),
+        )
+        .join(StockLotModel, StockLotModel.product_id == ProductModel.id)
+        .join(StockMovementModel, StockMovementModel.lot_id == StockLotModel.id)
+        .join(LocationModel, LocationModel.id == StockMovementModel.location_id)
+        .group_by(
+            ProductModel.id,
+            ProductModel.sku,
+            ProductModel.name,
+            ProductModel.brand,
+            LocationModel.id,
+            LocationModel.code,
+            LocationModel.location_type,
+            LocationModel.sector,
+        )
+        .having(available_expr != 0)
+    )
+    if search:
+        query = _apply_product_search(query, search)
+    if product_ids:
+        ids = [UUID(token.strip()) for token in product_ids.split(",") if token.strip()]
+        if ids:
+            query = query.filter(ProductModel.id.in_(ids))
+    if only_available:
+        query = query.having(available_expr > 0)
+
+    rows = query.order_by(ProductModel.sku.asc(), LocationModel.code.asc()).all()
+    return [
+        InventorySummaryWithLocationRow(
+            product_id=row.product_id,
+            product_code=row.product_code,
+            name=row.name,
+            brand=row.brand or None,
+            on_hand=row.on_hand,
+            available=row.available,
+            location_id=row.location_id,
+            location_code=row.location_code,
+            location_type=row.location_type,
+            sector=row.sector,
         )
         for row in rows
     ]
