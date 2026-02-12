@@ -16,6 +16,8 @@ import {
 type User = {
   id: string
   name: string
+  username: string
+  full_name?: string | null
   role: Role
   permissions: PermissionKey[]
 }
@@ -44,6 +46,7 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 const DEFAULT_USER: User = {
   id: 'mock-user',
   name: 'Operator',
+  username: 'operator',
   role: 'warehouse_admin',
   permissions: ROLE_PERMISSIONS.warehouse_admin,
 }
@@ -65,7 +68,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const me = await getMe()
           setUser({
             id: me.id,
-            name: me.username,
+            name: me.full_name || me.username,
+            username: me.username,
+            full_name: me.full_name,
             role: me.role as Role,
             permissions: normalizePermissions(me.permissions),
           })
@@ -120,7 +125,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const me = await getMe()
     const nextUser = {
       id: me.id,
-      name: me.username,
+      name: me.full_name || me.username,
+      username: me.username,
+      full_name: me.full_name,
       role: me.role as Role,
       permissions: normalizePermissions(me.permissions),
     }

@@ -52,7 +52,7 @@ export function PickerInventoryDetailPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 px-4">
-        <AppHeader title={t('inventory.title')} onBack={() => navigate(-1)} />
+        <AppHeader title={t('inventory.title')} onBack={() => navigate(-1)} hideUserMenu />
         <div className="space-y-4">
           <div className="h-32 animate-pulse rounded-2xl bg-slate-200" />
           <div className="h-24 animate-pulse rounded-2xl bg-slate-200" />
@@ -64,7 +64,7 @@ export function PickerInventoryDetailPage() {
   if (error || !data) {
     return (
       <div className="min-h-screen bg-slate-50 px-4">
-        <AppHeader title={t('inventory.title')} onBack={() => navigate(-1)} />
+        <AppHeader title={t('inventory.title')} onBack={() => navigate(-1)} hideUserMenu />
         <EmptyState
           icon={<Boxes size={32} />}
           title={error ?? t('inventory.no_results')}
@@ -77,7 +77,7 @@ export function PickerInventoryDetailPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 pb-6 dark:bg-slate-950">
-      <AppHeader title={data.name} onBack={() => navigate(-1)} />
+      <AppHeader title={data.name} onBack={() => navigate(-1)} hideUserMenu />
       <Card className="mb-4">
         <div className="text-lg font-medium text-slate-900 dark:text-slate-100">{data.name}</div>
         {data.main_barcode && (

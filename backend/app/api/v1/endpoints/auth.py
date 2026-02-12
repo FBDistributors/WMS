@@ -31,6 +31,7 @@ class TokenResponse(BaseModel):
 class MeResponse(BaseModel):
     id: UUID
     username: str
+    full_name: Optional[str] = None
     role: str
     permissions: list[str]
 
@@ -79,6 +80,7 @@ async def me(current_user: User = Depends(get_current_user)):
     return MeResponse(
         id=current_user.id,
         username=current_user.username,
+        full_name=current_user.full_name,
         role=current_user.role,
         permissions=get_permissions_for_role(current_user.role),
     )

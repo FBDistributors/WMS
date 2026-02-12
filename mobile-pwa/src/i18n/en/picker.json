@@ -37,5 +37,11 @@
     "title": "Scan barcode",
     "close": "Close",
     "unknown": "Barcode not recognized"
+  },
+  "profile": {
+    "title": "Profile",
+    "username": "Username",
+    "phone": "Phone number",
+    "settings_section": "Settings"
   }
 }

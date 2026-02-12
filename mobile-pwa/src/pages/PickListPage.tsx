@@ -42,7 +42,7 @@ export function PickListPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 px-4">
-        <AppHeader title={t('list_title')} onRefresh={load} />
+        <AppHeader title={t('list_title')} onRefresh={load} hideUserMenu />
         <div className="space-y-4">
           <div className="h-12 w-full animate-pulse rounded-2xl bg-slate-200" />
           <div className="h-24 w-full animate-pulse rounded-2xl bg-slate-200" />
@@ -57,6 +57,7 @@ export function PickListPage() {
       <AppHeader
         title={t('list_title')}
         onRefresh={load}
+        hideUserMenu
         actionSlot={
           <Link
             to="/picker/inventory"

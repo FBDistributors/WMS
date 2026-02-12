@@ -41,6 +41,7 @@ export function ControllerProductDetailPage() {
       <AppHeader
         title={product?.name ?? t('products.detail')}
         onBack={() => navigate('/controller/products')}
+        hideUserMenu
       />
       <div className="w-full max-w-xl mx-auto px-4 sm:px-6 min-w-0 pb-8">
         {loading ? (

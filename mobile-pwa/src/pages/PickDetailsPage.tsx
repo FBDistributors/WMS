@@ -70,7 +70,7 @@ export function PickDetailsPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 px-4">
-        <AppHeader title={t('details_title')} onBack={() => navigate(-1)} />
+        <AppHeader title={t('details_title')} onBack={() => navigate(-1)} hideUserMenu />
         <div className="space-y-4">
           <div className="h-20 w-full animate-pulse rounded-2xl bg-slate-200" />
           <div className="h-24 w-full animate-pulse rounded-2xl bg-slate-200" />
@@ -83,7 +83,7 @@ export function PickDetailsPage() {
   if (!data || error) {
     return (
       <div className="min-h-screen bg-slate-50 px-4">
-        <AppHeader title={t('details_title')} onBack={() => navigate(-1)} />
+        <AppHeader title={t('details_title')} onBack={() => navigate(-1)} hideUserMenu />
         <EmptyState
           icon={<PackageSearch size={32} />}
           title={error ?? t('document_not_found')}
@@ -101,6 +101,7 @@ export function PickDetailsPage() {
       <AppHeader
         title={t('document_number', { number: data.document_no })}
         onBack={() => navigate(-1)}
+        hideUserMenu
       />
       <div className="rounded-2xl bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between text-sm text-slate-600">

@@ -5,6 +5,7 @@ const TOKEN_KEY = 'wms_token'
 export type AuthUser = {
   id: string
   username: string
+  full_name?: string | null
   role: string
   permissions: string[]
 }

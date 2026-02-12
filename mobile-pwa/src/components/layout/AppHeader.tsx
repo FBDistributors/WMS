@@ -13,9 +13,11 @@ type AppHeaderProps = {
   onBack?: () => void
   onRefresh?: () => void
   actionSlot?: ReactNode
+  /** Hide user/account icon (for Picker/Controller - use profile page instead) */
+  hideUserMenu?: boolean
 }
 
-export function AppHeader({ title, onBack, onRefresh, actionSlot }: AppHeaderProps) {
+export function AppHeader({ title, onBack, onRefresh, actionSlot, hideUserMenu }: AppHeaderProps) {
   const { t } = useTranslation('common')
   const { user, logout } = useAuth()
   const navigate = useNavigate()
@@ -46,8 +48,8 @@ export function AppHeader({ title, onBack, onRefresh, actionSlot }: AppHeaderPro
               <RefreshCcw size={18} />
             </Button>
           ) : null}
-          {/* User Profile & Logout (like Admin) */}
-          {user ? (
+          {/* User Profile & Logout (hidden for Picker/Controller - use profile page) */}
+          {user && !hideUserMenu ? (
             <div className="relative">
               <Button
                 variant="ghost"

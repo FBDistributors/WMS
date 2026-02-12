@@ -21,7 +21,7 @@ export function PickCompletePage() {
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 pb-10">
-      <AppHeader title={t('complete_title')} onBack={() => navigate(-1)} />
+      <AppHeader title={t('complete_title')} onBack={() => navigate(-1)} hideUserMenu />
       <div className="flex flex-col items-center gap-4 rounded-2xl bg-white p-6 text-center shadow-sm">
         <CheckCircle2 size={48} className="text-green-600" />
         <div className="text-xl font-semibold text-slate-900">{t('complete_success')}</div>

@@ -62,7 +62,7 @@ export function PickerHomePage() {
 
   return (
     <div className="min-h-screen w-full min-w-0 overflow-x-hidden bg-slate-50 dark:bg-slate-950">
-      <AppHeader title={t('home.title')} />
+      <AppHeader title={t('home.title')} hideUserMenu />
       <div className="w-full max-w-xl mx-auto px-4 sm:px-6 min-w-0">
       {offlineMode && (
         <div className="mb-3 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">

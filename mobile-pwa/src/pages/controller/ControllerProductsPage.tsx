@@ -47,6 +47,7 @@ export function ControllerProductsPage() {
     <div className="min-h-screen w-full min-w-0 overflow-x-hidden bg-slate-50 dark:bg-slate-950">
       <AppHeader
         title={locationFilter ? `${t('products.title')} – ${locationFilter}` : t('products.title')}
+        hideUserMenu
       />
       <div className="w-full max-w-xl mx-auto px-4 sm:px-6 min-w-0 pb-nav">
         <div className="mb-4 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800">

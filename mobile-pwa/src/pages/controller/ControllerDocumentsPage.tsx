@@ -42,7 +42,7 @@ export function ControllerDocumentsPage() {
 
   return (
     <div className="min-h-screen w-full min-w-0 overflow-x-hidden bg-slate-50 dark:bg-slate-950">
-      <AppHeader title={t('documents.title')} onRefresh={() => window.location.reload()} />
+      <AppHeader title={t('documents.title')} onRefresh={() => window.location.reload()} hideUserMenu />
       <div className="w-full max-w-xl mx-auto px-4 sm:px-6 min-w-0 pb-nav">
         {loading ? (
           <div className="space-y-3">

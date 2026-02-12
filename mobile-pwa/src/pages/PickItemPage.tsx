@@ -107,7 +107,7 @@ export function PickItemPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 px-4">
-        <AppHeader title={t('item_title')} onBack={() => navigate(-1)} />
+        <AppHeader title={t('item_title')} onBack={() => navigate(-1)} hideUserMenu />
         <div className="h-40 w-full animate-pulse rounded-2xl bg-slate-200" />
       </div>
     )
@@ -116,7 +116,7 @@ export function PickItemPage() {
   if (!line || error) {
     return (
       <div className="min-h-screen bg-slate-50 px-4">
-        <AppHeader title={t('item_title')} onBack={() => navigate(-1)} />
+        <AppHeader title={t('item_title')} onBack={() => navigate(-1)} hideUserMenu />
         <EmptyState
           title={error ?? t('item_not_found')}
           actionLabel={t('refresh')}
@@ -128,7 +128,7 @@ export function PickItemPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 pb-10">
-      <AppHeader title={t('item_title')} onBack={() => navigate(-1)} />
+      <AppHeader title={t('item_title')} onBack={() => navigate(-1)} hideUserMenu />
 
       <div className="mb-4 space-y-3">
         <ScanInput onScan={handleScan} placeholder={t('scan_placeholder')} />

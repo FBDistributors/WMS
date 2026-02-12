@@ -10,7 +10,7 @@ export function PickerSettingsPage() {
 
   return (
     <div className="min-h-screen w-full bg-slate-50 dark:bg-slate-950">
-      <AppHeader title={t('home.settings')} />
+      <AppHeader title={t('home.settings')} hideUserMenu />
       <div className="w-full max-w-xl mx-auto px-4 sm:px-6">
         <div className="space-y-4">
           <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
