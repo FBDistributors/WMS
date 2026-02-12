@@ -35,8 +35,8 @@ export function PickerBottomNav({ onScanClick }: PickerBottomNavProps) {
   }
 
   return (
-    <nav className="relative flex-shrink-0 border-t border-slate-200 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
-      <div className="flex items-center justify-around px-2 sm:px-4 pb-safe pt-2 max-w-lg mx-auto">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 flex-shrink-0 border-t border-slate-200 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
+      <div className="flex items-center justify-around px-2 sm:px-4 pb-safe pt-2 max-w-xl mx-auto">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon
           const isActive = !item.isScan && location.pathname === item.path

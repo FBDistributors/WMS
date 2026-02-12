@@ -95,8 +95,8 @@ export function ControllerLayout({ children }: ControllerLayoutProps) {
   )
 
   return (
-    <div className="flex flex-col h-dvh max-h-dvh overflow-hidden w-full max-w-xl mx-auto min-w-0">
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden min-w-0">
+    <div className="flex flex-col min-h-dvh h-dvh max-h-dvh overflow-hidden w-full max-w-xl mx-auto min-w-0">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden min-w-0 pb-24">
         {children}
       </div>
       <ControllerBottomNav onScanClick={() => setScanOpen(true)} />
