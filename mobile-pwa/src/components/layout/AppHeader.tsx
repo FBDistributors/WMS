@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react'
 
-import { ArrowLeft, RefreshCcw } from 'lucide-react'
+import { ArrowLeft, LogOut, RefreshCcw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { Button } from '../ui/button'
+import { useAuth } from '../../rbac/AuthProvider'
 
 type AppHeaderProps = {
   title: string
@@ -13,6 +15,14 @@ type AppHeaderProps = {
 
 export function AppHeader({ title, onBack, onRefresh, actionSlot }: AppHeaderProps) {
   const { t } = useTranslation('common')
+  const { logout } = useAuth()
+  const navigate = useNavigate()
+
+  const handleLogout = async () => {
+    await logout()
+    navigate('/login')
+  }
+
   return (
     <header className="sticky top-0 z-10 -mx-4 mb-4 bg-slate-50/95 px-4 py-3 backdrop-blur">
       <div className="flex items-center justify-between gap-3">
@@ -31,6 +41,14 @@ export function AppHeader({ title, onBack, onRefresh, actionSlot }: AppHeaderPro
               <RefreshCcw size={18} />
             </Button>
           ) : null}
+          <Button
+            variant="ghost"
+            onClick={handleLogout}
+            aria-label={t('logout')}
+            title={t('logout')}
+          >
+            <LogOut size={18} />
+          </Button>
         </div>
       </div>
     </header>
