@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 
 import { Button } from '../components/ui/button'
 import { Card } from '../components/ui/card'
+import { LanguageSwitcher } from '../components/LanguageSwitcher'
 import { useAuth } from '../rbac/AuthProvider'
 import { BRAND } from '../config/branding'
 import { getHomeRouteForRole } from '../rbac/routes'
@@ -63,7 +64,10 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 px-4 dark:bg-slate-950">
+    <div className="relative flex min-h-screen flex-col items-center justify-center bg-slate-50 px-4 dark:bg-slate-950">
+      <div className="absolute right-4 top-4">
+        <LanguageSwitcher compact />
+      </div>
       <div className="mb-8 flex flex-col items-center gap-4">
         <img src={BRAND.logoIcon} alt="" className="h-20 w-auto object-contain sm:h-24" aria-hidden />
         <span className="text-center text-lg font-semibold tracking-tight text-slate-800 dark:text-slate-200 sm:text-xl">{BRAND.name}</span>
