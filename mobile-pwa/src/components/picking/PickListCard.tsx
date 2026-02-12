@@ -47,9 +47,8 @@ export function PickListCard({ item, onClick, onCancel, isCancelling }: PickList
             <Button
               type="button"
               variant="outline"
-              size="sm"
               disabled={isCancelling}
-              className="mt-2 w-fit border-red-200 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/30"
+              className="mt-2 w-fit px-3 py-2 text-xs border-red-200 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/30"
               onClick={(e) => {
                 e.stopPropagation()
                 onCancel(e)
