@@ -1,0 +1,20 @@
+{
+  "inventory": {
+    "title": "Инвентарь",
+    "search_placeholder": "Поиск по названию или SKU",
+    "scan": "Сканировать",
+    "no_results": "Результаты не найдены",
+    "best_location": "Место",
+    "available": "В наличии",
+    "expiry": "Срок годности",
+    "more_locations": "Другие места",
+    "full_details": "Подробнее",
+    "offline_warning": "Данные могут быть устаревшими",
+    "load_error": "Ошибка загрузки"
+  },
+  "scan": {
+    "title": "Сканировать штрихкод",
+    "close": "Закрыть",
+    "unknown": "Штрихкод не распознан"
+  }
+}

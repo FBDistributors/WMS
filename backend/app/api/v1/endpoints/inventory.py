@@ -11,6 +11,8 @@ from sqlalchemy import case, distinct, exists, func, select
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user, require_permission
+
+from app.api.v1.endpoints import picker_inventory
 from app.db import get_db
 from app.models.location import Location as LocationModel
 from app.models.product import Product as ProductModel
@@ -501,3 +503,6 @@ async def list_stock_balances(
         )
         for row in rows
     ]
+
+
+router.include_router(picker_inventory.router)

@@ -5,6 +5,7 @@ import commonUz from './uz/common.json'
 import authUz from './uz/auth.json'
 import adminUz from './uz/admin.json'
 import pickingUz from './uz/picking.json'
+import pickerUz from './uz/picker.json'
 import productsUz from './uz/products.json'
 import ordersUz from './uz/orders.json'
 import locationsUz from './uz/locations.json'
@@ -17,6 +18,7 @@ import commonEn from './en/common.json'
 import authEn from './en/auth.json'
 import adminEn from './en/admin.json'
 import pickingEn from './en/picking.json'
+import pickerEn from './en/picker.json'
 import productsEn from './en/products.json'
 import ordersEn from './en/orders.json'
 import locationsEn from './en/locations.json'
@@ -29,6 +31,7 @@ import commonRu from './ru/common.json'
 import authRu from './ru/auth.json'
 import adminRu from './ru/admin.json'
 import pickingRu from './ru/picking.json'
+import pickerRu from './ru/picker.json'
 import productsRu from './ru/products.json'
 import ordersRu from './ru/orders.json'
 import locationsRu from './ru/locations.json'
@@ -52,6 +55,7 @@ i18n.use(initReactI18next).init({
       auth: authUz,
       admin: adminUz,
       picking: pickingUz,
+      picker: pickerUz,
       products: productsUz,
       orders: ordersUz,
       locations: locationsUz,
@@ -65,6 +69,7 @@ i18n.use(initReactI18next).init({
       auth: authEn,
       admin: adminEn,
       picking: pickingEn,
+      picker: pickerEn,
       products: productsEn,
       orders: ordersEn,
       locations: locationsEn,
@@ -78,6 +83,7 @@ i18n.use(initReactI18next).init({
       auth: authRu,
       admin: adminRu,
       picking: pickingRu,
+      picker: pickerRu,
       products: productsRu,
       orders: ordersRu,
       locations: locationsRu,
@@ -93,7 +99,7 @@ i18n.use(initReactI18next).init({
   fallbackLng: 'en',
   supportedLngs: SUPPORTED_LANGS,
   defaultNS: 'common',
-    ns: ['common', 'auth', 'admin', 'picking', 'products', 'orders', 'locations', 'receiving', 'inventory', 'brands', 'users'],
+    ns: ['common', 'auth', 'admin', 'picking', 'picker', 'products', 'orders', 'locations', 'receiving', 'inventory', 'brands', 'users'],
   interpolation: {
     escapeValue: false,
   },

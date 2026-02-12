@@ -1,0 +1,20 @@
+{
+  "inventory": {
+    "title": "Inventory",
+    "search_placeholder": "Search by product name or SKU",
+    "scan": "Scan",
+    "no_results": "No results found",
+    "best_location": "Location",
+    "available": "Available",
+    "expiry": "Expiry",
+    "more_locations": "More locations",
+    "full_details": "Full details",
+    "offline_warning": "Data may be outdated",
+    "load_error": "Load error"
+  },
+  "scan": {
+    "title": "Scan barcode",
+    "close": "Close",
+    "unknown": "Barcode not recognized"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "inventory": {
+    "title": "Inventar",
+    "search_placeholder": "Mahsulot nomi yoki SKU bo'yicha qidirish",
+    "scan": "Skanner",
+    "no_results": "Natija topilmadi",
+    "best_location": "Joy",
+    "available": "Mavjud",
+    "expiry": "Muddati",
+    "more_locations": "Boshqa joylar",
+    "full_details": "To'liq tafsilotlar",
+    "offline_warning": "Ma'lumot eski bo'lishi mumkin",
+    "load_error": "Yuklashda xato"
+  },
+  "scan": {
+    "title": "Barkod skanerlash",
+    "close": "Yopish",
+    "unknown": "Barkod aniqlanmadi"
+  }
+}

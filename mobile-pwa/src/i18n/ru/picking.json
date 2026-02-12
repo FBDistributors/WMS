@@ -61,6 +61,7 @@
   "picked": "Подобрано",
   "time": "Время",
   "back_to_list": "Назад к спискам",
+  "inventory_link": "Инвентарь",
   "status": {
     "new": "Новый",
     "in_progress": "В процессе",

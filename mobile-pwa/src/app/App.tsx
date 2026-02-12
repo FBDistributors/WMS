@@ -26,6 +26,8 @@ import { PickCompletePage } from '../pages/PickCompletePage'
 import { PickDetailsPage } from '../pages/PickDetailsPage'
 import { PickItemPage } from '../pages/PickItemPage'
 import { PickListPage } from '../pages/PickListPage'
+import { PickerInventoryPage } from '../pages/picker/PickerInventoryPage'
+import { PickerInventoryDetailPage } from '../pages/picker/PickerInventoryDetailPage'
 import { LoginPage } from '../pages/LoginPage'
 import { NotAuthorizedPage as AppNotAuthorizedPage } from '../pages/NotAuthorizedPage'
 
@@ -77,6 +79,22 @@ export function App() {
           element={
             <RequireRoleOrPermission permission="picking:read">
               <PickCompletePage />
+            </RequireRoleOrPermission>
+          }
+        />
+        <Route
+          path="/picker/inventory"
+          element={
+            <RequireRoleOrPermission permissions={['picking:read', 'inventory:read']}>
+              <PickerInventoryPage />
+            </RequireRoleOrPermission>
+          }
+        />
+        <Route
+          path="/picker/inventory/:productId"
+          element={
+            <RequireRoleOrPermission permissions={['picking:read', 'inventory:read']}>
+              <PickerInventoryDetailPage />
             </RequireRoleOrPermission>
           }
         />

@@ -61,6 +61,7 @@
   "picked": "Terilgan",
   "time": "Vaqt",
   "back_to_list": "Pick listga qaytish",
+  "inventory_link": "Inventar",
   "status": {
     "new": "Yangi",
     "in_progress": "Jarayonda",

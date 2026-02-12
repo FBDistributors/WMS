@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Search, RefreshCcw, Boxes } from 'lucide-react'
+import { useNavigate, Link } from 'react-router-dom'
+import { Search, Boxes, Package } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AppHeader } from '../components/layout/AppHeader'
 import { PickListCard } from '../components/picking/PickListCard'
 import { EmptyState } from '../components/ui/EmptyState'
-import { Button } from '../components/ui/button'
 import { listPickLists, type PickList } from '../services/pickingApi'
 
 export function PickListPage() {
@@ -59,9 +58,13 @@ export function PickListPage() {
         title={t('list_title')}
         onRefresh={load}
         actionSlot={
-          <Button variant="ghost" onClick={load} aria-label={t('refresh')}>
-            <RefreshCcw size={18} />
-          </Button>
+          <Link
+            to="/picker/inventory"
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-sm text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+          >
+            <Package size={18} />
+            <span className="hidden sm:inline">{t('inventory_link')}</span>
+          </Link>
         }
       />
       <div className="mb-4 flex items-center gap-2 rounded-2xl bg-white px-3 py-2 shadow-sm">

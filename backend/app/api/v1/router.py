@@ -11,6 +11,7 @@ from app.api.v1.endpoints import (
     products,
     receiving,
     reports,
+    scanner,
     users,
 )
 
@@ -27,3 +28,4 @@ router.include_router(picking.router, prefix="/picking", tags=["picking"])
 router.include_router(products.router, prefix="/products", tags=["products"])
 router.include_router(integrations.router, prefix="/integrations", tags=["integrations"])
 router.include_router(users.router, prefix="/users", tags=["users"])
+router.include_router(scanner.router, prefix="/scanner", tags=["scanner"])
