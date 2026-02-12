@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon-180x180.png', 'pwa-192x192.png', 'pwa-512x512.png'],
+      includeAssets: ['favicon.ico', 'apple-touch-icon-180x180.png', 'logo-icon.png', 'pwa-192x192.png', 'pwa-512x512.png'],
       manifest: {
         name: 'FB DISTRIBUTORS GROUP',
         short_name: 'FB',

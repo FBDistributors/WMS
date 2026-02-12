@@ -64,9 +64,9 @@ export function LoginPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 px-4 dark:bg-slate-950">
-      <div className="mb-6 flex flex-col items-center gap-2">
-        <img src={BRAND.logoMain} alt={BRAND.name} className="h-16 w-auto object-contain" />
-        <span className="text-center text-sm font-medium text-slate-600 dark:text-slate-400">{BRAND.name}</span>
+      <div className="mb-6 flex flex-col items-center gap-3">
+        <img src={BRAND.logoIcon} alt="" className="h-14 w-auto object-contain" aria-hidden />
+        <span className="text-center text-base font-semibold tracking-tight text-slate-800 dark:text-slate-200">{BRAND.name}</span>
       </div>
       <Card className="w-full max-w-sm p-6">
         <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{t('title')}</h1>

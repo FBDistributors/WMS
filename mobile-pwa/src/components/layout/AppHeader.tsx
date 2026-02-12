@@ -35,7 +35,7 @@ export function AppHeader({ title, onBack, onRefresh, actionSlot }: AppHeaderPro
               <ArrowLeft size={18} />
             </Button>
           ) : (
-            <img src={BRAND.logoMain} alt="" className="h-8 w-auto object-contain" aria-hidden />
+            <img src={BRAND.logoIcon} alt="" className="h-8 w-auto object-contain" aria-hidden />
           )}
           <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{title}</h1>
         </div>
