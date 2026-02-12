@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon-180x180.png', 'logo-icon.png', 'pwa-192x192.png', 'pwa-512x512.png'],
       manifest: {
-        name: 'FB DISTRIBUTORS GROUP',
-        short_name: 'FB',
+        name: 'FB Warehouse',
+        short_name: 'FB Warehouse',
         description: 'Warehouse Management System',
         theme_color: '#1e40af',
         background_color: '#f8fafc',
