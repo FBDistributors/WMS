@@ -8,6 +8,7 @@
   "load_failed": "Не удалось загрузить остатки.",
   "empty": "Остатков нет",
   "empty_desc": "Остатки появятся после приёмки.",
+  "enter_stock": "Ввести остаток",
   "empty_details": "Детали не найдены",
   "empty_details_desc": "Измените фильтры, чтобы увидеть детали.",
   "movements_empty": "Движений не найдено",
@@ -30,6 +31,7 @@
   "filters": {
     "apply": "Применить",
     "only_available": "Только доступные",
+    "all_products": "Все товары (Smartup)",
     "low_stock": "Порог низкого остатка",
     "location": "Локация",
     "all_locations": "Все локации",

@@ -117,7 +117,7 @@ class InventorySummaryWithLocationRow(BaseModel):
     brand: Optional[str] = None
     on_hand: Decimal
     available: Decimal
-    location_id: UUID
+    location_id: Optional[UUID] = None
     location_code: str
     location_type: Optional[str] = None
     sector: Optional[str] = None
@@ -485,6 +485,10 @@ async def inventory_summary_by_location(
     search: Optional[str] = None,
     product_ids: Optional[str] = Query(default=None, description="Comma-separated product UUIDs"),
     only_available: bool = Query(False),
+    include_all_products: bool = Query(
+        False,
+        description="Include Smartup products with zero stock (for entering qoldiq/location)",
+    ),
     db: Session = Depends(get_db),
     _user=Depends(require_permission("inventory:read")),
 ):
@@ -540,7 +544,7 @@ async def inventory_summary_by_location(
         query = query.having(available_expr > 0)
 
     rows = query.order_by(ProductModel.sku.asc(), LocationModel.code.asc()).all()
-    return [
+    result = [
         InventorySummaryWithLocationRow(
             product_id=row.product_id,
             product_code=row.product_code,
@@ -555,6 +559,42 @@ async def inventory_summary_by_location(
         )
         for row in rows
     ]
+
+    if include_all_products:
+        products_query = db.query(
+            ProductModel.id,
+            ProductModel.sku,
+            ProductModel.name,
+            ProductModel.brand,
+        )
+        if search:
+            products_query = _apply_product_search(products_query, search)
+        if product_ids:
+            ids = [UUID(t.strip()) for t in product_ids.split(",") if t.strip()]
+            if ids:
+                products_query = products_query.filter(ProductModel.id.in_(ids))
+        products_query = products_query.order_by(ProductModel.sku.asc())
+        all_products = products_query.all()
+        have_stock_ids = {r.product_id for r in rows}
+        for p in all_products:
+            if p.id not in have_stock_ids:
+                result.append(
+                    InventorySummaryWithLocationRow(
+                        product_id=p.id,
+                        product_code=p.sku,
+                        name=p.name,
+                        brand=p.brand or None,
+                        on_hand=Decimal("0"),
+                        available=Decimal("0"),
+                        location_id=None,
+                        location_code="—",
+                        location_type=None,
+                        sector=None,
+                    )
+                )
+        result.sort(key=lambda r: (r.product_code, r.location_code or ""))
+
+    return result
 
 
 @router.get("/balances", response_model=List[StockBalanceOut], summary="List stock balances")

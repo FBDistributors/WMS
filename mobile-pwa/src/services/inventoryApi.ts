@@ -34,7 +34,7 @@ export type InventorySummaryWithLocationRow = {
   brand?: string | null
   on_hand: number
   available: number
-  location_id: string
+  location_id?: string | null
   location_code: string
   location_type?: string | null
   sector?: string | null
@@ -88,6 +88,8 @@ export type InventorySummaryByLocationQuery = {
   search?: string
   product_ids?: string[]
   only_available?: boolean
+  /** Include Smartup products with zero stock (barcha mahsulotlar, qoldiq kiritish uchun) */
+  include_all_products?: boolean
 }
 
 export async function getInventorySummaryByLocation(query: InventorySummaryByLocationQuery = {}) {
@@ -96,6 +98,7 @@ export async function getInventorySummaryByLocation(query: InventorySummaryByLoc
       search: query.search,
       product_ids: query.product_ids?.join(','),
       only_available: query.only_available,
+      include_all_products: query.include_all_products,
     },
   })
 }

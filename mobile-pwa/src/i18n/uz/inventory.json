@@ -8,6 +8,7 @@
   "load_failed": "Qoldiq ma'lumotlari yuklanmadi.",
   "empty": "Qoldiq topilmadi",
   "empty_desc": "Qabul qilingandan keyin qoldiq paydo bo‘ladi.",
+  "enter_stock": "Qoldiq kiritish",
   "empty_details": "Tafsilotlar topilmadi",
   "empty_details_desc": "Filtrlarni o‘zgartirib ko‘ring.",
   "movements_empty": "Harakatlar topilmadi",
@@ -30,6 +31,7 @@
   "filters": {
     "apply": "Qo‘llash",
     "only_available": "Faqat mavjud",
+    "all_products": "Barcha mahsulotlar (Smartup)",
     "low_stock": "Past qoldiq chegarasi",
     "location": "Joylashuv",
     "all_locations": "Barcha joylar",

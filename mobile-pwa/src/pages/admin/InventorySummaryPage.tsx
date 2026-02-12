@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Search, ChevronDown, ChevronRight } from 'lucide-react'
+import { useNavigate, Link } from 'react-router-dom'
+import { Search, ChevronDown, ChevronRight, PackagePlus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -53,6 +53,7 @@ export function InventorySummaryPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState('')
   const [onlyAvailable, setOnlyAvailable] = useState(false)
+  const [includeAllProducts, setIncludeAllProducts] = useState(true)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -63,6 +64,7 @@ export function InventorySummaryPage() {
       const data = await getInventorySummaryByLocation({
         search: search.trim() || undefined,
         only_available: onlyAvailable,
+        include_all_products: includeAllProducts,
       })
       setRows(data)
     } catch (err) {
@@ -70,7 +72,7 @@ export function InventorySummaryPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [onlyAvailable, search, t])
+  }, [includeAllProducts, onlyAvailable, search, t])
 
   useEffect(() => {
     void load()
@@ -167,7 +169,17 @@ export function InventorySummaryPage() {
                       {hasMultiple && !isExpanded
                         ? `${group.locations.length} ${t('inventory:columns.locations')}`
                         : group.locations.length === 1
-                          ? group.locations[0].location_code
+                          ? (group.locations[0].location_code === '—' || !group.locations[0].location_id
+                              ? (
+                                  <Link
+                                    to="/admin/receiving"
+                                    state={{ productId: group.product_id }}
+                                    className="text-blue-600 hover:underline dark:text-blue-400"
+                                  >
+                                    {t('inventory:enter_stock')}
+                                  </Link>
+                                )
+                              : group.locations[0].location_code)
                           : null}
                     </td>
                     <td className="px-4 py-3 text-slate-500">
@@ -227,12 +239,27 @@ export function InventorySummaryPage() {
           <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
             <input
               type="checkbox"
+              checked={includeAllProducts}
+              onChange={(event) => setIncludeAllProducts(event.target.checked)}
+            />
+            {t('inventory:filters.all_products')}
+          </label>
+          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+            <input
+              type="checkbox"
               checked={onlyAvailable}
               onChange={(event) => setOnlyAvailable(event.target.checked)}
             />
             {t('inventory:filters.only_available')}
           </label>
           <Button onClick={load}>{t('inventory:filters.apply')}</Button>
+          <Link
+            to="/admin/receiving"
+            className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-200 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+          >
+            <PackagePlus size={18} />
+            {t('inventory:enter_stock')}
+          </Link>
         </div>
       </Card>
       <Card className="space-y-4">{content}</Card>
