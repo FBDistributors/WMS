@@ -12,6 +12,7 @@
   "empty_desc": "Create the first location to build a hierarchy.",
   "show_inactive": "Show inactive",
   "inactive": "Inactive",
+  "sector": "Sector",
   "no_parent": "No parent",
   "validation": {
     "required": "Code and name are required."

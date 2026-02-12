@@ -109,6 +109,16 @@ export function LocationsPage() {
             <span className="rounded-xl bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-300">
               {t(`locations:types.${node.type}`)}
             </span>
+            {node.location_type ? (
+              <span className="rounded-xl bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
+                {node.location_type}
+              </span>
+            ) : null}
+            {node.sector ? (
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                {t('locations:sector')}: {node.sector}
+              </span>
+            ) : null}
             {!node.is_active ? (
               <span className="rounded-xl bg-red-50 px-2 py-0.5 text-xs text-red-500 dark:bg-red-500/10">
                 {t('locations:inactive')}

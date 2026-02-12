@@ -12,6 +12,7 @@
   "empty_desc": "Ierarxiyani yaratish uchun birinchi joylashuvni qo‘shing.",
   "show_inactive": "Faol emaslarni ko‘rsatish",
   "inactive": "Faol emas",
+  "sector": "Sektor",
   "no_parent": "Ota yo‘q",
   "validation": {
     "required": "Kod va nom majburiy."
