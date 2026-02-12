@@ -227,7 +227,7 @@ export function OrdersPage() {
     }
 
     return (
-      <div className="overflow-x-auto">
+      <div className="min-w-0 overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead className="text-xs uppercase text-slate-500">
             <tr className="border-b border-slate-200 dark:border-slate-800">

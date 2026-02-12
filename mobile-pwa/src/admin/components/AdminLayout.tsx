@@ -68,8 +68,13 @@ export function AdminLayout({ title, actionSlot, children }: AdminLayoutProps) {
           </div>
         </div>
       ) : null}
-      <div className={['flex flex-1 flex-col', isCollapsed ? 'md:pl-20' : 'md:pl-64'].join(' ')}>
-        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
+      <div
+        className={[
+          'flex min-w-0 flex-1 flex-col overflow-x-hidden',
+          isCollapsed ? 'md:pl-20' : 'md:pl-64',
+        ].join(' ')}
+      >
+        <header className="sticky top-0 z-10 flex shrink-0 items-center justify-between border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
           <div className="flex items-center gap-2">
             <Button variant="ghost" className="md:hidden" onClick={() => setIsOpen(true)}>
               <Menu size={18} />
@@ -144,7 +149,7 @@ export function AdminLayout({ title, actionSlot, children }: AdminLayoutProps) {
             ) : null}
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto px-6 py-6">{children}</main>
+        <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-6 py-6">{children}</main>
       </div>
     </div>
   )
