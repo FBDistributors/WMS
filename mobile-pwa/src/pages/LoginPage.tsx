@@ -69,8 +69,7 @@ export function LoginPage() {
         <span className="text-center text-lg font-semibold tracking-tight text-slate-800 dark:text-slate-200 sm:text-xl">{BRAND.name}</span>
       </div>
       <Card className="w-full max-w-sm p-6">
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{t('title')}</h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('subtitle')}</p>
+        <h1 className="mb-4 text-center text-xl font-semibold text-slate-900 dark:text-slate-100">{t('login')}</h1>
         {sessionExpiredMessage ? (
           <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
             {sessionExpiredMessage}
