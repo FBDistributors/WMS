@@ -16,7 +16,9 @@
     "inventory": "Inventar",
     "inventory_desc": "Mahsulotlar va joylar",
     "offline_queue": "Offline navbat",
-    "offline_queue_desc": "Sinxronlash kutilmoqda"
+    "offline_queue_desc": "Sinxronlash kutilmoqda",
+    "account": "Hisob",
+    "settings": "Sozlamalar"
   },
   "inventory": {
     "title": "Inventar",

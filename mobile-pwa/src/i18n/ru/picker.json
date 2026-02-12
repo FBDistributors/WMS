@@ -16,7 +16,9 @@
     "inventory": "Инвентарь",
     "inventory_desc": "Товары и места",
     "offline_queue": "Оффлайн очередь",
-    "offline_queue_desc": "Ожидает синхронизации"
+    "offline_queue_desc": "Ожидает синхронизации",
+    "account": "Аккаунт",
+    "settings": "Настройки"
   },
   "inventory": {
     "title": "Инвентарь",

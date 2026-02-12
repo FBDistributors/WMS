@@ -30,6 +30,7 @@ import { PickerLayout } from '../components/picker/PickerLayout'
 import { PickerHomePage } from '../pages/picker/PickerHomePage'
 import { PickerInventoryPage } from '../pages/picker/PickerInventoryPage'
 import { PickerInventoryDetailPage } from '../pages/picker/PickerInventoryDetailPage'
+import { PickerSettingsPage } from '../pages/picker/PickerSettingsPage'
 import { LoginPage } from '../pages/LoginPage'
 import { NotAuthorizedPage as AppNotAuthorizedPage } from '../pages/NotAuthorizedPage'
 
@@ -112,6 +113,16 @@ export function App() {
             <RequireRoleOrPermission permissions={['picking:read', 'inventory:read']}>
               <PickerLayout>
                 <PickerInventoryDetailPage />
+              </PickerLayout>
+            </RequireRoleOrPermission>
+          }
+        />
+        <Route
+          path="/picker/settings"
+          element={
+            <RequireRoleOrPermission permissions={['picking:read', 'inventory:read']}>
+              <PickerLayout>
+                <PickerSettingsPage />
               </PickerLayout>
             </RequireRoleOrPermission>
           }

@@ -16,7 +16,9 @@
     "inventory": "Inventory",
     "inventory_desc": "Products and locations",
     "offline_queue": "Offline queue",
-    "offline_queue_desc": "Pending sync"
+    "offline_queue_desc": "Pending sync",
+    "account": "Account",
+    "settings": "Settings"
   },
   "inventory": {
     "title": "Inventory",
