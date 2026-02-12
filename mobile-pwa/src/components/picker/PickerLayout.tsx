@@ -93,8 +93,10 @@ export function PickerLayout({ children }: PickerLayoutProps) {
   )
 
   return (
-    <div className="min-h-screen pb-nav w-full max-w-xl mx-auto">
-      {children}
+    <div className="flex flex-col h-screen overflow-hidden w-full max-w-xl mx-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        {children}
+      </div>
       <PickerBottomNav onScanClick={() => setScanOpen(true)} />
       <ScanModal open={scanOpen} onClose={() => setScanOpen(false)} onScanned={handleScanned} />
     </div>
