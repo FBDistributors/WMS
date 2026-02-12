@@ -147,3 +147,11 @@ export async function completePick(documentId: string) {
     method: 'POST',
   })
 }
+
+/** Cancel a picking document (e.g. test docs). Requires documents:edit_status. */
+export async function cancelPickList(documentId: string) {
+  return fetchJSON<{ id: string; status: string }>(`/api/v1/documents/${documentId}`, {
+    method: 'PATCH',
+    body: { status: 'cancelled' },
+  })
+}

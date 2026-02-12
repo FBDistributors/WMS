@@ -62,6 +62,10 @@
   "time": "Time",
   "back_to_list": "Back to pick list",
   "inventory_link": "Inventory",
+  "cancel_document": "Cancel document",
+  "cancel_confirm": "Cancel document {{doc}}? It will be removed from the list.",
+  "cancel_error": "Failed to cancel. Try again.",
+  "cancelling": "Cancelling...",
   "status": {
     "new": "New",
     "in_progress": "In progress",

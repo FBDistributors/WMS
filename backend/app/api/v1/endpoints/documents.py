@@ -258,3 +258,31 @@ async def get_document(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     return _to_document(doc)
+
+
+class DocumentStatusUpdate(BaseModel):
+    status: Literal["cancelled"]
+
+
+@router.patch("/{document_id}", response_model=DocumentListItem, summary="Update document status (cancel)")
+async def update_document_status(
+    document_id: UUID,
+    payload: DocumentStatusUpdate,
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("documents:edit_status")),
+):
+    """Cancel a document (e.g. test picking). Only transition to cancelled is allowed."""
+    doc = (
+        db.query(DocumentModel)
+        .options(selectinload(DocumentModel.lines))
+        .filter(DocumentModel.id == document_id)
+        .one_or_none()
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if payload.status != "cancelled":
+        raise HTTPException(status_code=400, detail="Only status 'cancelled' is allowed")
+    doc.status = "cancelled"
+    db.commit()
+    db.refresh(doc)
+    return _to_list_item(doc)

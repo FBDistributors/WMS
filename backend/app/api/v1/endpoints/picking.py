@@ -135,13 +135,16 @@ async def get_picking_document(
 async def list_picking_documents(
     limit: int = 50,
     offset: int = 0,
+    include_cancelled: bool = False,
     db: Session = Depends(get_db),
     user=Depends(require_permission("picking:read")),
 ):
     query = db.query(DocumentModel).options(selectinload(DocumentModel.lines))
     if user.role == "picker":
         query = query.filter(DocumentModel.assigned_to_user_id == user.id)
-    docs = query.offset(offset).limit(limit).all()
+    if not include_cancelled:
+        query = query.filter(DocumentModel.status != "cancelled")
+    docs = query.order_by(DocumentModel.created_at.desc()).offset(offset).limit(limit).all()
     return [_to_picking_list_item(doc) for doc in docs]
 
 

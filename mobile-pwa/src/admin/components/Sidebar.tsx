@@ -80,7 +80,7 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
         <Link to="/admin" className="flex items-center gap-2" onClick={onNavigate}>
           <img src={BRAND.logoIcon} alt="" className="h-9 w-auto shrink-0 object-contain" aria-hidden />
           {!collapsed && (
-            <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{BRAND.shortName}</span>
+            <span className="text-sm font-semibold leading-tight text-slate-900 dark:text-slate-100">{BRAND.name}</span>
           )}
         </Link>
         <Button
