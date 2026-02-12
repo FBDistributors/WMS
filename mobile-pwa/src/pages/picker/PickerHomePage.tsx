@@ -1,10 +1,9 @@
-import { useCallback, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Scan, ClipboardList, Package, WifiOff } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { ClipboardList, Package, WifiOff } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AppHeader } from '../../components/layout/AppHeader'
-import { ScanModal } from '../../components/picker/ScanModal'
 import { resolveBarcode } from '../../services/scannerApi'
 import { getInventoryByBarcode } from '../../services/pickerInventoryApi'
 import { getBarcodeCache, setBarcodeCache } from '../../lib/barcodeCache'
@@ -14,7 +13,7 @@ type ScanResult = 'idle' | 'product' | 'location' | 'unknown' | 'loading'
 export function PickerHomePage() {
   const { t } = useTranslation('picker')
   const navigate = useNavigate()
-  const [scanOpen, setScanOpen] = useState(false)
+  const location = useLocation()
   const [resultState, setResultState] = useState<ScanResult>('idle')
   const [resultData, setResultData] = useState<{
     product?: { product_id: string; name: string; barcode: string | null; locations: { location_code: string; available_qty: number }[]; fefo_lots: { batch_no: string; expiry_date: string | null; available_qty: number }[]; total_available: number }
@@ -23,88 +22,37 @@ export function PickerHomePage() {
   } | null>(null)
   const [offlineMode, setOfflineMode] = useState(false)
 
-  const handleScanned = useCallback(
-    async (barcode: string) => {
-      setScanOpen(false)
-      setResultState('loading')
-      setResultData(null)
-      setOfflineMode(false)
-
-      try {
-        const resolveRes = await resolveBarcode(barcode)
-        if (resolveRes.type === 'PRODUCT' && resolveRes.product) {
-          try {
-            const inv = await getInventoryByBarcode(barcode)
-            setBarcodeCache(barcode, inv)
-            setResultState('product')
-            setResultData({
-              product: {
-                product_id: inv.product_id,
-                name: inv.name,
-                barcode: inv.barcode,
-                locations: inv.best_locations.map((l) => ({
-                  location_code: l.location_code,
-                  available_qty: l.available_qty,
-                })),
-                fefo_lots: inv.fefo_lots.map((l) => ({
-                  batch_no: l.batch_no,
-                  expiry_date: l.expiry_date,
-                  available_qty: l.available_qty,
-                })),
-                total_available: inv.total_available,
-              },
-            })
-          } catch (err) {
-            const cached = getBarcodeCache(barcode)
-            if (cached) {
-              setOfflineMode(true)
-              setResultState('product')
-            setResultData({
-              product: {
-                product_id: cached.product_id,
-                name: cached.name,
-                barcode: cached.barcode,
-                locations: cached.best_locations,
-                fefo_lots: cached.fefo_lots,
-                total_available: cached.total_available,
-              },
-            })
-            } else {
-              setResultState('unknown')
-              setResultData({ message: t('scan.unknown') })
-            }
-          }
-        } else if (resolveRes.type === 'LOCATION' && resolveRes.location) {
-          setResultState('location')
-          setResultData({ location: { code: resolveRes.location.code } })
-          navigate(`/picker/inventory?location=${resolveRes.entity_id}`)
-        } else {
-          setResultState('unknown')
-          setResultData({ message: resolveRes.message ?? t('scan.unknown') })
-        }
-      } catch {
-        const cached = getBarcodeCache(barcode)
-        if (cached) {
-          setOfflineMode(true)
-          setResultState('product')
-            setResultData({
-              product: {
-                product_id: cached.product_id,
-                name: cached.name,
-                barcode: cached.barcode,
-                locations: cached.best_locations,
-                fefo_lots: cached.fefo_lots,
-                total_available: cached.total_available,
-              },
-            })
-        } else {
-          setResultState('unknown')
-          setResultData({ message: t('inventory.load_error') })
-        }
+  // Read scan result from navigation state (from PickerLayout scan flow)
+  useEffect(() => {
+    const state = location.state as { scanResult?: { product?: unknown; offline?: boolean }; scanError?: string } | null
+    if (state?.scanResult?.product) {
+      const p = state.scanResult.product as {
+        product_id: string
+        name: string
+        barcode: string | null
+        locations: { location_code: string; available_qty: number }[]
+        fefo_lots: { batch_no: string; expiry_date: string | null; available_qty: number }[]
+        total_available: number
       }
-    },
-    [navigate, t]
-  )
+      setResultState('product')
+      setResultData({
+        product: {
+          product_id: p.product_id,
+          name: p.name,
+          barcode: p.barcode,
+          locations: p.locations,
+          fefo_lots: p.fefo_lots,
+          total_available: p.total_available,
+        },
+      })
+      setOfflineMode(Boolean(state.scanResult.offline))
+      navigate(location.pathname, { replace: true, state: {} })
+    } else if (state?.scanError) {
+      setResultState('unknown')
+      setResultData({ message: state.scanError === 'unknown' ? t('scan.unknown') : t('inventory.load_error') })
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [location.state, location.pathname, navigate, t])
 
   const formatExpiry = (d: string | null) => {
     if (!d) return '—'
@@ -116,39 +64,27 @@ export function PickerHomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 pb-6 dark:bg-slate-950">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <AppHeader title={t('home.title')} />
       {offlineMode && (
-        <div className="mb-3 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+        <div className="mx-4 mb-3 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
           <WifiOff size={16} />
           {t('home.offline_warning')}
         </div>
       )}
 
-      {/* Center Scan Button */}
-      <div className="flex flex-col items-center py-12">
-        <button
-          type="button"
-          onClick={() => setScanOpen(true)}
-          className="flex h-32 w-32 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg transition hover:bg-blue-700 active:scale-95"
-          aria-label={t('home.scan_button')}
-        >
-          <Scan size={48} />
-        </button>
-        <p className="mt-4 text-lg font-medium text-slate-700 dark:text-slate-300">
-          {t('home.scan_button')}
-        </p>
-      </div>
+      {/* Dashboard - main content area */}
+      <div className="px-4">
 
-      {/* Result Card */}
-      {resultState === 'loading' && (
+        {/* Result Card */}
+        {resultState === 'loading' && (
         <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
           <div className="h-6 w-2/3 animate-pulse rounded bg-slate-200" />
           <div className="mt-3 h-4 w-full animate-pulse rounded bg-slate-200" />
         </div>
-      )}
+        )}
 
-      {resultState === 'product' && resultData?.product && (
+        {resultState === 'product' && resultData?.product && (
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
           <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
             {resultData.product.name}
@@ -207,62 +143,79 @@ export function PickerHomePage() {
             </button>
           </div>
         </div>
-      )}
+        )}
 
-      {resultState === 'unknown' && resultData?.message && (
+        {resultState === 'unknown' && resultData?.message && (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950">
           <div className="font-medium text-red-800 dark:text-red-200">{resultData.message}</div>
-          <button
-            type="button"
-            onClick={() => setScanOpen(true)}
-            className="mt-3 rounded-xl bg-red-600 px-4 py-2 text-sm text-white"
-          >
+            <button
+              type="button"
+              onClick={() => { setResultState('idle'); setResultData(null); }}
+              className="mt-3 rounded-xl bg-red-600 px-4 py-2 text-sm text-white"
+            >
             {t('home.retry')}
           </button>
         </div>
-      )}
+        )}
 
-      {/* Quick Links */}
-      <div className="mt-8 space-y-3">
+        {/* Dashboard - Quick Links */}
+        <div className="mt-4 space-y-2">
         <button
           type="button"
           onClick={() => navigate('/picking/mobile-pwa')}
-          className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+          className="flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"
         >
-          <ClipboardList size={24} className="text-slate-500" />
-          <div className="text-left">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-700">
+            <ClipboardList size={20} className="text-slate-600 dark:text-slate-300" />
+          </div>
+          <div className="flex-1 text-left">
             <div className="font-medium text-slate-900 dark:text-slate-100">
               {t('home.my_pick_tasks')}
             </div>
+            <div className="text-sm text-slate-500 dark:text-slate-400">
+              {t('home.pick_tasks_desc')}
+            </div>
           </div>
+          <span className="text-slate-400">›</span>
         </button>
         <button
           type="button"
           onClick={() => navigate('/picker/inventory')}
-          className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+          className="flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"
         >
-          <Package size={24} className="text-slate-500" />
-          <div className="text-left">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-700">
+            <Package size={20} className="text-slate-600 dark:text-slate-300" />
+          </div>
+          <div className="flex-1 text-left">
             <div className="font-medium text-slate-900 dark:text-slate-100">
               {t('home.inventory')}
             </div>
+            <div className="text-sm text-slate-500 dark:text-slate-400">
+              {t('home.inventory_desc')}
+            </div>
           </div>
+          <span className="text-slate-400">›</span>
         </button>
         <button
           type="button"
           onClick={() => navigate('/offline-queue')}
-          className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+          className="flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"
         >
-          <WifiOff size={24} className="text-slate-500" />
-          <div className="text-left">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-700">
+            <WifiOff size={20} className="text-slate-600 dark:text-slate-300" />
+          </div>
+          <div className="flex-1 text-left">
             <div className="font-medium text-slate-900 dark:text-slate-100">
               {t('home.offline_queue')}
             </div>
+            <div className="text-sm text-slate-500 dark:text-slate-400">
+              {t('home.offline_queue_desc')}
+            </div>
           </div>
+          <span className="text-slate-400">›</span>
         </button>
+        </div>
       </div>
-
-      <ScanModal open={scanOpen} onClose={() => setScanOpen(false)} onScanned={handleScanned} />
     </div>
   )
 }

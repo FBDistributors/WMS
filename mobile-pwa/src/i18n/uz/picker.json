@@ -1,6 +1,8 @@
 {
   "home": {
     "title": "Picker",
+    "asosiy": "Asosiy",
+    "pick_tasks": "Pick listlar",
     "scan_button": "Skaner",
     "offline_warning": "Offline – ma'lumot eski bo'lishi mumkin",
     "locations": "Joylar",
@@ -10,8 +12,11 @@
     "view_details": "Tafsilotlar",
     "retry": "Qayta urinish",
     "my_pick_tasks": "Mening pick vazifalarim",
+    "pick_tasks_desc": "Terish uchun hujjatlar",
     "inventory": "Inventar",
-    "offline_queue": "Offline navbat"
+    "inventory_desc": "Mahsulotlar va joylar",
+    "offline_queue": "Offline navbat",
+    "offline_queue_desc": "Sinxronlash kutilmoqda"
   },
   "inventory": {
     "title": "Inventar",

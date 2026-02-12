@@ -1,6 +1,8 @@
 {
   "home": {
     "title": "Picker",
+    "asosiy": "Home",
+    "pick_tasks": "Pick lists",
     "scan_button": "Scan",
     "offline_warning": "Offline – data may be outdated",
     "locations": "Locations",
@@ -10,8 +12,11 @@
     "view_details": "View Details",
     "retry": "Retry",
     "my_pick_tasks": "My pick tasks",
+    "pick_tasks_desc": "Documents for picking",
     "inventory": "Inventory",
-    "offline_queue": "Offline queue"
+    "inventory_desc": "Products and locations",
+    "offline_queue": "Offline queue",
+    "offline_queue_desc": "Pending sync"
   },
   "inventory": {
     "title": "Inventory",

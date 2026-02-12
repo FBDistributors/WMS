@@ -26,6 +26,7 @@ import { PickCompletePage } from '../pages/PickCompletePage'
 import { PickDetailsPage } from '../pages/PickDetailsPage'
 import { PickItemPage } from '../pages/PickItemPage'
 import { PickListPage } from '../pages/PickListPage'
+import { PickerLayout } from '../components/picker/PickerLayout'
 import { PickerHomePage } from '../pages/picker/PickerHomePage'
 import { PickerInventoryPage } from '../pages/picker/PickerInventoryPage'
 import { PickerInventoryDetailPage } from '../pages/picker/PickerInventoryDetailPage'
@@ -55,7 +56,9 @@ export function App() {
           path="/picker"
           element={
             <RequireRoleOrPermission permissions={['picking:read', 'inventory:read']}>
-              <PickerHomePage />
+              <PickerLayout>
+                <PickerHomePage />
+              </PickerLayout>
             </RequireRoleOrPermission>
           }
         />
@@ -63,7 +66,9 @@ export function App() {
           path="/picking/mobile-pwa"
           element={
             <RequireRoleOrPermission permission="picking:read">
-              <PickListPage />
+              <PickerLayout>
+                <PickListPage />
+              </PickerLayout>
             </RequireRoleOrPermission>
           }
         />
@@ -95,7 +100,9 @@ export function App() {
           path="/picker/inventory"
           element={
             <RequireRoleOrPermission permissions={['picking:read', 'inventory:read']}>
-              <PickerInventoryPage />
+              <PickerLayout>
+                <PickerInventoryPage />
+              </PickerLayout>
             </RequireRoleOrPermission>
           }
         />
@@ -103,7 +110,9 @@ export function App() {
           path="/picker/inventory/:productId"
           element={
             <RequireRoleOrPermission permissions={['picking:read', 'inventory:read']}>
-              <PickerInventoryDetailPage />
+              <PickerLayout>
+                <PickerInventoryDetailPage />
+              </PickerLayout>
             </RequireRoleOrPermission>
           }
         />
