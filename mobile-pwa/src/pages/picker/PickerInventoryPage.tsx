@@ -11,10 +11,10 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import {
   listPickerInventory,
   listPickerLocations,
-  resolveBarcode,
   type PickerInventoryItem,
   type PickerLocationOption,
 } from '../../services/pickerInventoryApi'
+import { resolveBarcode } from '../../services/scannerApi'
 import { getPickerInventoryCache, setPickerInventoryCache } from '../../lib/pickerInventoryCache'
 import { getExpiryColorClass } from '../../utils/expiry'
 import type { ApiError } from '../../services/apiClient'
@@ -48,7 +48,7 @@ export function PickerInventoryPage() {
   const [error, setError] = useState<string | null>(null)
   const [scanOpen, setScanOpen] = useState(false)
   const [offlineMode, setOfflineMode] = useState(false)
-  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [, setNextCursor] = useState<string | null>(null)
 
   const load = useCallback(async (overrides?: { q?: string; location_id?: string }) => {
     setIsLoading(true)
