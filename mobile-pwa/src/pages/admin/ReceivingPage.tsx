@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -30,6 +31,7 @@ const EMPTY_LINE: LineDraft = {
 
 export function ReceivingPage() {
   const { t } = useTranslation(['receiving', 'common'])
+  const navigate = useNavigate()
   const { has } = useAuth()
   const canWrite = has('receiving:write')
 
@@ -141,12 +143,23 @@ export function ReceivingPage() {
   return (
     <AdminLayout title={t('receiving:title')}>
       <Card className="space-y-4">
-        <div>
-          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            {t('receiving:create_title')}
-          </div>
-          <div className="text-sm text-slate-500 dark:text-slate-400">
-            {t('receiving:create_subtitle')}
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variant="ghost"
+            className="-ml-2 shrink-0 gap-2"
+            onClick={() => navigate(-1)}
+            aria-label={t('common:buttons.back')}
+          >
+            <ArrowLeft size={20} />
+            <span>{t('common:buttons.back')}</span>
+          </Button>
+          <div>
+            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              {t('receiving:create_title')}
+            </div>
+            <div className="text-sm text-slate-500 dark:text-slate-400">
+              {t('receiving:create_subtitle')}
+            </div>
           </div>
         </div>
         {error ? (
