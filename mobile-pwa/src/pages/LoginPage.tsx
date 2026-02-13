@@ -94,7 +94,7 @@ export function LoginPage() {
           <div className="relative">
             <input
               type={showPassword ? 'text' : 'password'}
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 pr-10 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              className="w-full appearance-none rounded-xl border border-slate-200 px-3 py-2 pr-10 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 [&::-ms-reveal]:hidden [&::-ms-clear]:hidden"
               placeholder={t('password_placeholder')}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
