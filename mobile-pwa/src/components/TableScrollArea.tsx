@@ -1,9 +1,5 @@
 import type { ReactNode } from 'react'
-import { useRef } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
-
-import { Button } from './ui/button'
+import { useEffect, useRef, useState } from 'react'
 
 type TableScrollAreaProps = {
   children: ReactNode
@@ -11,37 +7,71 @@ type TableScrollAreaProps = {
 }
 
 export function TableScrollArea({ children, className }: TableScrollAreaProps) {
-  const { t } = useTranslation('common')
   const scrollRef = useRef<HTMLDivElement>(null)
+  const stripRef = useRef<HTMLDivElement>(null)
+  const [contentWidth, setContentWidth] = useState(0)
+  const isSyncing = useRef(false)
+
+  // Jadval kontenti kengligini strip uchun yangilash
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const updateWidth = () => {
+      setContentWidth(el.scrollWidth)
+    }
+    updateWidth()
+    const ro = new ResizeObserver(updateWidth)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [children])
+
+  // Jadval va sticky strip scrollLeft ni sinxronlash
+  useEffect(() => {
+    const table = scrollRef.current
+    const strip = stripRef.current
+    if (!table || !strip) return
+
+    const syncTableToStrip = () => {
+      if (isSyncing.current) return
+      isSyncing.current = true
+      strip.scrollLeft = table.scrollLeft
+      requestAnimationFrame(() => {
+        isSyncing.current = false
+      })
+    }
+    const syncStripToTable = () => {
+      if (isSyncing.current) return
+      isSyncing.current = true
+      table.scrollLeft = strip.scrollLeft
+      requestAnimationFrame(() => {
+        isSyncing.current = false
+      })
+    }
+
+    table.addEventListener('scroll', syncTableToStrip)
+    strip.addEventListener('scroll', syncStripToTable)
+    return () => {
+      table.removeEventListener('scroll', syncTableToStrip)
+      strip.removeEventListener('scroll', syncStripToTable)
+    }
+  }, [])
 
   return (
-    <>
+    <div className="min-w-0">
       <div
         ref={scrollRef}
-        className={`min-w-0 overflow-x-scroll overflow-y-hidden ${className ?? ''}`}
-        style={{ scrollbarGutter: 'stable' }}
+        className={`overflow-x-scroll overflow-y-hidden ${className ?? ''}`}
       >
         {children}
       </div>
-      <div className="flex items-center justify-center gap-3 border-t border-slate-200 bg-slate-50/80 py-2.5 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
-        <Button
-          variant="ghost"
-          className="p-2"
-          onClick={() => scrollRef.current?.scrollBy({ left: -200 })}
-          aria-label={t('scroll_left')}
-        >
-          <ChevronLeft size={18} />
-        </Button>
-        <span>{t('scroll_horizontal')}</span>
-        <Button
-          variant="ghost"
-          className="p-2"
-          onClick={() => scrollRef.current?.scrollBy({ left: 200 })}
-          aria-label={t('scroll_right')}
-        >
-          <ChevronRight size={18} />
-        </Button>
+      {/* Pastda doim ko‘rinadigan sticky gorizontal scrollbar — sahifa oxiriga tushmasdan yon surish */}
+      <div
+        ref={stripRef}
+        className="sticky bottom-0 z-10 mt-1 h-3 min-w-0 overflow-x-scroll overflow-y-hidden border-t border-slate-200 bg-slate-100/90 dark:border-slate-700 dark:bg-slate-800/90"
+        aria-hidden
+      >
+        <div style={{ width: contentWidth, height: 1, minWidth: '100%' }} />
       </div>
-    </>
+    </div>
   )
 }
