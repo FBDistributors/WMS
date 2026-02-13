@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Button } from '../../components/ui/button'
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { LanguageSwitcher } from '../../components/LanguageSwitcher'
 import { useAuth } from '../../rbac/AuthProvider'
 import { useTheme } from '../../theme/ThemeProvider'
@@ -23,6 +24,7 @@ export function AdminLayout({ title, actionSlot, children }: AdminLayoutProps) {
     return window.localStorage.getItem('wms_sidebar_collapsed') === 'true'
   })
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
   const { user, setRole, isMock, logout } = useAuth()
   const { theme, setTheme } = useTheme()
@@ -30,6 +32,8 @@ export function AdminLayout({ title, actionSlot, children }: AdminLayoutProps) {
   const navigate = useNavigate()
 
   const handleLogout = async () => {
+    setShowLogoutConfirm(false)
+    setShowUserMenu(false)
     await logout()
     navigate('/login')
   }
@@ -151,7 +155,10 @@ export function AdminLayout({ title, actionSlot, children }: AdminLayoutProps) {
                         </div>
                       </div>
                       <button
-                        onClick={handleLogout}
+                        onClick={() => {
+                          setShowUserMenu(false)
+                          setShowLogoutConfirm(true)
+                        }}
                         className="flex w-full items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
                       >
                         <LogOut size={16} />
@@ -166,6 +173,16 @@ export function AdminLayout({ title, actionSlot, children }: AdminLayoutProps) {
         </header>
         <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-6 py-6">{children}</main>
       </div>
+      <ConfirmDialog
+        open={showLogoutConfirm}
+        title={t('common:logout_confirm_title')}
+        message={t('common:logout_confirm_message')}
+        confirmLabel={t('common:logout')}
+        cancelLabel={t('common:buttons.cancel')}
+        onConfirm={handleLogout}
+        onCancel={() => setShowLogoutConfirm(false)}
+        variant="danger"
+      />
     </div>
   )
 }

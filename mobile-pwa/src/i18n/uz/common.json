@@ -57,6 +57,8 @@
   },
   "user_menu": "Foydalanuvchi menyusi",
   "logout": "Chiqish",
+  "logout_confirm_title": "Chiqishni tasdiqlash",
+  "logout_confirm_message": "Hisobdan chiqmoqchimisiz?",
   "roles": {
     "picker": "Yig'uvchi",
     "receiver": "Qabul qiluvchi",

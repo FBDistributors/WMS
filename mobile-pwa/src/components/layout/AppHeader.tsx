@@ -6,6 +6,7 @@ import { BRAND } from '../../config/branding'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../ui/button'
+import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { useAuth } from '../../rbac/AuthProvider'
 
 type AppHeaderProps = {
@@ -22,8 +23,11 @@ export function AppHeader({ title, onBack, onRefresh, actionSlot, hideUserMenu }
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
   const handleLogout = async () => {
+    setShowLogoutConfirm(false)
+    setShowUserMenu(false)
     await logout()
     navigate('/login')
   }
@@ -76,7 +80,10 @@ export function AppHeader({ title, onBack, onRefresh, actionSlot, hideUserMenu }
                       </div>
                     </div>
                     <button
-                      onClick={handleLogout}
+                      onClick={() => {
+                        setShowUserMenu(false)
+                        setShowLogoutConfirm(true)
+                      }}
                       className="flex w-full items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
                     >
                       <LogOut size={16} />
@@ -89,6 +96,16 @@ export function AppHeader({ title, onBack, onRefresh, actionSlot, hideUserMenu }
           ) : null}
         </div>
       </div>
+      <ConfirmDialog
+        open={showLogoutConfirm}
+        title={t('logout_confirm_title')}
+        message={t('logout_confirm_message')}
+        confirmLabel={t('logout')}
+        cancelLabel={t('buttons.cancel')}
+        onConfirm={handleLogout}
+        onCancel={() => setShowLogoutConfirm(false)}
+        variant="danger"
+      />
     </header>
   )
 }

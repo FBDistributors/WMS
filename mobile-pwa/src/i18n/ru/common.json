@@ -57,6 +57,8 @@
   },
   "user_menu": "Меню пользователя",
   "logout": "Выйти",
+  "logout_confirm_title": "Подтвердите выход",
+  "logout_confirm_message": "Вы уверены, что хотите выйти?",
   "roles": {
     "picker": "Комплектовщик",
     "receiver": "Приёмщик",

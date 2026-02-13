@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { User, LogOut, Settings } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AppHeader } from '../../components/layout/AppHeader'
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { useAuth } from '../../rbac/AuthProvider'
 import { useTheme } from '../../theme/ThemeProvider'
 import { LanguageSwitcher } from '../../components/LanguageSwitcher'
@@ -12,8 +14,10 @@ export function ControllerProfilePage() {
   const { user, logout } = useAuth()
   const { theme, setTheme } = useTheme()
   const navigate = useNavigate()
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
   const handleLogout = async () => {
+    setShowLogoutConfirm(false)
     await logout()
     navigate('/login')
   }
@@ -90,7 +94,7 @@ export function ControllerProfilePage() {
         <div className="mt-6">
           <button
             type="button"
-            onClick={handleLogout}
+            onClick={() => setShowLogoutConfirm(true)}
             className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 transition hover:bg-red-100 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300 dark:hover:bg-red-900/50"
           >
             <LogOut size={18} />
@@ -98,6 +102,16 @@ export function ControllerProfilePage() {
           </button>
         </div>
       </div>
+      <ConfirmDialog
+        open={showLogoutConfirm}
+        title={t('common:logout_confirm_title')}
+        message={t('common:logout_confirm_message')}
+        confirmLabel={t('common:logout')}
+        cancelLabel={t('common:buttons.cancel')}
+        onConfirm={handleLogout}
+        onCancel={() => setShowLogoutConfirm(false)}
+        variant="danger"
+      />
     </div>
   )
 }
