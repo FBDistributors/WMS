@@ -27,6 +27,9 @@
   "qr_column": "QR",
   "qr_download": "QR yuklab olish",
   "qr_label_title": "Joylashuv QR kodi",
+  "delete_all": "Barcha joylashuvlarni o'chirish",
+  "delete_all_confirm": "Barcha joylashuvlarni faolsizlantirish?",
+  "delete_all_yes": "Ha, barchasini",
   "no_parent": "Ota yo'q",
   "validation": {
     "required": "Kod va nom majburiy.",

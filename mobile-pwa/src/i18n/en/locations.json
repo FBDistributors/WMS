@@ -27,6 +27,9 @@
   "qr_column": "QR",
   "qr_download": "QR download",
   "qr_label_title": "Location QR code",
+  "delete_all": "Delete all locations",
+  "delete_all_confirm": "Deactivate all locations?",
+  "delete_all_yes": "Yes, deactivate all",
   "no_parent": "No parent",
   "validation": {
     "required": "Code and name are required.",

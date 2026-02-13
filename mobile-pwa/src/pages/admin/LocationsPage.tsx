@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Download, Plus, Printer, QrCode, X } from 'lucide-react'
+import { Download, Pencil, Plus, Printer, QrCode, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import JsBarcode from 'jsbarcode'
 import QRCode from 'qrcode'
@@ -16,27 +16,6 @@ import {
   type Location,
   type LocationTypeEnum,
 } from '../../services/locationsApi'
-
-/** Small QR thumbnail for table cell. */
-function LocationQrThumbnail({ value, size = 40 }: { value: string; size?: number }) {
-  const [dataUrl, setDataUrl] = useState<string | null>(null)
-  useEffect(() => {
-    if (!value) return
-    QRCode.toDataURL(value, { width: size, margin: 1 })
-      .then(setDataUrl)
-      .catch(() => {})
-  }, [value, size])
-  if (!dataUrl) return <span className="text-slate-400">—</span>
-  return (
-    <img
-      src={dataUrl}
-      alt=""
-      className="inline-block rounded border border-slate-200 dark:border-slate-700"
-      width={size}
-      height={size}
-    />
-  )
-}
 
 /** Live preview of code from structured fields (same formula as backend). */
 function previewCode(
@@ -74,6 +53,8 @@ export function LocationsPage() {
   const [createdForBarcode, setCreatedForBarcode] = useState<Location | null>(null)
   const [locationForQr, setLocationForQr] = useState<Location | null>(null)
   const [includeInactive, setIncludeInactive] = useState(false)
+  const [deleteAllConfirm, setDeleteAllConfirm] = useState(false)
+  const [isDeletingAll, setIsDeletingAll] = useState(false)
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -121,9 +102,6 @@ export function LocationsPage() {
                 {t('locations:fields.code')}
               </th>
               <th className="pb-2 pr-4 font-semibold text-slate-700 dark:text-slate-300">
-                {t('locations:qr_column')}
-              </th>
-              <th className="pb-2 pr-4 font-semibold text-slate-700 dark:text-slate-300">
                 {t('locations:type_label')}
               </th>
               <th className="pb-2 pr-4 font-semibold text-slate-700 dark:text-slate-300">
@@ -151,9 +129,6 @@ export function LocationsPage() {
               <tr key={loc.id} className="border-b border-slate-100 dark:border-slate-800">
                 <td className="py-2 pr-4 font-medium text-slate-900 dark:text-slate-100">
                   {loc.code}
-                </td>
-                <td className="py-2 pr-4 align-middle">
-                  <LocationQrThumbnail value={loc.barcode_value || loc.code} size={44} />
                 </td>
                 <td className="py-2 pr-4 text-slate-600 dark:text-slate-400">
                   {loc.location_type ?? '—'}
@@ -184,8 +159,9 @@ export function LocationsPage() {
                     variant="ghost"
                     className="py-1.5 px-2 text-xs"
                     onClick={() => setDialog({ open: true, mode: 'edit', target: loc })}
+                    aria-label={t('locations:edit')}
                   >
-                    {t('locations:edit')}
+                    <Pencil size={14} />
                   </Button>
                   <Button
                     variant="ghost"
@@ -236,14 +212,62 @@ export function LocationsPage() {
               {t('locations:subtitle')}
             </div>
           </div>
-          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-            <input
-              type="checkbox"
-              checked={includeInactive}
-              onChange={(e) => setIncludeInactive(e.target.checked)}
-            />
-            {t('locations:show_inactive')}
-          </label>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+              <input
+                type="checkbox"
+                checked={includeInactive}
+                onChange={(e) => setIncludeInactive(e.target.checked)}
+              />
+              {t('locations:show_inactive')}
+            </label>
+            {deleteAllConfirm ? (
+              <span className="flex items-center gap-2 text-sm">
+                <span className="text-slate-600 dark:text-slate-400">
+                  {t('locations:delete_all_confirm')}
+                </span>
+                <Button
+                  variant="danger"
+                  className="gap-1 text-xs"
+                  disabled={isDeletingAll}
+                  onClick={async () => {
+                    setIsDeletingAll(true)
+                    try {
+                      const all = await getLocations(true)
+                      const active = all.filter((l) => l.is_active)
+                      for (const loc of active) {
+                        await deactivateLocation(loc.id)
+                      }
+                      setDeleteAllConfirm(false)
+                      await load()
+                    } finally {
+                      setIsDeletingAll(false)
+                    }
+                  }}
+                >
+                  <Trash2 size={14} />
+                  {t('locations:delete_all_yes')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="text-xs"
+                  disabled={isDeletingAll}
+                  onClick={() => setDeleteAllConfirm(false)}
+                >
+                  {t('common:buttons.cancel')}
+                </Button>
+              </span>
+            ) : (
+              <Button
+                variant="ghost"
+                className="gap-1 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10"
+                onClick={() => setDeleteAllConfirm(true)}
+              >
+                <Trash2 size={16} />
+                {t('locations:delete_all')}
+              </Button>
+            )}
+          </div>
         </div>
         {content}
       </Card>
