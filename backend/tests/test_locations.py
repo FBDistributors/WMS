@@ -39,14 +39,14 @@ def auth_headers(client: TestClient, admin_user: User) -> dict:
 
 
 def test_create_rack_location_works(client: TestClient, auth_headers: dict):
-    """Creating a Rack location S-15-01-02 works and returns location_type RACK."""
+    """Creating a Rack location via sector/level_no/row_no generates code S-15-01-02."""
     r = client.post(
         "/api/v1/locations",
         json={
-            "code": "S-15-01-02",
-            "name": "Rack 15 Level 1 Row 2",
-            "type": "rack",
             "location_type": "RACK",
+            "sector": "15",
+            "level_no": 1,
+            "row_no": 2,
             "is_active": True,
         },
         headers=auth_headers,
@@ -56,20 +56,19 @@ def test_create_rack_location_works(client: TestClient, auth_headers: dict):
     assert data["code"] == "S-15-01-02"
     assert data["location_type"] == "RACK"
     assert data["sector"] == "15"
-    assert data["level"] == 1
+    assert data["level_no"] == 1
     assert data["row_no"] == 2
     assert data["pallet_no"] is None
 
 
 def test_create_floor_location_works(client: TestClient, auth_headers: dict):
-    """Creating a Floor location P-AS-02 works and returns location_type FLOOR."""
+    """Creating a Floor location via sector/pallet_no generates code P-AS-02."""
     r = client.post(
         "/api/v1/locations",
         json={
-            "code": "P-AS-02",
-            "name": "Floor pallet AS 02",
-            "type": "rack",
             "location_type": "FLOOR",
+            "sector": "AS",
+            "pallet_no": 2,
             "is_active": True,
         },
         headers=auth_headers,
@@ -79,20 +78,20 @@ def test_create_floor_location_works(client: TestClient, auth_headers: dict):
     assert data["code"] == "P-AS-02"
     assert data["location_type"] == "FLOOR"
     assert data["sector"] == "AS"
-    assert data["level"] is None
+    assert data["level_no"] is None
     assert data["row_no"] is None
     assert data["pallet_no"] == 2
 
 
 def test_create_location_duplicate_code_fails(client: TestClient, auth_headers: dict):
-    """Duplicate location code returns 409."""
+    """Duplicate location code (same sector/level/row) returns 400."""
     r1 = client.post(
         "/api/v1/locations",
         json={
-            "code": "S-10-01-01",
-            "name": "Rack 10",
-            "type": "rack",
             "location_type": "RACK",
+            "sector": "10",
+            "level_no": 1,
+            "row_no": 1,
             "is_active": True,
         },
         headers=auth_headers,
@@ -101,14 +100,15 @@ def test_create_location_duplicate_code_fails(client: TestClient, auth_headers: 
     r2 = client.post(
         "/api/v1/locations",
         json={
-            "code": "S-10-01-01",
-            "name": "Duplicate",
-            "type": "rack",
+            "location_type": "RACK",
+            "sector": "10",
+            "level_no": 1,
+            "row_no": 1,
             "is_active": True,
         },
         headers=auth_headers,
     )
-    assert r2.status_code == 409
+    assert r2.status_code == 400
     assert "already exists" in r2.json().get("detail", "").lower()
 
 
@@ -187,3 +187,39 @@ def test_inventory_summary_by_location_shows_product_per_location(
     by_code = {row["location_code"]: row for row in product_rows}
     assert by_code["S-1-01-01"]["available"] == 5
     assert by_code["P-X-01"]["available"] == 3
+
+
+def test_receiving_rejects_invalid_location(client: TestClient, auth_headers: dict, db_session: Session):
+    """Receiving with invalid or missing location_id returns 400."""
+    from uuid import uuid4
+
+    from app.models.product import Product
+
+    product = Product(
+        external_source="test",
+        external_id="ext-rcv",
+        name="Product Rcv",
+        sku="SKU-RCV",
+        is_active=True,
+    )
+    db_session.add(product)
+    db_session.commit()
+    db_session.refresh(product)
+
+    # Non-existent location_id
+    r = client.post(
+        "/api/v1/receiving/receipts",
+        json={
+            "lines": [
+                {
+                    "product_id": str(product.id),
+                    "qty": 1,
+                    "batch": "B1",
+                    "location_id": str(uuid4()),
+                }
+            ]
+        },
+        headers=auth_headers,
+    )
+    assert r.status_code == 400
+    assert "location" in r.json().get("detail", "").lower()

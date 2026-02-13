@@ -41,6 +41,28 @@ def validate_location_code_format(code: str, location_type: str | None) -> None:
     return None
 
 
+def generate_location_code(
+    location_type: str,
+    sector: str,
+    level_no: int | None = None,
+    row_no: int | None = None,
+    pallet_no: int | None = None,
+) -> str:
+    """Generate location code from structured fields. Raises ValueError if invalid."""
+    sector = (sector or "").strip()
+    if not sector:
+        raise ValueError("sector is required")
+    if location_type == "RACK":
+        if level_no is None or row_no is None:
+            raise ValueError("level_no and row_no are required for RACK")
+        return f"S-{sector}-{level_no:02d}-{row_no:02d}"
+    if location_type == "FLOOR":
+        if pallet_no is None:
+            raise ValueError("pallet_no is required for FLOOR")
+        return f"P-{sector}-{pallet_no:02d}"
+    raise ValueError("location_type must be RACK or FLOOR")
+
+
 class Location(Base):
     __tablename__ = "locations"
 

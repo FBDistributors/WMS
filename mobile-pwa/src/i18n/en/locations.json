@@ -1,6 +1,6 @@
 {
   "title": "Locations",
-  "subtitle": "Manage warehouse locations hierarchy.",
+  "subtitle": "Manage warehouse locations (RACK: S-sector-level-row, FLOOR: P-sector-pallet).",
   "add": "Add location",
   "edit": "Edit",
   "deactivate": "Deactivate",
@@ -9,13 +9,26 @@
   "load_failed": "Failed to load locations.",
   "save_failed": "Failed to save location.",
   "empty": "No locations found",
-  "empty_desc": "Create the first location to build a hierarchy.",
+  "empty_desc": "Create the first location.",
   "show_inactive": "Show inactive",
   "inactive": "Inactive",
+  "active": "Active",
+  "status": "Status",
   "sector": "Sector",
+  "actions": "Actions",
+  "type_label": "Type",
+  "level_no": "Level",
+  "row_no": "Row",
+  "pallet_no": "Pallet no.",
+  "preview_code": "Code preview",
   "no_parent": "No parent",
   "validation": {
-    "required": "Code and name are required."
+    "required": "Code and name are required.",
+    "sector_required": "Sector is required.",
+    "level_row_required": "Level and row are required for RACK.",
+    "level_row_range": "Level and row must be 0–99.",
+    "pallet_required": "Pallet number is required for FLOOR.",
+    "pallet_range": "Pallet number must be 0–99."
   },
   "fields": {
     "code": "Code",
@@ -29,5 +42,9 @@
     "rack": "Rack",
     "shelf": "Shelf",
     "bin": "Bin"
+  },
+  "types_enum": {
+    "RACK": "Rack (S-sector-level-row)",
+    "FLOOR": "Floor (P-sector-pallet)"
   }
 }

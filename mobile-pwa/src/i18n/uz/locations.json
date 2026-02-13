@@ -1,21 +1,34 @@
 {
   "title": "Joylashuvlar",
-  "subtitle": "Ombor joylashuvlar ierarxiyasini boshqaring.",
-  "add": "Joylashuv qo‘shish",
+  "subtitle": "Ombor joylashuvlari (RACK: S-sektor-bosqich-qator, FLOOR: P-sektor-pallet).",
+  "add": "Joylashuv qo'shish",
   "edit": "Tahrirlash",
   "deactivate": "Faolsizlantirish",
   "save": "Joylashuvni saqlash",
   "saving": "Saqlanmoqda...",
   "load_failed": "Joylashuvlar yuklanmadi.",
-  "save_failed": "Joylashuvni saqlab bo‘lmadi.",
+  "save_failed": "Joylashuvni saqlab bo'lmadi.",
   "empty": "Joylashuvlar topilmadi",
-  "empty_desc": "Ierarxiyani yaratish uchun birinchi joylashuvni qo‘shing.",
-  "show_inactive": "Faol emaslarni ko‘rsatish",
+  "empty_desc": "Birinchi joylashuvni qo'shing.",
+  "show_inactive": "Faol emaslarni ko'rsatish",
   "inactive": "Faol emas",
+  "active": "Faol",
+  "status": "Holat",
   "sector": "Sektor",
-  "no_parent": "Ota yo‘q",
+  "actions": "Amallar",
+  "type_label": "Tur",
+  "level_no": "Bosqich",
+  "row_no": "Qator",
+  "pallet_no": "Pallet raqami",
+  "preview_code": "Kod oldindan ko'rinishi",
+  "no_parent": "Ota yo'q",
   "validation": {
-    "required": "Kod va nom majburiy."
+    "required": "Kod va nom majburiy.",
+    "sector_required": "Sektor majburiy.",
+    "level_row_required": "RACK uchun bosqich va qator kerak.",
+    "level_row_range": "Bosqich va qator 0–99 oralig'ida.",
+    "pallet_required": "FLOOR uchun pallet raqami kerak.",
+    "pallet_range": "Pallet raqami 0–99 oralig'ida."
   },
   "fields": {
     "code": "Kod",
@@ -29,5 +42,9 @@
     "rack": "Stellaj",
     "shelf": "Raf",
     "bin": "Yacheyka"
+  },
+  "types_enum": {
+    "RACK": "Stellaj (S-sektor-bosqich-qator)",
+    "FLOOR": "Pol (P-sektor-pallet)"
   }
 }

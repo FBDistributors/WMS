@@ -12,17 +12,28 @@ import {
   getLocations,
   updateLocation,
   type Location,
-  type LocationType,
+  type LocationTypeEnum,
 } from '../../services/locationsApi'
 
-type TreeNode = Location & { children: TreeNode[] }
-
-const LOCATION_TYPES: LocationType[] = ['zone', 'rack', 'shelf', 'bin']
-const PARENT_BY_TYPE: Record<LocationType, string | null> = {
-  zone: null,
-  rack: 'zone',
-  shelf: 'rack',
-  bin: 'shelf',
+/** Live preview of code from structured fields (same formula as backend). */
+function previewCode(
+  locationType: LocationTypeEnum,
+  sector: string,
+  levelNo: number | null,
+  rowNo: number | null,
+  palletNo: number | null
+): string {
+  const s = (sector || '').trim()
+  if (!s) return '—'
+  if (locationType === 'RACK') {
+    if (levelNo == null || rowNo == null) return '—'
+    return `S-${s}-${String(levelNo).padStart(2, '0')}-${String(rowNo).padStart(2, '0')}`
+  }
+  if (locationType === 'FLOOR') {
+    if (palletNo == null) return '—'
+    return `P-${s}-${String(palletNo).padStart(2, '0')}`
+  }
+  return '—'
 }
 
 type DialogState = {
@@ -57,27 +68,6 @@ export function LocationsPage() {
     void load()
   }, [load])
 
-  const tree = useMemo(() => {
-    const map = new Map<string, TreeNode>()
-    const roots: TreeNode[] = []
-    items.forEach((item) => {
-      map.set(item.id, { ...item, children: [] })
-    })
-    map.forEach((node) => {
-      if (node.parent_id && map.has(node.parent_id)) {
-        map.get(node.parent_id)!.children.push(node)
-      } else {
-        roots.push(node)
-      }
-    })
-    const sortTree = (nodes: TreeNode[]) => {
-      nodes.sort((a, b) => a.code.localeCompare(b.code))
-      nodes.forEach((child) => sortTree(child.children))
-    }
-    sortTree(roots)
-    return roots
-  }, [items])
-
   const content = useMemo(() => {
     if (isLoading) {
       return <div className="h-24 w-full animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800" />
@@ -97,59 +87,95 @@ export function LocationsPage() {
         />
       )
     }
-    const renderNode = (node: TreeNode, depth = 0) => (
-      <div key={node.id}>
-        <div className="flex items-center justify-between gap-3 py-2">
-          <div className="flex items-center gap-3">
-            <div style={{ width: depth * 16 }} />
-            <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              {node.code}
-            </div>
-            <div className="text-sm text-slate-600 dark:text-slate-300">{node.name}</div>
-            <span className="rounded-xl bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-              {t(`locations:types.${node.type}`)}
-            </span>
-            {node.location_type ? (
-              <span className="rounded-xl bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
-                {node.location_type}
-              </span>
-            ) : null}
-            {node.sector ? (
-              <span className="text-xs text-slate-500 dark:text-slate-400">
-                {t('locations:sector')}: {node.sector}
-              </span>
-            ) : null}
-            {!node.is_active ? (
-              <span className="rounded-xl bg-red-50 px-2 py-0.5 text-xs text-red-500 dark:bg-red-500/10">
-                {t('locations:inactive')}
-              </span>
-            ) : null}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              onClick={() => setDialog({ open: true, mode: 'edit', target: node })}
-            >
-              {t('locations:edit')}
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={async () => {
-                await deactivateLocation(node.id)
-                await load()
-              }}
-            >
-              {t('locations:deactivate')}
-            </Button>
-          </div>
-        </div>
-        {node.children.length > 0 ? (
-          <div className="space-y-1">{node.children.map((child) => renderNode(child, depth + 1))}</div>
-        ) : null}
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 dark:border-slate-700">
+              <th className="pb-2 pr-4 font-semibold text-slate-700 dark:text-slate-300">
+                {t('locations:fields.code')}
+              </th>
+              <th className="pb-2 pr-4 font-semibold text-slate-700 dark:text-slate-300">
+                {t('locations:type_label')}
+              </th>
+              <th className="pb-2 pr-4 font-semibold text-slate-700 dark:text-slate-300">
+                {t('locations:sector')}
+              </th>
+              <th className="pb-2 pr-4 font-semibold text-slate-700 dark:text-slate-300">
+                {t('locations:level_no')}
+              </th>
+              <th className="pb-2 pr-4 font-semibold text-slate-700 dark:text-slate-300">
+                {t('locations:row_no')}
+              </th>
+              <th className="pb-2 pr-4 font-semibold text-slate-700 dark:text-slate-300">
+                {t('locations:pallet_no')}
+              </th>
+              <th className="pb-2 pr-4 font-semibold text-slate-700 dark:text-slate-300">
+                {t('locations:status')}
+              </th>
+              <th className="pb-2 font-semibold text-slate-700 dark:text-slate-300">
+                {t('locations:actions')}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((loc) => (
+              <tr key={loc.id} className="border-b border-slate-100 dark:border-slate-800">
+                <td className="py-2 pr-4 font-medium text-slate-900 dark:text-slate-100">
+                  {loc.code}
+                </td>
+                <td className="py-2 pr-4 text-slate-600 dark:text-slate-400">
+                  {loc.location_type ?? '—'}
+                </td>
+                <td className="py-2 pr-4 text-slate-600 dark:text-slate-400">{loc.sector ?? '—'}</td>
+                <td className="py-2 pr-4 text-slate-600 dark:text-slate-400">
+                  {loc.level_no != null ? loc.level_no : '—'}
+                </td>
+                <td className="py-2 pr-4 text-slate-600 dark:text-slate-400">
+                  {loc.row_no != null ? loc.row_no : '—'}
+                </td>
+                <td className="py-2 pr-4 text-slate-600 dark:text-slate-400">
+                  {loc.pallet_no != null ? loc.pallet_no : '—'}
+                </td>
+                <td className="py-2 pr-4">
+                  {loc.is_active ? (
+                    <span className="text-green-600 dark:text-green-400">
+                      {t('locations:active')}
+                    </span>
+                  ) : (
+                    <span className="text-slate-500 dark:text-slate-400">
+                      {t('locations:inactive')}
+                    </span>
+                  )}
+                </td>
+                <td className="py-2 flex flex-wrap gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setDialog({ open: true, mode: 'edit', target: loc })}
+                  >
+                    {t('locations:edit')}
+                  </Button>
+                  {loc.is_active ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={async () => {
+                        await deactivateLocation(loc.id)
+                        await load()
+                      }}
+                    >
+                      {t('locations:deactivate')}
+                    </Button>
+                  ) : null}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     )
-    return <div className="space-y-2">{tree.map((node) => renderNode(node))}</div>
-  }, [error, isLoading, items.length, load, t, tree])
+  }, [error, isLoading, items, load, t])
 
   return (
     <AdminLayout
@@ -175,7 +201,7 @@ export function LocationsPage() {
             <input
               type="checkbox"
               checked={includeInactive}
-              onChange={(event) => setIncludeInactive(event.target.checked)}
+              onChange={(e) => setIncludeInactive(e.target.checked)}
             />
             {t('locations:show_inactive')}
           </label>
@@ -187,7 +213,6 @@ export function LocationsPage() {
         <LocationDialog
           mode={dialog.mode}
           target={dialog.target}
-          locations={items}
           onClose={() => setDialog({ open: false, mode: 'create' })}
           onSaved={load}
         />
@@ -199,49 +224,79 @@ export function LocationsPage() {
 type DialogProps = {
   mode: 'create' | 'edit'
   target?: Location
-  locations: Location[]
   onClose: () => void
   onSaved: () => void
 }
 
-function LocationDialog({ mode, target, locations, onClose, onSaved }: DialogProps) {
+function LocationDialog({ mode, target, onClose, onSaved }: DialogProps) {
   const { t } = useTranslation(['locations', 'common'])
-  const [code, setCode] = useState(target?.code ?? '')
-  const [name, setName] = useState(target?.name ?? '')
-  const [type, setType] = useState<LocationType>(target?.type ?? 'zone')
-  const [parentId, setParentId] = useState<string>(target?.parent_id ?? '')
+  const [locationType, setLocationType] = useState<LocationTypeEnum>(
+    (target?.location_type as LocationTypeEnum) ?? 'RACK'
+  )
+  const [sector, setSector] = useState(target?.sector ?? '')
+  const [levelNo, setLevelNo] = useState<number | ''>(target?.level_no ?? '')
+  const [rowNo, setRowNo] = useState<number | ''>(target?.row_no ?? '')
+  const [palletNo, setPalletNo] = useState<number | ''>(target?.pallet_no ?? '')
   const [isActive, setIsActive] = useState(target?.is_active ?? true)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const parentOptions = useMemo(() => {
-    const requiredParentType = PARENT_BY_TYPE[type]
-    if (!requiredParentType) return []
-    return locations.filter((loc) => loc.type === requiredParentType && loc.id !== target?.id)
-  }, [locations, type, target?.id])
+  const preview = useMemo(
+    () =>
+      previewCode(
+        locationType,
+        sector,
+        levelNo === '' ? null : Number(levelNo),
+        rowNo === '' ? null : Number(rowNo),
+        palletNo === '' ? null : Number(palletNo)
+      ),
+    [locationType, sector, levelNo, rowNo, palletNo]
+  )
 
   const handleSubmit = async () => {
-    if (!code.trim() || !name.trim()) {
-      setError(t('locations:validation.required'))
+    const s = sector.trim()
+    if (!s) {
+      setError(t('locations:validation.sector_required'))
       return
+    }
+    if (locationType === 'RACK') {
+      if (levelNo === '' || rowNo === '') {
+        setError(t('locations:validation.level_row_required'))
+        return
+      }
+      if (Number(levelNo) < 0 || Number(levelNo) > 99 || Number(rowNo) < 0 || Number(rowNo) > 99) {
+        setError(t('locations:validation.level_row_range'))
+        return
+      }
+    }
+    if (locationType === 'FLOOR') {
+      if (palletNo === '') {
+        setError(t('locations:validation.pallet_required'))
+        return
+      }
+      if (Number(palletNo) < 0 || Number(palletNo) > 99) {
+        setError(t('locations:validation.pallet_range'))
+        return
+      }
     }
     setIsSubmitting(true)
     setError(null)
     try {
       if (mode === 'create') {
         await createLocation({
-          code: code.trim(),
-          name: name.trim(),
-          type,
-          parent_id: parentId || null,
+          location_type: locationType,
+          sector: s,
+          ...(locationType === 'RACK'
+            ? { level_no: Number(levelNo), row_no: Number(rowNo) }
+            : { pallet_no: Number(palletNo) }),
           is_active: isActive,
         })
       } else if (target) {
         await updateLocation(target.id, {
-          code: code.trim(),
-          name: name.trim(),
-          type,
-          parent_id: parentId || null,
+          sector: s,
+          ...(locationType === 'RACK'
+            ? { level_no: Number(levelNo), row_no: Number(rowNo), pallet_no: undefined }
+            : { pallet_no: Number(palletNo), level_no: undefined, row_no: undefined }),
           is_active: isActive,
         })
       }
@@ -278,63 +333,87 @@ function LocationDialog({ mode, target, locations, onClose, onSaved }: DialogPro
               {error}
             </div>
           ) : null}
+
           <label className="text-sm text-slate-600 dark:text-slate-300">
-            {t('locations:fields.code')}
-            <input
-              className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-            />
-          </label>
-          <label className="text-sm text-slate-600 dark:text-slate-300">
-            {t('locations:fields.name')}
-            <input
-              className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-            />
-          </label>
-          <label className="text-sm text-slate-600 dark:text-slate-300">
-            {t('locations:fields.type')}
+            {t('locations:type_label')}
             <select
               className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-              value={type}
-              onChange={(event) => {
-                const nextType = event.target.value as LocationType
-                setType(nextType)
-                setParentId('')
-              }}
+              value={locationType}
+              onChange={(e) => setLocationType(e.target.value as LocationTypeEnum)}
+              disabled={mode === 'edit'}
             >
-              {LOCATION_TYPES.map((item) => (
-                <option key={item} value={item}>
-                  {t(`locations:types.${item}`)}
-                </option>
-              ))}
+              <option value="RACK">{t('locations:types_enum.RACK')}</option>
+              <option value="FLOOR">{t('locations:types_enum.FLOOR')}</option>
             </select>
           </label>
+
           <label className="text-sm text-slate-600 dark:text-slate-300">
-            {t('locations:fields.parent')}
-            <select
+            {t('locations:sector')} *
+            <input
               className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-              value={parentId}
-              onChange={(event) => setParentId(event.target.value)}
-            >
-              <option value="">{t('locations:no_parent')}</option>
-              {parentOptions.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.code} · {option.name}
-                </option>
-              ))}
-            </select>
+              value={sector}
+              onChange={(e) => setSector(e.target.value)}
+              placeholder="e.g. 15 or AS"
+            />
           </label>
+
+          {locationType === 'RACK' ? (
+            <>
+              <label className="text-sm text-slate-600 dark:text-slate-300">
+                {t('locations:level_no')} *
+                <input
+                  type="number"
+                  min={0}
+                  max={99}
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                  value={levelNo === '' ? '' : levelNo}
+                  onChange={(e) => setLevelNo(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                />
+              </label>
+              <label className="text-sm text-slate-600 dark:text-slate-300">
+                {t('locations:row_no')} *
+                <input
+                  type="number"
+                  min={0}
+                  max={99}
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                  value={rowNo === '' ? '' : rowNo}
+                  onChange={(e) => setRowNo(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                />
+              </label>
+            </>
+          ) : (
+            <label className="text-sm text-slate-600 dark:text-slate-300">
+              {t('locations:pallet_no')} *
+              <input
+                type="number"
+                min={0}
+                max={99}
+                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                value={palletNo === '' ? '' : palletNo}
+                onChange={(e) =>
+                  setPalletNo(e.target.value === '' ? '' : parseInt(e.target.value, 10))
+                }
+              />
+            </label>
+          )}
+
+          <div className="rounded-2xl bg-slate-100 px-4 py-2 text-sm dark:bg-slate-800">
+            <span className="text-slate-500 dark:text-slate-400">{t('locations:preview_code')}: </span>
+            <span className="font-mono font-semibold text-slate-900 dark:text-slate-100">
+              {preview}
+            </span>
+          </div>
+
           <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
             <input
               type="checkbox"
               checked={isActive}
-              onChange={(event) => setIsActive(event.target.checked)}
+              onChange={(e) => setIsActive(e.target.checked)}
             />
             {t('locations:fields.active')}
           </label>
+
           <div className="flex items-center justify-end gap-2">
             <Button variant="ghost" onClick={onClose}>
               {t('common:buttons.cancel')}
