@@ -47,7 +47,7 @@ export function ControllerBottomNav({ onScanClick }: ControllerBottomNavProps) {
                 key="scan"
                 type="button"
                 onClick={onScanClick}
-                className="-mt-6 flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-violet-600 text-white shadow-lg transition hover:bg-violet-700 active:scale-95"
+                className="-mt-6 flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg transition hover:bg-blue-700 active:scale-95"
                 aria-label={t(item.labelKey)}
               >
                 <Scan size={28} />
@@ -64,11 +64,11 @@ export function ControllerBottomNav({ onScanClick }: ControllerBottomNavProps) {
             >
               <Icon
                 size={22}
-                className={isActive ? 'text-violet-600' : 'text-slate-500 dark:text-slate-400'}
+                className={isActive ? 'text-blue-600' : 'text-slate-500 dark:text-slate-400'}
               />
               <span
                 className={`text-xs ${
-                  isActive ? 'font-medium text-violet-600' : 'text-slate-600 dark:text-slate-400'
+                  isActive ? 'font-medium text-blue-600' : 'text-slate-600 dark:text-slate-400'
                 }`}
               >
                 {t(item.labelKey)}
