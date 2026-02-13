@@ -37,6 +37,7 @@
   "confirm_delete_title": "Подтверждение",
   "confirm_delete_one": "Деактивировать локацию «{{code}}»?",
   "confirm_delete_selected": "Деактивировать {{count}} локацию(й)?",
+  "delete_failed": "Не удалось удалить локацию.",
   "confirm_yes": "Да, деактивировать",
   "no_parent": "Без родителя",
   "validation": {

@@ -38,6 +38,7 @@
   "confirm_delete_one": "«{{code}}» joylashuvni faolsizlantirish?",
   "confirm_delete_selected": "{{count}} ta joylashuvni faolsizlantirish?",
   "confirm_yes": "Ha, o'chirish",
+  "delete_failed": "Joylashuvni o'chirib bo'lmadi.",
   "no_parent": "Ota yo'q",
   "validation": {
     "required": "Kod va nom majburiy.",

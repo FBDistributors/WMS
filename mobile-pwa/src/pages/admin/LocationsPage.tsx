@@ -201,16 +201,14 @@ export function LocationsPage() {
                     <QrCode size={14} className="mr-1 inline" />
                     {t('locations:qr_download')}
                   </Button>
-                  {loc.is_active ? (
-                    <Button
-                      variant="ghost"
-                      className="py-1.5 px-2 text-xs text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10"
-                      onClick={() => setConfirmSingle(loc)}
-                      aria-label={t('locations:delete_one')}
-                    >
-                      <Trash2 size={14} />
-                    </Button>
-                  ) : null}
+                  <Button
+                    variant="ghost"
+                    className="py-1.5 px-2 text-xs text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10"
+                    onClick={() => setConfirmSingle(loc)}
+                    aria-label={t('locations:delete_one')}
+                  >
+                    <Trash2 size={14} />
+                  </Button>
                 </td>
               </tr>
             ))}
@@ -300,10 +298,19 @@ export function LocationsPage() {
         onConfirm={async () => {
           if (!confirmSingle) return
           setIsDeleting(true)
+          setError(null)
           try {
             await deactivateLocation(confirmSingle.id)
             setConfirmSingle(null)
             await load()
+          } catch (err: unknown) {
+            const msg =
+              typeof err === 'object' && err !== null && 'details' in err &&
+              typeof (err as { details?: { detail?: string } }).details?.detail === 'string'
+                ? (err as { details: { detail: string } }).details.detail
+                : err instanceof Error ? err.message : t('locations:delete_failed')
+            setError(msg)
+            setConfirmSingle(null)
           } finally {
             setIsDeleting(false)
           }
@@ -320,6 +327,7 @@ export function LocationsPage() {
         loading={isDeleting}
         onConfirm={async () => {
           setIsDeleting(true)
+          setError(null)
           try {
             for (const id of selectedIds) {
               await deactivateLocation(id)
@@ -327,6 +335,14 @@ export function LocationsPage() {
             setSelectedIds(new Set())
             setConfirmBulk(false)
             await load()
+          } catch (err: unknown) {
+            const msg =
+              typeof err === 'object' && err !== null && 'details' in err &&
+              typeof (err as { details?: { detail?: string } }).details?.detail === 'string'
+                ? (err as { details: { detail: string } }).details.detail
+                : err instanceof Error ? err.message : t('locations:delete_failed')
+            setError(msg)
+            setConfirmBulk(false)
           } finally {
             setIsDeleting(false)
           }

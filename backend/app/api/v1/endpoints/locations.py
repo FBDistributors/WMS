@@ -5,6 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.deps import require_permission
@@ -188,7 +189,7 @@ async def update_location(
     return _to_location(location)
 
 
-@router.delete("/{location_id}", response_model=LocationOut, summary="Deactivate location")
+@router.delete("/{location_id}", response_model=LocationOut, summary="Deactivate or delete location")
 async def deactivate_location(
     location_id: UUID,
     db: Session = Depends(get_db),
@@ -197,7 +198,20 @@ async def deactivate_location(
     location = db.query(LocationModel).filter(LocationModel.id == location_id).one_or_none()
     if not location:
         raise HTTPException(status_code=404, detail="Location not found")
-    location.is_active = False
-    db.commit()
-    db.refresh(location)
-    return _to_location(location)
+    out = _to_location(location)
+    if location.is_active:
+        location.is_active = False
+        db.commit()
+        db.refresh(location)
+        return _to_location(location)
+    # Faol emas: bazadan butunlay o‘chirish (hard delete)
+    try:
+        db.delete(location)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Joylashuv hali ishlatilmoqda (inventar/hujjatda), o‘chirib bo‘lmaydi.",
+        )
+    return out

@@ -37,6 +37,7 @@
   "confirm_delete_title": "Confirm",
   "confirm_delete_one": "Deactivate location \"{{code}}\"?",
   "confirm_delete_selected": "Deactivate {{count}} location(s)?",
+  "delete_failed": "Failed to delete location.",
   "confirm_yes": "Yes, deactivate",
   "no_parent": "No parent",
   "validation": {
