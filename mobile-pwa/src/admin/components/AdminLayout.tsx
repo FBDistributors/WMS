@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { LogOut, Menu, Moon, Sun, User, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -23,6 +23,7 @@ export function AdminLayout({ title, actionSlot, children }: AdminLayoutProps) {
     return window.localStorage.getItem('wms_sidebar_collapsed') === 'true'
   })
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const userMenuRef = useRef<HTMLDivElement>(null)
   const { user, setRole, isMock, logout } = useAuth()
   const { theme, setTheme } = useTheme()
   const { t } = useTranslation(['admin', 'common'])
@@ -37,6 +38,19 @@ export function AdminLayout({ title, actionSlot, children }: AdminLayoutProps) {
     if (typeof window === 'undefined') return
     window.localStorage.setItem('wms_sidebar_collapsed', String(isCollapsed))
   }, [isCollapsed])
+
+  // Close user menu when clicking anywhere outside (platform-wide)
+  useEffect(() => {
+    if (!showUserMenu) return
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node
+      if (userMenuRef.current && !userMenuRef.current.contains(target)) {
+        setShowUserMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showUserMenu])
 
   return (
     <div className="flex h-screen bg-slate-100 dark:bg-slate-950">
@@ -107,9 +121,9 @@ export function AdminLayout({ title, actionSlot, children }: AdminLayoutProps) {
             ) : null}
             {actionSlot}
             
-            {/* User Profile & Logout */}
+            {/* User Profile & Logout — closes when clicking anywhere outside */}
             {user ? (
-              <div className="relative">
+              <div className="relative" ref={userMenuRef}>
                 <Button
                   variant="ghost"
                   onClick={() => setShowUserMenu(!showUserMenu)}
@@ -123,10 +137,11 @@ export function AdminLayout({ title, actionSlot, children }: AdminLayoutProps) {
                 {showUserMenu ? (
                   <>
                     <div
-                      className="fixed inset-0 z-10"
+                      className="fixed inset-0 z-40"
+                      aria-hidden
                       onClick={() => setShowUserMenu(false)}
                     />
-                    <div className="absolute right-0 top-full mt-2 z-20 w-48 rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800">
+                    <div className="absolute right-0 top-full mt-2 z-50 w-48 rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800">
                       <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">
                         <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
                           {user.name}
