@@ -53,7 +53,7 @@
   "roles": {
     "warehouse_admin": "Warehouse Admin",
     "supervisor": "Supervisor",
-    "picker": "Picker",
+    "picker": "Order picker",
     "receiver": "Receiver",
     "inventory_controller": "Inventory Controller"
   },

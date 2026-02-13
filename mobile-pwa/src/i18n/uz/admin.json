@@ -53,7 +53,7 @@
   "roles": {
     "warehouse_admin": "Ombor administratori",
     "supervisor": "Supervayzer",
-    "picker": "Teruvchi",
+    "picker": "Yig'uvchi",
     "receiver": "Qabulchi",
     "inventory_controller": "Inventar nazoratchisi"
   },

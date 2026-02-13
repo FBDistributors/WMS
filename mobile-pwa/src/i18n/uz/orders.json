@@ -19,13 +19,13 @@
   "send_to_picking": {
     "button": "Pickingga yuborish",
     "title": "Pickingga yuborish",
-    "picker": "Picker biriktirish",
-    "select_picker": "Picker tanlang",
-    "picker_required": "Avval picker tanlang.",
+    "picker": "Yig'uvchi biriktirish",
+    "select_picker": "Yig'uvchi tanlang",
+    "picker_required": "Avval yig'uvchi tanlang.",
     "send": "Yuborish",
     "sending": "Yuborilmoqda...",
     "failed": "Pickingga yuborib bo‘lmadi.",
-    "load_failed": "Pickerlar ro‘yxati yuklanmadi."
+    "load_failed": "Yig'uvchilar ro‘yxati yuklanmadi."
   },
   "filters": {
     "status": "Holat",

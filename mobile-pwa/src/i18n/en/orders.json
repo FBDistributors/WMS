@@ -19,13 +19,13 @@
   "send_to_picking": {
     "button": "Send to picking",
     "title": "Send to picking",
-    "picker": "Assign picker",
-    "select_picker": "Select picker",
-    "picker_required": "Select a picker first.",
+    "picker": "Assign order picker",
+    "select_picker": "Select order picker",
+    "picker_required": "Select an order picker first.",
     "send": "Send",
     "sending": "Sending...",
     "failed": "Failed to send to picking.",
-    "load_failed": "Failed to load picker list."
+    "load_failed": "Failed to load order picker list."
   },
   "filters": {
     "status": "Status",

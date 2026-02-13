@@ -58,7 +58,7 @@
   "user_menu": "User menu",
   "logout": "Logout",
   "roles": {
-    "picker": "Picker",
+    "picker": "Order picker",
     "receiver": "Receiver",
     "inventory_controller": "Inventory Controller",
     "supervisor": "Supervisor",
