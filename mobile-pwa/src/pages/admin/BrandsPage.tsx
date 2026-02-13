@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { EmptyState } from '../../components/ui/EmptyState'
 import {
   createBrand,
@@ -33,6 +34,8 @@ export function BrandsPage() {
   const [search, setSearch] = useState('')
   const [includeInactive, setIncludeInactive] = useState(false)
   const [dialog, setDialog] = useState<DialogState>({ open: false, mode: 'create' })
+  const [confirmDeactivate, setConfirmDeactivate] = useState<Brand | null>(null)
+  const [isDeactivating, setIsDeactivating] = useState(false)
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -105,10 +108,8 @@ export function BrandsPage() {
                       </Button>
                       <Button
                         variant="ghost"
-                        onClick={async () => {
-                          await deactivateBrand(brand.id)
-                          await load()
-                        }}
+                        className="text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+                        onClick={() => setConfirmDeactivate(brand)}
                       >
                         {t('brands:deactivate')}
                       </Button>
@@ -183,6 +184,27 @@ export function BrandsPage() {
           onSaved={load}
         />
       ) : null}
+      <ConfirmDialog
+        open={!!confirmDeactivate}
+        title={t('brands:confirm_deactivate_title')}
+        message={t('brands:confirm_deactivate', { name: confirmDeactivate?.name ?? '' })}
+        confirmLabel={t('brands:confirm_yes')}
+        cancelLabel={t('common:buttons.cancel')}
+        variant="danger"
+        loading={isDeactivating}
+        onConfirm={async () => {
+          if (!confirmDeactivate) return
+          setIsDeactivating(true)
+          try {
+            await deactivateBrand(confirmDeactivate.id)
+            setConfirmDeactivate(null)
+            await load()
+          } finally {
+            setIsDeactivating(false)
+          }
+        }}
+        onCancel={() => setConfirmDeactivate(null)}
+      />
     </AdminLayout>
   )
 }
