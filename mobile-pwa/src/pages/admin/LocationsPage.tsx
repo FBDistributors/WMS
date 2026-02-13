@@ -151,7 +151,7 @@ export function LocationsPage() {
                 <td className="py-2 flex flex-wrap gap-1">
                   <Button
                     variant="ghost"
-                    size="sm"
+                    className="py-1.5 px-2 text-xs"
                     onClick={() => setDialog({ open: true, mode: 'edit', target: loc })}
                   >
                     {t('locations:edit')}
@@ -159,7 +159,7 @@ export function LocationsPage() {
                   {loc.is_active ? (
                     <Button
                       variant="ghost"
-                      size="sm"
+                      className="py-1.5 px-2 text-xs"
                       onClick={async () => {
                         await deactivateLocation(loc.id)
                         await load()
