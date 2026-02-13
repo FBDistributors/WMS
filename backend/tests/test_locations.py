@@ -54,6 +54,7 @@ def test_create_rack_location_works(client: TestClient, auth_headers: dict):
     assert r.status_code == 201
     data = r.json()
     assert data["code"] == "S-15-01-02"
+    assert data["barcode_value"] == "S-15-01-02"
     assert data["location_type"] == "RACK"
     assert data["sector"] == "15"
     assert data["level_no"] == 1
@@ -76,6 +77,7 @@ def test_create_floor_location_works(client: TestClient, auth_headers: dict):
     assert r.status_code == 201
     data = r.json()
     assert data["code"] == "P-AS-02"
+    assert data["barcode_value"] == "P-AS-02"
     assert data["location_type"] == "FLOOR"
     assert data["sector"] == "AS"
     assert data["level_no"] is None
@@ -121,6 +123,7 @@ def test_inventory_summary_by_location_shows_product_per_location(
     # Create two locations (RACK and FLOOR) directly so we have location_type set
     loc_rack = Location(
         code="S-1-01-01",
+        barcode_value="S-1-01-01",
         name="Rack 1",
         type="rack",
         location_type="RACK",
@@ -131,6 +134,7 @@ def test_inventory_summary_by_location_shows_product_per_location(
     )
     loc_floor = Location(
         code="P-X-01",
+        barcode_value="P-X-01",
         name="Floor X",
         type="rack",
         location_type="FLOOR",

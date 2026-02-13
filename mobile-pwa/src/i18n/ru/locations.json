@@ -21,6 +21,9 @@
   "row_no": "Ряд",
   "pallet_no": "Палета №",
   "preview_code": "Предпросмотр кода",
+  "barcode_label": "Штрихкод локации",
+  "print_label": "Печать этикетки",
+  "download_png": "Скачать PNG",
   "no_parent": "Без родителя",
   "validation": {
     "required": "Код и название обязательны.",

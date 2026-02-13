@@ -21,6 +21,9 @@
   "row_no": "Row",
   "pallet_no": "Pallet no.",
   "preview_code": "Code preview",
+  "barcode_label": "Location barcode",
+  "print_label": "Print label",
+  "download_png": "Download PNG",
   "no_parent": "No parent",
   "validation": {
     "required": "Code and name are required.",

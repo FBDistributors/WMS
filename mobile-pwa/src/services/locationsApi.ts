@@ -6,6 +6,8 @@ export type LocationTypeEnum = 'RACK' | 'FLOOR'
 export type Location = {
   id: string
   code: string
+  /** Same as code; used for barcode (Code128). */
+  barcode_value?: string
   name: string
   type: LocationType
   location_type?: LocationTypeEnum | null

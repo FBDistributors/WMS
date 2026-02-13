@@ -30,7 +30,7 @@ def picker_user(db_session: Session) -> User:
 
 @pytest.fixture
 def test_location(db_session: Session) -> Location:
-    loc = Location(code="A-01-01", name="Shelf A", type="bin", is_active=True)
+    loc = Location(code="A-01-01", barcode_value="A-01-01", name="Shelf A", type="bin", is_active=True)
     db_session.add(loc)
     db_session.commit()
     db_session.refresh(loc)

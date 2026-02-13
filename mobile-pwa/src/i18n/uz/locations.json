@@ -21,6 +21,9 @@
   "row_no": "Qator",
   "pallet_no": "Pallet raqami",
   "preview_code": "Kod oldindan ko'rinishi",
+  "barcode_label": "Joylashuv shtrixkodi",
+  "print_label": "Yorliqni chop etish",
+  "download_png": "PNG yuklab olish",
   "no_parent": "Ota yo'q",
   "validation": {
     "required": "Kod va nom majburiy.",

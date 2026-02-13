@@ -22,6 +22,7 @@ LOCATION_TYPE_ENUM = {"RACK", "FLOOR"}
 class LocationOut(BaseModel):
     id: UUID
     code: str
+    barcode_value: str
     name: str
     type: str
     location_type: Optional[str] = None
@@ -59,6 +60,7 @@ def _to_location(location: LocationModel) -> LocationOut:
     return LocationOut(
         id=location.id,
         code=location.code,
+        barcode_value=location.barcode_value or location.code,
         name=location.name,
         type=location.type,
         location_type=location.location_type,
@@ -123,6 +125,7 @@ async def create_location(
     type_normalized = "rack" if payload.location_type == "RACK" else "floor"
     location = LocationModel(
         code=code,
+        barcode_value=code,
         name=code,
         type=type_normalized,
         location_type=payload.location_type,
@@ -174,6 +177,7 @@ async def update_location(
             if existing:
                 raise HTTPException(status_code=400, detail="Location code already exists")
             location.code = new_code
+            location.barcode_value = new_code
             location.name = new_code
             location.sector = sector
             location.level = level_no

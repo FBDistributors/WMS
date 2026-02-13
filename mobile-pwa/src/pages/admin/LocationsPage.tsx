@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Plus, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Download, Plus, Printer, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import JsBarcode from 'jsbarcode'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { Button } from '../../components/ui/button'
@@ -48,6 +49,7 @@ export function LocationsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dialog, setDialog] = useState<DialogState>({ open: false, mode: 'create' })
+  const [createdForBarcode, setCreatedForBarcode] = useState<Location | null>(null)
   const [includeInactive, setIncludeInactive] = useState(false)
 
   const load = useCallback(async () => {
@@ -215,6 +217,17 @@ export function LocationsPage() {
           target={dialog.target}
           onClose={() => setDialog({ open: false, mode: 'create' })}
           onSaved={load}
+          onCreated={(loc) => {
+            setCreatedForBarcode(loc)
+            setDialog({ open: false, mode: 'create' })
+            load()
+          }}
+        />
+      ) : null}
+      {createdForBarcode ? (
+        <BarcodeLabelDialog
+          location={createdForBarcode}
+          onClose={() => setCreatedForBarcode(null)}
         />
       ) : null}
     </AdminLayout>
@@ -226,9 +239,10 @@ type DialogProps = {
   target?: Location
   onClose: () => void
   onSaved: () => void
+  onCreated?: (location: Location) => void
 }
 
-function LocationDialog({ mode, target, onClose, onSaved }: DialogProps) {
+function LocationDialog({ mode, target, onClose, onSaved, onCreated }: DialogProps) {
   const { t } = useTranslation(['locations', 'common'])
   const [locationType, setLocationType] = useState<LocationTypeEnum>(
     (target?.location_type as LocationTypeEnum) ?? 'RACK'
@@ -283,7 +297,7 @@ function LocationDialog({ mode, target, onClose, onSaved }: DialogProps) {
     setError(null)
     try {
       if (mode === 'create') {
-        await createLocation({
+        const created = await createLocation({
           location_type: locationType,
           sector: s,
           ...(locationType === 'RACK'
@@ -291,6 +305,7 @@ function LocationDialog({ mode, target, onClose, onSaved }: DialogProps) {
             : { pallet_no: Number(palletNo) }),
           is_active: isActive,
         })
+        onCreated?.(created)
       } else if (target) {
         await updateLocation(target.id, {
           sector: s,
@@ -422,6 +437,98 @@ function LocationDialog({ mode, target, onClose, onSaved }: DialogProps) {
               {isSubmitting ? t('locations:saving') : t('locations:save')}
             </Button>
           </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+type BarcodeLabelDialogProps = {
+  location: Location
+  onClose: () => void
+}
+
+function BarcodeLabelDialog({ location, onClose }: BarcodeLabelDialogProps) {
+  const { t } = useTranslation(['locations', 'common'])
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const value = location.barcode_value || location.code
+
+  useEffect(() => {
+    if (!canvasRef.current || !value) return
+    try {
+      JsBarcode(canvasRef.current, value, {
+        format: 'CODE128',
+        displayValue: true,
+        width: 2,
+        height: 60,
+      })
+    } catch {
+      // ignore invalid barcode
+    }
+  }, [value])
+
+  const handleDownloadPng = () => {
+    if (!canvasRef.current) return
+    const dataUrl = canvasRef.current.toDataURL('image/png')
+    const a = document.createElement('a')
+    a.href = dataUrl
+    a.download = `location-${value}.png`
+    a.click()
+  }
+
+  const handlePrint = () => {
+    if (!canvasRef.current) return
+    const dataUrl = canvasRef.current.toDataURL('image/png')
+    const w = window.open('', '_blank')
+    if (!w) return
+    w.document.write(`
+      <!DOCTYPE html><html><head><title>${value}</title></head>
+      <body style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;margin:0;font-family:sans-serif;">
+        <p style="font-size:18px;font-weight:bold;margin-bottom:8px;">${value}</p>
+        <img src="${dataUrl}" alt="${value}" />
+      </body></html>
+    `)
+    w.document.close()
+    w.focus()
+    w.print()
+    w.close()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
+      <button
+        className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm"
+        onClick={onClose}
+        aria-label={t('common:buttons.close')}
+        type="button"
+      />
+      <div className="relative w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+        <div className="mb-4 flex items-center justify-between">
+          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            {t('locations:barcode_label')}
+          </div>
+          <Button variant="ghost" className="rounded-full px-3 py-3" onClick={onClose}>
+            <X size={18} />
+          </Button>
+        </div>
+        <div className="flex flex-col items-center gap-4">
+          <p className="text-center font-mono text-sm font-medium text-slate-700 dark:text-slate-300">
+            {value}
+          </p>
+          <canvas ref={canvasRef} className="max-w-full" />
+        </div>
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
+          <Button onClick={handlePrint} className="gap-2">
+            <Printer size={16} />
+            {t('locations:print_label')}
+          </Button>
+          <Button variant="secondary" onClick={handleDownloadPng} className="gap-2">
+            <Download size={16} />
+            {t('locations:download_png')}
+          </Button>
+          <Button variant="ghost" onClick={onClose}>
+            {t('common:buttons.close')}
+          </Button>
         </div>
       </div>
     </div>

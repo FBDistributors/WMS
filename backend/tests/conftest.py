@@ -81,7 +81,7 @@ def test_product(db_session: Session) -> Product:
 
 @pytest.fixture
 def test_location(db_session: Session) -> Location:
-    loc = Location(code="LOC-01", name="Location 01", type="bin", is_active=True)
+    loc = Location(code="LOC-01", barcode_value="LOC-01", name="Location 01", type="bin", is_active=True)
     db_session.add(loc)
     db_session.commit()
     db_session.refresh(loc)
