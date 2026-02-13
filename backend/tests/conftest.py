@@ -7,6 +7,7 @@ from app.main import app
 from app.db import get_db
 from app.models.base import Base
 from app.models.user import User
+from app.models.user_session import UserSession
 from app.models.product import Product
 from app.models.location import Location
 from app.auth.security import get_password_hash

@@ -9,6 +9,7 @@ from app.models.receipt import Receipt, ReceiptLine
 from app.models.stock import StockLot, StockMovement
 from app.models.smartup_sync import SmartupSyncRun
 from app.models.user import User
+from app.models.user_session import UserSession
 
 __all__ = [
     "Base",
@@ -27,4 +28,5 @@ __all__ = [
     "StockMovement",
     "SmartupSyncRun",
     "User",
+    "UserSession",
 ]

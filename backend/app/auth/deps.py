@@ -11,6 +11,7 @@ from app.auth.permissions import get_permissions_for_role
 from app.auth.security import decode_token
 from app.db import get_db
 from app.models.user import User
+from app.models.user_session import UserSession
 
 security = HTTPBearer(auto_error=False)
 
@@ -35,14 +36,23 @@ def get_current_user(
     user = db.query(User).filter(User.id == user_id).one_or_none()
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Inactive user")
-    
-    # Session validation: check if this token is still the active session
-    if user.active_session_token and user.active_session_token != token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, 
-            detail="Session expired: logged in from another device"
-        )
-    
+
+    # Session validation: token must exist in user_sessions (admin up to 3, others 1)
+    session = (
+        db.query(UserSession)
+        .filter(UserSession.user_id == user.id, UserSession.token == token)
+        .first()
+    )
+    if not session:
+        # Backward compat: allow old single-token sessions until next login
+        if user.active_session_token and user.active_session_token == token:
+            pass
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Session expired or logged in from another device",
+            )
+
     return user
 
 
