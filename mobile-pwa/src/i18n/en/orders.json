@@ -4,6 +4,7 @@
   "load_failed": "Failed to load orders.",
   "sync": "Sync Smartup",
   "syncing": "Syncing...",
+  "refreshing": "Refreshing...",
   "sync_failed": "Smartup sync failed.",
   "pack": "Pack",
   "packing": "Packing...",

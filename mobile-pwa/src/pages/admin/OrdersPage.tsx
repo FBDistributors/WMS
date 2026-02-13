@@ -55,11 +55,16 @@ export function OrdersPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isSyncing, setIsSyncing] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
+  const load = useCallback(async (background = false) => {
+    if (!background) {
+      setIsLoading(true)
+      setError(null)
+    } else {
+      setIsRefreshing(true)
+    }
     try {
       const data = await getOrders({
         status: status === 'all' ? undefined : status,
@@ -71,10 +76,13 @@ export function OrdersPage() {
       setItems(data.items)
       setTotal(data.total)
     } catch (err) {
-      const message = err instanceof Error ? err.message : t('orders:load_failed')
-      setError(message)
+      if (!background) {
+        const message = err instanceof Error ? err.message : t('orders:load_failed')
+        setError(message)
+      }
     } finally {
-      setIsLoading(false)
+      if (!background) setIsLoading(false)
+      else setIsRefreshing(false)
     }
   }, [config.searchFields, offset, search, status, t])
 
@@ -82,15 +90,15 @@ export function OrdersPage() {
     void load()
   }, [load])
 
-  // Avtoyangilash: faqat sahifa ko‘rinayotganda har 1 daqiqada (tab aktiv bo‘lganda)
+  // Avtoyangilash: orqada yangilash — jadval o‘chirilmasdan, chaqnashsiz
   useEffect(() => {
     if (typeof document === 'undefined') return
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') void load()
+      if (document.visibilityState === 'visible') void load(true)
     }
     document.addEventListener('visibilitychange', handleVisibility)
     const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') void load()
+      if (document.visibilityState === 'visible') void load(true)
     }, 60_000)
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility)
@@ -263,8 +271,13 @@ export function OrdersPage() {
             <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               {t('orders:title')}
             </div>
-            <div className="text-sm text-slate-500 dark:text-slate-400">
-              {t('orders:subtitle')}
+            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+              <span>{t('orders:subtitle')}</span>
+              {isRefreshing ? (
+                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+                  {t('orders:refreshing')}
+                </span>
+              ) : null}
             </div>
           </div>
           <div className="flex items-center gap-2">
