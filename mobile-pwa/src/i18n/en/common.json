@@ -59,6 +59,9 @@
   "logout": "Logout",
   "logout_confirm_title": "Confirm sign out",
   "logout_confirm_message": "Are you sure you want to sign out?",
+  "scroll_horizontal": "Scroll horizontally",
+  "scroll_left": "Scroll left",
+  "scroll_right": "Scroll right",
   "roles": {
     "picker": "Order picker",
     "receiver": "Receiver",

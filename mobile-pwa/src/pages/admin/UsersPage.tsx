@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Users } from 'lucide-react'
+import { Pencil, Search, Users } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -126,8 +126,13 @@ export function UsersPage() {
                 <Badge variant={user.is_active ? 'success' : 'neutral'}>
                   {user.is_active ? t('common:status.active') : t('common:status.inactive')}
                 </Badge>
-                <Button variant="ghost" onClick={() => navigate(`/admin/users/${user.id}`)}>
-                  {t('users:actions.edit')}
+                <Button
+                  variant="ghost"
+                  className="p-2"
+                  onClick={() => navigate(`/admin/users/${user.id}`)}
+                  aria-label={t('users:actions.edit')}
+                >
+                  <Pencil size={16} />
                 </Button>
               </div>
             </Card>

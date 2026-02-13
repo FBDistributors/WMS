@@ -5,6 +5,7 @@ import JsBarcode from 'jsbarcode'
 import QRCode from 'qrcode'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
@@ -97,7 +98,7 @@ export function LocationsPage() {
       )
     }
     return (
-      <div className="overflow-x-auto">
+      <TableScrollArea>
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-slate-200 dark:border-slate-700">
@@ -215,7 +216,7 @@ export function LocationsPage() {
             ))}
           </tbody>
         </table>
-      </div>
+      </TableScrollArea>
     )
   }, [error, isLoading, items, load, selectedIds, t])
 

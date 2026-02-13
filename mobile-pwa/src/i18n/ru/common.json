@@ -59,6 +59,9 @@
   "logout": "Выйти",
   "logout_confirm_title": "Подтвердите выход",
   "logout_confirm_message": "Вы уверены, что хотите выйти?",
+  "scroll_horizontal": "Прокрутить в сторону",
+  "scroll_left": "Влево",
+  "scroll_right": "Вправо",
   "roles": {
     "picker": "Комплектовщик",
     "receiver": "Приёмщик",

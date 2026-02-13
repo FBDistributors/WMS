@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { Package } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { TableScrollArea } from '../../../components/TableScrollArea'
 import { Badge } from '../../../components/ui/badge'
 import { Card } from '../../../components/ui/card'
 import type { Product } from '../../../services/productsApi'
@@ -229,7 +230,7 @@ export function ProductsTable({
 
   return (
     <Card className="overflow-hidden p-0">
-      <div className="overflow-x-auto">
+      <TableScrollArea className="border-0">
         <table className="min-w-full border-separate border-spacing-0 text-sm">
           <thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-950/40 dark:text-slate-400">
             <tr>
@@ -271,7 +272,7 @@ export function ProductsTable({
             ))}
           </tbody>
         </table>
-      </div>
+      </TableScrollArea>
     </Card>
   )
 }

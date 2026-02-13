@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -84,7 +85,7 @@ export function InventoryMovementsPage() {
       )
     }
     return (
-      <div className="overflow-x-auto">
+      <TableScrollArea>
         <table className="min-w-full text-sm">
           <thead className="text-xs uppercase text-slate-500">
             <tr className="border-b border-slate-200 dark:border-slate-800">
@@ -113,7 +114,7 @@ export function InventoryMovementsPage() {
             ))}
           </tbody>
         </table>
-      </div>
+      </TableScrollArea>
     )
   }
 

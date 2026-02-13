@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -80,7 +81,7 @@ export function SmartupOrdersPage() {
       )
     }
     return (
-      <div className="overflow-x-auto">
+      <TableScrollArea>
         <table className="min-w-full text-sm">
           <thead className="text-xs uppercase text-slate-500">
             <tr className="border-b border-slate-200 dark:border-slate-800">
@@ -111,7 +112,7 @@ export function SmartupOrdersPage() {
             ))}
           </tbody>
         </table>
-      </div>
+      </TableScrollArea>
     )
   }, [error, isLoading, items, load, t])
 

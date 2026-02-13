@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Plus, X } from 'lucide-react'
+import { Pencil, Plus, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
@@ -76,7 +77,7 @@ export function BrandsPage() {
       )
     }
     return (
-      <div className="overflow-x-auto">
+      <TableScrollArea>
         <table className="min-w-full text-sm">
           <thead className="text-xs uppercase text-slate-500">
             <tr className="border-b border-slate-200 dark:border-slate-800">
@@ -103,8 +104,13 @@ export function BrandsPage() {
                 {canManage ? (
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <Button variant="ghost" onClick={() => setDialog({ open: true, mode: 'edit', target: brand })}>
-                        {t('brands:edit')}
+                      <Button
+                        variant="ghost"
+                        className="p-2"
+                        onClick={() => setDialog({ open: true, mode: 'edit', target: brand })}
+                        aria-label={t('brands:edit')}
+                      >
+                        <Pencil size={16} />
                       </Button>
                       <Button
                         variant="ghost"
@@ -120,7 +126,7 @@ export function BrandsPage() {
             ))}
           </tbody>
         </table>
-      </div>
+      </TableScrollArea>
     )
   }, [canManage, error, isLoading, items, load, t])
 

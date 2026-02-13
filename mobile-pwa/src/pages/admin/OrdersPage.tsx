@@ -4,6 +4,7 @@ import { Settings, FileText } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { TableScrollArea } from '../../components/TableScrollArea'
 import { SendToPickingDialog } from '../../admin/components/orders/SendToPickingDialog'
 import { OrdersTableSettings } from '../../admin/components/orders/OrdersTableSettings'
 import { useOrdersTableConfig } from '../../admin/hooks/useOrdersTableConfig'
@@ -227,7 +228,7 @@ export function OrdersPage() {
     }
 
     return (
-      <div className="min-w-0 overflow-x-auto">
+      <TableScrollArea>
         <table className="min-w-full text-sm">
           <thead className="text-xs uppercase text-slate-500">
             <tr className="border-b border-slate-200 dark:border-slate-800">
@@ -250,7 +251,7 @@ export function OrdersPage() {
             ))}
           </tbody>
         </table>
-      </div>
+      </TableScrollArea>
     )
   }, [canSend, config.columnOrder, config.visibleColumns, error, isLoading, items, load, navigate, t])
 

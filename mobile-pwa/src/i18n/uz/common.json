@@ -59,6 +59,9 @@
   "logout": "Chiqish",
   "logout_confirm_title": "Chiqishni tasdiqlash",
   "logout_confirm_message": "Hisobdan chiqmoqchimisiz?",
+  "scroll_horizontal": "Jadvalni yonga suring",
+  "scroll_left": "Chapga",
+  "scroll_right": "O'ngga",
   "roles": {
     "picker": "Yig'uvchi",
     "receiver": "Qabul qiluvchi",
