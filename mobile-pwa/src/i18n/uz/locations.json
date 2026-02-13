@@ -24,6 +24,9 @@
   "barcode_label": "Joylashuv shtrixkodi",
   "print_label": "Yorliqni chop etish",
   "download_png": "PNG yuklab olish",
+  "qr_column": "QR",
+  "qr_download": "QR yuklab olish",
+  "qr_label_title": "Joylashuv QR kodi",
   "no_parent": "Ota yo'q",
   "validation": {
     "required": "Kod va nom majburiy.",

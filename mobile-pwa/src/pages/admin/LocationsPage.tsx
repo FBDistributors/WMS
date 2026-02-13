@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Download, Plus, Printer, X } from 'lucide-react'
+import { Download, Plus, Printer, QrCode, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import JsBarcode from 'jsbarcode'
+import QRCode from 'qrcode'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { Button } from '../../components/ui/button'
@@ -15,6 +16,27 @@ import {
   type Location,
   type LocationTypeEnum,
 } from '../../services/locationsApi'
+
+/** Small QR thumbnail for table cell. */
+function LocationQrThumbnail({ value, size = 40 }: { value: string; size?: number }) {
+  const [dataUrl, setDataUrl] = useState<string | null>(null)
+  useEffect(() => {
+    if (!value) return
+    QRCode.toDataURL(value, { width: size, margin: 1 })
+      .then(setDataUrl)
+      .catch(() => {})
+  }, [value, size])
+  if (!dataUrl) return <span className="text-slate-400">—</span>
+  return (
+    <img
+      src={dataUrl}
+      alt=""
+      className="inline-block rounded border border-slate-200 dark:border-slate-700"
+      width={size}
+      height={size}
+    />
+  )
+}
 
 /** Live preview of code from structured fields (same formula as backend). */
 function previewCode(
@@ -50,6 +72,7 @@ export function LocationsPage() {
   const [error, setError] = useState<string | null>(null)
   const [dialog, setDialog] = useState<DialogState>({ open: false, mode: 'create' })
   const [createdForBarcode, setCreatedForBarcode] = useState<Location | null>(null)
+  const [locationForQr, setLocationForQr] = useState<Location | null>(null)
   const [includeInactive, setIncludeInactive] = useState(false)
 
   const load = useCallback(async () => {
@@ -98,6 +121,9 @@ export function LocationsPage() {
                 {t('locations:fields.code')}
               </th>
               <th className="pb-2 pr-4 font-semibold text-slate-700 dark:text-slate-300">
+                {t('locations:qr_column')}
+              </th>
+              <th className="pb-2 pr-4 font-semibold text-slate-700 dark:text-slate-300">
                 {t('locations:type_label')}
               </th>
               <th className="pb-2 pr-4 font-semibold text-slate-700 dark:text-slate-300">
@@ -125,6 +151,9 @@ export function LocationsPage() {
               <tr key={loc.id} className="border-b border-slate-100 dark:border-slate-800">
                 <td className="py-2 pr-4 font-medium text-slate-900 dark:text-slate-100">
                   {loc.code}
+                </td>
+                <td className="py-2 pr-4 align-middle">
+                  <LocationQrThumbnail value={loc.barcode_value || loc.code} size={44} />
                 </td>
                 <td className="py-2 pr-4 text-slate-600 dark:text-slate-400">
                   {loc.location_type ?? '—'}
@@ -157,6 +186,14 @@ export function LocationsPage() {
                     onClick={() => setDialog({ open: true, mode: 'edit', target: loc })}
                   >
                     {t('locations:edit')}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="py-1.5 px-2 text-xs"
+                    onClick={() => setLocationForQr(loc)}
+                  >
+                    <QrCode size={14} className="mr-1 inline" />
+                    {t('locations:qr_download')}
                   </Button>
                   {loc.is_active ? (
                     <Button
@@ -228,6 +265,12 @@ export function LocationsPage() {
         <BarcodeLabelDialog
           location={createdForBarcode}
           onClose={() => setCreatedForBarcode(null)}
+        />
+      ) : null}
+      {locationForQr ? (
+        <QrDownloadDialog
+          location={locationForQr}
+          onClose={() => setLocationForQr(null)}
         />
       ) : null}
     </AdminLayout>
@@ -523,6 +566,78 @@ function BarcodeLabelDialog({ location, onClose }: BarcodeLabelDialogProps) {
             {t('locations:print_label')}
           </Button>
           <Button variant="secondary" onClick={handleDownloadPng} className="gap-2">
+            <Download size={16} />
+            {t('locations:download_png')}
+          </Button>
+          <Button variant="ghost" onClick={onClose}>
+            {t('common:buttons.close')}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+type QrDownloadDialogProps = {
+  location: Location
+  onClose: () => void
+}
+
+function QrDownloadDialog({ location, onClose }: QrDownloadDialogProps) {
+  const { t } = useTranslation(['locations', 'common'])
+  const [dataUrl, setDataUrl] = useState<string | null>(null)
+  const value = location.barcode_value || location.code
+
+  useEffect(() => {
+    if (!value) return
+    QRCode.toDataURL(value, { width: 256, margin: 2 })
+      .then(setDataUrl)
+      .catch(() => {})
+  }, [value])
+
+  const handleDownloadPng = () => {
+    if (!dataUrl) return
+    const a = document.createElement('a')
+    a.href = dataUrl
+    a.download = `location-qr-${value}.png`
+    a.click()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
+      <button
+        className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm"
+        onClick={onClose}
+        aria-label={t('common:buttons.close')}
+        type="button"
+      />
+      <div className="relative w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+        <div className="mb-4 flex items-center justify-between">
+          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            {t('locations:qr_label_title')}
+          </div>
+          <Button variant="ghost" className="rounded-full px-3 py-3" onClick={onClose}>
+            <X size={18} />
+          </Button>
+        </div>
+        <div className="flex flex-col items-center gap-4">
+          <p className="text-center font-mono text-sm font-medium text-slate-700 dark:text-slate-300">
+            {value}
+          </p>
+          {dataUrl ? (
+            <img
+              src={dataUrl}
+              alt=""
+              className="rounded-lg border border-slate-200 dark:border-slate-700"
+              width={256}
+              height={256}
+            />
+          ) : (
+            <div className="h-64 w-64 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-800" />
+          )}
+        </div>
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
+          <Button onClick={handleDownloadPng} className="gap-2" disabled={!dataUrl}>
             <Download size={16} />
             {t('locations:download_png')}
           </Button>

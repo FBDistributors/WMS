@@ -24,6 +24,9 @@
   "barcode_label": "Штрихкод локации",
   "print_label": "Печать этикетки",
   "download_png": "Скачать PNG",
+  "qr_column": "QR",
+  "qr_download": "Скачать QR",
+  "qr_label_title": "QR-код локации",
   "no_parent": "Без родителя",
   "validation": {
     "required": "Код и название обязательны.",

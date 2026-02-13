@@ -24,6 +24,9 @@
   "barcode_label": "Location barcode",
   "print_label": "Print label",
   "download_png": "Download PNG",
+  "qr_column": "QR",
+  "qr_download": "QR download",
+  "qr_label_title": "Location QR code",
   "no_parent": "No parent",
   "validation": {
     "required": "Code and name are required.",
