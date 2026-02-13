@@ -16,10 +16,14 @@ export function TableScrollArea({ children, className }: TableScrollAreaProps) {
 
   return (
     <>
-      <div ref={scrollRef} className={`min-w-0 overflow-x-auto ${className ?? ''}`}>
+      <div
+        ref={scrollRef}
+        className={`min-w-0 overflow-x-scroll overflow-y-hidden ${className ?? ''}`}
+        style={{ scrollbarGutter: 'stable' }}
+      >
         {children}
       </div>
-      <div className="flex items-center justify-center gap-2 py-2 text-xs text-slate-500 dark:text-slate-400">
+      <div className="flex items-center justify-center gap-3 border-t border-slate-200 bg-slate-50/80 py-2.5 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
         <Button
           variant="ghost"
           className="p-2"
