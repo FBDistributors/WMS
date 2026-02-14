@@ -16,6 +16,8 @@ from app.models.smartup_sync import SmartupSyncRun
 class SyncError:
     external_id: str
     reason: str
+    sku: str | None = None
+    barcode: str | None = None
 
 
 def _normalize_barcode(raw: str | None) -> tuple[str | None, list[str]]:
@@ -178,7 +180,10 @@ def _sync_products(
             inserted += 1
         except IntegrityError:
             db.rollback()
-            errors.append(SyncError(external_id=external_id, reason="Duplicate SKU or barcode"))
+            err = SyncError(external_id=external_id, reason="Duplicate SKU or barcode")
+            err.sku = code
+            err.barcode = barcode_primary
+            errors.append(err)
         except Exception as exc:  # noqa: BLE001
             db.rollback()
             errors.append(SyncError(external_id=external_id, reason=str(exc)))

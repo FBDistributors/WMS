@@ -37,10 +37,10 @@ def _get_orders_date_range() -> Tuple[date, date]:
     return start_date, end_date
 
 
-def sync_products(db: Session) -> Tuple[int, str | None]:
+def sync_products(db: Session) -> Tuple[int, str | None, list]:
     """
     Fetch products from SmartUp API and upsert into products table.
-    Returns (count_synced, error_message).
+    Returns (count_synced, exception_message, list of SyncError dicts).
     """
     try:
         client = SmartupInventoryExportClient()
@@ -66,16 +66,16 @@ def sync_products(db: Session) -> Tuple[int, str | None]:
             skipped,
             len(errors),
         )
-        return count, None
+        return count, None, [e.__dict__ for e in errors]
     except Exception as exc:
         logger.exception("Products sync failed: %s", exc)
-        return 0, str(exc)
+        return 0, str(exc), []
 
 
-def sync_orders(db: Session) -> Tuple[int, str | None]:
+def sync_orders(db: Session) -> Tuple[int, str | None, list]:
     """
     Fetch orders from SmartUp API and upsert into orders table.
-    Returns (count_synced, error_message).
+    Returns (count_synced, exception_message, list of error dicts).
     """
     try:
         start_date, end_date = _get_orders_date_range()
@@ -98,10 +98,10 @@ def sync_orders(db: Session) -> Tuple[int, str | None]:
             skipped,
             len(errors),
         )
-        return count, None
+        return count, None, [e.__dict__ for e in errors]
     except Exception as exc:
         logger.exception("Orders sync failed: %s", exc)
-        return 0, str(exc)
+        return 0, str(exc), []
 
 
 def run_full_sync() -> SmartupSyncRun | None:
@@ -130,19 +130,23 @@ def run_full_sync() -> SmartupSyncRun | None:
         orders_count = 0
         products_error: str | None = None
         orders_error: str | None = None
+        products_errors: list = []
+        orders_errors: list = []
 
         # Sync products
         try:
-            products_count, products_error = sync_products(db)
+            products_count, products_error, products_errors = sync_products(db)
         except Exception as exc:
             products_error = str(exc)
+            products_errors = []
             logger.exception("Products sync raised: %s", exc)
 
         # Sync orders (even if products failed)
         try:
-            orders_count, orders_error = sync_orders(db)
+            orders_count, orders_error, orders_errors = sync_orders(db)
         except Exception as exc:
             orders_error = str(exc)
+            orders_errors = []
             logger.exception("Orders sync raised: %s", exc)
 
         # Determine status
@@ -156,6 +160,17 @@ def run_full_sync() -> SmartupSyncRun | None:
             status = STATUS_SUCCESS
             error_message = None
 
+        # Build errors_json with full details (external_id, reason) for debugging
+        all_errors: list = []
+        if products_error:
+            all_errors.append({"step": "products", "reason": products_error})
+        for e in products_errors:
+            all_errors.append({"step": "products", "external_id": e.get("external_id"), "reason": e.get("reason")})
+        if orders_error:
+            all_errors.append({"step": "orders", "reason": orders_error})
+        for e in orders_errors:
+            all_errors.append({"step": "orders", "external_id": e.get("external_id"), "reason": e.get("reason")})
+
         # Update sync run
         run.finished_at = datetime.now(timezone.utc)
         run.status = status
@@ -165,15 +180,8 @@ def run_full_sync() -> SmartupSyncRun | None:
         run.inserted_count = products_count
         run.updated_count = orders_count
         run.success_count = products_count + orders_count
-
-        if products_error:
-            run.error_count = (run.error_count or 0) + 1
-            run.errors_json = run.errors_json or []
-            run.errors_json.append({"step": "products", "reason": products_error})
-        if orders_error:
-            run.error_count = (run.error_count or 0) + 1
-            run.errors_json = run.errors_json or []
-            run.errors_json.append({"step": "orders", "reason": orders_error})
+        run.error_count = len(all_errors)
+        run.errors_json = all_errors
 
         db.add(run)
         db.commit()

@@ -58,6 +58,7 @@ class SmartupSyncRunOut(BaseModel):
     skipped_count: int
     error_count: int
     status: str
+    errors_json: Optional[List[dict]] = None
 
 
 def _to_product(product: ProductModel) -> ProductOut:
@@ -114,16 +115,14 @@ async def sync_products_from_smartup(
     summary="List Smartup sync runs",
 )
 async def list_smartup_sync_runs(
+    run_type: Optional[str] = Query(None, description="Filter: products, orders, full"),
     db: Session = Depends(get_db),
     _user=Depends(require_permission("products:write")),
 ):
-    runs = (
-        db.query(SmartupSyncRun)
-        .filter(SmartupSyncRun.run_type == "products")
-        .order_by(SmartupSyncRun.started_at.desc())
-        .limit(20)
-        .all()
-    )
+    query = db.query(SmartupSyncRun).order_by(SmartupSyncRun.started_at.desc()).limit(20)
+    if run_type:
+        query = query.filter(SmartupSyncRun.run_type == run_type)
+    runs = query.all()
     return [
         SmartupSyncRunOut(
             id=str(run.id),
@@ -135,6 +134,7 @@ async def list_smartup_sync_runs(
             skipped_count=run.skipped_count,
             error_count=run.error_count,
             status=run.status,
+            errors_json=run.errors_json or [],
         )
         for run in runs
     ]
