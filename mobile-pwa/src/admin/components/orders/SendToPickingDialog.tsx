@@ -8,8 +8,19 @@ import type { ApiError } from '../../../services/apiClient'
 
 function formatApiError(err: unknown): string {
   if (err && typeof err === 'object' && 'details' in err) {
-    const d = (err as ApiError).details
-    if (d && typeof d === 'object' && 'detail' in d) return String(d.detail)
+    const apiErr = err as ApiError
+    const d = apiErr.details
+    if (d && typeof d === 'object' && 'detail' in d) {
+      const detail = d.detail
+      if (typeof detail === 'string') return detail
+      if (Array.isArray(detail) && detail[0]?.msg) return String(detail[0].msg)
+      if (typeof detail === 'object' && detail !== null) {
+        const o = detail as Record<string, unknown>
+        if (typeof o.msg === 'string') return o.msg
+        if (typeof o.message === 'string') return o.message
+      }
+    }
+    if (typeof apiErr.message === 'string') return apiErr.message
   }
   return err instanceof Error ? err.message : 'Error'
 }
