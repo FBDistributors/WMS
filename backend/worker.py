@@ -26,7 +26,7 @@ logger = logging.getLogger("smartup_worker")
 
 def main() -> None:
     """Run sync loop with configurable interval."""
-    interval = int(os.getenv("SYNC_INTERVAL_SECONDS", "300"))
+    interval = int(os.getenv("SYNC_INTERVAL_SECONDS", "600"))
     interval = max(60, min(interval, 86400))  # 1 min - 24 hours
 
     logger.info("SmartUp sync worker started, interval=%d seconds", interval)

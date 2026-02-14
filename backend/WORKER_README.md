@@ -26,7 +26,7 @@ python worker.py
 | `SMARTUP_PROJECT_CODE` | No | `trade` | Project code for orders |
 | `SMARTUP_FILIAL_ID` | No | - | Filial ID for orders |
 | `SMARTUP_INVENTORY_EXPORT_URL` | No | (built-in) | Override inventory export URL |
-| `SYNC_INTERVAL_SECONDS` | No | `300` | Seconds between sync runs (60–86400) |
+| `SYNC_INTERVAL_SECONDS` | No | `600` | Seconds between sync runs (60–86400). Higher = less DB load on web. |
 | `SYNC_ORDERS_DAYS_BACK` | No | `7` | Days of orders to fetch (1–90) |
 
 ## Render deployment

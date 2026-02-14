@@ -26,6 +26,6 @@ services:
       - key: SMARTUP_INVENTORY_EXPORT_URL
         sync: false  # Optional, has default
       - key: SYNC_INTERVAL_SECONDS
-        value: "300"
+        value: "600"
       - key: SYNC_ORDERS_DAYS_BACK
         value: "7"

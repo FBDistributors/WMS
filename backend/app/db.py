@@ -24,7 +24,14 @@ def get_database_url() -> str:
 
 def create_engine_from_env() -> Engine:
     url = get_database_url()
-    return create_engine(url, pool_pre_ping=True)
+    # Limit pool: Render free Postgres ~20 connections. Web + Worker share DB.
+    return create_engine(
+        url,
+        pool_pre_ping=True,
+        pool_size=3,
+        max_overflow=2,
+        pool_recycle=300,
+    )
 
 
 @lru_cache
