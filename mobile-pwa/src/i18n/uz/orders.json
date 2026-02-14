@@ -27,7 +27,8 @@
     "sending": "Yuborilmoqda...",
     "failed": "Pickingga yuborib bo‘lmadi.",
     "load_failed": "Yig'uvchilar ro‘yxati yuklanmadi.",
-    "no_pickers_hint": "Yig'uvchi yo'q. Admin > Foydalanuvchilar orqali Yig'uvchi rolida foydalanuvchi yarating."
+    "no_pickers_hint": "Yig'uvchi yo'q. Admin > Foydalanuvchilar orqali Yig'uvchi rolida foydalanuvchi yarating.",
+    "invalid_selection": "Noto'g'ri tanlov. Sahifani yangilab qayta urinib ko'ring."
   },
   "filters": {
     "status": "Holat",

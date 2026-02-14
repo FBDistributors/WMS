@@ -6,6 +6,12 @@ import { Button } from '../../../components/ui/button'
 import { getPickerUsers, sendOrderToPicking, type PickerUser } from '../../../services/ordersApi'
 import type { ApiError } from '../../../services/apiClient'
 
+const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
+
+function isValidUuid(s: unknown): s is string {
+  return typeof s === 'string' && UUID_REGEX.test(s)
+}
+
 function formatApiError(err: unknown): string {
   if (err && typeof err === 'object' && 'details' in err) {
     const apiErr = err as ApiError
@@ -64,10 +70,16 @@ export function SendToPickingDialog({ open, orderId, onOpenChange, onSent }: Sen
       setError(t('orders:send_to_picking.picker_required'))
       return
     }
+    const orderIdStr = String(orderId)
+    const selectedStr = String(selected).trim()
+    if (!isValidUuid(orderIdStr) || !isValidUuid(selectedStr)) {
+      setError(t('orders:send_to_picking.invalid_selection'))
+      return
+    }
     setIsSubmitting(true)
     setError(null)
     try {
-      await sendOrderToPicking(orderId, selected)
+      await sendOrderToPicking(orderIdStr, selectedStr)
       onSent()
       onOpenChange(false)
     } catch (err) {
@@ -111,11 +123,13 @@ export function SendToPickingDialog({ open, orderId, onOpenChange, onSent }: Sen
               <option value="">
                 {isLoadingPickers ? t('common:loading') : t('orders:send_to_picking.select_picker')}
               </option>
-              {pickers.map((picker) => (
-                <option key={picker.id} value={picker.id}>
-                  {picker.name}
-                </option>
-              ))}
+              {pickers
+                .filter((p) => isValidUuid(p.id))
+                .map((picker) => (
+                  <option key={String(picker.id)} value={String(picker.id)}>
+                    {picker.name}
+                  </option>
+                ))}
             </select>
             {!error && !isLoadingPickers && pickers.length === 0 ? (
               <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">

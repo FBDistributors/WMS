@@ -27,7 +27,8 @@
     "sending": "Sending...",
     "failed": "Failed to send to picking.",
     "load_failed": "Failed to load order picker list.",
-  "no_pickers_hint": "No pickers. Create a user with 'Order picker' role via Admin > Users."
+  "no_pickers_hint": "No pickers. Create a user with 'Order picker' role via Admin > Users.",
+    "invalid_selection": "Invalid selection. Please refresh the page and try again."
   },
   "filters": {
     "status": "Status",
