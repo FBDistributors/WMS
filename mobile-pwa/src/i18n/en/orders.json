@@ -28,7 +28,8 @@
     "failed": "Failed to send to picking.",
     "load_failed": "Failed to load order picker list.",
   "no_pickers_hint": "No pickers. Create a user with 'Order picker' role via Admin > Users.",
-    "invalid_selection": "Invalid selection. Please refresh the page and try again."
+    "invalid_selection": "Invalid selection. Please refresh the page and try again.",
+    "insufficient_stock": "Insufficient stock in warehouse. Receive products first or check inventory."
   },
   "filters": {
     "status": "Status",

@@ -28,7 +28,8 @@
     "failed": "Pickingga yuborib bo‘lmadi.",
     "load_failed": "Yig'uvchilar ro‘yxati yuklanmadi.",
     "no_pickers_hint": "Yig'uvchi yo'q. Admin > Foydalanuvchilar orqali Yig'uvchi rolida foydalanuvchi yarating.",
-    "invalid_selection": "Noto'g'ri tanlov. Sahifani yangilab qayta urinib ko'ring."
+    "invalid_selection": "Noto'g'ri tanlov. Sahifani yangilab qayta urinib ko'ring.",
+    "insufficient_stock": "Omborxonada yetarli qoldiq yo'q. Avval mahsulotlarni qabul qiling yoki inventarni tekshiring."
   },
   "filters": {
     "status": "Holat",

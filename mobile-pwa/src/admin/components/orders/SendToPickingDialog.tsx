@@ -83,7 +83,12 @@ export function SendToPickingDialog({ open, orderId, onOpenChange, onSent }: Sen
       onSent()
       onOpenChange(false)
     } catch (err) {
-      setError(formatApiError(err) || t('orders:send_to_picking.failed'))
+      const msg = formatApiError(err) || t('orders:send_to_picking.failed')
+      setError(
+        msg.toLowerCase().includes('insufficient stock')
+          ? t('orders:send_to_picking.insufficient_stock')
+          : msg
+      )
     } finally {
       setIsSubmitting(false)
     }
