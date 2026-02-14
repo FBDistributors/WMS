@@ -39,6 +39,14 @@ def _is_active_state(value: object) -> bool:
     return str(value).strip().upper() == "A"
 
 
+def _truncate(value: str | None, max_len: int) -> str | None:
+    """Truncate string to max_len to avoid StringDataRightTruncation."""
+    if value is None:
+        return None
+    s = str(value).strip()
+    return s[:max_len] if len(s) > max_len else s or None
+
+
 def _extract_brand_code(groups: list | None) -> str | None:
     if not groups:
         return None
@@ -76,7 +84,7 @@ def _sync_products(
             continue
         try:
             code = str(item.get("code") or "").strip()
-            name = str(item.get("name") or "").strip()
+            name = _truncate(item.get("name"), 512) or ""
             if not code or not name:
                 skipped += 1
                 continue
@@ -114,7 +122,7 @@ def _sync_products(
                     "smartup_code": code,
                     "sku": code,
                     "name": name,
-                    "short_name": item.get("short_name"),
+                    "short_name": _truncate(item.get("short_name"), 512),
                     "barcode": barcode_primary,
                     "article_code": item.get("article_code"),
                     "is_active": is_active,
@@ -122,7 +130,7 @@ def _sync_products(
                     "raw_payload": item,
                     "brand_id": brand_id if is_active else None,
                     "brand_code": brand_code if is_active else None,
-                    "brand": brand_name if is_active else None,
+                    "brand": _truncate(brand_name, 256) if is_active else None,
                 }
                 for key, value in fields.items():
                     if getattr(existing, key) != value:
@@ -153,7 +161,7 @@ def _sync_products(
                 smartup_code=code,
                 sku=code,
                 name=name,
-                short_name=item.get("short_name"),
+                short_name=_truncate(item.get("short_name"), 512),
                 barcode=barcode_primary,
                 article_code=item.get("article_code"),
                 is_active=is_active,
@@ -161,7 +169,7 @@ def _sync_products(
                 raw_payload=item,
                 brand_id=brand_id,
                 brand_code=brand_code,
-                brand=brand_name,
+                brand=_truncate(brand_name, 256),
             )
             if barcode_list:
                 record.barcodes = [ProductBarcode(barcode=code_value) for code_value in barcode_list]

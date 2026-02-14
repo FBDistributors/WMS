@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Tuple
 
 from sqlalchemy.orm import Session
@@ -111,7 +111,7 @@ def run_full_sync() -> SmartupSyncRun | None:
     """
     db = SessionLocal()
     run: SmartupSyncRun | None = None
-    start_time = datetime.utcnow()
+    start_time = datetime.now(timezone.utc)
 
     try:
         run = SmartupSyncRun(
@@ -157,7 +157,7 @@ def run_full_sync() -> SmartupSyncRun | None:
             error_message = None
 
         # Update sync run
-        run.finished_at = datetime.utcnow()
+        run.finished_at = datetime.now(timezone.utc)
         run.status = status
         run.error_message = error_message[:512] if error_message else None
         run.synced_products_count = products_count
@@ -192,7 +192,7 @@ def run_full_sync() -> SmartupSyncRun | None:
         logger.exception("SmartUp full sync failed: %s", exc)
         if run:
             try:
-                run.finished_at = datetime.utcnow()
+                run.finished_at = datetime.now(timezone.utc)
                 run.status = STATUS_FAILED
                 run.error_message = str(exc)[:512]
                 db.add(run)

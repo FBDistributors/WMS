@@ -18,12 +18,12 @@ class Product(Base):
     external_source: Mapped[str] = mapped_column(String(32), nullable=False, default="smartup")
     external_id: Mapped[str] = mapped_column(String(128), nullable=False)
     smartup_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    name: Mapped[str] = mapped_column(String(128), nullable=False)
-    short_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    name: Mapped[str] = mapped_column(String(512), nullable=False)
+    short_name: Mapped[str | None] = mapped_column(String(512), nullable=True)
     sku: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     barcode: Mapped[str | None] = mapped_column(String(64), nullable=True)
     article_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    brand: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    brand: Mapped[str | None] = mapped_column(String(256), nullable=True)
     brand_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("brands.id", ondelete="SET NULL"), nullable=True
     )
