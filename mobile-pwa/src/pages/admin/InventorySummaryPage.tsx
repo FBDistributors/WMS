@@ -301,20 +301,18 @@ export function InventorySummaryPage() {
             <div className="flex gap-2">
               <Button
                 variant="outline"
-                size="sm"
                 onClick={goPrev}
                 disabled={!hasPrev}
-                className="gap-1"
+                className="gap-1 px-3 py-2"
               >
                 <ChevronLeft size={16} />
                 {t('common:buttons.back')}
               </Button>
               <Button
                 variant="outline"
-                size="sm"
                 onClick={goNext}
                 disabled={!hasNext}
-                className="gap-1"
+                className="gap-1 px-3 py-2"
               >
                 {t('common:buttons.next')}
                 <ChevronRight size={16} />
