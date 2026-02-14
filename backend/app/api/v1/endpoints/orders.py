@@ -355,6 +355,15 @@ async def list_orders(
     return OrdersListResponse(items=items, total=total, limit=limit, offset=offset)
 
 
+@router.get("/pickers", response_model=List[PickerUser], summary="List picker users")
+async def list_picker_users(
+    db: Session = Depends(get_db),
+    _user=Depends(require_any_permission(["picking:assign", "orders:send_to_picking"])),
+):
+    users = db.query(User).filter(User.role == "picker", User.is_active.is_(True)).order_by(User.full_name, User.username).all()
+    return [PickerUser(id=user.id, name=user.full_name or user.username) for user in users]
+
+
 @router.get("/{order_id}", response_model=OrderDetails, summary="Get order")
 async def get_order(
     order_id: UUID,
@@ -395,15 +404,6 @@ async def sync_orders_from_smartup(
         return SmartupSyncResponse(created=created, updated=updated, skipped=skipped)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"Smartup export failed: {exc}") from exc
-
-
-@router.get("/pickers", response_model=List[PickerUser], summary="List picker users")
-async def list_picker_users(
-    db: Session = Depends(get_db),
-    _user=Depends(require_any_permission(["picking:assign", "orders:send_to_picking"])),
-):
-    users = db.query(User).filter(User.role == "picker", User.is_active.is_(True)).order_by(User.full_name, User.username).all()
-    return [PickerUser(id=user.id, name=user.full_name or user.username) for user in users]
 
 
 @router.post("/{order_id}/send-to-picking", response_model=SendToPickingResponse, summary="Send order to picking")
