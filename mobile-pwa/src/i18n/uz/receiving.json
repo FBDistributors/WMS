@@ -34,5 +34,6 @@
   "validation": {
     "lines_required": "Kamida bitta qator kerak.",
     "line_invalid": "Har qator uchun mahsulot, joylashuv, partiya va miqdorni kiriting."
-  }
+  },
+  "no_results": "Natija topilmadi"
 }

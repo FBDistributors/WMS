@@ -34,5 +34,6 @@
   "validation": {
     "lines_required": "At least one line is required.",
     "line_invalid": "Fill product, location, batch and qty for each line."
-  }
+  },
+  "no_results": "No results"
 }

@@ -194,6 +194,7 @@ async def list_smartup_sync_runs(
 async def list_products(
     search: Optional[str] = Query(None, alias="search"),
     q: Optional[str] = None,
+    product_ids: Optional[str] = Query(None, description="Comma-separated product UUIDs to filter"),
     include_inactive: bool = Query(False),
     include_summary: bool = Query(False, description="Include on_hand_total, available_total per product"),
     limit: int = Query(50, ge=1, le=200),
@@ -204,6 +205,11 @@ async def list_products(
     query = db.query(ProductModel).options(selectinload(ProductModel.barcodes))
     if not include_inactive:
         query = query.filter(ProductModel.is_active.is_(True))
+    ids_value = (product_ids or "").strip()
+    if ids_value:
+        ids = [UUID(x.strip()) for x in ids_value.split(",") if x.strip()]
+        if ids:
+            query = query.filter(ProductModel.id.in_(ids))
     term_value = (search or q or "").strip()
     if term_value:
         term = f"%{term_value}%"

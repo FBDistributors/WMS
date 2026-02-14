@@ -28,6 +28,7 @@ export type ProductListResponse = {
 export type ProductsQuery = {
   q?: string
   search?: string
+  product_ids?: string[] | string
   limit?: number
   offset?: number
   include_summary?: boolean
@@ -37,9 +38,17 @@ export async function getProducts(
   query: ProductsQuery = {},
   signal?: AbortSignal
 ) {
+  const productIds = query.product_ids
+  const productIdsStr =
+    Array.isArray(productIds)
+      ? productIds.join(',')
+      : typeof productIds === 'string'
+        ? productIds
+        : undefined
   return fetchJSON<ProductListResponse>('/api/v1/products', {
     query: {
       search: query.search ?? query.q,
+      product_ids: productIdsStr,
       limit: query.limit,
       offset: query.offset,
       include_summary: query.include_summary,

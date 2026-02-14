@@ -4,6 +4,7 @@ import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { ProductSearchCombobox, formatProductLabel } from '../../components/ProductSearchCombobox'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -36,6 +37,7 @@ export function ReceivingPage() {
   const canWrite = has('receiving:write')
 
   const [products, setProducts] = useState<Product[]>([])
+  const [selectedProducts, setSelectedProducts] = useState<Map<string, Product>>(new Map())
   const [locations, setLocations] = useState<Location[]>([])
   const [receipts, setReceipts] = useState<Receipt[]>([])
   const [docNo, setDocNo] = useState('')
@@ -48,14 +50,27 @@ export function ReceivingPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const [productsResponse, locationsResponse, receiptsResponse] = await Promise.all([
-        getProducts({ limit: 200 }),
+      const [locationsResponse, receiptsResponse] = await Promise.all([
         getLocations(true),
         listReceipts(),
       ])
-      setProducts(productsResponse.items)
       setLocations(locationsResponse)
       setReceipts(receiptsResponse)
+
+      const productIds = [
+        ...new Set(
+          receiptsResponse.flatMap((r) => r.lines.map((l) => l.product_id).filter(Boolean))
+        ),
+      ]
+      if (productIds.length > 0) {
+        const productsResponse = await getProducts({
+          product_ids: productIds,
+          limit: productIds.length,
+        })
+        setProducts(productsResponse.items)
+      } else {
+        setProducts([])
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : t('receiving:load_failed'))
     } finally {
@@ -68,9 +83,10 @@ export function ReceivingPage() {
   }, [load])
 
   const productLookup = useMemo(() => {
-    const map = new Map(products.map((product) => [product.id, product]))
+    const map = new Map<string, Product>(products.map((p) => [p.id, p]))
+    selectedProducts.forEach((p) => map.set(p.id, p))
     return map
-  }, [products])
+  }, [products, selectedProducts])
 
   const locationLookup = useMemo(() => {
     const map = new Map(locations.map((location) => [location.id, location]))
@@ -118,6 +134,7 @@ export function ReceivingPage() {
       })
       setDocNo('')
       setLines([{ ...EMPTY_LINE }])
+      setSelectedProducts(new Map())
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : t('receiving:save_failed'))
@@ -191,18 +208,29 @@ export function ReceivingPage() {
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 <label className="text-sm text-slate-600 dark:text-slate-300">
                   {t('receiving:fields.product')}
-                  <select
-                    className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-                    value={line.product_id}
-                    onChange={(event) => updateLine(line.id, { product_id: event.target.value })}
-                  >
-                    <option value="">{t('receiving:fields.select_product')}</option>
-                    {products.map((product) => (
-                      <option key={product.id} value={product.id}>
-                        {product.sku} · {product.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="mt-1">
+                    <ProductSearchCombobox
+                      value={line.product_id}
+                      placeholder={t('receiving:fields.select_product')}
+                      displayLabel={
+                        line.product_id
+                          ? (() => {
+                              const p = productLookup.get(line.product_id)
+                              return p ? formatProductLabel(p) : ''
+                            })()
+                          : undefined
+                      }
+                      onSelect={(product) => {
+                        if (product) {
+                          setSelectedProducts((prev) => new Map(prev).set(product.id, product))
+                          updateLine(line.id, { product_id: product.id })
+                        } else {
+                          updateLine(line.id, { product_id: '' })
+                        }
+                      }}
+                      className="w-full"
+                    />
+                  </div>
                 </label>
                 <label className="text-sm text-slate-600 dark:text-slate-300">
                   {t('receiving:fields.location')}
