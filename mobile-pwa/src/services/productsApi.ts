@@ -30,13 +30,17 @@ export type ProductsQuery = {
   offset?: number
 }
 
-export async function getProducts(query: ProductsQuery = {}) {
+export async function getProducts(
+  query: ProductsQuery = {},
+  signal?: AbortSignal
+) {
   return fetchJSON<ProductListResponse>('/api/v1/products', {
     query: {
       search: query.search ?? query.q,
       limit: query.limit,
       offset: query.offset,
     },
+    signal,
   })
 }
 

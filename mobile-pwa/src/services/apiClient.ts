@@ -10,6 +10,7 @@ type RequestOptions<TBody> = {
   body?: TBody
   headers?: Record<string, string>
   query?: Record<string, string | number | boolean | undefined>
+  signal?: AbortSignal
 }
 
 const TOKEN_KEY = 'wms_token'
@@ -55,6 +56,7 @@ export async function fetchJSON<TResponse, TBody = unknown>(
         ...(options.headers ?? {}),
       },
       body: options.body ? JSON.stringify(options.body) : undefined,
+      signal: options.signal,
     })
 
     const contentType = response.headers.get('Content-Type') ?? ''

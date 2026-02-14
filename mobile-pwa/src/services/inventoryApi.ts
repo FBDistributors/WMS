@@ -60,7 +60,10 @@ export type InventorySummaryQuery = {
   low_stock_threshold?: number
 }
 
-export async function getInventorySummary(query: InventorySummaryQuery = {}) {
+export async function getInventorySummary(
+  query: InventorySummaryQuery = {},
+  signal?: AbortSignal
+) {
   return fetchJSON<InventorySummaryRow[]>('/api/v1/inventory/summary', {
     query: {
       search: query.search,
@@ -68,6 +71,7 @@ export async function getInventorySummary(query: InventorySummaryQuery = {}) {
       only_available: query.only_available,
       low_stock_threshold: query.low_stock_threshold,
     },
+    signal,
   })
 }
 

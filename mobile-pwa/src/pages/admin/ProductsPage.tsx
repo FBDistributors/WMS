@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Settings, Upload } from 'lucide-react'
+import { Search, Settings, Upload, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -70,7 +70,8 @@ export function ProductsPage() {
   const [offset, setOffset] = useState(0)
   const limit = 50
   const [query, setQuery] = useState('')
-  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [activeSearch, setActiveSearch] = useState('')
+  const abortRef = useRef<AbortController | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
@@ -80,24 +81,33 @@ export function ProductsPage() {
 
   const load = useCallback(
     async (search: string, nextOffset: number) => {
+      abortRef.current?.abort()
+      const ac = new AbortController()
+      abortRef.current = ac
       setIsLoading(true)
       setError(null)
       try {
-        const data = await getProducts({ search, limit, offset: nextOffset })
+        const data = await getProducts(
+          { search: search || undefined, limit, offset: nextOffset },
+          ac.signal
+        )
         let summaryMap = new Map<string, { on_hand_total: number; available_total: number }>()
         try {
-          const summary = await getInventorySummary({
-            product_ids: data.items.map((item) => item.id),
-          })
+          const summary = await getInventorySummary(
+            { product_ids: data.items.map((item) => item.id) },
+            ac.signal
+          )
           summaryMap = new Map(
             summary.map((row) => [
               row.product_id,
               { on_hand_total: row.on_hand_total, available_total: row.available_total },
             ])
           )
-        } catch {
+        } catch (err) {
+          if ((err as { name?: string }).name === 'AbortError') return
           summaryMap = new Map()
         }
+        if (abortRef.current !== ac) return
         setItems(
           data.items.map((item) => {
             const totals = summaryMap.get(item.id)
@@ -109,18 +119,33 @@ export function ProductsPage() {
           })
         )
         setTotal(data.total)
-      } catch {
+      } catch (err) {
+        if ((err as { name?: string }).name === 'AbortError') return
         setError(t('products:load_error'))
       } finally {
-        setIsLoading(false)
+        if (abortRef.current === ac) {
+          abortRef.current = null
+          setIsLoading(false)
+        }
       }
     },
     [limit, t]
   )
 
   const handleRetry = useCallback(() => {
-    void load(debouncedQuery, offset)
-  }, [debouncedQuery, load, offset])
+    void load(activeSearch, offset)
+  }, [activeSearch, load, offset])
+
+  const handleSearch = useCallback(() => {
+    setActiveSearch(query.trim())
+    setOffset(0)
+  }, [query])
+
+  const handleClear = useCallback(() => {
+    setQuery('')
+    setActiveSearch('')
+    setOffset(0)
+  }, [])
 
   const loadRuns = useCallback(async () => {
     try {
@@ -132,22 +157,8 @@ export function ProductsPage() {
   }, [])
 
   useEffect(() => {
-    const handle = setTimeout(() => setDebouncedQuery(query.trim()), 300)
-    return () => clearTimeout(handle)
-  }, [query])
-
-  const prevQueryRef = useRef(debouncedQuery)
-
-  useEffect(() => {
-    const prev = prevQueryRef.current
-    if (prev !== debouncedQuery && offset !== 0) {
-      prevQueryRef.current = debouncedQuery
-      setOffset(0)
-      return
-    }
-    prevQueryRef.current = debouncedQuery
-    void load(debouncedQuery, offset)
-  }, [debouncedQuery, load, offset])
+    void load(activeSearch, offset)
+  }, [activeSearch, offset, load])
 
   useEffect(() => {
     void loadRuns()
@@ -221,7 +232,7 @@ export function ProductsPage() {
       })
       setSyncResult(result)
       await loadRuns()
-      await load(debouncedQuery, offset)
+      await load(activeSearch, offset)
     } catch (err) {
       setSyncError(err instanceof Error ? err.message : t('products:sync_failed'))
     } finally {
@@ -264,7 +275,21 @@ export function ProductsPage() {
             placeholder={t('products:search_placeholder')}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           />
+          {activeSearch ? (
+            <button
+              type="button"
+              onClick={handleClear}
+              className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+              aria-label={t('common:buttons.close')}
+            >
+              <X size={18} />
+            </button>
+          ) : null}
+          <Button variant="secondary" onClick={handleSearch} className="shrink-0">
+            {t('common:labels.search')}
+          </Button>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2 md:flex-nowrap">
           {canManageProducts && (
@@ -352,7 +377,7 @@ export function ProductsPage() {
           onOpenChange={setIsAddOpen}
           onCreated={() => {
             setOffset(0)
-            void load(debouncedQuery, 0)
+            void load(activeSearch, 0)
           }}
         />
       )}
@@ -362,7 +387,7 @@ export function ProductsPage() {
           onOpenChange={setIsImportOpen}
           onImported={() => {
             setOffset(0)
-            void load(debouncedQuery, 0)
+            void load(activeSearch, 0)
           }}
         />
       )}
