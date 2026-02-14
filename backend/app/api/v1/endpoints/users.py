@@ -5,13 +5,20 @@ import re
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.auth.deps import require_permission
 from app.auth.permissions import ROLE_PERMISSIONS
+from app.services.audit_service import (
+    ACTION_CREATE,
+    ACTION_DELETE,
+    ACTION_UPDATE,
+    get_client_ip,
+    log_action,
+)
 from app.auth.security import get_password_hash
 from app.db import get_db
 from app.models.user import User
@@ -117,9 +124,10 @@ async def get_user(
 @router.post("", response_model=UserOut, summary="Create user", status_code=status.HTTP_201_CREATED)
 @router.post("/", response_model=UserOut, summary="Create user", status_code=status.HTTP_201_CREATED)
 async def create_user(
+    request: Request,
     payload: UserCreateIn,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("users:manage")),
+    user=Depends(require_permission("users:manage")),
 ):
     if payload.role not in VALID_ROLES:
         raise HTTPException(status_code=400, detail="Invalid role")
@@ -130,30 +138,41 @@ async def create_user(
     if existing:
         raise HTTPException(status_code=409, detail="Username already exists")
 
-    user = User(
+    new_user = User(
         username=payload.username,
         full_name=payload.full_name,
         password_hash=get_password_hash(payload.password),
         role=payload.role,
         is_active=payload.is_active,
     )
-    db.add(user)
+    db.add(new_user)
+    log_action(
+        db,
+        user_id=user.id,
+        action=ACTION_CREATE,
+        entity_type="user",
+        entity_id=str(new_user.id),
+        new_data={"username": payload.username, "role": payload.role, "is_active": payload.is_active},
+        ip_address=get_client_ip(request),
+    )
     db.commit()
-    db.refresh(user)
-    return _to_user_out(user)
+    db.refresh(new_user)
+    return _to_user_out(new_user)
 
 
 @router.patch("/{user_id}", response_model=UserOut, summary="Update user")
 async def update_user(
+    request: Request,
     user_id: UUID,
     payload: UserUpdateIn,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("users:manage")),
+    current_user=Depends(require_permission("users:manage")),
 ):
     user = db.query(User).filter(User.id == user_id).one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    old_data = {"username": user.username, "role": user.role, "is_active": user.is_active}
     updates = payload.dict(exclude_unset=True)
     if "role" in updates and updates["role"] not in VALID_ROLES:
         raise HTTPException(status_code=400, detail="Invalid role")
@@ -165,6 +184,17 @@ async def update_user(
     if "is_active" in updates:
         user.is_active = updates["is_active"]
 
+    new_data = {"username": user.username, "role": user.role, "is_active": user.is_active}
+    log_action(
+        db,
+        user_id=current_user.id,
+        action=ACTION_UPDATE,
+        entity_type="user",
+        entity_id=str(user_id),
+        old_data=old_data,
+        new_data=new_data,
+        ip_address=get_client_ip(request),
+    )
     db.commit()
     db.refresh(user)
     return _to_user_out(user)
@@ -172,10 +202,11 @@ async def update_user(
 
 @router.post("/{user_id}/reset-password", summary="Reset password")
 async def reset_password(
+    request: Request,
     user_id: UUID,
     payload: ResetPasswordIn,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("users:manage")),
+    current_user=Depends(require_permission("users:manage")),
 ):
     _validate_password(payload.new_password)
     user = db.query(User).filter(User.id == user_id).one_or_none()
@@ -183,20 +214,42 @@ async def reset_password(
         raise HTTPException(status_code=404, detail="User not found")
 
     user.password_hash = get_password_hash(payload.new_password)
+    log_action(
+        db,
+        user_id=current_user.id,
+        action=ACTION_UPDATE,
+        entity_type="user",
+        entity_id=str(user_id),
+        old_data={},
+        new_data={"action": "password_reset"},
+        ip_address=get_client_ip(request),
+    )
     db.commit()
     return {"status": "ok"}
 
 
 @router.delete("/{user_id}", response_model=UserOut, summary="Disable user")
 async def disable_user(
+    request: Request,
     user_id: UUID,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("users:manage")),
+    current_user=Depends(require_permission("users:manage")),
 ):
     user = db.query(User).filter(User.id == user_id).one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    old_data = {"username": user.username, "is_active": user.is_active}
     user.is_active = False
+    log_action(
+        db,
+        user_id=current_user.id,
+        action=ACTION_UPDATE,
+        entity_type="user",
+        entity_id=str(user_id),
+        old_data=old_data,
+        new_data={**old_data, "is_active": False},
+        ip_address=get_client_ip(request),
+    )
     db.commit()
     db.refresh(user)
     return _to_user_out(user)

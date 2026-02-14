@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Query, status
 from pydantic import BaseModel
 from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.auth.deps import require_permission
 from app.db import get_db
+from app.services.audit_service import ACTION_CREATE, get_client_ip, log_action
 from app.integrations.smartup.products_sync import sync_smartup_products
 from app.models.smartup_sync import SmartupSyncRun
 from app.models.product import Product as ProductModel
@@ -224,9 +225,10 @@ def _status_to_active(status_value: str) -> bool:
 @router.post("", response_model=ProductOut, summary="Create Product", status_code=status.HTTP_201_CREATED)
 @router.post("/", response_model=ProductOut, summary="Create Product", status_code=status.HTTP_201_CREATED)
 async def create_product(
+    request: Request,
     payload: ProductCreateIn,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("products:write")),
+    user=Depends(require_permission("products:write")),
 ):
     if not payload.sku or not payload.sku.strip():
         raise HTTPException(status_code=400, detail="SKU is required")
@@ -265,6 +267,15 @@ async def create_product(
 
     try:
         db.add(product)
+        log_action(
+            db,
+            user_id=user.id,
+            action=ACTION_CREATE,
+            entity_type="product",
+            entity_id=str(product.id),
+            new_data={"sku": product.sku, "name": product.name, "brand": product.brand, "is_active": product.is_active},
+            ip_address=get_client_ip(request),
+        )
         db.commit()
     except IntegrityError:
         db.rollback()

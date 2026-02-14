@@ -5,12 +5,13 @@ from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import case, distinct, exists, func, select
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user, require_permission
+from app.services.audit_service import ACTION_CREATE, get_client_ip, log_action
 
 from app.api.v1.endpoints import picker_inventory
 from app.db import get_db
@@ -288,6 +289,7 @@ async def list_stock_movements(
 @router.post("/movements", response_model=StockMovementOut, status_code=status.HTTP_201_CREATED)
 @router.post("/movements/", response_model=StockMovementOut, status_code=status.HTTP_201_CREATED)
 async def create_stock_movement(
+    request: Request,
     payload: StockMovementCreate,
     db: Session = Depends(get_db),
     user: UserModel = Depends(get_current_user),
@@ -328,6 +330,21 @@ async def create_stock_movement(
         created_by_user_id=user.id,
     )
     db.add(movement)
+    log_action(
+        db,
+        user_id=user.id,
+        action=ACTION_CREATE,
+        entity_type="stock_movement",
+        entity_id=str(movement.id),
+        new_data={
+            "product_id": str(payload.product_id),
+            "lot_id": str(payload.lot_id),
+            "location_id": str(payload.location_id),
+            "qty_change": str(payload.qty_change),
+            "movement_type": payload.movement_type,
+        },
+        ip_address=get_client_ip(request),
+    )
     db.commit()
     db.refresh(movement)
     return _to_movement(movement)

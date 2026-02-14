@@ -1,0 +1,23 @@
+{
+  "title": "Audit log",
+  "load_error": "Audit log yuklanmadi.",
+  "empty": "Audit log yo'q",
+  "empty_desc": "Foydalanuvchilar o'zgarish kiritganda audit log paydo bo'ladi.",
+  "total": "Jami {{count}} ta",
+  "columns": {
+    "timestamp": "Vaqt",
+    "user": "Foydalanuvchi",
+    "action": "Amal",
+    "entity_type": "Ob'ekt turi",
+    "entity_id": "Ob'ekt ID"
+  },
+  "filters": {
+    "entity_type": "Ob'ekt turi",
+    "all": "Barchasi",
+    "date_from": "Boshlanish",
+    "date_to": "Tugash",
+    "apply": "Qo'llash"
+  },
+  "old_data": "Eski ma'lumot",
+  "new_data": "Yangi ma'lumot"
+}

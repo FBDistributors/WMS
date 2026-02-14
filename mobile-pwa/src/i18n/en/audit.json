@@ -1,0 +1,23 @@
+{
+  "title": "Audit Logs",
+  "load_error": "Failed to load audit logs.",
+  "empty": "No audit logs",
+  "empty_desc": "Audit logs will appear when users make changes.",
+  "total": "{{count}} total",
+  "columns": {
+    "timestamp": "Timestamp",
+    "user": "User",
+    "action": "Action",
+    "entity_type": "Entity Type",
+    "entity_id": "Entity ID"
+  },
+  "filters": {
+    "entity_type": "Entity type",
+    "all": "All",
+    "date_from": "From date",
+    "date_to": "To date",
+    "apply": "Apply"
+  },
+  "old_data": "Old data",
+  "new_data": "New data"
+}

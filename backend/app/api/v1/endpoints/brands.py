@@ -3,13 +3,20 @@ from __future__ import annotations
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.auth.deps import require_permission
 from app.db import get_db
+from app.services.audit_service import (
+    ACTION_CREATE,
+    ACTION_DELETE,
+    ACTION_UPDATE,
+    get_client_ip,
+    log_action,
+)
 from app.models.brand import Brand as BrandModel
 from app.models.product import Product as ProductModel
 
@@ -77,9 +84,10 @@ async def list_brands(
 @router.post("", response_model=BrandOut, status_code=status.HTTP_201_CREATED, summary="Create brand")
 @router.post("/", response_model=BrandOut, status_code=status.HTTP_201_CREATED, summary="Create brand")
 async def create_brand(
+    request: Request,
     payload: BrandCreate,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("brands:manage")),
+    user=Depends(require_permission("brands:manage")),
 ):
     existing = db.query(BrandModel).filter(BrandModel.code == payload.code).one_or_none()
     if existing:
@@ -91,6 +99,15 @@ async def create_brand(
         is_active=payload.is_active,
     )
     db.add(brand)
+    log_action(
+        db,
+        user_id=user.id,
+        action=ACTION_CREATE,
+        entity_type="brand",
+        entity_id=str(brand.id),
+        new_data={"code": brand.code, "name": brand.name, "is_active": brand.is_active},
+        ip_address=get_client_ip(request),
+    )
     db.commit()
     db.refresh(brand)
     return _to_brand(brand)
@@ -98,15 +115,17 @@ async def create_brand(
 
 @router.put("/{brand_id}", response_model=BrandOut, summary="Update brand")
 async def update_brand(
+    request: Request,
     brand_id: UUID,
     payload: BrandUpdate,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("brands:manage")),
+    user=Depends(require_permission("brands:manage")),
 ):
     brand = db.query(BrandModel).filter(BrandModel.id == brand_id).one_or_none()
     if not brand:
         raise HTTPException(status_code=404, detail="Brand not found")
 
+    old_data = {"code": brand.code, "name": brand.name, "is_active": brand.is_active}
     if payload.code and payload.code != brand.code:
         existing = db.query(BrandModel).filter(BrandModel.code == payload.code).one_or_none()
         if existing:
@@ -119,6 +138,17 @@ async def update_brand(
     if payload.is_active is not None:
         brand.is_active = payload.is_active
 
+    new_data = {"code": brand.code, "name": brand.name, "is_active": brand.is_active}
+    log_action(
+        db,
+        user_id=user.id,
+        action=ACTION_UPDATE,
+        entity_type="brand",
+        entity_id=str(brand_id),
+        old_data=old_data,
+        new_data=new_data,
+        ip_address=get_client_ip(request),
+    )
     db.commit()
     db.refresh(brand)
     return _to_brand(brand)
@@ -126,14 +156,26 @@ async def update_brand(
 
 @router.delete("/{brand_id}", response_model=BrandOut, summary="Deactivate brand")
 async def delete_brand(
+    request: Request,
     brand_id: UUID,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("brands:manage")),
+    user=Depends(require_permission("brands:manage")),
 ):
     brand = db.query(BrandModel).filter(BrandModel.id == brand_id).one_or_none()
     if not brand:
         raise HTTPException(status_code=404, detail="Brand not found")
+    old_data = {"code": brand.code, "is_active": brand.is_active}
     brand.is_active = False
+    log_action(
+        db,
+        user_id=user.id,
+        action=ACTION_UPDATE,
+        entity_type="brand",
+        entity_id=str(brand_id),
+        old_data=old_data,
+        new_data={**old_data, "is_active": False},
+        ip_address=get_client_ip(request),
+    )
     db.commit()
     db.refresh(brand)
     return _to_brand(brand)

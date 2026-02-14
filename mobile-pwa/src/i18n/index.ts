@@ -14,6 +14,7 @@ import receivingUz from './uz/receiving.json'
 import inventoryUz from './uz/inventory.json'
 import brandsUz from './uz/brands.json'
 import usersUz from './uz/users.json'
+import auditUz from './uz/audit.json'
 
 import commonEn from './en/common.json'
 import authEn from './en/auth.json'
@@ -28,6 +29,7 @@ import receivingEn from './en/receiving.json'
 import inventoryEn from './en/inventory.json'
 import brandsEn from './en/brands.json'
 import usersEn from './en/users.json'
+import auditEn from './en/audit.json'
 
 import commonRu from './ru/common.json'
 import authRu from './ru/auth.json'
@@ -42,6 +44,7 @@ import receivingRu from './ru/receiving.json'
 import inventoryRu from './ru/inventory.json'
 import brandsRu from './ru/brands.json'
 import usersRu from './ru/users.json'
+import auditRu from './ru/audit.json'
 
 const SUPPORTED_LANGS = ['uz', 'en', 'ru'] as const
 const STORAGE_KEY = 'wms_lang'
@@ -67,6 +70,7 @@ i18n.use(initReactI18next).init({
       inventory: inventoryUz,
       brands: brandsUz,
       users: usersUz,
+      audit: auditUz,
     },
     en: {
       common: commonEn,
@@ -82,6 +86,7 @@ i18n.use(initReactI18next).init({
       inventory: inventoryEn,
       brands: brandsEn,
       users: usersEn,
+      audit: auditEn,
     },
     ru: {
       common: commonRu,
@@ -97,6 +102,7 @@ i18n.use(initReactI18next).init({
       inventory: inventoryRu,
       brands: brandsRu,
       users: usersRu,
+      audit: auditRu,
     },
   },
   lng: SUPPORTED_LANGS.includes(storedLanguage as (typeof SUPPORTED_LANGS)[number])
@@ -105,7 +111,7 @@ i18n.use(initReactI18next).init({
   fallbackLng: 'en',
   supportedLngs: SUPPORTED_LANGS,
   defaultNS: 'common',
-    ns: ['common', 'auth', 'admin', 'picking', 'picker', 'controller', 'products', 'orders', 'locations', 'receiving', 'inventory', 'brands', 'users'],
+    ns: ['common', 'auth', 'admin', 'audit', 'picking', 'picker', 'controller', 'products', 'orders', 'locations', 'receiving', 'inventory', 'brands', 'users'],
   interpolation: {
     escapeValue: false,
   },

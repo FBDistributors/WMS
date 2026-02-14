@@ -1,3 +1,4 @@
+from app.models.audit_log import AuditLog
 from app.models.base import Base
 from app.models.brand import Brand
 from app.models.document import Document, DocumentLine
@@ -12,6 +13,7 @@ from app.models.user import User
 from app.models.user_session import UserSession
 
 __all__ = [
+    "AuditLog",
     "Base",
     "Brand",
     "Document",

@@ -4,7 +4,7 @@ from datetime import date
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Query, status
 from pydantic import BaseModel, Field
 from decimal import Decimal
 from sqlalchemy import func, or_
@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.auth.deps import get_current_user, require_permission
 from app.db import get_db
+from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_ip, log_action
 from app.integrations.smartup.client import SmartupClient
 from app.integrations.smartup.importer import import_orders
 from app.models.document import Document as DocumentModel
@@ -407,6 +408,7 @@ async def list_picker_users(
 
 @router.post("/{order_id}/send-to-picking", response_model=SendToPickingResponse, summary="Send order to picking")
 async def send_order_to_picking(
+    request: Request,
     order_id: UUID,
     payload: SendToPickingRequest,
     db: Session = Depends(get_db),
@@ -453,7 +455,18 @@ async def send_order_to_picking(
     document.lines = document_lines
 
     db.add(document)
+    old_status = order.status
     order.status = "allocated"
+    log_action(
+        db,
+        user_id=user.id,
+        action=ACTION_UPDATE,
+        entity_type="order",
+        entity_id=str(order_id),
+        old_data={"status": old_status},
+        new_data={"status": "allocated", "document_id": str(document.id)},
+        ip_address=get_client_ip(request),
+    )
     db.commit()
     db.refresh(document)
 
@@ -462,9 +475,10 @@ async def send_order_to_picking(
 
 @router.post("/{order_id}/pack", response_model=OrderDetails, summary="Mark order as packed")
 async def pack_order(
+    request: Request,
     order_id: UUID,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("documents:edit_status")),
+    user=Depends(require_permission("documents:edit_status")),
 ):
     order = (
         db.query(OrderModel)
@@ -485,13 +499,25 @@ async def pack_order(
     if not document or document.status != "completed":
         raise HTTPException(status_code=409, detail="Picking document is not completed")
 
+    old_status = order.status
     order.status = "packed"
+    log_action(
+        db,
+        user_id=user.id,
+        action=ACTION_UPDATE,
+        entity_type="order",
+        entity_id=str(order_id),
+        old_data={"status": old_status},
+        new_data={"status": "packed"},
+        ip_address=get_client_ip(request),
+    )
     db.commit()
     return _to_order_details(order)
 
 
 @router.post("/{order_id}/ship", response_model=OrderDetails, summary="Ship order")
 async def ship_order(
+    request: Request,
     order_id: UUID,
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
@@ -552,6 +578,17 @@ async def ship_order(
     if not shipped_any:
         raise HTTPException(status_code=409, detail="No picked quantities to ship")
 
+    old_status = order.status
     order.status = "shipped"
+    log_action(
+        db,
+        user_id=user.id,
+        action=ACTION_UPDATE,
+        entity_type="order",
+        entity_id=str(order_id),
+        old_data={"status": old_status},
+        new_data={"status": "shipped"},
+        ip_address=get_client_ip(request),
+    )
     db.commit()
     return _to_order_details(order)

@@ -2,13 +2,14 @@ from datetime import datetime
 from typing import List, Literal, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth.deps import require_permission
 from app.db import get_db
+from app.services.audit_service import ACTION_UPDATE, get_client_ip, log_action
 from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
 
@@ -266,10 +267,11 @@ class DocumentStatusUpdate(BaseModel):
 
 @router.patch("/{document_id}", response_model=DocumentListItem, summary="Update document status (cancel)")
 async def update_document_status(
+    request: Request,
     document_id: UUID,
     payload: DocumentStatusUpdate,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("documents:edit_status")),
+    user=Depends(require_permission("documents:edit_status")),
 ):
     """Cancel a document (e.g. test picking). Only transition to cancelled is allowed."""
     doc = (
@@ -282,7 +284,18 @@ async def update_document_status(
         raise HTTPException(status_code=404, detail="Document not found")
     if payload.status != "cancelled":
         raise HTTPException(status_code=400, detail="Only status 'cancelled' is allowed")
+    old_status = doc.status
     doc.status = "cancelled"
+    log_action(
+        db,
+        user_id=user.id,
+        action=ACTION_UPDATE,
+        entity_type="document",
+        entity_id=str(document_id),
+        old_data={"status": old_status},
+        new_data={"status": "cancelled"},
+        ip_address=get_client_ip(request),
+    )
     db.commit()
     db.refresh(doc)
     return _to_list_item(doc)
