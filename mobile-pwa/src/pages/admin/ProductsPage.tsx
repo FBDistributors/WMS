@@ -20,7 +20,6 @@ import {
   type SmartupProductsSyncResult,
   type SmartupSyncRun,
 } from '../../services/productsApi'
-import { getInventorySummary } from '../../services/inventoryApi'
 import { useAuth } from '../../rbac/AuthProvider'
 
 const COLUMN_OPTIONS = [
@@ -88,36 +87,16 @@ export function ProductsPage() {
       setError(null)
       try {
         const data = await getProducts(
-          { search: search || undefined, limit, offset: nextOffset },
+          {
+            search: search || undefined,
+            limit,
+            offset: nextOffset,
+            include_summary: true,
+          },
           ac.signal
         )
-        let summaryMap = new Map<string, { on_hand_total: number; available_total: number }>()
-        try {
-          const summary = await getInventorySummary(
-            { product_ids: data.items.map((item) => item.id) },
-            ac.signal
-          )
-          summaryMap = new Map(
-            summary.map((row) => [
-              row.product_id,
-              { on_hand_total: row.on_hand_total, available_total: row.available_total },
-            ])
-          )
-        } catch (err) {
-          if ((err as { name?: string }).name === 'AbortError') return
-          summaryMap = new Map()
-        }
         if (abortRef.current !== ac) return
-        setItems(
-          data.items.map((item) => {
-            const totals = summaryMap.get(item.id)
-            return {
-              ...item,
-              on_hand_total: totals?.on_hand_total,
-              available_total: totals?.available_total,
-            }
-          })
-        )
+        setItems(data.items)
         setTotal(data.total)
       } catch (err) {
         if ((err as { name?: string }).name === 'AbortError') return
@@ -161,7 +140,8 @@ export function ProductsPage() {
   }, [activeSearch, offset, load])
 
   useEffect(() => {
-    void loadRuns()
+    const timer = setTimeout(() => void loadRuns(), 2000)
+    return () => clearTimeout(timer)
   }, [loadRuns])
 
   const columnOptions = useMemo(

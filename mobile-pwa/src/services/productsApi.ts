@@ -14,6 +14,8 @@ export type Product = {
   photo_url?: string
   is_active: boolean
   created_at?: string
+  on_hand_total?: number
+  available_total?: number
 }
 
 export type ProductListResponse = {
@@ -28,6 +30,7 @@ export type ProductsQuery = {
   search?: string
   limit?: number
   offset?: number
+  include_summary?: boolean
 }
 
 export async function getProducts(
@@ -39,6 +42,7 @@ export async function getProducts(
       search: query.search ?? query.q,
       limit: query.limit,
       offset: query.offset,
+      include_summary: query.include_summary,
     },
     signal,
   })

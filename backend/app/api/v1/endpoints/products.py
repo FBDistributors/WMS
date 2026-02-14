@@ -1,10 +1,10 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Dict, List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Query, status
 from pydantic import BaseModel
-from sqlalchemy import func, or_
+from sqlalchemy import case, func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -15,6 +15,8 @@ from app.integrations.smartup.products_sync import sync_smartup_products
 from app.models.smartup_sync import SmartupSyncRun
 from app.models.product import Product as ProductModel
 from app.models.product import ProductBarcode
+from app.models.stock import StockLot as StockLotModel
+from app.models.stock import StockMovement as StockMovementModel
 from app.schemas.product import ProductCreateIn, ProductImportItem, ProductListOut, ProductOut
 
 router = APIRouter()
@@ -61,9 +63,13 @@ class SmartupSyncRunOut(BaseModel):
     errors_json: Optional[List[dict]] = None
 
 
-def _to_product(product: ProductModel) -> ProductOut:
+def _to_product(
+    product: ProductModel,
+    summary: Optional[Dict[UUID, dict]] = None,
+) -> ProductOut:
     barcodes = [barcode.barcode for barcode in product.barcodes]
     brand_ref = getattr(product, "brand_ref", None)
+    s = (summary or {}).get(product.id) or {}
     return ProductOut(
         id=product.id,
         name=product.name,
@@ -78,7 +84,50 @@ def _to_product(product: ProductModel) -> ProductOut:
         barcodes=barcodes,
         barcode=barcodes[0] if barcodes else None,
         created_at=product.created_at,
+        on_hand_total=float(s["on_hand_total"]) if s.get("on_hand_total") is not None else None,
+        available_total=float(s["available_total"]) if s.get("available_total") is not None else None,
     )
+
+
+def _fetch_inventory_summary(db: Session, product_ids: List[UUID]) -> Dict[UUID, dict]:
+    """Single aggregate query for on_hand/available per product. No N+1."""
+    if not product_ids:
+        return {}
+    on_hand_expr = func.sum(
+        case(
+            (StockMovementModel.movement_type.in_(("allocate", "unallocate")), 0),
+            else_=StockMovementModel.qty_change,
+        )
+    )
+    reserved_expr = func.sum(
+        case(
+            (
+                StockMovementModel.movement_type.in_(("allocate", "unallocate")),
+                StockMovementModel.qty_change,
+            ),
+            else_=0,
+        )
+    )
+    rows = (
+        db.query(
+            StockLotModel.product_id,
+            on_hand_expr.label("on_hand_total"),
+            (on_hand_expr - reserved_expr).label("available_total"),
+        )
+        .join(StockMovementModel, StockMovementModel.lot_id == StockLotModel.id)
+        .filter(StockLotModel.product_id.in_(product_ids))
+        .group_by(StockLotModel.product_id)
+        .all()
+    )
+    result = {}
+    for r in rows:
+        oh = r.on_hand_total
+        av = r.available_total
+        result[r.product_id] = {
+            "on_hand_total": float(oh) if oh is not None else 0,
+            "available_total": float(av) if av is not None else 0,
+        }
+    return result
 
 
 @router.post(
@@ -146,6 +195,7 @@ async def list_products(
     search: Optional[str] = Query(None, alias="search"),
     q: Optional[str] = None,
     include_inactive: bool = Query(False),
+    include_summary: bool = Query(False, description="Include on_hand_total, available_total per product"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -178,8 +228,13 @@ async def list_products(
         .all()
     )
 
+    summary: Dict[UUID, dict] = {}
+    if include_summary and items:
+        product_ids = [item.id for item in items]
+        summary = _fetch_inventory_summary(db, product_ids)
+
     return ProductListOut(
-        items=[_to_product(item) for item in items],
+        items=[_to_product(item, summary) for item in items],
         total=total,
         limit=limit,
         offset=offset,

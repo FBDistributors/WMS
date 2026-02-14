@@ -43,6 +43,8 @@ class ProductOut(BaseModel):
     barcodes: List[str] = Field(default_factory=list)
     barcode: Optional[str] = None
     created_at: datetime
+    on_hand_total: Optional[float] = None
+    available_total: Optional[float] = None
 
 
 class ProductListOut(BaseModel):
