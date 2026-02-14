@@ -124,6 +124,32 @@ class InventorySummaryWithLocationRow(BaseModel):
     sector: Optional[str] = None
 
 
+class InventorySummaryLightRow(BaseModel):
+    """Lightweight summary: product_id, name, brand, totals only. No location breakdown."""
+    product_id: UUID
+    product_name: str
+    product_code: str
+    brand_name: Optional[str] = None
+    total_qty: Decimal
+    available_qty: Decimal
+
+
+class InventorySummaryLightResponse(BaseModel):
+    items: List[InventorySummaryLightRow]
+    total: int
+    limit: int
+    offset: int
+
+
+class InventoryByProductRow(BaseModel):
+    """Per-location breakdown for one product. Load on row expand."""
+    location_code: str
+    location_type: Optional[str] = None
+    qty: Decimal
+    available_qty: Decimal
+    expiry_date: Optional[date] = None
+
+
 def _build_location_path_map(locations: list[LocationModel]) -> dict[UUID, str]:
     by_id = {location.id: location for location in locations}
     cache: dict[UUID, str] = {}
@@ -402,6 +428,129 @@ async def inventory_summary(
 
     rows = query.order_by(ProductModel.sku.asc()).all()
     return [InventorySummaryRow(**row._asdict()) for row in rows]
+
+
+@router.get("/summary-light", response_model=InventorySummaryLightResponse, summary="Lightweight inventory summary (paginated)")
+@router.get("/summary-light/", response_model=InventorySummaryLightResponse, summary="Lightweight inventory summary (paginated)")
+async def inventory_summary_light(
+    search: Optional[str] = None,
+    only_available: bool = Query(True, description="Default true for fast load"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("inventory:read")),
+):
+    """Lightweight summary: product_id, name, brand, totals. No location breakdown. Paginated."""
+    on_hand_expr = func.sum(
+        case(
+            (StockMovementModel.movement_type.in_(("allocate", "unallocate")), 0),
+            else_=StockMovementModel.qty_change,
+        )
+    )
+    reserved_expr = func.sum(
+        case(
+            (StockMovementModel.movement_type.in_(("allocate", "unallocate")), StockMovementModel.qty_change),
+            else_=0,
+        )
+    )
+    available_expr = on_hand_expr - reserved_expr
+
+    base_query = (
+        db.query(
+            ProductModel.id.label("product_id"),
+            ProductModel.name.label("product_name"),
+            ProductModel.sku.label("product_code"),
+            func.coalesce(ProductModel.brand, "").label("brand_name"),
+            on_hand_expr.label("total_qty"),
+            available_expr.label("available_qty"),
+        )
+        .join(StockLotModel, StockLotModel.product_id == ProductModel.id)
+        .join(StockMovementModel, StockMovementModel.lot_id == StockLotModel.id)
+        .group_by(ProductModel.id, ProductModel.name, ProductModel.sku, ProductModel.brand)
+    )
+    if search:
+        base_query = _apply_product_search(base_query, search)
+    if only_available:
+        base_query = base_query.having(available_expr > 0)
+
+    subq = base_query.subquery()
+    total = db.execute(select(func.count()).select_from(subq)).scalar() or 0
+
+    rows = (
+        base_query.order_by(ProductModel.sku.asc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    items = [
+        InventorySummaryLightRow(
+            product_id=row.product_id,
+            product_name=row.product_name,
+            product_code=row.product_code,
+            brand_name=row.brand_name or None,
+            total_qty=row.total_qty,
+            available_qty=row.available_qty,
+        )
+        for row in rows
+    ]
+    return InventorySummaryLightResponse(items=items, total=total, limit=limit, offset=offset)
+
+
+@router.get("/by-product/{product_id}", response_model=List[InventoryByProductRow], summary="Location breakdown for one product")
+async def inventory_by_product(
+    product_id: UUID,
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("inventory:read")),
+):
+    """Per-location details for one product. Call when user expands row."""
+    on_hand_expr = func.sum(
+        case(
+            (StockMovementModel.movement_type.in_(("allocate", "unallocate")), 0),
+            else_=StockMovementModel.qty_change,
+        )
+    )
+    reserved_expr = func.sum(
+        case(
+            (StockMovementModel.movement_type.in_(("allocate", "unallocate")), StockMovementModel.qty_change),
+            else_=0,
+        )
+    )
+    available_expr = on_hand_expr - reserved_expr
+
+    rows = (
+        db.query(
+            LocationModel.code.label("location_code"),
+            LocationModel.location_type.label("location_type"),
+            on_hand_expr.label("qty"),
+            available_expr.label("available_qty"),
+            StockLotModel.expiry_date.label("expiry_date"),
+        )
+        .select_from(ProductModel)
+        .join(StockLotModel, StockLotModel.product_id == ProductModel.id)
+        .join(StockMovementModel, StockMovementModel.lot_id == StockLotModel.id)
+        .join(LocationModel, LocationModel.id == StockMovementModel.location_id)
+        .filter(ProductModel.id == product_id)
+        .group_by(
+            StockMovementModel.location_id,
+            LocationModel.code,
+            LocationModel.location_type,
+            StockLotModel.id,
+            StockLotModel.expiry_date,
+        )
+        .having(available_expr != 0)
+        .order_by(LocationModel.code.asc(), StockLotModel.expiry_date.asc().nullslast())
+        .all()
+    )
+    return [
+        InventoryByProductRow(
+            location_code=row.location_code,
+            location_type=row.location_type,
+            qty=row.qty,
+            available_qty=row.available_qty,
+            expiry_date=row.expiry_date,
+        )
+        for row in rows
+    ]
 
 
 @router.get("/details", response_model=List[InventoryDetailRow], summary="Inventory details")

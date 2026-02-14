@@ -103,6 +103,54 @@ export async function getInventorySummaryByLocation(query: InventorySummaryByLoc
   })
 }
 
+/** Lightweight paginated summary - fast initial load */
+export type InventorySummaryLightQuery = {
+  search?: string
+  only_available?: boolean
+  limit?: number
+  offset?: number
+}
+
+export type InventorySummaryLightResponse = {
+  items: InventorySummaryLightRow[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export type InventorySummaryLightRow = {
+  product_id: string
+  product_name: string
+  product_code: string
+  brand_name?: string | null
+  total_qty: number
+  available_qty: number
+}
+
+export async function getInventorySummaryLight(query: InventorySummaryLightQuery = {}) {
+  return fetchJSON<InventorySummaryLightResponse>('/api/v1/inventory/summary-light', {
+    query: {
+      search: query.search,
+      only_available: query.only_available ?? true,
+      limit: query.limit ?? 50,
+      offset: query.offset ?? 0,
+    },
+  })
+}
+
+/** Location breakdown for one product - load on row expand */
+export type InventoryByProductRow = {
+  location_code: string
+  location_type?: string | null
+  qty: number
+  available_qty: number
+  expiry_date?: string | null
+}
+
+export async function getInventoryByProduct(productId: string) {
+  return fetchJSON<InventoryByProductRow[]>(`/api/v1/inventory/by-product/${productId}`)
+}
+
 export type InventoryMovementsQuery = {
   product_id?: string
   lot_id?: string
