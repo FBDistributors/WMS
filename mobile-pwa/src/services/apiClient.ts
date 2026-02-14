@@ -78,8 +78,15 @@ export async function fetchJSON<TResponse, TBody = unknown>(
     }
 
     if (!response.ok) {
+      let message = `HTTP ${response.status}`
+      if (isJson && payload && typeof payload === 'object' && payload !== null) {
+        const d = (payload as { detail?: string | { msg?: string }[] }).detail
+        if (typeof d === 'string') message = d
+        else if (Array.isArray(d) && d[0] && typeof d[0] === 'object' && 'msg' in d[0])
+          message = String((d[0] as { msg: string }).msg)
+      }
       throw {
-        message: `HTTP ${response.status}`,
+        message,
         status: response.status,
         code: 'HTTP',
         details: payload,

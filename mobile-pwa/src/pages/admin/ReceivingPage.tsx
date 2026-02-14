@@ -51,7 +51,7 @@ export function ReceivingPage() {
     setError(null)
     try {
       const [locationsResponse, receiptsResponse] = await Promise.all([
-        getLocations(true),
+        getLocations(false),
         listReceipts(),
       ])
       setLocations(locationsResponse)
@@ -137,7 +137,13 @@ export function ReceivingPage() {
       setSelectedProducts(new Map())
       await load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('receiving:save_failed'))
+      const msg =
+        err && typeof err === 'object' && 'message' in err
+          ? String((err as { message: string }).message)
+          : err instanceof Error
+            ? err.message
+            : t('receiving:save_failed')
+      setError(msg)
     } finally {
       setIsSubmitting(false)
     }
