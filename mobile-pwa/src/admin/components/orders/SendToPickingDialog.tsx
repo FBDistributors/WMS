@@ -4,6 +4,15 @@ import { useTranslation } from 'react-i18next'
 
 import { Button } from '../../../components/ui/button'
 import { getPickerUsers, sendOrderToPicking, type PickerUser } from '../../../services/ordersApi'
+import type { ApiError } from '../../../services/apiClient'
+
+function formatApiError(err: unknown): string {
+  if (err && typeof err === 'object' && 'details' in err) {
+    const d = (err as ApiError).details
+    if (d && typeof d === 'object' && 'detail' in d) return String(d.detail)
+  }
+  return err instanceof Error ? err.message : 'Error'
+}
 
 type SendToPickingDialogProps = {
   open: boolean
@@ -16,6 +25,7 @@ export function SendToPickingDialog({ open, orderId, onOpenChange, onSent }: Sen
   const { t } = useTranslation(['orders', 'common'])
   const [pickers, setPickers] = useState<PickerUser[]>([])
   const [selected, setSelected] = useState('')
+  const [isLoadingPickers, setIsLoadingPickers] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -23,12 +33,15 @@ export function SendToPickingDialog({ open, orderId, onOpenChange, onSent }: Sen
     if (!open) return
     setError(null)
     setSelected('')
+    setIsLoadingPickers(true)
     void (async () => {
       try {
         const data = await getPickerUsers()
         setPickers(data)
       } catch (err) {
-        setError(err instanceof Error ? err.message : t('orders:send_to_picking.load_failed'))
+        setError(formatApiError(err) || t('orders:send_to_picking.load_failed'))
+      } finally {
+        setIsLoadingPickers(false)
       }
     })()
   }, [open, t])
@@ -47,7 +60,7 @@ export function SendToPickingDialog({ open, orderId, onOpenChange, onSent }: Sen
       onSent()
       onOpenChange(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('orders:send_to_picking.failed'))
+      setError(formatApiError(err) || t('orders:send_to_picking.failed'))
     } finally {
       setIsSubmitting(false)
     }
@@ -82,14 +95,22 @@ export function SendToPickingDialog({ open, orderId, onOpenChange, onSent }: Sen
               className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
               value={selected}
               onChange={(event) => setSelected(event.target.value)}
+              disabled={isLoadingPickers}
             >
-              <option value="">{t('orders:send_to_picking.select_picker')}</option>
+              <option value="">
+                {isLoadingPickers ? t('common:loading') : t('orders:send_to_picking.select_picker')}
+              </option>
               {pickers.map((picker) => (
                 <option key={picker.id} value={picker.id}>
                   {picker.name}
                 </option>
               ))}
             </select>
+            {!error && !isLoadingPickers && pickers.length === 0 ? (
+              <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                {t('orders:send_to_picking.no_pickers_hint')}
+              </p>
+            ) : null}
           </label>
           <div className="flex items-center justify-end gap-2">
             <Button variant="ghost" onClick={() => onOpenChange(false)}>

@@ -26,7 +26,8 @@
     "send": "Yuborish",
     "sending": "Yuborilmoqda...",
     "failed": "Pickingga yuborib bo‘lmadi.",
-    "load_failed": "Yig'uvchilar ro‘yxati yuklanmadi."
+    "load_failed": "Yig'uvchilar ro‘yxati yuklanmadi.",
+    "no_pickers_hint": "Yig'uvchi yo'q. Admin > Foydalanuvchilar orqali Yig'uvchi rolida foydalanuvchi yarating."
   },
   "filters": {
     "status": "Holat",

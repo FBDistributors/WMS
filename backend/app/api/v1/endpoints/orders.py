@@ -10,7 +10,7 @@ from decimal import Decimal
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, selectinload
 
-from app.auth.deps import get_current_user, require_permission
+from app.auth.deps import get_current_user, require_any_permission, require_permission
 from app.db import get_db
 from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_ip, log_action
 from app.integrations.smartup.client import SmartupClient
@@ -400,9 +400,9 @@ async def sync_orders_from_smartup(
 @router.get("/pickers", response_model=List[PickerUser], summary="List picker users")
 async def list_picker_users(
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("picking:assign")),
+    _user=Depends(require_any_permission(["picking:assign", "orders:send_to_picking"])),
 ):
-    users = db.query(User).filter(User.role == "picker", User.is_active.is_(True)).all()
+    users = db.query(User).filter(User.role == "picker", User.is_active.is_(True)).order_by(User.full_name, User.username).all()
     return [PickerUser(id=user.id, name=user.full_name or user.username) for user in users]
 
 

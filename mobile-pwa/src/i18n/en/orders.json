@@ -26,7 +26,8 @@
     "send": "Send",
     "sending": "Sending...",
     "failed": "Failed to send to picking.",
-    "load_failed": "Failed to load order picker list."
+    "load_failed": "Failed to load order picker list.",
+  "no_pickers_hint": "No pickers. Create a user with 'Order picker' role via Admin > Users."
   },
   "filters": {
     "status": "Status",
