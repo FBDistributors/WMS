@@ -1,0 +1,31 @@
+# Render Background Worker - SmartUp Sync
+# Deploy as separate service from the web API.
+# Uses same PostgreSQL database as web service.
+# If using from repo root (WMS/), add: rootDir: backend
+---
+services:
+  - type: worker
+    name: wms-smartup-sync
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: python worker.py
+    envVars:
+      - key: DATABASE_URL
+        sync: false  # Set in Render dashboard or use PostgreSQL addon
+      - key: SMARTUP_BASE_URL
+        sync: false
+      - key: SMARTUP_BASIC_USER
+        sync: false
+      - key: SMARTUP_BASIC_PASS
+        sync: false
+      - key: SMARTUP_PROJECT_CODE
+        value: trade
+      - key: SMARTUP_FILIAL_ID
+        sync: false
+      - key: SMARTUP_INVENTORY_EXPORT_URL
+        sync: false  # Optional, has default
+      - key: SYNC_INTERVAL_SECONDS
+        value: "300"
+      - key: SYNC_ORDERS_DAYS_BACK
+        value: "7"
