@@ -7,13 +7,16 @@ import type {
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
   return {
-    openPickLists: 7,
+    totalOrders: 42,
     completedToday: 24,
+    inPicking: 7,
+    activePickers: 5,
     exceptions: 3,
     lowStock: 5,
     deltas: {
-      openPickLists: '+2 since yesterday',
+      totalOrders: '+8',
       completedToday: '+6 vs avg',
+      inPicking: '+2',
       exceptions: '2 new',
       lowStock: '3 critical',
     },
@@ -52,7 +55,6 @@ export async function getTodayOverview(): Promise<TodayOverviewItem[]> {
     { id: 'ov-2', label: 'Top SKU: SKU-0012', value: '36 picks' },
     { id: 'ov-3', label: 'Completed picks', value: '24 docs' },
     { id: 'ov-4', label: 'Avg pick time', value: '7m 12s' },
-    { id: 'ov-5', label: 'Active pickers', value: '5 operators' },
   ]
 }
 

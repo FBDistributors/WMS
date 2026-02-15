@@ -26,8 +26,10 @@
   },
   "dashboard": {
     "title": "Дашборд",
-    "open_pick_lists": "Открытые списки подбора",
+    "total_orders": "Всего заказов",
     "completed_today": "Завершено сегодня",
+    "in_picking": "В подборе",
+    "active_pickers": "Работают сотрудников",
     "exceptions": "Исключения",
     "low_stock": "Низкий остаток",
     "active_picks": "Активный подбор",

@@ -1,11 +1,15 @@
 export type DashboardSummary = {
-  openPickLists: number
+  totalOrders: number
   completedToday: number
+  inPicking: number
+  activePickers: number
   exceptions: number
   lowStock: number
   deltas?: {
-    openPickLists?: string
+    totalOrders?: string
     completedToday?: string
+    inPicking?: string
+    activePickers?: string
     exceptions?: string
     lowStock?: string
   }

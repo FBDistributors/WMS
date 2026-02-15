@@ -26,10 +26,12 @@
   },
   "dashboard": {
     "title": "Dashboard",
-    "open_pick_lists": "Open pick lists",
+    "total_orders": "Total orders",
     "completed_today": "Completed today",
+    "in_picking": "In picking",
+    "active_pickers": "Active workers",
     "exceptions": "Exceptions",
-    "low_stock": "Low stock alerts",
+    "low_stock": "Low stock",
     "active_picks": "Active picks",
     "today_overview": "Today overview",
     "load_error": "Failed to load dashboard. Please try again."

@@ -26,10 +26,12 @@
   },
   "dashboard": {
     "title": "Dashboard",
-    "open_pick_lists": "Ochiq pick listlar",
-    "completed_today": "Bugun yakunlangan",
+    "total_orders": "Buyurtmalar soni",
+    "completed_today": "Yakunlangan buyurtmalar",
+    "in_picking": "Yig'ishda",
+    "active_pickers": "Ishlayotgan xodimlar",
     "exceptions": "Istisnolar",
-    "low_stock": "Past qoldiq ogohlantirishlari",
+    "low_stock": "Past qoldiq",
     "active_picks": "Faol pickinglar",
     "today_overview": "Bugungi ko‘rinish",
     "load_error": "Dashboard yuklanmadi. Qayta urinib ko‘ring."

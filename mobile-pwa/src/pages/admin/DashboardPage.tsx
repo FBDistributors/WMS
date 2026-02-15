@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
+  ShoppingCart,
+  PackageCheck,
   ClipboardList,
+  Users,
   AlertTriangle,
   Boxes,
-  PackageCheck,
 } from 'lucide-react'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -63,11 +65,11 @@ export function DashboardPage() {
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <KpiCard
-              title={t('admin:dashboard.open_pick_lists')}
-              value={summary?.openPickLists ?? '—'}
-              delta={summary?.deltas?.openPickLists}
-              icon={ClipboardList}
-              href="/admin/picking"
+              title={t('admin:dashboard.total_orders')}
+              value={summary?.totalOrders ?? '—'}
+              delta={summary?.deltas?.totalOrders}
+              icon={ShoppingCart}
+              href="/admin/orders"
             />
             <KpiCard
               title={t('admin:dashboard.completed_today')}
@@ -76,6 +78,22 @@ export function DashboardPage() {
               icon={PackageCheck}
               href="/admin/picking"
             />
+            <KpiCard
+              title={t('admin:dashboard.in_picking')}
+              value={summary?.inPicking ?? '—'}
+              delta={summary?.deltas?.inPicking}
+              icon={ClipboardList}
+              href="/admin/picking"
+            />
+            <KpiCard
+              title={t('admin:dashboard.active_pickers')}
+              value={summary?.activePickers ?? '—'}
+              delta={summary?.deltas?.activePickers}
+              icon={Users}
+              href="/admin/picking"
+            />
+          </div>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <KpiCard
               title={t('admin:dashboard.exceptions')}
               value={summary?.exceptions ?? '—'}
