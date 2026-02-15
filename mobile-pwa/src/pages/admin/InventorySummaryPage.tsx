@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Search, ChevronLeft, ChevronRight, PackagePlus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
