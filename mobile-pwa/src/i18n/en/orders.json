@@ -17,6 +17,8 @@
   "view_details": "View details",
   "details_title": "Order details",
   "not_found": "Order not found.",
+  "select_all": "Select all",
+  "send_selected_to_picking": "Send {{count}} orders to picking",
   "send_to_picking": {
     "button": "Send to picking",
     "title": "Send to picking",
@@ -68,6 +70,7 @@
     "cancelled": "Cancelled"
   },
   "columns": {
+    "select": "",
     "order_number": "Order",
     "external_id": "External ID",
     "customer": "Customer",

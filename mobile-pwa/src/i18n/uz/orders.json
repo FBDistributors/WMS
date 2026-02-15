@@ -17,6 +17,8 @@
   "view_details": "Tafsilotlarni ko‘rish",
   "details_title": "Buyurtma tafsilotlari",
   "not_found": "Buyurtma topilmadi.",
+  "select_all": "Barchasini tanlash",
+  "send_selected_to_picking": "{{count}} ta buyurtmani pickingga yuborish",
   "send_to_picking": {
     "button": "Pickingga yuborish",
     "title": "Pickingga yuborish",
@@ -68,6 +70,7 @@
     "cancelled": "Bekor qilingan"
   },
   "columns": {
+    "select": "",
     "order_number": "Buyurtma",
     "external_id": "Tashqi ID",
     "customer": "Mijoz",

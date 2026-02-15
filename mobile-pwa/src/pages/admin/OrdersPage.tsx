@@ -16,6 +16,7 @@ import { useAuth } from '../../rbac/AuthProvider'
 
 const PAGE_SIZE = 50
 const COLUMN_OPTIONS = [
+  { id: 'select', labelKey: 'orders:columns.select' },
   { id: 'order_number', labelKey: 'orders:columns.order_number' },
   { id: 'external_id', labelKey: 'orders:columns.external_id' },
   { id: 'customer', labelKey: 'orders:columns.customer' },
@@ -56,7 +57,16 @@ export function OrdersPage() {
   const [error, setError] = useState<string | null>(null)
   const [isSyncing, setIsSyncing] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set())
+  const [sendDialogOrderIds, setSendDialogOrderIds] = useState<string[] | null>(null)
+
+  const ELIGIBLE_PICKING_STATUSES = new Set(['imported', 'B#S', 'ready_for_picking', 'allocated'])
+  const canBeSentToPicking = (order: OrderListItem) =>
+    canSend && ELIGIBLE_PICKING_STATUSES.has(order.status)
+  const eligibleItems = useMemo(
+    () => items.filter((o) => ELIGIBLE_PICKING_STATUSES.has(o.status)),
+    [items]
+  )
 
   const load = useCallback(async (background = false) => {
     if (!background) {
@@ -152,6 +162,32 @@ export function OrdersPage() {
     )
     const renderCell = (columnId: string, order: OrderListItem) => {
       switch (columnId) {
+        case 'select':
+          if (!canSend) return null
+          {
+            const eligible = canBeSentToPicking(order)
+            const checked = selectedOrderIds.has(order.id)
+            return (
+              <td className="px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  disabled={!eligible}
+                  onChange={() => {
+                    if (!eligible) return
+                    setSelectedOrderIds((prev) => {
+                      const next = new Set(prev)
+                      if (next.has(order.id)) next.delete(order.id)
+                      else next.add(order.id)
+                      return next
+                    })
+                  }}
+                  aria-label={t('orders:select_all')}
+                  className="h-4 w-4 rounded border-slate-300"
+                />
+              </td>
+            )
+          }
         case 'order_number':
           return (
             <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">
@@ -222,7 +258,7 @@ export function OrdersPage() {
           return (
             <td className="px-4 py-3">
               {canSend ? (
-                <Button variant="secondary" onClick={() => setSelectedOrderId(order.id)}>
+                <Button variant="secondary" onClick={() => setSendDialogOrderIds([order.id])}>
                   {t('orders:send_to_picking.button')}
                 </Button>
               ) : (
@@ -243,7 +279,32 @@ export function OrdersPage() {
               {orderedColumns.map((columnId) =>
                 visibleColumns.has(columnId) ? (
                   <th key={columnId} className="px-4 py-3 text-left">
-                    {columnLabels.get(columnId)}
+                    {columnId === 'select' && canSend ? (
+                      (() => {
+                        const allSelected =
+                          eligibleItems.length > 0 &&
+                          eligibleItems.every((o) => selectedOrderIds.has(o.id))
+                        const someSelected = eligibleItems.some((o) => selectedOrderIds.has(o.id))
+                        return (
+                          <input
+                            type="checkbox"
+                            checked={allSelected}
+                            ref={(el) => {
+                              if (el) el.indeterminate = someSelected && !allSelected
+                            }}
+                            onChange={() =>
+                              setSelectedOrderIds(
+                                allSelected ? new Set() : new Set(eligibleItems.map((o) => o.id))
+                              )
+                            }
+                            aria-label={t('orders:select_all')}
+                            className="h-4 w-4 rounded border-slate-300"
+                          />
+                        )
+                      })()
+                    ) : (
+                      columnLabels.get(columnId)
+                    )}
                   </th>
                 ) : null
               )}
@@ -261,7 +322,7 @@ export function OrdersPage() {
         </table>
       </TableScrollArea>
     )
-  }, [canSend, config.columnOrder, config.visibleColumns, error, isLoading, items, load, navigate, t])
+  }, [canSend, config.columnOrder, config.visibleColumns, eligibleItems, error, isLoading, items, load, navigate, selectedOrderIds, t])
 
   return (
     <AdminLayout title={t('orders:title')}>
@@ -330,6 +391,27 @@ export function OrdersPage() {
 
         {content}
 
+        {canSend && selectedOrderIds.size > 0 ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/50">
+            <span className="text-sm text-slate-600 dark:text-slate-300">
+              {t('orders:send_selected_to_picking', { count: selectedOrderIds.size })}
+            </span>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setSelectedOrderIds(new Set())}
+              >
+                {t('common:buttons.cancel')}
+              </Button>
+              <Button
+                onClick={() => setSendDialogOrderIds(Array.from(selectedOrderIds))}
+              >
+                {t('orders:send_to_picking.button')}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
         <div className="flex items-center justify-end gap-2">
           <Button
             variant="secondary"
@@ -349,10 +431,14 @@ export function OrdersPage() {
       </Card>
 
       <SendToPickingDialog
-        open={Boolean(selectedOrderId)}
-        orderId={selectedOrderId}
-        onOpenChange={(open) => !open && setSelectedOrderId(null)}
-        onSent={() => void load()}
+        open={sendDialogOrderIds !== null}
+        orderIds={sendDialogOrderIds ?? []}
+        onOpenChange={(open) => !open && setSendDialogOrderIds(null)}
+        onSent={() => {
+          setSendDialogOrderIds(null)
+          setSelectedOrderIds(new Set())
+          void load()
+        }}
       />
       <OrdersTableSettings
         open={isSettingsOpen}

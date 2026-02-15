@@ -33,12 +33,12 @@ function formatApiError(err: unknown): string {
 
 type SendToPickingDialogProps = {
   open: boolean
-  orderId: string | null
+  orderIds: string[]
   onOpenChange: (open: boolean) => void
   onSent: () => void
 }
 
-export function SendToPickingDialog({ open, orderId, onOpenChange, onSent }: SendToPickingDialogProps) {
+export function SendToPickingDialog({ open, orderIds, onOpenChange, onSent }: SendToPickingDialogProps) {
   const { t } = useTranslation(['orders', 'common'])
   const [pickers, setPickers] = useState<PickerUser[]>([])
   const [selected, setSelected] = useState('')
@@ -63,23 +63,29 @@ export function SendToPickingDialog({ open, orderId, onOpenChange, onSent }: Sen
     })()
   }, [open, t])
 
-  if (!open || !orderId) return null
+  if (!open || orderIds.length === 0) return null
 
   const handleSubmit = async () => {
     if (!selected) {
       setError(t('orders:send_to_picking.picker_required'))
       return
     }
-    const orderIdStr = String(orderId)
     const selectedStr = String(selected).trim()
-    if (!isValidUuid(orderIdStr) || !isValidUuid(selectedStr)) {
+    if (!isValidUuid(selectedStr)) {
+      setError(t('orders:send_to_picking.invalid_selection'))
+      return
+    }
+    const validIds = orderIds.filter((id) => isValidUuid(id))
+    if (validIds.length === 0) {
       setError(t('orders:send_to_picking.invalid_selection'))
       return
     }
     setIsSubmitting(true)
     setError(null)
     try {
-      await sendOrderToPicking(orderIdStr, selectedStr)
+      for (const orderIdStr of validIds) {
+        await sendOrderToPicking(orderIdStr, selectedStr)
+      }
       onSent()
       onOpenChange(false)
     } catch (err) {
@@ -105,7 +111,9 @@ export function SendToPickingDialog({ open, orderId, onOpenChange, onSent }: Sen
       <div className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
           <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            {t('orders:send_to_picking.title')}
+            {orderIds.length > 1
+              ? t('orders:send_selected_to_picking', { count: orderIds.length })
+              : t('orders:send_to_picking.title')}
           </div>
           <Button variant="ghost" className="rounded-full px-3 py-3" onClick={() => onOpenChange(false)}>
             <X size={18} />

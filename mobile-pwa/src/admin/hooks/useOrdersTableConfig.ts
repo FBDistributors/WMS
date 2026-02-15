@@ -9,6 +9,7 @@ export type OrdersTableConfig = {
 const STORAGE_KEY = 'wms_orders_table_config'
 
 export const ORDERS_TABLE_COLUMN_IDS = [
+  'select',
   'order_number',
   'external_id',
   'customer',
@@ -23,6 +24,7 @@ export const ORDERS_TABLE_COLUMN_IDS = [
 ]
 
 export const DEFAULT_VISIBLE_COLUMNS = [
+  'select',
   'order_number',
   'external_id',
   'customer',
@@ -52,6 +54,9 @@ const DEFAULT_CONFIG: OrdersTableConfig = {
 
 const dedupe = (values: string[]) => Array.from(new Set(values))
 
+const ensureSelectColumn = (ids: string[]) =>
+  ids.includes('select') ? ids : ['select', ...ids]
+
 const normalizeConfig = (value: OrdersTableConfig | null) => {
   if (!value) return DEFAULT_CONFIG
 
@@ -60,18 +65,21 @@ const normalizeConfig = (value: OrdersTableConfig | null) => {
       .filter((id) => ORDERS_TABLE_COLUMN_IDS.includes(id))
   )
 
-  const orderedColumns = [
+  const orderedColumns = ensureSelectColumn([
     ...columnOrder,
     ...ORDERS_TABLE_COLUMN_IDS.filter((id) => !columnOrder.includes(id)),
-  ]
+  ])
 
   const visibleColumns = dedupe(
     (Array.isArray(value.visibleColumns) ? value.visibleColumns : [])
       .filter((id) => ORDERS_TABLE_COLUMN_IDS.includes(id))
   )
 
+  const finalVisible =
+    visibleColumns.length > 0 ? visibleColumns : DEFAULT_VISIBLE_COLUMNS
+
   return {
-    visibleColumns: visibleColumns.length > 0 ? visibleColumns : DEFAULT_VISIBLE_COLUMNS,
+    visibleColumns: ensureSelectColumn(finalVisible),
     columnOrder: orderedColumns,
     searchFields: (() => {
       const next = dedupe(
