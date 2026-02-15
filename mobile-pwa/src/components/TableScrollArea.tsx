@@ -64,10 +64,10 @@ export function TableScrollArea({ children, className }: TableScrollAreaProps) {
       >
         {children}
       </div>
-      {/* Ekranning eng pastida gorizontal scrollbar — fixed pastga */}
+      {/* Gorizontal scrollbar — scroll container ostida sticky */}
       <div
         ref={stripRef}
-        className="fixed bottom-0 left-0 right-0 z-10 h-3 min-w-0 overflow-x-scroll overflow-y-hidden border-t border-slate-200 bg-slate-100/95 dark:border-slate-700 dark:bg-slate-800/95"
+        className="sticky bottom-0 z-10 mt-1 h-3 min-w-0 overflow-x-scroll overflow-y-hidden rounded border border-slate-200 bg-slate-100/95 dark:border-slate-700 dark:bg-slate-800/95"
         aria-hidden
       >
         <div style={{ width: contentWidth, height: 1, minWidth: '100%' }} />

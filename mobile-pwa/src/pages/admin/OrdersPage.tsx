@@ -389,8 +389,6 @@ export function OrdersPage() {
           </label>
         </div>
 
-        {content}
-
         {canSend && selectedOrderIds.size > 0 ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/50">
             <span className="text-sm text-slate-600 dark:text-slate-300">
@@ -411,6 +409,10 @@ export function OrdersPage() {
             </div>
           </div>
         ) : null}
+
+        <div className="max-h-[calc(100vh-320px)] min-h-0 overflow-auto">
+          {content}
+        </div>
 
         <div className="flex items-center justify-end gap-2">
           <Button
