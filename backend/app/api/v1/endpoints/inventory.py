@@ -137,6 +137,7 @@ class InventorySummaryLightRow(BaseModel):
     product_id: UUID
     product_name: str
     product_code: str
+    barcode: Optional[str] = None
     brand_name: Optional[str] = None
     total_qty: Decimal
     available_qty: Decimal
@@ -525,13 +526,14 @@ async def inventory_summary_light(
             ProductModel.id.label("product_id"),
             ProductModel.name.label("product_name"),
             ProductModel.sku.label("product_code"),
+            ProductModel.barcode.label("barcode"),
             func.coalesce(ProductModel.brand, "").label("brand_name"),
             on_hand_expr.label("total_qty"),
             available_expr.label("available_qty"),
         )
         .join(StockLotModel, StockLotModel.product_id == ProductModel.id)
         .join(StockMovementModel, StockMovementModel.lot_id == StockLotModel.id)
-        .group_by(ProductModel.id, ProductModel.name, ProductModel.sku, ProductModel.brand)
+        .group_by(ProductModel.id, ProductModel.name, ProductModel.sku, ProductModel.barcode, ProductModel.brand)
     )
     if search:
         base_query = _apply_product_search(base_query, search)
@@ -556,6 +558,7 @@ async def inventory_summary_light(
             product_id=row.product_id,
             product_name=row.product_name,
             product_code=row.product_code,
+            barcode=row.barcode if row.barcode else None,
             brand_name=row.brand_name or None,
             total_qty=row.total_qty,
             available_qty=row.available_qty,

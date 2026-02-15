@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Search, ChevronLeft, ChevronRight, PackagePlus } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight, PackagePlus, Settings } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { InventoryTableSettings } from '../../admin/components/inventory/InventoryTableSettings'
+import { useInventoryTableConfig } from '../../admin/hooks/useInventoryTableConfig'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
@@ -13,12 +15,24 @@ import {
   type InventorySummaryLightRow,
 } from '../../services/inventoryApi'
 
+const COLUMN_OPTIONS = [
+  { id: 'code', labelKey: 'inventory:columns.code' },
+  { id: 'barcode', labelKey: 'inventory:columns.barcode' },
+  { id: 'product', labelKey: 'inventory:columns.product' },
+  { id: 'brand', labelKey: 'inventory:columns.brand' },
+  { id: 'total_qty', labelKey: 'inventory:columns.total_qty' },
+  { id: 'available', labelKey: 'inventory:columns.available' },
+  { id: 'location', labelKey: 'inventory:columns.location' },
+]
+
 const DEBOUNCE_MS = 400
 const PAGE_SIZE = 50
 
 export function InventorySummaryPage() {
   const navigate = useNavigate()
   const { t } = useTranslation(['inventory', 'common'])
+  const { config, updateConfig, resetConfig } = useInventoryTableConfig()
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [data, setData] = useState<{ items: InventorySummaryLightRow[]; total: number }>({
     items: [],
     total: 0,
@@ -100,64 +114,74 @@ export function InventorySummaryPage() {
         />
       )
     }
+    const visibleColumns = new Set(config.visibleColumns)
+    const orderedColumns = config.columnOrder.filter((id) =>
+      COLUMN_OPTIONS.some((c) => c.id === id)
+    )
+    const columnLabels = new Map(COLUMN_OPTIONS.map((c) => [c.id, t(c.labelKey)]))
+
     return (
       <TableScrollArea inline>
         <table className="w-max min-w-full text-sm">
           <thead className="text-xs uppercase text-slate-500">
             <tr className="border-b border-slate-200 dark:border-slate-800">
-              <th className="px-4 py-3 text-left">{t('inventory:columns.product')}</th>
-              <th className="px-4 py-3 text-left">{t('inventory:columns.brand')}</th>
-              <th className="px-4 py-3 text-left">{t('inventory:columns.total_qty')}</th>
-              <th className="px-4 py-3 text-left">{t('inventory:columns.available')}</th>
-              <th className="px-4 py-3 text-left">{t('inventory:columns.location')}</th>
+              {orderedColumns.map((columnId) =>
+                visibleColumns.has(columnId) ? (
+                  <th key={columnId} className="px-4 py-3 text-left">
+                    {columnLabels.get(columnId)}
+                  </th>
+                ) : null
+              )}
             </tr>
           </thead>
           <tbody>
             {data.items.map((row) => {
               const locs = row.locations ?? []
-
               return (
                 <tr
                   key={row.product_id}
                   className="border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/40"
                 >
-                  <td
-                    className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100 cursor-pointer"
-                    onClick={() => navigate(`/admin/inventory/${row.product_id}`)}
-                  >
-                    {row.product_code} · {row.product_name}
-                  </td>
-                  <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
-                    {row.brand_name ?? '—'}
-                  </td>
-                  <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
-                    {row.total_qty}
-                  </td>
-                  <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
-                    {row.available_qty}
-                  </td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                    {locs.length === 0 ? (
-                      <Link
-                        to="/admin/receiving"
-                        state={{ productId: row.product_id }}
-                        className="text-blue-600 hover:underline dark:text-blue-400"
-                      >
-                        {t('inventory:enter_stock')}
-                      </Link>
-                    ) : locs.length === 1 ? (
-                      locs[0].location_code
-                    ) : (
-                      <span className="block space-y-1">
-                        {locs.map((loc, idx) => (
-                          <span key={idx} className="block font-mono">
-                            {loc.location_code}
-                            {loc.expiry_date ? ` · ${loc.expiry_date}` : ''}
+                  {orderedColumns.map((columnId) =>
+                    visibleColumns.has(columnId) ? (
+                      <td key={columnId}>
+                        {columnId === 'code' && row.product_code}
+                        {columnId === 'barcode' && (row.barcode ?? '—')}
+                        {columnId === 'product' && (
+                          <span
+                            className="font-semibold text-slate-900 dark:text-slate-100 cursor-pointer"
+                            onClick={() => navigate(`/admin/inventory/${row.product_id}`)}
+                          >
+                            {row.product_code} · {row.product_name}
                           </span>
-                        ))}
-                      </span>
-                    )}
-                  </td>
+                        )}
+                        {columnId === 'brand' && (row.brand_name ?? '—')}
+                        {columnId === 'total_qty' && row.total_qty}
+                        {columnId === 'available' && row.available_qty}
+                        {columnId === 'location' &&
+                          (locs.length === 0 ? (
+                          <Link
+                            to="/admin/receiving"
+                            state={{ productId: row.product_id }}
+                            className="text-blue-600 hover:underline dark:text-blue-400"
+                          >
+                            {t('inventory:enter_stock')}
+                          </Link>
+                        ) : locs.length === 1 ? (
+                          locs[0].location_code
+                        ) : (
+                          <span className="block space-y-1">
+                            {locs.map((loc, idx) => (
+                              <span key={idx} className="block font-mono">
+                                {loc.location_code}
+                                {loc.expiry_date ? ` · ${loc.expiry_date}` : ''}
+                              </span>
+                            ))}
+                          </span>
+                          ))}
+                      </td>
+                    ) : null
+                  )}
                 </tr>
               )
             })}
@@ -165,15 +189,25 @@ export function InventorySummaryPage() {
         </table>
       </TableScrollArea>
     )
-  }, [data.items, error, isLoading, load, navigate, t])
+  }, [config.columnOrder, config.visibleColumns, data.items, error, isLoading, load, navigate, t])
 
   return (
     <AdminLayout
       title={t('inventory:title')}
       actionSlot={
-        <Button variant="secondary" onClick={load}>
-          {t('common:buttons.refresh')}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            className="rounded-full px-3 py-3"
+            onClick={() => setIsSettingsOpen(true)}
+            aria-label={t('inventory:table.settings_title')}
+          >
+            <Settings size={18} />
+          </Button>
+          <Button variant="secondary" onClick={load}>
+            {t('common:buttons.refresh')}
+          </Button>
+        </div>
       }
     >
       <Card className="mb-4 space-y-3">
@@ -232,10 +266,18 @@ export function InventorySummaryPage() {
         )}
       </Card>
       <Card className="space-y-4">
-        <div className="max-h-[calc(100vh-320px)] min-h-0 overflow-auto">
+        <div className="min-h-[calc(100vh-320px)] max-h-[calc(100vh-320px)] overflow-auto">
           {content}
         </div>
       </Card>
+      <InventoryTableSettings
+        open={isSettingsOpen}
+        onOpenChange={setIsSettingsOpen}
+        config={config}
+        columns={COLUMN_OPTIONS.map((c) => ({ id: c.id, label: t(c.labelKey) }))}
+        onSave={updateConfig}
+        onReset={resetConfig}
+      />
     </AdminLayout>
   )
 }
