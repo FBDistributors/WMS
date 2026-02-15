@@ -122,29 +122,17 @@ export function InventorySummaryPage() {
 
     return (
       <TableScrollArea inline>
-        <table className="w-full min-w-full table-fixed text-sm">
-          <colgroup>
-            {orderedColumns
-              .filter((id) => visibleColumns.has(id))
-              .map((columnId) => (
-                <col
-                  key={columnId}
-                  style={{
-                    width:
-                      columnId === 'product'
-                        ? '35%'
-                        : columnId === 'barcode' || columnId === 'code'
-                          ? '11%'
-                          : '13%',
-                  }}
-                />
-              ))}
-          </colgroup>
+        <table className="w-max min-w-full text-sm">
           <thead className="text-xs uppercase text-slate-500">
             <tr className="border-b border-slate-200 dark:border-slate-800">
               {orderedColumns.map((columnId) =>
                 visibleColumns.has(columnId) ? (
-                  <th key={columnId} className="px-3 py-3 text-left">
+                  <th
+                    key={columnId}
+                    className={`px-3 py-3 text-left ${
+                      columnId === 'barcode' ? 'min-w-[9rem]' : columnId === 'product' ? 'min-w-[12rem]' : ''
+                    }`}
+                  >
                     {columnLabels.get(columnId)}
                   </th>
                 ) : null
@@ -163,29 +151,23 @@ export function InventorySummaryPage() {
                     visibleColumns.has(columnId) ? (
                       <td
                       key={columnId}
-                      className={`overflow-hidden px-3 py-3 ${
-                        columnId === 'barcode' || columnId === 'code'
-                          ? 'min-w-[7rem]'
-                          : ''
+                      className={`whitespace-nowrap px-3 py-3 ${
+                        columnId === 'barcode' ? 'min-w-[9rem]' : columnId === 'product' ? 'min-w-[12rem]' : ''
                       }`}
                     >
                         {columnId === 'code' && (
-                          <span className="block truncate font-mono" title={row.product_code}>
-                            {row.product_code}
-                          </span>
+                          <span className="font-mono">{row.product_code}</span>
                         )}
                         {columnId === 'barcode' && (
-                          <span className="block truncate font-mono" title={row.barcode ?? ''}>
-                            {row.barcode ?? '—'}
-                          </span>
+                          <span className="font-mono">{row.barcode ?? '—'}</span>
                         )}
                         {columnId === 'product' && (
                           <span
-                            className="block max-w-full cursor-pointer truncate font-semibold text-slate-900 dark:text-slate-100"
+                            className="cursor-pointer font-semibold text-slate-900 dark:text-slate-100"
                             onClick={() => navigate(`/admin/inventory/${row.product_id}`)}
-                            title={`${row.product_code} · ${row.product_name}`}
+                            title={row.product_name}
                           >
-                            {row.product_code} · {row.product_name}
+                            {row.product_name}
                           </span>
                         )}
                         {columnId === 'brand' && (row.brand_name ?? '—')}
