@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 type TableScrollAreaProps = {
   children: ReactNode
@@ -56,6 +57,17 @@ export function TableScrollArea({ children, className }: TableScrollAreaProps) {
     }
   }, [])
 
+  const stripEl = (
+    <div
+      ref={stripRef}
+      className="fixed bottom-0 left-0 right-0 z-50 flex h-5 min-w-0 items-center overflow-x-auto overflow-y-hidden border-t border-slate-300 bg-slate-200 shadow-[0_-2px_8px_rgba(0,0,0,0.08)] dark:border-slate-600 dark:bg-slate-700 dark:shadow-[0_-2px_8px_rgba(0,0,0,0.3)]"
+      aria-hidden
+      style={{ scrollbarGutter: 'stable' }}
+    >
+      <div style={{ width: contentWidth, height: 1, minWidth: '100%', flexShrink: 0 }} />
+    </div>
+  )
+
   return (
     <div className="min-w-0">
       <div
@@ -64,14 +76,7 @@ export function TableScrollArea({ children, className }: TableScrollAreaProps) {
       >
         {children}
       </div>
-      {/* Gorizontal scrollbar — sahifa pastida fixed footer */}
-      <div
-        ref={stripRef}
-        className="fixed bottom-0 left-0 right-0 z-10 h-3 min-w-0 overflow-x-scroll overflow-y-hidden border-t border-slate-200 bg-slate-100/95 dark:border-slate-700 dark:bg-slate-800/95 [&::-webkit-scrollbar]:h-1.5"
-        aria-hidden
-      >
-        <div style={{ width: contentWidth, height: 1, minWidth: '100%' }} />
-      </div>
+      {typeof document !== 'undefined' && createPortal(stripEl, document.body)}
     </div>
   )
 }
