@@ -18,16 +18,16 @@
   "details_title": "Buyurtma tafsilotlari",
   "not_found": "Buyurtma topilmadi.",
   "select_all": "Barchasini tanlash",
-  "send_selected_to_picking": "{{count}} ta buyurtmani pickingga yuborish",
+  "send_selected_to_picking": "{{count}} ta buyurtmani yig'ishga yuborish",
   "send_to_picking": {
-    "button": "Pickingga yuborish",
-    "title": "Pickingga yuborish",
+    "button": "Yig'ishga yuborish",
+    "title": "Yig'ishga yuborish",
     "picker": "Yig'uvchi biriktirish",
     "select_picker": "Yig'uvchi tanlang",
     "picker_required": "Avval yig'uvchi tanlang.",
     "send": "Yuborish",
     "sending": "Yuborilmoqda...",
-    "failed": "Pickingga yuborib bo‘lmadi.",
+    "failed": "Yig'ishga yuborib bo‘lmadi.",
     "load_failed": "Yig'uvchilar ro‘yxati yuklanmadi.",
     "no_pickers_hint": "Yig'uvchi yo'q. Admin > Foydalanuvchilar orqali Yig'uvchi rolida foydalanuvchi yarating.",
     "invalid_selection": "Noto'g'ri tanlov. Sahifani yangilab qayta urinib ko'ring.",
@@ -62,7 +62,7 @@
     "b#s": "B#S",
     "imported": "Import qilingan",
     "allocated": "Ajratilgan",
-    "ready_for_picking": "Pickingga tayyor",
+    "ready_for_picking": "Yig'ishga tayyor",
     "picking": "Pickingda",
     "picked": "Terildi",
     "packed": "Qadoqlandi",
@@ -82,7 +82,7 @@
     "lines": "Qatorlar",
     "created": "Yaratilgan",
     "view_details": "",
-    "send_to_picking": "Pickingga yuborish"
+    "send_to_picking": "Yig'ishga yuborish"
   },
   "lines": {
     "sku": "SKU",
