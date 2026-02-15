@@ -366,16 +366,7 @@ export function OrdersPage() {
               value={status}
               onChange={(event) => setStatus(event.target.value)}
             >
-              <option value="all">{t('orders:filters.all')}</option>
               <option value="B#S">{t('orders:status.b#s')}</option>
-              <option value="imported">{t('orders:status.imported')}</option>
-              <option value="allocated">{t('orders:status.allocated')}</option>
-              <option value="ready_for_picking">{t('orders:status.ready_for_picking')}</option>
-              <option value="picking">{t('orders:status.picking')}</option>
-              <option value="picked">{t('orders:status.picked')}</option>
-              <option value="packed">{t('orders:status.packed')}</option>
-              <option value="shipped">{t('orders:status.shipped')}</option>
-              <option value="cancelled">{t('orders:status.cancelled')}</option>
             </select>
           </label>
           <label className="text-sm text-slate-600 dark:text-slate-300">
