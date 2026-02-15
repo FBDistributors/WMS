@@ -124,14 +124,23 @@ class InventorySummaryWithLocationRow(BaseModel):
     sector: Optional[str] = None
 
 
+class InventoryByProductRowEmbed(BaseModel):
+    """Per-location row for embedding in summary."""
+    location_code: str
+    qty: Decimal
+    available_qty: Decimal
+    expiry_date: Optional[date] = None
+
+
 class InventorySummaryLightRow(BaseModel):
-    """Lightweight summary: product_id, name, brand, totals only. No location breakdown."""
+    """Lightweight summary: product_id, name, brand, totals. Optional location breakdown."""
     product_id: UUID
     product_name: str
     product_code: str
     brand_name: Optional[str] = None
     total_qty: Decimal
     available_qty: Decimal
+    locations: Optional[List[InventoryByProductRowEmbed]] = None
 
 
 class InventorySummaryLightResponse(BaseModel):
@@ -430,17 +439,73 @@ async def inventory_summary(
     return [InventorySummaryRow(**row._asdict()) for row in rows]
 
 
+def _fetch_locations_by_products(db: Session, product_ids: list[UUID]) -> dict[UUID, list]:
+    """Fetch per-location breakdown for given product_ids. Returns {product_id: [rows]}."""
+    if not product_ids:
+        return {}
+    on_hand_expr = func.sum(
+        case(
+            (StockMovementModel.movement_type.in_(("allocate", "unallocate")), 0),
+            else_=StockMovementModel.qty_change,
+        )
+    )
+    reserved_expr = func.sum(
+        case(
+            (
+                StockMovementModel.movement_type.in_(("allocate", "unallocate")),
+                StockMovementModel.qty_change,
+            ),
+            else_=0,
+        )
+    )
+    available_expr = on_hand_expr - reserved_expr
+    rows = (
+        db.query(
+            StockLotModel.product_id,
+            LocationModel.code.label("location_code"),
+            on_hand_expr.label("qty"),
+            available_expr.label("available_qty"),
+            StockLotModel.expiry_date.label("expiry_date"),
+        )
+        .join(StockMovementModel, StockMovementModel.lot_id == StockLotModel.id)
+        .join(LocationModel, LocationModel.id == StockMovementModel.location_id)
+        .filter(StockLotModel.product_id.in_(product_ids))
+        .group_by(
+            StockLotModel.product_id,
+            StockMovementModel.location_id,
+            LocationModel.code,
+            StockLotModel.id,
+            StockLotModel.expiry_date,
+        )
+        .having(available_expr != 0)
+        .order_by(StockLotModel.product_id, LocationModel.code.asc(), StockLotModel.expiry_date.asc().nullslast())
+        .all()
+    )
+    result: dict[UUID, list] = {pid: [] for pid in product_ids}
+    for r in rows:
+        result[r.product_id].append(
+            {
+                "location_code": r.location_code,
+                "qty": r.qty,
+                "available_qty": r.available_qty,
+                "expiry_date": r.expiry_date,
+            }
+        )
+    return result
+
+
 @router.get("/summary-light", response_model=InventorySummaryLightResponse, summary="Lightweight inventory summary (paginated)")
 @router.get("/summary-light/", response_model=InventorySummaryLightResponse, summary="Lightweight inventory summary (paginated)")
 async def inventory_summary_light(
     search: Optional[str] = None,
     only_available: bool = Query(True, description="Default true for fast load"),
+    include_locations: bool = Query(True, description="Include location breakdown per product"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     _user=Depends(require_permission("inventory:read")),
 ):
-    """Lightweight summary: product_id, name, brand, totals. No location breakdown. Paginated."""
+    """Lightweight summary: product_id, name, brand, totals. Optional location breakdown. Paginated."""
     on_hand_expr = func.sum(
         case(
             (StockMovementModel.movement_type.in_(("allocate", "unallocate")), 0),
@@ -482,6 +547,10 @@ async def inventory_summary_light(
         .limit(limit)
         .all()
     )
+    product_ids = [row.product_id for row in rows]
+    locs_map: dict[UUID, list] = {}
+    if include_locations and product_ids:
+        locs_map = _fetch_locations_by_products(db, product_ids)
     items = [
         InventorySummaryLightRow(
             product_id=row.product_id,
@@ -490,6 +559,17 @@ async def inventory_summary_light(
             brand_name=row.brand_name or None,
             total_qty=row.total_qty,
             available_qty=row.available_qty,
+            locations=[
+                InventoryByProductRowEmbed(
+                    location_code=l["location_code"],
+                    qty=l["qty"],
+                    available_qty=l["available_qty"],
+                    expiry_date=l["expiry_date"],
+                )
+                for l in locs_map.get(row.product_id, [])
+            ]
+            if include_locations
+            else None,
         )
         for row in rows
     ]

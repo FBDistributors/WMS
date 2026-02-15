@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Search, ChevronDown, ChevronRight, PackagePlus, ChevronLeft } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight, PackagePlus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -10,9 +10,7 @@ import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import {
   getInventorySummaryLight,
-  getInventoryByProduct,
   type InventorySummaryLightRow,
-  type InventoryByProductRow,
 } from '../../services/inventoryApi'
 
 const DEBOUNCE_MS = 400
@@ -26,16 +24,12 @@ export function InventorySummaryPage() {
     total: 0,
   })
   const [offset, setOffset] = useState(0)
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [locationDetails, setLocationDetails] = useState<Record<string, InventoryByProductRow[]>>({})
-  const [loadingDetails, setLoadingDetails] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [onlyAvailable, setOnlyAvailable] = useState(true)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Debounce search (400ms)
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), DEBOUNCE_MS)
     return () => clearTimeout(timer)
@@ -48,6 +42,7 @@ export function InventorySummaryPage() {
       const res = await getInventorySummaryLight({
         search: debouncedSearch.trim() || undefined,
         only_available: onlyAvailable,
+        include_locations: true,
         limit: PAGE_SIZE,
         offset,
       })
@@ -59,7 +54,6 @@ export function InventorySummaryPage() {
     }
   }, [debouncedSearch, onlyAvailable, offset, t])
 
-  // Reset offset when search/filters change
   const prevSearchRef = useRef(debouncedSearch)
   const prevOnlyRef = useRef(onlyAvailable)
   useEffect(() => {
@@ -70,36 +64,9 @@ export function InventorySummaryPage() {
     }
   }, [debouncedSearch, onlyAvailable])
 
-  // Single API call on initial load and when filters change
   useEffect(() => {
     void load()
   }, [load])
-
-  const toggleExpand = useCallback(async (productId: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (next.has(productId)) {
-        next.delete(productId)
-        return next
-      }
-      next.add(productId)
-      return next
-    })
-
-    if (locationDetails[productId]) return
-
-    setLoadingDetails((prev) => new Set(prev).add(productId))
-    try {
-      const locs = await getInventoryByProduct(productId)
-      setLocationDetails((prev) => ({ ...prev, [productId]: locs }))
-    } finally {
-      setLoadingDetails((prev) => {
-        const next = new Set(prev)
-        next.delete(productId)
-        return next
-      })
-    }
-  }, [locationDetails])
 
   const goPrev = useCallback(() => {
     setOffset((o) => Math.max(0, o - PAGE_SIZE))
@@ -138,124 +105,67 @@ export function InventorySummaryPage() {
         <table className="min-w-full text-sm">
           <thead className="text-xs uppercase text-slate-500">
             <tr className="border-b border-slate-200 dark:border-slate-800">
-              <th className="w-8 px-1 py-3" aria-label="Expand" />
               <th className="px-4 py-3 text-left">{t('inventory:columns.product')}</th>
               <th className="px-4 py-3 text-left">{t('inventory:columns.brand')}</th>
               <th className="px-4 py-3 text-left">{t('inventory:columns.total_qty')}</th>
               <th className="px-4 py-3 text-left">{t('inventory:columns.available')}</th>
               <th className="px-4 py-3 text-left">{t('inventory:columns.location')}</th>
-              <th className="px-4 py-3 text-left">{t('inventory:columns.location_type')}</th>
             </tr>
           </thead>
           <tbody>
             {data.items.map((row) => {
-              const isExpanded = expanded.has(row.product_id)
-              const locs = locationDetails[row.product_id]
-              const isLoadingLocs = loadingDetails.has(row.product_id)
+              const locs = row.locations ?? []
 
               return (
-                <React.Fragment key={row.product_id}>
-                  <tr
-                    className="border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/40"
+                <tr
+                  key={row.product_id}
+                  className="border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/40"
+                >
+                  <td
+                    className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100 cursor-pointer"
+                    onClick={() => navigate(`/admin/inventory/${row.product_id}`)}
                   >
-                    <td className="w-8 px-1 py-2">
-                      <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            toggleExpand(row.product_id)
-                          }}
-                          className="p-1 text-slate-500 hover:text-slate-700"
-                          aria-expanded={isExpanded}
-                        >
-                          {isLoadingLocs ? (
-                            <span className="inline-block size-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
-                          ) : isExpanded ? (
-                            <ChevronDown size={18} />
-                          ) : (
-                            <ChevronRight size={18} />
-                          )}
-                        </button>
-                    </td>
-                    <td
-                      className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100 cursor-pointer"
-                      onClick={() => navigate(`/admin/inventory/${row.product_id}`)}
-                    >
-                      {row.product_code} · {row.product_name}
-                    </td>
-                    <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
-                      {row.brand_name ?? '—'}
-                    </td>
-                    <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
-                      {row.total_qty}
-                    </td>
-                    <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
-                      {row.available_qty}
-                    </td>
-                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                      {locs
-                        ? locs.length === 0
-                          ? (
-                            <Link
-                              to="/admin/receiving"
-                              state={{ productId: row.product_id }}
-                              className="text-blue-600 hover:underline dark:text-blue-400"
-                            >
-                              {t('inventory:enter_stock')}
-                            </Link>
-                            )
-                          : locs.length === 1
-                            ? `${locs[0].location_code} (${locs[0].available_qty} ${t('inventory:columns.qty')})`
-                            : `${locs.length} ${t('inventory:columns.locations')}`
-                        : isLoadingLocs
-                          ? '…'
-                          : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-slate-500">
-                      {isExpanded && locs?.length === 1 ? locs[0].location_type ?? '—' : null}
-                    </td>
-                  </tr>
-                  {isExpanded &&
-                    locs &&
-                    locs.length > 1 &&
-                    locs.map((loc, idx) => (
-                      <tr
-                        key={`${row.product_id}-${idx}-${loc.location_code}`}
-                        className="border-b border-slate-100 bg-slate-50/50 dark:bg-slate-900/20"
+                    {row.product_code} · {row.product_name}
+                  </td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
+                    {row.brand_name ?? '—'}
+                  </td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
+                    {row.total_qty}
+                  </td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
+                    {row.available_qty}
+                  </td>
+                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                    {locs.length === 0 ? (
+                      <Link
+                        to="/admin/receiving"
+                        state={{ productId: row.product_id }}
+                        className="text-blue-600 hover:underline dark:text-blue-400"
                       >
-                        <td className="w-8 px-1 py-2" />
-                        <td className="px-4 py-2 pl-8 text-slate-600 dark:text-slate-400" />
-                        <td className="px-4 py-2" />
-                        <td className="px-4 py-2" />
-                        <td className="px-4 py-2" />
-                        <td className="px-4 py-2 font-mono text-slate-700 dark:text-slate-300">
-                          {loc.location_code} ({loc.available_qty} {t('inventory:columns.qty')})
-                          {loc.expiry_date ? ` · ${loc.expiry_date}` : ''}
-                        </td>
-                        <td className="px-4 py-2 text-slate-500">
-                          {loc.location_type ?? '—'}
-                        </td>
-                      </tr>
-                    ))}
-                </React.Fragment>
+                        {t('inventory:enter_stock')}
+                      </Link>
+                    ) : locs.length === 1 ? (
+                      `${locs[0].location_code} (${locs[0].available_qty} ${t('inventory:columns.qty')})`
+                    ) : (
+                      <span className="block space-y-1">
+                        {locs.map((loc, idx) => (
+                          <span key={idx} className="block font-mono">
+                            {loc.location_code} ({loc.available_qty} {t('inventory:columns.qty')})
+                            {loc.expiry_date ? ` · ${loc.expiry_date}` : ''}
+                          </span>
+                        ))}
+                      </span>
+                    )}
+                  </td>
+                </tr>
               )
             })}
           </tbody>
         </table>
       </TableScrollArea>
     )
-  }, [
-    data.items,
-    error,
-    expanded,
-    isLoading,
-    load,
-    locationDetails,
-    loadingDetails,
-    navigate,
-    t,
-    toggleExpand,
-  ])
+  }, [data.items, error, isLoading, load, navigate, t])
 
   return (
     <AdminLayout

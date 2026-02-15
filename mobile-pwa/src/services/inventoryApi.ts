@@ -111,6 +111,7 @@ export async function getInventorySummaryByLocation(query: InventorySummaryByLoc
 export type InventorySummaryLightQuery = {
   search?: string
   only_available?: boolean
+  include_locations?: boolean
   limit?: number
   offset?: number
 }
@@ -122,6 +123,13 @@ export type InventorySummaryLightResponse = {
   offset: number
 }
 
+export type InventorySummaryLightLocation = {
+  location_code: string
+  qty: number
+  available_qty: number
+  expiry_date?: string | null
+}
+
 export type InventorySummaryLightRow = {
   product_id: string
   product_name: string
@@ -129,6 +137,7 @@ export type InventorySummaryLightRow = {
   brand_name?: string | null
   total_qty: number
   available_qty: number
+  locations?: InventorySummaryLightLocation[] | null
 }
 
 export async function getInventorySummaryLight(query: InventorySummaryLightQuery = {}) {
@@ -136,6 +145,7 @@ export async function getInventorySummaryLight(query: InventorySummaryLightQuery
     query: {
       search: query.search,
       only_available: query.only_available ?? true,
+      include_locations: query.include_locations ?? true,
       limit: query.limit ?? 50,
       offset: query.offset ?? 0,
     },
