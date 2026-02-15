@@ -101,8 +101,8 @@ export function InventorySummaryPage() {
       )
     }
     return (
-      <TableScrollArea>
-        <table className="min-w-full text-sm">
+      <TableScrollArea inline>
+        <table className="w-max min-w-full text-sm">
           <thead className="text-xs uppercase text-slate-500">
             <tr className="border-b border-slate-200 dark:border-slate-800">
               <th className="px-4 py-3 text-left">{t('inventory:columns.product')}</th>
@@ -146,12 +146,12 @@ export function InventorySummaryPage() {
                         {t('inventory:enter_stock')}
                       </Link>
                     ) : locs.length === 1 ? (
-                      `${locs[0].location_code} (${locs[0].available_qty} ${t('inventory:columns.qty')})`
+                      locs[0].location_code
                     ) : (
                       <span className="block space-y-1">
                         {locs.map((loc, idx) => (
                           <span key={idx} className="block font-mono">
-                            {loc.location_code} ({loc.available_qty} {t('inventory:columns.qty')})
+                            {loc.location_code}
                             {loc.expiry_date ? ` · ${loc.expiry_date}` : ''}
                           </span>
                         ))}
@@ -231,7 +231,11 @@ export function InventorySummaryPage() {
           </div>
         )}
       </Card>
-      <Card className="space-y-4">{content}</Card>
+      <Card className="space-y-4">
+        <div className="max-h-[calc(100vh-320px)] min-h-0 overflow-auto">
+          {content}
+        </div>
+      </Card>
     </AdminLayout>
   )
 }
