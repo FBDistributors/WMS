@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Search, ChevronLeft, ChevronRight, PackagePlus, Settings } from 'lucide-react'
+import { Search, PackagePlus, Settings } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -226,7 +226,7 @@ export function InventorySummaryPage() {
 
   return (
     <AdminLayout title={t('inventory:title')}>
-      <Card className="mb-4 space-y-3">
+      <Card className="space-y-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex flex-1 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
             <Search size={18} className="text-slate-400" />
@@ -264,37 +264,24 @@ export function InventorySummaryPage() {
             {t('common:buttons.refresh')}
           </Button>
         </div>
-        {data.total > 0 && (
-          <div className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-400">
-            <span>
+
+
+        <div className="max-h-[calc(100vh-320px)] min-h-0 overflow-auto">
+          {content}
+        </div>
+
+        <div className="flex items-center justify-end gap-2">
+          {data.total > 0 ? (
+            <span className="mr-auto text-sm text-slate-600 dark:text-slate-400">
               {pageStart}–{pageEnd} / {data.total}
             </span>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={goPrev}
-                disabled={!hasPrev}
-                className="gap-1 px-3 py-2"
-              >
-                <ChevronLeft size={16} />
-                {t('common:buttons.back')}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={goNext}
-                disabled={!hasNext}
-                className="gap-1 px-3 py-2"
-              >
-                {t('common:buttons.next')}
-                <ChevronRight size={16} />
-              </Button>
-            </div>
-          </div>
-        )}
-      </Card>
-      <Card className="space-y-4">
-        <div className="min-h-[calc(100vh-320px)] max-h-[calc(100vh-320px)] overflow-auto">
-          {content}
+          ) : null}
+          <Button variant="secondary" disabled={!hasPrev} onClick={goPrev}>
+            {t('common:buttons.back')}
+          </Button>
+          <Button variant="secondary" disabled={!hasNext} onClick={goNext}>
+            {t('common:buttons.next')}
+          </Button>
         </div>
       </Card>
       <InventoryTableSettings
