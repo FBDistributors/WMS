@@ -46,11 +46,12 @@ class SmartupClient:
             url = raw_base
         else:
             url = urljoin(f"{raw_base}/", "b/trade/txs/tdeal/order$export")
-        # Use explicit filial filter: default to our filial so we only get our branch's orders
-        normalized_filial_code = (filial_code or self.filial_id or "").strip()
+        # Pass filial_code only when explicitly provided. SmartUp may return 400 "org not found"
+        # if we pass 3788131 in payload - so we import all, then filter by filial in our API.
+        normalized_filial_code = (filial_code or "").strip()
         payload = {
-            "filial_codes": [{"filial_code": normalized_filial_code}] if normalized_filial_code else [],
-            "filial_code": normalized_filial_code,
+            "filial_codes": [{"filial_code": normalized_filial_code}] if normalized_filial_code else [{"filial_code": ""}],
+            "filial_code": normalized_filial_code or "",
             "external_id": "",
             "deal_id": "",
             "status": "B#S",
