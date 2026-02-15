@@ -60,14 +60,14 @@ export function TableScrollArea({ children, className }: TableScrollAreaProps) {
     <div className="min-w-0">
       <div
         ref={scrollRef}
-        className={`overflow-x-scroll overflow-y-hidden ${className ?? ''}`}
+        className={`scrollbar-hide overflow-x-scroll overflow-y-hidden ${className ?? ''}`}
       >
         {children}
       </div>
-      {/* Gorizontal scrollbar — scroll container ostida sticky */}
+      {/* Gorizontal scrollbar — sahifa pastida fixed footer */}
       <div
         ref={stripRef}
-        className="sticky bottom-0 z-10 mt-1 h-3 min-w-0 overflow-x-scroll overflow-y-hidden rounded border border-slate-200 bg-slate-100/95 dark:border-slate-700 dark:bg-slate-800/95"
+        className="fixed bottom-0 left-0 right-0 z-10 h-3 min-w-0 overflow-x-scroll overflow-y-hidden border-t border-slate-200 bg-slate-100/95 dark:border-slate-700 dark:bg-slate-800/95 [&::-webkit-scrollbar]:h-1.5"
         aria-hidden
       >
         <div style={{ width: contentWidth, height: 1, minWidth: '100%' }} />

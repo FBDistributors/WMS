@@ -45,4 +45,12 @@
   .max-h-dvh {
     max-height: 100dvh;
   }
+  /* Yashirish: brauzer gorizontal scrollbar, faqat strip ishlatiladi */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }
