@@ -1,18 +1,20 @@
 """Dashboard summary API - real counts from database."""
 
+import os
 from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 from app.auth.deps import require_permission
 from app.db import get_db
 from app.models.document import Document as DocumentModel
 from app.models.order import Order as OrderModel
-from sqlalchemy.orm import Session
 
 router = APIRouter()
+DEFAULT_FILIAL_ID = os.getenv("WMS_DEFAULT_FILIAL_ID", "3788131").strip()
 
 
 class DashboardSummaryResponse(BaseModel):
@@ -36,12 +38,17 @@ async def get_dashboard_summary(
 ):
     today = _today_utc()
 
-    # Total orders (same as orders list with status=all - all orders)
-    total_orders = db.query(func.count(OrderModel.id)).scalar() or 0
+    def _order_base(q):
+        return q.filter(OrderModel.filial_id == DEFAULT_FILIAL_ID) if DEFAULT_FILIAL_ID else q
+
+    # Total orders (same as orders list - default filial 3788131)
+    total_orders = (
+        _order_base(db.query(func.count(OrderModel.id))).scalar() or 0
+    )
 
     # Orders completed (shipped/packed) today
     completed_today = (
-        db.query(func.count(OrderModel.id))
+        _order_base(db.query(func.count(OrderModel.id)))
         .filter(
             OrderModel.status.in_(("packed", "shipped")),
             func.date(OrderModel.updated_at) == today,
@@ -79,7 +86,7 @@ async def get_dashboard_summary(
 
     # Deltas: new orders today for total_orders
     new_orders_today = (
-        db.query(func.count(OrderModel.id))
+        _order_base(db.query(func.count(OrderModel.id)))
         .filter(func.date(OrderModel.created_at) == today)
         .scalar()
         or 0

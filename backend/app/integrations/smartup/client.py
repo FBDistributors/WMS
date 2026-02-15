@@ -46,11 +46,10 @@ class SmartupClient:
             url = raw_base
         else:
             url = urljoin(f"{raw_base}/", "b/trade/txs/tdeal/order$export")
-        normalized_filial_code = (filial_code or "").strip()
-        if normalized_filial_code and normalized_filial_code == self.filial_id:
-            normalized_filial_code = ""
+        # Use explicit filial filter: default to our filial so we only get our branch's orders
+        normalized_filial_code = (filial_code or self.filial_id or "").strip()
         payload = {
-            "filial_codes": [{"filial_code": normalized_filial_code}],
+            "filial_codes": [{"filial_code": normalized_filial_code}] if normalized_filial_code else [],
             "filial_code": normalized_filial_code,
             "external_id": "",
             "deal_id": "",

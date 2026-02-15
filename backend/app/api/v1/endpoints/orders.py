@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import date
 from typing import List, Optional
 from uuid import UUID
@@ -318,8 +319,15 @@ async def list_orders(
         term = f"%{q.strip()}%"
         query = query.filter(or_(*[field.ilike(term) for field in fields]))
 
-    if filial_id:
-        query = query.filter(OrderModel.filial_id == filial_id)
+    # Default to filial 3788131 - only show this branch's orders (use filial_id=all to see all)
+    if filial_id and filial_id.strip().lower() == "all":
+        pass  # no filial filter
+    elif filial_id and filial_id.strip():
+        query = query.filter(OrderModel.filial_id == filial_id.strip())
+    else:
+        default_filial = os.getenv("WMS_DEFAULT_FILIAL_ID", "3788131").strip()
+        if default_filial:
+            query = query.filter(OrderModel.filial_id == default_filial)
 
     if date_from:
         query = query.filter(func.date(OrderModel.created_at) >= date_from)
