@@ -172,6 +172,9 @@ export function AdminLayout({ title, actionSlot, children }: AdminLayoutProps) {
           </div>
         </header>
         <main className="min-w-0 flex-1 overflow-x-auto overflow-y-auto px-6 py-6 pb-14">{children}</main>
+        <footer className="shrink-0 border-t border-slate-200 bg-white/80 px-6 py-2 text-center text-xs text-slate-500 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+          FB Warehouse Management System · Developed by Jaloliddin
+        </footer>
       </div>
       <ConfirmDialog
         open={showLogoutConfirm}
