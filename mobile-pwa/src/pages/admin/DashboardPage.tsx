@@ -15,9 +15,9 @@ import { ActivePickList } from '../../admin/components/ActivePickList'
 import { ExceptionsList } from '../../admin/components/ExceptionsList'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { getDashboardSummary } from '../../services/dashboardApi'
 import {
   getActivePicks,
-  getDashboardSummary,
   getExceptions,
   getTodayOverview,
 } from '../../services/dashboardApi.mock'
