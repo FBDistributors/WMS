@@ -521,12 +521,20 @@ async def inventory_summary_light(
     )
     available_expr = on_hand_expr - reserved_expr
 
+    barcode_subq = (
+        select(ProductBarcode.barcode)
+        .where(ProductBarcode.product_id == ProductModel.id)
+        .limit(1)
+        .correlate(ProductModel)
+        .scalar_subquery()
+    )
+    barcode_expr = func.coalesce(ProductModel.barcode, barcode_subq)
     base_query = (
         db.query(
             ProductModel.id.label("product_id"),
             ProductModel.name.label("product_name"),
             ProductModel.sku.label("product_code"),
-            ProductModel.barcode.label("barcode"),
+            barcode_expr.label("barcode"),
             func.coalesce(ProductModel.brand, "").label("brand_name"),
             on_hand_expr.label("total_qty"),
             available_expr.label("available_qty"),

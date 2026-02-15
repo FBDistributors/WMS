@@ -122,12 +122,29 @@ export function InventorySummaryPage() {
 
     return (
       <TableScrollArea inline>
-        <table className="w-max min-w-full text-sm">
+        <table className="w-full min-w-full table-fixed text-sm">
+          <colgroup>
+            {orderedColumns
+              .filter((id) => visibleColumns.has(id))
+              .map((columnId) => (
+                <col
+                  key={columnId}
+                  style={{
+                    width:
+                      columnId === 'product'
+                        ? '35%'
+                        : columnId === 'barcode' || columnId === 'code'
+                          ? '11%'
+                          : '13%',
+                  }}
+                />
+              ))}
+          </colgroup>
           <thead className="text-xs uppercase text-slate-500">
             <tr className="border-b border-slate-200 dark:border-slate-800">
               {orderedColumns.map((columnId) =>
                 visibleColumns.has(columnId) ? (
-                  <th key={columnId} className="px-4 py-3 text-left">
+                  <th key={columnId} className="px-3 py-3 text-left">
                     {columnLabels.get(columnId)}
                   </th>
                 ) : null
@@ -144,13 +161,29 @@ export function InventorySummaryPage() {
                 >
                   {orderedColumns.map((columnId) =>
                     visibleColumns.has(columnId) ? (
-                      <td key={columnId}>
-                        {columnId === 'code' && row.product_code}
-                        {columnId === 'barcode' && (row.barcode ?? '—')}
+                      <td
+                      key={columnId}
+                      className={`overflow-hidden px-3 py-3 ${
+                        columnId === 'barcode' || columnId === 'code'
+                          ? 'min-w-[7rem]'
+                          : ''
+                      }`}
+                    >
+                        {columnId === 'code' && (
+                          <span className="block truncate font-mono" title={row.product_code}>
+                            {row.product_code}
+                          </span>
+                        )}
+                        {columnId === 'barcode' && (
+                          <span className="block truncate font-mono" title={row.barcode ?? ''}>
+                            {row.barcode ?? '—'}
+                          </span>
+                        )}
                         {columnId === 'product' && (
                           <span
-                            className="font-semibold text-slate-900 dark:text-slate-100 cursor-pointer"
+                            className="block max-w-full cursor-pointer truncate font-semibold text-slate-900 dark:text-slate-100"
                             onClick={() => navigate(`/admin/inventory/${row.product_id}`)}
+                            title={`${row.product_code} · ${row.product_name}`}
                           >
                             {row.product_code} · {row.product_name}
                           </span>
@@ -192,24 +225,7 @@ export function InventorySummaryPage() {
   }, [config.columnOrder, config.visibleColumns, data.items, error, isLoading, load, navigate, t])
 
   return (
-    <AdminLayout
-      title={t('inventory:title')}
-      actionSlot={
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            className="rounded-full px-3 py-3"
-            onClick={() => setIsSettingsOpen(true)}
-            aria-label={t('inventory:table.settings_title')}
-          >
-            <Settings size={18} />
-          </Button>
-          <Button variant="secondary" onClick={load}>
-            {t('common:buttons.refresh')}
-          </Button>
-        </div>
-      }
-    >
+    <AdminLayout title={t('inventory:title')}>
       <Card className="mb-4 space-y-3">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex flex-1 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
@@ -236,6 +252,17 @@ export function InventorySummaryPage() {
             <PackagePlus size={18} />
             {t('inventory:enter_stock')}
           </Link>
+          <Button
+            variant="ghost"
+            className="rounded-full px-3 py-3"
+            onClick={() => setIsSettingsOpen(true)}
+            aria-label={t('inventory:table.settings_title')}
+          >
+            <Settings size={18} />
+          </Button>
+          <Button variant="secondary" onClick={load}>
+            {t('common:buttons.refresh')}
+          </Button>
         </div>
         {data.total > 0 && (
           <div className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-400">
