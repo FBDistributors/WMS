@@ -5,7 +5,7 @@ from typing import Iterable, List, Tuple
 
 from sqlalchemy.orm import Session, selectinload
 
-from app.integrations.smartup.mapper import map_order_to_wms_order
+from app.integrations.smartup.mapper import _resolve_external_id, map_order_to_wms_order
 from app.integrations.smartup.schemas import SmartupOrder
 from app.models.order import Order, OrderLine
 
@@ -23,18 +23,30 @@ def import_orders(db: Session, orders: Iterable[SmartupOrder]) -> Tuple[int, int
     errors: List[ImportError] = []
 
     for order in orders:
+        external_id = _resolve_external_id(order)
+        existing = (
+            db.query(Order)
+            .options(selectinload(Order.lines))
+            .filter(Order.source_external_id == external_id)
+            .one_or_none()
+        )
+
         if order.status != "B#S":
-            skipped += 1
+            # Status changed in SmartUp: update our record so it no longer shows in B#S view
+            if existing and existing.status in ("imported", "B#S", "ready_for_picking"):
+                try:
+                    existing.status = order.status or "cancelled"
+                    db.commit()
+                    updated += 1
+                except Exception as exc:
+                    db.rollback()
+                    errors.append(ImportError(external_id=external_id, reason=str(exc)))
+            else:
+                skipped += 1
             continue
+
         payload = map_order_to_wms_order(order)
         try:
-            existing = (
-                db.query(Order)
-                .options(selectinload(Order.lines))
-                .filter(Order.source_external_id == payload.source_external_id)
-                .one_or_none()
-            )
-
             if existing:
                 existing.order_number = payload.order_number
                 existing.filial_id = payload.filial_id

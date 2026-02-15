@@ -51,7 +51,7 @@ export function OrdersPage() {
   const [items, setItems] = useState<OrderListItem[]>([])
   const [offset, setOffset] = useState(0)
   const [total, setTotal] = useState(0)
-  const [status, setStatus] = useState('all')
+  const [status, setStatus] = useState('B#S')
   const [search, setSearch] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

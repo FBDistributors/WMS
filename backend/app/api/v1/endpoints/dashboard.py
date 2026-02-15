@@ -41,9 +41,12 @@ async def get_dashboard_summary(
     def _order_base(q):
         return q.filter(OrderModel.filial_id == DEFAULT_FILIAL_ID) if DEFAULT_FILIAL_ID else q
 
-    # Total orders (same as orders list - default filial 3788131)
+    # Total orders: B#S only (matches orders page default view)
     total_orders = (
-        _order_base(db.query(func.count(OrderModel.id))).scalar() or 0
+        _order_base(db.query(func.count(OrderModel.id)))
+        .filter(OrderModel.status == "B#S")
+        .scalar()
+        or 0
     )
 
     # Orders completed (shipped/packed) today
@@ -84,10 +87,10 @@ async def get_dashboard_summary(
     exceptions = 0
     low_stock = 0
 
-    # Deltas: new orders today for total_orders
+    # Deltas: new B#S orders today
     new_orders_today = (
         _order_base(db.query(func.count(OrderModel.id)))
-        .filter(func.date(OrderModel.created_at) == today)
+        .filter(OrderModel.status == "B#S", func.date(OrderModel.created_at) == today)
         .scalar()
         or 0
     )
