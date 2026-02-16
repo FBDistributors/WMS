@@ -71,25 +71,5 @@
     "in_progress": "In progress",
     "done": "Done",
     "error": "Error"
-  },
-  "wave": {
-    "title": "Wave Picking",
-    "select_wave": "Select wave",
-    "no_waves": "No waves in picking.",
-    "scan_barcode": "Scan barcode",
-    "remaining": "Remaining",
-    "picked": "Picked",
-    "confirm": "Confirm",
-    "scan_success": "Picked {{qty}}",
-    "scan_error": "Barcode not in wave"
-  },
-  "sorting": {
-    "title": "Sorting Zone",
-    "select_wave": "Select wave",
-    "select_order": "Select order / bin",
-    "scan_barcode": "Scan barcode",
-    "assign_qty": "Qty to assign",
-    "confirm": "Confirm",
-    "scan_success": "Assigned {{qty}} to order"
   }
 }
