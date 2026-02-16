@@ -7,6 +7,7 @@ import { pickLineDelta } from '../../services/pickingApi'
 import type { PickLine } from '../../services/pickingApi'
 import { ScanInput } from './ScanInput'
 import { cn } from '../../lib/utils'
+import { playBeep } from '../../utils/beep'
 
 const CameraScanner = lazy(() => import('./CameraScanner'))
 
@@ -43,6 +44,7 @@ export function PickScanModal({ open, line, onClose, onSuccess }: PickScanModalP
   const handleScan = useCallback(
     (code: string) => {
       if (!line) return
+      setScanError(null)
       const normalized = normalizeScan(code)
       if (!normalized) return
       const candidates = [
@@ -55,9 +57,11 @@ export function PickScanModal({ open, line, onClose, onSuccess }: PickScanModalP
         .map((v) => normalizeScan(String(v)))
       const found = candidates.includes(normalized)
       if (found) {
+        playBeep()
         setBarcodeScanned(true)
         setScanError(null)
         setQty(Math.min(1, remaining))
+        setIsCameraActive(false)
       } else {
         setScanError(t('not_found'))
       }
@@ -134,21 +138,23 @@ export function PickScanModal({ open, line, onClose, onSuccess }: PickScanModalP
                   >
                     {isCameraActive ? t('stop_camera') : isMobile ? t('scan_camera') : t('camera_optional')}
                   </Button>
-                  <Suspense
-                    fallback={
-                      <div className="rounded-2xl bg-white p-4 text-sm text-slate-500 dark:bg-slate-800">
-                        {t('loading_camera')}
-                      </div>
-                    }
-                  >
-                    <CameraScanner
-                      active={isCameraActive}
-                      onDetected={(code) => {
-                        handleScan(code)
-                        setIsCameraActive(false)
-                      }}
-                    />
-                  </Suspense>
+                  {isCameraActive && (
+                    <Suspense
+                      fallback={
+                        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black text-white">
+                          {t('loading_camera')}
+                        </div>
+                      }
+                    >
+                      <CameraScanner
+                        active={true}
+                        fullscreen
+                        scanError={scanError}
+                        onClose={() => setIsCameraActive(false)}
+                        onDetected={handleScan}
+                      />
+                    </Suspense>
+                  )}
                   {scanError && (
                     <div className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">
                       {scanError}

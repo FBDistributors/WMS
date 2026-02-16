@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
+import { X } from 'lucide-react'
 import type { Result } from '@zxing/library'
 import type { IScannerControls } from '@zxing/browser'
 
 type CameraScannerProps = {
   onDetected: (code: string) => void
   onError?: (message: string) => void
+  onClose?: () => void
   active: boolean
+  fullscreen?: boolean
+  scanError?: string | null
 }
 
 const VIDEO_CONSTRAINTS: MediaStreamConstraints['video'] = {
@@ -19,7 +23,7 @@ const SCANNER_OPTIONS = {
   delayBetweenScanSuccess: 100,
 }
 
-export default function CameraScanner({ onDetected, onError, active }: CameraScannerProps) {
+export default function CameraScanner({ onDetected, onError, onClose, active, fullscreen = false, scanError: scanErr }: CameraScannerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const [error, setError] = useState<string | null>(null)
   const onDetectedRef = useRef(onDetected)
@@ -70,19 +74,46 @@ export default function CameraScanner({ onDetected, onError, active }: CameraSca
 
   if (!active) return null
 
+  const containerClass = fullscreen
+    ? 'fixed inset-0 z-[60] flex flex-col bg-black'
+    : 'rounded-2xl bg-white p-4 shadow-sm'
+
   return (
-    <div className="rounded-2xl bg-white p-4 shadow-sm">
-      <div className="text-xs uppercase text-slate-500">Camera scan</div>
-      <div className="mt-3 overflow-hidden rounded-xl bg-slate-100">
+    <div className={containerClass}>
+      {fullscreen && onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute top-4 right-4 z-10 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
+          aria-label="Close camera"
+        >
+          <X size={24} />
+        </button>
+      )}
+      <div className="relative flex-1 overflow-hidden">
         <video
           ref={videoRef}
           playsInline
           muted
           autoPlay
-          className="h-56 w-full object-cover"
+          className={fullscreen ? 'h-full w-full object-cover' : 'h-56 w-full rounded-xl object-cover'}
         />
+        {fullscreen && (
+          <div className="absolute inset-0 pointer-events-none">
+            <div
+              className="absolute left-4 right-4 top-[4%] h-1 rounded-full bg-red-500 animate-scan-line"
+              style={{
+                boxShadow: '0 0 20px 8px rgba(239, 68, 68, 0.9)',
+              }}
+            />
+          </div>
+        )}
       </div>
-      {error ? <div className="mt-2 text-xs text-red-600">{error}</div> : null}
+      {(error || scanErr) ? (
+        <div className="absolute bottom-4 left-4 right-4 rounded-lg bg-red-600 px-4 py-2 text-sm text-white">
+          {error || scanErr}
+        </div>
+      ) : null}
     </div>
   )
 }
