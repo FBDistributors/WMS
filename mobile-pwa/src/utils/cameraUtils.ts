@@ -9,10 +9,12 @@ export interface CameraDevice {
   kind: MediaDeviceInfo['kind']
 }
 
-/** High-res constraints: ideal 1920x1080, min 1280x720. Never 640x480. */
-function getVideoConstraints(): MediaTrackConstraints {
-  const w = typeof window !== 'undefined' ? Math.min(1920, window.screen?.width ?? 1920) : 1920
-  const h = typeof window !== 'undefined' ? Math.min(1080, window.screen?.height ?? 1080) : 1080
+const DEFAULT_ZOOM = 1.5
+
+/** High-res: prefer 1920x1080, fallback 1280x720. Never 640x480. */
+function getVideoConstraints(prefer1080 = true): MediaTrackConstraints {
+  const w = prefer1080 ? 1920 : 1280
+  const h = prefer1080 ? 1080 : 720
   return {
     facingMode: { exact: 'environment' },
     width: { ideal: w, min: 1280 },
@@ -47,9 +49,9 @@ export async function listBackCameras(): Promise<CameraDevice[]> {
   return list.map((d) => ({ deviceId: d.deviceId, label: d.label || `Camera ${d.deviceId.slice(0, 8)}`, kind: d.kind }))
 }
 
-/** Build video constraints for a device (or default back) */
-export function buildVideoConstraints(deviceId?: string): MediaTrackConstraints {
-  const base = { ...getVideoConstraints() }
+/** Build video constraints for a device (or default back). Prefer 1080p, fallback 720p. */
+export function buildVideoConstraints(deviceId?: string, prefer1080 = true): MediaTrackConstraints {
+  const base = { ...getVideoConstraints(prefer1080) }
   const supported = navigator.mediaDevices.getSupportedConstraints() as Record<string, boolean>
   if (supported.focusMode) {
     ;(base as Record<string, unknown>).focusMode = 'continuous'
@@ -130,6 +132,12 @@ export async function setTorch(track: MediaStreamTrack | null, on: boolean): Pro
   } catch {
     // iOS/Safari often doesn't support torch
   }
+}
+
+/** AppSheet-like default zoom: 1.5x if supported (sharper 1D barcodes) */
+export function getDefaultZoom(caps: TrackCapabilities | null): number {
+  if (!caps?.hasZoom || caps.zoomMax < 1.5) return 1
+  return Math.min(caps.zoomMax, DEFAULT_ZOOM)
 }
 
 /** Set zoom level (1 = no zoom) */

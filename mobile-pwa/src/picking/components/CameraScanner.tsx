@@ -8,6 +8,7 @@ import {
   startStream,
   stopStream,
   getTrackCapabilities,
+  getDefaultZoom,
   setTorch,
   setZoom,
   focusAtPoint,
@@ -105,15 +106,21 @@ export default function CameraScanner({
       const deviceList = await listBackCameras()
       setDevices(deviceList)
       const deviceId = currentDeviceId ?? deviceList[0]?.deviceId
-      const constraints = buildVideoConstraints(deviceId)
-      const stream = await startStream(constraints)
+      let stream: MediaStream
+      try {
+        stream = await startStream(buildVideoConstraints(deviceId, true))
+      } catch {
+        stream = await startStream(buildVideoConstraints(deviceId, false))
+      }
       streamRef.current = stream
       const track = stream.getVideoTracks()[0]
       trackRef.current = track ?? null
-      setCaps(getTrackCapabilities(track ?? null))
-      setZoomVal(1)
+      const trackCaps = getTrackCapabilities(track ?? null)
+      setCaps(trackCaps)
+      const initialZoom = getDefaultZoom(trackCaps)
+      setZoomVal(initialZoom)
+      await setZoom(track ?? null, initialZoom)
       await attachStreamToVideo(stream, video)
-      // Video oqimini boshlash uchun qisqa kutish
       await new Promise((r) => setTimeout(r, 200))
       await startZXing(stream, video)
     } catch (err) {
