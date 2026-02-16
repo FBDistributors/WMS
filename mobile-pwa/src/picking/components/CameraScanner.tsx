@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { X, Zap, RotateCcw, Focus } from 'lucide-react'
 import type { Result } from '@zxing/library'
+import { BarcodeFormat, DecodeHintType } from '@zxing/library'
 import type { IScannerControls } from '@zxing/browser'
 import {
   getPreferredBackCameraDeviceId,
+  getPersistedDeviceId,
+  setPersistedDeviceId,
   listBackCameras,
   buildVideoConstraints,
   startStream,
@@ -13,6 +16,8 @@ import {
   getDefaultZoom,
   applyZoom,
   setTorch,
+  focusAtPoint,
+  triggerSingleShotFocus,
   type CameraDevice,
   type TrackCapabilities,
   type TrackSettingsInfo,
@@ -32,10 +37,9 @@ const SCANNER_OPTIONS = {
   delayBetweenScanSuccess: 120,
 }
 
-// TRY_HARDER=3, POSSIBLE_FORMATS=2 (CODE_39, CODE_128, EAN_8, EAN_13)
 const DECODE_HINTS = new Map<number, unknown>([
-  [3, true],
-  [2, [2, 4, 6, 7]],
+  [DecodeHintType.TRY_HARDER, true],
+  [DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.QR_CODE, BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.CODE_128]],
 ])
 
 export default function CameraScanner({
@@ -87,8 +91,11 @@ export default function CameraScanner({
           if (!result) return
           const text = result.getText()
           if (!text) return
-          onDetectedRef.current(text)
           ctrl.stop()
+          stopStream(streamRef.current)
+          streamRef.current = null
+          trackRef.current = null
+          onDetectedRef.current(text)
         }
       )
       controlsRef.current = ctrl
@@ -111,8 +118,10 @@ export default function CameraScanner({
     try {
       const deviceList = await listBackCameras()
       setDevices(deviceList)
-      const deviceId = currentDeviceId ?? (await getPreferredBackCameraDeviceId()) ?? deviceList[0]?.deviceId
+      const preferred = currentDeviceId ?? getPersistedDeviceId() ?? (await getPreferredBackCameraDeviceId()) ?? deviceList[0]?.deviceId
+      const deviceId = deviceList.some((d) => d.deviceId === preferred) ? preferred : deviceList[0]?.deviceId
       actualDeviceIdRef.current = deviceId
+      if (deviceId) setPersistedDeviceId(deviceId)
       const selectedDevice = deviceList.find((d) => d.deviceId === deviceId) ?? deviceList[0]
       setCurrentDeviceLabel(selectedDevice?.label ?? deviceId ?? '')
       fallbackDeviceIdRef.current = deviceId
@@ -147,21 +156,40 @@ export default function CameraScanner({
     }
   }, [currentDeviceId, startZXing, attachStreamToVideo, onError])
 
-  /** Tap-to-refocus: fully restart stream (stop tracks -> new getUserMedia) preserving deviceId */
+  /** Tap-to-focus: try pointsOfInterest, then single-shot, then full stream restart */
   const handleTapToRefocus = useCallback(
-    (e: React.MouseEvent | React.TouchEvent) => {
+    async (e: React.MouseEvent | React.TouchEvent) => {
       e.preventDefault()
-      if (!videoRef.current || !trackRef.current) return
-      cleanup()
-      setTimeout(() => void runScanner(), 150)
+      const video = videoRef.current
+      const track = trackRef.current
+      if (!video || !track) return
+      const rect = video.getBoundingClientRect()
+      const te = e as unknown as TouchEvent
+      const touch = te.touches?.[0] ?? te.changedTouches?.[0]
+      const x = touch ? touch.clientX : (e as React.MouseEvent).clientX
+      const y = touch ? touch.clientY : (e as React.MouseEvent).clientY
+      if (x == null || y == null) return
+      const nx = (x - rect.left) / rect.width
+      const ny = (y - rect.top) / rect.height
+      let ok = await focusAtPoint(track, nx, ny)
+      if (!ok) ok = await triggerSingleShotFocus(track)
+      if (!ok) {
+        cleanup()
+        setTimeout(() => void runScanner(), 150)
+      }
     },
     [cleanup, runScanner]
   )
 
-  const handleRefocusClick = useCallback(() => {
-    if (!videoRef.current || !trackRef.current) return
-    cleanup()
-    setTimeout(() => void runScanner(), 150)
+  const handleRefocusClick = useCallback(async () => {
+    const track = trackRef.current
+    if (!track) return
+    let ok = await focusAtPoint(track, 0.5, 0.5)
+    if (!ok) ok = await triggerSingleShotFocus(track)
+    if (!ok) {
+      cleanup()
+      setTimeout(() => void runScanner(), 150)
+    }
   }, [cleanup, runScanner])
 
   const handleTorchToggle = useCallback(async () => {
@@ -308,7 +336,8 @@ export default function CameraScanner({
             playsInline
             muted
             autoPlay
-            className={`w-full h-full object-contain ${!fullscreen ? 'min-h-[224px]' : ''}`}
+            className={`w-full h-full object-cover ${!fullscreen ? 'min-h-[224px]' : ''}`}
+            style={{ imageRendering: 'auto' }}
           />
           <div className="absolute inset-0 pointer-events-none border-4 border-white/60 rounded-2xl m-4 flex items-center justify-center">
             <div className="w-64 h-40 border-2 border-white/80 rounded-lg" />
@@ -330,7 +359,8 @@ export default function CameraScanner({
               </div>
               <div>
                 Caps: zoom{caps?.hasZoom ? ` ${caps.zoomMin}–${caps.zoomMax}` : '✗'} torch
-                {caps?.hasTorch ? ' ✓' : ' ✗'} focus{caps?.focusModes?.length ? ` ${caps.focusModes.join(',')}` : ' ✗'}
+                {caps?.hasTorch ? ' ✓' : ' ✗'} focus{caps?.focusModes?.length ? ` ${caps.focusModes.join(',')}` : ' ✗'} exposure
+                {caps?.exposureModes?.length ? ` ${caps.exposureModes.join(',')}` : ' ✗'}
               </div>
               <div className="text-white/60">tap to hide</div>
             </div>
@@ -397,7 +427,10 @@ export default function CameraScanner({
               value={currentDeviceId ?? actualDeviceIdRef.current ?? ''}
               onChange={(e) => {
                 const id = e.target.value
-                if (id) setCurrentDeviceId(id)
+                if (id) {
+                  setCurrentDeviceId(id)
+                  setPersistedDeviceId(id)
+                }
               }}
               className="max-w-[140px] rounded-lg bg-white/20 px-2 py-1.5 text-sm text-white border border-white/30"
               aria-label="Switch camera"

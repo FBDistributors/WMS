@@ -34,6 +34,26 @@ export async function getPreferredBackCameraDeviceId(): Promise<string | undefin
   return list[0]?.deviceId
 }
 
+const CAMERA_STORAGE_KEY = 'wms_scanner_device_id'
+
+/** Load persisted deviceId from localStorage */
+export function getPersistedDeviceId(): string | null {
+  try {
+    return localStorage.getItem(CAMERA_STORAGE_KEY)
+  } catch {
+    return null
+  }
+}
+
+/** Persist deviceId to localStorage */
+export function setPersistedDeviceId(deviceId: string): void {
+  try {
+    localStorage.setItem(CAMERA_STORAGE_KEY, deviceId)
+  } catch {
+    // ignore
+  }
+}
+
 /** List back cameras by label heuristics, prefer main over ultrawide */
 export async function listBackCameras(): Promise<CameraDevice[]> {
   const devices = await navigator.mediaDevices.enumerateDevices()
@@ -49,22 +69,20 @@ export async function listBackCameras(): Promise<CameraDevice[]> {
   }))
 }
 
-/** Build constraints: 1920x1080 or 1280x720, facingMode env, frameRate 30, focusMode continuous */
+/** Build constraints: 1920x1080 or 1280x720, prefer back camera, frameRate 30 */
 export function buildVideoConstraints(deviceId?: string, prefer1080 = true): MediaTrackConstraints {
   const w = prefer1080 ? 1920 : 1280
   const h = prefer1080 ? 1080 : 720
   const base: Record<string, unknown> = {
-    facingMode: { exact: 'environment' },
-    width: { ideal: w, min: 1280 },
-    height: { ideal: h, min: 720 },
+    width: { ideal: w },
+    height: { ideal: h },
     frameRate: { ideal: 30 },
-  }
-  const supported = navigator.mediaDevices.getSupportedConstraints() as Record<string, boolean>
-  if (supported.focusMode) {
-    base.focusMode = 'continuous'
   }
   if (deviceId) {
     base.deviceId = { exact: deviceId }
+    base.facingMode = { ideal: 'environment' }
+  } else {
+    base.facingMode = { ideal: 'environment' }
   }
   return base as MediaTrackConstraints
 }
@@ -76,18 +94,42 @@ export async function startStream(constraints: MediaTrackConstraints): Promise<M
   }
   const stream = await navigator.mediaDevices.getUserMedia({ video: constraints })
   const track = stream.getVideoTracks()[0]
-  const supported = navigator.mediaDevices.getSupportedConstraints() as Record<string, boolean>
-  if (track && supported.focusMode) {
-    try {
-      await track.applyConstraints({ focusMode: 'continuous' } as MediaTrackConstraints)
-    } catch {
-      // ignore
-    }
-  }
   if (track) {
+    await applyBestConstraints(track)
     setTimeout(() => focusAtPoint(track, 0.5, 0.5), 300)
   }
   return stream
+}
+
+/** Apply focusMode, exposureMode from capabilities. Do not force unsupported constraints. */
+export async function applyBestConstraints(track: MediaStreamTrack): Promise<void> {
+  const supported = navigator.mediaDevices.getSupportedConstraints() as Record<string, boolean>
+  const caps = track.getCapabilities?.() as Record<string, unknown> | undefined
+  const toApply: Record<string, unknown> = {}
+
+  if (supported.focusMode && caps?.focusMode) {
+    const modes = Array.isArray(caps.focusMode) ? caps.focusMode : (caps.focusMode as { ideal?: string[] })?.ideal
+    const arr = Array.isArray(modes) ? modes : modes ? [modes] : []
+    if (arr.includes('continuous')) {
+      toApply.focusMode = 'continuous'
+    } else if (arr.includes('single-shot')) {
+      toApply.focusMode = 'single-shot'
+    }
+  }
+  if (supported.exposureMode && caps?.exposureMode) {
+    const modes = Array.isArray(caps.exposureMode) ? caps.exposureMode : (caps.exposureMode as { ideal?: string[] })?.ideal
+    const arr = Array.isArray(modes) ? modes : modes ? [modes] : []
+    if (arr.includes('continuous')) {
+      toApply.exposureMode = 'continuous'
+    }
+  }
+  if (Object.keys(toApply).length > 0) {
+    try {
+      await track.applyConstraints(toApply as MediaTrackConstraints)
+    } catch {
+      // ignore if device rejects
+    }
+  }
 }
 
 /** Stop all tracks; prevent leaks */
@@ -103,6 +145,7 @@ export interface TrackCapabilities {
   zoomStep: number
   hasPointsOfInterest: boolean
   focusModes?: string[]
+  exposureModes?: string[]
 }
 
 export interface TrackSettingsInfo {
@@ -151,6 +194,12 @@ export function getTrackCapabilities(track: MediaStreamTrack | null): TrackCapab
     const fm = (c.focusMode as { ideal?: string | string[] }).ideal
     caps.focusModes = Array.isArray(fm) ? fm : fm ? [fm] : []
   }
+  if (Array.isArray(c.exposureMode)) {
+    caps.exposureModes = c.exposureMode as string[]
+  } else if (typeof c.exposureMode === 'object' && c.exposureMode !== null && 'ideal' in (c.exposureMode as object)) {
+    const em = (c.exposureMode as { ideal?: string | string[] }).ideal
+    caps.exposureModes = Array.isArray(em) ? em : em ? [em] : []
+  }
   return caps
 }
 
@@ -193,7 +242,7 @@ export async function setTorch(track: MediaStreamTrack | null, on: boolean): Pro
   await toggleTorch(stream, on)
 }
 
-/** Tap-to-refocus at normalized point. Returns true if applied. */
+/** Tap-to-focus at normalized point (pointsOfInterest). Returns true if applied. */
 export async function focusAtPoint(track: MediaStreamTrack | null, x: number, y: number): Promise<boolean> {
   if (!track) return false
   const c = track.getCapabilities?.() as Record<string, unknown> | undefined
@@ -202,6 +251,23 @@ export async function focusAtPoint(track: MediaStreamTrack | null, x: number, y:
   const ny = Math.max(0, Math.min(1, y))
   try {
     await track.applyConstraints({ pointsOfInterest: [{ x: nx, y: ny }] } as unknown as MediaTrackConstraints)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Trigger single-shot autofocus if supported (fallback when pointsOfInterest not available) */
+export async function triggerSingleShotFocus(track: MediaStreamTrack | null): Promise<boolean> {
+  if (!track) return false
+  const supported = navigator.mediaDevices.getSupportedConstraints() as Record<string, boolean>
+  const c = track.getCapabilities?.() as Record<string, unknown> | undefined
+  if (!supported.focusMode || !c?.focusMode) return false
+  const modes = Array.isArray(c.focusMode) ? c.focusMode : (c.focusMode as { ideal?: string[] })?.ideal
+  const arr = Array.isArray(modes) ? modes : modes ? [modes] : []
+  if (!arr.includes('single-shot')) return false
+  try {
+    await track.applyConstraints({ focusMode: 'single-shot' } as MediaTrackConstraints)
     return true
   } catch {
     return false
