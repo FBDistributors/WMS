@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import type { Result } from '@zxing/library'
 import type { IScannerControls } from '@zxing/browser'
@@ -19,8 +19,8 @@ async function getMainCameraStream(): Promise<MediaStream> {
 
   const baseConstraints: MediaTrackConstraints = {
     facingMode: { exact: 'environment' },
-    width: { ideal: 1280 },
-    height: { ideal: 720 },
+    width: { ideal: 1920 },
+    height: { ideal: 1080 },
     ...(hasFocusMode && { focusMode: 'continuous' }),
   }
 
@@ -62,15 +62,36 @@ async function getMainCameraStream(): Promise<MediaStream> {
 }
 
 const SCANNER_OPTIONS = {
-  delayBetweenScanAttempts: 100,
-  delayBetweenScanSuccess: 100,
+  delayBetweenScanAttempts: 150,
+  delayBetweenScanSuccess: 150,
 }
+
+// TRY_HARDER = 3 — kichik shtrix-kodlar uchun aniqroq o‘qish
+const DECODE_HINTS = new Map<number, unknown>([[3, true]])
 
 export default function CameraScanner({ onDetected, onError, onClose, active, fullscreen = false, scanError: scanErr }: CameraScannerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  const trackRef = useRef<MediaStreamTrack | null>(null)
   const [error, setError] = useState<string | null>(null)
   const onDetectedRef = useRef(onDetected)
   onDetectedRef.current = onDetected
+
+  const handleVideoTap = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    const video = videoRef.current
+    const track = trackRef.current
+    if (!video || !track || video.readyState < 2) return
+    const caps = track.getCapabilities ? track.getCapabilities() : {}
+    if (!('pointsOfInterest' in caps)) return
+    const rect = video.getBoundingClientRect()
+    const te = e as unknown as TouchEvent
+    const touch = te.touches?.[0] ?? te.changedTouches?.[0]
+    const x = touch ? touch.clientX : (e as React.MouseEvent).clientX
+    const y = touch ? touch.clientY : (e as React.MouseEvent).clientY
+    if (x == null || y == null) return
+    const nx = Math.max(0, Math.min(1, (x - rect.left) / rect.width))
+    const ny = Math.max(0, Math.min(1, (y - rect.top) / rect.height))
+    track.applyConstraints({ pointsOfInterest: [{ x: nx, y: ny }] } as MediaTrackConstraints).catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (!active) return
@@ -82,16 +103,19 @@ export default function CameraScanner({ onDetected, onError, onClose, active, fu
       if (!video) return
       try {
         const stream = await getMainCameraStream()
+        trackRef.current = stream.getVideoTracks()[0] ?? null
         if (isCancelled) {
           stream.getTracks().forEach((t) => t.stop())
+          trackRef.current = null
           return
         }
         const { BrowserMultiFormatReader } = await import('@zxing/browser')
         if (isCancelled) {
           stream.getTracks().forEach((t) => t.stop())
+          trackRef.current = null
           return
         }
-        const reader = new BrowserMultiFormatReader(undefined, SCANNER_OPTIONS)
+        const reader = new BrowserMultiFormatReader(DECODE_HINTS, SCANNER_OPTIONS)
         controls = await reader.decodeFromStream(
           stream,
           video,
@@ -119,6 +143,7 @@ export default function CameraScanner({ onDetected, onError, onClose, active, fu
 
     return () => {
       isCancelled = true
+      trackRef.current = null
       controls?.stop()
     }
   }, [active, onError])
@@ -141,7 +166,14 @@ export default function CameraScanner({ onDetected, onError, onClose, active, fu
           <X size={24} />
         </button>
       )}
-      <div className="relative flex-1 overflow-hidden">
+      <div
+        className="relative flex-1 overflow-hidden cursor-default"
+        onClick={handleVideoTap}
+        onTouchEnd={(e) => e.changedTouches[0] && handleVideoTap(e)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === 'Enter' && handleVideoTap(e as unknown as React.MouseEvent)}
+      >
         <video
           ref={videoRef}
           playsInline
