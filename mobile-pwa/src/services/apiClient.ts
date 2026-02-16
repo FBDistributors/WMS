@@ -14,6 +14,7 @@ type RequestOptions<TBody> = {
 }
 
 const TOKEN_KEY = 'wms_token'
+const FETCH_TIMEOUT_MS = 30000
 const rawBaseUrl =
   import.meta.env.VITE_API_BASE_URL ?? 'https://wms-ngdm.onrender.com'
 const baseUrl = rawBaseUrl.toString().replace(/\/+$/, '')
@@ -45,6 +46,13 @@ export async function fetchJSON<TResponse, TBody = unknown>(
   path: string,
   options: RequestOptions<TBody> = {}
 ): Promise<TResponse> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null
+  const controller = options.signal ? null : new AbortController()
+  if (controller) {
+    timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+  }
+  const signal = options.signal ?? controller!.signal
+
   try {
     const url = buildApiUrl(path, options.query)
     const token = localStorage.getItem(TOKEN_KEY)
@@ -56,8 +64,9 @@ export async function fetchJSON<TResponse, TBody = unknown>(
         ...(options.headers ?? {}),
       },
       body: options.body ? JSON.stringify(options.body) : undefined,
-      signal: options.signal,
+      signal,
     })
+    if (timeoutId) clearTimeout(timeoutId)
 
     const contentType = response.headers.get('Content-Type') ?? ''
     const isJson = contentType.includes('application/json')
@@ -95,12 +104,15 @@ export async function fetchJSON<TResponse, TBody = unknown>(
 
     return payload as TResponse
   } catch (error) {
+    if (timeoutId) clearTimeout(timeoutId)
     if (typeof error === 'object' && error !== null && 'code' in error) {
       throw error as ApiError
     }
-
+    const originalMsg =
+      error instanceof Error ? error.message : typeof error === 'string' ? error : ''
+    const isAbort = originalMsg === 'AbortError' || (error && typeof error === 'object' && 'name' in error && (error as { name: string }).name === 'AbortError')
     throw {
-      message: 'Network error',
+      message: isAbort ? 'Request timeout' : (originalMsg || 'Network error'),
       code: 'NETWORK',
       details: error,
     } satisfies ApiError

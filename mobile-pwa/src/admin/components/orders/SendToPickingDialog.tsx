@@ -12,7 +12,16 @@ function isValidUuid(s: unknown): s is string {
   return typeof s === 'string' && UUID_REGEX.test(s)
 }
 
-function formatApiError(err: unknown): string {
+function formatApiError(err: unknown, t: (key: string) => string): string {
+  if (err && typeof err === 'object' && 'code' in err) {
+    const apiErr = err as ApiError
+    if (apiErr.code === 'NETWORK') {
+      if (apiErr.message === 'Request timeout') {
+        return t('orders:send_to_picking.request_timeout')
+      }
+      return t('orders:send_to_picking.network_error')
+    }
+  }
   if (err && typeof err === 'object' && 'details' in err) {
     const apiErr = err as ApiError
     const d = apiErr.details
@@ -56,7 +65,7 @@ export function SendToPickingDialog({ open, orderIds, onOpenChange, onSent }: Se
         const data = await getPickerUsers()
         setPickers(data)
       } catch (err) {
-        setError(formatApiError(err) || t('orders:send_to_picking.load_failed'))
+        setError(formatApiError(err, t) || t('orders:send_to_picking.load_failed'))
       } finally {
         setIsLoadingPickers(false)
       }
@@ -89,7 +98,7 @@ export function SendToPickingDialog({ open, orderIds, onOpenChange, onSent }: Se
       onSent()
       onOpenChange(false)
     } catch (err) {
-      const msg = formatApiError(err) || t('orders:send_to_picking.failed')
+      const msg = formatApiError(err, t) || t('orders:send_to_picking.failed')
       setError(
         msg.toLowerCase().includes('insufficient stock')
           ? t('orders:send_to_picking.insufficient_stock')
