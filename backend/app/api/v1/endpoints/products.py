@@ -247,6 +247,43 @@ async def list_products(
     )
 
 
+def _get_product_by_barcode(db: Session, barcode: str) -> Optional[ProductModel]:
+    barcode = (barcode or "").strip()
+    if not barcode:
+        return None
+    return (
+        db.query(ProductModel)
+        .options(selectinload(ProductModel.barcodes))
+        .filter(
+            ProductModel.is_active.is_(True),
+            (
+                (ProductModel.barcode == barcode)
+                | ProductModel.id.in_(
+                    db.query(ProductBarcode.product_id).filter(ProductBarcode.barcode == barcode)
+                )
+            ),
+        )
+        .first()
+    )
+
+
+@router.get(
+    "/by-barcode/{barcode}",
+    response_model=ProductOut,
+    summary="Get product by barcode (for scanner/mobile)",
+)
+async def get_product_by_barcode(
+    barcode: str,
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("products:read")),
+):
+    product = _get_product_by_barcode(db, barcode)
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    summary = _fetch_inventory_summary(db, [product.id])
+    return _to_product(product, summary)
+
+
 @router.get("/{product_id}", response_model=ProductOut, summary="Get Product")
 async def get_product(
     product_id: UUID,
