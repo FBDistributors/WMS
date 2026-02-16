@@ -6,7 +6,7 @@ from typing import List, Optional
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
@@ -31,6 +31,13 @@ class ReceiptLineCreate(BaseModel):
     batch: str = Field(..., min_length=1, max_length=64)
     expiry_date: Optional[date] = None
     location_id: UUID
+
+    @validator("qty")
+    def qty_must_be_integer(cls, v: Decimal) -> Decimal:
+        d = Decimal(str(v))
+        if d % 1 != 0:
+            raise ValueError("qty must be an integer")
+        return d.quantize(Decimal("1"))
 
 
 class ReceiptCreate(BaseModel):

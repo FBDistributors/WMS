@@ -171,8 +171,8 @@ export function InventorySummaryPage() {
                           </span>
                         )}
                         {columnId === 'brand' && (row.brand_name ?? '—')}
-                        {columnId === 'total_qty' && row.total_qty}
-                        {columnId === 'available' && row.available_qty}
+                        {columnId === 'total_qty' && Math.round(Number(row.total_qty))}
+                        {columnId === 'available' && Math.round(Number(row.available_qty))}
                         {columnId === 'location' &&
                           (locs.length === 0 ? (
                           <Link

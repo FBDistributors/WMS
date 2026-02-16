@@ -91,9 +91,15 @@ export function InventoryDetailsPage() {
                 <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
                   {row.expiry_date ?? '—'}
                 </td>
-                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">{row.on_hand}</td>
-                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">{row.reserved}</td>
-                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">{row.available}</td>
+                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
+                  {Math.round(Number(row.on_hand))}
+                </td>
+                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
+                  {Math.round(Number(row.reserved))}
+                </td>
+                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
+                  {Math.round(Number(row.available))}
+                </td>
               </tr>
             ))}
           </tbody>

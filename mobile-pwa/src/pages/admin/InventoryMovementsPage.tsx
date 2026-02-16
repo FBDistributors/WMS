@@ -103,7 +103,9 @@ export function InventoryMovementsPage() {
                 <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
                   {t(`inventory:movement_types.${row.movement_type}`, row.movement_type)}
                 </td>
-                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">{row.qty_change}</td>
+                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
+                  {Math.round(Number(row.qty_change))}
+                </td>
                 <td className="px-4 py-3 text-slate-500">{row.product_id}</td>
                 <td className="px-4 py-3 text-slate-500">{row.lot_id}</td>
                 <td className="px-4 py-3 text-slate-500">{row.location_id}</td>

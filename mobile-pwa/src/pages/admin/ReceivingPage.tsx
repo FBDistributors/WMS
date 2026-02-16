@@ -19,12 +19,12 @@ import {
 } from '../../services/receivingApi'
 import { useAuth } from '../../rbac/AuthProvider'
 
-type LineDraft = ReceiptLineCreate & { id: string }
+type LineDraft = Omit<ReceiptLineCreate, 'qty'> & { id: string; qty: number | '' }
 
 const EMPTY_LINE: LineDraft = {
   id: 'line-0',
   product_id: '',
-  qty: 1,
+  qty: '',
   batch: '',
   expiry_date: null,
   location_id: '',
@@ -115,7 +115,12 @@ export function ReceivingPage() {
       return
     }
     const invalid = lines.some(
-      (line) => !line.product_id || !line.location_id || !line.batch.trim() || line.qty <= 0
+      (line) =>
+        !line.product_id ||
+        !line.location_id ||
+        !line.batch.trim() ||
+        line.qty === '' ||
+        Number(line.qty) <= 0
     )
     if (invalid) {
       setError(t('receiving:validation.line_invalid'))
@@ -128,6 +133,7 @@ export function ReceivingPage() {
         doc_no: docNo.trim() || undefined,
         lines: lines.map(({ id, ...line }) => ({
           ...line,
+          qty: Math.max(1, Math.floor(Number(line.qty))),
           batch: line.batch.trim(),
           expiry_date: line.expiry_date || null,
         })),
@@ -258,10 +264,22 @@ export function ReceivingPage() {
                   <input
                     type="number"
                     min={0}
-                    step={0.001}
+                    step={1}
+                    inputMode="numeric"
+                    placeholder=""
                     className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-                    value={line.qty}
-                    onChange={(event) => updateLine(line.id, { qty: Number(event.target.value) })}
+                    value={line.qty === '' ? '' : line.qty}
+                    onChange={(event) => {
+                      const raw = event.target.value
+                      if (raw === '') {
+                        updateLine(line.id, { qty: '' })
+                        return
+                      }
+                      const num = parseInt(raw, 10)
+                      if (!isNaN(num) && num >= 0) {
+                        updateLine(line.id, { qty: num })
+                      }
+                    }}
                   />
                 </label>
                 <label className="text-sm text-slate-600 dark:text-slate-300">
@@ -346,7 +364,7 @@ export function ReceivingPage() {
                           {product ? `${product.sku} · ${product.name}` : line.product_id}
                         </span>
                         <span>
-                          {t('receiving:fields.qty')}: {line.qty}
+                          {t('receiving:fields.qty')}: {Math.round(Number(line.qty))}
                         </span>
                         <span>
                           {t('receiving:fields.batch')}: {line.batch}
