@@ -63,13 +63,13 @@ export function UserDetailsPage() {
     setIsSaving(true)
     setError(null)
     try {
-      const updated = await updateUser(user.id, {
+      await updateUser(user.id, {
         username: trimmedUsername,
         full_name: fullName.trim() || null,
         role,
         is_active: isActive,
       })
-      setUser(updated)
+      navigate('/admin/users')
     } catch {
       setError(t('users:messages.update_failed'))
     } finally {
