@@ -12,11 +12,46 @@ type CameraScannerProps = {
   scanError?: string | null
 }
 
-// 640x480 — mahsulotni scan qilish uchun mos yaqin fokus (1280x720 uzoq fokus qilardi)
-const VIDEO_CONSTRAINTS: MediaStreamConstraints['video'] = {
-  facingMode: 'environment',
-  width: { ideal: 640 },
-  height: { ideal: 480 },
+/** Asosiy (1x) kamera + continuous autofocus — mahsulot skaner uchun optimal */
+async function getMainCameraStream(): Promise<MediaStream> {
+  const supported = navigator.mediaDevices.getSupportedConstraints() as Record<string, boolean>
+  const hasFocusMode = supported.focusMode === true
+
+  const baseConstraints: MediaTrackConstraints = {
+    facingMode: 'environment',
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
+    ...(hasFocusMode && { focusMode: 'continuous' }),
+  }
+
+  let preferredId: string | undefined
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices()
+    const videoInputs = devices.filter((d) => d.kind === 'videoinput')
+    const mainCameras = videoInputs.filter(
+      (d) => !/ultra|0\.5x|macro|fisheye/i.test(d.label || '') || videoInputs.length === 1
+    )
+    preferredId = mainCameras[0]?.deviceId
+  } catch {
+    // fallback to facingMode only
+  }
+
+  const constraints: MediaTrackConstraints = preferredId
+    ? { ...baseConstraints, deviceId: { exact: preferredId } }
+    : baseConstraints
+
+  const stream = await navigator.mediaDevices.getUserMedia({ video: constraints })
+
+  const track = stream.getVideoTracks()[0]
+  if (track && hasFocusMode) {
+    try {
+      await track.applyConstraints({ focusMode: 'continuous' } as MediaTrackConstraints)
+    } catch {
+      // ignore
+    }
+  }
+
+  return stream
 }
 
 const SCANNER_OPTIONS = {
@@ -39,11 +74,19 @@ export default function CameraScanner({ onDetected, onError, onClose, active, fu
       const video = videoRef.current
       if (!video) return
       try {
+        const stream = await getMainCameraStream()
+        if (isCancelled) {
+          stream.getTracks().forEach((t) => t.stop())
+          return
+        }
         const { BrowserMultiFormatReader } = await import('@zxing/browser')
-        if (isCancelled) return
+        if (isCancelled) {
+          stream.getTracks().forEach((t) => t.stop())
+          return
+        }
         const reader = new BrowserMultiFormatReader(undefined, SCANNER_OPTIONS)
-        controls = await reader.decodeFromConstraints(
-          { video: VIDEO_CONSTRAINTS },
+        controls = await reader.decodeFromStream(
+          stream,
           video,
           (result: Result | undefined, _err, ctrl) => {
             if (!result) return
