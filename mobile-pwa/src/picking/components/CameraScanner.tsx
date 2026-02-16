@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { X, Zap, RotateCcw, Camera, Focus } from 'lucide-react'
+import { X, Zap, RotateCcw, Focus } from 'lucide-react'
 import type { Result } from '@zxing/library'
 import type { IScannerControls } from '@zxing/browser'
 import {
@@ -9,12 +9,13 @@ import {
   startStream,
   stopStream,
   getTrackCapabilities,
+  getTrackSettings,
   getDefaultZoom,
   applyZoom,
   setTorch,
-  focusAtPoint,
   type CameraDevice,
   type TrackCapabilities,
+  type TrackSettingsInfo,
 } from '../../utils/cameraUtils'
 
 type CameraScannerProps = {
@@ -58,8 +59,12 @@ export default function CameraScanner({
   const [torchOn, setTorchOn] = useState(false)
   const [zoomVal, setZoomVal] = useState(1)
   const [caps, setCaps] = useState<TrackCapabilities | null>(null)
+  const [trackSettings, setTrackSettings] = useState<TrackSettingsInfo>({})
+  const [currentDeviceLabel, setCurrentDeviceLabel] = useState<string>('')
   const [useFallback, setUseFallback] = useState(false)
+  const [showDebug, setShowDebug] = useState(true)
   const fallbackDeviceIdRef = useRef<string | undefined>(undefined)
+  const actualDeviceIdRef = useRef<string | undefined>(undefined)
 
   const cleanup = useCallback(() => {
     controlsRef.current?.stop()
@@ -107,6 +112,9 @@ export default function CameraScanner({
       const deviceList = await listBackCameras()
       setDevices(deviceList)
       const deviceId = currentDeviceId ?? (await getPreferredBackCameraDeviceId()) ?? deviceList[0]?.deviceId
+      actualDeviceIdRef.current = deviceId
+      const selectedDevice = deviceList.find((d) => d.deviceId === deviceId) ?? deviceList[0]
+      setCurrentDeviceLabel(selectedDevice?.label ?? deviceId ?? '')
       fallbackDeviceIdRef.current = deviceId
 
       let stream: MediaStream
@@ -126,7 +134,8 @@ export default function CameraScanner({
       await applyZoom(stream, initialZoom)
 
       await attachStreamToVideo(stream, video)
-      await new Promise((r) => setTimeout(r, 200))
+      await new Promise((r) => setTimeout(r, 300))
+      setTrackSettings(getTrackSettings(track ?? null))
       await startZXing(stream, video)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Camera error'
@@ -138,37 +147,21 @@ export default function CameraScanner({
     }
   }, [currentDeviceId, startZXing, attachStreamToVideo, onError])
 
+  /** Tap-to-refocus: fully restart stream (stop tracks -> new getUserMedia) preserving deviceId */
   const handleTapToRefocus = useCallback(
-    async (e: React.MouseEvent | React.TouchEvent) => {
-      const video = videoRef.current
-      const track = trackRef.current
-      if (!video || !track) return
-      const rect = video.getBoundingClientRect()
-      const te = e as unknown as TouchEvent
-      const touch = te.touches?.[0] ?? te.changedTouches?.[0]
-      const x = touch ? touch.clientX : (e as React.MouseEvent).clientX
-      const y = touch ? touch.clientY : (e as React.MouseEvent).clientY
-      if (x == null || y == null) return
-      const nx = (x - rect.left) / rect.width
-      const ny = (y - rect.top) / rect.height
-      const ok = await focusAtPoint(track, nx, ny)
-      if (!ok && caps?.hasPointsOfInterest === false) {
-        cleanup()
-        setTimeout(() => void runScanner(), 150)
-      }
+    (e: React.MouseEvent | React.TouchEvent) => {
+      e.preventDefault()
+      if (!videoRef.current || !trackRef.current) return
+      cleanup()
+      setTimeout(() => void runScanner(), 150)
     },
-    [caps?.hasPointsOfInterest, cleanup, runScanner]
+    [cleanup, runScanner]
   )
 
   const handleRefocusClick = useCallback(() => {
-    const track = trackRef.current
-    if (!track) return
-    focusAtPoint(track, 0.5, 0.5).then((ok) => {
-      if (!ok) {
-        cleanup()
-        setTimeout(() => void runScanner(), 150)
-      }
-    })
+    if (!videoRef.current || !trackRef.current) return
+    cleanup()
+    setTimeout(() => void runScanner(), 150)
   }, [cleanup, runScanner])
 
   const handleTorchToggle = useCallback(async () => {
@@ -180,20 +173,14 @@ export default function CameraScanner({
   }, [torchOn, caps?.hasTorch])
 
   const handleZoomChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
       const v = parseFloat(e.target.value)
       setZoomVal(v)
-      void applyZoom(streamRef.current, v)
+      await applyZoom(streamRef.current, v)
+      setTrackSettings(getTrackSettings(trackRef.current))
     },
     []
   )
-
-  const handleDeviceSwitch = useCallback(() => {
-    if (devices.length < 2) return
-    const idx = devices.findIndex((d) => d.deviceId === currentDeviceId)
-    const next = devices[(idx + 1) % devices.length]
-    setCurrentDeviceId(next.deviceId)
-  }, [devices, currentDeviceId])
 
   const handleTryFallback = useCallback(() => {
     cleanup()
@@ -215,7 +202,7 @@ export default function CameraScanner({
       clearTimeout(t)
       cleanup()
     }
-  }, [active, runScanner, cleanup])
+  }, [active, currentDeviceId, runScanner, cleanup])
 
   const fallbackScannerRef = useRef<{ stop: () => Promise<void> } | null>(null)
   useEffect(() => {
@@ -223,21 +210,40 @@ export default function CameraScanner({
     let cancelled = false
     const elId = 'html5-qrcode-fallback'
     const deviceId = fallbackDeviceIdRef.current
-    import('html5-qrcode').then(({ Html5Qrcode }) => {
+    import('html5-qrcode').then(({ Html5Qrcode, Html5QrcodeSupportedFormats }) => {
       if (cancelled || !document.getElementById(elId)) return
-      const scanner = new Html5Qrcode(elId)
+      const scanner = new Html5Qrcode(elId, {
+        verbose: false,
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.CODE_128,
+        ],
+      })
       fallbackScannerRef.current = scanner
-      const config = deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'environment' }
+      const cameraConfig: MediaTrackConstraints = deviceId
+        ? {
+            deviceId: { exact: deviceId },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            frameRate: { ideal: 30 },
+          }
+        : {
+            facingMode: 'environment',
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            frameRate: { ideal: 30 },
+          }
+      const scanConfig = {
+        fps: 15,
+        disableFlip: true,
+        qrbox: { width: 280, height: 120 },
+      }
       scanner
-        .start(
-          config,
-          { fps: 8, qrbox: { width: 250, height: 150 } },
-          (decoded) => {
-            onDetectedRef.current(decoded)
-            void scanner.stop()
-          },
-          () => {}
-        )
+        .start(cameraConfig, scanConfig, (decoded) => {
+          onDetectedRef.current(decoded)
+          void scanner.stop()
+        }, () => {})
         .catch((err: unknown) => !cancelled && setError(String(err)))
     })
     return () => {
@@ -307,6 +313,37 @@ export default function CameraScanner({
           <div className="absolute inset-0 pointer-events-none border-4 border-white/60 rounded-2xl m-4 flex items-center justify-center">
             <div className="w-64 h-40 border-2 border-white/80 rounded-lg" />
           </div>
+          {showDebug && (
+            <div
+              className="absolute top-2 left-2 right-2 max-w-[90%] rounded bg-black/70 px-2 py-1.5 text-[10px] text-green-400 font-mono pointer-events-auto"
+              role="button"
+              onClick={() => setShowDebug(false)}
+              onKeyDown={(e) => e.key === 'Enter' && setShowDebug(false)}
+              tabIndex={0}
+            >
+              <div title={currentDeviceId}>📷 {currentDeviceLabel || '—'}</div>
+              <div>ID: {(currentDeviceId || '').slice(0, 20)}…</div>
+              <div>
+                Settings: {trackSettings.width ?? '?'}×{trackSettings.height ?? '?'} @{' '}
+                {trackSettings.frameRate ?? '?'}fps
+                {trackSettings.zoom != null ? ` zoom=${trackSettings.zoom.toFixed(1)}` : ''}
+              </div>
+              <div>
+                Caps: zoom{caps?.hasZoom ? ` ${caps.zoomMin}–${caps.zoomMax}` : '✗'} torch
+                {caps?.hasTorch ? ' ✓' : ' ✗'} focus{caps?.focusModes?.length ? ` ${caps.focusModes.join(',')}` : ' ✗'}
+              </div>
+              <div className="text-white/60">tap to hide</div>
+            </div>
+          )}
+          {!showDebug && (
+            <button
+              type="button"
+              className="absolute top-2 left-2 rounded bg-black/50 px-2 py-1 text-[10px] text-white/70 pointer-events-auto"
+              onClick={() => setShowDebug(true)}
+            >
+              Debug
+            </button>
+          )}
           {error && (
             <div className="absolute bottom-2 left-2 right-2 rounded bg-red-600/90 px-3 py-2 text-sm text-white text-center">
               {error}
@@ -356,14 +393,21 @@ export default function CameraScanner({
             <Focus size={22} />
           </button>
           {devices.length > 1 && (
-            <button
-              type="button"
-              onClick={handleDeviceSwitch}
-              className="rounded-full p-2 bg-white/20 text-white"
+            <select
+              value={currentDeviceId ?? actualDeviceIdRef.current ?? ''}
+              onChange={(e) => {
+                const id = e.target.value
+                if (id) setCurrentDeviceId(id)
+              }}
+              className="max-w-[140px] rounded-lg bg-white/20 px-2 py-1.5 text-sm text-white border border-white/30"
               aria-label="Switch camera"
             >
-              <Camera size={22} />
-            </button>
+              {devices.map((d) => (
+                <option key={d.deviceId} value={d.deviceId} className="text-black">
+                  {d.label}
+                </option>
+              ))}
+            </select>
           )}
           {error && !caps && (
             <button

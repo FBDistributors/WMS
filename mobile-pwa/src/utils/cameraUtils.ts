@@ -23,8 +23,9 @@ function isBack(d: MediaDeviceInfo) {
   return /back|rear|environment|asosiy|orqa/i.test(label(d))
 }
 
+/** Exclude ultra-wide, macro, 0.5x; prefer main back camera */
 function isUltraWide(d: MediaDeviceInfo) {
-  return /ultra|0\.5x|macro|fisheye/i.test(label(d))
+  return /ultra|wide|0\.5|macro|fisheye/i.test(label(d))
 }
 
 /** Get preferred back camera deviceId (main, non-ultrawide) */
@@ -101,6 +102,26 @@ export interface TrackCapabilities {
   zoomMax: number
   zoomStep: number
   hasPointsOfInterest: boolean
+  focusModes?: string[]
+}
+
+export interface TrackSettingsInfo {
+  width?: number
+  height?: number
+  frameRate?: number
+  zoom?: number
+}
+
+/** Extract width, height, frameRate, zoom from track.getSettings() for debug */
+export function getTrackSettings(track: MediaStreamTrack | null): TrackSettingsInfo {
+  if (!track?.getSettings) return {}
+  const s = track.getSettings() as Record<string, unknown>
+  return {
+    width: typeof s.width === 'number' ? s.width : undefined,
+    height: typeof s.height === 'number' ? s.height : undefined,
+    frameRate: typeof s.frameRate === 'number' ? s.frameRate : undefined,
+    zoom: typeof s.zoom === 'number' ? s.zoom : undefined,
+  }
 }
 
 /** Detect torch, zoom, tap-to-focus from track */
@@ -124,6 +145,12 @@ export function getTrackCapabilities(track: MediaStreamTrack | null): TrackCapab
     caps.zoomStep = z.step ?? 0.1
   }
   caps.hasPointsOfInterest = 'pointsOfInterest' in c
+  if (Array.isArray(c.focusMode)) {
+    caps.focusModes = c.focusMode as string[]
+  } else if (typeof c.focusMode === 'object' && c.focusMode !== null && 'ideal' in (c.focusMode as object)) {
+    const fm = (c.focusMode as { ideal?: string | string[] }).ideal
+    caps.focusModes = Array.isArray(fm) ? fm : fm ? [fm] : []
+  }
   return caps
 }
 
