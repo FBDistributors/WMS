@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { AppHeader } from '../../components/layout/AppHeader'
 import { Button } from '../../components/ui/button'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { getWave, sortingScan, type WaveOut, type SortingBinOut } from '../../services/wavesApi'
+import { getWave, sortingScan, type WaveOut } from '../../services/wavesApi'
 import { ScanInput } from '../../picking/components/ScanInput'
 
 const CameraScanner = lazy(() => import('../../picking/components/CameraScanner'))
@@ -180,11 +180,11 @@ export function WaveSortingPage() {
               <div className="mt-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-sm">{t('picking:sorting.assign_qty')}:</span>
-                  <Button variant="secondary" size="sm" onClick={() => setQty((p) => Math.max(1, p - 1))}>
+                  <Button variant="secondary" className="px-3 py-2" onClick={() => setQty((p) => Math.max(1, p - 1))}>
                     <Minus size={18} />
                   </Button>
                   <span className="w-8 text-center text-lg font-semibold">{qty}</span>
-                  <Button variant="secondary" size="sm" onClick={() => setQty((p) => p + 1)}>
+                  <Button variant="secondary" className="px-3 py-2" onClick={() => setQty((p) => p + 1)}>
                     <Plus size={18} />
                   </Button>
                 </div>

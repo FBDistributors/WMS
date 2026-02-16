@@ -182,11 +182,11 @@ export function WavePickingPage() {
           )}
           <div className="mt-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Button variant="secondary" size="sm" onClick={() => setQty((p) => Math.max(1, p - 1))}>
+              <Button variant="secondary" className="px-3 py-2" onClick={() => setQty((p) => Math.max(1, p - 1))}>
                 <Minus size={18} />
               </Button>
               <span className="w-8 text-center text-lg font-semibold">{qty}</span>
-              <Button variant="secondary" size="sm" onClick={() => setQty((p) => Math.min(remaining, p + 1))}>
+              <Button variant="secondary" className="px-3 py-2" onClick={() => setQty((p) => Math.min(remaining, p + 1))}>
                 <Plus size={18} />
               </Button>
             </div>

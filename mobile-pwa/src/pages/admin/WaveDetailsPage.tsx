@@ -101,7 +101,7 @@ export function WaveDetailsPage() {
     <AdminLayout
       title={wave.wave_number}
       actionSlot={
-        <Button variant="ghost" size="sm" onClick={() => navigate('/admin/waves')}>
+        <Button variant="ghost" className="px-3 py-2 text-xs" onClick={() => navigate('/admin/waves')}>
           <ArrowLeft size={18} />
           {t('common:buttons.back')}
         </Button>

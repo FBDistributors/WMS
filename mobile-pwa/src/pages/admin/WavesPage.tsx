@@ -15,7 +15,7 @@ import {
   type WaveOut,
   type WavesQuery,
 } from '../../services/wavesApi'
-import { getOrders, type OrderListItem } from '../../services/ordersApi'
+import { getOrders } from '../../services/ordersApi'
 import { CreateWaveModal } from '../../admin/components/waves/CreateWaveModal'
 import { useAuth } from '../../rbac/AuthProvider'
 
@@ -162,7 +162,7 @@ export function WavesPage() {
               <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                 {wave.status === 'DRAFT' && canManage && (
                   <Button
-                    size="sm"
+                    className="px-3 py-2 text-xs"
                     onClick={() => handleStart(wave.id)}
                     disabled={actionWaveId === wave.id}
                   >
@@ -172,7 +172,7 @@ export function WavesPage() {
                 )}
                 {wave.status === 'SORTING' && canManage && (
                   <Button
-                    size="sm"
+                    className="px-3 py-2 text-xs"
                     onClick={() => handleComplete(wave.id)}
                     disabled={actionWaveId === wave.id}
                   >
@@ -182,7 +182,7 @@ export function WavesPage() {
                 )}
                 <Button
                   variant="ghost"
-                  size="sm"
+                  className="px-3 py-2 text-xs"
                   onClick={() => navigate(`/admin/waves/${wave.id}`)}
                 >
                   <FileText size={14} />
