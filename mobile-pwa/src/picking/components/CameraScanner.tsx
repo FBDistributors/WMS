@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { X, Zap, RotateCcw, Focus } from 'lucide-react'
+import { X, Zap, RotateCcw, Focus, ScanLine, Camera } from 'lucide-react'
 import type { Result } from '@zxing/library'
 import { BarcodeFormat, DecodeHintType } from '@zxing/library'
 import type { IScannerControls } from '@zxing/browser'
+import { isNativePlatform, scanOnce } from '../../services/scanner'
+import { playBeep, vibrateSuccess } from '../../utils/beep'
 import {
   getPreferredBackCameraDeviceId,
   getPersistedDeviceId,
@@ -69,6 +71,48 @@ export default function CameraScanner({
   const [showDebug, setShowDebug] = useState(true)
   const fallbackDeviceIdRef = useRef<string | undefined>(undefined)
   const actualDeviceIdRef = useRef<string | undefined>(undefined)
+  const lastCodeRef = useRef<string>('')
+  const lastCodeTimeRef = useRef(0)
+  const [useWebScanner, setUseWebScanner] = useState(false)
+  const [manualInput, setManualInput] = useState('')
+  const [isScanning, setIsScanning] = useState(false)
+  const isNative = isNativePlatform()
+
+  const reportCode = useCallback(
+    (code: string) => {
+      const now = Date.now()
+      if (code === lastCodeRef.current && now - lastCodeTimeRef.current < 800) return
+      lastCodeRef.current = code
+      lastCodeTimeRef.current = now
+      playBeep()
+      vibrateSuccess()
+      onDetectedRef.current(code)
+    },
+    []
+  )
+
+  const handleNativeScan = useCallback(async () => {
+    if (isScanning) return
+    setIsScanning(true)
+    setError(null)
+    try {
+      const result = await scanOnce()
+      if (result?.code) reportCode(result.code)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      setError(msg)
+      onError?.(msg)
+    } finally {
+      setIsScanning(false)
+    }
+  }, [isScanning, onError])
+
+  const handleManualSubmit = useCallback(() => {
+    const code = manualInput.trim()
+    if (!code) return
+    setManualInput('')
+    reportCode(code)
+  }, [manualInput, reportCode])
 
   const cleanup = useCallback(() => {
     controlsRef.current?.stop()
@@ -287,6 +331,67 @@ export default function CameraScanner({
     ? 'fixed inset-0 z-[60] flex flex-col bg-black'
     : 'rounded-2xl bg-white p-4 shadow-sm'
 
+  if (isNative && !useWebScanner) {
+    return (
+      <div className={containerClass}>
+        {fullscreen && onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-4 right-4 z-10 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
+            aria-label="Close"
+          >
+            <X size={24} />
+          </button>
+        )}
+        <div className="flex-1 flex flex-col items-center justify-center gap-6 p-6">
+          <button
+            type="button"
+            onClick={handleNativeScan}
+            disabled={isScanning}
+            className="flex h-48 w-48 flex-col items-center justify-center gap-2 rounded-full bg-blue-600 text-white shadow-lg transition active:scale-95 disabled:opacity-70"
+            aria-label="Scan barcode"
+          >
+            <ScanLine size={64} strokeWidth={2} />
+            <span className="text-lg font-medium">{isScanning ? '...' : 'Scan'}</span>
+          </button>
+          <div className="w-full max-w-xs space-y-2">
+            <input
+              type="text"
+              value={manualInput}
+              onChange={(e) => setManualInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleManualSubmit()}
+              placeholder="Or paste barcode"
+              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-base dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+            />
+            <button
+              type="button"
+              onClick={handleManualSubmit}
+              disabled={!manualInput.trim()}
+              className="w-full rounded-lg bg-slate-200 px-4 py-3 font-medium disabled:opacity-50 dark:bg-slate-700 dark:text-white"
+            >
+              Enter manually
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => setUseWebScanner(true)}
+            className="flex items-center gap-2 rounded-lg bg-white/20 px-4 py-2 text-sm text-white"
+          >
+            <Camera size={18} />
+            Use web scanner
+          </button>
+          {error && (
+            <div className="rounded-lg bg-red-600/90 px-4 py-2 text-sm text-white">{error}</div>
+          )}
+          {scanErr && !error && (
+            <div className="rounded-lg bg-red-600 px-4 py-2 text-sm text-white">{scanErr}</div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   if (useFallback) {
     return (
       <div className={containerClass}>
@@ -450,6 +555,16 @@ export default function CameraScanner({
             >
               <RotateCcw size={18} className="inline mr-1" />
               Alternative
+            </button>
+          )}
+          {isNative && (
+            <button
+              type="button"
+              onClick={() => setUseWebScanner(false)}
+              className="flex items-center gap-2 rounded-lg px-3 py-2 bg-blue-600 text-white text-sm"
+            >
+              <ScanLine size={18} />
+              Native scan
             </button>
           )}
         </div>

@@ -53,3 +53,10 @@ export function vibrateError(): void {
     navigator.vibrate([100, 50, 100])
   }
 }
+
+/** Qisqa vibratsiya (muvaffaqiyat) */
+export function vibrateSuccess(): void {
+  if (typeof navigator !== 'undefined' && navigator.vibrate) {
+    navigator.vibrate(50)
+  }
+}

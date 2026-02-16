@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">FB WMS</string>
+    <string name="title_activity_main">FB WMS</string>
+    <string name="package_name">uz.fbdg.wms</string>
+    <string name="custom_url_scheme">uz.fbdg.wms</string>
+</resources>
