@@ -36,6 +36,7 @@
     "inventory_controller": "Inventory Controller"
   },
   "messages": {
+    "username_min": "Username must be at least 3 characters.",
     "password_mismatch": "Passwords do not match.",
     "create_failed": "Failed to create user. Please try again.",
     "update_failed": "Failed to update user.",

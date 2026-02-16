@@ -36,6 +36,7 @@
     "inventory_controller": "Inventory Controller"
   },
   "messages": {
+    "username_min": "Username kamida 3 ta belgidan iborat bo'lishi kerak.",
     "password_mismatch": "Parollar mos emas.",
     "create_failed": "User yaratilmadi. Qaytadan urinib ko'ring.",
     "update_failed": "User yangilanmadi.",

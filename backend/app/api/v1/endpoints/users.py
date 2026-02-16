@@ -63,6 +63,7 @@ class UserCreateIn(BaseModel):
 
 
 class UserUpdateIn(BaseModel):
+    username: Optional[str] = Field(default=None, min_length=3, max_length=128)
     full_name: Optional[str] = Field(default=None, max_length=255)
     role: Optional[str] = None
     is_active: Optional[bool] = None
@@ -176,6 +177,13 @@ async def update_user(
     updates = payload.dict(exclude_unset=True)
     if "role" in updates and updates["role"] not in VALID_ROLES:
         raise HTTPException(status_code=400, detail="Invalid role")
+    if "username" in updates:
+        new_username = updates["username"].strip() if updates["username"] else None
+        if new_username and new_username != user.username:
+            existing = db.query(User).filter(User.username == new_username).one_or_none()
+            if existing:
+                raise HTTPException(status_code=409, detail="Username already exists")
+            user.username = new_username
 
     if "full_name" in updates:
         user.full_name = updates["full_name"]

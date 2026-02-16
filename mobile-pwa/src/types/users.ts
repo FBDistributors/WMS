@@ -31,6 +31,7 @@ export type CreateUserPayload = {
 }
 
 export type UpdateUserPayload = {
+  username?: string
   full_name?: string | null
   role?: UserRole
   is_active?: boolean
