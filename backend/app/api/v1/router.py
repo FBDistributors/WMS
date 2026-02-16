@@ -3,6 +3,7 @@ from app.api.v1.endpoints import (
     audit,
     auth,
     brands,
+    waves,
     dashboard,
     documents,
     integrations,
@@ -33,3 +34,4 @@ router.include_router(products.router, prefix="/products", tags=["products"])
 router.include_router(integrations.router, prefix="/integrations", tags=["integrations"])
 router.include_router(users.router, prefix="/users", tags=["users"])
 router.include_router(scanner.router, prefix="/scanner", tags=["scanner"])
+router.include_router(waves.router, prefix="/waves", tags=["waves"])

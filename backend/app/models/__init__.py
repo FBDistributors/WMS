@@ -11,6 +11,15 @@ from app.models.stock import StockLot, StockMovement
 from app.models.smartup_sync import SmartupSyncRun
 from app.models.user import User
 from app.models.user_session import UserSession
+from app.models.wave import (
+    SortingBin,
+    SortingScan,
+    Wave,
+    WaveAllocation,
+    WaveLine,
+    WaveOrder,
+    WavePickScan,
+)
 
 __all__ = [
     "AuditLog",
@@ -31,4 +40,10 @@ __all__ = [
     "SmartupSyncRun",
     "User",
     "UserSession",
+    "Wave",
+    "WaveOrder",
+    "WaveLine",
+    "WaveAllocation",
+    "SortingBin",
+    "SortingScan",
 ]

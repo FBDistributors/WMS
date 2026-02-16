@@ -32,6 +32,11 @@ export type PermissionKey =
   | 'locations:manage'
   | 'movements:read'
   | 'brands:manage'
+  | 'waves:read'
+  | 'waves:create'
+  | 'waves:manage'
+  | 'waves:pick'
+  | 'waves:sort'
 
 export const PERMISSION_KEYS: PermissionKey[] = [
   'admin:access',
@@ -60,6 +65,11 @@ export const PERMISSION_KEYS: PermissionKey[] = [
   'locations:manage',
   'movements:read',
   'brands:manage',
+  'waves:read',
+  'waves:create',
+  'waves:manage',
+  'waves:pick',
+  'waves:sort',
 ]
 
 const PERMISSION_ALIASES: Record<string, PermissionKey> = {
@@ -96,6 +106,11 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     'brands:manage',
     'reports:read',
     'audit:read',
+    'waves:read',
+    'waves:create',
+    'waves:manage',
+    'waves:pick',
+    'waves:sort',
   ],
   supervisor: [
     'admin:access',
@@ -119,8 +134,20 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     'locations:manage',
     'movements:read',
     'brands:manage',
+    'waves:read',
+    'waves:create',
+    'waves:manage',
+    'waves:pick',
+    'waves:sort',
   ],
-  picker: ['picking:read', 'picking:pick', 'picking:complete', 'picking:exception'],
+  picker: [
+    'picking:read',
+    'picking:pick',
+    'picking:complete',
+    'picking:exception',
+    'waves:read',
+    'waves:pick',
+  ],
   receiver: [
     'admin:access',
     'receiving:read',

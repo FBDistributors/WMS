@@ -22,6 +22,10 @@ import { UsersPage } from '../pages/admin/UsersPage'
 import { UserCreatePage } from '../pages/admin/users/UserCreatePage'
 import { UserDetailsPage } from '../pages/admin/users/UserDetailsPage'
 import { AuditLogsPage } from '../pages/admin/AuditLogsPage'
+import { WavesPage } from '../pages/admin/WavesPage'
+import { WaveDetailsPage } from '../pages/admin/WaveDetailsPage'
+import { WavePickingPage } from '../pages/picker/WavePickingPage'
+import { WaveSortingPage } from '../pages/picker/WaveSortingPage'
 import { OfflineQueuePage } from '../pages/offline/OfflineQueuePage'
 import { PickCompletePage } from '../pages/PickCompletePage'
 import { PickDetailsPage } from '../pages/PickDetailsPage'
@@ -332,6 +336,46 @@ export function App() {
                 <UsersPage />
               </RequirePermission>
             </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/waves"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="waves:read">
+                <WavesPage />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/waves/:id"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="waves:read">
+                <WaveDetailsPage />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/picker/wave/:waveId"
+          element={
+            <RequireRoleOrPermission permissions={['waves:read', 'waves:pick']}>
+              <PickerLayout>
+                <WavePickingPage />
+              </PickerLayout>
+            </RequireRoleOrPermission>
+          }
+        />
+        <Route
+          path="/picker/wave/:waveId/sorting"
+          element={
+            <RequireRoleOrPermission permissions={['waves:read', 'waves:sort']}>
+              <PickerLayout>
+                <WaveSortingPage />
+              </PickerLayout>
+            </RequireRoleOrPermission>
           }
         />
         <Route

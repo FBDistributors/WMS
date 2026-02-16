@@ -25,6 +25,11 @@ PERMISSIONS: set[str] = {
     "locations:manage",
     "movements:read",
     "brands:manage",
+    "waves:read",
+    "waves:create",
+    "waves:manage",
+    "waves:pick",
+    "waves:sort",
 }
 
 ROLE_PERMISSIONS: dict[str, list[str]] = {
@@ -55,6 +60,11 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "brands:manage",
         "reports:read",
         "audit:read",
+        "waves:read",
+        "waves:create",
+        "waves:manage",
+        "waves:pick",
+        "waves:sort",
     ],
     "supervisor": [
         "admin:access",
@@ -78,12 +88,19 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "locations:manage",
         "movements:read",
         "brands:manage",
+        "waves:read",
+        "waves:create",
+        "waves:manage",
+        "waves:pick",
+        "waves:sort",
     ],
     "picker": [
         "picking:read",
         "picking:pick",
         "picking:complete",
         "picking:exception",
+        "waves:read",
+        "waves:pick",
     ],
     "receiver": [
         "admin:access",
