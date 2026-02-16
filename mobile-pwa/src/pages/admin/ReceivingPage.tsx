@@ -254,7 +254,7 @@ export function ReceivingPage() {
                     <option value="">{t('receiving:fields.select_location')}</option>
                     {locations.map((location) => (
                       <option key={location.id} value={location.id}>
-                        {location.code} · {location.name}
+                        {location.code === location.name ? location.code : `${location.code} · ${location.name}`}
                       </option>
                     ))}
                   </select>

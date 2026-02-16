@@ -130,7 +130,7 @@ export function InventoryDetailsPage() {
               <option value="">{t('inventory:filters.all_locations')}</option>
               {locations.map((location) => (
                 <option key={location.id} value={location.id}>
-                  {location.code} · {location.name}
+                  {location.code === location.name ? location.code : `${location.code} · ${location.name}`}
                 </option>
               ))}
             </select>
