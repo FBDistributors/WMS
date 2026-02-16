@@ -12,10 +12,11 @@ type CameraScannerProps = {
   scanError?: string | null
 }
 
+// 640x480 — mahsulotni scan qilish uchun mos yaqin fokus (1280x720 uzoq fokus qilardi)
 const VIDEO_CONSTRAINTS: MediaStreamConstraints['video'] = {
   facingMode: 'environment',
-  width: { ideal: 1280, min: 640 },
-  height: { ideal: 720, min: 480 },
+  width: { ideal: 640 },
+  height: { ideal: 480 },
 }
 
 const SCANNER_OPTIONS = {
@@ -98,16 +99,6 @@ export default function CameraScanner({ onDetected, onError, onClose, active, fu
           autoPlay
           className={fullscreen ? 'h-full w-full object-cover' : 'h-56 w-full rounded-xl object-cover'}
         />
-        {fullscreen && (
-          <div className="absolute inset-0 pointer-events-none">
-            <div
-              className="absolute left-4 right-4 top-[4%] h-1 rounded-full bg-red-500 animate-scan-line"
-              style={{
-                boxShadow: '0 0 20px 8px rgba(239, 68, 68, 0.9)',
-              }}
-            />
-          </div>
-        )}
       </div>
       {(error || scanErr) ? (
         <div className="absolute bottom-4 left-4 right-4 rounded-lg bg-red-600 px-4 py-2 text-sm text-white">
