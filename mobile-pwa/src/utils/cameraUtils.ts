@@ -9,10 +9,15 @@ export interface CameraDevice {
   kind: MediaDeviceInfo['kind']
 }
 
-const VIDEO_CONSTRAINTS: MediaTrackConstraints = {
-  facingMode: { exact: 'environment' },
-  width: { ideal: 1280, min: 640 },
-  height: { ideal: 720, min: 480 },
+/** Full HD — oddiy kameraga yaqin sifati (1280x720 fullscreenda xira ko‘rinadi) */
+function getVideoConstraints(): MediaTrackConstraints {
+  const w = typeof window !== 'undefined' ? Math.min(1920, window.screen?.width ?? 1920) : 1920
+  const h = typeof window !== 'undefined' ? Math.min(1080, window.screen?.height ?? 1080) : 1080
+  return {
+    facingMode: { exact: 'environment' },
+    width: { ideal: w, min: 1280 },
+    height: { ideal: h, min: 720 },
+  }
 }
 
 function label(d: MediaDeviceInfo) {
@@ -44,7 +49,7 @@ export async function listBackCameras(): Promise<CameraDevice[]> {
 
 /** Build video constraints for a device (or default back) */
 export function buildVideoConstraints(deviceId?: string): MediaTrackConstraints {
-  const base = { ...VIDEO_CONSTRAINTS }
+  const base = { ...getVideoConstraints() }
   const supported = navigator.mediaDevices.getSupportedConstraints() as Record<string, boolean>
   if (supported.focusMode) {
     ;(base as Record<string, unknown>).focusMode = 'continuous'
@@ -69,6 +74,10 @@ export async function startStream(constraints: MediaTrackConstraints): Promise<M
     } catch {
       // ignore
     }
+  }
+  // Markazga dastlabki fokus — barcode odatda o‘rta qismda
+  if (track) {
+    setTimeout(() => focusAtPoint(track, 0.5, 0.5), 300)
   }
   return stream
 }

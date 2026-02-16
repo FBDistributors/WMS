@@ -113,6 +113,8 @@ export default function CameraScanner({
       setCaps(getTrackCapabilities(track ?? null))
       setZoomVal(1)
       await attachStreamToVideo(stream, video)
+      // Video oqimini boshlash uchun qisqa kutish
+      await new Promise((r) => setTimeout(r, 200))
       await startZXing(stream, video)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Camera error'
