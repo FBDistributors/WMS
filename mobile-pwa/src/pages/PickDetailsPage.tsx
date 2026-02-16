@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 
 import { AppHeader } from '../components/layout/AppHeader'
 import { PickLineRow } from '../components/picking/PickLineRow'
+import { PickScanModal } from '../picking/components/PickScanModal'
 import { Button } from '../components/ui/button'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Progress } from '../components/ui/progress'
@@ -13,6 +14,7 @@ import {
   completePick,
   getPickListDetailsForPicker,
   type PickListDetails,
+  type PickLine,
 } from '../services/pickingApi'
 
 export function PickDetailsPage() {
@@ -23,6 +25,7 @@ export function PickDetailsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isCompleting, setIsCompleting] = useState(false)
+  const [scanModalLine, setScanModalLine] = useState<PickLine | null>(null)
 
   const load = useCallback(async () => {
     if (!documentId) {
@@ -118,10 +121,17 @@ export function PickDetailsPage() {
           <PickLineRow
             key={line.id}
             line={line}
-            onClick={() => navigate(`/picking/mobile-pwa/${data.id}/line/${line.id}`)}
+            onClick={() => setScanModalLine(line)}
           />
         ))}
       </div>
+
+      <PickScanModal
+        open={scanModalLine !== null}
+        line={scanModalLine}
+        onClose={() => setScanModalLine(null)}
+        onSuccess={load}
+      />
 
       <div className="fixed bottom-0 left-0 right-0 border-t bg-white px-4 py-3">
         <Button
