@@ -120,16 +120,14 @@ export default function CameraScanner({
       const msg = err instanceof Error ? err.message : 'Camera error'
       setError(msg)
       onError?.(msg)
-      if (
-        /Permission|denied|NotAllowed|NotFound|NotReadable|Overconstrained/i.test(String(msg))
-      ) {
-        setError(`${msg} Use HTTPS and grant camera permission.`)
+      if (/Permission|denied|NotAllowed|NotFound|NotReadable|Overconstrained/i.test(String(msg))) {
+        setError('Camera error. Use HTTPS, grant permission, and ensure no other app is using the camera.')
       }
     }
   }, [currentDeviceId, startZXing, attachStreamToVideo, onError])
 
   const handleTapToRefocus = useCallback(
-    (e: React.MouseEvent | React.TouchEvent) => {
+    async (e: React.MouseEvent | React.TouchEvent) => {
       const video = videoRef.current
       const track = trackRef.current
       if (!video || !track) return
@@ -141,9 +139,13 @@ export default function CameraScanner({
       if (x == null || y == null) return
       const nx = (x - rect.left) / rect.width
       const ny = (y - rect.top) / rect.height
-      focusAtPoint(track, nx, ny)
+      const ok = await focusAtPoint(track, nx, ny)
+      if (!ok && caps?.hasPointsOfInterest === false) {
+        cleanup()
+        setTimeout(() => void runScanner(), 150)
+      }
     },
-    []
+    [caps?.hasPointsOfInterest, cleanup, runScanner]
   )
 
   const handleTorchToggle = useCallback(async () => {
@@ -275,7 +277,7 @@ export default function CameraScanner({
             playsInline
             muted
             autoPlay
-            className={`w-full h-full object-cover ${!fullscreen ? 'min-h-[224px]' : ''}`}
+            className={`w-full h-full object-contain bg-black ${!fullscreen ? 'min-h-[224px]' : ''}`}
           />
           <div className="absolute inset-0 pointer-events-none border-4 border-white/60 rounded-2xl m-4 flex items-center justify-center">
             <div className="w-64 h-40 border-2 border-white/80 rounded-lg" />

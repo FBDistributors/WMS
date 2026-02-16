@@ -9,7 +9,7 @@ export interface CameraDevice {
   kind: MediaDeviceInfo['kind']
 }
 
-/** Full HD — oddiy kameraga yaqin sifati (1280x720 fullscreenda xira ko‘rinadi) */
+/** High-res constraints: ideal 1920x1080, min 1280x720. Never 640x480. */
 function getVideoConstraints(): MediaTrackConstraints {
   const w = typeof window !== 'undefined' ? Math.min(1920, window.screen?.width ?? 1920) : 1920
   const h = typeof window !== 'undefined' ? Math.min(1080, window.screen?.height ?? 1080) : 1080
@@ -145,16 +145,17 @@ export async function setZoom(track: MediaStreamTrack | null, value: number): Pr
   }
 }
 
-/** Tap to refocus at normalized point (0–1) */
-export async function focusAtPoint(track: MediaStreamTrack | null, x: number, y: number): Promise<void> {
-  if (!track) return
+/** Tap to refocus at normalized point (0–1). Returns true if applied, false if not supported. */
+export async function focusAtPoint(track: MediaStreamTrack | null, x: number, y: number): Promise<boolean> {
+  if (!track) return false
   const c = track.getCapabilities?.() as Record<string, unknown> | undefined
-  if (!c?.pointsOfInterest) return
+  if (!c?.pointsOfInterest) return false
   const nx = Math.max(0, Math.min(1, x))
   const ny = Math.max(0, Math.min(1, y))
   try {
     await track.applyConstraints({ pointsOfInterest: [{ x: nx, y: ny }] } as unknown as MediaTrackConstraints)
+    return true
   } catch {
-    // fallback: briefly restart stream can help; caller may do that
+    return false
   }
 }
