@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { X, Zap, RotateCcw, Camera } from 'lucide-react'
+import { X, Zap, RotateCcw, Camera, Focus } from 'lucide-react'
 import type { Result } from '@zxing/library'
 import type { IScannerControls } from '@zxing/browser'
 import {
+  getPreferredBackCameraDeviceId,
   listBackCameras,
   buildVideoConstraints,
   startStream,
   stopStream,
   getTrackCapabilities,
   getDefaultZoom,
+  applyZoom,
   setTorch,
-  setZoom,
   focusAtPoint,
   type CameraDevice,
   type TrackCapabilities,
@@ -30,8 +31,7 @@ const SCANNER_OPTIONS = {
   delayBetweenScanSuccess: 120,
 }
 
-// DecodeHintType: TRY_HARDER=3, POSSIBLE_FORMATS=2
-// BarcodeFormat: CODE_39=2, CODE_128=4, EAN_8=6, EAN_13=7
+// TRY_HARDER=3, POSSIBLE_FORMATS=2 (CODE_39, CODE_128, EAN_8, EAN_13)
 const DECODE_HINTS = new Map<number, unknown>([
   [3, true],
   [2, [2, 4, 6, 7]],
@@ -59,6 +59,7 @@ export default function CameraScanner({
   const [zoomVal, setZoomVal] = useState(1)
   const [caps, setCaps] = useState<TrackCapabilities | null>(null)
   const [useFallback, setUseFallback] = useState(false)
+  const fallbackDeviceIdRef = useRef<string | undefined>(undefined)
 
   const cleanup = useCallback(() => {
     controlsRef.current?.stop()
@@ -105,7 +106,9 @@ export default function CameraScanner({
     try {
       const deviceList = await listBackCameras()
       setDevices(deviceList)
-      const deviceId = currentDeviceId ?? deviceList[0]?.deviceId
+      const deviceId = currentDeviceId ?? (await getPreferredBackCameraDeviceId()) ?? deviceList[0]?.deviceId
+      fallbackDeviceIdRef.current = deviceId
+
       let stream: MediaStream
       try {
         stream = await startStream(buildVideoConstraints(deviceId, true))
@@ -115,11 +118,13 @@ export default function CameraScanner({
       streamRef.current = stream
       const track = stream.getVideoTracks()[0]
       trackRef.current = track ?? null
+
       const trackCaps = getTrackCapabilities(track ?? null)
       setCaps(trackCaps)
       const initialZoom = getDefaultZoom(trackCaps)
       setZoomVal(initialZoom)
-      await setZoom(track ?? null, initialZoom)
+      await applyZoom(stream, initialZoom)
+
       await attachStreamToVideo(stream, video)
       await new Promise((r) => setTimeout(r, 200))
       await startZXing(stream, video)
@@ -155,6 +160,17 @@ export default function CameraScanner({
     [caps?.hasPointsOfInterest, cleanup, runScanner]
   )
 
+  const handleRefocusClick = useCallback(() => {
+    const track = trackRef.current
+    if (!track) return
+    focusAtPoint(track, 0.5, 0.5).then((ok) => {
+      if (!ok) {
+        cleanup()
+        setTimeout(() => void runScanner(), 150)
+      }
+    })
+  }, [cleanup, runScanner])
+
   const handleTorchToggle = useCallback(async () => {
     const track = trackRef.current
     if (!caps?.hasTorch) return
@@ -167,7 +183,7 @@ export default function CameraScanner({
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const v = parseFloat(e.target.value)
       setZoomVal(v)
-      void setZoom(trackRef.current, v)
+      void applyZoom(streamRef.current, v)
     },
     []
   )
@@ -206,13 +222,15 @@ export default function CameraScanner({
     if (!useFallback || !active) return
     let cancelled = false
     const elId = 'html5-qrcode-fallback'
+    const deviceId = fallbackDeviceIdRef.current
     import('html5-qrcode').then(({ Html5Qrcode }) => {
       if (cancelled || !document.getElementById(elId)) return
       const scanner = new Html5Qrcode(elId)
       fallbackScannerRef.current = scanner
+      const config = deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'environment' }
       scanner
         .start(
-          { facingMode: 'environment' },
+          config,
           { fps: 8, qrbox: { width: 250, height: 150 } },
           (decoded) => {
             onDetectedRef.current(decoded)
@@ -273,7 +291,7 @@ export default function CameraScanner({
 
       <div className="flex-1 flex flex-col overflow-hidden">
         <div
-          className="relative flex-1 flex items-center justify-center overflow-hidden"
+          className="relative flex-1 flex items-center justify-center overflow-hidden bg-black"
           onClick={handleTapToRefocus}
           onTouchEnd={(e) => e.changedTouches[0] && handleTapToRefocus(e)}
           role="button"
@@ -284,7 +302,7 @@ export default function CameraScanner({
             playsInline
             muted
             autoPlay
-            className={`w-full h-full object-contain bg-black ${!fullscreen ? 'min-h-[224px]' : ''}`}
+            className={`w-full h-full object-contain ${!fullscreen ? 'min-h-[224px]' : ''}`}
           />
           <div className="absolute inset-0 pointer-events-none border-4 border-white/60 rounded-2xl m-4 flex items-center justify-center">
             <div className="w-64 h-40 border-2 border-white/80 rounded-lg" />
@@ -329,6 +347,14 @@ export default function CameraScanner({
               <span className="text-white text-sm w-10">{zoomVal.toFixed(1)}×</span>
             </div>
           )}
+          <button
+            type="button"
+            onClick={handleRefocusClick}
+            className="rounded-full p-2 bg-white/20 text-white"
+            aria-label="Refocus"
+          >
+            <Focus size={22} />
+          </button>
           {devices.length > 1 && (
             <button
               type="button"
