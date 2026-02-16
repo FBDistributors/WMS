@@ -60,6 +60,7 @@ type BackendPickingDetails = {
 const STATUS_MAP: Record<string, PickListStatus> = {
   draft: 'NEW',
   confirmed: 'NEW',
+  new: 'NEW',
   in_progress: 'IN_PROGRESS',
   partial: 'IN_PROGRESS',
   completed: 'DONE',
