@@ -7,7 +7,7 @@ import { pickLineDelta } from '../../services/pickingApi'
 import type { PickLine } from '../../services/pickingApi'
 import { ScanInput } from './ScanInput'
 import { cn } from '../../lib/utils'
-import { playBeep } from '../../utils/beep'
+import { playBeep, playErrorBeep, vibrateError } from '../../utils/beep'
 
 const CameraScanner = lazy(() => import('./CameraScanner'))
 
@@ -63,6 +63,8 @@ export function PickScanModal({ open, line, onClose, onSuccess }: PickScanModalP
         setQty(Math.min(1, remaining))
         setIsCameraActive(false)
       } else {
+        playErrorBeep()
+        vibrateError()
         setScanError(t('not_found'))
       }
     },

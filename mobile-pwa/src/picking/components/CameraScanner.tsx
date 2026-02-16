@@ -18,7 +18,7 @@ async function getMainCameraStream(): Promise<MediaStream> {
   const hasFocusMode = supported.focusMode === true
 
   const baseConstraints: MediaTrackConstraints = {
-    facingMode: 'environment',
+    facingMode: { exact: 'environment' },
     width: { ideal: 1280 },
     height: { ideal: 720 },
     ...(hasFocusMode && { focusMode: 'continuous' }),
@@ -28,12 +28,19 @@ async function getMainCameraStream(): Promise<MediaStream> {
   try {
     const devices = await navigator.mediaDevices.enumerateDevices()
     const videoInputs = devices.filter((d) => d.kind === 'videoinput')
-    const mainCameras = videoInputs.filter(
-      (d) => !/ultra|0\.5x|macro|fisheye/i.test(d.label || '') || videoInputs.length === 1
+    const label = (d: MediaDeviceInfo) => (d.label || '').toLowerCase()
+    const isFront = (d: MediaDeviceInfo) => /front|selfie|user|facing/i.test(label(d))
+    const isBack = (d: MediaDeviceInfo) => /back|rear|environment|asosiy|orqa/i.test(label(d))
+    const backCameras = videoInputs.filter((d) => isBack(d) && !isFront(d))
+    const candidates = backCameras.length ? backCameras : videoInputs.filter((d) => !isFront(d))
+    const mainCameras = candidates.filter(
+      (d) => !/ultra|0\.5x|macro|fisheye/i.test(label(d)) || candidates.length === 1
     )
-    preferredId = mainCameras[0]?.deviceId
+    if (mainCameras.length && (backCameras.length > 0 || !label(mainCameras[0]))) {
+      preferredId = mainCameras[0]?.deviceId
+    }
   } catch {
-    // fallback to facingMode only
+    // fallback
   }
 
   const constraints: MediaTrackConstraints = preferredId
