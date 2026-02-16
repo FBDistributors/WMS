@@ -1,7 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { X } from 'lucide-react'
+import { X, Zap, RotateCcw, Camera } from 'lucide-react'
 import type { Result } from '@zxing/library'
 import type { IScannerControls } from '@zxing/browser'
+import {
+  listBackCameras,
+  buildVideoConstraints,
+  startStream,
+  stopStream,
+  getTrackCapabilities,
+  setTorch,
+  setZoom,
+  focusAtPoint,
+  type CameraDevice,
+  type TrackCapabilities,
+} from '../../utils/cameraUtils'
 
 type CameraScannerProps = {
   onDetected: (code: string) => void
@@ -12,147 +24,228 @@ type CameraScannerProps = {
   scanError?: string | null
 }
 
-/** Asosiy (1x) kamera + continuous autofocus — mahsulot skaner uchun optimal */
-async function getMainCameraStream(): Promise<MediaStream> {
-  const supported = navigator.mediaDevices.getSupportedConstraints() as Record<string, boolean>
-  const hasFocusMode = supported.focusMode === true
-
-  const baseConstraints: MediaTrackConstraints = {
-    facingMode: { exact: 'environment' },
-    width: { ideal: 1920 },
-    height: { ideal: 1080 },
-    ...(hasFocusMode && { focusMode: 'continuous' }),
-  }
-
-  let preferredId: string | undefined
-  try {
-    const devices = await navigator.mediaDevices.enumerateDevices()
-    const videoInputs = devices.filter((d) => d.kind === 'videoinput')
-    const label = (d: MediaDeviceInfo) => (d.label || '').toLowerCase()
-    const isFront = (d: MediaDeviceInfo) => /front|selfie|user|facing/i.test(label(d))
-    const isBack = (d: MediaDeviceInfo) => /back|rear|environment|asosiy|orqa/i.test(label(d))
-    const backCameras = videoInputs.filter((d) => isBack(d) && !isFront(d))
-    const candidates = backCameras.length ? backCameras : videoInputs.filter((d) => !isFront(d))
-    const mainCameras = candidates.filter(
-      (d) => !/ultra|0\.5x|macro|fisheye/i.test(label(d)) || candidates.length === 1
-    )
-    if (mainCameras.length && (backCameras.length > 0 || !label(mainCameras[0]))) {
-      preferredId = mainCameras[0]?.deviceId
-    }
-  } catch {
-    // fallback
-  }
-
-  const constraints: MediaTrackConstraints = preferredId
-    ? { ...baseConstraints, deviceId: { exact: preferredId } }
-    : baseConstraints
-
-  const stream = await navigator.mediaDevices.getUserMedia({ video: constraints })
-
-  const track = stream.getVideoTracks()[0]
-  if (track && hasFocusMode) {
-    try {
-      await track.applyConstraints({ focusMode: 'continuous' } as MediaTrackConstraints)
-    } catch {
-      // ignore
-    }
-  }
-
-  return stream
-}
-
 const SCANNER_OPTIONS = {
-  delayBetweenScanAttempts: 150,
-  delayBetweenScanSuccess: 150,
+  delayBetweenScanAttempts: 120,
+  delayBetweenScanSuccess: 120,
 }
 
-// TRY_HARDER = 3 — kichik shtrix-kodlar uchun aniqroq o‘qish
-const DECODE_HINTS = new Map<number, unknown>([[3, true]])
+// DecodeHintType: TRY_HARDER=3, POSSIBLE_FORMATS=2
+// BarcodeFormat: CODE_39=2, CODE_128=4, EAN_8=6, EAN_13=7
+const DECODE_HINTS = new Map<number, unknown>([
+  [3, true],
+  [2, [2, 4, 6, 7]],
+])
 
-export default function CameraScanner({ onDetected, onError, onClose, active, fullscreen = false, scanError: scanErr }: CameraScannerProps) {
+export default function CameraScanner({
+  onDetected,
+  onError,
+  onClose,
+  active,
+  fullscreen = false,
+  scanError: scanErr,
+}: CameraScannerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
   const trackRef = useRef<MediaStreamTrack | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const controlsRef = useRef<IScannerControls | null>(null)
   const onDetectedRef = useRef(onDetected)
   onDetectedRef.current = onDetected
 
-  const handleVideoTap = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    const video = videoRef.current
-    const track = trackRef.current
-    if (!video || !track || video.readyState < 2) return
-    const caps = track.getCapabilities ? track.getCapabilities() : {}
-    if (!('pointsOfInterest' in caps)) return
-    const rect = video.getBoundingClientRect()
-    const te = e as unknown as TouchEvent
-    const touch = te.touches?.[0] ?? te.changedTouches?.[0]
-    const x = touch ? touch.clientX : (e as React.MouseEvent).clientX
-    const y = touch ? touch.clientY : (e as React.MouseEvent).clientY
-    if (x == null || y == null) return
-    const nx = Math.max(0, Math.min(1, (x - rect.left) / rect.width))
-    const ny = Math.max(0, Math.min(1, (y - rect.top) / rect.height))
-    track.applyConstraints({ pointsOfInterest: [{ x: nx, y: ny }] } as MediaTrackConstraints).catch(() => {})
+  const [error, setError] = useState<string | null>(null)
+  const [devices, setDevices] = useState<CameraDevice[]>([])
+  const [currentDeviceId, setCurrentDeviceId] = useState<string | undefined>()
+  const [torchOn, setTorchOn] = useState(false)
+  const [zoomVal, setZoomVal] = useState(1)
+  const [caps, setCaps] = useState<TrackCapabilities | null>(null)
+  const [useFallback, setUseFallback] = useState(false)
+
+  const cleanup = useCallback(() => {
+    controlsRef.current?.stop()
+    controlsRef.current = null
+    stopStream(streamRef.current)
+    streamRef.current = null
+    trackRef.current = null
+    setCaps(null)
+    setTorchOn(false)
   }, [])
 
-  useEffect(() => {
-    if (!active) return
-    let isCancelled = false
-    let controls: IScannerControls | null = null
+  const startZXing = useCallback(
+    async (stream: MediaStream, video: HTMLVideoElement) => {
+      const { BrowserMultiFormatReader } = await import('@zxing/browser')
+      const reader = new BrowserMultiFormatReader(DECODE_HINTS, SCANNER_OPTIONS)
+      const ctrl = await reader.decodeFromStream(
+        stream,
+        video,
+        (result: Result | undefined, _err, ctrl) => {
+          if (!result) return
+          const text = result.getText()
+          if (!text) return
+          onDetectedRef.current(text)
+          ctrl.stop()
+        }
+      )
+      controlsRef.current = ctrl
+    },
+    []
+  )
 
-    const start = async () => {
-      const video = videoRef.current
-      if (!video) return
-      try {
-        const stream = await getMainCameraStream()
-        trackRef.current = stream.getVideoTracks()[0] ?? null
-        if (isCancelled) {
-          stream.getTracks().forEach((t) => t.stop())
-          trackRef.current = null
-          return
-        }
-        const { BrowserMultiFormatReader } = await import('@zxing/browser')
-        if (isCancelled) {
-          stream.getTracks().forEach((t) => t.stop())
-          trackRef.current = null
-          return
-        }
-        const reader = new BrowserMultiFormatReader(DECODE_HINTS, SCANNER_OPTIONS)
-        controls = await reader.decodeFromStream(
-          stream,
-          video,
-          (result: Result | undefined, _err, ctrl) => {
-            if (!result) return
-            const text = result.getText()
-            if (!text) return
-            onDetectedRef.current(text)
-            ctrl.stop()
-          }
-        )
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Camera error'
-        setError(message)
-        onError?.(message)
+  const attachStreamToVideo = useCallback((stream: MediaStream, video: HTMLVideoElement) => {
+    video.srcObject = stream
+    video.setAttribute('playsInline', 'true')
+    video.setAttribute('muted', 'true')
+    video.setAttribute('autoplay', 'true')
+    return video.play()
+  }, [])
+
+  const runScanner = useCallback(async () => {
+    const video = videoRef.current
+    if (!video) return
+    setError(null)
+    try {
+      const deviceList = await listBackCameras()
+      setDevices(deviceList)
+      const deviceId = currentDeviceId ?? deviceList[0]?.deviceId
+      const constraints = buildVideoConstraints(deviceId)
+      const stream = await startStream(constraints)
+      streamRef.current = stream
+      const track = stream.getVideoTracks()[0]
+      trackRef.current = track ?? null
+      setCaps(getTrackCapabilities(track ?? null))
+      setZoomVal(1)
+      await attachStreamToVideo(stream, video)
+      await startZXing(stream, video)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Camera error'
+      setError(msg)
+      onError?.(msg)
+      if (
+        /Permission|denied|NotAllowed|NotFound|NotReadable|Overconstrained/i.test(String(msg))
+      ) {
+        setError(`${msg} Use HTTPS and grant camera permission.`)
       }
     }
+  }, [currentDeviceId, startZXing, attachStreamToVideo, onError])
 
-    const run = () => {
-      requestAnimationFrame(() => {
-        if (videoRef.current && !isCancelled) void start()
-      })
+  const handleTapToRefocus = useCallback(
+    (e: React.MouseEvent | React.TouchEvent) => {
+      const video = videoRef.current
+      const track = trackRef.current
+      if (!video || !track) return
+      const rect = video.getBoundingClientRect()
+      const te = e as unknown as TouchEvent
+      const touch = te.touches?.[0] ?? te.changedTouches?.[0]
+      const x = touch ? touch.clientX : (e as React.MouseEvent).clientX
+      const y = touch ? touch.clientY : (e as React.MouseEvent).clientY
+      if (x == null || y == null) return
+      const nx = (x - rect.left) / rect.width
+      const ny = (y - rect.top) / rect.height
+      focusAtPoint(track, nx, ny)
+    },
+    []
+  )
+
+  const handleTorchToggle = useCallback(async () => {
+    const track = trackRef.current
+    if (!caps?.hasTorch) return
+    const next = !torchOn
+    await setTorch(track, next)
+    setTorchOn(next)
+  }, [torchOn, caps?.hasTorch])
+
+  const handleZoomChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const v = parseFloat(e.target.value)
+      setZoomVal(v)
+      void setZoom(trackRef.current, v)
+    },
+    []
+  )
+
+  const handleDeviceSwitch = useCallback(() => {
+    if (devices.length < 2) return
+    const idx = devices.findIndex((d) => d.deviceId === currentDeviceId)
+    const next = devices[(idx + 1) % devices.length]
+    setCurrentDeviceId(next.deviceId)
+  }, [devices, currentDeviceId])
+
+  const handleTryFallback = useCallback(() => {
+    cleanup()
+    setUseFallback(true)
+    setError(null)
+  }, [cleanup])
+
+  useEffect(() => {
+    if (!active) {
+      setUseFallback(false)
+      return
     }
-    run()
-
+    let cancelled = false
+    const t = setTimeout(() => {
+      if (!cancelled) void runScanner()
+    }, 50)
     return () => {
-      isCancelled = true
-      trackRef.current = null
-      controls?.stop()
+      cancelled = true
+      clearTimeout(t)
+      cleanup()
     }
-  }, [active, onError])
+  }, [active, runScanner, cleanup])
+
+  const fallbackScannerRef = useRef<{ stop: () => Promise<void> } | null>(null)
+  useEffect(() => {
+    if (!useFallback || !active) return
+    let cancelled = false
+    const elId = 'html5-qrcode-fallback'
+    import('html5-qrcode').then(({ Html5Qrcode }) => {
+      if (cancelled || !document.getElementById(elId)) return
+      const scanner = new Html5Qrcode(elId)
+      fallbackScannerRef.current = scanner
+      scanner
+        .start(
+          { facingMode: 'environment' },
+          { fps: 8, qrbox: { width: 250, height: 150 } },
+          (decoded) => {
+            onDetectedRef.current(decoded)
+            void scanner.stop()
+          },
+          () => {}
+        )
+        .catch((err: unknown) => !cancelled && setError(String(err)))
+    })
+    return () => {
+      cancelled = true
+      fallbackScannerRef.current?.stop().catch(() => {})
+      fallbackScannerRef.current = null
+    }
+  }, [useFallback, active])
 
   if (!active) return null
 
   const containerClass = fullscreen
     ? 'fixed inset-0 z-[60] flex flex-col bg-black'
     : 'rounded-2xl bg-white p-4 shadow-sm'
+
+  if (useFallback) {
+    return (
+      <div className={containerClass}>
+        {fullscreen && onClose && (
+          <button
+            type="button"
+            onClick={() => { setUseFallback(false); onClose?.() }}
+            className="absolute top-4 right-4 z-10 rounded-full bg-black/50 p-2 text-white"
+            aria-label="Close"
+          >
+            <X size={24} />
+          </button>
+        )}
+        <div id="html5-qrcode-fallback" className="flex-1 min-h-[200px]" />
+        {error && (
+          <div className="absolute bottom-4 left-4 right-4 rounded-lg bg-red-600 px-4 py-2 text-sm text-white">
+            {error}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className={containerClass}>
@@ -161,32 +254,98 @@ export default function CameraScanner({ onDetected, onError, onClose, active, fu
           type="button"
           onClick={onClose}
           className="absolute top-4 right-4 z-10 rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
-          aria-label="Close camera"
+          aria-label="Close"
         >
           <X size={24} />
         </button>
       )}
-      <div
-        className="relative flex-1 overflow-hidden cursor-default"
-        onClick={handleVideoTap}
-        onTouchEnd={(e) => e.changedTouches[0] && handleVideoTap(e)}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => e.key === 'Enter' && handleVideoTap(e as unknown as React.MouseEvent)}
-      >
-        <video
-          ref={videoRef}
-          playsInline
-          muted
-          autoPlay
-          className={fullscreen ? 'h-full w-full object-cover' : 'h-56 w-full rounded-xl object-cover'}
-        />
-      </div>
-      {(error || scanErr) ? (
-        <div className="absolute bottom-4 left-4 right-4 rounded-lg bg-red-600 px-4 py-2 text-sm text-white">
-          {error || scanErr}
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div
+          className="relative flex-1 flex items-center justify-center overflow-hidden"
+          onClick={handleTapToRefocus}
+          onTouchEnd={(e) => e.changedTouches[0] && handleTapToRefocus(e)}
+          role="button"
+          tabIndex={0}
+        >
+          <video
+            ref={videoRef}
+            playsInline
+            muted
+            autoPlay
+            className={`w-full h-full object-cover ${!fullscreen ? 'min-h-[224px]' : ''}`}
+          />
+          <div className="absolute inset-0 pointer-events-none border-4 border-white/60 rounded-2xl m-4 flex items-center justify-center">
+            <div className="w-64 h-40 border-2 border-white/80 rounded-lg" />
+          </div>
+          {error && (
+            <div className="absolute bottom-2 left-2 right-2 rounded bg-red-600/90 px-3 py-2 text-sm text-white text-center">
+              {error}
+              <button
+                type="button"
+                className="mt-2 block w-full text-white/90 underline"
+                onClick={(e) => { e.stopPropagation(); handleTryFallback() }}
+              >
+                Try alternative scanner
+              </button>
+            </div>
+          )}
         </div>
-      ) : null}
+
+        <div className="flex items-center gap-3 p-3 bg-black/80">
+          {caps?.hasTorch && (
+            <button
+              type="button"
+              onClick={handleTorchToggle}
+              className={`rounded-full p-2 ${torchOn ? 'bg-amber-500 text-black' : 'bg-white/20 text-white'}`}
+              aria-label="Torch"
+            >
+              <Zap size={22} />
+            </button>
+          )}
+          {caps?.hasZoom && (
+            <div className="flex-1 flex items-center gap-2">
+              <span className="text-white text-sm w-8">1×</span>
+              <input
+                type="range"
+                min={caps.zoomMin}
+                max={caps.zoomMax}
+                step={caps.zoomStep}
+                value={zoomVal}
+                onChange={handleZoomChange}
+                className="flex-1 h-2 rounded-lg"
+              />
+              <span className="text-white text-sm w-10">{zoomVal.toFixed(1)}×</span>
+            </div>
+          )}
+          {devices.length > 1 && (
+            <button
+              type="button"
+              onClick={handleDeviceSwitch}
+              className="rounded-full p-2 bg-white/20 text-white"
+              aria-label="Switch camera"
+            >
+              <Camera size={22} />
+            </button>
+          )}
+          {error && !caps && (
+            <button
+              type="button"
+              onClick={handleTryFallback}
+              className="rounded-lg px-3 py-2 bg-amber-600 text-white text-sm"
+            >
+              <RotateCcw size={18} className="inline mr-1" />
+              Alternative
+            </button>
+          )}
+        </div>
+      </div>
+
+      {scanErr && !error && (
+        <div className="absolute bottom-20 left-4 right-4 rounded-lg bg-red-600 px-4 py-2 text-sm text-white">
+          {scanErr}
+        </div>
+      )}
     </div>
   )
 }

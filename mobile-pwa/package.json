@@ -12,6 +12,7 @@
   "dependencies": {
     "@radix-ui/react-tooltip": "^1.2.8",
     "@zxing/browser": "^0.1.5",
+    "html5-qrcode": "^2.3.8",
     "i18next": "^25.8.4",
     "jsbarcode": "^3.12.3",
     "lucide-react": "^0.474.0",
