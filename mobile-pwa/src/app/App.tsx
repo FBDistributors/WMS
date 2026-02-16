@@ -25,7 +25,6 @@ import { AuditLogsPage } from '../pages/admin/AuditLogsPage'
 import { WavesPage } from '../pages/admin/WavesPage'
 import { WaveDetailsPage } from '../pages/admin/WaveDetailsPage'
 import { WavePickingPage } from '../pages/picker/WavePickingPage'
-import { WaveSortingPage } from '../pages/picker/WaveSortingPage'
 import { OfflineQueuePage } from '../pages/offline/OfflineQueuePage'
 import { PickCompletePage } from '../pages/PickCompletePage'
 import { PickDetailsPage } from '../pages/PickDetailsPage'
@@ -364,16 +363,6 @@ export function App() {
             <RequireRoleOrPermission permissions={['waves:read', 'waves:pick']}>
               <PickerLayout>
                 <WavePickingPage />
-              </PickerLayout>
-            </RequireRoleOrPermission>
-          }
-        />
-        <Route
-          path="/picker/wave/:waveId/sorting"
-          element={
-            <RequireRoleOrPermission permissions={['waves:read', 'waves:sort']}>
-              <PickerLayout>
-                <WaveSortingPage />
               </PickerLayout>
             </RequireRoleOrPermission>
           }

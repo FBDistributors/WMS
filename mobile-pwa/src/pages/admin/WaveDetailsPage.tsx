@@ -28,7 +28,6 @@ export function WaveDetailsPage() {
 
   const canManage = has('waves:manage')
   const canPick = has('waves:pick')
-  const canSort = has('waves:sort')
 
   const load = useCallback(async () => {
     if (!id) return
@@ -139,12 +138,6 @@ export function WaveDetailsPage() {
                 <Button onClick={() => navigate(`/picker/wave/${wave.id}`)}>
                   <ScanLine size={16} />
                   {t('admin:waves.wave_picking')}
-                </Button>
-              )}
-              {wave.status === 'SORTING' && canSort && (
-                <Button onClick={() => navigate(`/picker/wave/${wave.id}/sorting`)}>
-                  <ScanLine size={16} />
-                  {t('admin:waves.sorting_zone')}
                 </Button>
               )}
               {wave.status === 'SORTING' && canManage && (
