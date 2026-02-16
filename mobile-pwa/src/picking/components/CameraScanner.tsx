@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Result } from '@zxing/library'
-import type { BrowserMultiFormatReader, IScannerControls } from '@zxing/browser'
+import type { IScannerControls } from '@zxing/browser'
 
 type CameraScannerProps = {
   onDetected: (code: string) => void
