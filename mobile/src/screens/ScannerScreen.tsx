@@ -61,11 +61,13 @@ export function ScannerScreen() {
     setIsScanning(true);
   }, [reset]);
 
+  // Loading or no device: show visible UI (not black)
   if (permStatus === 'loading' || !device) {
     return (
-      <View style={styles.centered}>
+      <View style={[styles.centered, styles.whiteBg]}>
+        <Text style={styles.message}>Camera screen loading…</Text>
         {!device ? (
-          <Text style={styles.message}>No camera device</Text>
+          <Text style={styles.messageSmall}>No camera device (emulator may have none)</Text>
         ) : (
           <ActivityIndicator size="large" color="#333" />
         )}
@@ -73,10 +75,14 @@ export function ScannerScreen() {
     );
   }
 
+  // Permission denied / not determined: show permission UI (visible, not black)
   if (permStatus !== 'granted') {
     return (
-      <View style={styles.centered}>
+      <View style={[styles.centered, styles.whiteBg]}>
         <Text style={styles.message}>Camera access is required to scan barcodes.</Text>
+        <Text style={styles.messageSmall}>
+          {permStatus === 'denied' ? 'Permission denied. Open Settings to enable.' : 'Tap below to allow.'}
+        </Text>
         <TouchableOpacity style={styles.button} onPress={handleRequestPermission}>
           <Text style={styles.buttonText}>
             {permStatus === 'denied' ? 'Open Settings' : 'Allow Camera'}
@@ -86,6 +92,7 @@ export function ScannerScreen() {
     );
   }
 
+  // Permission granted: render camera + always-visible overlay (confirms screen is rendering even if preview is black)
   return (
     <View style={StyleSheet.absoluteFill}>
       <Camera
@@ -94,6 +101,11 @@ export function ScannerScreen() {
         isActive={isScanning}
         codeScanner={codeScanner}
       />
+      {/* Overlay: confirms scanner screen is rendering (preview may be black on emulator) */}
+      <View style={styles.overlayBanner}>
+        <Text style={styles.overlayBannerText}>Scanner active — point at barcode (EAN/Code128/QR)</Text>
+        <Text style={styles.overlayBannerSub}>Preview may be black on emulator; use real device to test camera.</Text>
+      </View>
       <View style={styles.overlay}>
         <Text style={styles.hint}>
           Point at a barcode (EAN / Code128 / QR)
@@ -136,11 +148,20 @@ const styles = StyleSheet.create({
     padding: 24,
     backgroundColor: '#f5f5f5',
   },
+  whiteBg: {
+    backgroundColor: '#fff',
+  },
   message: {
-    fontSize: 16,
-    color: '#333',
+    fontSize: 18,
+    color: '#111',
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
+  },
+  messageSmall: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
   },
   button: {
     backgroundColor: '#333',
@@ -161,9 +182,30 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 12,
   },
+  overlayBanner: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  overlayBannerText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  overlayBannerSub: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 2,
+  },
   overlay: {
     position: 'absolute',
-    top: 48,
+    top: 56,
     left: 0,
     right: 0,
     alignItems: 'center',

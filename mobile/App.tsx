@@ -1,24 +1,29 @@
 /**
- * WMS Mobile — barcode scanner app (React Native, Android-first).
+ * WMS Mobile — Stack: Home, Picker, Scanner.
  */
 import React from 'react';
-import { SafeAreaView, StatusBar, StyleSheet } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import type { RootStackParamList } from './src/types/navigation';
+import { HomeScreen } from './src/screens/HomeScreen';
+import { PickerScreen } from './src/screens/PickerScreen';
 import { ScannerScreen } from './src/screens/ScannerScreen';
 
-function App(): React.JSX.Element {
+const Stack = createNativeStackNavigator<RootStackParamList>();
+
+export default function App() {
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#111" />
-      <ScannerScreen />
-    </SafeAreaView>
+    <NavigationContainer>
+      <Stack.Navigator
+        initialRouteName="Home"
+        screenOptions={{
+          headerShown: false,
+        }}
+      >
+        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="Picker" component={PickerScreen} />
+        <Stack.Screen name="Scanner" component={ScannerScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#111',
-  },
-});
-
-export default App;
