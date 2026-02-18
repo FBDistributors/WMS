@@ -266,6 +266,16 @@ export function App() {
           }
         />
         <Route
+          path="/admin/order-statuses"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="orders:read">
+                <OrdersPage mode="statuses" />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
           path="/admin/orders/:id"
           element={
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">

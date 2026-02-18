@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Package, ClipboardList, SearchCheck, PackageCheck, Boxes, LayoutGrid } from 'lucide-react'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -30,6 +30,7 @@ function aggregateByFourGroups(
 
 export function DashboardPage() {
   const { t } = useTranslation(['admin', 'common'])
+  const navigate = useNavigate()
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [ordersByStatus, setOrdersByStatus] = useState<{ status: string; count: number }[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -78,31 +79,31 @@ export function DashboardPage() {
               title={t('admin:dashboard.status_xom')}
               value={isLoading ? '—' : counts.xom}
               icon={Package}
-              href="/admin/orders?group=xom"
+              href="/admin/order-statuses?group=xom"
             />
             <KpiCard
               title={t('admin:dashboard.status_yigishda')}
               value={isLoading ? '—' : counts.yigishda}
               icon={ClipboardList}
-              href="/admin/orders?group=yigishda"
+              href="/admin/order-statuses?group=yigishda"
             />
             <KpiCard
               title={t('admin:dashboard.status_tekshiruvda')}
               value={isLoading ? '—' : counts.tekshiruvda}
               icon={SearchCheck}
-              href="/admin/orders?group=tekshiruvda"
+              href="/admin/order-statuses?group=tekshiruvda"
             />
             <KpiCard
               title={t('admin:dashboard.status_yakunlangan')}
               value={isLoading ? '—' : counts.yakunlangan}
               icon={PackageCheck}
-              href="/admin/orders?group=yakunlangan"
+              href="/admin/order-statuses?group=yakunlangan"
             />
             <KpiCard
               title={t('admin:dashboard.status_barcha')}
               value={isLoading ? '—' : totalOrders}
               icon={LayoutGrid}
-              href="/admin/orders?group=all"
+              href="/admin/order-statuses?group=all"
             />
           </div>
 
@@ -127,27 +128,26 @@ export function DashboardPage() {
                   </thead>
                   <tbody>
                     {statusRows.map((row) => {
-                      const href = row.key === 'barcha' ? '/admin/orders?group=all' : `/admin/orders?group=${row.key}`
+                      const path = row.key === 'barcha' ? '/admin/order-statuses?group=all' : `/admin/order-statuses?group=${row.key}`
                       return (
                         <tr
                           key={row.key}
-                          className="border-b border-slate-100 dark:border-slate-800"
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => navigate(path)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              navigate(path)
+                            }
+                          }}
+                          className="cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
                         >
-                          <td className="px-3 py-2">
-                            <Link
-                              to={href}
-                              className="text-slate-700 hover:text-blue-600 hover:underline dark:text-slate-300 dark:hover:text-blue-400"
-                            >
-                              {t(row.labelKey)}
-                            </Link>
+                          <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
+                            {t(row.labelKey)}
                           </td>
                           <td className="px-3 py-2 text-right font-medium text-slate-900 dark:text-slate-100">
-                            <Link
-                              to={href}
-                              className="hover:text-blue-600 hover:underline dark:hover:text-blue-400"
-                            >
-                              {row.count}
-                            </Link>
+                            {row.count}
                           </td>
                         </tr>
                       )

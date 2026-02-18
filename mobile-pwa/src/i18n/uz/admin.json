@@ -42,6 +42,7 @@
     "status_tekshiruvda": "Tekshiruvda",
     "status_yakunlangan": "Yakunlangan",
     "status_barcha": "Barcha buyurtmalar",
+    "order_statuses_title": "Buyurtma statuslari",
     "load_error": "Dashboard yuklanmadi. Qayta urinib ko‘ring."
   },
   "active_picks": {

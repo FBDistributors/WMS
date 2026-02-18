@@ -42,6 +42,7 @@
     "status_tekshiruvda": "In verification",
     "status_yakunlangan": "Completed",
     "status_barcha": "All orders",
+    "order_statuses_title": "Order statuses",
     "load_error": "Failed to load dashboard. Please try again."
   },
   "active_picks": {

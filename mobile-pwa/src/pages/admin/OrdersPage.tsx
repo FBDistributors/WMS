@@ -46,11 +46,14 @@ const GROUP_TO_STATUS: Record<string, string | undefined> = {
   all: undefined,
 }
 
-export function OrdersPage() {
+type OrdersPageProps = { mode?: 'default' | 'statuses' }
+
+export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
   const { t } = useTranslation(['orders', 'common', 'admin'])
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const group = searchParams.get('group') ?? 'all'
+  const pageTitle = mode === 'statuses' ? t('admin:dashboard.order_statuses_title') : t('orders:title')
   const statusParam = GROUP_TO_STATUS[group] ?? GROUP_TO_STATUS.all
   const { has } = useAuth()
   const canSync = has('orders:sync')
@@ -339,12 +342,12 @@ export function OrdersPage() {
   }, [canSend, config.columnOrder, config.visibleColumns, eligibleItems, error, isLoading, items, load, navigate, selectedOrderIds, t])
 
   return (
-    <AdminLayout title={t('orders:title')}>
+    <AdminLayout title={pageTitle}>
       <Card className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              {t('orders:title')}
+              {pageTitle}
             </div>
             <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
               <span>{t('orders:subtitle')}</span>

@@ -42,6 +42,7 @@
     "status_tekshiruvda": "На проверке",
     "status_yakunlangan": "Завершённые",
     "status_barcha": "Все заказы",
+    "order_statuses_title": "Статусы заказов",
     "load_error": "Не удалось загрузить дашборд. Попробуйте снова."
   },
   "active_picks": {
