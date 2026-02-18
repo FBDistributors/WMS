@@ -9,6 +9,7 @@ export type ProductsTableConfig = {
 const STORAGE_KEY = 'wms_products_table_config'
 
 export const PRODUCTS_TABLE_COLUMN_IDS = [
+  'detail',
   'sku',
   'photo',
   'name',
@@ -30,6 +31,7 @@ export const PRODUCTS_TABLE_COLUMN_IDS = [
 ]
 
 export const DEFAULT_VISIBLE_COLUMNS = [
+  'detail',
   'sku',
   'photo',
   'name',

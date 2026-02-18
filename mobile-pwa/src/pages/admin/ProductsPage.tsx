@@ -23,6 +23,7 @@ import {
 import { useAuth } from '../../rbac/AuthProvider'
 
 const COLUMN_OPTIONS = [
+  { id: 'detail', labelKey: 'products:columns.detail' },
   { id: 'sku', labelKey: 'products:columns.sku' },
   { id: 'photo', labelKey: 'products:columns.photo' },
   { id: 'name', labelKey: 'products:columns.name' },
@@ -193,6 +194,7 @@ export function ProductsPage() {
         columnOrder={config.columnOrder}
         visibleColumns={config.visibleColumns}
         onRowClick={(item) => navigate(`/admin/products/${item.id}`)}
+        onDetailClick={(item) => navigate(`/admin/products/${item.id}`)}
         onInventoryClick={(item) => navigate(`/admin/inventory/${item.id}`)}
       />
     )

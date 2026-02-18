@@ -166,7 +166,6 @@ export function PickTaskDetails() {
             };
           });
           await saveCachedPickTaskDetail(taskId, { ...doc, lines: doc.lines.map((l) => (l.id === res.line.id ? res.line : l)), progress: res.progress, status: res.document_status } as PickingDocument);
-          Alert.alert(t('picked'), `${res.line.product_name}: ${res.line.qty_picked} / ${res.line.qty_required}`);
         } else {
           await addToQueue('PICK_SCAN', { taskId, barcode: value, lineId: line.id, ts: Date.now() });
           const newPicked = line.qty_picked + 1;
@@ -176,7 +175,6 @@ export function PickTaskDetails() {
           const updated = { ...doc, lines: newLines, progress: { ...doc.progress, picked } };
           setDoc(updated);
           await saveCachedPickTaskDetail(taskId, updated);
-          Alert.alert(t('picked'), `${line.product_name}: ${newPicked} / ${line.qty_required}`);
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : t('error');
@@ -248,7 +246,6 @@ export function PickTaskDetails() {
         setDoc((prev) => (prev ? { ...prev, lines: prev.lines.map((l) => (l.id === res.line.id ? res.line : l)), progress: res.progress, status: res.document_status } : prev));
         await saveCachedPickTaskDetail(taskId, { ...doc, lines: doc.lines.map((l) => (l.id === res.line.id ? res.line : l)), progress: res.progress, status: res.document_status } as PickingDocument);
         closeLineScan();
-        Alert.alert(t('picked'), `${res.line.product_name}: ${res.line.qty_picked} / ${res.line.qty_required}`);
       } else {
         const additional = qty - 1;
         if (additional > 0) {
@@ -261,7 +258,6 @@ export function PickTaskDetails() {
         setDoc(updated);
         await saveCachedPickTaskDetail(taskId, updated);
         closeLineScan();
-        Alert.alert(t('picked'), `${selectedLine.product_name}: ${newPicked} / ${selectedLine.qty_required}`);
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : t('error');

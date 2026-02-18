@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import type { ReactNode } from 'react'
-import { Package } from 'lucide-react'
+import { Eye, Package } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 
 import { TableScrollArea } from '../../../components/TableScrollArea'
 import { Badge } from '../../../components/ui/badge'
@@ -37,6 +38,7 @@ type ProductsTableProps = {
   columnOrder: string[]
   visibleColumns: string[]
   onRowClick?: (item: ProductRow) => void
+  onDetailClick?: (item: ProductRow) => void
   onInventoryClick?: (item: ProductRow) => void
 }
 
@@ -47,12 +49,33 @@ export function ProductsTable({
   columnOrder,
   visibleColumns,
   onRowClick,
+  onDetailClick,
   onInventoryClick,
 }: ProductsTableProps) {
   const { t } = useTranslation(['products', 'common'])
+  const navigate = useNavigate()
+  const handleDetail = (item: ProductRow) => (e: React.MouseEvent) => {
+    e.stopPropagation()
+    ;(onDetailClick ?? (() => navigate(`/admin/products/${item.id}`)))(item)
+  }
 
   const columns = useMemo<Column[]>(
     () => [
+      {
+        id: 'detail',
+        label: t('products:columns.detail'),
+        className: 'w-[80px]',
+        render: (item) => (
+          <button
+            type="button"
+            onClick={handleDetail(item)}
+            className="inline-flex items-center justify-center rounded-md p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+            title={t('products:columns.detail')}
+          >
+            <Eye size={18} />
+          </button>
+        ),
+      },
       {
         id: 'sku',
         label: t('products:columns.sku'),
@@ -202,7 +225,7 @@ export function ProductsTable({
         render: (item) => item.qty_units ?? '—',
       },
     ],
-    [t]
+    [t, navigate, onDetailClick]
   )
 
   const columnsById = useMemo(() => new Map(columns.map((col) => [col.id, col])), [columns])

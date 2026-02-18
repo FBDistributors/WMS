@@ -15,6 +15,12 @@ from app.integrations.smartup.products_sync import sync_smartup_products
 from app.models.smartup_sync import SmartupSyncRun
 from app.models.product import Product as ProductModel
 from app.models.product import ProductBarcode
+from app.models.receipt import Receipt as ReceiptModel
+from app.models.receipt import ReceiptLine as ReceiptLineModel
+from app.models.document import Document as DocumentModel
+from app.models.order import Order as OrderModel
+from app.models.location import Location as LocationModel
+from app.models.user import User as UserModel
 from app.models.stock import StockLot as StockLotModel
 from app.models.stock import StockMovement as StockMovementModel
 from app.schemas.product import ProductCreateIn, ProductImportItem, ProductListOut, ProductOut
@@ -61,6 +67,30 @@ class SmartupSyncRunOut(BaseModel):
     error_count: int
     status: str
     errors_json: Optional[List[dict]] = None
+
+
+class ProductHistoryReceiving(BaseModel):
+    date: str  # ISO
+    received_by: Optional[str] = None
+    doc_no: str
+    qty: float
+    batch: str
+    location_name: Optional[str] = None
+
+
+class ProductHistoryPick(BaseModel):
+    date: str  # ISO
+    picked_by: Optional[str] = None
+    order_number: Optional[str] = None
+    document_doc_no: Optional[str] = None
+    qty: float
+
+
+class ProductHistoryResponse(BaseModel):
+    receiving: List[ProductHistoryReceiving] = []
+    picks: List[ProductHistoryPick] = []
+    on_hand_total: Optional[float] = None
+    available_total: Optional[float] = None
 
 
 def _to_product(
@@ -282,6 +312,117 @@ async def get_product_by_barcode(
         raise HTTPException(status_code=404, detail="Product not found")
     summary = _fetch_inventory_summary(db, [product.id])
     return _to_product(product, summary)
+
+
+@router.get(
+    "/{product_id}/history",
+    response_model=ProductHistoryResponse,
+    summary="Get product history (receiving and picks)",
+)
+async def get_product_history(
+    product_id: UUID,
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("products:read")),
+):
+    product = (
+        db.query(ProductModel)
+        .filter(ProductModel.id == product_id)
+        .one_or_none()
+    )
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    receiving: List[ProductHistoryReceiving] = []
+    receipt_lines = (
+        db.query(ReceiptLineModel)
+        .options(
+            selectinload(ReceiptLineModel.receipt),
+            selectinload(ReceiptLineModel.location),
+        )
+        .filter(
+            ReceiptLineModel.product_id == product_id,
+            ReceiptLineModel.receipt.has(ReceiptModel.status == "completed"),
+        )
+        .order_by(ReceiptLineModel.receipt_id)
+        .all()
+    )
+    creator_ids = {line.receipt.created_by for line in receipt_lines if line.receipt and line.receipt.created_by}
+    users_by_id: Dict[UUID, UserModel] = {}
+    if creator_ids:
+        for u in db.query(UserModel).filter(UserModel.id.in_(creator_ids)).all():
+            users_by_id[u.id] = u
+    for line in receipt_lines:
+        rec = line.receipt
+        creator = users_by_id.get(rec.created_by) if rec and rec.created_by else None
+        received_by = (creator.full_name or creator.username) if creator else None
+        loc = line.location
+        location_name = loc.name if loc else None
+        receiving.append(
+            ProductHistoryReceiving(
+                date=rec.created_at.isoformat() if rec and rec.created_at else "",
+                received_by=received_by,
+                doc_no=rec.doc_no if rec else "",
+                qty=float(line.qty),
+                batch=line.batch or "",
+                location_name=location_name,
+            )
+        )
+
+    picks: List[ProductHistoryPick] = []
+    movements = (
+        db.query(StockMovementModel)
+        .filter(
+            StockMovementModel.product_id == product_id,
+            StockMovementModel.movement_type == "pick",
+            StockMovementModel.source_document_type == "document",
+        )
+        .order_by(StockMovementModel.created_at.desc())
+        .all()
+    )
+    picker_ids = {m.created_by_user_id for m in movements if m.created_by_user_id}
+    pickers_by_id: Dict[UUID, UserModel] = {}
+    if picker_ids:
+        for u in db.query(UserModel).filter(UserModel.id.in_(picker_ids)).all():
+            pickers_by_id[u.id] = u
+    doc_ids = {m.source_document_id for m in movements if m.source_document_id}
+    docs_by_id: Dict[UUID, DocumentModel] = {}
+    if doc_ids:
+        for d in db.query(DocumentModel).filter(DocumentModel.id.in_(doc_ids)).all():
+            docs_by_id[d.id] = d
+    order_ids = {d.order_id for d in docs_by_id.values() if d.order_id}
+    orders_by_id: Dict[UUID, OrderModel] = {}
+    if order_ids:
+        for o in db.query(OrderModel).filter(OrderModel.id.in_(order_ids)).all():
+            orders_by_id[o.id] = o
+    for mov in movements:
+        doc = docs_by_id.get(mov.source_document_id) if mov.source_document_id else None
+        order_number = None
+        document_doc_no = doc.doc_no if doc else None
+        if doc and doc.order_id:
+            order = orders_by_id.get(doc.order_id)
+            if order:
+                order_number = order.order_number
+        creator = pickers_by_id.get(mov.created_by_user_id) if mov.created_by_user_id else None
+        picked_by = (creator.full_name or creator.username) if creator else None
+        qty = abs(float(mov.qty_change))
+        picks.append(
+            ProductHistoryPick(
+                date=mov.created_at.isoformat() if mov.created_at else "",
+                picked_by=picked_by,
+                order_number=order_number,
+                document_doc_no=document_doc_no,
+                qty=qty,
+            )
+        )
+
+    summary = _fetch_inventory_summary(db, [product_id])
+    s = summary.get(product_id) or {}
+    return ProductHistoryResponse(
+        receiving=receiving,
+        picks=picks,
+        on_hand_total=s.get("on_hand_total"),
+        available_total=s.get("available_total"),
+    )
 
 
 @router.get("/{product_id}", response_model=ProductOut, summary="Get Product")

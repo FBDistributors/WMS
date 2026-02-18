@@ -8,6 +8,7 @@
   "details_title": "Mahsulot tafsilotlari",
   "not_found": "Mahsulot topilmadi.",
   "load_failed": "Mahsulot yuklanmadi.",
+  "history_load_failed": "Mahsulot tarixi yuklanmadi.",
   "sync_from_smartup": "Smartup'dan yangilash",
   "syncing": "Yangilanmoqda...",
   "sync_completed": "Yangilash yakunlandi.",
@@ -27,6 +28,7 @@
     "no_columns": "Ustunlar tanlanmagan."
   },
   "columns": {
+    "detail": "Tafsilot",
     "sku": "SKU / Kod",
     "photo": "Foto",
     "name": "Nomi",
@@ -99,5 +101,21 @@
     "category": "Kategoriya",
     "photo_url": "Foto URL",
     "barcodes": "Barcodelar"
+  },
+  "history": {
+    "receiving_history": "Kirim tarixi",
+    "pick_history": "Terish tarixi",
+    "on_hand": "Mavjud",
+    "available": "Erkin",
+    "date": "Sana",
+    "received_by": "Kim qabul qilgan",
+    "order_number": "Buyurtma",
+    "picked_by": "Kim yig'gan",
+    "qty": "Miqdor",
+    "doc_no": "Hujjat raqami",
+    "batch": "Partiya",
+    "location": "Joy",
+    "no_receiving": "Kirim yozuvlari yo'q.",
+    "no_picks": "Terish yozuvlari yo'q."
   }
 }

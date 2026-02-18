@@ -8,6 +8,7 @@
   "details_title": "Product details",
   "not_found": "Product not found.",
   "load_failed": "Failed to load product.",
+  "history_load_failed": "Failed to load product history.",
   "sync_from_smartup": "Sync from Smartup",
   "syncing": "Syncing...",
   "sync_completed": "Sync completed.",
@@ -27,6 +28,7 @@
     "no_columns": "No columns selected."
   },
   "columns": {
+    "detail": "Detail",
     "sku": "SKU / Code",
     "photo": "Photo",
     "name": "Name",
@@ -99,5 +101,21 @@
     "category": "Category",
     "photo_url": "Photo URL",
     "barcodes": "Barcodes"
+  },
+  "history": {
+    "receiving_history": "Receiving history",
+    "pick_history": "Pick history",
+    "on_hand": "On hand",
+    "available": "Available",
+    "date": "Date",
+    "received_by": "Received by",
+    "order_number": "Order",
+    "picked_by": "Picked by",
+    "qty": "Qty",
+    "doc_no": "Doc no",
+    "batch": "Batch",
+    "location": "Location",
+    "no_receiving": "No receiving records.",
+    "no_picks": "No pick records."
   }
 }

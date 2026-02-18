@@ -61,6 +61,34 @@ export async function getProduct(id: string) {
   return fetchJSON<Product>(`/api/v1/products/${id}`)
 }
 
+export type ProductHistoryReceiving = {
+  date: string
+  received_by: string | null
+  doc_no: string
+  qty: number
+  batch: string
+  location_name: string | null
+}
+
+export type ProductHistoryPick = {
+  date: string
+  picked_by: string | null
+  order_number: string | null
+  document_doc_no: string | null
+  qty: number
+}
+
+export type ProductHistoryResponse = {
+  receiving: ProductHistoryReceiving[]
+  picks: ProductHistoryPick[]
+  on_hand_total: number | null
+  available_total: number | null
+}
+
+export async function getProductHistory(productId: string) {
+  return fetchJSON<ProductHistoryResponse>(`/api/v1/products/${productId}/history`)
+}
+
 export type ProductCreateInput = {
   sku: string
   name: string

@@ -8,6 +8,7 @@
   "details_title": "Детали товара",
   "not_found": "Товар не найден.",
   "load_failed": "Не удалось загрузить товар.",
+  "history_load_failed": "Не удалось загрузить историю товара.",
   "sync_from_smartup": "Синхронизировать Smartup",
   "syncing": "Синхронизация...",
   "sync_completed": "Синхронизация завершена.",
@@ -27,6 +28,7 @@
     "no_columns": "Колонки не выбраны."
   },
   "columns": {
+    "detail": "Детали",
     "sku": "SKU / Код",
     "photo": "Фото",
     "name": "Название",
@@ -99,5 +101,21 @@
     "category": "Категория",
     "photo_url": "URL фото",
     "barcodes": "Штрих‑коды"
+  },
+  "history": {
+    "receiving_history": "История поступлений",
+    "pick_history": "История отборов",
+    "on_hand": "В наличии",
+    "available": "Доступно",
+    "date": "Дата",
+    "received_by": "Кто принял",
+    "order_number": "Заказ",
+    "picked_by": "Кто собрал",
+    "qty": "Кол-во",
+    "doc_no": "Док. №",
+    "batch": "Партия",
+    "location": "Место",
+    "no_receiving": "Нет записей о поступлении.",
+    "no_picks": "Нет записей об отборе."
   }
 }
