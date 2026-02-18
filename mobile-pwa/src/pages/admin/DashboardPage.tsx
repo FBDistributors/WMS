@@ -7,8 +7,7 @@ import { AdminLayout } from '../../admin/components/AdminLayout'
 import { KpiCard } from '../../admin/components/KpiCard'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { getDashboardSummary, getOrdersByStatus, getPickerPerformance, type PickerPerformanceRow } from '../../services/dashboardApi'
-import type { DashboardSummary } from '../../types/dashboard'
+import { getOrdersByStatus, getPickerPerformance, type PickerPerformanceRow } from '../../services/dashboardApi'
 
 const STATUS_XOM = ['B#S'] // Buyurtmalar bo'limida faqat B#S ko'rsatiladi; yig'ishga yuborilgach chiqadi
 const STATUS_YIGISHDA = ['picking']
@@ -31,7 +30,6 @@ function aggregateByFourGroups(
 export function DashboardPage() {
   const { t } = useTranslation(['admin', 'common'])
   const navigate = useNavigate()
-  const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [ordersByStatus, setOrdersByStatus] = useState<{ status: string; count: number }[]>([])
   const [pickerPerformance, setPickerPerformance] = useState<PickerPerformanceRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -44,12 +42,10 @@ export function DashboardPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const [summaryData, ordersByStatusData, pickerData] = await Promise.all([
-        getDashboardSummary(),
+      const [ordersByStatusData, pickerData] = await Promise.all([
         getOrdersByStatus().catch(() => []),
         getPickerPerformance().catch(() => []),
       ])
-      setSummary(summaryData)
       setOrdersByStatus(Array.isArray(ordersByStatusData) ? ordersByStatusData : [])
       const sorted = Array.isArray(pickerData)
         ? [...pickerData].sort((a, b) => b.documents_count - a.documents_count)
