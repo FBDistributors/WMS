@@ -98,7 +98,7 @@ export function AdminLayout({ title, backTo, actionSlot, children }: AdminLayout
             {backTo ? (
               <Button
                 variant="ghost"
-                size="icon"
+                className="shrink-0 p-2"
                 onClick={() => navigate(backTo)}
                 aria-label={t('common:back')}
               >
