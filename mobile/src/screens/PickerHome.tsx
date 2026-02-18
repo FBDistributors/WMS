@@ -1,7 +1,7 @@
 /**
- * Yig'uvchi sahifasi — rasmga mos: header, 3 ta karta, pastki nav.
+ * Yig'uvchi sahifasi — header, offline banner, 3 ta karta, pastki nav.
  */
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   Image,
   ScrollView,
@@ -11,11 +11,14 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { RootStackParamList } from '../types/navigation';
 import { useLocale } from '../i18n/LocaleContext';
+import { useNetwork } from '../network';
+import { getPendingCount } from '../offline/offlineQueue';
+import { BRAND } from '../config/branding';
 
 type Nav = StackNavigationProp<RootStackParamList, 'PickerHome'>;
 
@@ -84,6 +87,14 @@ function BottomNavTab({
 export function PickerHome() {
   const navigation = useNavigation<Nav>();
   const { t } = useLocale();
+  const { isOnline } = useNetwork();
+  const [queueCount, setQueueCount] = useState(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      getPendingCount().then(setQueueCount);
+    }, [])
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -91,11 +102,24 @@ export function PickerHome() {
       <View style={styles.header}>
         <Image
           source={require('../assets/logo.png')}
-          style={styles.headerLogo}
+          style={[styles.headerLogo, { width: BRAND.headerLogoSize, height: BRAND.headerLogoSize }]}
           resizeMode="contain"
         />
         <Text style={styles.headerTitle}>{t('pickerTitle')}</Text>
+        {!isOnline && (
+          <View style={styles.onlineBadge}>
+            <Text style={styles.onlineBadgeText}>Offline</Text>
+          </View>
+        )}
       </View>
+
+      {!isOnline && (
+        <View style={styles.offlineBanner}>
+          <Text style={styles.offlineBannerText}>
+            {t('offlineBanner', { count: queueCount })}
+          </Text>
+        </View>
+      )}
 
       {/* Cards */}
       <ScrollView
@@ -117,9 +141,9 @@ export function PickerHome() {
         />
         <Card
           iconName="sync-off"
-          title={t('offlineQueue')}
+          title={queueCount > 0 ? `${t('offlineQueue')} (${queueCount})` : t('offlineQueue')}
           subtitle={t('syncPending')}
-          onPress={() => {}}
+          onPress={() => navigation.navigate('QueueScreen')}
         />
       </ScrollView>
 
@@ -179,16 +203,30 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e0e0e0',
   },
   headerLogo: {
-    width: 36,
-    height: 36,
     borderRadius: 8,
     marginRight: 12,
   },
   headerTitle: {
+    flex: 1,
     fontSize: 24,
     fontWeight: '700',
     color: TEXT_PRIMARY,
   },
+  onlineBadge: {
+    backgroundColor: '#ff9800',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  onlineBadgeText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  offlineBanner: {
+    backgroundColor: '#fff3e0',
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ffe0b2',
+  },
+  offlineBannerText: { fontSize: 14, color: '#e65100', fontWeight: '500', textAlign: 'center' },
   scroll: {
     flex: 1,
   },

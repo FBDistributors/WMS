@@ -25,6 +25,7 @@ import {
   type PickerInventoryItem,
   type PickerLocationOption,
 } from '../api/inventory';
+import { BRAND } from '../config/branding';
 
 type Nav = StackNavigationProp<RootStackParamList, 'Inventory'>;
 
@@ -189,7 +190,7 @@ export function InventoryScreen() {
         </TouchableOpacity>
         <Image
           source={require('../assets/logo.png')}
-          style={styles.headerLogo}
+          style={[styles.headerLogo, { width: BRAND.headerLogoSize, height: BRAND.headerLogoSize }]}
           resizeMode="contain"
         />
         <Text style={styles.headerTitle}>{t('invTitle')}</Text>
@@ -322,8 +323,6 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   headerLogo: {
-    width: 32,
-    height: 32,
     borderRadius: 8,
     marginRight: 10,
   },

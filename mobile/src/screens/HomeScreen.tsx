@@ -6,6 +6,7 @@ import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../types/navigation';
+import { BRAND } from '../config/branding';
 
 type HomeNav = StackNavigationProp<RootStackParamList, 'Home'>;
 
@@ -14,8 +15,8 @@ export function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <Image source={require('../assets/logo.png')} style={styles.logo} resizeMode="contain" />
-      <Text style={styles.brand}>FB Warehouse</Text>
+      <Image source={require('../assets/logo.png')} style={[styles.logo, { width: BRAND.loginLogoSize, height: BRAND.loginLogoSize }]} resizeMode="contain" />
+      <Text style={styles.brand}>{BRAND.name}</Text>
       <Text style={styles.subtitle}>Skaner yoki terish (Picker)</Text>
 
       <TouchableOpacity
@@ -46,16 +47,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   logo: {
-    width: 80,
-    height: 80,
     marginBottom: 8,
   },
   brand: {
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '600',
     color: '#111',
     marginBottom: 4,
     letterSpacing: 0.5,
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
