@@ -7,10 +7,13 @@
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
-    "test": "jest"
+    "test": "jest",
+    "copy-apk": "node scripts/copy-apk-to-backend.js"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-native-community/netinfo": "^11.4.1",
+    "react-native-sqlite-storage": "^6.0.1",
     "@react-navigation/native": "^7.1.28",
     "@react-navigation/stack": "^7.7.2",
     "axios": "^1.13.5",
@@ -21,7 +24,8 @@
     "react-native-reanimated": "3.16.1",
     "react-native-safe-area-context": "^5.6.2",
     "react-native-vector-icons": "^10.3.0",
-    "react-native-vision-camera": "^4.7.3"
+    "react-native-vision-camera": "^4.7.3",
+    "react-native-image-picker": "^7.1.2"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
