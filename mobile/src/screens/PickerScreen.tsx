@@ -14,12 +14,12 @@ import {
   View,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../types/navigation';
 import type { PickItem, PickTask, PickProgress } from '../types/picker';
 import { getPickTask } from '../services/pickerService';
 
-type PickerNav = NativeStackNavigationProp<RootStackParamList, 'Picker'>;
+type PickerNav = StackNavigationProp<RootStackParamList, 'Picker'>;
 type PickerRoute = RouteProp<RootStackParamList, 'Picker'>;
 
 const STATUS_LABEL: Record<string, string> = {

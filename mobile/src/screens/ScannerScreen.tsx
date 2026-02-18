@@ -1,12 +1,13 @@
 import React, { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import type { RootStackParamList } from '../types/navigation';
 import {
   Camera,
   useCameraDevice,
@@ -19,7 +20,12 @@ import { ProductCard } from '../components/ProductCard';
 const DEBOUNCE_MS = 1500;
 const SUPPORTED_CODE_TYPES = ['ean-13', 'ean-8', 'code-128', 'qr'] as const;
 
+type ScannerRoute = RouteProp<RootStackParamList, 'Scanner'>;
+
 export function ScannerScreen() {
+  const navigation = useNavigation();
+  const route = useRoute<ScannerRoute>();
+  const params = route.params ?? {};
   const device = useCameraDevice('back');
   const { status: permStatus, requestOrOpenSettings } = useCameraPermission();
   const { product, error, status: fetchStatus, fetchByBarcode, reset } = useProductByBarcode();
@@ -38,9 +44,18 @@ export function ScannerScreen() {
       lastScannedRef.current = value;
       lastScannedAtRef.current = now;
       setIsScanning(false);
+
+      if (params.returnToPick && params.taskId && params.lineId) {
+        navigation.navigate('PickTaskDetails', {
+          taskId: params.taskId,
+          lineId: params.lineId,
+          scannedBarcode: value,
+        });
+        return;
+      }
       fetchByBarcode(value);
     },
-    [fetchByBarcode]
+    [fetchByBarcode, params.returnToPick, params.taskId, params.lineId, navigation]
   );
 
   const codeScanner = useCodeScanner({
@@ -103,8 +118,22 @@ export function ScannerScreen() {
       />
       {/* Overlay: confirms scanner screen is rendering (preview may be black on emulator) */}
       <View style={styles.overlayBanner}>
-        <Text style={styles.overlayBannerText}>Scanner active — point at barcode (EAN/Code128/QR)</Text>
-        <Text style={styles.overlayBannerSub}>Preview may be black on emulator; use real device to test camera.</Text>
+        {params.returnToPick ? (
+          <>
+            <Text style={styles.overlayBannerText}>Terish uchun shtrixni skanerlang</Text>
+            <TouchableOpacity
+              style={styles.backBtnOverlay}
+              onPress={() => navigation.goBack()}
+            >
+              <Text style={styles.buttonText}>Orqaga</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <Text style={styles.overlayBannerText}>Scanner active — point at barcode (EAN/Code128/QR)</Text>
+            <Text style={styles.overlayBannerSub}>Preview may be black on emulator; use real device to test camera.</Text>
+          </>
+        )}
       </View>
       <View style={styles.overlay}>
         <Text style={styles.hint}>
@@ -202,6 +231,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textAlign: 'center',
     marginTop: 2,
+  },
+  backBtnOverlay: {
+    alignSelf: 'center',
+    marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: 8,
   },
   overlay: {
     position: 'absolute',

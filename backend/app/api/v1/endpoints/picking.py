@@ -2,10 +2,14 @@ from decimal import Decimal
 from typing import List, Literal, Optional
 from uuid import UUID
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
+
+logger = logging.getLogger(__name__)
 
 from app.auth.deps import require_permission
 from app.db import get_db
@@ -159,6 +163,20 @@ async def pick_line(
     db: Session = Depends(get_db),
     user=Depends(require_permission("picking:pick")),
 ):
+    try:
+        return _pick_line_impl(line_id, payload, db, user)
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.exception("pick_line error: %s", e)
+        raise HTTPException(
+            status_code=400,
+            detail="Terish saqlanmadi. Joylashtirish yoki ombor tekshiruvi kerak.",
+        ) from e
+
+
+def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
     existing_request = (
         db.query(PickRequest).filter(PickRequest.request_id == payload.request_id).one_or_none()
     )
@@ -213,48 +231,53 @@ async def pick_line(
     if next_qty > line.required_qty:
         raise HTTPException(status_code=400, detail="qty_picked cannot exceed qty_required")
 
-    line.picked_qty = next_qty
     if not line.product_id or not line.lot_id or not line.location_id:
-        raise HTTPException(status_code=409, detail="Pick line missing allocation details")
+        raise HTTPException(
+            status_code=409,
+            detail="Pick line missing allocation details (product/lot/location). Allocate the order first.",
+        )
+
+    line.picked_qty = next_qty
     qty_delta = Decimal(str(payload.delta))
-    db.add(
-        StockMovementModel(
-            product_id=line.product_id,
-            lot_id=line.lot_id,
-            location_id=line.location_id,
-            qty_change=-qty_delta,
-            movement_type="pick",
-            source_document_type="document",
-            source_document_id=document.id,
-            created_by_user_id=user.id,
-        )
-    )
-    db.add(
-        StockMovementModel(
-            product_id=line.product_id,
-            lot_id=line.lot_id,
-            location_id=line.location_id,
-            qty_change=-qty_delta,
-            movement_type="unallocate",
-            source_document_type="document",
-            source_document_id=document.id,
-            created_by_user_id=user.id,
-        )
-    )
-    if document.order_id:
-        order = (
-            db.query(OrderModel)
-            .filter(OrderModel.id == document.order_id)
-            .with_for_update()
-            .one_or_none()
-        )
-        if order and order.status in {"allocated", "ready_for_picking"}:
-            order.status = "picking"
     try:
+        db.add(
+            StockMovementModel(
+                product_id=line.product_id,
+                lot_id=line.lot_id,
+                location_id=line.location_id,
+                qty_change=-qty_delta,
+                movement_type="pick",
+                source_document_type="document",
+                source_document_id=document.id,
+                created_by_user_id=user.id,
+            )
+        )
+        db.add(
+            StockMovementModel(
+                product_id=line.product_id,
+                lot_id=line.lot_id,
+                location_id=line.location_id,
+                qty_change=-qty_delta,
+                movement_type="unallocate",
+                source_document_type="document",
+                source_document_id=document.id,
+                created_by_user_id=user.id,
+            )
+        )
+        if document.order_id:
+            order = (
+                db.query(OrderModel)
+                .filter(OrderModel.id == document.order_id)
+                .with_for_update()
+                .one_or_none()
+            )
+            if order and order.status in {"allocated", "ready_for_picking"}:
+                order.status = "picking"
         db.add(PickRequest(request_id=payload.request_id, line_id=line.id))
         db.flush()
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
+        logger.warning("pick_line IntegrityError: %s", e)
         stored = (
             db.query(PickRequest)
             .filter(PickRequest.request_id == payload.request_id)
@@ -282,7 +305,10 @@ async def pick_line(
                 progress=_calculate_progress(document.lines),
                 document_status=document.status,
             )
-        raise
+        raise HTTPException(
+            status_code=409,
+            detail="Pick conflict (duplicate or constraint). Try again.",
+        ) from e
 
     lines = (
         db.query(DocumentLineModel)
