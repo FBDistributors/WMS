@@ -115,8 +115,8 @@ export function QueueScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backText}>← {t('back')}</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <Icon name="arrow-left" size={24} color="#1976d2" />
         </TouchableOpacity>
         <Text style={styles.title}>{t('offlineQueue')}</Text>
         {isOnline && total > 0 && (

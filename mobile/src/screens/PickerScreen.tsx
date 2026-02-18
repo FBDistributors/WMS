@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { RootStackParamList } from '../types/navigation';
 import type { PickItem, PickTask, PickProgress } from '../types/picker';
 import { getPickTask } from '../services/pickerService';
@@ -178,8 +179,8 @@ export function PickerScreen() {
           <Text style={styles.retryBtnText}>Qayta urinish</Text>
         </TouchableOpacity>
         {onBack && (
-          <TouchableOpacity style={styles.backBtn} onPress={onBack}>
-            <Text style={styles.backBtnText}>← Orqaga</Text>
+          <TouchableOpacity style={styles.backBtn} onPress={onBack} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Icon name="arrow-left" size={24} color="#1976d2" />
           </TouchableOpacity>
         )}
       </View>
@@ -191,8 +192,8 @@ export function PickerScreen() {
       {/* Header */}
       <View style={styles.header}>
         {onBack && (
-          <TouchableOpacity onPress={onBack} style={styles.backLink}>
-            <Text style={styles.backLinkText}>← Ro‘yxat</Text>
+          <TouchableOpacity onPress={onBack} style={styles.backLink} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Icon name="arrow-left" size={24} color="#1976d2" />
           </TouchableOpacity>
         )}
         <Text style={styles.title}>{task.reference_number}</Text>

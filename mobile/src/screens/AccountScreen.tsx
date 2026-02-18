@@ -185,9 +185,9 @@ export function AccountScreen() {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
           activeOpacity={0.7}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
-          <Icon name="arrow-left" size={22} color="#1976d2" />
-          <Text style={styles.backButtonText}>{t('back')}</Text>
+          <Icon name="arrow-left" size={24} color="#1976d2" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('account')}</Text>
       </View>

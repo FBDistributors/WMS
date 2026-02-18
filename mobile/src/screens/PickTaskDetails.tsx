@@ -261,8 +261,8 @@ export function PickTaskDetails() {
         <TouchableOpacity style={styles.retryBtn} onPress={load}>
           <Text style={styles.retryBtnText}>{t('retry')}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.backBtnText}>← {t('back')}</Text>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <Icon name="arrow-left" size={24} color="#1976d2" />
         </TouchableOpacity>
       </View>
     );
@@ -271,8 +271,8 @@ export function PickTaskDetails() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backLink}>← Ro‘yxat</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <Icon name="arrow-left" size={24} color="#1976d2" />
         </TouchableOpacity>
         <Text style={styles.title}>{doc.reference_number}</Text>
         <View style={styles.badge}>
