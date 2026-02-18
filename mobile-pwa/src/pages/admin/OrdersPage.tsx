@@ -23,12 +23,14 @@ const COLUMN_OPTIONS = [
   { id: 'customer_id', labelKey: 'orders:columns.customer_id' },
   { id: 'agent', labelKey: 'orders:columns.agent' },
   { id: 'total_amount', labelKey: 'orders:columns.total_amount' },
-  { id: 'status', labelKey: 'orders:columns.status' },
+  { id: 'status', labelKey: 'orders:columns.status' }, // faqat "Buyurtmalar statusi" sahifasida ko‘rinadi
   { id: 'lines', labelKey: 'orders:columns.lines' },
   { id: 'created', labelKey: 'orders:columns.created' },
   { id: 'view_details', labelKey: 'orders:columns.view_details' },
   { id: 'send_to_picking', labelKey: 'orders:columns.send_to_picking' },
 ]
+
+const COLUMN_OPTIONS_DEFAULT = COLUMN_OPTIONS.filter((c) => c.id !== 'status')
 
 const SEARCH_FIELD_OPTIONS = [
   { id: 'order_number', labelKey: 'orders:search_fields.order_number' },
@@ -39,7 +41,7 @@ const SEARCH_FIELD_OPTIONS = [
 ]
 
 const GROUP_TO_STATUS: Record<string, string | undefined> = {
-  xom: 'imported,B#S,allocated,ready_for_picking',
+  xom: 'B#S', // Buyurtmalar bo'limi: faqat Smartupdan B#S, yig'ishga yuborilgach ro'yxatdan chiqadi
   yigishda: 'picking',
   tekshiruvda: 'picked',
   yakunlangan: 'packed,shipped',
@@ -54,7 +56,11 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
   const [searchParams] = useSearchParams()
   const group = searchParams.get('group') ?? 'all'
   const pageTitle = mode === 'statuses' ? t('admin:dashboard.order_statuses_title') : t('orders:title')
-  const statusParam = GROUP_TO_STATUS[group] ?? GROUP_TO_STATUS.all
+  // Asosiy Buyurtmalar sahifasida faqat B#S (Smartupdan import; yig'ishga yuborilgach ko'rinmaydi)
+  const statusParam =
+    mode === 'default' && (group === 'all' || !searchParams.get('group'))
+      ? 'B#S'
+      : (GROUP_TO_STATUS[group] ?? GROUP_TO_STATUS.all)
   const { has } = useAuth()
   const canSync = has('orders:sync')
   const canSend = has('orders:send_to_picking') && has('picking:assign')
@@ -170,9 +176,12 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
         />
       )
     }
-    const visibleColumns = new Set(config.visibleColumns)
+    const columnOptionsForMode = mode === 'default' ? COLUMN_OPTIONS_DEFAULT : COLUMN_OPTIONS
+    const visibleColumns = new Set(
+      (mode === 'default' ? config.visibleColumns.filter((id) => id !== 'status') : config.visibleColumns)
+    )
     const orderedColumns = config.columnOrder.filter((id) =>
-      COLUMN_OPTIONS.some((column) => column.id === id)
+      columnOptionsForMode.some((column) => column.id === id)
     )
     const getStatusRowClass = (status: string) => {
       if (mode !== 'statuses') return ''
@@ -182,7 +191,7 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
       return ''
     }
     const columnLabels = new Map(
-      COLUMN_OPTIONS.map((column) => [column.id, t(column.labelKey)])
+      columnOptionsForMode.map((column) => [column.id, t(column.labelKey)])
     )
     const renderCell = (columnId: string, order: OrderListItem) => {
       switch (columnId) {
@@ -459,7 +468,7 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
         open={isSettingsOpen}
         onOpenChange={setIsSettingsOpen}
         config={config}
-        columns={COLUMN_OPTIONS.map((column) => ({
+        columns={(mode === 'default' ? COLUMN_OPTIONS_DEFAULT : COLUMN_OPTIONS).map((column) => ({
           id: column.id,
           label: t(column.labelKey),
         }))}

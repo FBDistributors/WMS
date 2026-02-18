@@ -10,7 +10,7 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { getDashboardSummary, getOrdersByStatus } from '../../services/dashboardApi'
 import type { DashboardSummary } from '../../types/dashboard'
 
-const STATUS_XOM = ['imported', 'B#S', 'allocated', 'ready_for_picking']
+const STATUS_XOM = ['B#S'] // Buyurtmalar bo'limida faqat B#S ko'rsatiladi; yig'ishga yuborilgach chiqadi
 const STATUS_YIGISHDA = ['picking']
 const STATUS_TEKSHIRUVDA = ['picked']
 const STATUS_YAKUNLANGAN = ['packed', 'shipped']
