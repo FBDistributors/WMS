@@ -37,10 +37,11 @@
     "orders_by_status": "Buyurtmalar holati",
     "status_column": "Holat",
     "count_column": "Soni",
-    "status_xom": "Buyurtmalar xom",
+    "status_xom": "Yangi buyurtmalar",
     "status_yigishda": "Yig'ishda",
     "status_tekshiruvda": "Tekshiruvda",
     "status_yakunlangan": "Yakunlangan",
+    "status_barcha": "Barcha buyurtmalar",
     "load_error": "Dashboard yuklanmadi. Qayta urinib ko‘ring."
   },
   "active_picks": {

@@ -37,10 +37,11 @@
     "orders_by_status": "Заказы по статусу",
     "status_column": "Статус",
     "count_column": "Кол-во",
-    "status_xom": "Новые заказы (импорт)",
+    "status_xom": "Новые заказы",
     "status_yigishda": "В подборе",
     "status_tekshiruvda": "На проверке",
     "status_yakunlangan": "Завершённые",
+    "status_barcha": "Все заказы",
     "load_error": "Не удалось загрузить дашборд. Попробуйте снова."
   },
   "active_picks": {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Settings, FileText } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -38,9 +38,20 @@ const SEARCH_FIELD_OPTIONS = [
   { id: 'agent', labelKey: 'orders:search_fields.agent' },
 ]
 
+const GROUP_TO_STATUS: Record<string, string | undefined> = {
+  xom: 'imported,B#S,allocated,ready_for_picking',
+  yigishda: 'picking',
+  tekshiruvda: 'picked',
+  yakunlangan: 'packed,shipped',
+  all: undefined,
+}
+
 export function OrdersPage() {
-  const { t } = useTranslation(['orders', 'common'])
+  const { t } = useTranslation(['orders', 'common', 'admin'])
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const group = searchParams.get('group') ?? 'all'
+  const statusParam = GROUP_TO_STATUS[group] ?? GROUP_TO_STATUS.all
   const { has } = useAuth()
   const canSync = has('orders:sync')
   const canSend = has('orders:send_to_picking') && has('picking:assign')
@@ -76,6 +87,7 @@ export function OrdersPage() {
     }
     try {
       const data = await getOrders({
+        status: statusParam,
         q: search || undefined,
         search_fields: config.searchFields.length > 0 ? config.searchFields.join(',') : undefined,
         limit: PAGE_SIZE,
@@ -92,11 +104,15 @@ export function OrdersPage() {
       if (!background) setIsLoading(false)
       else setIsRefreshing(false)
     }
-  }, [config.searchFields, offset, search, t])
+  }, [config.searchFields, offset, search, statusParam, t])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    setOffset(0)
+  }, [group])
 
   // Avtoyangilash: orqada yangilash — jadval o‘chirilmasdan, chaqnashsiz
   useEffect(() => {
@@ -332,6 +348,11 @@ export function OrdersPage() {
             </div>
             <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
               <span>{t('orders:subtitle')}</span>
+              {group && group !== 'all' ? (
+                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/50 dark:text-blue-200">
+                  {t(`admin:dashboard.status_${group}`)}
+                </span>
+              ) : null}
               {isRefreshing ? (
                 <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
                   {t('orders:refreshing')}

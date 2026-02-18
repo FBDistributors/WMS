@@ -37,10 +37,11 @@
     "orders_by_status": "Orders by status",
     "status_column": "Status",
     "count_column": "Count",
-    "status_xom": "New orders (imported)",
+    "status_xom": "New orders",
     "status_yigishda": "In picking",
     "status_tekshiruvda": "In verification",
     "status_yakunlangan": "Completed",
+    "status_barcha": "All orders",
     "load_error": "Failed to load dashboard. Please try again."
   },
   "active_picks": {

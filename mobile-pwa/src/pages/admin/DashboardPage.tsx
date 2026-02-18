@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Package, ClipboardList, SearchCheck, PackageCheck, Boxes } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Package, ClipboardList, SearchCheck, PackageCheck, Boxes, LayoutGrid } from 'lucide-react'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { KpiCard } from '../../admin/components/KpiCard'
@@ -35,6 +36,7 @@ export function DashboardPage() {
   const [error, setError] = useState<string | null>(null)
 
   const counts = useMemo(() => aggregateByFourGroups(ordersByStatus), [ordersByStatus])
+  const totalOrders = counts.xom + counts.yigishda + counts.tekshiruvda + counts.yakunlangan
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -62,6 +64,7 @@ export function DashboardPage() {
     { key: 'yigishda' as const, labelKey: 'admin:dashboard.status_yigishda', count: counts.yigishda },
     { key: 'tekshiruvda' as const, labelKey: 'admin:dashboard.status_tekshiruvda', count: counts.tekshiruvda },
     { key: 'yakunlangan' as const, labelKey: 'admin:dashboard.status_yakunlangan', count: counts.yakunlangan },
+    { key: 'barcha' as const, labelKey: 'admin:dashboard.status_barcha', count: totalOrders },
   ]
 
   return (
@@ -70,30 +73,36 @@ export function DashboardPage() {
         <EmptyState title={error} actionLabel={t('common:buttons.retry')} onAction={load} />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
             <KpiCard
               title={t('admin:dashboard.status_xom')}
               value={isLoading ? '—' : counts.xom}
               icon={Package}
-              href="/admin/orders"
+              href="/admin/orders?group=xom"
             />
             <KpiCard
               title={t('admin:dashboard.status_yigishda')}
               value={isLoading ? '—' : counts.yigishda}
               icon={ClipboardList}
-              href="/admin/orders"
+              href="/admin/orders?group=yigishda"
             />
             <KpiCard
               title={t('admin:dashboard.status_tekshiruvda')}
               value={isLoading ? '—' : counts.tekshiruvda}
               icon={SearchCheck}
-              href="/admin/orders"
+              href="/admin/orders?group=tekshiruvda"
             />
             <KpiCard
               title={t('admin:dashboard.status_yakunlangan')}
               value={isLoading ? '—' : counts.yakunlangan}
               icon={PackageCheck}
-              href="/admin/orders"
+              href="/admin/orders?group=yakunlangan"
+            />
+            <KpiCard
+              title={t('admin:dashboard.status_barcha')}
+              value={isLoading ? '—' : totalOrders}
+              icon={LayoutGrid}
+              href="/admin/orders?group=all"
             />
           </div>
 
@@ -117,19 +126,32 @@ export function DashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {statusRows.map((row) => (
-                      <tr
-                        key={row.key}
-                        className="border-b border-slate-100 dark:border-slate-800"
-                      >
-                        <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
-                          {t(row.labelKey)}
-                        </td>
-                        <td className="px-3 py-2 text-right font-medium text-slate-900 dark:text-slate-100">
-                          {row.count}
-                        </td>
-                      </tr>
-                    ))}
+                    {statusRows.map((row) => {
+                      const href = row.key === 'barcha' ? '/admin/orders?group=all' : `/admin/orders?group=${row.key}`
+                      return (
+                        <tr
+                          key={row.key}
+                          className="border-b border-slate-100 dark:border-slate-800"
+                        >
+                          <td className="px-3 py-2">
+                            <Link
+                              to={href}
+                              className="text-slate-700 hover:text-blue-600 hover:underline dark:text-slate-300 dark:hover:text-blue-400"
+                            >
+                              {t(row.labelKey)}
+                            </Link>
+                          </td>
+                          <td className="px-3 py-2 text-right font-medium text-slate-900 dark:text-slate-100">
+                            <Link
+                              to={href}
+                              className="hover:text-blue-600 hover:underline dark:hover:text-blue-400"
+                            >
+                              {row.count}
+                            </Link>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               )}

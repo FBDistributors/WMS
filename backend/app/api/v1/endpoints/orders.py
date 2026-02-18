@@ -293,9 +293,14 @@ async def list_orders(
     query = db.query(OrderModel).options(selectinload(OrderModel.lines))
 
     if status:
-        if status not in ORDER_STATUSES:
+        statuses = [s.strip() for s in status.split(",") if s.strip()]
+        valid = [s for s in statuses if s in ORDER_STATUSES]
+        if not valid:
             raise HTTPException(status_code=400, detail="Invalid status")
-        query = query.filter(OrderModel.status == status)
+        if len(valid) == 1:
+            query = query.filter(OrderModel.status == valid[0])
+        else:
+            query = query.filter(OrderModel.status.in_(valid))
 
     if q:
         allowed_fields = {
