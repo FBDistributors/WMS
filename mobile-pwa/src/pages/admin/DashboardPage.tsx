@@ -15,9 +15,8 @@ import { ActivePickList } from '../../admin/components/ActivePickList'
 import { ExceptionsList } from '../../admin/components/ExceptionsList'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { getDashboardSummary } from '../../services/dashboardApi'
+import { getDashboardSummary, getPickDocuments } from '../../services/dashboardApi'
 import {
-  getActivePicks,
   getExceptions,
   getTodayOverview,
 } from '../../services/dashboardApi.mock'
@@ -38,7 +37,7 @@ export function DashboardPage() {
     try {
       const [summaryData, picksData, overviewData, exceptionsData] = await Promise.all([
         getDashboardSummary(),
-        getActivePicks(),
+        getPickDocuments({ limit: 30 }),
         getTodayOverview(),
         getExceptions(),
       ])

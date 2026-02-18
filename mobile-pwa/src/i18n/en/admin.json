@@ -39,7 +39,14 @@
   "active_picks": {
     "empty": "No active picks right now.",
     "open": "Open",
-    "picked": "{{picked}}/{{total}} picked"
+    "picked": "{{picked}}/{{total}} picked",
+    "picker": "Picker",
+    "controller": "Controller",
+    "status_new": "New",
+    "status_in_progress": "In progress",
+    "status_partial": "Partial",
+    "status_picked": "Picked",
+    "status_completed": "Completed"
   },
   "exceptions": {
     "empty": "No exceptions reported today.",

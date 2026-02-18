@@ -39,7 +39,14 @@
   "active_picks": {
     "empty": "Hozircha faol picking yo‘q.",
     "open": "Ochish",
-    "picked": "{{picked}}/{{total}} picked"
+    "picked": "{{picked}}/{{total}} terildi",
+    "picker": "Yig‘uvchi",
+    "controller": "Kontrolyor",
+    "status_new": "Yangi",
+    "status_in_progress": "Jarayonda",
+    "status_partial": "Qisman",
+    "status_picked": "Yig‘ildi",
+    "status_completed": "Tugallangan"
   },
   "exceptions": {
     "empty": "Bugun istisnolar yo‘q.",

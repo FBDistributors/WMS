@@ -1,5 +1,19 @@
 import { fetchJSON } from './apiClient'
-import type { DashboardSummary } from '../types/dashboard'
+import type { ActivePick, DashboardSummary } from '../types/dashboard'
+
+type ApiPickDocumentItem = {
+  id: string
+  document_no: string
+  status: string
+  lines_picked: number
+  lines_total: number
+  picker_name: string | null
+  controller_name: string | null
+}
+
+type ApiPickDocumentsResponse = {
+  items: ApiPickDocumentItem[]
+}
 
 type ApiDashboardSummary = {
   total_orders: number
@@ -41,4 +55,28 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     lowStock: data.low_stock,
     deltas: toCamelDeltas(data.deltas),
   }
+}
+
+export async function getPickDocuments(params?: {
+  limit?: number
+  offset?: number
+  status?: string
+}): Promise<ActivePick[]> {
+  const searchParams = new URLSearchParams()
+  if (params?.limit != null) searchParams.set('limit', String(params.limit))
+  if (params?.offset != null) searchParams.set('offset', String(params.offset))
+  if (params?.status) searchParams.set('status', params.status)
+  const qs = searchParams.toString()
+  const data = await fetchJSON<ApiPickDocumentsResponse>(
+    `/api/v1/dashboard/pick-documents${qs ? `?${qs}` : ''}`
+  )
+  return data.items.map((item) => ({
+    id: item.id,
+    document_no: item.document_no,
+    status: item.status,
+    picked: item.lines_picked,
+    total: item.lines_total,
+    picker_name: item.picker_name ?? undefined,
+    controller_name: item.controller_name ?? undefined,
+  }))
 }

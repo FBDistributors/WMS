@@ -43,6 +43,16 @@ class Document(Base):
         back_populates="document",
         cascade="all, delete-orphan",
     )
+    assigned_to_user = relationship(
+        "User",
+        foreign_keys=[assigned_to_user_id],
+        lazy="selectin",
+    )
+    controlled_by_user = relationship(
+        "User",
+        foreign_keys=[controlled_by_user_id],
+        lazy="selectin",
+    )
 
     __table_args__ = (
         UniqueConstraint("doc_no", "doc_type", name="uq_documents_doc_no_doc_type"),

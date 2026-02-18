@@ -316,7 +316,9 @@ export function PickTaskDetails() {
         <Text style={styles.title}>{doc.reference_number}</Text>
         <View style={styles.badge}>
           <Text style={styles.badgeText}>
-            {t(STATUS_KEYS[doc.status] ?? 'statusNew')}
+            {isController && doc.status === 'picked'
+              ? t('statusPendingVerify')
+              : t(STATUS_KEYS[doc.status] ?? 'statusNew')}
           </Text>
         </View>
         <Text style={styles.progressText}>
@@ -404,7 +406,9 @@ export function PickTaskDetails() {
                 ) : (
                   <>
                     <Text style={styles.modalHint}>
-                      {t('quantityRemaining', { n: selectedLine.qty_required - selectedLine.qty_picked })}
+                      {isController
+                        ? t('quantityVerify', { n: selectedLine.qty_picked })
+                        : t('quantityRemaining', { n: selectedLine.qty_required - selectedLine.qty_picked })}
                     </Text>
                     <TextInput
                       style={styles.qtyInput}

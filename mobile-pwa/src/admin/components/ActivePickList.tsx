@@ -5,10 +5,17 @@ import { Progress } from '../../components/ui/progress'
 import type { ActivePick } from '../../types/dashboard'
 import { useTranslation } from 'react-i18next'
 
-const statusVariant: Record<ActivePick['status'], 'neutral' | 'primary' | 'success'> = {
-  NEW: 'neutral',
-  IN_PROGRESS: 'primary',
-  DONE: 'success',
+const statusVariant: Record<string, 'neutral' | 'primary' | 'success'> = {
+  new: 'neutral',
+  in_progress: 'primary',
+  partial: 'primary',
+  picked: 'primary',
+  completed: 'success',
+}
+
+function getStatusKey(status: string): string {
+  const key = status.toLowerCase().replace(/-/g, '_')
+  return `admin:active_picks.status_${key}`
 }
 
 type ActivePickListProps = {
@@ -30,12 +37,14 @@ export function ActivePickList({ items, onOpen }: ActivePickListProps) {
     <div className="space-y-3">
       {items.map((item) => {
         const percent = item.total > 0 ? Math.round((item.picked / item.total) * 100) : 0
+        const statusKey = getStatusKey(item.status)
+        const variant = statusVariant[item.status] ?? 'neutral'
         return (
           <Card key={item.id} className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="text-sm font-semibold text-slate-900">{item.document_no}</div>
-              <Badge variant={statusVariant[item.status]}>
-                {t(`common:status.${item.status.toLowerCase()}`)}
+              <Badge variant={variant}>
+                {t(statusKey)}
               </Badge>
             </div>
             <div className="flex items-center justify-between text-xs text-slate-500">
@@ -44,6 +53,20 @@ export function ActivePickList({ items, onOpen }: ActivePickListProps) {
               </span>
               <span>{percent}%</span>
             </div>
+            {(item.picker_name != null || item.controller_name != null) && (
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
+                {item.picker_name != null && (
+                  <span title={t('admin:active_picks.picker')}>
+                    {t('admin:active_picks.picker')}: <strong>{item.picker_name}</strong>
+                  </span>
+                )}
+                {item.controller_name != null && (
+                  <span title={t('admin:active_picks.controller')}>
+                    {t('admin:active_picks.controller')}: <strong>{item.controller_name}</strong>
+                  </span>
+                )}
+              </div>
+            )}
             <Progress value={percent} />
             <div className="pt-1">
               <Button variant="outline" onClick={() => onOpen(item.id)}>

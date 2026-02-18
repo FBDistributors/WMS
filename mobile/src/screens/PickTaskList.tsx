@@ -46,7 +46,10 @@ function TaskRow({
   onSendToController?: (doc: PickingListItem) => void;
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
-  const statusText = t(STATUS_KEYS[item.status] ?? item.status);
+  const statusText =
+    profileType === 'controller' && item.status === 'picked'
+      ? t('statusPendingVerify')
+      : t(STATUS_KEYS[item.status] ?? item.status);
   const showSendBtn =
     profileType === 'picker' &&
     item.status === 'picked' &&
@@ -62,7 +65,7 @@ function TaskRow({
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{statusText}</Text>
         </View>
-        {item.status === 'picked' && item.controlled_by_user_id && (
+        {profileType === 'picker' && item.status === 'picked' && item.controlled_by_user_id && (
           <Text style={styles.sentLabel}>{t('sendToControllerDone')}</Text>
         )}
       </TouchableOpacity>

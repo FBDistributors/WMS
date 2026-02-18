@@ -18,9 +18,11 @@ export type DashboardSummary = {
 export type ActivePick = {
   id: string
   document_no: string
-  status: 'NEW' | 'IN_PROGRESS' | 'DONE'
+  status: string
   picked: number
   total: number
+  picker_name?: string | null
+  controller_name?: string | null
 }
 
 export type TodayOverviewItem = {

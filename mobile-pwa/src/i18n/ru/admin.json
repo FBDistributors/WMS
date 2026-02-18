@@ -39,7 +39,14 @@
   "active_picks": {
     "empty": "Нет активного подбора.",
     "open": "Открыть",
-    "picked": "{{picked}}/{{total}} подобрано"
+    "picked": "{{picked}}/{{total}} подобрано",
+    "picker": "Сборщик",
+    "controller": "Контролёр",
+    "status_new": "Новый",
+    "status_in_progress": "В процессе",
+    "status_partial": "Частично",
+    "status_picked": "Собрано",
+    "status_completed": "Завершён"
   },
   "exceptions": {
     "empty": "Сегодня исключений нет.",
