@@ -1,7 +1,7 @@
 /**
  * Generates Android launcher icons from src/assets/logo.png
  * into all mipmap-* folders (ic_launcher.png and ic_launcher_round.png).
- * Logo is drawn smaller (58% of canvas) on white background so it fits nicely.
+ * Logo is drawn smaller (48% of canvas) on white background so it fits like web.
  * Run: node scripts/generate-android-icons.js
  */
 const fs = require('fs');
@@ -13,8 +13,8 @@ const ROOT = path.resolve(__dirname, '..');
 const LOGO = path.join(ROOT, 'src', 'assets', 'logo.png');
 const RES = path.join(ROOT, 'android', 'app', 'src', 'main', 'res');
 
-/** Logo size as fraction of icon canvas (0.58 = 58%, leaves more padding) */
-const LOGO_SCALE = 0.58;
+/** Logo size as fraction of icon canvas (0.48 = 48%, fits like web app icon) */
+const LOGO_SCALE = 0.48;
 
 const SIZES = {
   'mipmap-mdpi': 48,
