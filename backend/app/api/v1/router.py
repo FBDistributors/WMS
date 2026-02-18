@@ -6,6 +6,7 @@ from app.api.v1.endpoints import (
     waves,
     dashboard,
     documents,
+    download,
     integrations,
     inventory,
     locations,
@@ -24,6 +25,7 @@ router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
 router.include_router(auth.router, prefix="/auth", tags=["auth"])
 router.include_router(brands.router, prefix="/brands", tags=["brands"])
 router.include_router(documents.router, prefix="/documents", tags=["documents"])
+router.include_router(download.router, prefix="/download", tags=["download"])
 router.include_router(orders.router, prefix="/orders", tags=["orders"])
 router.include_router(locations.router, prefix="/locations", tags=["locations"])
 router.include_router(inventory.router, prefix="/inventory", tags=["inventory"])

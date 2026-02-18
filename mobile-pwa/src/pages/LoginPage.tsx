@@ -9,6 +9,7 @@ import { LanguageSwitcher } from '../components/LanguageSwitcher'
 import { useAuth } from '../rbac/AuthProvider'
 import { BRAND } from '../config/branding'
 import { getHomeRouteForRole } from '../rbac/routes'
+import { buildApiUrl } from '../services/apiClient'
 
 export function LoginPage() {
   const { signIn, user, isLoading: isAuthLoading } = useAuth()
@@ -114,6 +115,14 @@ export function LoginPage() {
             {isLoading ? t('logging_in') : t('login')}
           </Button>
         </form>
+        <a
+          href={buildApiUrl('/api/v1/download/app')}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+        >
+          {t('download_mobile_app')}
+        </a>
       </Card>
     </div>
   )
