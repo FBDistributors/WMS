@@ -57,6 +57,8 @@ class OrderListItem(BaseModel):
     total_amount: Optional[Decimal] = None
     created_at: date
     lines_total: int
+    picker_name: Optional[str] = None
+    controller_name: Optional[str] = None
 
 
 class OrderLineOut(BaseModel):
@@ -348,23 +350,53 @@ async def list_orders(
     )
     orders = query.order_by(OrderModel.created_at.desc()).offset(offset).limit(limit).all()
 
-    items = [
-        OrderListItem(
-            id=order.id,
-            order_number=order.order_number,
-            source_external_id=order.source_external_id,
-            status=order.status,
-            filial_id=order.filial_id,
-            customer_id=order.customer_id,
-            customer_name=order.customer_name,
-            agent_id=order.agent_id,
-            agent_name=order.agent_name,
-            total_amount=order.total_amount,
-            created_at=order.created_at.date(),
-            lines_total=len(order.lines),
+    order_ids = [o.id for o in orders]
+    doc_by_order: dict[UUID, DocumentModel] = {}
+    if order_ids:
+        docs = (
+            db.query(DocumentModel)
+            .filter(DocumentModel.order_id.in_(order_ids), DocumentModel.doc_type == "SO")
+            .options(
+                selectinload(DocumentModel.assigned_to_user),
+                selectinload(DocumentModel.controlled_by_user),
+            )
+            .all()
         )
-        for order in orders
-    ]
+        doc_by_order = {d.order_id: d for d in docs if d.order_id}
+
+    def _picker_name(doc: DocumentModel | None) -> Optional[str]:
+        if not doc or not doc.assigned_to_user:
+            return None
+        u = doc.assigned_to_user
+        return u.full_name or u.username
+
+    def _controller_name(doc: DocumentModel | None) -> Optional[str]:
+        if not doc or not doc.controlled_by_user:
+            return None
+        u = doc.controlled_by_user
+        return u.full_name or u.username
+
+    items = []
+    for order in orders:
+        doc = doc_by_order.get(order.id)
+        items.append(
+            OrderListItem(
+                id=order.id,
+                order_number=order.order_number,
+                source_external_id=order.source_external_id,
+                status=order.status,
+                filial_id=order.filial_id,
+                customer_id=order.customer_id,
+                customer_name=order.customer_name,
+                agent_id=order.agent_id,
+                agent_name=order.agent_name,
+                total_amount=order.total_amount,
+                created_at=order.created_at.date(),
+                lines_total=len(order.lines),
+                picker_name=_picker_name(doc),
+                controller_name=_controller_name(doc),
+            )
+        )
 
     return OrdersListResponse(items=items, total=total, limit=limit, offset=offset)
 

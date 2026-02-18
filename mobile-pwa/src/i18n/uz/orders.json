@@ -84,7 +84,9 @@
     "lines": "Qatorlar",
     "created": "Yaratilgan",
     "view_details": "",
-    "send_to_picking": "Yig'ishga yuborish"
+    "send_to_picking": "Yig'ishga yuborish",
+    "picker": "Yig'uvchi",
+    "controller": "Kontrolyor"
   },
   "lines": {
     "sku": "SKU",

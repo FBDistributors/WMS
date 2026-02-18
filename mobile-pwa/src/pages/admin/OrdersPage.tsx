@@ -23,14 +23,32 @@ const COLUMN_OPTIONS = [
   { id: 'customer_id', labelKey: 'orders:columns.customer_id' },
   { id: 'agent', labelKey: 'orders:columns.agent' },
   { id: 'total_amount', labelKey: 'orders:columns.total_amount' },
-  { id: 'status', labelKey: 'orders:columns.status' }, // faqat "Buyurtmalar statusi" sahifasida ko‘rinadi
+  { id: 'status', labelKey: 'orders:columns.status' },
   { id: 'lines', labelKey: 'orders:columns.lines' },
   { id: 'created', labelKey: 'orders:columns.created' },
   { id: 'view_details', labelKey: 'orders:columns.view_details' },
   { id: 'send_to_picking', labelKey: 'orders:columns.send_to_picking' },
+  { id: 'picker', labelKey: 'orders:columns.picker' },
+  { id: 'controller', labelKey: 'orders:columns.controller' },
 ]
 
 const COLUMN_OPTIONS_DEFAULT = COLUMN_OPTIONS.filter((c) => c.id !== 'status')
+
+// Buyurtma statuslari sahifasi: faqat ma'lumot, yig'ishga yuborish yo'q; yig'uvchi va kontrolyor ustunlari
+const COLUMN_OPTIONS_STATUSES = [
+  { id: 'order_number', labelKey: 'orders:columns.order_number' },
+  { id: 'external_id', labelKey: 'orders:columns.external_id' },
+  { id: 'customer', labelKey: 'orders:columns.customer' },
+  { id: 'customer_id', labelKey: 'orders:columns.customer_id' },
+  { id: 'agent', labelKey: 'orders:columns.agent' },
+  { id: 'total_amount', labelKey: 'orders:columns.total_amount' },
+  { id: 'status', labelKey: 'orders:columns.status' },
+  { id: 'lines', labelKey: 'orders:columns.lines' },
+  { id: 'created', labelKey: 'orders:columns.created' },
+  { id: 'view_details', labelKey: 'orders:columns.view_details' },
+  { id: 'picker', labelKey: 'orders:columns.picker' },
+  { id: 'controller', labelKey: 'orders:columns.controller' },
+]
 
 const SEARCH_FIELD_OPTIONS = [
   { id: 'order_number', labelKey: 'orders:search_fields.order_number' },
@@ -176,13 +194,26 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
         />
       )
     }
-    const columnOptionsForMode = mode === 'default' ? COLUMN_OPTIONS_DEFAULT : COLUMN_OPTIONS
-    const visibleColumns = new Set(
-      (mode === 'default' ? config.visibleColumns.filter((id) => id !== 'status') : config.visibleColumns)
-    )
-    const orderedColumns = config.columnOrder.filter((id) =>
-      columnOptionsForMode.some((column) => column.id === id)
-    )
+    const columnOptionsForMode =
+      mode === 'statuses'
+        ? COLUMN_OPTIONS_STATUSES
+        : mode === 'default'
+          ? COLUMN_OPTIONS_DEFAULT
+          : COLUMN_OPTIONS
+    const visibleColumns =
+      mode === 'statuses'
+        ? new Set(COLUMN_OPTIONS_STATUSES.map((c) => c.id))
+        : new Set(
+            mode === 'default'
+              ? config.visibleColumns.filter((id) => id !== 'status')
+              : config.visibleColumns
+          )
+    const orderedColumns =
+      mode === 'statuses'
+        ? COLUMN_OPTIONS_STATUSES.map((c) => c.id)
+        : config.columnOrder.filter((id) =>
+            columnOptionsForMode.some((column) => column.id === id)
+          )
     const getStatusRowClass = (status: string) => {
       if (mode !== 'statuses') return ''
       if (status === 'picking') return 'bg-blue-50 dark:bg-blue-950/30'
@@ -261,6 +292,18 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
           return (
             <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
               {t(`orders:status.${order.status === 'B#S' ? 'b#s' : order.status}`, order.status)}
+            </td>
+          )
+        case 'picker':
+          return (
+            <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+              {order.picker_name ?? '—'}
+            </td>
+          )
+        case 'controller':
+          return (
+            <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+              {order.controller_name ?? '—'}
             </td>
           )
         case 'lines':
@@ -383,14 +426,16 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              className="rounded-full px-3 py-3"
-              onClick={() => setIsSettingsOpen(true)}
-              aria-label={t('orders:table.settings_title')}
-            >
-              <Settings size={18} />
-            </Button>
+            {mode !== 'statuses' ? (
+              <Button
+                variant="ghost"
+                className="rounded-full px-3 py-3"
+                onClick={() => setIsSettingsOpen(true)}
+                aria-label={t('orders:table.settings_title')}
+              >
+                <Settings size={18} />
+              </Button>
+            ) : null}
             {canSync && mode !== 'statuses' ? (
               <Button onClick={handleSync} disabled={isSyncing}>
                 {isSyncing ? t('orders:syncing') : t('orders:sync')}
@@ -411,7 +456,7 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
           </label>
         </div>
 
-        {canSend && selectedOrderIds.size > 0 ? (
+        {mode !== 'statuses' && canSend && selectedOrderIds.size > 0 ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/50">
             <span className="text-sm text-slate-600 dark:text-slate-300">
               {t('orders:send_selected_to_picking', { count: selectedOrderIds.size })}
@@ -454,21 +499,23 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
         </div>
       </Card>
 
-      <SendToPickingDialog
-        open={sendDialogOrderIds !== null}
-        orderIds={sendDialogOrderIds ?? []}
-        onOpenChange={(open) => !open && setSendDialogOrderIds(null)}
-        onSent={() => {
-          setSendDialogOrderIds(null)
-          setSelectedOrderIds(new Set())
-          void load()
-        }}
-      />
+      {mode !== 'statuses' ? (
+        <SendToPickingDialog
+          open={sendDialogOrderIds !== null}
+          orderIds={sendDialogOrderIds ?? []}
+          onOpenChange={(open) => !open && setSendDialogOrderIds(null)}
+          onSent={() => {
+            setSendDialogOrderIds(null)
+            setSelectedOrderIds(new Set())
+            void load()
+          }}
+        />
+      ) : null}
       <OrdersTableSettings
         open={isSettingsOpen}
         onOpenChange={setIsSettingsOpen}
         config={config}
-        columns={(mode === 'default' ? COLUMN_OPTIONS_DEFAULT : COLUMN_OPTIONS).map((column) => ({
+        columns={(mode === 'statuses' ? COLUMN_OPTIONS_STATUSES : mode === 'default' ? COLUMN_OPTIONS_DEFAULT : COLUMN_OPTIONS).map((column) => ({
           id: column.id,
           label: t(column.labelKey),
         }))}

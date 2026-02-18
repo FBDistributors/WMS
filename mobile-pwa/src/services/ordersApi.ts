@@ -13,6 +13,8 @@ export type OrderListItem = {
   total_amount?: number | null
   created_at: string
   lines_total: number
+  picker_name?: string | null
+  controller_name?: string | null
 }
 
 export type OrdersListResponse = {

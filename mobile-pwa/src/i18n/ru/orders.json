@@ -81,7 +81,9 @@
     "lines": "Строки",
     "created": "Создано",
     "view_details": "",
-    "send_to_picking": "В подбор"
+    "send_to_picking": "В подбор",
+    "picker": "Сборщик",
+    "controller": "Контролёр"
   },
   "lines": {
     "sku": "SKU",

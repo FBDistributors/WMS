@@ -84,7 +84,9 @@
     "lines": "Lines",
     "created": "Created",
     "view_details": "",
-    "send_to_picking": "Send to Picking"
+    "send_to_picking": "Send to Picking",
+    "picker": "Picker",
+    "controller": "Controller"
   },
   "lines": {
     "sku": "SKU",
