@@ -89,25 +89,46 @@ export function PickTaskDetails() {
   useFocusEffect(
     useCallback(() => {
       const { scannedBarcode, lineId } = route.params ?? {};
-      if (!scannedBarcode || !lineId || !doc) return;
-      const line = doc.lines.find((l) => l.id === lineId);
-      if (!line) return;
+      if (!scannedBarcode || !doc) return;
       navigation.setParams({ scannedBarcode: undefined, lineId: undefined });
-      if (barcodeMatchesLine(scannedBarcode, line)) {
+
+      if (lineId) {
+        const line = doc.lines.find((l) => l.id === lineId);
+        if (!line) return;
+        if (barcodeMatchesLine(scannedBarcode, line)) {
+          setSelectedLine(line);
+          void playSuccessBeep();
+          setScannedBarcodeForQty(scannedBarcode);
+          const remaining = line.qty_required - line.qty_picked;
+          setQtyInput(remaining >= 1 ? String(remaining) : '0');
+        } else {
+          setScannedBarcodeForQty(null);
+          setQtyInput('');
+          Alert.alert(
+            t('wrongBarcodeTitle'),
+            t('wrongBarcodeMessage') + (line.barcode || line.sku || '—')
+          );
+        }
+        return;
+      }
+
+      if (isController) {
+        const q = scannedBarcode.trim().toLowerCase();
+        const line = doc.lines.find(
+          (l) =>
+            (l.barcode && l.barcode.toLowerCase() === q) ||
+            (l.sku && l.sku.toLowerCase() === q)
+        );
+        if (!line) {
+          Alert.alert(t('wrongBarcodeTitle'), t('productNotInOrder'));
+          return;
+        }
         setSelectedLine(line);
         void playSuccessBeep();
         setScannedBarcodeForQty(scannedBarcode);
-        const remaining = line.qty_required - line.qty_picked;
-        setQtyInput(remaining >= 1 ? String(remaining) : '0');
-      } else {
-        setScannedBarcodeForQty(null);
-        setQtyInput('');
-        Alert.alert(
-          t('wrongBarcodeTitle'),
-          t('wrongBarcodeMessage') + (line.barcode || line.sku || '—')
-        );
+        setQtyInput(String(line.qty_picked));
       }
-    }, [route.params?.scannedBarcode, route.params?.lineId, doc, navigation, t])
+    }, [route.params?.scannedBarcode, route.params?.lineId, doc, navigation, t, isController])
   );
 
   const handleScanSubmit = useCallback(
@@ -326,13 +347,15 @@ export function PickTaskDetails() {
         </Text>
       </View>
 
-      <ScanInput
-        onSubmit={handleScanSubmit}
-        placeholder={t('barcodeOrSku')}
-        label={t('barcodeSkuLabel')}
-        submitText={t('submit')}
-        disabled={submitting}
-      />
+      {!isController && (
+        <ScanInput
+          onSubmit={handleScanSubmit}
+          placeholder={t('barcodeOrSku')}
+          label={t('barcodeSkuLabel')}
+          submitText={t('submit')}
+          disabled={submitting}
+        />
+      )}
 
       <ScrollView
         style={styles.scroll}
@@ -344,9 +367,9 @@ export function PickTaskDetails() {
           <LineCard
             key={line.id}
             line={line}
-            onPress={() => openLineScan(line)}
+            onPress={isController ? undefined : () => openLineScan(line)}
             t={t}
-            readOnly={false}
+            readOnly={isController}
           />
         ))}
       </ScrollView>
@@ -437,6 +460,22 @@ export function PickTaskDetails() {
       </Modal>
 
       <View style={styles.footer}>
+        {isController && (
+          <TouchableOpacity
+            style={styles.scanBottomBtn}
+            onPress={() => {
+              navigation.navigate('Scanner', {
+                returnToPick: true,
+                taskId,
+                profileType: profileType ?? 'picker',
+              });
+            }}
+            disabled={submitting}
+          >
+            <Icon name="barcode-scan" size={28} color="#fff" />
+            <Text style={styles.scanBottomBtnText}>{t('scanButton')}</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={[styles.completeBtn, submitting && styles.completeBtnDisabled]}
           onPress={handleComplete}
@@ -564,6 +603,17 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
   },
+  scanBottomBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: '#2e7d32',
+    paddingVertical: 14,
+    borderRadius: 14,
+    marginBottom: 12,
+  },
+  scanBottomBtnText: { color: '#fff', fontSize: 18, fontWeight: '600' },
   completeBtn: {
     backgroundColor: '#1976d2',
     paddingVertical: 16,

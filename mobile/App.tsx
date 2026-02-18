@@ -1,11 +1,13 @@
 /**
  * WMS Mobile — Render wms-api ga ulangan.
  * Stack: Login, Home, PickerHome → PickTaskList → PickTaskDetails, Scanner.
+ * Offline MVP: cache + queue + sync.
  */
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { LocaleProvider } from './src/i18n/LocaleContext';
+import { NetworkProvider } from './src/network';
 import type { RootStackParamList } from './src/types/navigation';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
@@ -17,12 +19,14 @@ import { ScannerScreen } from './src/screens/ScannerScreen';
 import { AccountScreen } from './src/screens/AccountScreen';
 import { InventoryScreen } from './src/screens/InventoryScreen';
 import { InventoryDetailScreen } from './src/screens/InventoryDetailScreen';
+import { QueueScreen } from './src/screens/QueueScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
 export default function App() {
   return (
     <LocaleProvider>
+      <NetworkProvider>
       <NavigationContainer>
       <Stack.Navigator
         initialRouteName="Login"
@@ -38,8 +42,10 @@ export default function App() {
         <Stack.Screen name="Hisob" component={AccountScreen} />
         <Stack.Screen name="Inventory" component={InventoryScreen} />
         <Stack.Screen name="InventoryDetail" component={InventoryDetailScreen} />
+        <Stack.Screen name="QueueScreen" component={QueueScreen} />
       </Stack.Navigator>
     </NavigationContainer>
+    </NetworkProvider>
     </LocaleProvider>
   );
 }

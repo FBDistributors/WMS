@@ -48,23 +48,21 @@ export function ScannerScreen() {
       lastScannedAtRef.current = now;
       setIsScanning(false);
 
-      if (params.returnToPick && params.taskId && params.lineId) {
+      if (params.returnToPick && params.taskId) {
         const profileType = params.profileType ?? 'picker';
+        const navParams: { taskId: string; scannedBarcode: string; profileType: string; lineId?: string } = {
+          taskId: params.taskId,
+          scannedBarcode: value,
+          profileType,
+        };
+        if (params.lineId) navParams.lineId = params.lineId;
         navigation.dispatch(
           CommonActions.reset({
             index: 2,
             routes: [
               { name: 'PickerHome', params: { profileType } },
               { name: 'PickTaskList', params: { profileType } },
-              {
-                name: 'PickTaskDetails',
-                params: {
-                  taskId: params.taskId,
-                  lineId: params.lineId,
-                  scannedBarcode: value,
-                  profileType,
-                },
-              },
+              { name: 'PickTaskDetails', params: navParams },
             ],
           })
         );
@@ -72,7 +70,7 @@ export function ScannerScreen() {
       }
       fetchByBarcode(value);
     },
-    [fetchByBarcode, params.returnToPick, params.taskId, params.lineId, params.profileType, navigation]
+    [fetchByBarcode, params.returnToPick, params.taskId, params.profileType, navigation]
   );
 
   const codeScanner = useCodeScanner({

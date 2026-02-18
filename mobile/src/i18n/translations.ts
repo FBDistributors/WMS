@@ -103,6 +103,7 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
 
     wrongBarcodeTitle: "Noto'g'ri shtrix",
     wrongBarcodeMessage: "Boshqa mahsulotni kiritdingiz yoki noto'g'ri shtrix kod. Ushbu qator uchun kutilgan: ",
+    productNotInOrder: "Bu mahsulot ushbu buyurtmada yo'q.",
 
     barcodeOrSku: 'Shtrixkod yoki SKU',
     barcodeSkuLabel: 'Shtrixkod / SKU',
@@ -216,6 +217,7 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
 
     wrongBarcodeTitle: 'Неверный штрихкод',
     wrongBarcodeMessage: 'Вы ввели другой товар или неверный штрихкод. Для этой позиции ожидается: ',
+    productNotInOrder: 'Этого товара нет в данном заказе.',
 
     barcodeOrSku: 'Штрихкод или SKU',
     barcodeSkuLabel: 'Штрихкод / SKU',
@@ -329,6 +331,7 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
 
     wrongBarcodeTitle: 'Wrong barcode',
     wrongBarcodeMessage: 'You entered another product or wrong barcode. Expected for this line: ',
+    productNotInOrder: 'This product is not in this order.',
 
     barcodeOrSku: 'Barcode or SKU',
     barcodeSkuLabel: 'Barcode / SKU',

@@ -1,7 +1,7 @@
 /**
- * Generates Android launcher icons from src/assets/logo.png
- * into all mipmap-* folders (ic_launcher.png and ic_launcher_round.png).
- * Logo is drawn smaller (48% of canvas) on white background so it fits like web.
+ * Android launcher ikoni – faqat web app (mobile-pwa) ishlatadigan ikon.
+ * Web'dagi pwa-192x192.png dan resize qilinadi, boshqa o'zgarishsiz.
+ * Boshqa joydagi logo/icon (login, header) o'zgarmaydi.
  * Run: node scripts/generate-android-icons.js
  */
 const fs = require('fs');
@@ -10,11 +10,9 @@ const path = require('path');
 const sharp = require('sharp');
 
 const ROOT = path.resolve(__dirname, '..');
-const LOGO = path.join(ROOT, 'src', 'assets', 'logo.png');
+/** Web app PWA ikoni – launcher uchun aynan shu ishlatiladi */
+const WEB_ICON = path.resolve(ROOT, '..', 'mobile-pwa', 'public', 'pwa-192x192.png');
 const RES = path.join(ROOT, 'android', 'app', 'src', 'main', 'res');
-
-/** Logo size as fraction of icon canvas (0.48 = 48%, fits like web app icon) */
-const LOGO_SCALE = 0.48;
 
 const SIZES = {
   'mipmap-mdpi': 48,
@@ -25,8 +23,9 @@ const SIZES = {
 };
 
 async function main() {
-  if (!fs.existsSync(LOGO)) {
-    console.error('Logo not found:', LOGO);
+  if (!fs.existsSync(WEB_ICON)) {
+    console.error('Web icon topilmadi:', WEB_ICON);
+    console.error('mobile-pwa/public/pwa-192x192.png mavjud bo\'lishi kerak.');
     process.exit(1);
   }
 
@@ -34,28 +33,18 @@ async function main() {
     const dir = path.join(RES, folder);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-    const logoSize = Math.round(size * LOGO_SCALE);
-    const offset = Math.round((size - logoSize) / 2);
-
-    const logoBuf = await sharp(LOGO)
-      .resize(logoSize, logoSize)
+    const icon = await sharp(WEB_ICON)
+      .resize(size, size)
       .png()
-      .toBuffer();
-
-    const icon = await sharp({
-      create: { width: size, height: size, channels: 3, background: { r: 255, g: 255, b: 255 } },
-    })
-      .png()
-      .composite([{ input: logoBuf, left: offset, top: offset }])
       .toBuffer();
 
     const squarePath = path.join(dir, 'ic_launcher.png');
     const roundPath = path.join(dir, 'ic_launcher_round.png');
     fs.writeFileSync(squarePath, icon);
     fs.writeFileSync(roundPath, icon);
-    console.log('Written', size + 'px (logo ' + logoSize + 'px) ->', folder);
+    console.log('Written', size + 'px ->', folder);
   }
-  console.log('Done. ic_launcher and ic_launcher_round updated; logo at', Math.round(LOGO_SCALE * 100) + '% of canvas.');
+  console.log('Done. Launcher ikoni = web app ikoni (pwa-192x192.png).');
 }
 
 main().catch((err) => {
