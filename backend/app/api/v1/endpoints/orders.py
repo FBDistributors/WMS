@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.auth.deps import get_current_user, require_any_permission, require_permission
 from app.db import get_db
 from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_ip, log_action
+from app.services.push_notifications import send_push_to_user
 from app.integrations.smartup.client import SmartupClient
 from app.integrations.smartup.importer import import_orders
 from app.models.document import Document as DocumentModel
@@ -477,6 +478,17 @@ async def send_order_to_picking(
     )
     db.commit()
     db.refresh(document)
+
+    try:
+        send_push_to_user(
+            db,
+            payload.assigned_to_user_id,
+            "Yangi buyurtma",
+            f"Terish buyurtmasi: {document.doc_no}. Ilovani oching.",
+            data={"taskId": str(document.id), "type": "new_pick_task"},
+        )
+    except Exception:
+        pass
 
     return SendToPickingResponse(pick_task_id=document.id, assigned_to=payload.assigned_to_user_id)
 

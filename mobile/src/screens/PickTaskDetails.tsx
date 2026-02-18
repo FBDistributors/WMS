@@ -131,62 +131,6 @@ export function PickTaskDetails() {
     }, [route.params?.scannedBarcode, route.params?.lineId, doc, navigation, t, isController])
   );
 
-  const handleScanSubmit = useCallback(
-    async (value: string) => {
-      if (!taskId || !doc) return;
-      const q = value.trim().toLowerCase();
-      const line = doc.lines.find(
-        (l) =>
-          (l.barcode && l.barcode.toLowerCase() === q) ||
-          (l.sku && l.sku.toLowerCase() === q) ||
-          (l.product_name && l.product_name.toLowerCase().includes(q))
-      );
-      if (!line) {
-        Alert.alert(t('wrongBarcodeTitle'), t('wrongBarcodeMessage') + value);
-        return;
-      }
-      if (isController) {
-        setSelectedLine(line);
-        void playSuccessBeep();
-        setScannedBarcodeForQty(value.trim());
-        setQtyInput(String(line.qty_picked));
-        return;
-      }
-      setSubmitting(true);
-      try {
-        if (isOnline) {
-          const res = await submitScan(taskId, { barcode: value });
-          setDoc((prev) => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              lines: prev.lines.map((l) => (l.id === res.line.id ? res.line : l)),
-              progress: res.progress,
-              status: res.document_status,
-            };
-          });
-          await saveCachedPickTaskDetail(taskId, { ...doc, lines: doc.lines.map((l) => (l.id === res.line.id ? res.line : l)), progress: res.progress, status: res.document_status } as PickingDocument);
-        } else {
-          await addToQueue('PICK_SCAN', { taskId, barcode: value, lineId: line.id, ts: Date.now() });
-          const newPicked = line.qty_picked + 1;
-          const updatedLine = { ...line, qty_picked: newPicked };
-          const newLines = doc.lines.map((l) => (l.id === line.id ? updatedLine : l));
-          const picked = doc.progress.picked + 1;
-          const updated = { ...doc, lines: newLines, progress: { ...doc.progress, picked } };
-          setDoc(updated);
-          await saveCachedPickTaskDetail(taskId, updated);
-        }
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : t('error');
-        if (msg === UNAUTHORIZED_MSG) navigation.replace('Login');
-        else Alert.alert(t('error'), msg);
-      } finally {
-        setSubmitting(false);
-      }
-    },
-    [taskId, doc, navigation, t, isOnline, isController]
-  );
-
   const openLineScan = useCallback((line: PickingLine) => {
     setSelectedLine(line);
     setScannedBarcodeForQty(null);
@@ -342,16 +286,6 @@ export function PickTaskDetails() {
           {t('picked')}: {doc.progress.picked} / {doc.progress.required}
         </Text>
       </View>
-
-      {!isController && (
-        <ScanInput
-          onSubmit={handleScanSubmit}
-          placeholder={t('barcodeOrSku')}
-          label={t('barcodeSkuLabel')}
-          submitText={t('submit')}
-          disabled={submitting}
-        />
-      )}
 
       <ScrollView
         style={styles.scroll}

@@ -1,7 +1,7 @@
 /**
  * Yig'uvchi sahifasi — header, offline banner, 3 ta karta, pastki nav.
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Image,
   ScrollView,
@@ -21,6 +21,7 @@ import { useNetwork } from '../network';
 import { getOpenTasks } from '../api/picking';
 import { getCachedPickTasks } from '../offline/offlineDb';
 import { getPendingCount } from '../offline/offlineQueue';
+import { registerPushToken } from '../notifications/pushNotifications';
 import { BRAND } from '../config/branding';
 
 type Nav = StackNavigationProp<RootStackParamList, 'PickerHome'>;
@@ -120,6 +121,10 @@ export function PickerHome() {
   const [taskCount, setTaskCount] = useState(0);
   const profileType = route.params?.profileType ?? 'picker';
   const headerTitle = profileType === 'controller' ? t('controllerTitle') : t('pickerTitle');
+
+  useEffect(() => {
+    registerPushToken();
+  }, []);
 
   useFocusEffect(
     useCallback(() => {

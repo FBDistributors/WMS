@@ -10,6 +10,7 @@ from app.models.receipt import Receipt, ReceiptLine
 from app.models.stock import StockLot, StockMovement
 from app.models.smartup_sync import SmartupSyncRun
 from app.models.user import User
+from app.models.user_fcm_token import UserFCMToken
 from app.models.user_session import UserSession
 from app.models.wave import (
     SortingBin,
@@ -39,6 +40,7 @@ __all__ = [
     "StockMovement",
     "SmartupSyncRun",
     "User",
+    "UserFCMToken",
     "UserSession",
     "Wave",
     "WaveOrder",

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 
 logger = logging.getLogger(__name__)
 
-from app.auth.deps import require_permission
+from app.auth.deps import get_current_user, require_permission
 from app.db import get_db
 from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
@@ -19,6 +19,7 @@ from app.models.order import Order as OrderModel
 from app.models.picking import PickRequest
 from app.models.stock import StockMovement as StockMovementModel
 from app.models.user import User as UserModel
+from app.models.user_fcm_token import UserFCMToken
 
 router = APIRouter()
 
@@ -76,6 +77,11 @@ class ControllerUser(BaseModel):
 
 class SendToControllerRequest(BaseModel):
     controller_user_id: UUID
+
+
+class FCMTokenRequest(BaseModel):
+    token: str
+    device_id: Optional[str] = None
 
 
 def _calculate_progress(lines: List[DocumentLineModel]) -> PickingProgress:
@@ -188,6 +194,25 @@ async def list_controllers(
         ControllerUser(id=u.id, username=u.username, full_name=u.full_name)
         for u in controllers
     ]
+
+
+@router.post("/fcm-token", status_code=status.HTTP_204_NO_CONTENT, summary="Register FCM token for push notifications")
+async def register_fcm_token(
+    payload: FCMTokenRequest,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    if not payload.token or not payload.token.strip():
+        raise HTTPException(status_code=400, detail="token is required")
+    token = payload.token.strip()
+    existing = db.query(UserFCMToken).filter(UserFCMToken.token == token).one_or_none()
+    if existing:
+        existing.user_id = user.id
+        existing.device_id = payload.device_id
+    else:
+        db.add(UserFCMToken(user_id=user.id, token=token, device_id=payload.device_id))
+    db.commit()
+    return None
 
 
 @router.post(
