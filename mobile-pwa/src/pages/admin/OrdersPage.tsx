@@ -174,6 +174,13 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
     const orderedColumns = config.columnOrder.filter((id) =>
       COLUMN_OPTIONS.some((column) => column.id === id)
     )
+    const getStatusRowClass = (status: string) => {
+      if (mode !== 'statuses') return ''
+      if (status === 'picking') return 'bg-blue-50 dark:bg-blue-950/30'
+      if (status === 'picked') return 'bg-amber-50 dark:bg-amber-950/30'
+      if (status === 'packed' || status === 'shipped') return 'bg-emerald-50 dark:bg-emerald-950/30'
+      return ''
+    }
     const columnLabels = new Map(
       COLUMN_OPTIONS.map((column) => [column.id, t(column.labelKey)])
     )
@@ -329,7 +336,10 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
           </thead>
           <tbody>
             {items.map((order) => (
-              <tr key={order.id} className="border-b border-slate-100 dark:border-slate-800">
+              <tr
+                key={order.id}
+                className={`border-b border-slate-100 dark:border-slate-800 ${getStatusRowClass(order.status)}`}
+              >
                 {orderedColumns.map((columnId) =>
                   visibleColumns.has(columnId) ? renderCell(columnId, order) : null
                 )}
@@ -339,7 +349,7 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
         </table>
       </TableScrollArea>
     )
-  }, [canSend, config.columnOrder, config.visibleColumns, eligibleItems, error, isLoading, items, load, navigate, selectedOrderIds, t])
+  }, [canSend, config.columnOrder, config.visibleColumns, eligibleItems, error, isLoading, items, load, mode, navigate, selectedOrderIds, t])
 
   return (
     <AdminLayout title={pageTitle}>
@@ -372,7 +382,7 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
             >
               <Settings size={18} />
             </Button>
-            {canSync ? (
+            {canSync && mode !== 'statuses' ? (
               <Button onClick={handleSync} disabled={isSyncing}>
                 {isSyncing ? t('orders:syncing') : t('orders:sync')}
               </Button>

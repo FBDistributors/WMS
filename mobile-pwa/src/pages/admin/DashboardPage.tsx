@@ -79,7 +79,7 @@ export function DashboardPage() {
               title={t('admin:dashboard.status_xom')}
               value={isLoading ? '—' : counts.xom}
               icon={Package}
-              href="/admin/order-statuses?group=xom"
+              href="/admin/orders?group=xom"
             />
             <KpiCard
               title={t('admin:dashboard.status_yigishda')}
@@ -103,7 +103,6 @@ export function DashboardPage() {
               title={t('admin:dashboard.status_barcha')}
               value={isLoading ? '—' : totalOrders}
               icon={LayoutGrid}
-              href="/admin/order-statuses?group=all"
             />
           </div>
 
@@ -128,7 +127,25 @@ export function DashboardPage() {
                   </thead>
                   <tbody>
                     {statusRows.map((row) => {
-                      const path = row.key === 'barcha' ? '/admin/order-statuses?group=all' : `/admin/order-statuses?group=${row.key}`
+                      if (row.key === 'barcha') {
+                        return (
+                          <tr
+                            key={row.key}
+                            className="border-b border-slate-100 dark:border-slate-800"
+                          >
+                            <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
+                              {t(row.labelKey)}
+                            </td>
+                            <td className="px-3 py-2 text-right font-medium text-slate-900 dark:text-slate-100">
+                              {row.count}
+                            </td>
+                          </tr>
+                        )
+                      }
+                      const path =
+                        row.key === 'xom'
+                          ? '/admin/orders?group=xom'
+                          : `/admin/order-statuses?group=${row.key}`
                       return (
                         <tr
                           key={row.key}
