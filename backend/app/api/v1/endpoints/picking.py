@@ -442,6 +442,10 @@ async def complete_picking_document(
     if user.role == "inventory_controller":
         if document.controlled_by_user_id != user.id:
             raise HTTPException(status_code=403, detail="Document not assigned to you")
+        if document.status == "completed":
+            db.commit()
+            document.lines = lines
+            return _to_picking_document(document)
         if document.status != "picked":
             raise HTTPException(status_code=409, detail="Document must be in picked status")
         document.status = "completed"
