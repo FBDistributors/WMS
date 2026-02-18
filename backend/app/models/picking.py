@@ -14,7 +14,7 @@ class PickRequest(Base):
     __tablename__ = "pick_requests"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    request_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    request_id: Mapped[str] = mapped_column(String(128), nullable=False)
     line_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("document_lines.id", ondelete="CASCADE"), nullable=False
     )

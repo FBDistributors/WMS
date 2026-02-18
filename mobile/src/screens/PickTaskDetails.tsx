@@ -384,6 +384,7 @@ export function PickTaskDetails() {
                           returnToPick: true,
                           taskId,
                           lineId: selectedLine.id,
+                          profileType: profileType ?? 'picker',
                         });
                       }}
                       activeOpacity={0.8}

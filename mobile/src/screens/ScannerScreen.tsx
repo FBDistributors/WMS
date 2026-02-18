@@ -7,6 +7,8 @@ import {
   View,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { CommonActions } from '@react-navigation/native';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { RootStackParamList } from '../types/navigation';
 import {
   Camera,
@@ -32,6 +34,7 @@ export function ScannerScreen() {
   const lastScannedRef = useRef<string | null>(null);
   const lastScannedAtRef = useRef<number>(0);
   const [isScanning, setIsScanning] = useState(true);
+  const [torchOn, setTorchOn] = useState(false);
 
   const onCodeScanned = useCallback(
     (codes: { value?: string }[]) => {
@@ -46,16 +49,30 @@ export function ScannerScreen() {
       setIsScanning(false);
 
       if (params.returnToPick && params.taskId && params.lineId) {
-        navigation.navigate('PickTaskDetails', {
-          taskId: params.taskId,
-          lineId: params.lineId,
-          scannedBarcode: value,
-        });
+        const profileType = params.profileType ?? 'picker';
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 2,
+            routes: [
+              { name: 'PickerHome', params: { profileType } },
+              { name: 'PickTaskList', params: { profileType } },
+              {
+                name: 'PickTaskDetails',
+                params: {
+                  taskId: params.taskId,
+                  lineId: params.lineId,
+                  scannedBarcode: value,
+                  profileType,
+                },
+              },
+            ],
+          })
+        );
         return;
       }
       fetchByBarcode(value);
     },
-    [fetchByBarcode, params.returnToPick, params.taskId, params.lineId, navigation]
+    [fetchByBarcode, params.returnToPick, params.taskId, params.lineId, params.profileType, navigation]
   );
 
   const codeScanner = useCodeScanner({
@@ -115,30 +132,21 @@ export function ScannerScreen() {
         device={device}
         isActive={isScanning}
         codeScanner={codeScanner}
+        torch={torchOn ? 'on' : 'off'}
       />
-      {/* Overlay: confirms scanner screen is rendering (preview may be black on emulator) */}
-      <View style={styles.overlayBanner}>
-        {params.returnToPick ? (
-          <>
-            <Text style={styles.overlayBannerText}>Terish uchun shtrixni skanerlang</Text>
-            <TouchableOpacity
-              style={styles.backBtnOverlay}
-              onPress={() => navigation.goBack()}
-            >
-              <Text style={styles.buttonText}>Orqaga</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            <Text style={styles.overlayBannerText}>Scanner active — point at barcode (EAN/Code128/QR)</Text>
-            <Text style={styles.overlayBannerSub}>Preview may be black on emulator; use real device to test camera.</Text>
-          </>
-        )}
-      </View>
-      <View style={styles.overlay}>
-        <Text style={styles.hint}>
-          Point at a barcode (EAN / Code128 / QR)
-        </Text>
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          style={styles.iconBtn}
+          onPress={() => navigation.goBack()}
+        >
+          <Icon name="arrow-left" size={26} color="#fff" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.iconBtn, torchOn && styles.iconBtnActive]}
+          onPress={() => setTorchOn((v) => !v)}
+        >
+          <Icon name={torchOn ? 'flashlight-off' : 'flashlight'} size={26} color="#fff" />
+        </TouchableOpacity>
       </View>
 
       {fetchStatus === 'loading' && (
@@ -211,48 +219,28 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 12,
   },
-  overlayBanner: {
+  topBar: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingVertical: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
     paddingHorizontal: 16,
+    paddingTop: 40,
   },
-  overlayBannerText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  overlayBannerSub: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 11,
-    textAlign: 'center',
-    marginTop: 2,
-  },
-  backBtnOverlay: {
-    alignSelf: 'center',
-    marginTop: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    borderRadius: 8,
-  },
-  overlay: {
-    position: 'absolute',
-    top: 56,
-    left: 0,
-    right: 0,
+  iconBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  hint: {
-    color: '#fff',
-    fontSize: 14,
-    textShadowColor: '#000',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+  iconBtnActive: {
+    backgroundColor: 'rgba(255,193,7,0.9)',
   },
   resultBox: {
     position: 'absolute',
