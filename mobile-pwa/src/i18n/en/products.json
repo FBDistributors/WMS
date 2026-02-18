@@ -106,6 +106,9 @@
   "history": {
     "tab_basic": "Basic information",
     "tab_stock": "Stock",
+    "total_stock": "Total stock",
+    "by_location": "By location",
+    "location_code": "Location",
     "receiving_history": "Receiving history",
     "pick_history": "Pick history",
     "on_hand": "On hand",
@@ -119,6 +122,7 @@
     "batch": "Batch",
     "location": "Location",
     "no_receiving": "No receiving records.",
-    "no_picks": "No pick records."
+    "no_picks": "No pick records.",
+    "no_stock_by_location": "No stock by location."
   }
 }

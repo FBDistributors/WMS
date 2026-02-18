@@ -13,6 +13,10 @@ import {
   type Product,
   type ProductHistoryResponse,
 } from '../../services/productsApi'
+import {
+  getInventorySummaryByLocation,
+  type InventorySummaryWithLocationRow,
+} from '../../services/inventoryApi'
 
 function formatDate(iso: string): string {
   if (!iso) return '—'
@@ -37,6 +41,21 @@ export function ProductDetailsPage() {
   const [historyLoading, setHistoryLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [historyError, setHistoryError] = useState<string | null>(null)
+  const [stockByLocation, setStockByLocation] = useState<InventorySummaryWithLocationRow[] | null>(null)
+  const [stockByLocationLoading, setStockByLocationLoading] = useState(false)
+
+  const loadStockByLocation = useCallback(async (productId: string) => {
+    setStockByLocationLoading(true)
+    setStockByLocation(null)
+    try {
+      const rows = await getInventorySummaryByLocation({ product_ids: [productId] })
+      setStockByLocation(rows)
+    } catch {
+      setStockByLocation([])
+    } finally {
+      setStockByLocationLoading(false)
+    }
+  }, [])
 
   const load = useCallback(async () => {
     if (!id) {
@@ -71,6 +90,12 @@ export function ProductDetailsPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (activeTab === 'stock' && product?.id) {
+      void loadStockByLocation(product.id)
+    }
+  }, [activeTab, product?.id, loadStockByLocation])
 
   if (isLoading) {
     return (
@@ -359,7 +384,10 @@ export function ProductDetailsPage() {
                 <h3 className="mb-4 text-base font-semibold text-slate-900 dark:text-slate-100">
                   {t('products:history.tab_stock')}
                 </h3>
-                <dl className="grid gap-4 sm:grid-cols-2">
+                <h4 className="mb-2 text-sm font-medium text-slate-600 dark:text-slate-300">
+                  {t('products:history.total_stock')}
+                </h4>
+                <dl className="mb-6 grid gap-4 sm:grid-cols-2">
                   <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/50">
                     <dt className="text-sm font-medium text-slate-500 dark:text-slate-400">
                       {t('products:history.on_hand')}
@@ -377,6 +405,52 @@ export function ProductDetailsPage() {
                     </dd>
                   </div>
                 </dl>
+                <h4 className="mb-2 text-sm font-medium text-slate-600 dark:text-slate-300">
+                  {t('products:history.by_location')}
+                </h4>
+                {stockByLocationLoading ? (
+                  <div className="h-24 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
+                ) : !stockByLocation || stockByLocation.length === 0 ? (
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    {t('products:history.no_stock_by_location')}
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200 dark:border-slate-700">
+                          <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">
+                            {t('products:history.location_code')}
+                          </th>
+                          <th className="px-3 py-2 text-right font-medium text-slate-600 dark:text-slate-400">
+                            {t('products:history.on_hand')}
+                          </th>
+                          <th className="px-3 py-2 text-right font-medium text-slate-600 dark:text-slate-400">
+                            {t('products:history.available')}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {stockByLocation.map((row, idx) => (
+                          <tr
+                            key={row.location_id ?? idx}
+                            className="border-b border-slate-100 dark:border-slate-800"
+                          >
+                            <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300">
+                              {row.location_code}
+                            </td>
+                            <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">
+                              {Number(row.on_hand)}
+                            </td>
+                            <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">
+                              {Number(row.available)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </section>
             )}
           </div>

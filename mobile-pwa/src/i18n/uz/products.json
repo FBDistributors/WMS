@@ -105,7 +105,10 @@
   "details_close": "Yopish",
   "history": {
     "tab_basic": "Asosiy ma'lumot",
-    "tab_stock": "Ostatki",
+    "tab_stock": "Qoldiq",
+    "total_stock": "Jami qoldiq",
+    "by_location": "Lokatsiya bo'yicha",
+    "location_code": "Joy kodi",
     "receiving_history": "Kirim tarixi",
     "pick_history": "Terish tarixi",
     "on_hand": "Mavjud",
@@ -119,6 +122,7 @@
     "batch": "Partiya",
     "location": "Joy",
     "no_receiving": "Kirim yozuvlari yo'q.",
-    "no_picks": "Terish yozuvlari yo'q."
+    "no_picks": "Terish yozuvlari yo'q.",
+    "no_stock_by_location": "Lokatsiyalar bo'yicha qoldiq yo'q."
   }
 }
