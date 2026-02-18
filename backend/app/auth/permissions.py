@@ -19,6 +19,7 @@ PERMISSIONS: set[str] = {
     "picking:pick",
     "picking:complete",
     "picking:exception",
+    "picking:send_to_controller",
     "inventory:read",
     "inventory:count",
     "inventory:adjust",
@@ -99,6 +100,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "picking:pick",
         "picking:complete",
         "picking:exception",
+        "picking:send_to_controller",
         "waves:read",
         "waves:pick",
     ],
@@ -114,6 +116,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "documents:read",
         "products:read",
         "picking:read",
+        "picking:complete",
         "inventory:read",
     ],
 }

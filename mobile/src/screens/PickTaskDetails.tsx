@@ -38,6 +38,7 @@ const STATUS_KEYS: Record<string, string> = {
   new: 'statusNew',
   in_progress: 'statusInProgress',
   partial: 'statusPartial',
+  picked: 'statusPicked',
   completed: 'statusCompleted',
   cancelled: 'statusCancelled',
 };
@@ -48,6 +49,8 @@ export function PickTaskDetails() {
   const route = useRoute<Route>();
   const { isOnline } = useNetwork();
   const taskId = route.params?.taskId ?? '';
+  const profileType = route.params?.profileType ?? 'picker';
+  const isController = profileType === 'controller';
   const [doc, setDoc] = useState<PickingDocument | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -121,6 +124,13 @@ export function PickTaskDetails() {
         Alert.alert(t('wrongBarcodeTitle'), t('wrongBarcodeMessage') + value);
         return;
       }
+      if (isController) {
+        setSelectedLine(line);
+        void playSuccessBeep();
+        setScannedBarcodeForQty(value.trim());
+        setQtyInput(String(line.qty_picked));
+        return;
+      }
       setSubmitting(true);
       try {
         if (isOnline) {
@@ -155,7 +165,7 @@ export function PickTaskDetails() {
         setSubmitting(false);
       }
     },
-    [taskId, doc, navigation, t, isOnline]
+    [taskId, doc, navigation, t, isOnline, isController]
   );
 
   const openLineScan = useCallback((line: PickingLine) => {
@@ -176,8 +186,12 @@ export function PickTaskDetails() {
       if (barcodeMatchesLine(value, selectedLine)) {
         void playSuccessBeep();
         setScannedBarcodeForQty(value.trim());
-        const remaining = selectedLine.qty_required - selectedLine.qty_picked;
-        setQtyInput(remaining >= 1 ? String(remaining) : '0');
+        if (isController) {
+          setQtyInput(String(selectedLine.qty_picked));
+        } else {
+          const remaining = selectedLine.qty_required - selectedLine.qty_picked;
+          setQtyInput(remaining >= 1 ? String(remaining) : '0');
+        }
       } else {
         Alert.alert(
           t('wrongBarcodeTitle'),
@@ -185,12 +199,22 @@ export function PickTaskDetails() {
         );
       }
     },
-    [selectedLine, t]
+    [selectedLine, t, isController]
   );
 
   const handleLineQtySubmit = useCallback(async () => {
     if (!taskId || !doc || !selectedLine || !scannedBarcodeForQty) return;
     const qty = Math.floor(Number(qtyInput) || 0);
+    if (isController) {
+      if (qty !== selectedLine.qty_picked) {
+        Alert.alert(t('error'), `${t('qtyMismatch') ?? 'Miqdor mos emas'}: ${selectedLine.product_name} — terilgan: ${selectedLine.qty_picked}`);
+        return;
+      }
+      void playSuccessBeep();
+      closeLineScan();
+      Alert.alert(t('success'), `${selectedLine.product_name}: ${qty} / ${selectedLine.qty_required}`);
+      return;
+    }
     const remaining = selectedLine.qty_required - selectedLine.qty_picked;
     if (qty < 1 || qty > remaining) {
       Alert.alert(t('error'), t('qtyRangeError', { max: remaining }));
@@ -225,26 +249,30 @@ export function PickTaskDetails() {
     } finally {
       setSubmitting(false);
     }
-  }, [taskId, doc, selectedLine, scannedBarcodeForQty, qtyInput, closeLineScan, navigation, t, isOnline]);
+  }, [taskId, doc, selectedLine, scannedBarcodeForQty, qtyInput, closeLineScan, navigation, t, isOnline, isController]);
 
   const handleComplete = useCallback(async () => {
     if (!taskId) return;
-    const incomplete = doc?.lines.filter((l) => l.qty_picked < l.qty_required);
-    if (incomplete?.length) {
-      Alert.alert(t('incomplete'), t('incompleteLines', { count: incomplete.length }));
-      return;
+    if (!isController) {
+      const incomplete = doc?.lines.filter((l) => l.qty_picked < l.qty_required);
+      if (incomplete?.length) {
+        Alert.alert(t('incomplete'), t('incompleteLines', { count: incomplete.length }));
+        return;
+      }
     }
     setSubmitting(true);
     try {
       if (isOnline) {
         await apiClient.post(`/picking/documents/${taskId}/complete`);
+        const profileType = isController ? 'controller' : 'picker';
         Alert.alert(t('success'), t('pickingComplete'), [
-          { text: 'OK', onPress: () => navigation.navigate('PickTaskList') },
+          { text: 'OK', onPress: () => navigation.navigate('PickTaskList', { profileType }) },
         ]);
       } else {
         await addToQueue('PICK_CLOSE_TASK', { taskId, ts: Date.now() });
+        const profileType = isController ? 'controller' : 'picker';
         Alert.alert(t('success'), t('pickingComplete'), [
-          { text: 'OK', onPress: () => navigation.navigate('PickTaskList') },
+          { text: 'OK', onPress: () => navigation.navigate('PickTaskList', { profileType }) },
         ]);
       }
     } catch (e) {
@@ -254,7 +282,7 @@ export function PickTaskDetails() {
     } finally {
       setSubmitting(false);
     }
-  }, [taskId, doc, navigation, t, isOnline]);
+  }, [taskId, doc, navigation, t, isOnline, isController]);
 
   if (loading) {
     return (
@@ -311,7 +339,13 @@ export function PickTaskDetails() {
       >
         <Text style={styles.sectionTitle}>{t('positions')}</Text>
         {doc.lines.map((line) => (
-          <LineCard key={line.id} line={line} onPress={() => openLineScan(line)} t={t} />
+          <LineCard
+            key={line.id}
+            line={line}
+            onPress={() => openLineScan(line)}
+            t={t}
+            readOnly={false}
+          />
         ))}
       </ScrollView>
 
@@ -416,18 +450,16 @@ function LineCard({
   line,
   onPress,
   t,
+  readOnly,
 }: {
   line: PickingLine;
-  onPress: () => void;
+  onPress?: () => void;
   t: (key: string, params?: Record<string, string | number>) => string;
+  readOnly?: boolean;
 }) {
   const isDone = line.qty_picked >= line.qty_required;
-  return (
-    <TouchableOpacity
-      style={[styles.lineCard, isDone && styles.lineCardDone]}
-      onPress={onPress}
-      activeOpacity={0.8}
-    >
+  const content = (
+    <>
       <Text style={styles.lineName}>{line.product_name}</Text>
       <Text style={styles.lineMeta}>{t('locationLabel')}: {line.location_code}</Text>
       <Text style={styles.lineMeta}>{t('barcodeLabel')}: {line.barcode ?? '—'}</Text>
@@ -439,6 +471,18 @@ function LineCard({
           <Text style={styles.doneBadgeText}>{t('doneBadge')}</Text>
         </View>
       )}
+    </>
+  );
+  if (readOnly) {
+    return <View style={[styles.lineCard, isDone && styles.lineCardDone]}>{content}</View>;
+  }
+  return (
+    <TouchableOpacity
+      style={[styles.lineCard, isDone && styles.lineCardDone]}
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
+      {content}
     </TouchableOpacity>
   );
 }

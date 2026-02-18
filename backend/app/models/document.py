@@ -28,6 +28,9 @@ class Document(Base):
     assigned_to_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+    controlled_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -53,6 +56,7 @@ class Document(Base):
         Index("ix_documents_source", "source"),
         Index("ix_documents_source_external_id", "source_external_id"),
         Index("ix_documents_assigned_to_user_id", "assigned_to_user_id"),
+        Index("ix_documents_controlled_by_user_id", "controlled_by_user_id"),
     )
 
 

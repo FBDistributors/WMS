@@ -32,6 +32,7 @@ export interface PickingListItem {
   status: string;
   lines_total: number;
   lines_done: number;
+  controlled_by_user_id?: string | null;
 }
 
 export interface PickLineResponse {

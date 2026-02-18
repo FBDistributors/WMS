@@ -11,8 +11,9 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
+import type { RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { RootStackParamList } from '../types/navigation';
 import { useLocale } from '../i18n/LocaleContext';
@@ -21,6 +22,7 @@ import { getPendingCount } from '../offline/offlineQueue';
 import { BRAND } from '../config/branding';
 
 type Nav = StackNavigationProp<RootStackParamList, 'PickerHome'>;
+type PickerHomeRoute = RouteProp<RootStackParamList, 'PickerHome'>;
 
 const HEADER_ACCENT = '#1a237e';
 const CARD_BG = '#f0f0f0';
@@ -86,9 +88,12 @@ function BottomNavTab({
 
 export function PickerHome() {
   const navigation = useNavigation<Nav>();
+  const route = useRoute<PickerHomeRoute>();
   const { t } = useLocale();
   const { isOnline } = useNetwork();
   const [queueCount, setQueueCount] = useState(0);
+  const profileType = route.params?.profileType ?? 'picker';
+  const headerTitle = profileType === 'controller' ? t('controllerTitle') : t('pickerTitle');
 
   useFocusEffect(
     useCallback(() => {
@@ -105,7 +110,7 @@ export function PickerHome() {
           style={[styles.headerLogo, { width: BRAND.headerLogoSize, height: BRAND.headerLogoSize }]}
           resizeMode="contain"
         />
-        <Text style={styles.headerTitle}>{t('pickerTitle')}</Text>
+        <Text style={styles.headerTitle}>{headerTitle}</Text>
         {!isOnline && (
           <View style={styles.onlineBadge}>
             <Text style={styles.onlineBadgeText}>Offline</Text>
@@ -131,7 +136,7 @@ export function PickerHome() {
           iconName="clipboard-list-outline"
           title={t('myPickTasks')}
           subtitle={t('docsForPicking')}
-          onPress={() => navigation.navigate('PickTaskList')}
+          onPress={() => navigation.navigate('PickTaskList', { profileType })}
         />
         <Card
           iconName="package-variant"
@@ -159,7 +164,7 @@ export function PickerHome() {
           iconName="clipboard-list-outline"
           label={t('tabPickLists')}
           active={false}
-          onPress={() => navigation.navigate('PickTaskList')}
+          onPress={() => navigation.navigate('PickTaskList', { profileType })}
         />
         <View style={styles.scanBtnWrap}>
           <TouchableOpacity

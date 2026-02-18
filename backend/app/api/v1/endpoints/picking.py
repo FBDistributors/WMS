@@ -18,6 +18,7 @@ from app.models.document import DocumentLine as DocumentLineModel
 from app.models.order import Order as OrderModel
 from app.models.picking import PickRequest
 from app.models.stock import StockMovement as StockMovementModel
+from app.models.user import User as UserModel
 
 router = APIRouter()
 
@@ -53,6 +54,7 @@ class PickingListItem(BaseModel):
     status: str
     lines_total: int
     lines_done: int
+    controlled_by_user_id: Optional[UUID] = None
 
 
 class PickLineRequest(BaseModel):
@@ -64,6 +66,16 @@ class PickLineResponse(BaseModel):
     line: PickingLine
     progress: PickingProgress
     document_status: str
+
+
+class ControllerUser(BaseModel):
+    id: UUID
+    username: str
+    full_name: Optional[str] = None
+
+
+class SendToControllerRequest(BaseModel):
+    controller_user_id: UUID
 
 
 def _calculate_progress(lines: List[DocumentLineModel]) -> PickingProgress:
@@ -105,12 +117,13 @@ def _to_picking_list_item(doc: DocumentModel) -> PickingListItem:
         status=doc.status,
         lines_total=lines_total,
         lines_done=lines_done,
+        controlled_by_user_id=doc.controlled_by_user_id,
     )
 
 
 def _refresh_document_status(doc: DocumentModel, lines: List[DocumentLineModel]) -> None:
     if all(line.picked_qty >= line.required_qty for line in lines):
-        doc.status = "completed"
+        doc.status = "in_progress"
     elif any(line.picked_qty > 0 for line in lines):
         doc.status = "in_progress"
 
@@ -131,6 +144,8 @@ async def get_picking_document(
         raise HTTPException(status_code=404, detail="Document not found")
     if user.role == "picker" and document.assigned_to_user_id != user.id:
         raise HTTPException(status_code=404, detail="Document not found")
+    if user.role == "inventory_controller" and document.controlled_by_user_id != user.id:
+        raise HTTPException(status_code=404, detail="Document not found")
     return _to_picking_document(document)
 
 
@@ -146,10 +161,75 @@ async def list_picking_documents(
     query = db.query(DocumentModel).options(selectinload(DocumentModel.lines))
     if user.role == "picker":
         query = query.filter(DocumentModel.assigned_to_user_id == user.id)
+    elif user.role == "inventory_controller":
+        query = query.filter(
+            DocumentModel.controlled_by_user_id == user.id,
+            DocumentModel.status == "picked",
+        )
     if not include_cancelled:
         query = query.filter(DocumentModel.status != "cancelled")
     docs = query.order_by(DocumentModel.created_at.desc()).offset(offset).limit(limit).all()
     return [_to_picking_list_item(doc) for doc in docs]
+
+
+@router.get("/controllers", response_model=List[ControllerUser], summary="List controllers (inventory_controller)")
+@router.get("/controllers/", response_model=List[ControllerUser], summary="List controllers")
+async def list_controllers(
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("picking:read")),
+):
+    controllers = (
+        db.query(UserModel)
+        .filter(UserModel.role == "inventory_controller", UserModel.is_active.is_(True))
+        .order_by(UserModel.full_name, UserModel.username)
+        .all()
+    )
+    return [
+        ControllerUser(id=u.id, username=u.username, full_name=u.full_name)
+        for u in controllers
+    ]
+
+
+@router.post(
+    "/documents/{document_id}/send-to-controller",
+    response_model=PickingDocument,
+    summary="Send picked document to controller",
+)
+async def send_to_controller(
+    document_id: UUID,
+    payload: SendToControllerRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("picking:send_to_controller")),
+):
+    document = (
+        db.query(DocumentModel)
+        .options(selectinload(DocumentModel.lines))
+        .filter(DocumentModel.id == document_id)
+        .with_for_update()
+        .one_or_none()
+    )
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if document.assigned_to_user_id != user.id:
+        raise HTTPException(status_code=403, detail="Document not assigned to you")
+    if document.status != "picked":
+        raise HTTPException(status_code=409, detail="Document must be in picked status")
+    if document.controlled_by_user_id is not None:
+        raise HTTPException(status_code=409, detail="Already sent to controller")
+    controller = (
+        db.query(UserModel)
+        .filter(
+            UserModel.id == payload.controller_user_id,
+            UserModel.role == "inventory_controller",
+            UserModel.is_active.is_(True),
+        )
+        .one_or_none()
+    )
+    if not controller:
+        raise HTTPException(status_code=400, detail="Invalid controller")
+    document.controlled_by_user_id = payload.controller_user_id
+    db.commit()
+    return _to_picking_document(document)
 
 
 @router.post(
@@ -330,12 +410,12 @@ def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
 @router.post(
     "/documents/{document_id}/complete",
     response_model=PickingDocument,
-    summary="Complete picking document",
+    summary="Complete picking document (picker: -> picked; controller: -> completed)",
 )
 async def complete_picking_document(
     document_id: UUID,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("picking:complete")),
+    user=Depends(require_permission("picking:complete")),
 ):
     document = (
         db.query(DocumentModel)
@@ -359,16 +439,25 @@ async def complete_picking_document(
             detail={"message": "Incomplete lines", "lines": incomplete},
         )
 
-    document.status = "completed"
-    if document.order_id:
-        order = (
-            db.query(OrderModel)
-            .filter(OrderModel.id == document.order_id)
-            .with_for_update()
-            .one_or_none()
-        )
-        if order and order.status in {"picking", "allocated"}:
-            order.status = "picked"
+    if user.role == "inventory_controller":
+        if document.controlled_by_user_id != user.id:
+            raise HTTPException(status_code=403, detail="Document not assigned to you")
+        if document.status != "picked":
+            raise HTTPException(status_code=409, detail="Document must be in picked status")
+        document.status = "completed"
+    else:
+        if document.assigned_to_user_id != user.id:
+            raise HTTPException(status_code=403, detail="Document not assigned to you")
+        document.status = "picked"
+        if document.order_id:
+            order = (
+                db.query(OrderModel)
+                .filter(OrderModel.id == document.order_id)
+                .with_for_update()
+                .one_or_none()
+            )
+            if order and order.status in {"picking", "allocated"}:
+                order.status = "picked"
     db.commit()
 
     document.lines = lines

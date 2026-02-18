@@ -6,10 +6,29 @@ import type { PickingListItem, PickingDocument, PickLineResponse } from './picki
 
 const PICKING = '/picking';
 
+export interface ControllerUser {
+  id: string;
+  username: string;
+  full_name: string | null;
+}
+
 export async function getOpenTasks(limit = 50, offset = 0): Promise<PickingListItem[]> {
   const { data } = await apiClient.get<PickingListItem[]>(`${PICKING}/documents`, {
     params: { limit, offset, include_cancelled: false },
   });
+  return data;
+}
+
+export async function getControllers(): Promise<ControllerUser[]> {
+  const { data } = await apiClient.get<ControllerUser[]>(`${PICKING}/controllers`);
+  return data;
+}
+
+export async function sendToController(documentId: string, controllerUserId: string): Promise<PickingDocument> {
+  const { data } = await apiClient.post<PickingDocument>(
+    `${PICKING}/documents/${documentId}/send-to-controller`,
+    { controller_user_id: controllerUserId }
+  );
   return data;
 }
 

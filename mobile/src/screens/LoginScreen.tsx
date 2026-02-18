@@ -18,7 +18,7 @@ import type { LocaleCode } from '../i18n/translations';
 import { useLocale } from '../i18n/LocaleContext';
 import { localeLabels } from '../i18n/translations';
 import { getStoredToken } from '../api/client';
-import { login } from '../api/auth';
+import { login, getMe } from '../api/auth';
 import { BRAND } from '../config/branding';
 
 type Nav = StackNavigationProp<RootStackParamList, 'Login'>;
@@ -36,7 +36,13 @@ export function LoginScreen() {
 
   useEffect(() => {
     getStoredToken().then((token) => {
-      if (token) navigation.replace('PickerHome');
+      if (!token) return;
+      getMe()
+        .then((me) => {
+          const profileType = me.role === 'inventory_controller' ? 'controller' : 'picker';
+          navigation.replace('PickerHome', { profileType });
+        })
+        .catch(() => navigation.replace('PickerHome', { profileType: 'picker' }));
     });
   }, [navigation]);
 
@@ -50,7 +56,9 @@ export function LoginScreen() {
     setLoading(true);
     try {
       await login({ username: u, password: p });
-      navigation.replace('PickerHome');
+      const me = await getMe();
+      const profileType = me.role === 'inventory_controller' ? 'controller' : 'picker';
+      navigation.replace('PickerHome', { profileType });
     } catch (e) {
       const msg = e instanceof Error ? e.message : t('loginError');
       Alert.alert(t('error'), msg);
