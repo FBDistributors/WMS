@@ -18,6 +18,8 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { RootStackParamList } from '../types/navigation';
 import { useLocale } from '../i18n/LocaleContext';
 import { useNetwork } from '../network';
+import { getOpenTasks } from '../api/picking';
+import { getCachedPickTasks } from '../offline/offlineDb';
 import { getPendingCount } from '../offline/offlineQueue';
 import { BRAND } from '../config/branding';
 
@@ -33,22 +35,34 @@ const BOTTOM_INACTIVE = '#666';
 const SCAN_BTN = '#1976d2';
 const CARD_ICON_SIZE = 24;
 const TAB_ICON_SIZE = 24;
+const BADGE_BG = '#e53935';
 
 function Card({
   iconName,
   title,
   subtitle,
   onPress,
+  badge,
 }: {
   iconName: string;
   title: string;
   subtitle: string;
   onPress: () => void;
+  badge?: number;
 }) {
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
-      <View style={styles.cardIcon}>
-        <Icon name={iconName as any} size={CARD_ICON_SIZE} color={TEXT_PRIMARY} />
+      <View style={styles.cardIconWrap}>
+        <View style={styles.cardIcon}>
+          <Icon name={iconName as any} size={CARD_ICON_SIZE} color={TEXT_PRIMARY} />
+        </View>
+        {badge != null && badge > 0 && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText} numberOfLines={1}>
+              {badge > 99 ? '99+' : String(badge)}
+            </Text>
+          </View>
+        )}
       </View>
       <View style={styles.cardBody}>
         <Text style={styles.cardTitle}>{title}</Text>
@@ -64,16 +78,27 @@ function BottomNavTab({
   label,
   active,
   onPress,
+  badge,
 }: {
   iconName: string;
   label: string;
   active: boolean;
   onPress: () => void;
+  badge?: number;
 }) {
   const color = active ? BOTTOM_ACTIVE : BOTTOM_INACTIVE;
   return (
     <TouchableOpacity style={styles.tab} onPress={onPress} activeOpacity={0.7}>
-      <Icon name={iconName as any} size={TAB_ICON_SIZE} color={color} style={styles.tabIcon} />
+      <View style={styles.tabIconWrap}>
+        <Icon name={iconName as any} size={TAB_ICON_SIZE} color={color} style={styles.tabIcon} />
+        {badge != null && badge > 0 && (
+          <View style={styles.tabBadge}>
+            <Text style={styles.tabBadgeText} numberOfLines={1}>
+              {badge > 99 ? '99+' : String(badge)}
+            </Text>
+          </View>
+        )}
+      </View>
       <Text
         style={[styles.tabLabel, { color }]}
         numberOfLines={1}
@@ -92,13 +117,23 @@ export function PickerHome() {
   const { t } = useLocale();
   const { isOnline } = useNetwork();
   const [queueCount, setQueueCount] = useState(0);
+  const [taskCount, setTaskCount] = useState(0);
   const profileType = route.params?.profileType ?? 'picker';
   const headerTitle = profileType === 'controller' ? t('controllerTitle') : t('pickerTitle');
 
   useFocusEffect(
     useCallback(() => {
       getPendingCount().then(setQueueCount);
-    }, [])
+      if (isOnline) {
+        getOpenTasks(50, 0)
+          .then((data) => setTaskCount(Array.isArray(data) ? data.length : 0))
+          .catch(() => setTaskCount(0));
+      } else {
+        getCachedPickTasks()
+          .then((data) => setTaskCount(Array.isArray(data) ? data.length : 0))
+          .catch(() => setTaskCount(0));
+      }
+    }, [isOnline])
   );
 
   return (
@@ -137,6 +172,7 @@ export function PickerHome() {
           title={t('myPickTasks')}
           subtitle={t('docsForPicking')}
           onPress={() => navigation.navigate('PickTaskList', { profileType })}
+          badge={taskCount}
         />
         <Card
           iconName="package-variant"
@@ -165,6 +201,7 @@ export function PickerHome() {
           label={t('tabPickLists')}
           active={false}
           onPress={() => navigation.navigate('PickTaskList', { profileType })}
+          badge={taskCount}
         />
         <View style={styles.scanBtnWrap}>
           <TouchableOpacity
@@ -247,6 +284,10 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
   },
+  cardIconWrap: {
+    position: 'relative',
+    marginRight: 14,
+  },
   cardIcon: {
     width: 40,
     height: 40,
@@ -254,7 +295,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#e0e0e0',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
+  },
+  badge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: BADGE_BG,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
   },
   cardBody: {
     flex: 1,
@@ -288,8 +345,27 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
     paddingHorizontal: 2,
   },
-  tabIcon: {
+  tabIconWrap: {
+    position: 'relative',
     marginBottom: 4,
+  },
+  tabIcon: {},
+  tabBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -10,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: BADGE_BG,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  tabBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
   },
   tabLabel: {
     fontSize: 10,
