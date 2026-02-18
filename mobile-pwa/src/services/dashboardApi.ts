@@ -57,6 +57,13 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
   }
 }
 
+export type OrdersByStatusRow = { status: string; count: number }
+
+export async function getOrdersByStatus(): Promise<OrdersByStatusRow[]> {
+  const data = await fetchJSON<{ items: OrdersByStatusRow[] }>('/api/v1/dashboard/orders-by-status')
+  return data.items
+}
+
 export async function getPickDocuments(params?: {
   limit?: number
   offset?: number

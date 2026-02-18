@@ -43,6 +43,15 @@ class DashboardSummaryResponse(BaseModel):
     deltas: dict | None = None
 
 
+class OrdersByStatusRow(BaseModel):
+    status: str
+    count: int
+
+
+class OrdersByStatusResponse(BaseModel):
+    items: List[OrdersByStatusRow]
+
+
 def _today_utc() -> date:
     return datetime.now(timezone.utc).date()
 
@@ -123,6 +132,46 @@ async def get_dashboard_summary(
         low_stock=low_stock,
         deltas=deltas if deltas else None,
     )
+
+
+ORDER_STATUSES_FOR_COUNTS = (
+    "imported",
+    "B#S",
+    "allocated",
+    "ready_for_picking",
+    "picking",
+    "picked",
+    "packed",
+    "shipped",
+    "cancelled",
+)
+
+
+@router.get(
+    "/orders-by-status",
+    response_model=OrdersByStatusResponse,
+    summary="Order counts by status (for dashboard table)",
+)
+async def get_orders_by_status(
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("admin:access")),
+):
+    def _order_base(q):
+        return q.filter(OrderModel.filial_id == DEFAULT_FILIAL_ID) if DEFAULT_FILIAL_ID else q
+
+    rows = (
+        _order_base(db.query(OrderModel.status, func.count(OrderModel.id)))
+        .filter(OrderModel.status.in_(ORDER_STATUSES_FOR_COUNTS))
+        .group_by(OrderModel.status)
+        .all()
+    )
+    # Include zero counts for statuses that have no orders
+    by_status = {r.status: r[1] for r in rows}
+    items = [
+        OrdersByStatusRow(status=s, count=by_status.get(s, 0))
+        for s in ORDER_STATUSES_FOR_COUNTS
+    ]
+    return OrdersByStatusResponse(items=items)
 
 
 @router.get(

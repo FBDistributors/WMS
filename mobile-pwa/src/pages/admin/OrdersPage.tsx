@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Settings, FileText } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -38,9 +38,14 @@ const SEARCH_FIELD_OPTIONS = [
   { id: 'agent', labelKey: 'orders:search_fields.agent' },
 ]
 
+const VALID_STATUSES = new Set([
+  'all', 'imported', 'allocated', 'ready_for_picking', 'picking', 'picked', 'packed', 'shipped', 'cancelled',
+])
+
 export function OrdersPage() {
   const { t } = useTranslation(['orders', 'common'])
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { has } = useAuth()
   const canSync = has('orders:sync')
   const canSend = has('orders:send_to_picking') && has('picking:assign')
@@ -48,10 +53,13 @@ export function OrdersPage() {
   const { config, updateConfig, resetConfig } = useOrdersTableConfig()
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
+  const initialStatus = searchParams.get('status')
   const [items, setItems] = useState<OrderListItem[]>([])
   const [offset, setOffset] = useState(0)
   const [total, setTotal] = useState(0)
-  const [status, setStatus] = useState('B#S')
+  const [status, setStatus] = useState(
+    initialStatus && VALID_STATUSES.has(initialStatus) ? initialStatus : 'all'
+  )
   const [search, setSearch] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -366,7 +374,15 @@ export function OrdersPage() {
               value={status}
               onChange={(event) => setStatus(event.target.value)}
             >
-              <option value="B#S">{t('orders:status.b#s')}</option>
+              <option value="all">{t('orders:filters.all')}</option>
+              <option value="imported">{t('orders:status.imported')}</option>
+              <option value="allocated">{t('orders:status.allocated')}</option>
+              <option value="ready_for_picking">{t('orders:status.ready_for_picking')}</option>
+              <option value="picking">{t('orders:status.picking')}</option>
+              <option value="picked">{t('orders:status.picked')}</option>
+              <option value="packed">{t('orders:status.packed')}</option>
+              <option value="shipped">{t('orders:status.shipped')}</option>
+              <option value="cancelled">{t('orders:status.cancelled')}</option>
             </select>
           </label>
           <label className="text-sm text-slate-600 dark:text-slate-300">

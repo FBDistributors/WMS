@@ -34,6 +34,9 @@
     "low_stock": "Низкий остаток",
     "active_picks": "Активный подбор",
     "today_overview": "Сводка за день",
+    "orders_by_status": "Заказы по статусу",
+    "status_column": "Статус",
+    "count_column": "Кол-во",
     "load_error": "Не удалось загрузить дашборд. Попробуйте снова."
   },
   "active_picks": {

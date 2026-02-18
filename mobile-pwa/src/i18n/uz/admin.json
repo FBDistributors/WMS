@@ -34,6 +34,9 @@
     "low_stock": "Past qoldiq",
     "active_picks": "Faol pickinglar",
     "today_overview": "Bugungi ko‘rinish",
+    "orders_by_status": "Buyurtmalar holati",
+    "status_column": "Holat",
+    "count_column": "Soni",
     "load_error": "Dashboard yuklanmadi. Qayta urinib ko‘ring."
   },
   "active_picks": {

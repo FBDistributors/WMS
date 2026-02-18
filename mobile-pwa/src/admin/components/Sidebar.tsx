@@ -31,7 +31,6 @@ const MENU_ITEMS: Array<MenuItem & { key: string }> = [
   { key: 'orders', label: 'Orders', path: '/admin/orders', icon: ClipboardList, required: 'orders:read' },
   { key: 'locations', label: 'Locations', path: '/admin/locations', icon: MapPin, required: 'locations:manage' },
   { key: 'inventory', label: 'Inventory', path: '/admin/inventory', icon: Boxes, required: 'inventory:read' },
-  { key: 'picking', label: 'Picking', path: '/admin/picking', icon: ClipboardList, required: 'picking:read' },
   { key: 'receiving', label: 'Receiving', path: '/admin/receiving', icon: Inbox, required: 'receiving:read' },
   { key: 'users', label: 'Users & Access', path: '/admin/users', icon: Users, required: 'users:manage' },
   { key: 'audit', label: 'Audit Logs', path: '/admin/audit', icon: FileText, required: 'audit:read' },

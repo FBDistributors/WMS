@@ -34,6 +34,9 @@
     "low_stock": "Low stock",
     "active_picks": "Active picks",
     "today_overview": "Today overview",
+    "orders_by_status": "Orders by status",
+    "status_column": "Status",
+    "count_column": "Count",
     "load_error": "Failed to load dashboard. Please try again."
   },
   "active_picks": {
