@@ -170,9 +170,10 @@ async def pick_line(
     except Exception as e:
         db.rollback()
         logger.exception("pick_line error: %s", e)
+        err_msg = str(e).strip() or type(e).__name__
         raise HTTPException(
             status_code=400,
-            detail="Terish saqlanmadi. Joylashtirish yoki ombor tekshiruvi kerak.",
+            detail=f"Terish saqlanmadi. Sabab: {err_msg}",
         ) from e
 
 

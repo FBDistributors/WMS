@@ -20,6 +20,9 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { ScanInput } from '../components/ScanInput';
 import { useLocale } from '../i18n/LocaleContext';
 import { playSuccessBeep } from '../utils/playBeep';
+import { useNetwork } from '../network';
+import { getCachedPickTaskDetail, saveCachedPickTaskDetail } from '../offline/offlineDb';
+import { addToQueue } from '../offline/offlineQueue';
 
 function barcodeMatchesLine(value: string, line: PickingLine): boolean {
   const v = value.trim().toLowerCase();
@@ -43,6 +46,7 @@ export function PickTaskDetails() {
   const { t } = useLocale();
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
+  const { isOnline } = useNetwork();
   const taskId = route.params?.taskId ?? '';
   const [doc, setDoc] = useState<PickingDocument | null>(null);
   const [loading, setLoading] = useState(true);
@@ -57,8 +61,15 @@ export function PickTaskDetails() {
     setLoading(true);
     setError(null);
     try {
-      const data = await getTaskById(taskId);
-      setDoc(data);
+      if (isOnline) {
+        const data = await getTaskById(taskId);
+        setDoc(data);
+        await saveCachedPickTaskDetail(taskId, data);
+      } else {
+        const cached = await getCachedPickTaskDetail(taskId);
+        setDoc(cached as PickingDocument | null);
+        if (!cached) setError(t('notFound'));
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : t('loadError');
       setError(msg);
@@ -66,7 +77,7 @@ export function PickTaskDetails() {
     } finally {
       setLoading(false);
     }
-  }, [taskId, navigation, t]);
+  }, [taskId, navigation, t, isOnline]);
 
   useEffect(() => {
     load();
@@ -83,7 +94,8 @@ export function PickTaskDetails() {
         setSelectedLine(line);
         void playSuccessBeep();
         setScannedBarcodeForQty(scannedBarcode);
-        setQtyInput('1');
+        const remaining = line.qty_required - line.qty_picked;
+        setQtyInput(remaining >= 1 ? String(remaining) : '0');
       } else {
         setScannedBarcodeForQty(null);
         setQtyInput('');
@@ -98,37 +110,52 @@ export function PickTaskDetails() {
   const handleScanSubmit = useCallback(
     async (value: string) => {
       if (!taskId || !doc) return;
+      const q = value.trim().toLowerCase();
+      const line = doc.lines.find(
+        (l) =>
+          (l.barcode && l.barcode.toLowerCase() === q) ||
+          (l.sku && l.sku.toLowerCase() === q) ||
+          (l.product_name && l.product_name.toLowerCase().includes(q))
+      );
+      if (!line) {
+        Alert.alert(t('wrongBarcodeTitle'), t('wrongBarcodeMessage') + value);
+        return;
+      }
       setSubmitting(true);
       try {
-        const res = await submitScan(taskId, { barcode: value });
-        setDoc((prev) => {
-          if (!prev) return prev;
-          const lines = prev.lines.map((l) =>
-            l.id === res.line.id ? res.line : l
-          );
-          return {
-            ...prev,
-            lines,
-            progress: res.progress,
-            status: res.document_status,
-          };
-        });
-        Alert.alert(
-          t('picked'),
-          `${res.line.product_name}: ${res.line.qty_picked} / ${res.line.qty_required}`
-        );
+        if (isOnline) {
+          const res = await submitScan(taskId, { barcode: value });
+          setDoc((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              lines: prev.lines.map((l) => (l.id === res.line.id ? res.line : l)),
+              progress: res.progress,
+              status: res.document_status,
+            };
+          });
+          await saveCachedPickTaskDetail(taskId, { ...doc, lines: doc.lines.map((l) => (l.id === res.line.id ? res.line : l)), progress: res.progress, status: res.document_status } as PickingDocument);
+          Alert.alert(t('picked'), `${res.line.product_name}: ${res.line.qty_picked} / ${res.line.qty_required}`);
+        } else {
+          await addToQueue('PICK_SCAN', { taskId, barcode: value, lineId: line.id, ts: Date.now() });
+          const newPicked = line.qty_picked + 1;
+          const updatedLine = { ...line, qty_picked: newPicked };
+          const newLines = doc.lines.map((l) => (l.id === line.id ? updatedLine : l));
+          const picked = doc.progress.picked + 1;
+          const updated = { ...doc, lines: newLines, progress: { ...doc.progress, picked } };
+          setDoc(updated);
+          await saveCachedPickTaskDetail(taskId, updated);
+          Alert.alert(t('picked'), `${line.product_name}: ${newPicked} / ${line.qty_required}`);
+        }
       } catch (e) {
         const msg = e instanceof Error ? e.message : t('error');
-        if (msg === UNAUTHORIZED_MSG) {
-          navigation.replace('Login');
-          return;
-        }
-        Alert.alert(t('error'), msg);
+        if (msg === UNAUTHORIZED_MSG) navigation.replace('Login');
+        else Alert.alert(t('error'), msg);
       } finally {
         setSubmitting(false);
       }
     },
-    [taskId, doc, navigation, t]
+    [taskId, doc, navigation, t, isOnline]
   );
 
   const openLineScan = useCallback((line: PickingLine) => {
@@ -150,7 +177,7 @@ export function PickTaskDetails() {
         void playSuccessBeep();
         setScannedBarcodeForQty(value.trim());
         const remaining = selectedLine.qty_required - selectedLine.qty_picked;
-        setQtyInput(remaining >= 1 ? '1' : '0');
+        setQtyInput(remaining >= 1 ? String(remaining) : '0');
       } else {
         Alert.alert(
           t('wrongBarcodeTitle'),
@@ -171,64 +198,63 @@ export function PickTaskDetails() {
     }
     setSubmitting(true);
     try {
-      const res = await submitScan(taskId, {
-        barcode: scannedBarcodeForQty,
-        qty,
-      });
-      setDoc((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          lines: prev.lines.map((l) => (l.id === res.line.id ? res.line : l)),
-          progress: res.progress,
-          status: res.document_status,
-        };
-      });
-      closeLineScan();
-      Alert.alert(
-        t('picked'),
-        `${res.line.product_name}: ${res.line.qty_picked} / ${res.line.qty_required}`
-      );
+      if (isOnline) {
+        const res = await submitScan(taskId, { barcode: scannedBarcodeForQty, qty });
+        setDoc((prev) => (prev ? { ...prev, lines: prev.lines.map((l) => (l.id === res.line.id ? res.line : l)), progress: res.progress, status: res.document_status } : prev));
+        await saveCachedPickTaskDetail(taskId, { ...doc, lines: doc.lines.map((l) => (l.id === res.line.id ? res.line : l)), progress: res.progress, status: res.document_status } as PickingDocument);
+        closeLineScan();
+        Alert.alert(t('picked'), `${res.line.product_name}: ${res.line.qty_picked} / ${res.line.qty_required}`);
+      } else {
+        const additional = qty - 1;
+        if (additional > 0) {
+          await addToQueue('PICK_CONFIRM_ITEM', { taskId, itemId: selectedLine.id, qty: additional, ts: Date.now() });
+        }
+        const newPicked = selectedLine.qty_picked + (additional > 0 ? additional : 0);
+        const updatedLine = { ...selectedLine, qty_picked: newPicked };
+        const newLines = doc.lines.map((l) => (l.id === selectedLine.id ? updatedLine : l));
+        const updated = { ...doc, lines: newLines, progress: { ...doc.progress, picked: doc.progress.picked + (additional > 0 ? additional : 0) } };
+        setDoc(updated);
+        await saveCachedPickTaskDetail(taskId, updated);
+        closeLineScan();
+        Alert.alert(t('picked'), `${selectedLine.product_name}: ${newPicked} / ${selectedLine.qty_required}`);
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : t('error');
-      if (msg === UNAUTHORIZED_MSG) {
-        navigation.replace('Login');
-        closeLineScan();
-        return;
-      }
+      if (msg === UNAUTHORIZED_MSG) { navigation.replace('Login'); closeLineScan(); return; }
       Alert.alert(t('error'), msg);
     } finally {
       setSubmitting(false);
     }
-  }, [taskId, doc, selectedLine, scannedBarcodeForQty, qtyInput, closeLineScan, navigation, t]);
+  }, [taskId, doc, selectedLine, scannedBarcodeForQty, qtyInput, closeLineScan, navigation, t, isOnline]);
 
   const handleComplete = useCallback(async () => {
     if (!taskId) return;
     const incomplete = doc?.lines.filter((l) => l.qty_picked < l.qty_required);
     if (incomplete?.length) {
-      Alert.alert(
-        t('incomplete'),
-        t('incompleteLines', { count: incomplete.length })
-      );
+      Alert.alert(t('incomplete'), t('incompleteLines', { count: incomplete.length }));
       return;
     }
     setSubmitting(true);
     try {
-      await apiClient.post(`/picking/documents/${taskId}/complete`);
-      Alert.alert(t('success'), t('pickingComplete'), [
-        { text: 'OK', onPress: () => navigation.navigate('PickTaskList') },
-      ]);
+      if (isOnline) {
+        await apiClient.post(`/picking/documents/${taskId}/complete`);
+        Alert.alert(t('success'), t('pickingComplete'), [
+          { text: 'OK', onPress: () => navigation.navigate('PickTaskList') },
+        ]);
+      } else {
+        await addToQueue('PICK_CLOSE_TASK', { taskId, ts: Date.now() });
+        Alert.alert(t('success'), t('pickingComplete'), [
+          { text: 'OK', onPress: () => navigation.navigate('PickTaskList') },
+        ]);
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : t('completeError');
-      if (msg === UNAUTHORIZED_MSG) {
-        navigation.replace('Login');
-        return;
-      }
-      Alert.alert(t('error'), msg);
+      if (msg === UNAUTHORIZED_MSG) navigation.replace('Login');
+      else Alert.alert(t('error'), msg);
     } finally {
       setSubmitting(false);
     }
-  }, [taskId, doc, navigation, t]);
+  }, [taskId, doc, navigation, t, isOnline]);
 
   if (loading) {
     return (
