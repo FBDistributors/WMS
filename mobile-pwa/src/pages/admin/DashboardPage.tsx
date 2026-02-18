@@ -38,14 +38,14 @@ export function DashboardPage() {
     try {
       const [summaryData, picksData, ordersByStatusData, overviewData, exceptionsData] = await Promise.all([
         getDashboardSummary(),
-        getPickDocuments({ limit: 30 }),
-        getOrdersByStatus(),
+        getPickDocuments({ limit: 30 }).catch(() => []),
+        getOrdersByStatus().catch(() => []),
         getTodayOverview(),
         getExceptions(),
       ])
       setSummary(summaryData)
-      setActivePicks(picksData)
-      setOrdersByStatus(ordersByStatusData)
+      setActivePicks(Array.isArray(picksData) ? picksData : [])
+      setOrdersByStatus(Array.isArray(ordersByStatusData) ? ordersByStatusData : [])
       setOverview(overviewData)
       setExceptions(exceptionsData)
     } catch {

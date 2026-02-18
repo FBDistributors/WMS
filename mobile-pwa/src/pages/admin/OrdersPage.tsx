@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Settings, FileText } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -38,14 +38,9 @@ const SEARCH_FIELD_OPTIONS = [
   { id: 'agent', labelKey: 'orders:search_fields.agent' },
 ]
 
-const VALID_STATUSES = new Set([
-  'all', 'imported', 'allocated', 'ready_for_picking', 'picking', 'picked', 'packed', 'shipped', 'cancelled',
-])
-
 export function OrdersPage() {
   const { t } = useTranslation(['orders', 'common'])
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
   const { has } = useAuth()
   const canSync = has('orders:sync')
   const canSend = has('orders:send_to_picking') && has('picking:assign')
@@ -53,13 +48,9 @@ export function OrdersPage() {
   const { config, updateConfig, resetConfig } = useOrdersTableConfig()
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
-  const initialStatus = searchParams.get('status')
   const [items, setItems] = useState<OrderListItem[]>([])
   const [offset, setOffset] = useState(0)
   const [total, setTotal] = useState(0)
-  const [status, setStatus] = useState(
-    initialStatus && VALID_STATUSES.has(initialStatus) ? initialStatus : 'all'
-  )
   const [search, setSearch] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -85,7 +76,6 @@ export function OrdersPage() {
     }
     try {
       const data = await getOrders({
-        status: status === 'all' ? undefined : status,
         q: search || undefined,
         search_fields: config.searchFields.length > 0 ? config.searchFields.join(',') : undefined,
         limit: PAGE_SIZE,
@@ -102,7 +92,7 @@ export function OrdersPage() {
       if (!background) setIsLoading(false)
       else setIsRefreshing(false)
     }
-  }, [config.searchFields, offset, search, status, t])
+  }, [config.searchFields, offset, search, t])
 
   useEffect(() => {
     void load()
@@ -126,7 +116,7 @@ export function OrdersPage() {
 
   useEffect(() => {
     setOffset(0)
-  }, [status, search])
+  }, [search])
 
   const handleSync = async () => {
     setIsSyncing(true)
@@ -366,29 +356,11 @@ export function OrdersPage() {
           </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2">
-          <label className="text-sm text-slate-600 dark:text-slate-300">
-            {t('orders:filters.status')}
-            <select
-              className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-              value={status}
-              onChange={(event) => setStatus(event.target.value)}
-            >
-              <option value="all">{t('orders:filters.all')}</option>
-              <option value="imported">{t('orders:status.imported')}</option>
-              <option value="allocated">{t('orders:status.allocated')}</option>
-              <option value="ready_for_picking">{t('orders:status.ready_for_picking')}</option>
-              <option value="picking">{t('orders:status.picking')}</option>
-              <option value="picked">{t('orders:status.picked')}</option>
-              <option value="packed">{t('orders:status.packed')}</option>
-              <option value="shipped">{t('orders:status.shipped')}</option>
-              <option value="cancelled">{t('orders:status.cancelled')}</option>
-            </select>
-          </label>
+        <div className="grid gap-3">
           <label className="text-sm text-slate-600 dark:text-slate-300">
             {t('orders:filters.search')}
             <input
-              className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+              className="mt-1 w-full max-w-md rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder={t('orders:filters.search_placeholder')}
