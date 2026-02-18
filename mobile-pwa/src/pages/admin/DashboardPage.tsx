@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { Package, ClipboardList, SearchCheck, PackageCheck, Boxes, LayoutGrid } from 'lucide-react'
+import { Package, ClipboardList, SearchCheck, PackageCheck, LayoutGrid } from 'lucide-react'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { KpiCard } from '../../admin/components/KpiCard'
@@ -229,16 +229,6 @@ export function DashboardPage() {
               )}
             </div>
           </Card>
-
-          <div className="mt-6 grid gap-4 sm:grid-cols-2">
-            <KpiCard
-              title={t('admin:dashboard.low_stock')}
-              value={summary?.lowStock ?? '—'}
-              delta={summary?.deltas?.lowStock}
-              icon={Boxes}
-              href="/admin/inventory"
-            />
-          </div>
         </>
       )}
     </AdminLayout>
