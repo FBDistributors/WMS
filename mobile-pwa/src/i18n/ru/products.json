@@ -102,7 +102,10 @@
     "photo_url": "URL фото",
     "barcodes": "Штрих‑коды"
   },
+  "details_close": "Закрыть",
   "history": {
+    "tab_basic": "Основная информация",
+    "tab_stock": "Остатки",
     "receiving_history": "История поступлений",
     "pick_history": "История отборов",
     "on_hand": "В наличии",

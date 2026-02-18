@@ -102,7 +102,10 @@
     "photo_url": "Photo URL",
     "barcodes": "Barcodes"
   },
+  "details_close": "Close",
   "history": {
+    "tab_basic": "Basic information",
+    "tab_stock": "Stock",
     "receiving_history": "Receiving history",
     "pick_history": "Pick history",
     "on_hand": "On hand",

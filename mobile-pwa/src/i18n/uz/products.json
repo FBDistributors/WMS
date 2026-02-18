@@ -102,7 +102,10 @@
     "photo_url": "Foto URL",
     "barcodes": "Barcodelar"
   },
+  "details_close": "Yopish",
   "history": {
+    "tab_basic": "Asosiy ma'lumot",
+    "tab_stock": "Ostatki",
     "receiving_history": "Kirim tarixi",
     "pick_history": "Terish tarixi",
     "on_hand": "Mavjud",
