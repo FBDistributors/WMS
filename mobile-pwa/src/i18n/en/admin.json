@@ -43,7 +43,11 @@
     "status_yakunlangan": "Completed",
     "status_barcha": "All orders",
     "order_statuses_title": "Order statuses",
-    "load_error": "Failed to load dashboard. Please try again."
+    "load_error": "Failed to load dashboard. Please try again.",
+    "pickers_orders_title": "Orders picked by worker",
+    "worker_column": "Worker",
+    "orders_picked_column": "Orders picked",
+    "pickers_empty": "No data yet."
   },
   "active_picks": {
     "empty": "No active picks right now.",

@@ -43,7 +43,11 @@
     "status_yakunlangan": "Завершённые",
     "status_barcha": "Все заказы",
     "order_statuses_title": "Статусы заказов",
-    "load_error": "Не удалось загрузить дашборд. Попробуйте снова."
+    "load_error": "Не удалось загрузить дашборд. Попробуйте снова.",
+    "pickers_orders_title": "Собранные заказы по сотрудникам",
+    "worker_column": "Сотрудник",
+    "orders_picked_column": "Собрано заказов",
+    "pickers_empty": "Пока нет данных."
   },
   "active_picks": {
     "empty": "Нет активного подбора.",

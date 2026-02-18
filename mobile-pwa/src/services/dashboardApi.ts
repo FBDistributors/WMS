@@ -64,6 +64,33 @@ export async function getOrdersByStatus(): Promise<OrdersByStatusRow[]> {
   return data.items
 }
 
+export type PickerPerformanceRow = {
+  picker_id: string
+  picker_name: string
+  total_picked_qty: number
+  movements_count: number
+  documents_count: number
+}
+
+export async function getPickerPerformance(params?: {
+  date_from?: string
+  date_to?: string
+}): Promise<PickerPerformanceRow[]> {
+  const query: Record<string, string> = {}
+  if (params?.date_from) query.date_from = params.date_from
+  if (params?.date_to) query.date_to = params.date_to
+  const data = await fetchJSON<
+    { picker_id: string; picker_name: string; total_picked_qty: string; movements_count: number; documents_count: number }[]
+  >('/api/v1/reports/picker-performance', { query })
+  return data.map((row) => ({
+    picker_id: row.picker_id,
+    picker_name: row.picker_name,
+    total_picked_qty: Number(row.total_picked_qty),
+    movements_count: row.movements_count,
+    documents_count: row.documents_count,
+  }))
+}
+
 export async function getPickDocuments(params?: {
   limit?: number
   offset?: number

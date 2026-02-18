@@ -43,7 +43,11 @@
     "status_yakunlangan": "Yakunlangan",
     "status_barcha": "Barcha buyurtmalar",
     "order_statuses_title": "Buyurtma statuslari",
-    "load_error": "Dashboard yuklanmadi. Qayta urinib ko‘ring."
+    "load_error": "Dashboard yuklanmadi. Qayta urinib ko‘ring.",
+    "pickers_orders_title": "Ishchilar bo‘yicha yig‘ilgan buyurtmalar",
+    "worker_column": "Ishchi",
+    "orders_picked_column": "Yig‘ilgan buyurtmalar",
+    "pickers_empty": "Hozircha ma'lumot yo'q."
   },
   "active_picks": {
     "empty": "Hozircha faol picking yo‘q.",

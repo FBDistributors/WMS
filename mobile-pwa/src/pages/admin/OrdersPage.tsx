@@ -361,7 +361,7 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
   }, [canSend, config.columnOrder, config.visibleColumns, eligibleItems, error, isLoading, items, load, mode, navigate, selectedOrderIds, t])
 
   return (
-    <AdminLayout title={pageTitle}>
+    <AdminLayout title={pageTitle} backTo={mode === 'statuses' ? '/admin' : undefined}>
       <Card className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>

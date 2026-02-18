@@ -7,7 +7,7 @@ import { AdminLayout } from '../../admin/components/AdminLayout'
 import { KpiCard } from '../../admin/components/KpiCard'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { getDashboardSummary, getOrdersByStatus } from '../../services/dashboardApi'
+import { getDashboardSummary, getOrdersByStatus, getPickerPerformance, type PickerPerformanceRow } from '../../services/dashboardApi'
 import type { DashboardSummary } from '../../types/dashboard'
 
 const STATUS_XOM = ['B#S'] // Buyurtmalar bo'limida faqat B#S ko'rsatiladi; yig'ishga yuborilgach chiqadi
@@ -33,6 +33,7 @@ export function DashboardPage() {
   const navigate = useNavigate()
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [ordersByStatus, setOrdersByStatus] = useState<{ status: string; count: number }[]>([])
+  const [pickerPerformance, setPickerPerformance] = useState<PickerPerformanceRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -43,12 +44,17 @@ export function DashboardPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const [summaryData, ordersByStatusData] = await Promise.all([
+      const [summaryData, ordersByStatusData, pickerData] = await Promise.all([
         getDashboardSummary(),
         getOrdersByStatus().catch(() => []),
+        getPickerPerformance().catch(() => []),
       ])
       setSummary(summaryData)
       setOrdersByStatus(Array.isArray(ordersByStatusData) ? ordersByStatusData : [])
+      const sorted = Array.isArray(pickerData)
+        ? [...pickerData].sort((a, b) => b.documents_count - a.documents_count)
+        : []
+      setPickerPerformance(sorted)
     } catch {
       setError(t('admin:dashboard.load_error'))
     } finally {
@@ -169,6 +175,55 @@ export function DashboardPage() {
                         </tr>
                       )
                     })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </Card>
+
+          <Card className="mt-6">
+            <div className="text-base font-semibold text-slate-900 dark:text-slate-100">
+              {t('admin:dashboard.pickers_orders_title')}
+            </div>
+            <div className="mt-3 overflow-x-auto">
+              {isLoading ? (
+                <div className="h-24 animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-700" />
+              ) : pickerPerformance.length === 0 ? (
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {t('admin:dashboard.pickers_empty')}
+                </p>
+              ) : (
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-700">
+                      <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">
+                        #
+                      </th>
+                      <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">
+                        {t('admin:dashboard.worker_column')}
+                      </th>
+                      <th className="px-3 py-2 text-right font-medium text-slate-600 dark:text-slate-400">
+                        {t('admin:dashboard.orders_picked_column')}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pickerPerformance.map((row, index) => (
+                      <tr
+                        key={row.picker_id}
+                        className="border-b border-slate-100 dark:border-slate-800"
+                      >
+                        <td className="px-3 py-2 text-slate-500 dark:text-slate-400">
+                          {index + 1}
+                        </td>
+                        <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
+                          {row.picker_name}
+                        </td>
+                        <td className="px-3 py-2 text-right font-medium text-slate-900 dark:text-slate-100">
+                          {row.documents_count}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               )}

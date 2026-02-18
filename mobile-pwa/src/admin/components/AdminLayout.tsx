@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
 
-import { LogOut, Menu, Moon, Sun, User, X } from 'lucide-react'
+import { ArrowLeft, LogOut, Menu, Moon, Sun, User, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
@@ -13,11 +13,12 @@ import { useTheme } from '../../theme/ThemeProvider'
 
 type AdminLayoutProps = {
   title: string
+  backTo?: string
   actionSlot?: ReactNode
   children: ReactNode
 }
 
-export function AdminLayout({ title, actionSlot, children }: AdminLayoutProps) {
+export function AdminLayout({ title, backTo, actionSlot, children }: AdminLayoutProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -93,11 +94,22 @@ export function AdminLayout({ title, actionSlot, children }: AdminLayoutProps) {
         ].join(' ')}
       >
         <header className="sticky top-0 z-10 flex shrink-0 items-center justify-between border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" className="md:hidden" onClick={() => setIsOpen(true)}>
-              <Menu size={18} />
-            </Button>
-            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+          <div className="flex min-w-0 items-center gap-2">
+            {backTo ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate(backTo)}
+                aria-label={t('common:back')}
+              >
+                <ArrowLeft size={20} />
+              </Button>
+            ) : (
+              <Button variant="ghost" className="md:hidden" onClick={() => setIsOpen(true)}>
+                <Menu size={18} />
+              </Button>
+            )}
+            <div className="min-w-0 truncate text-lg font-semibold text-slate-900 dark:text-slate-100">
               {title}
             </div>
           </div>
