@@ -20,6 +20,7 @@
   "level_no": "Level",
   "row_no": "Row",
   "pallet_no": "Pallet no.",
+  "pick_sequence": "Pick order",
   "preview_code": "Code preview",
   "barcode_label": "Location barcode",
   "print_label": "Print label",

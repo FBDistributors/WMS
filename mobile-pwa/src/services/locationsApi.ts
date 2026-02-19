@@ -17,6 +17,8 @@ export type Location = {
   pallet_no?: number | null
   parent_id?: string | null
   is_active: boolean
+  /** Terish ketma-ketligi (yo'nalish optimizatsiyasi). */
+  pick_sequence?: number | null
   created_at?: string | null
 }
 
@@ -36,6 +38,7 @@ export type LocationUpdateInput = {
   row_no?: number
   pallet_no?: number
   is_active?: boolean
+  pick_sequence?: number | null
 }
 
 export async function getLocations(includeInactive = false) {

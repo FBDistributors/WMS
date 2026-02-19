@@ -46,6 +46,60 @@ type DialogState = {
   target?: Location
 }
 
+function PickSequenceCell({
+  locationId,
+  value,
+  onSaved,
+}: {
+  locationId: string
+  value: number | null | undefined
+  onSaved: () => void
+}) {
+  const { t } = useTranslation(['locations'])
+  const [local, setLocal] = useState<string>(value != null ? String(value) : '')
+  const [saving, setSaving] = useState(false)
+  const prevValueRef = useRef(value)
+
+  useEffect(() => {
+    if (prevValueRef.current !== value) {
+      prevValueRef.current = value
+      setLocal(value != null ? String(value) : '')
+    }
+  }, [value])
+
+  const handleBlur = useCallback(async () => {
+    const trimmed = local.trim()
+    const num = trimmed === '' ? null : parseInt(trimmed, 10)
+    if (num !== null && (isNaN(num) || num < 0)) return
+    if (num === value) return
+    setSaving(true)
+    try {
+      await updateLocation(locationId, {
+        pick_sequence: trimmed === '' ? null : num ?? undefined,
+      })
+      onSaved()
+    } catch {
+      setLocal(value != null ? String(value) : '')
+    } finally {
+      setSaving(false)
+    }
+  }, [local, value, locationId, onSaved])
+
+  return (
+    <input
+      type="number"
+      min={0}
+      className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-1 text-center text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+      value={local}
+      onChange={(e) => setLocal(e.target.value)}
+      onBlur={handleBlur}
+      disabled={saving}
+      placeholder="—"
+      aria-label={t('locations:pick_sequence')}
+    />
+  )
+}
+
 export function LocationsPage() {
   const { t } = useTranslation(['locations', 'common'])
   const [items, setItems] = useState<Location[]>([])
@@ -97,8 +151,8 @@ export function LocationsPage() {
         />
       )
     }
-    return (
-      <TableScrollArea>
+  return (
+    <TableScrollArea>
         <table className="w-full min-w-[640px] table-fixed text-left text-sm sm:table-auto">
           <thead>
             <tr className="border-b border-slate-200 dark:border-slate-700">
@@ -130,6 +184,9 @@ export function LocationsPage() {
               </th>
               <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
                 {t('locations:pallet_no')}
+              </th>
+              <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
+                {t('locations:pick_sequence')}
               </th>
               <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
                 {t('locations:status')}
@@ -172,6 +229,13 @@ export function LocationsPage() {
                 </td>
                 <td className="whitespace-nowrap py-2 pr-3 text-slate-600 dark:text-slate-400 sm:pr-4">
                   {loc.pallet_no != null ? loc.pallet_no : '—'}
+                </td>
+                <td className="whitespace-nowrap py-2 pr-3 sm:pr-4">
+                  <PickSequenceCell
+                    locationId={loc.id}
+                    value={loc.pick_sequence}
+                    onSaved={load}
+                  />
                 </td>
                 <td className="whitespace-nowrap py-2 pr-3 sm:pr-4">
                   {loc.is_active ? (

@@ -20,6 +20,7 @@
   "level_no": "Уровень",
   "row_no": "Ряд",
   "pallet_no": "Палета №",
+  "pick_sequence": "Порядок сбора",
   "preview_code": "Предпросмотр кода",
   "barcode_label": "Штрихкод локации",
   "print_label": "Печать этикетки",

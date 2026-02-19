@@ -40,6 +40,7 @@ class LocationOut(BaseModel):
     pallet_no: Optional[int] = None
     parent_id: Optional[UUID] = None
     is_active: bool
+    pick_sequence: Optional[int] = None
     created_at: Optional[str] = None
 
 
@@ -62,6 +63,7 @@ class LocationUpdate(BaseModel):
     row_no: Optional[int] = Field(default=None, ge=0, le=99)
     pallet_no: Optional[int] = Field(default=None, ge=0, le=99)
     is_active: Optional[bool] = None
+    pick_sequence: Optional[int] = Field(default=None, ge=0, description="Terish ketma-ketligi (yo'nalish)")
 
 
 def _to_location(location: LocationModel) -> LocationOut:
@@ -78,6 +80,7 @@ def _to_location(location: LocationModel) -> LocationOut:
         pallet_no=location.pallet_no,
         parent_id=location.parent_id,
         is_active=location.is_active,
+        pick_sequence=location.pick_sequence,
         created_at=location.created_at.isoformat() if location.created_at else None,
     )
 
@@ -92,7 +95,13 @@ async def list_locations(
     query = db.query(LocationModel)
     if not include_inactive:
         query = query.filter(LocationModel.is_active.is_(True))
-    locations = query.order_by(LocationModel.code.asc()).all()
+    locations = (
+        query.order_by(
+            LocationModel.pick_sequence.asc().nulls_last(),
+            LocationModel.code.asc(),
+        )
+        .all()
+    )
     return [_to_location(location) for location in locations]
 
 
@@ -175,6 +184,8 @@ async def update_location(
     old_data = {"code": location.code, "is_active": location.is_active}
     if payload.is_active is not None:
         location.is_active = payload.is_active
+    if "pick_sequence" in payload.model_dump(exclude_unset=True):
+        location.pick_sequence = payload.pick_sequence
     if location.location_type in LOCATION_TYPE_ENUM and (
         payload.sector is not None or payload.level_no is not None or payload.row_no is not None or payload.pallet_no is not None
     ):
