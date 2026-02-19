@@ -10,8 +10,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
 
-# Qoldiq (on_hand): faqat Kirim va Jo'natish — receipt (kirim), ship (jo'natish)
-ON_HAND_MOVEMENT_TYPES = ("receipt", "ship")
+# Qoldiq (on_hand): Kirim, Terish yakunlanganida minus, Jo'natish
+# receipt = kirim; pick = yig'uvchi yakunlaganda qoldiqdan minus; ship = jo'natish
+ON_HAND_MOVEMENT_TYPES = ("receipt", "pick", "ship")
 
 
 class StockLot(Base):
