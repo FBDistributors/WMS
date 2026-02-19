@@ -9,9 +9,13 @@ import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { getOrdersByStatus, getPickerPerformance, type PickerPerformanceRow } from '../../services/dashboardApi'
 
-const STATUS_XOM = ['B#S'] // Buyurtmalar bo'limida faqat B#S ko'rsatiladi; yig'ishga yuborilgach chiqadi
-const STATUS_YIGISHDA = ['picking']
+// Yangi = Smartupdan kelgan, admin yig'uvchiga yubormagan
+const STATUS_XOM = ['imported', 'B#S']
+// Yig'ishda = admin yuborgan, yig'uvchi yig'ib controllerga yubormagan (allocated → picking)
+const STATUS_YIGISHDA = ['allocated', 'ready_for_picking', 'picking']
+// Tekshiruvda = yig'uvchi controllerga yuborgan, controller yakunlamagan
 const STATUS_TEKSHIRUVDA = ['picked']
+// Yakunlangan = controller tekshirib yakunlagan
 const STATUS_YAKUNLANGAN = ['packed', 'shipped']
 
 function aggregateByFourGroups(

@@ -59,10 +59,10 @@ const SEARCH_FIELD_OPTIONS = [
 ]
 
 const GROUP_TO_STATUS: Record<string, string | undefined> = {
-  xom: 'B#S', // Buyurtmalar bo'limi: faqat Smartupdan B#S, yig'ishga yuborilgach ro'yxatdan chiqadi
-  yigishda: 'picking',
-  tekshiruvda: 'picked',
-  yakunlangan: 'packed,shipped',
+  xom: 'imported,B#S', // Yangi: Smartupdan kelgan, admin yig'uvchiga yubormagan
+  yigishda: 'allocated,ready_for_picking,picking', // Yig'uvchi yig'ishda / controllerga yubormagan
+  tekshiruvda: 'picked', // Controllerga yuborilgan, controller yakunlamagan
+  yakunlangan: 'packed,shipped', // Controller yakunlagan
   all: undefined,
 }
 
@@ -216,7 +216,8 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
           )
     const getStatusRowClass = (status: string) => {
       if (mode !== 'statuses') return ''
-      if (status === 'picking') return 'bg-blue-50 dark:bg-blue-950/30'
+      if (status === 'allocated' || status === 'ready_for_picking' || status === 'picking')
+        return 'bg-blue-50 dark:bg-blue-950/30'
       if (status === 'picked') return 'bg-amber-50 dark:bg-amber-950/30'
       if (status === 'packed' || status === 'shipped') return 'bg-emerald-50 dark:bg-emerald-950/30'
       return ''
