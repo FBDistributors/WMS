@@ -86,6 +86,27 @@ class StockBalanceOut(BaseModel):
     expiry_date: Optional[date] = None
 
 
+class BalanceMovementItem(BaseModel):
+    """Bitta harakat – diagnostika uchun."""
+    movement_type: str
+    qty_change: Decimal
+    created_at: datetime
+    source_document_type: Optional[str] = None
+    source_document_id: Optional[UUID] = None
+
+
+class BalanceDiagnosticOut(BaseModel):
+    """Mahsulot qoldiqining sababi – barcha harakatlar va hisoblash."""
+    product_id: UUID
+    sku: str
+    name: str
+    on_hand: Decimal
+    reserved: Decimal
+    available: Decimal
+    movements: List[BalanceMovementItem]
+    summary: str
+
+
 class InventorySummaryRow(BaseModel):
     product_id: UUID
     product_code: str
@@ -917,6 +938,84 @@ async def list_stock_balances(
         )
         for row in rows
     ]
+
+
+@router.get(
+    "/balance-diagnostic",
+    response_model=BalanceDiagnosticOut,
+    summary="Mahsulot qoldiqining sababi (SKU bo'yicha)",
+)
+async def balance_diagnostic(
+    sku: str = Query(..., description="Mahsulot kodi, masalan C0037"),
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("inventory:read")),
+):
+    """
+    Berilgan SKU (masalan C0037) bo'yicha barcha stock harakatlarini va
+    on_hand/reserved/available hisoblashini qaytaradi. Qoldiq nega shunday ekanini aniqlash uchun.
+    """
+    product = (
+        db.query(ProductModel)
+        .filter(func.upper(ProductModel.sku) == func.upper(sku.strip()))
+        .one_or_none()
+    )
+    if not product:
+        raise HTTPException(status_code=404, detail=f"Mahsulot topilmadi: {sku}")
+
+    movements = (
+        db.query(StockMovementModel)
+        .filter(StockMovementModel.product_id == product.id)
+        .order_by(StockMovementModel.created_at.asc())
+        .all()
+    )
+
+    on_hand = Decimal("0")
+    reserved = Decimal("0")
+    for m in movements:
+        if m.movement_type in ("allocate", "unallocate"):
+            reserved += m.qty_change
+        else:
+            on_hand += m.qty_change
+    available = on_hand - reserved
+
+    items = [
+        BalanceMovementItem(
+            movement_type=m.movement_type,
+            qty_change=m.qty_change,
+            created_at=m.created_at,
+            source_document_type=m.source_document_type,
+            source_document_id=m.source_document_id,
+        )
+        for m in movements
+    ]
+
+    # Qisqacha tushuntirish
+    receipt_sum = sum(m.qty_change for m in movements if m.movement_type == "receipt")
+    pick_sum = sum(m.qty_change for m in movements if m.movement_type == "pick")
+    pick_count = sum(1 for m in movements if m.movement_type == "pick")
+    if pick_count >= 2:
+        summary = (
+            f"Kirim (receipt): {receipt_sum}. Terish (pick): jami {pick_sum} ({pick_count} ta pick yozuvi). "
+            f"on_hand = {on_hand}. "
+            f"2 yoki undan ortiq pick yozuvi bor – bitta terilgan bo'lsa ortiqcha yozuv mavjud. "
+            "POST /api/v1/inventory/fix-duplicate-pick body: {{\"product_id\": \"...\"}} orqali tuzatish mumkin."
+        )
+    else:
+        summary = (
+            f"Kirim: {receipt_sum}, terish (pick): {pick_sum}, boshqa harakatlar hisobga olingan. "
+            f"on_hand={on_hand}, reserved={reserved}, available={available}."
+        )
+
+    return BalanceDiagnosticOut(
+        product_id=product.id,
+        sku=product.sku,
+        name=product.name,
+        on_hand=on_hand,
+        reserved=reserved,
+        available=available,
+        movements=items,
+        summary=summary,
+    )
 
 
 class FixDuplicatePickRequest(BaseModel):
