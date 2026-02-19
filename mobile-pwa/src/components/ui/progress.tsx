@@ -10,7 +10,7 @@ export function Progress({ className, value, ...props }: ProgressProps) {
   const clamped = Math.min(100, Math.max(0, value))
   return (
     <div
-      className={cn('h-2 w-full rounded-full bg-slate-200', className)}
+      className={cn('h-2 w-full rounded-full bg-slate-200 dark:bg-slate-700', className)}
       {...props}
     >
       <div

@@ -157,7 +157,7 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
                   </div>
                   <div className="flex flex-col">
                     <span>{t('admin:menu.profile')}</span>
-                    <span className="text-xs text-slate-400">{roleLabel}</span>
+                    <span className="text-xs text-slate-400 dark:text-slate-500">{roleLabel}</span>
                   </div>
                 </Link>
               )

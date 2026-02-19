@@ -28,7 +28,7 @@ export function ActivePickList({ items, onOpen }: ActivePickListProps) {
   if (items.length === 0) {
     return (
       <Card>
-        <div className="text-sm text-slate-500">{t('admin:active_picks.empty')}</div>
+        <div className="text-sm text-slate-500 dark:text-slate-400">{t('admin:active_picks.empty')}</div>
       </Card>
     )
   }
@@ -42,19 +42,19 @@ export function ActivePickList({ items, onOpen }: ActivePickListProps) {
         return (
           <Card key={item.id} className="space-y-2">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold text-slate-900">{item.document_no}</div>
+              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{item.document_no}</div>
               <Badge variant={variant}>
                 {t(statusKey)}
               </Badge>
             </div>
-            <div className="flex items-center justify-between text-xs text-slate-500">
+            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
               <span>
                 {t('admin:active_picks.picked', { picked: item.picked, total: item.total })}
               </span>
               <span>{percent}%</span>
             </div>
             {(item.picker_name != null || item.controller_name != null) && (
-              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-slate-300">
                 {item.picker_name != null && (
                   <span title={t('admin:active_picks.picker')}>
                     {t('admin:active_picks.picker')}: <strong>{item.picker_name}</strong>

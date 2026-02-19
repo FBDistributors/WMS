@@ -15,14 +15,14 @@ type KpiCardProps = {
 export function KpiCard({ title, value, delta, icon: Icon, href }: KpiCardProps) {
   const card = (
     <Card
-      className={`flex h-full min-h-[100px] items-center justify-between ${href ? 'hover:border-blue-200' : ''}`}
+      className={`flex h-full min-h-[100px] items-center justify-between ${href ? 'hover:border-blue-200 dark:hover:border-blue-800' : ''}`}
     >
       <div>
-        <div className="text-sm text-slate-500">{title}</div>
-        <div className="text-2xl font-semibold text-slate-900">{value}</div>
-        {delta ? <div className="text-xs text-slate-500">{delta}</div> : null}
+        <div className="text-sm text-slate-500 dark:text-slate-400">{title}</div>
+        <div className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{value}</div>
+        {delta ? <div className="text-xs text-slate-500 dark:text-slate-400">{delta}</div> : null}
       </div>
-      <div className="rounded-2xl bg-slate-100 p-3 text-slate-500">
+      <div className="rounded-2xl bg-slate-100 p-3 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
         <Icon size={20} />
       </div>
     </Card>

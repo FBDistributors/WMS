@@ -245,7 +245,7 @@ export function ProductsTable({
 
   if (displayColumns.length === 0) {
     return (
-      <Card className="flex items-center justify-center py-10 text-sm text-slate-500">
+      <Card className="flex items-center justify-center py-10 text-sm text-slate-500 dark:text-slate-400">
         {t('products:table.no_columns')}
       </Card>
     )
