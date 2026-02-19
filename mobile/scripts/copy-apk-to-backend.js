@@ -1,8 +1,8 @@
 /**
- * Build qilingan APK ni backend/static/wms-app.apk ga nusxalaydi.
+ * Release APK ni backend/static/wms-app.apk ga nusxalaydi.
  * Web orqali yuklab olish yangi APK ni beradi.
  * Build dan keyin, commit/push dan oldin ishlating:
- *   cd mobile && node scripts/copy-apk-to-backend.js
+ *   cd mobile && npm run copy-apk
  */
 const fs = require('fs');
 const path = require('path');
@@ -15,16 +15,15 @@ const APK_SOURCE = path.join(
   'build',
   'outputs',
   'apk',
-  'debug',
-  'app-debug.apk'
+  'release',
+  'app-release.apk'
 );
 const BACKEND_STATIC = path.join(MOBILE_ROOT, '..', 'backend', 'static');
 const APK_DEST = path.join(BACKEND_STATIC, 'wms-app.apk');
 
 if (!fs.existsSync(APK_SOURCE)) {
-  console.error('APK topilmadi. Avval build qiling:');
-  console.error('  cd mobile && npx react-native run-android');
-  console.error('  yoki: cd mobile/android && ../gradlew assembleDebug');
+  console.error('Release APK topilmadi. Avval build qiling:');
+  console.error('  cd mobile/android && gradlew.bat assembleRelease');
   console.error('Manba:', APK_SOURCE);
   process.exit(1);
 }
