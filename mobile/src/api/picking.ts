@@ -6,6 +6,24 @@ import type { PickingListItem, PickingDocument, PickLineResponse } from './picki
 
 const PICKING = '/picking';
 
+export interface MyPickerStatsDay {
+  date: string;
+  count: number;
+}
+
+export interface MyPickerStats {
+  total_completed: number;
+  completed_today: number;
+  by_day: MyPickerStatsDay[];
+}
+
+export async function getMyPickerStats(days = 7): Promise<MyPickerStats> {
+  const { data } = await apiClient.get<MyPickerStats>(`${PICKING}/my-stats`, {
+    params: { days },
+  });
+  return data;
+}
+
 export interface ControllerUser {
   id: string;
   username: string;

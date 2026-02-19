@@ -18,7 +18,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { RootStackParamList } from '../types/navigation';
 import { useLocale } from '../i18n/LocaleContext';
 import { useNetwork } from '../network';
-import { getOpenTasks } from '../api/picking';
+import { getOpenTasks, getMyPickerStats, type MyPickerStats } from '../api/picking';
 import { getCachedPickTasks } from '../offline/offlineDb';
 import { getPendingCount } from '../offline/offlineQueue';
 import { registerPushToken } from '../notifications/pushNotifications';
@@ -119,6 +119,7 @@ export function PickerHome() {
   const { isOnline } = useNetwork();
   const [queueCount, setQueueCount] = useState(0);
   const [taskCount, setTaskCount] = useState(0);
+  const [stats, setStats] = useState<MyPickerStats | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const profileType = route.params?.profileType ?? 'picker';
   const headerTitle = profileType === 'controller' ? t('controllerTitle') : t('pickerTitle');
@@ -129,10 +130,12 @@ export function PickerHome() {
       getOpenTasks(50, 0)
         .then((data) => setTaskCount(Array.isArray(data) ? data.length : 0))
         .catch(() => setTaskCount(0));
+      getMyPickerStats(7).then(setStats).catch(() => setStats(null));
     } else {
       getCachedPickTasks()
         .then((data) => setTaskCount(Array.isArray(data) ? data.length : 0))
         .catch(() => setTaskCount(0));
+      setStats(null);
     }
   }, [isOnline]);
 
@@ -171,25 +174,47 @@ export function PickerHome() {
         </View>
       )}
 
-      {/* Cards */}
+      {/* Stats + Chart, then Offline queue card */}
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={true}
       >
-        <Card
-          iconName="clipboard-list-outline"
-          title={t('myPickTasks')}
-          subtitle={t('docsForPicking')}
-          onPress={() => navigation.navigate('PickTaskList', { profileType })}
-          badge={taskCount}
-        />
-        <Card
-          iconName="package-variant"
-          title={t('inventory')}
-          subtitle={t('productsAndLocations')}
-          onPress={() => navigation.navigate('Inventory')}
-        />
+        {stats !== null && (
+          <View style={styles.statsSection}>
+            <View style={styles.statsRow}>
+              <View style={styles.statBox}>
+                <Text style={styles.statValue}>{stats.total_completed}</Text>
+                <Text style={styles.statLabel}>{t('statsTotalCompleted')}</Text>
+              </View>
+              <View style={styles.statBox}>
+                <Text style={styles.statValue}>{stats.completed_today}</Text>
+                <Text style={styles.statLabel}>{t('statsCompletedToday')}</Text>
+              </View>
+            </View>
+            {stats.by_day.length > 0 && (
+              <View style={styles.chartWrap}>
+                <Text style={styles.chartTitle}>{t('statsChartTitle')}</Text>
+                <View style={styles.chartBarRow}>
+                  {stats.by_day.map((d) => {
+                    const maxC = Math.max(1, ...stats.by_day.map((x) => x.count));
+                    const h = maxC > 0 ? Math.max(4, (d.count / maxC) * 80) : 4;
+                    const label = d.date.slice(8, 10);
+                    return (
+                      <View key={d.date} style={styles.chartBarCol}>
+                        <View style={[styles.chartBar, { height: h }]} />
+                        <Text style={styles.chartBarLabel} numberOfLines={1}>{label}</Text>
+                        {d.count > 0 && (
+                          <Text style={styles.chartBarCount}>{d.count}</Text>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+          </View>
+        )}
         <Card
           iconName="sync-off"
           title={queueCount > 0 ? `${t('offlineQueue')} (${queueCount})` : t('offlineQueue')}
@@ -265,6 +290,70 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
     paddingBottom: 24,
+  },
+  statsSection: {
+    marginBottom: 20,
+    backgroundColor: CARD_BG,
+    borderRadius: 12,
+    padding: 16,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 16,
+  },
+  statBox: {
+    alignItems: 'center',
+    minWidth: 100,
+  },
+  statValue: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: HEADER_ACCENT,
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 13,
+    color: TEXT_SECONDARY,
+  },
+  chartWrap: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#ddd',
+    paddingTop: 12,
+  },
+  chartTitle: {
+    fontSize: 13,
+    color: TEXT_SECONDARY,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  chartBarRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    height: 100,
+  },
+  chartBarCol: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 2,
+  },
+  chartBar: {
+    width: '80%',
+    minHeight: 4,
+    backgroundColor: HEADER_ACCENT,
+    borderRadius: 4,
+    marginBottom: 4,
+  },
+  chartBarLabel: {
+    fontSize: 10,
+    color: TEXT_SECONDARY,
+  },
+  chartBarCount: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: TEXT_PRIMARY,
   },
   card: {
     flexDirection: 'row',

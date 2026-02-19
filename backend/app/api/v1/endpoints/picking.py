@@ -1,3 +1,4 @@
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import List, Literal, Optional
 from uuid import UUID
@@ -83,6 +84,17 @@ class SendToControllerRequest(BaseModel):
 class FCMTokenRequest(BaseModel):
     token: str
     device_id: Optional[str] = None
+
+
+class MyPickerStatsDay(BaseModel):
+    date: str  # YYYY-MM-DD
+    count: int
+
+
+class MyPickerStatsResponse(BaseModel):
+    total_completed: int
+    completed_today: int
+    by_day: List[MyPickerStatsDay]
 
 
 def _calculate_progress(lines: List[DocumentLineModel]) -> PickingProgress:
@@ -195,6 +207,62 @@ async def list_controllers(
         ControllerUser(id=u.id, username=u.username, full_name=u.full_name)
         for u in controllers
     ]
+
+
+@router.get("/my-stats", response_model=MyPickerStatsResponse, summary="My completed pick documents (for dashboard)")
+@router.get("/my-stats/", response_model=MyPickerStatsResponse, summary="My completed pick documents")
+async def get_my_picker_stats(
+    days: int = 7,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("picking:read")),
+):
+    today = datetime.now(timezone.utc).date()
+    total_completed = (
+        db.query(func.count(DocumentModel.id))
+        .filter(
+            DocumentModel.doc_type == "SO",
+            DocumentModel.status == "completed",
+            (DocumentModel.assigned_to_user_id == user.id) | (DocumentModel.controlled_by_user_id == user.id),
+        )
+        .scalar()
+        or 0
+    )
+    completed_today = (
+        db.query(func.count(DocumentModel.id))
+        .filter(
+            DocumentModel.doc_type == "SO",
+            DocumentModel.status == "completed",
+            (DocumentModel.assigned_to_user_id == user.id) | (DocumentModel.controlled_by_user_id == user.id),
+            func.date(DocumentModel.updated_at) == today,
+        )
+        .scalar()
+        or 0
+    )
+    days = max(1, min(31, days))
+    start_date = today - timedelta(days=days - 1)
+    rows = (
+        db.query(func.date(DocumentModel.updated_at).label("d"), func.count(DocumentModel.id).label("c"))
+        .filter(
+            DocumentModel.doc_type == "SO",
+            DocumentModel.status == "completed",
+            (DocumentModel.assigned_to_user_id == user.id) | (DocumentModel.controlled_by_user_id == user.id),
+            func.date(DocumentModel.updated_at) >= start_date,
+            func.date(DocumentModel.updated_at) <= today,
+        )
+        .group_by(func.date(DocumentModel.updated_at))
+        .order_by(func.date(DocumentModel.updated_at))
+        .all()
+    )
+    by_date = {str(r.d): r.c for r in rows}
+    by_day = [
+        MyPickerStatsDay(date=(start_date + timedelta(days=i)).isoformat(), count=by_date.get((start_date + timedelta(days=i)).isoformat(), 0))
+        for i in range(days)
+    ]
+    return MyPickerStatsResponse(
+        total_completed=total_completed,
+        completed_today=completed_today,
+        by_day=by_day,
+    )
 
 
 @router.post("/fcm-token", status_code=status.HTTP_204_NO_CONTENT, summary="Register FCM token for push notifications")

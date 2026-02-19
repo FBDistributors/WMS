@@ -33,6 +33,9 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     tabPickLists: 'Listlar',
     tabInventory: 'Inventar',
     tabAccount: 'Hisob',
+    statsTotalCompleted: "Jami yig'ilgan",
+    statsCompletedToday: "Bugun yig'ilgan",
+    statsChartTitle: "Kunlik yig'ilgan (7 kun)",
 
     // Account (Hisob)
     account: 'Hisob',
@@ -151,6 +154,9 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     tabPickLists: 'Списки',
     tabInventory: 'Инвентарь',
     tabAccount: 'Аккаунт',
+    statsTotalCompleted: 'Всего собрано',
+    statsCompletedToday: 'Собрано сегодня',
+    statsChartTitle: 'За день (7 дней)',
 
     account: 'Аккаунт',
     accountLoadError: 'Не удалось загрузить данные',
@@ -265,6 +271,9 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     tabPickLists: 'Lists',
     tabInventory: 'Inventory',
     tabAccount: 'Account',
+    statsTotalCompleted: 'Total completed',
+    statsCompletedToday: 'Completed today',
+    statsChartTitle: 'Daily completed (7 days)',
 
     account: 'Account',
     accountLoadError: 'Failed to load data',
