@@ -1,11 +1,11 @@
 import { useCallback, useState } from 'react';
-import { api } from '../api/client';
-import type { ProductByBarcode } from '../api/types';
+import { getInventoryByBarcode } from '../api/inventory';
+import type { InventoryByBarcodeResponse } from '../api/inventory';
 
 type Status = 'idle' | 'loading' | 'success' | 'error';
 
 export function useProductByBarcode() {
-  const [product, setProduct] = useState<ProductByBarcode | null>(null);
+  const [product, setProduct] = useState<InventoryByBarcodeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<Status>('idle');
 
@@ -16,7 +16,7 @@ export function useProductByBarcode() {
     setError(null);
     setProduct(null);
     try {
-      const data = await api.getProductByBarcode(trimmed);
+      const data = await getInventoryByBarcode(trimmed);
       setProduct(data);
       setStatus('success');
     } catch (e) {

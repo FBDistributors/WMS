@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import type { ProductByBarcode } from '../api/types';
+import type { InventoryByBarcodeResponse } from '../api/inventory';
 
 const styles = StyleSheet.create({
   card: {
@@ -46,31 +46,47 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#0a0',
   },
+  locationsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+    paddingHorizontal: 0,
+  },
+  locationCode: {
+    fontSize: 14,
+    color: '#111',
+    fontWeight: '500',
+  },
+  locationQty: {
+    fontSize: 14,
+    color: '#0a0',
+  },
 });
 
 interface ProductCardProps {
-  product: ProductByBarcode;
+  product: InventoryByBarcodeResponse;
 }
 
 export function ProductCard({ product }: ProductCardProps) {
-  const onHand = product.on_hand_total ?? 0;
-  const available = product.available_total ?? 0;
+  const total = Number(product.total_available ?? 0);
+  const locations = product.best_locations ?? [];
 
   return (
     <View style={styles.card}>
       <Text style={styles.name} numberOfLines={2}>
         {product.name}
       </Text>
-      <View style={styles.row}>
-        <Text style={styles.label}>SKU</Text>
-        <Text style={styles.value}>{product.sku}</Text>
-      </View>
-      {(product.barcode || (product.barcodes && product.barcodes.length > 0)) && (
+      {product.barcode && (
         <View style={styles.row}>
           <Text style={styles.label}>Barcode</Text>
-          <Text style={styles.value}>
-            {product.barcode || product.barcodes?.[0] || '—'}
-          </Text>
+          <Text style={styles.value}>{product.barcode}</Text>
         </View>
       )}
       {product.brand && (
@@ -81,9 +97,20 @@ export function ProductCard({ product }: ProductCardProps) {
       )}
       <View style={styles.stock}>
         <Text style={styles.stockText}>
-          Stock: {available} available{onHand !== available ? ` (${onHand} on hand)` : ''}
+          Jami mavjud: {total} dona
         </Text>
       </View>
+      {locations.length > 0 && (
+        <>
+          <Text style={styles.locationsTitle}>Qayerda:</Text>
+          {locations.map((loc, i) => (
+            <View key={`${loc.location_code}-${i}`} style={styles.locationRow}>
+              <Text style={styles.locationCode}>{loc.location_code}</Text>
+              <Text style={styles.locationQty}>{Number(loc.available_qty)} dona</Text>
+            </View>
+          ))}
+        </>
+      )}
     </View>
   );
 }

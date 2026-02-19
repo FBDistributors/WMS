@@ -81,3 +81,30 @@ export async function getPickerProductDetail(
   );
   return data;
 }
+
+/** Skaner uchun: barcode bo‘yicha mahsulot + qayerda qancha (lokatsiyalar) */
+export type InventoryByBarcodeLocation = {
+  location_code: string;
+  available_qty: number;
+};
+
+export type InventoryByBarcodeResponse = {
+  product_id: string;
+  name: string;
+  barcode: string | null;
+  brand: string | null;
+  best_locations: InventoryByBarcodeLocation[];
+  fefo_lots: Array<{ batch_no: string; expiry_date: string | null; available_qty: number }>;
+  total_available: number;
+};
+
+export async function getInventoryByBarcode(
+  barcode: string
+): Promise<InventoryByBarcodeResponse> {
+  const trimmed = barcode.trim();
+  if (!trimmed) throw new Error('Barcode bo‘sh bo‘lmasligi kerak');
+  const { data } = await apiClient.get<InventoryByBarcodeResponse>(
+    `${INV}/by-barcode/${encodeURIComponent(trimmed)}`
+  );
+  return data;
+}
