@@ -17,6 +17,7 @@ import type { RootStackParamList } from '../types/navigation';
 import type { LocaleCode } from '../i18n/translations';
 import { useLocale } from '../i18n/LocaleContext';
 import { localeLabels } from '../i18n/translations';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getStoredToken } from '../api/client';
 import { login, getMe } from '../api/auth';
 import { BRAND } from '../config/branding';
@@ -25,25 +26,56 @@ type Nav = StackNavigationProp<RootStackParamList, 'Login'>;
 
 const LOCALES: LocaleCode[] = ['uz', 'ru', 'en'];
 
+const LAST_USERNAME_KEY = '@wms_last_username';
+
+async function getLastUsername(): Promise<string | null> {
+  try {
+    return await AsyncStorage.getItem(LAST_USERNAME_KEY);
+  } catch {
+    return null;
+  }
+}
+
+async function setLastUsername(username: string): Promise<void> {
+  try {
+    await AsyncStorage.setItem(LAST_USERNAME_KEY, username);
+  } catch {
+    // ignore
+  }
+}
+
 export function LoginScreen() {
   const navigation = useNavigation<Nav>();
   const { t, locale, setLocale } = useLocale();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   useEffect(() => {
-    getStoredToken().then((token) => {
-      if (!token) return;
-      getMe()
-        .then((me) => {
-          const profileType = me.role === 'inventory_controller' ? 'controller' : 'picker';
-          navigation.replace('PickerHome', { profileType });
-        })
-        .catch(() => navigation.replace('PickerHome', { profileType: 'picker' }));
-    });
+    let cancelled = false;
+    (async () => {
+      const token = await getStoredToken();
+      if (!token) {
+        if (!cancelled) {
+          const lastUser = await getLastUsername();
+          if (lastUser) setUsername(lastUser);
+          setCheckingSession(false);
+        }
+        return;
+      }
+      try {
+        const me = await getMe();
+        if (cancelled) return;
+        const profileType = me.role === 'inventory_controller' ? 'controller' : 'picker';
+        navigation.replace('PickerHome', { profileType });
+      } catch {
+        if (!cancelled) setCheckingSession(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [navigation]);
 
   const handleLogin = async () => {
@@ -56,6 +88,7 @@ export function LoginScreen() {
     setLoading(true);
     try {
       await login({ username: u, password: p });
+      await setLastUsername(u);
       const me = await getMe();
       const profileType = me.role === 'inventory_controller' ? 'controller' : 'picker';
       navigation.replace('PickerHome', { profileType });
@@ -66,6 +99,15 @@ export function LoginScreen() {
       setLoading(false);
     }
   };
+
+  if (checkingSession) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#1976d2" />
+        <Text style={styles.loadingText}>{t('loading')}</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -162,6 +204,15 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 48,
     backgroundColor: '#f5f5f5',
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#666',
   },
   langDropdownWrap: {
     position: 'absolute',
