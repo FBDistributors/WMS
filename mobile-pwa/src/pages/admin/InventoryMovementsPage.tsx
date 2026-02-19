@@ -106,7 +106,15 @@ export function InventoryMovementsPage() {
                 <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
                   {Math.round(Number(row.qty_change))}
                 </td>
-                <td className="px-4 py-3 text-slate-500">{row.product_id}</td>
+                <td className="max-w-[200px] px-4 py-3 text-slate-700 dark:text-slate-200">
+                  {row.product_code != null || row.product_name != null ? (
+                    <span className="block truncate" title={row.product_name ?? undefined}>
+                      {[row.product_code, row.product_name].filter(Boolean).join(' — ')}
+                    </span>
+                  ) : (
+                    row.product_id
+                  )}
+                </td>
                 <td className="px-4 py-3 text-slate-500">{row.lot_id}</td>
                 <td className="px-4 py-3 text-slate-500">{row.location_id}</td>
                 <td className="px-4 py-3 text-slate-500">

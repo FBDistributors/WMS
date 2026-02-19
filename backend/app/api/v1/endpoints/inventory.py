@@ -8,7 +8,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import case, distinct, exists, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.auth.deps import get_current_user, require_permission
 from app.services.audit_service import ACTION_CREATE, get_client_ip, log_action
@@ -58,6 +58,8 @@ class StockLotCreate(BaseModel):
 class StockMovementOut(BaseModel):
     id: UUID
     product_id: UUID
+    product_code: Optional[str] = None
+    product_name: Optional[str] = None
     lot_id: UUID
     location_id: UUID
     qty_change: Decimal
@@ -242,9 +244,12 @@ def _to_lot(lot: StockLotModel) -> StockLotOut:
 
 
 def _to_movement(movement: StockMovementModel) -> StockMovementOut:
+    product = getattr(movement, "product", None)
     return StockMovementOut(
         id=movement.id,
         product_id=movement.product_id,
+        product_code=product.sku if product else None,
+        product_name=product.name if product else None,
         lot_id=movement.lot_id,
         location_id=movement.location_id,
         qty_change=movement.qty_change,
@@ -340,7 +345,8 @@ async def list_stock_movements(
         query = query.filter(StockMovementModel.source_document_id == source_document_id)
 
     movements = (
-        query.order_by(StockMovementModel.created_at.desc())
+        query.options(selectinload(StockMovementModel.product))
+        .order_by(StockMovementModel.created_at.desc())
         .offset(offset)
         .limit(limit)
         .all()
