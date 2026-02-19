@@ -130,7 +130,7 @@ export function ReceivingPage() {
     setIsSubmitting(true)
     setError(null)
     try {
-      await createReceipt({
+      const created = await createReceipt({
         doc_no: docNo.trim() || undefined,
         lines: lines.map(({ id, ...line }) => ({
           ...line,
@@ -139,6 +139,7 @@ export function ReceivingPage() {
           expiry_date: line.expiry_date || null,
         })),
       })
+      await completeReceipt(created.id)
       setDocNo('')
       setLines([{ ...EMPTY_LINE }])
       setSelectedProducts(new Map())
