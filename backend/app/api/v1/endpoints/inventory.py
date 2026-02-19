@@ -20,6 +20,7 @@ from app.models.document import DocumentLine as DocumentLineModel
 from app.models.location import Location as LocationModel
 from app.models.product import Product as ProductModel
 from app.models.product import ProductBarcode
+from app.models.stock import ON_HAND_MOVEMENT_TYPES
 from app.models.stock import StockLot as StockLotModel
 from app.models.stock import StockMovement as StockMovementModel
 from app.models.user import User as UserModel
@@ -421,10 +422,11 @@ async def inventory_summary(
     db: Session = Depends(get_db),
     _user=Depends(require_permission("inventory:read")),
 ):
+    # Qoldiq: faqat Kirim (receipt) va Jo'natish (ship)
     on_hand_expr = func.sum(
         case(
-            (StockMovementModel.movement_type.in_(("allocate", "unallocate")), 0),
-            else_=StockMovementModel.qty_change,
+            (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
+            else_=0,
         )
     )
     reserved_expr = func.sum(
@@ -471,8 +473,8 @@ def _fetch_locations_by_products(db: Session, product_ids: list[UUID]) -> dict[U
         return {}
     on_hand_expr = func.sum(
         case(
-            (StockMovementModel.movement_type.in_(("allocate", "unallocate")), 0),
-            else_=StockMovementModel.qty_change,
+            (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
+            else_=0,
         )
     )
     reserved_expr = func.sum(
@@ -534,8 +536,8 @@ async def inventory_summary_light(
     """Lightweight summary: product_id, name, brand, totals. Optional location breakdown. Paginated."""
     on_hand_expr = func.sum(
         case(
-            (StockMovementModel.movement_type.in_(("allocate", "unallocate")), 0),
-            else_=StockMovementModel.qty_change,
+            (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
+            else_=0,
         )
     )
     reserved_expr = func.sum(
@@ -621,8 +623,8 @@ async def inventory_by_product(
     """Per-location details for one product. Call when user expands row."""
     on_hand_expr = func.sum(
         case(
-            (StockMovementModel.movement_type.in_(("allocate", "unallocate")), 0),
-            else_=StockMovementModel.qty_change,
+            (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
+            else_=0,
         )
     )
     reserved_expr = func.sum(
@@ -683,8 +685,8 @@ async def inventory_details(
 ):
     on_hand_expr = func.sum(
         case(
-            (StockMovementModel.movement_type.in_(("allocate", "unallocate")), 0),
-            else_=StockMovementModel.qty_change,
+            (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
+            else_=0,
         )
     )
     reserved_expr = func.sum(
@@ -778,8 +780,8 @@ async def inventory_summary_by_location(
 ):
     on_hand_expr = func.sum(
         case(
-            (StockMovementModel.movement_type.in_(("allocate", "unallocate")), 0),
-            else_=StockMovementModel.qty_change,
+            (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
+            else_=0,
         )
     )
     reserved_expr = func.sum(
@@ -894,16 +896,17 @@ async def list_stock_balances(
     db: Session = Depends(get_db),
     _user=Depends(require_permission("inventory:read")),
 ):
+    qty_expr = func.sum(
+        case(
+            (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
+            else_=0,
+        )
+    )
     query = (
         db.query(
             StockMovementModel.lot_id,
             StockMovementModel.location_id,
-            func.sum(
-                case(
-                    (StockMovementModel.movement_type.in_(("allocate", "unallocate")), 0),
-                    else_=StockMovementModel.qty_change,
-                )
-            ).label("qty"),
+            qty_expr.label("qty"),
             StockLotModel.product_id,
             StockLotModel.batch,
             StockLotModel.expiry_date,
@@ -924,7 +927,7 @@ async def list_stock_balances(
     if location_id:
         query = query.filter(StockMovementModel.location_id == location_id)
     if not include_zero:
-        query = query.having(func.sum(StockMovementModel.qty_change) != 0)
+        query = query.having(qty_expr != 0)
 
     rows = query.all()
     return [
@@ -969,13 +972,15 @@ async def balance_diagnostic(
         .all()
     )
 
-    on_hand = Decimal("0")
-    reserved = Decimal("0")
-    for m in movements:
-        if m.movement_type in ("allocate", "unallocate"):
-            reserved += m.qty_change
-        else:
-            on_hand += m.qty_change
+    # Qoldiq: faqat Kirim (receipt) va Jo'natish (ship)
+    on_hand = sum(
+        (m.qty_change for m in movements if m.movement_type in ON_HAND_MOVEMENT_TYPES),
+        Decimal("0"),
+    )
+    reserved = sum(
+        (m.qty_change for m in movements if m.movement_type in ("allocate", "unallocate")),
+        Decimal("0"),
+    )
     available = on_hand - reserved
 
     items = [
@@ -993,17 +998,14 @@ async def balance_diagnostic(
     receipt_sum = sum(m.qty_change for m in movements if m.movement_type == "receipt")
     pick_sum = sum(m.qty_change for m in movements if m.movement_type == "pick")
     pick_count = sum(1 for m in movements if m.movement_type == "pick")
+    ship_sum = sum(m.qty_change for m in movements if m.movement_type == "ship")
+    summary = (
+        f"Qoldiq hisobi: faqat Kirim (receipt) va Jo'natish (ship). "
+        f"Kirim: {receipt_sum}, Jo'natish: {ship_sum} → on_hand={on_hand}, reserved={reserved}, available={available}."
+    )
     if pick_count >= 2:
-        summary = (
-            f"Kirim (receipt): {receipt_sum}. Terish (pick): jami {pick_sum} ({pick_count} ta pick yozuvi). "
-            f"on_hand = {on_hand}. "
-            f"2 yoki undan ortiq pick yozuvi bor – bitta terilgan bo'lsa ortiqcha yozuv mavjud. "
-            "POST /api/v1/inventory/fix-duplicate-pick body: {{\"product_id\": \"...\"}} orqali tuzatish mumkin."
-        )
-    else:
-        summary = (
-            f"Kirim: {receipt_sum}, terish (pick): {pick_sum}, boshqa harakatlar hisobga olingan. "
-            f"on_hand={on_hand}, reserved={reserved}, available={available}."
+        summary += (
+            f" Eslatma: {pick_count} ta terish (pick) yozuvi bor; qoldiqda faqat receipt+ship hisoblanadi."
         )
 
     return BalanceDiagnosticOut(

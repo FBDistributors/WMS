@@ -21,6 +21,7 @@ from app.models.document import Document as DocumentModel
 from app.models.order import Order as OrderModel
 from app.models.location import Location as LocationModel
 from app.models.user import User as UserModel
+from app.models.stock import ON_HAND_MOVEMENT_TYPES
 from app.models.stock import StockLot as StockLotModel
 from app.models.stock import StockMovement as StockMovementModel
 from app.schemas.product import ProductCreateIn, ProductImportItem, ProductListOut, ProductOut
@@ -122,13 +123,13 @@ def _to_product(
 
 
 def _fetch_inventory_summary(db: Session, product_ids: List[UUID]) -> Dict[UUID, dict]:
-    """Single aggregate query for on_hand/available per product. No N+1."""
+    """Single aggregate query for on_hand/available per product. Qoldiq: faqat Kirim (receipt) va Jo'natish (ship)."""
     if not product_ids:
         return {}
     on_hand_expr = func.sum(
         case(
-            (StockMovementModel.movement_type.in_(("allocate", "unallocate")), 0),
-            else_=StockMovementModel.qty_change,
+            (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
+            else_=0,
         )
     )
     reserved_expr = func.sum(

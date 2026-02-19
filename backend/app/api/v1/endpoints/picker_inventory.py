@@ -19,6 +19,7 @@ from app.db import get_db
 from app.models.location import Location as LocationModel
 from app.models.product import Product as ProductModel
 from app.models.product import ProductBarcode
+from app.models.stock import ON_HAND_MOVEMENT_TYPES
 from app.models.stock import StockLot as StockLotModel
 from app.models.stock import StockMovement as StockMovementModel
 from app.models.user import User as UserModel
@@ -111,11 +112,8 @@ def _get_lot_level_balances(
 ) -> list[dict[str, Any]]:
     on_hand_expr = func.sum(
         case(
-            (
-                StockMovementModel.movement_type.in_(("allocate", "unallocate")),
-                0,
-            ),
-            else_=StockMovementModel.qty_change,
+            (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
+            else_=0,
         )
     )
     reserved_expr = func.sum(
