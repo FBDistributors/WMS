@@ -223,18 +223,15 @@ export function PickTaskDetails() {
     }
     setSubmitting(true);
     try {
+      const profileType = isController ? 'controller' : 'picker';
       if (isOnline) {
         await apiClient.post(`/picking/documents/${taskId}/complete`);
-        const profileType = isController ? 'controller' : 'picker';
-        Alert.alert(t('success'), t('pickingComplete'), [
-          { text: 'OK', onPress: () => navigation.navigate('PickTaskList', { profileType }) },
-        ]);
+        navigation.replace('PickTaskList', { profileType });
+        Alert.alert(t('success'), t('pickingComplete'));
       } else {
         await addToQueue('PICK_CLOSE_TASK', { taskId, ts: Date.now() });
-        const profileType = isController ? 'controller' : 'picker';
-        Alert.alert(t('success'), t('pickingComplete'), [
-          { text: 'OK', onPress: () => navigation.navigate('PickTaskList', { profileType }) },
-        ]);
+        navigation.replace('PickTaskList', { profileType });
+        Alert.alert(t('success'), t('pickingComplete'));
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : t('completeError');
@@ -268,10 +265,19 @@ export function PickTaskDetails() {
     );
   }
 
+  const goBack = useCallback(() => {
+    const profileType = isController ? 'controller' : 'picker';
+    if (doc?.status === 'completed') {
+      navigation.replace('PickTaskList', { profileType });
+    } else {
+      navigation.goBack();
+    }
+  }, [doc?.status, isController, navigation]);
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+        <TouchableOpacity onPress={goBack} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <Icon name="arrow-left" size={24} color="#1976d2" />
         </TouchableOpacity>
         <Text style={styles.title}>{doc.reference_number}</Text>
