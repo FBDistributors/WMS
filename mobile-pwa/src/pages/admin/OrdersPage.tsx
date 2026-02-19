@@ -349,7 +349,7 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
 
     return (
       <TableScrollArea inline>
-        <table className="w-max min-w-full text-sm">
+        <table className="w-max min-w-[600px] text-sm">
           <thead className="text-xs uppercase text-slate-500">
             <tr className="border-b border-slate-200 dark:border-slate-800">
               {orderedColumns.map((columnId) =>

@@ -78,32 +78,32 @@ export function BrandsPage() {
     }
     return (
       <TableScrollArea>
-        <table className="min-w-full text-sm">
+        <table className="w-full min-w-[520px] text-sm">
           <thead className="text-xs uppercase text-slate-500">
             <tr className="border-b border-slate-200 dark:border-slate-800">
-              <th className="px-4 py-3 text-left">{t('brands:columns.code')}</th>
-              <th className="px-4 py-3 text-left">{t('brands:columns.name')}</th>
-              <th className="px-4 py-3 text-left">{t('brands:columns.display_name')}</th>
-              <th className="px-4 py-3 text-left">{t('brands:columns.status')}</th>
-              {canManage ? <th className="px-4 py-3 text-left">{t('brands:columns.actions')}</th> : null}
+              <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('brands:columns.code')}</th>
+              <th className="px-3 py-3 text-left sm:px-4">{t('brands:columns.name')}</th>
+              <th className="px-3 py-3 text-left sm:px-4">{t('brands:columns.display_name')}</th>
+              <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('brands:columns.status')}</th>
+              {canManage ? <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('brands:columns.actions')}</th> : null}
             </tr>
           </thead>
           <tbody>
             {items.map((brand) => (
               <tr key={brand.id} className="border-b border-slate-100 dark:border-slate-800">
-                <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">
+                <td className="whitespace-nowrap px-3 py-3 font-semibold text-slate-900 dark:text-slate-100 sm:px-4">
                   {brand.code}
                 </td>
-                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">{brand.name}</td>
-                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
+                <td className="min-w-[80px] px-3 py-3 text-slate-700 dark:text-slate-200 sm:px-4">{brand.name}</td>
+                <td className="min-w-[80px] px-3 py-3 text-slate-700 dark:text-slate-200 sm:px-4">
                   {brand.display_name ?? '—'}
                 </td>
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                <td className="whitespace-nowrap px-3 py-3 text-slate-600 dark:text-slate-300 sm:px-4">
                   {brand.is_active ? t('brands:status.active') : t('brands:status.inactive')}
                 </td>
                 {canManage ? (
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
+                  <td className="whitespace-nowrap px-3 py-3 sm:px-4">
+                    <div className="flex flex-nowrap items-center gap-1 sm:gap-2">
                       <Button
                         variant="ghost"
                         className="p-2"
@@ -135,9 +135,9 @@ export function BrandsPage() {
       title={t('brands:title')}
       actionSlot={
         canManage ? (
-          <Button onClick={() => setDialog({ open: true, mode: 'create' })}>
+          <Button onClick={() => setDialog({ open: true, mode: 'create' })} className="shrink-0">
             <Plus size={16} />
-            {t('brands:add')}
+            <span className="hidden sm:inline">{t('brands:add')}</span>
           </Button>
         ) : null
       }

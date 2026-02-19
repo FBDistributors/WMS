@@ -84,14 +84,14 @@ export function AuditLogsPage() {
     }
     return (
       <TableScrollArea>
-        <table className="min-w-full text-sm">
+        <table className="w-full min-w-[560px] text-sm">
           <thead className="text-xs uppercase text-slate-500">
             <tr className="border-b border-slate-200 dark:border-slate-800">
-              <th className="px-4 py-3 text-left">{t('audit:columns.timestamp')}</th>
-              <th className="px-4 py-3 text-left">{t('audit:columns.user')}</th>
-              <th className="px-4 py-3 text-left">{t('audit:columns.action')}</th>
-              <th className="px-4 py-3 text-left">{t('audit:columns.entity_type')}</th>
-              <th className="px-4 py-3 text-left">{t('audit:columns.entity_id')}</th>
+              <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('audit:columns.timestamp')}</th>
+              <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('audit:columns.user')}</th>
+              <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('audit:columns.action')}</th>
+              <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('audit:columns.entity_type')}</th>
+              <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('audit:columns.entity_id')}</th>
             </tr>
           </thead>
           <tbody>
@@ -101,13 +101,13 @@ export function AuditLogsPage() {
                 className="cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
                 onClick={() => setDetailRow(row)}
               >
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                <td className="whitespace-nowrap px-3 py-3 text-slate-600 dark:text-slate-300 sm:px-4">
                   {new Date(row.created_at).toLocaleString()}
                 </td>
-                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
+                <td className="whitespace-nowrap px-3 py-3 text-slate-700 dark:text-slate-200 sm:px-4">
                   {row.username ?? row.user_id ?? '—'}
                 </td>
-                <td className="px-4 py-3">
+                <td className="whitespace-nowrap px-3 py-3 sm:px-4">
                   <span
                     className={
                       row.action === 'CREATE'
@@ -120,8 +120,8 @@ export function AuditLogsPage() {
                     {row.action}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{row.entity_type}</td>
-                <td className="px-4 py-3 font-mono text-xs text-slate-500">{row.entity_id}</td>
+                <td className="whitespace-nowrap px-3 py-3 text-slate-600 dark:text-slate-300 sm:px-4">{row.entity_type}</td>
+                <td className="max-w-[120px] truncate px-3 py-3 font-mono text-xs text-slate-500 sm:max-w-none sm:px-4" title={row.entity_id}>{row.entity_id}</td>
               </tr>
             ))}
           </tbody>

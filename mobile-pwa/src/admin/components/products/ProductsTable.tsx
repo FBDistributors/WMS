@@ -254,7 +254,7 @@ export function ProductsTable({
   return (
     <Card className="overflow-hidden p-0">
       <TableScrollArea className="border-0">
-        <table className="min-w-full border-separate border-spacing-0 text-sm">
+        <table className="w-full min-w-[600px] border-separate border-spacing-0 text-sm">
           <thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-950/40 dark:text-slate-400">
             <tr>
               {displayColumns.map((column) => (

@@ -93,8 +93,8 @@ export function AdminLayout({ title, backTo, actionSlot, children }: AdminLayout
           isCollapsed ? 'md:pl-20' : 'md:pl-64',
         ].join(' ')}
       >
-        <header className="sticky top-0 z-10 flex shrink-0 items-center justify-between border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
-          <div className="flex min-w-0 items-center gap-2">
+        <header className="sticky top-0 z-10 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:gap-3 md:px-6 md:py-4 dark:border-slate-800 dark:bg-slate-900/95">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             {backTo ? (
               <Button
                 variant="ghost"
@@ -109,19 +109,22 @@ export function AdminLayout({ title, backTo, actionSlot, children }: AdminLayout
                 <Menu size={18} />
               </Button>
             )}
-            <div className="min-w-0 truncate text-lg font-semibold text-slate-900 dark:text-slate-100">
+            <div className="min-w-0 truncate text-base font-semibold text-slate-900 dark:text-slate-100 sm:text-lg">
               {title}
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <LanguageSwitcher />
-            <Button
-              variant="ghost"
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              aria-label={t('common:theme.label')}
-            >
-              {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
-            </Button>
+          <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+            {/* Mobil: til va tema faqat profil menyuda; planshet/desktop: headerda */}
+            <div className="hidden md:flex md:items-center md:gap-2">
+              <LanguageSwitcher />
+              <Button
+                variant="ghost"
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                aria-label={t('common:theme.label')}
+              >
+                {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
+              </Button>
+            </div>
             {user && import.meta.env.DEV && isMock ? (
               <select
                 className="rounded-xl border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
@@ -157,7 +160,7 @@ export function AdminLayout({ title, backTo, actionSlot, children }: AdminLayout
                       aria-hidden
                       onClick={() => setShowUserMenu(false)}
                     />
-                    <div className="absolute right-0 top-full mt-2 z-50 w-48 rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800">
+                    <div className="absolute right-0 top-full mt-2 z-50 w-56 rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800">
                       <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">
                         <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
                           {user.name}
@@ -165,6 +168,23 @@ export function AdminLayout({ title, backTo, actionSlot, children }: AdminLayout
                         <div className="text-xs text-slate-500 dark:text-slate-400">
                           {t(`common:roles.${user.role}`)}
                         </div>
+                      </div>
+                      {/* Mobil: til va tema — profil menyuda */}
+                      <div className="flex flex-col gap-0 border-b border-slate-200 dark:border-slate-700 md:hidden">
+                        <div className="flex items-center justify-between px-4 py-2">
+                          <span className="text-xs text-slate-600 dark:text-slate-400">{t('common:labels.language')}</span>
+                          <LanguageSwitcher compact />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTheme(theme === 'dark' ? 'light' : 'dark')
+                          }}
+                          className="flex items-center justify-between gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
+                        >
+                          <span className="text-xs text-slate-600 dark:text-slate-400">{t('common:theme.label')}</span>
+                          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+                        </button>
                       </div>
                       <button
                         onClick={() => {
@@ -183,8 +203,8 @@ export function AdminLayout({ title, backTo, actionSlot, children }: AdminLayout
             ) : null}
           </div>
         </header>
-        <main className="min-w-0 flex-1 overflow-x-auto overflow-y-auto px-6 py-6 pb-14">{children}</main>
-        <footer className="shrink-0 border-t border-slate-200 bg-white/80 px-6 py-2 text-left text-xs text-slate-500 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+        <main className="min-w-0 flex-1 overflow-x-auto overflow-y-auto px-4 py-4 pb-14 sm:px-6 sm:py-6">{children}</main>
+        <footer className="shrink-0 border-t border-slate-200 bg-white/80 px-4 py-2 text-left text-[10px] text-slate-500 backdrop-blur sm:px-6 sm:text-xs dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
           © 2026 FB Warehouse Management System · Developed by Jaloliddin
         </footer>
       </div>

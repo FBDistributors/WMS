@@ -99,10 +99,10 @@ export function LocationsPage() {
     }
     return (
       <TableScrollArea>
-        <table className="w-full text-left text-sm">
+        <table className="w-full min-w-[640px] table-fixed text-left text-sm sm:table-auto">
           <thead>
             <tr className="border-b border-slate-200 dark:border-slate-700">
-              <th className="w-10 pb-2 pr-2 font-semibold text-slate-700 dark:text-slate-300">
+              <th className="w-10 shrink-0 pb-2 pr-2 font-semibold text-slate-700 dark:text-slate-300">
                 <input
                   type="checkbox"
                   checked={items.length > 0 && selectedIds.size === items.length}
@@ -113,28 +113,28 @@ export function LocationsPage() {
                   aria-label={t('locations:select_all')}
                 />
               </th>
-              <th className="pb-2 pr-4 font-semibold text-slate-700 dark:text-slate-300">
+              <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
                 {t('locations:fields.code')}
               </th>
-              <th className="pb-2 pr-4 font-semibold text-slate-700 dark:text-slate-300">
+              <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
                 {t('locations:type_label')}
               </th>
-              <th className="pb-2 pr-4 font-semibold text-slate-700 dark:text-slate-300">
+              <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
                 {t('locations:sector')}
               </th>
-              <th className="pb-2 pr-4 font-semibold text-slate-700 dark:text-slate-300">
+              <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
                 {t('locations:level_no')}
               </th>
-              <th className="pb-2 pr-4 font-semibold text-slate-700 dark:text-slate-300">
+              <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
                 {t('locations:row_no')}
               </th>
-              <th className="pb-2 pr-4 font-semibold text-slate-700 dark:text-slate-300">
+              <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
                 {t('locations:pallet_no')}
               </th>
-              <th className="pb-2 pr-4 font-semibold text-slate-700 dark:text-slate-300">
+              <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
                 {t('locations:status')}
               </th>
-              <th className="pb-2 font-semibold text-slate-700 dark:text-slate-300">
+              <th className="whitespace-nowrap pb-2 pl-2 font-semibold text-slate-700 dark:text-slate-300">
                 {t('locations:actions')}
               </th>
             </tr>
@@ -142,7 +142,7 @@ export function LocationsPage() {
           <tbody>
             {items.map((loc) => (
               <tr key={loc.id} className="border-b border-slate-100 dark:border-slate-800">
-                <td className="w-10 py-2 pr-2">
+                <td className="w-10 shrink-0 py-2 pr-2">
                   <input
                     type="checkbox"
                     checked={selectedIds.has(loc.id)}
@@ -157,23 +157,23 @@ export function LocationsPage() {
                     aria-label={t('locations:select_one')}
                   />
                 </td>
-                <td className="py-2 pr-4 font-medium text-slate-900 dark:text-slate-100">
+                <td className="whitespace-nowrap py-2 pr-3 font-medium text-slate-900 dark:text-slate-100 sm:pr-4">
                   {loc.code}
                 </td>
-                <td className="py-2 pr-4 text-slate-600 dark:text-slate-400">
+                <td className="whitespace-nowrap py-2 pr-3 text-slate-600 dark:text-slate-400 sm:pr-4">
                   {loc.location_type ?? '—'}
                 </td>
-                <td className="py-2 pr-4 text-slate-600 dark:text-slate-400">{loc.sector ?? '—'}</td>
-                <td className="py-2 pr-4 text-slate-600 dark:text-slate-400">
+                <td className="whitespace-nowrap py-2 pr-3 text-slate-600 dark:text-slate-400 sm:pr-4">{loc.sector ?? '—'}</td>
+                <td className="whitespace-nowrap py-2 pr-3 text-slate-600 dark:text-slate-400 sm:pr-4">
                   {loc.level_no != null ? loc.level_no : '—'}
                 </td>
-                <td className="py-2 pr-4 text-slate-600 dark:text-slate-400">
+                <td className="whitespace-nowrap py-2 pr-3 text-slate-600 dark:text-slate-400 sm:pr-4">
                   {loc.row_no != null ? loc.row_no : '—'}
                 </td>
-                <td className="py-2 pr-4 text-slate-600 dark:text-slate-400">
+                <td className="whitespace-nowrap py-2 pr-3 text-slate-600 dark:text-slate-400 sm:pr-4">
                   {loc.pallet_no != null ? loc.pallet_no : '—'}
                 </td>
-                <td className="py-2 pr-4">
+                <td className="whitespace-nowrap py-2 pr-3 sm:pr-4">
                   {loc.is_active ? (
                     <span className="text-green-600 dark:text-green-400">
                       {t('locations:active')}
@@ -184,31 +184,34 @@ export function LocationsPage() {
                     </span>
                   )}
                 </td>
-                <td className="py-2 flex flex-wrap gap-1">
-                  <Button
-                    variant="ghost"
-                    className="py-1.5 px-2 text-xs"
-                    onClick={() => setDialog({ open: true, mode: 'edit', target: loc })}
-                    aria-label={t('locations:edit')}
-                  >
-                    <Pencil size={14} />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="py-1.5 px-2 text-xs"
-                    onClick={() => setLocationForQr(loc)}
-                  >
-                    <QrCode size={14} className="mr-1 inline" />
-                    {t('locations:qr_download')}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="py-1.5 px-2 text-xs text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10"
-                    onClick={() => setConfirmSingle(loc)}
-                    aria-label={t('locations:delete_one')}
-                  >
-                    <Trash2 size={14} />
-                  </Button>
+                <td className="py-2 pl-2">
+                  <div className="flex flex-nowrap items-center gap-0.5 sm:gap-1">
+                    <Button
+                      variant="ghost"
+                      className="shrink-0 py-1.5 px-1.5 text-xs sm:px-2"
+                      onClick={() => setDialog({ open: true, mode: 'edit', target: loc })}
+                      aria-label={t('locations:edit')}
+                    >
+                      <Pencil size={14} />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="shrink-0 py-1.5 px-1.5 text-xs sm:px-2"
+                      onClick={() => setLocationForQr(loc)}
+                      aria-label={t('locations:qr_download')}
+                    >
+                      <QrCode size={14} className="sm:mr-1 sm:inline" />
+                      <span className="hidden sm:inline">{t('locations:qr_download')}</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="shrink-0 py-1.5 px-1.5 text-xs text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10 sm:px-2"
+                      onClick={() => setConfirmSingle(loc)}
+                      aria-label={t('locations:delete_one')}
+                    >
+                      <Trash2 size={14} />
+                    </Button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -222,19 +225,19 @@ export function LocationsPage() {
     <AdminLayout
       title={t('locations:title')}
       actionSlot={
-        <Button onClick={() => setDialog({ open: true, mode: 'create' })}>
+        <Button onClick={() => setDialog({ open: true, mode: 'create' })} className="shrink-0">
           <Plus size={16} />
-          {t('locations:add')}
+          <span className="hidden sm:inline">{t('locations:add')}</span>
         </Button>
       }
     >
-      <Card className="space-y-4">
+      <Card className="min-w-0 space-y-4 overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-base font-semibold text-slate-900 dark:text-slate-100 sm:text-lg">
               {t('locations:title')}
             </div>
-            <div className="text-sm text-slate-500 dark:text-slate-400">
+            <div className="break-words text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
               {t('locations:subtitle')}
             </div>
           </div>
