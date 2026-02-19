@@ -15,6 +15,8 @@ from app.services.audit_service import ACTION_CREATE, get_client_ip, log_action
 
 from app.api.v1.endpoints import picker_inventory
 from app.db import get_db
+from app.models.document import Document as DocumentModel
+from app.models.document import DocumentLine as DocumentLineModel
 from app.models.location import Location as LocationModel
 from app.models.product import Product as ProductModel
 from app.models.product import ProductBarcode
@@ -915,6 +917,122 @@ async def list_stock_balances(
         )
         for row in rows
     ]
+
+
+class FixDuplicatePickRequest(BaseModel):
+    """Mahsulot bo'yicha ortiqcha (takroriy) pick yozuvini tuzatish."""
+    product_id: UUID
+    document_id: Optional[UUID] = None
+
+
+class FixDuplicatePickResponse(BaseModel):
+    fixed: bool
+    message: str
+    removed_pick_id: Optional[UUID] = None
+    removed_unallocate_id: Optional[UUID] = None
+
+
+@router.post(
+    "/fix-duplicate-pick",
+    response_model=FixDuplicatePickResponse,
+    summary="Takroriy pick tuzatish (admin)",
+)
+async def fix_duplicate_pick(
+    body: FixDuplicatePickRequest,
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("inventory:adjust")),
+):
+    """
+    Bir xil hujjat/mahsulot/lot/joy uchun ortiqcha yozilgan pick+unallocate juftini o'chiradi.
+    10 kirim, 1 terish kerak, lekin 2 ta pick yozilgan bo'lsa qoldiq 8 ko'rinadi; bitta ortiqcha juftni o'chiramiz.
+    """
+    # Hujjat bo'yicha (product, lot, location) guruhlarda pick sum va max_required hisoblash
+    pick_sum_q = (
+        db.query(
+            StockMovementModel.source_document_id,
+            StockMovementModel.product_id,
+            StockMovementModel.lot_id,
+            StockMovementModel.location_id,
+            func.sum(StockMovementModel.qty_change).label("total_pick"),
+        )
+        .filter(
+            StockMovementModel.movement_type == "pick",
+            StockMovementModel.source_document_type == "document",
+            StockMovementModel.product_id == body.product_id,
+        )
+    )
+    if body.document_id is not None:
+        pick_sum_q = pick_sum_q.filter(StockMovementModel.source_document_id == body.document_id)
+    pick_rows = pick_sum_q.group_by(
+        StockMovementModel.source_document_id,
+        StockMovementModel.product_id,
+        StockMovementModel.lot_id,
+        StockMovementModel.location_id,
+    ).all()
+
+    for row in pick_rows:
+        doc_id = row.source_document_id
+        if doc_id is None:
+            continue
+        total_pick = float(row.total_pick or 0)
+        # Hujjatdagi shu (product, lot, location) bo'yicha kerak miqdor
+        max_required = (
+            db.query(func.coalesce(func.sum(DocumentLineModel.required_qty), 0))
+            .filter(
+                DocumentLineModel.document_id == doc_id,
+                DocumentLineModel.product_id == row.product_id,
+                DocumentLineModel.lot_id == row.lot_id,
+                DocumentLineModel.location_id == row.location_id,
+            )
+            .scalar()
+        )
+        max_required = float(max_required or 0)
+        # total_pick manfiy (masalan -2); kerak -max_required dan katta yoki teng (masalan -1)
+        if total_pick >= -max_required:
+            continue
+        # Ortiqcha terilgan: eng oxirgi pick va unallocate ni o'chiramiz
+        last_pick = (
+            db.query(StockMovementModel)
+            .filter(
+                StockMovementModel.movement_type == "pick",
+                StockMovementModel.source_document_type == "document",
+                StockMovementModel.source_document_id == doc_id,
+                StockMovementModel.product_id == row.product_id,
+                StockMovementModel.lot_id == row.lot_id,
+                StockMovementModel.location_id == row.location_id,
+            )
+            .order_by(StockMovementModel.created_at.desc())
+            .first()
+        )
+        last_unallocate = (
+            db.query(StockMovementModel)
+            .filter(
+                StockMovementModel.movement_type == "unallocate",
+                StockMovementModel.source_document_type == "document",
+                StockMovementModel.source_document_id == doc_id,
+                StockMovementModel.product_id == row.product_id,
+                StockMovementModel.lot_id == row.lot_id,
+                StockMovementModel.location_id == row.location_id,
+            )
+            .order_by(StockMovementModel.created_at.desc())
+            .first()
+        )
+        if last_pick and last_unallocate:
+            pick_id, unalloc_id = last_pick.id, last_unallocate.id
+            db.delete(last_pick)
+            db.delete(last_unallocate)
+            db.commit()
+            return FixDuplicatePickResponse(
+                fixed=True,
+                message="Ortiqcha terish yozuvi o'chirildi. Qoldiq endi to'g'ri hisoblanadi.",
+                removed_pick_id=pick_id,
+                removed_unallocate_id=unalloc_id,
+            )
+
+    return FixDuplicatePickResponse(
+        fixed=False,
+        message="Ortiqcha pick topilmadi yoki allaqachon to'g'ri.",
+    )
 
 
 router.include_router(picker_inventory.router)

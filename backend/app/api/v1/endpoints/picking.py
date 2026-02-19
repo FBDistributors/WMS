@@ -6,6 +6,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -345,6 +346,42 @@ def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
 
     line.picked_qty = next_qty
     qty_delta = Decimal(str(payload.delta))
+
+    # Ortiqcha terishni oldini olish: hujjat bo'yicha (product+lot+location) jami terilgan
+    # required_qty dan oshmasin (takroriy pick / ikki marta yozilishini bloklash)
+    total_picked = (
+        db.query(func.coalesce(func.sum(StockMovementModel.qty_change), 0))
+        .filter(
+            StockMovementModel.movement_type == "pick",
+            StockMovementModel.source_document_type == "document",
+            StockMovementModel.source_document_id == document.id,
+            StockMovementModel.product_id == line.product_id,
+            StockMovementModel.lot_id == line.lot_id,
+            StockMovementModel.location_id == line.location_id,
+        )
+        .scalar()
+    )
+    max_required = (
+        db.query(func.coalesce(func.sum(DocumentLineModel.required_qty), 0))
+        .filter(
+            DocumentLineModel.document_id == document.id,
+            DocumentLineModel.product_id == line.product_id,
+            DocumentLineModel.lot_id == line.lot_id,
+            DocumentLineModel.location_id == line.location_id,
+        )
+        .scalar()
+    )
+    if total_picked is None:
+        total_picked = 0
+    if max_required is None:
+        max_required = 0
+    # total_picked va qty_delta manfiy (pick -1); kerak: total_picked + (-qty_delta) >= -max_required
+    if float(total_picked) - float(qty_delta) < -float(max_required):
+        raise HTTPException(
+            status_code=400,
+            detail="Terish miqdori buyurtma bo'yicha kerak miqdordan oshib ketdi. Ehtimol allaqachon terilgan.",
+        )
+
     try:
         db.add(
             StockMovementModel(
