@@ -40,21 +40,17 @@ function formatExpiry(d: string | null): string {
 
 function InventoryCard({
   item,
-  expanded,
-  onToggle,
-  onDetails,
+  onPress,
   t,
 }: {
   item: PickerInventoryItem;
-  expanded: boolean;
-  onToggle: () => void;
-  onDetails: () => void;
+  onPress: () => void;
   t: (key: string) => string;
 }) {
   return (
     <TouchableOpacity
       style={styles.card}
-      onPress={onToggle}
+      onPress={onPress}
       activeOpacity={0.8}
     >
       <View style={styles.cardRow}>
@@ -64,11 +60,7 @@ function InventoryCard({
             <Text style={styles.cardBarcode}>{item.main_barcode}</Text>
           ) : null}
         </View>
-        <Icon
-          name={expanded ? 'chevron-up' : 'chevron-down'}
-          size={22}
-          color="#666"
-        />
+        <Icon name="chevron-right" size={22} color="#666" />
       </View>
       <View style={styles.cardMeta}>
         <Text style={styles.cardMetaText}>
@@ -81,31 +73,6 @@ function InventoryCard({
           {t('invExpiry')}: {formatExpiry(item.nearest_expiry)}
         </Text>
       </View>
-      {expanded && item.top_locations.length > 0 && (
-        <View style={styles.expanded}>
-          <Text style={styles.moreLabel}>{t('invMoreLocations')}</Text>
-          {item.top_locations.map((lot, i) => (
-            <View key={`${i}-${lot.location_code}`} style={styles.lotRow}>
-              <Text style={styles.lotText}>
-                {lot.location_code} / {lot.batch_no}
-              </Text>
-              <Text style={styles.lotText}>
-                {lot.available_qty} {formatExpiry(lot.expiry_date)}
-              </Text>
-            </View>
-          ))}
-          <TouchableOpacity
-            style={styles.detailsBtn}
-            onPress={(e) => {
-              e.stopPropagation();
-              onDetails();
-            }}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.detailsBtnText}>{t('invFullDetails')} →</Text>
-          </TouchableOpacity>
-        </View>
-      )}
     </TouchableOpacity>
   );
 }
@@ -117,7 +84,6 @@ export function InventoryScreen() {
   const [locationId, setLocationId] = useState('');
   const [locations, setLocations] = useState<PickerLocationOption[]>([]);
   const [items, setItems] = useState<PickerInventoryItem[]>([]);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [locationModalVisible, setLocationModalVisible] = useState(false);
@@ -157,21 +123,10 @@ export function InventoryScreen() {
     loadLocations();
   }, [loadLocations]);
 
-  const toggleExpand = (productId: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(productId)) next.delete(productId);
-      else next.add(productId);
-      return next;
-    });
-  };
-
   const renderItem = ({ item }: { item: PickerInventoryItem }) => (
     <InventoryCard
       item={item}
-      expanded={expanded.has(item.product_id)}
-      onToggle={() => toggleExpand(item.product_id)}
-      onDetails={() =>
+      onPress={() =>
         navigation.navigate('InventoryDetail', { productId: item.product_id })
       }
       t={t}
@@ -436,36 +391,6 @@ const styles = StyleSheet.create({
   cardMetaText: {
     fontSize: 13,
     color: '#666',
-  },
-  expanded: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#e0e0e0',
-  },
-  moreLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#666',
-    marginBottom: 8,
-  },
-  lotRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-  },
-  lotText: {
-    fontSize: 13,
-    color: '#555',
-  },
-  detailsBtn: {
-    marginTop: 10,
-    alignSelf: 'flex-start',
-  },
-  detailsBtnText: {
-    fontSize: 14,
-    color: '#1a237e',
-    fontWeight: '600',
   },
   centered: {
     flex: 1,

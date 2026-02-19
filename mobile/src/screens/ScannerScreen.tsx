@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
@@ -91,6 +91,19 @@ export function ScannerScreen() {
     setIsScanning(true);
   }, [reset]);
 
+  // Menyudan skaner: mahsulot topilsa avtomatik mahsulot detail sahifasiga yo'naltirish
+  useEffect(() => {
+    if (
+      fetchStatus === 'success' &&
+      product &&
+      !params.returnToPick
+    ) {
+      (navigation as any).replace('InventoryDetail', {
+        productId: product.product_id,
+      });
+    }
+  }, [fetchStatus, product, params.returnToPick, navigation]);
+
   // Loading or no device: show visible UI (not black)
   if (permStatus === 'loading' || !device) {
     return (
@@ -166,9 +179,13 @@ export function ScannerScreen() {
       {fetchStatus === 'success' && product && (
         <View style={styles.resultBox}>
           <ProductCard product={product} />
-          <TouchableOpacity style={styles.buttonSmall} onPress={handleScanAgain}>
-            <Text style={styles.buttonText}>Scan another</Text>
-          </TouchableOpacity>
+          {params.returnToPick ? (
+            <TouchableOpacity style={styles.buttonSmall} onPress={handleScanAgain}>
+              <Text style={styles.buttonText}>Scan another</Text>
+            </TouchableOpacity>
+          ) : (
+            <Text style={styles.resultText}>Mahsulot tafsilotiga yo'naltirilmoqda…</Text>
+          )}
         </View>
       )}
     </View>
