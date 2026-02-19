@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { ProductSearchCombobox, formatProductLabel } from '../../components/ProductSearchCombobox'
+import { LocationSearchCombobox, formatLocationLabel } from '../../components/LocationSearchCombobox'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -246,18 +247,23 @@ export function ReceivingPage() {
                 </label>
                 <label className="text-sm text-slate-600 dark:text-slate-300">
                   {t('receiving:fields.location')}
-                  <select
-                    className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                  <LocationSearchCombobox
+                    locations={locations}
                     value={line.location_id}
-                    onChange={(event) => updateLine(line.id, { location_id: event.target.value })}
-                  >
-                    <option value="">{t('receiving:fields.select_location')}</option>
-                    {locations.map((location) => (
-                      <option key={location.id} value={location.id}>
-                        {location.code === location.name ? location.code : `${location.code} · ${location.name}`}
-                      </option>
-                    ))}
-                  </select>
+                    displayLabel={
+                      line.location_id
+                        ? (() => {
+                            const loc = locationLookup.get(line.location_id)
+                            return loc ? formatLocationLabel(loc) : ''
+                          })()
+                        : undefined
+                    }
+                    onSelect={(loc) =>
+                      updateLine(line.id, { location_id: loc?.id ?? '' })
+                    }
+                    placeholder={t('receiving:fields.select_location')}
+                    className="mt-1 w-full"
+                  />
                 </label>
                 <label className="text-sm text-slate-600 dark:text-slate-300">
                   {t('receiving:fields.qty')}
