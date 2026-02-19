@@ -15,6 +15,7 @@ export type Product = {
   is_active: boolean
   created_at?: string
   on_hand_total?: number
+  reserved_total?: number
   available_total?: number
 }
 
@@ -82,6 +83,7 @@ export type ProductHistoryResponse = {
   receiving: ProductHistoryReceiving[]
   picks: ProductHistoryPick[]
   on_hand_total: number | null
+  reserved_total: number | null
   available_total: number | null
 }
 

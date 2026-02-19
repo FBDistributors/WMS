@@ -117,6 +117,7 @@ class InventorySummaryWithLocationRow(BaseModel):
     name: str
     brand: Optional[str] = None
     on_hand: Decimal
+    reserved: Decimal
     available: Decimal
     location_id: Optional[UUID] = None
     location_code: str
@@ -156,6 +157,7 @@ class InventoryByProductRow(BaseModel):
     location_code: str
     location_type: Optional[str] = None
     qty: Decimal
+    reserved_qty: Decimal
     available_qty: Decimal
     expiry_date: Optional[date] = None
 
@@ -613,6 +615,7 @@ async def inventory_by_product(
             LocationModel.code.label("location_code"),
             LocationModel.location_type.label("location_type"),
             on_hand_expr.label("qty"),
+            reserved_expr.label("reserved_qty"),
             available_expr.label("available_qty"),
             StockLotModel.expiry_date.label("expiry_date"),
         )
@@ -628,7 +631,7 @@ async def inventory_by_product(
             StockLotModel.id,
             StockLotModel.expiry_date,
         )
-        .having(available_expr != 0)
+        .having(on_hand_expr != 0)
         .order_by(LocationModel.code.asc(), StockLotModel.expiry_date.asc().nullslast())
         .all()
     )
@@ -637,6 +640,7 @@ async def inventory_by_product(
             location_code=row.location_code,
             location_type=row.location_type,
             qty=row.qty,
+            reserved_qty=row.reserved_qty,
             available_qty=row.available_qty,
             expiry_date=row.expiry_date,
         )
@@ -770,6 +774,7 @@ async def inventory_summary_by_location(
             ProductModel.name.label("name"),
             func.coalesce(ProductModel.brand, "").label("brand"),
             on_hand_expr.label("on_hand"),
+            reserved_expr.label("reserved"),
             available_expr.label("available"),
             LocationModel.id.label("location_id"),
             LocationModel.code.label("location_code"),
@@ -808,6 +813,7 @@ async def inventory_summary_by_location(
             name=row.name,
             brand=row.brand or None,
             on_hand=row.on_hand,
+            reserved=row.reserved,
             available=row.available,
             location_id=row.location_id,
             location_code=row.location_code,
@@ -842,6 +848,7 @@ async def inventory_summary_by_location(
                         name=p.name,
                         brand=p.brand or None,
                         on_hand=Decimal("0"),
+                        reserved=Decimal("0"),
                         available=Decimal("0"),
                         location_id=None,
                         location_code="—",

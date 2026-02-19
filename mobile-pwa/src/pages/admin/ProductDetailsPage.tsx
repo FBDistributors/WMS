@@ -118,6 +118,7 @@ export function ProductDetailsPage() {
   }
 
   const onHand = history?.on_hand_total ?? product?.on_hand_total
+  const reserved = history?.reserved_total ?? product?.reserved_total
   const available = history?.available_total ?? product?.available_total
 
   const tabs: { id: TabId; labelKey: string; icon: React.ReactNode }[] = [
@@ -387,13 +388,21 @@ export function ProductDetailsPage() {
                 <h4 className="mb-2 text-sm font-medium text-slate-600 dark:text-slate-300">
                   {t('products:history.total_stock')}
                 </h4>
-                <dl className="mb-6 grid gap-4 sm:grid-cols-2">
+                <dl className="mb-6 grid gap-4 sm:grid-cols-3">
                   <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/50">
                     <dt className="text-sm font-medium text-slate-500 dark:text-slate-400">
                       {t('products:history.on_hand')}
                     </dt>
                     <dd className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-100">
                       {onHand ?? '—'}
+                    </dd>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/50">
+                    <dt className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                      {t('products:history.reserved')}
+                    </dt>
+                    <dd className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-100">
+                      {reserved ?? '—'}
                     </dd>
                   </div>
                   <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/50">
@@ -426,6 +435,9 @@ export function ProductDetailsPage() {
                             {t('products:history.on_hand')}
                           </th>
                           <th className="px-3 py-2 text-right font-medium text-slate-600 dark:text-slate-400">
+                            {t('products:history.reserved')}
+                          </th>
+                          <th className="px-3 py-2 text-right font-medium text-slate-600 dark:text-slate-400">
                             {t('products:history.available')}
                           </th>
                         </tr>
@@ -441,6 +453,9 @@ export function ProductDetailsPage() {
                             </td>
                             <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">
                               {Number(row.on_hand)}
+                            </td>
+                            <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">
+                              {Number(row.reserved)}
                             </td>
                             <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">
                               {Number(row.available)}

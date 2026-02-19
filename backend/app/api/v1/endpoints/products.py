@@ -90,6 +90,7 @@ class ProductHistoryResponse(BaseModel):
     receiving: List[ProductHistoryReceiving] = []
     picks: List[ProductHistoryPick] = []
     on_hand_total: Optional[float] = None
+    reserved_total: Optional[float] = None
     available_total: Optional[float] = None
 
 
@@ -115,6 +116,7 @@ def _to_product(
         barcode=barcodes[0] if barcodes else None,
         created_at=product.created_at,
         on_hand_total=float(s["on_hand_total"]) if s.get("on_hand_total") is not None else None,
+        reserved_total=float(s["reserved_total"]) if s.get("reserved_total") is not None else None,
         available_total=float(s["available_total"]) if s.get("available_total") is not None else None,
     )
 
@@ -142,6 +144,7 @@ def _fetch_inventory_summary(db: Session, product_ids: List[UUID]) -> Dict[UUID,
         db.query(
             StockLotModel.product_id,
             on_hand_expr.label("on_hand_total"),
+            reserved_expr.label("reserved_total"),
             (on_hand_expr - reserved_expr).label("available_total"),
         )
         .join(StockMovementModel, StockMovementModel.lot_id == StockLotModel.id)
@@ -152,9 +155,11 @@ def _fetch_inventory_summary(db: Session, product_ids: List[UUID]) -> Dict[UUID,
     result = {}
     for r in rows:
         oh = r.on_hand_total
+        res = r.reserved_total
         av = r.available_total
         result[r.product_id] = {
             "on_hand_total": float(oh) if oh is not None else 0,
+            "reserved_total": float(res) if res is not None else 0,
             "available_total": float(av) if av is not None else 0,
         }
     return result
@@ -421,6 +426,7 @@ async def get_product_history(
         receiving=receiving,
         picks=picks,
         on_hand_total=s.get("on_hand_total"),
+        reserved_total=s.get("reserved_total"),
         available_total=s.get("available_total"),
     )
 

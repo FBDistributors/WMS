@@ -33,6 +33,7 @@ export type InventorySummaryWithLocationRow = {
   name: string
   brand?: string | null
   on_hand: number
+  reserved: number
   available: number
   location_id?: string | null
   location_code: string
@@ -158,6 +159,7 @@ export type InventoryByProductRow = {
   location_code: string
   location_type?: string | null
   qty: number
+  reserved_qty: number
   available_qty: number
   expiry_date?: string | null
 }

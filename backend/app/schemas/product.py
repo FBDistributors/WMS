@@ -44,6 +44,7 @@ class ProductOut(BaseModel):
     barcode: Optional[str] = None
     created_at: datetime
     on_hand_total: Optional[float] = None
+    reserved_total: Optional[float] = None
     available_total: Optional[float] = None
 
 
