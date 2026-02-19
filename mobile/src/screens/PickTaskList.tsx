@@ -193,8 +193,18 @@ export function PickTaskList() {
         >
           <Icon name="arrow-left" size={24} color="#1976d2" />
         </TouchableOpacity>
-        <Text style={styles.title}>{t('openTasks')}</Text>
-        <Text style={styles.count}>{list.length}{t('countTa')}</Text>
+        <View style={styles.headerCenter}>
+          <Text style={styles.title}>{t('openTasks')}</Text>
+          <Text style={styles.count}>{list.length}{t('countTa')}</Text>
+        </View>
+        <TouchableOpacity
+          onPress={() => load()}
+          style={styles.refreshBtn}
+          disabled={loading}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
+          <Icon name="refresh" size={24} color={loading ? '#999' : '#1976d2'} />
+        </TouchableOpacity>
       </View>
       {list.length === 0 ? (
         <View style={styles.empty}>
@@ -288,6 +298,8 @@ const styles = StyleSheet.create({
   backBtnIcon: { marginRight: 6 },
   backBtnText: { color: '#1976d2', fontSize: 16, fontWeight: '500' },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 12,
@@ -311,8 +323,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 6,
   },
+  headerCenter: { flex: 1, marginLeft: 12 },
   title: { fontSize: 20, fontWeight: '700', color: '#111' },
   count: { fontSize: 14, color: '#666', marginTop: 4 },
+  refreshBtn: { padding: 4 },
   listContent: { padding: 16, paddingBottom: 24 },
   rowWrap: { marginBottom: 12 },
   row: {

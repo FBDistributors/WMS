@@ -6,7 +6,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   Modal,
   StyleSheet,
   Text,
@@ -26,6 +25,7 @@ import {
   type PickerLocationOption,
 } from '../api/inventory';
 import { BRAND } from '../config/branding';
+import { AppHeader } from '../components/AppHeader';
 
 type Nav = StackNavigationProp<RootStackParamList, 'Inventory'>;
 
@@ -121,6 +121,7 @@ export function InventoryScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [locationModalVisible, setLocationModalVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -177,24 +178,23 @@ export function InventoryScreen() {
     />
   );
 
+  const onHeaderRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
+
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backBtn}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <Icon name="arrow-left" size={24} color="#1a237e" />
-        </TouchableOpacity>
-        <Image
-          source={require('../assets/logo.png')}
-          style={[styles.headerLogo, { width: BRAND.headerLogoSize, height: BRAND.headerLogoSize }]}
-          resizeMode="contain"
-        />
-        <Text style={styles.headerTitle}>{t('invTitle')}</Text>
-      </View>
+      <AppHeader
+        title={t('invTitle')}
+        showBack
+        onBack={() => navigation.goBack()}
+        showLogo={true}
+        onRefresh={onHeaderRefresh}
+        refreshing={refreshing}
+      />
 
       {/* Search + location */}
       <View style={styles.toolbar}>
@@ -308,28 +308,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e0e0e0',
-  },
-  backBtn: {
-    marginRight: 12,
-  },
-  headerLogo: {
-    borderRadius: 8,
-    marginRight: 10,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#333',
   },
   toolbar: {
     flexDirection: 'row',

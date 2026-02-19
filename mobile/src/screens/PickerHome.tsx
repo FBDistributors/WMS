@@ -22,7 +22,7 @@ import { getOpenTasks } from '../api/picking';
 import { getCachedPickTasks } from '../offline/offlineDb';
 import { getPendingCount } from '../offline/offlineQueue';
 import { registerPushToken } from '../notifications/pushNotifications';
-import { BRAND } from '../config/branding';
+import { AppHeader } from '../components/AppHeader';
 
 type Nav = StackNavigationProp<RootStackParamList, 'PickerHome'>;
 type PickerHomeRoute = RouteProp<RootStackParamList, 'PickerHome'>;
@@ -119,44 +119,49 @@ export function PickerHome() {
   const { isOnline } = useNetwork();
   const [queueCount, setQueueCount] = useState(0);
   const [taskCount, setTaskCount] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
   const profileType = route.params?.profileType ?? 'picker';
   const headerTitle = profileType === 'controller' ? t('controllerTitle') : t('pickerTitle');
+
+  const refreshCounts = useCallback(async () => {
+    getPendingCount().then(setQueueCount);
+    if (isOnline) {
+      getOpenTasks(50, 0)
+        .then((data) => setTaskCount(Array.isArray(data) ? data.length : 0))
+        .catch(() => setTaskCount(0));
+    } else {
+      getCachedPickTasks()
+        .then((data) => setTaskCount(Array.isArray(data) ? data.length : 0))
+        .catch(() => setTaskCount(0));
+    }
+  }, [isOnline]);
 
   useEffect(() => {
     registerPushToken();
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      getPendingCount().then(setQueueCount);
-      if (isOnline) {
-        getOpenTasks(50, 0)
-          .then((data) => setTaskCount(Array.isArray(data) ? data.length : 0))
-          .catch(() => setTaskCount(0));
-      } else {
-        getCachedPickTasks()
-          .then((data) => setTaskCount(Array.isArray(data) ? data.length : 0))
-          .catch(() => setTaskCount(0));
-      }
-    }, [isOnline])
-  );
+  useFocusEffect(useCallback(() => { refreshCounts(); }, [refreshCounts]));
+
+  const onHeaderRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refreshCounts();
+    setRefreshing(false);
+  }, [refreshCounts]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
-        <Image
-          source={require('../assets/logo.png')}
-          style={[styles.headerLogo, { width: BRAND.headerLogoSize, height: BRAND.headerLogoSize }]}
-          resizeMode="contain"
-        />
-        <Text style={styles.headerTitle}>{headerTitle}</Text>
-        {!isOnline && (
+      <AppHeader
+        title={headerTitle}
+        showLogo={true}
+        onRefresh={onHeaderRefresh}
+        refreshing={refreshing}
+        rightTrailing={!isOnline ? (
           <View style={styles.onlineBadge}>
             <Text style={styles.onlineBadgeText}>Offline</Text>
           </View>
-        )}
-      </View>
+        ) : undefined}
+      />
 
       {!isOnline && (
         <View style={styles.offlineBanner}>
@@ -238,26 +243,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e0e0e0',
-  },
-  headerLogo: {
-    borderRadius: 8,
-    marginRight: 12,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 24,
-    fontWeight: '700',
-    color: TEXT_PRIMARY,
   },
   onlineBadge: {
     backgroundColor: '#ff9800',
