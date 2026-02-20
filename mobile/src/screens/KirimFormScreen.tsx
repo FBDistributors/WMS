@@ -23,6 +23,7 @@ import { useLocale } from '../i18n/LocaleContext';
 import { useNetwork } from '../network';
 import { getPickerProductDetail, getInventoryByBarcode, listPickerLocations, type PickerProductDetailResponse, type PickerProductLocation, type PickerLocationOption } from '../api/inventory';
 import { getPickers, type PickerUser } from '../api/picking';
+import { createReceipt, completeReceipt } from '../api/receiving';
 import { AppHeader } from '../components/AppHeader';
 
 type Nav = StackNavigationProp<RootStackParamList, 'KirimForm'>;
@@ -36,6 +37,8 @@ type FormLine = {
   locationId: string;
   lotId: string;
   qty: number;
+  batch: string;
+  expiryDate: string | null;
 };
 
 function sortLocations(locs: PickerProductLocation[]): PickerProductLocation[] {
@@ -59,6 +62,8 @@ export function KirimFormScreen() {
   const [finished, setFinished] = useState(false);
   const [currentProduct, setCurrentProduct] = useState<PickerProductDetailResponse | null>(null);
   const [currentQty, setCurrentQty] = useState('');
+  const [currentBatch, setCurrentBatch] = useState('');
+  const [currentExpiry, setCurrentExpiry] = useState('');
   const [selectedLocation, setSelectedLocation] = useState<PickerLocationOption | null>(null);
   const [allLocations, setAllLocations] = useState<PickerLocationOption[]>([]);
   const [locationSearch, setLocationSearch] = useState('');
@@ -158,6 +163,16 @@ export function KirimFormScreen() {
       Alert.alert(t('error'), t('qtyRangeError', { max: maxQty }));
       return;
     }
+    const batch = currentBatch.trim();
+    if (batch.length < 1 || batch.length > 64) {
+      Alert.alert(t('error'), t('kirimBatchRequired'));
+      return;
+    }
+    const expiryVal = currentExpiry.trim() || null;
+    if (expiryVal && !/^\d{4}-\d{2}-\d{2}$/.test(expiryVal)) {
+      Alert.alert(t('error'), t('kirimExpiryFormat'));
+      return;
+    }
     setLines((prev) => [
       ...prev,
       {
@@ -168,11 +183,15 @@ export function KirimFormScreen() {
         locationId: selectedLocation.id,
         lotId: '',
         qty,
+        batch,
+        expiryDate: expiryVal,
       },
     ]);
     setCurrentProduct(null);
     setCurrentQty('');
-  }, [currentProduct, selectedLocation, currentQty, t]);
+    setCurrentBatch('');
+    setCurrentExpiry('');
+  }, [currentProduct, selectedLocation, currentQty, currentBatch, currentExpiry, t]);
 
   const removeLine = useCallback((id: string) => {
     setLines((prev) => prev.filter((l) => l.id !== id));
@@ -186,7 +205,7 @@ export function KirimFormScreen() {
     setFinished(true);
   }, [lines.length, t]);
 
-  const handleSendToPicker = useCallback(() => {
+  const handleSendToPicker = useCallback(async () => {
     if (flow === 'return') {
       if (!selectedPickerId) {
         Alert.alert(t('error'), t('returnsSelectPicker'));
@@ -201,16 +220,34 @@ export function KirimFormScreen() {
         setFinished(false);
         Alert.alert(t('success'), t('returnsSentToPicker'));
       }, 500);
-    } else {
-      setSending(true);
-      setTimeout(() => {
-        setSending(false);
-        setLines([]);
-        setFinished(false);
-        Alert.alert(t('success'), t('kirimSubmitDone'));
-      }, 500);
+      return;
     }
-  }, [flow, selectedPickerId, t]);
+    // flow === 'new': backend receiving API orqali omborga kirim va qoldiq yangilash
+    setSending(true);
+    try {
+      const payload = {
+        lines: lines.map((l) => ({
+          product_id: l.productId,
+          qty: l.qty,
+          batch: l.batch,
+          expiry_date: l.expiryDate || null,
+          location_id: l.locationId,
+        })),
+      };
+      const receipt = await createReceipt(payload);
+      await completeReceipt(receipt.id);
+      setLines([]);
+      setFinished(false);
+      Alert.alert(t('success'), t('kirimSubmitDone'));
+    } catch (e: unknown) {
+      const msg = e && typeof e === 'object' && 'response' in e && e.response && typeof e.response === 'object' && 'data' in e.response
+        ? (e.response as { data?: { detail?: string } }).data?.detail
+        : e instanceof Error ? e.message : t('kirimSubmitError');
+      Alert.alert(t('error'), String(msg));
+    } finally {
+      setSending(false);
+    }
+  }, [flow, selectedPickerId, lines, t]);
 
   const filteredLocations = locationSearch.trim()
     ? allLocations
@@ -221,7 +258,7 @@ export function KirimFormScreen() {
         )
         .slice(0, 10)
     : allLocations.slice(0, 10);
-  const canAddLine = currentProduct && selectedLocation && currentQty.trim().length > 0;
+  const canAddLine = currentProduct && selectedLocation && currentQty.trim().length > 0 && currentBatch.trim().length > 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -268,6 +305,26 @@ export function KirimFormScreen() {
               </Text>
               <Icon name="chevron-down" size={22} color="#555" />
             </TouchableOpacity>
+            <Text style={styles.label}>{t('kirimBatchLabel')}</Text>
+            <TextInput
+              style={styles.input}
+              value={currentBatch}
+              onChangeText={setCurrentBatch}
+              placeholder={t('kirimBatchPlaceholder')}
+              placeholderTextColor="#999"
+              autoCapitalize="characters"
+              autoCorrect={false}
+            />
+            <Text style={styles.label}>{t('kirimExpiryLabel')}</Text>
+            <TextInput
+              style={styles.input}
+              value={currentExpiry}
+              onChangeText={setCurrentExpiry}
+              placeholder={t('kirimExpiryPlaceholder')}
+              placeholderTextColor="#999"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
             {locationDropdownOpen && (
               <Modal
                 visible={locationDropdownOpen}
@@ -324,7 +381,7 @@ export function KirimFormScreen() {
               <View key={line.id} style={styles.lineRow}>
                 <View style={styles.lineInfo}>
                   <Text style={styles.lineProduct} numberOfLines={1}>{line.productName}</Text>
-                  <Text style={styles.lineMeta}>{line.locationCode} · {line.qty} dona</Text>
+                  <Text style={styles.lineMeta}>{line.locationCode} · {line.qty} dona · {line.batch}{line.expiryDate ? ` · ${line.expiryDate}` : ''}</Text>
                 </View>
                 <TouchableOpacity onPress={() => removeLine(line.id)} hitSlop={12}>
                   <Icon name="close-circle-outline" size={24} color="#c62828" />
