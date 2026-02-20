@@ -98,7 +98,7 @@ export function ScannerScreen() {
     if (fetchStatus !== 'success' || !product) return;
     if (params.returnToPick) return;
     if (params.returnToKirimForm) {
-      (navigation as any).navigate('KirimForm', {
+      (navigation as any).replace('KirimForm', {
         flow: params.flow ?? 'return',
         scannedProductId: product.product_id,
         scannedBarcode: product.barcode ?? undefined,
@@ -106,7 +106,7 @@ export function ScannerScreen() {
       return;
     }
     if (params.returnToReturns) {
-      (navigation as any).navigate('KirimForm', {
+      (navigation as any).replace('KirimForm', {
         flow: 'return',
         scannedProductId: product.product_id,
         scannedBarcode: product.barcode ?? undefined,

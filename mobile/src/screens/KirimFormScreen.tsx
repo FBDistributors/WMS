@@ -21,7 +21,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { RootStackParamList } from '../types/navigation';
 import { useLocale } from '../i18n/LocaleContext';
 import { useNetwork } from '../network';
-import { getPickerProductDetail, type PickerProductDetailResponse, type PickerProductLocation } from '../api/inventory';
+import { getPickerProductDetail, getInventoryByBarcode, type PickerProductDetailResponse, type PickerProductLocation } from '../api/inventory';
 import { getPickers, type PickerUser } from '../api/picking';
 import { AppHeader } from '../components/AppHeader';
 
@@ -62,7 +62,7 @@ export function KirimFormScreen() {
   const [currentLocation, setCurrentLocation] = useState<PickerProductLocation | null>(null);
   const [loadingProduct, setLoadingProduct] = useState(false);
   const [productError, setProductError] = useState<string | null>(null);
-  const [locationDropdownOpen, setLocationDropdownOpen] = useState(false);
+  const [manualBarcode, setManualBarcode] = useState('');
   const [pickerModalVisible, setPickerModalVisible] = useState(false);
   const [pickers, setPickers] = useState<PickerUser[]>([]);
   const [selectedPickerId, setSelectedPickerId] = useState<string | null>(null);
@@ -70,7 +70,7 @@ export function KirimFormScreen() {
 
   const title = flow === 'new' ? t('kirimNewProducts') : t('kirimCustomerReturns');
 
-  const loadProductByScan = useCallback(async (productId: string) => {
+  const loadProductById = useCallback(async (productId: string) => {
     setLoadingProduct(true);
     setProductError(null);
     setCurrentProduct(null);
@@ -88,14 +88,41 @@ export function KirimFormScreen() {
     }
   }, [t]);
 
+  const loadProductByScan = loadProductById;
+
+  const handleManualFind = useCallback(async () => {
+    const barcode = manualBarcode.trim();
+    if (!barcode) {
+      setProductError(t('kirimBarcodePlaceholder'));
+      return;
+    }
+    setLoadingProduct(true);
+    setProductError(null);
+    setCurrentProduct(null);
+    setCurrentLocation(null);
+    setCurrentQty('');
+    try {
+      const byBarcode = await getInventoryByBarcode(barcode);
+      const res = await getPickerProductDetail(byBarcode.product_id);
+      setCurrentProduct(res);
+      const sorted = sortLocations(res.locations);
+      if (sorted.length > 0) setCurrentLocation(sorted[0]);
+      setManualBarcode('');
+    } catch (e) {
+      setProductError(e instanceof Error ? e.message : t('invLoadError'));
+    } finally {
+      setLoadingProduct(false);
+    }
+  }, [manualBarcode, t]);
+
   useFocusEffect(
     useCallback(() => {
       const pid = params?.scannedProductId;
       if (pid) {
-        loadProductByScan(pid);
+        loadProductById(pid);
         navigation.setParams({ flow: route.params?.flow ?? 'return', scannedProductId: undefined, scannedBarcode: undefined } as any);
       }
-    }, [params?.scannedProductId, loadProductByScan, navigation, route.params])
+    }, [params?.scannedProductId, loadProductById, navigation, route.params])
   );
 
   useEffect(() => {
@@ -131,7 +158,6 @@ export function KirimFormScreen() {
     setCurrentProduct(null);
     setCurrentLocation(null);
     setCurrentQty('');
-    setLocationDropdownOpen(false);
   }, [currentProduct, currentLocation, currentQty, t]);
 
   const removeLine = useCallback((id: string) => {
@@ -185,10 +211,29 @@ export function KirimFormScreen() {
       />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-        <TouchableOpacity style={styles.scanBtn} onPress={handleScan} activeOpacity={0.8}>
-          <Icon name="barcode-scan" size={32} color="#fff" />
-          <Text style={styles.scanBtnText}>{t('scanButton')}</Text>
-        </TouchableOpacity>
+        <View style={styles.scanRow}>
+          <TouchableOpacity style={styles.scanBtn} onPress={handleScan} activeOpacity={0.8}>
+            <Icon name="barcode-scan" size={28} color="#fff" />
+            <Text style={styles.scanBtnText}>{t('scanButton')}</Text>
+          </TouchableOpacity>
+          <View style={styles.manualEntryBlock}>
+            <Text style={styles.manualEntryLabel}>{t('kirimManualEntry')}</Text>
+            <View style={styles.manualEntryRow}>
+              <TextInput
+                style={styles.manualBarcodeInput}
+                value={manualBarcode}
+                onChangeText={(text) => { setManualBarcode(text); setProductError(null); }}
+                placeholder={t('kirimBarcodePlaceholder')}
+                placeholderTextColor="#999"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity style={styles.findProductBtn} onPress={handleManualFind} disabled={loadingProduct}>
+                <Text style={styles.findProductBtnText}>{t('kirimFindProduct')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
 
         {loadingProduct && (
           <View style={styles.loadingRow}>
@@ -216,36 +261,24 @@ export function KirimFormScreen() {
               placeholderTextColor="#999"
             />
             <Text style={styles.label}>{t('locationLabel')}</Text>
-            <TouchableOpacity
-              style={styles.dropdownTrigger}
-              onPress={() => setLocationDropdownOpen((v) => !v)}
-            >
-              <Text style={styles.dropdownTriggerText}>
-                {currentLocation ? currentLocation.location_code : t('returnsSelectLocation')}
-              </Text>
-              <Icon name={locationDropdownOpen ? 'chevron-up' : 'chevron-down'} size={22} color="#555" />
-            </TouchableOpacity>
-            {locationDropdownOpen && (
-              <>
-                <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setLocationDropdownOpen(false)} />
-                <View style={styles.dropdown}>
-                  {locations.map((loc) => (
-                    <TouchableOpacity
-                      key={loc.lot_id + loc.location_id}
-                      style={styles.dropdownItem}
-                      onPress={() => {
-                        setCurrentLocation(loc);
-                        setLocationDropdownOpen(false);
-                      }}
-                    >
-                      <Text style={styles.dropdownItemText}>
-                        {loc.location_code} — {loc.batch_no} {loc.expiry_date ? `(${loc.expiry_date})` : ''} — {Number(loc.available_qty)} {t('invAvailable')}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </>
-            )}
+            <View style={styles.locationRows}>
+              {locations.map((loc) => {
+                const isSelected = currentLocation?.lot_id === loc.lot_id && currentLocation?.location_id === loc.location_id;
+                return (
+                  <TouchableOpacity
+                    key={loc.lot_id + loc.location_id}
+                    style={[styles.locationRow, isSelected && styles.locationRowSelected]}
+                    onPress={() => setCurrentLocation(loc)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.locationRowText, isSelected && styles.locationRowTextSelected]}>
+                      {loc.location_code} — {loc.batch_no} {loc.expiry_date ? `(${loc.expiry_date})` : ''} — {Number(loc.available_qty)} {t('invAvailable')}
+                    </Text>
+                    {isSelected && <Icon name="check-circle" size={22} color="#2e7d32" />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
             <TouchableOpacity
               style={[styles.addLineBtn, !canAddLine && styles.addLineBtnDisabled]}
               onPress={addLine}
@@ -361,6 +394,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   scroll: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 40 },
+  scanRow: { marginBottom: 20 },
   scanBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -369,9 +403,46 @@ const styles = StyleSheet.create({
     backgroundColor: '#1976d2',
     paddingVertical: 14,
     borderRadius: 12,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   scanBtnText: { color: '#fff', fontSize: 18, fontWeight: '600' },
+  manualEntryBlock: { marginTop: 8 },
+  manualEntryLabel: { fontSize: 13, color: '#666', marginBottom: 6 },
+  manualEntryRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  manualBarcodeInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    backgroundColor: '#fff',
+  },
+  findProductBtn: {
+    backgroundColor: '#1a237e',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    justifyContent: 'center',
+  },
+  findProductBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  locationRows: { marginBottom: 12 },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    backgroundColor: '#fff',
+    marginBottom: 8,
+  },
+  locationRowSelected: { backgroundColor: '#c8e6c9', borderColor: '#2e7d32' },
+  locationRowText: { fontSize: 14, color: '#333', flex: 1 },
+  locationRowTextSelected: { color: '#1b5e20', fontWeight: '600' },
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   loadingText: { fontSize: 14, color: '#666' },
   errorRow: { marginBottom: 12 },
@@ -394,37 +465,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     backgroundColor: '#fff',
   },
-  dropdownTrigger: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    marginBottom: 12,
-  },
-  dropdownTriggerText: { fontSize: 15, color: '#333' },
-  dropdown: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    maxHeight: 200,
-    marginBottom: 12,
-  },
-  dropdownItem: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#eee',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  dropdownItemText: { fontSize: 14, color: '#333', flex: 1 },
   addLineBtn: {
     backgroundColor: '#1a237e',
     paddingVertical: 12,

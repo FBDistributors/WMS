@@ -147,6 +147,9 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     kirimCustomerReturnsDesc: "Mijozdan qaytgan mahsulotlarni joylashtirish",
     kirimSubmit: 'Yuborish',
     kirimSubmitDone: 'Yuborildi',
+    kirimManualEntry: "Qo'lda kiritish",
+    kirimBarcodePlaceholder: 'Barkod yoki SKU kiriting',
+    kirimFindProduct: 'Topish',
   },
   ru: {
     brand: 'FB Warehouse',
@@ -285,6 +288,9 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     kirimCustomerReturnsDesc: 'Размещение возвратов от клиента',
     kirimSubmit: 'Отправить',
     kirimSubmitDone: 'Отправлено',
+    kirimManualEntry: 'Ввести вручную',
+    kirimBarcodePlaceholder: 'Введите штрихкод или SKU',
+    kirimFindProduct: 'Найти',
   },
   en: {
     brand: 'FB Warehouse',
@@ -423,6 +429,9 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     kirimCustomerReturnsDesc: 'Place customer returns',
     kirimSubmit: 'Submit',
     kirimSubmitDone: 'Submitted',
+    kirimManualEntry: 'Enter manually',
+    kirimBarcodePlaceholder: 'Enter barcode or SKU',
+    kirimFindProduct: 'Find',
   },
 };
 
