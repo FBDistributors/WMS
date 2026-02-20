@@ -270,7 +270,6 @@ function LocationDialog({ mode, target, onClose, onSaved, onCreated }: DialogPro
   const [rowNo, setRowNo] = useState<number | ''>(target?.row_no ?? '')
   const [palletNo, setPalletNo] = useState<number | ''>(target?.pallet_no ?? '')
   const [pickSequence, setPickSequence] = useState<number | ''>(target?.pick_sequence ?? '')
-  const [isActive, setIsActive] = useState(target?.is_active ?? true)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false)
@@ -324,7 +323,7 @@ function LocationDialog({ mode, target, onClose, onSaved, onCreated }: DialogPro
           ...(locationType === 'RACK'
             ? { level_no: Number(levelNo), row_no: Number(rowNo) }
             : { pallet_no: Number(palletNo) }),
-          is_active: isActive,
+          is_active: true,
         })
         onCreated?.(created)
       } else if (target) {
@@ -333,7 +332,7 @@ function LocationDialog({ mode, target, onClose, onSaved, onCreated }: DialogPro
           ...(locationType === 'RACK'
             ? { level_no: Number(levelNo), row_no: Number(rowNo), pallet_no: undefined }
             : { pallet_no: Number(palletNo), level_no: undefined, row_no: undefined }),
-          is_active: isActive,
+          is_active: target.is_active,
           pick_sequence: pickSequence === '' ? null : Number(pickSequence),
         })
       }
@@ -458,21 +457,12 @@ function LocationDialog({ mode, target, onClose, onSaved, onCreated }: DialogPro
             </label>
           )}
 
-          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-            <input
-              type="checkbox"
-              checked={isActive}
-              onChange={(e) => setIsActive(e.target.checked)}
-            />
-            {t('locations:fields.active')}
-          </label>
-
           {mode === 'edit' && target?.is_active && (
             <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
               <Button
                 type="button"
-                variant="secondary"
-                className="w-full text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/40"
+                variant="danger"
+                className="w-full"
                 onClick={() => setShowDeactivateConfirm(true)}
                 disabled={isSubmitting}
               >
