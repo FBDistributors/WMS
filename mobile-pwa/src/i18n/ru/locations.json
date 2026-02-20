@@ -54,6 +54,7 @@
   "detail_col_batch": "Партия",
   "detail_col_expiry": "Срок",
   "detail_col_qty": "Кол-во",
+  "detail_filter_placeholder": "Поиск по коду, штрихкоду, бренду",
   "validation": {
     "required": "Код и название обязательны.",
     "sector_required": "Сектор обязателен.",

@@ -54,6 +54,7 @@
   "detail_col_batch": "Batch",
   "detail_col_expiry": "Expiry",
   "detail_col_qty": "Qty",
+  "detail_filter_placeholder": "Search by code, barcode, brand",
   "validation": {
     "required": "Code and name are required.",
     "sector_required": "Sector is required.",

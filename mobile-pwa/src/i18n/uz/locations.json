@@ -53,6 +53,7 @@
   "detail_col_batch": "Partiya",
   "detail_col_expiry": "Muddati",
   "detail_col_qty": "Miqdor",
+  "detail_filter_placeholder": "Kod, shtrix kod, brend bo'yicha qidirish",
   "validation": {
     "required": "Kod va nom majburiy.",
     "sector_required": "Sektor majburiy.",
