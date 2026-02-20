@@ -46,60 +46,6 @@ type DialogState = {
   target?: Location
 }
 
-function PickSequenceCell({
-  locationId,
-  value,
-  onSaved,
-}: {
-  locationId: string
-  value: number | null | undefined
-  onSaved: () => void
-}) {
-  const { t } = useTranslation(['locations'])
-  const [local, setLocal] = useState<string>(value != null ? String(value) : '')
-  const [saving, setSaving] = useState(false)
-  const prevValueRef = useRef(value)
-
-  useEffect(() => {
-    if (prevValueRef.current !== value) {
-      prevValueRef.current = value
-      setLocal(value != null ? String(value) : '')
-    }
-  }, [value])
-
-  const handleBlur = useCallback(async () => {
-    const trimmed = local.trim()
-    const num = trimmed === '' ? null : parseInt(trimmed, 10)
-    if (num !== null && (isNaN(num) || num < 0)) return
-    if (num === value) return
-    setSaving(true)
-    try {
-      await updateLocation(locationId, {
-        pick_sequence: trimmed === '' ? null : num ?? undefined,
-      })
-      onSaved()
-    } catch {
-      setLocal(value != null ? String(value) : '')
-    } finally {
-      setSaving(false)
-    }
-  }, [local, value, locationId, onSaved])
-
-  return (
-    <input
-      type="number"
-      min={0}
-      className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-1 text-center text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-      value={local}
-      onChange={(e) => setLocal(e.target.value)}
-      onBlur={handleBlur}
-      disabled={saving}
-      placeholder="—"
-      aria-label={t('locations:pick_sequence')}
-    />
-  )
-}
-
 export function LocationsPage() {
   const { t } = useTranslation(['locations', 'common'])
   const [items, setItems] = useState<Location[]>([])
@@ -230,12 +176,8 @@ export function LocationsPage() {
                 <td className="whitespace-nowrap py-2 pr-3 text-slate-600 dark:text-slate-400 sm:pr-4">
                   {loc.pallet_no != null ? loc.pallet_no : '—'}
                 </td>
-                <td className="whitespace-nowrap py-2 pr-3 sm:pr-4">
-                  <PickSequenceCell
-                    locationId={loc.id}
-                    value={loc.pick_sequence}
-                    onSaved={load}
-                  />
+                <td className="whitespace-nowrap py-2 pr-3 text-slate-600 dark:text-slate-400 sm:pr-4">
+                  {loc.pick_sequence != null ? loc.pick_sequence : '—'}
                 </td>
                 <td className="whitespace-nowrap py-2 pr-3 sm:pr-4">
                   {loc.is_active ? (
@@ -437,6 +379,7 @@ function LocationDialog({ mode, target, onClose, onSaved, onCreated }: DialogPro
   const [levelNo, setLevelNo] = useState<number | ''>(target?.level_no ?? '')
   const [rowNo, setRowNo] = useState<number | ''>(target?.row_no ?? '')
   const [palletNo, setPalletNo] = useState<number | ''>(target?.pallet_no ?? '')
+  const [pickSequence, setPickSequence] = useState<number | ''>(target?.pick_sequence ?? '')
   const [isActive, setIsActive] = useState(target?.is_active ?? true)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -499,6 +442,7 @@ function LocationDialog({ mode, target, onClose, onSaved, onCreated }: DialogPro
             ? { level_no: Number(levelNo), row_no: Number(rowNo), pallet_no: undefined }
             : { pallet_no: Number(palletNo), level_no: undefined, row_no: undefined }),
           is_active: isActive,
+          pick_sequence: pickSequence === '' ? null : Number(pickSequence),
         })
       }
       onSaved()
@@ -605,6 +549,22 @@ function LocationDialog({ mode, target, onClose, onSaved, onCreated }: DialogPro
               {preview}
             </span>
           </div>
+
+          {mode === 'edit' && (
+            <label className="text-sm text-slate-600 dark:text-slate-300">
+              {t('locations:pick_sequence')}
+              <input
+                type="number"
+                min={0}
+                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                value={pickSequence === '' ? '' : pickSequence}
+                onChange={(e) =>
+                  setPickSequence(e.target.value === '' ? '' : parseInt(e.target.value, 10))
+                }
+                placeholder="—"
+              />
+            </label>
+          )}
 
           <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
             <input
