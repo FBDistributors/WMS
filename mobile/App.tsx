@@ -22,6 +22,7 @@ import { AccountScreen } from './src/screens/AccountScreen';
 import { InventoryScreen } from './src/screens/InventoryScreen';
 import { InventoryDetailScreen } from './src/screens/InventoryDetailScreen';
 import { QueueScreen } from './src/screens/QueueScreen';
+import { ReturnsScreen } from './src/screens/ReturnsScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -59,6 +60,7 @@ export default function App() {
         <Stack.Screen name="Inventory" component={InventoryScreen} />
         <Stack.Screen name="InventoryDetail" component={InventoryDetailScreen} />
         <Stack.Screen name="QueueScreen" component={QueueScreen} />
+        <Stack.Screen name="Returns" component={ReturnsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
     </NetworkProvider>

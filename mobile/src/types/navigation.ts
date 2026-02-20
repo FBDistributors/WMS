@@ -8,9 +8,10 @@ export type RootStackParamList = {
   PickerHome: { profileType?: 'picker' | 'controller' } | undefined;
   PickTaskList: { profileType?: 'picker' | 'controller' } | undefined;
   PickTaskDetails: { taskId: string; scannedBarcode?: string; lineId?: string; profileType?: 'picker' | 'controller' };
-  Scanner: { returnToPick?: boolean; taskId?: string; lineId?: string; profileType?: 'picker' | 'controller' };
+  Scanner: { returnToPick?: boolean; returnToReturns?: boolean; taskId?: string; lineId?: string; profileType?: 'picker' | 'controller' };
   Hisob: undefined;
   Inventory: undefined;
   InventoryDetail: { productId: string };
   QueueScreen: undefined;
+  Returns: { scannedProductId?: string; scannedBarcode?: string } | undefined;
 };

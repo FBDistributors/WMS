@@ -30,6 +30,17 @@ export interface ControllerUser {
   full_name: string | null;
 }
 
+export interface PickerUser {
+  id: string;
+  username: string;
+  full_name: string | null;
+}
+
+export async function getPickers(): Promise<PickerUser[]> {
+  const { data } = await apiClient.get<PickerUser[]>(`${PICKING}/pickers`);
+  return data;
+}
+
 export async function getOpenTasks(limit = 50, offset = 0): Promise<PickingListItem[]> {
   const { data } = await apiClient.get<PickingListItem[]>(`${PICKING}/documents`, {
     params: { limit, offset, include_cancelled: false },

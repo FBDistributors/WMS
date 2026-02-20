@@ -254,6 +254,12 @@ export function PickerHome() {
           onPress={() => navigation.navigate('Inventory')}
         />
         <BottomNavTab
+          iconName="undo"
+          label={t('tabReturns')}
+          active={false}
+          onPress={() => navigation.navigate('Returns')}
+        />
+        <BottomNavTab
           iconName="account-outline"
           label={t('tabAccount')}
           active={false}

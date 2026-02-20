@@ -77,6 +77,12 @@ class ControllerUser(BaseModel):
     full_name: Optional[str] = None
 
 
+class PickerUser(BaseModel):
+    id: UUID
+    username: str
+    full_name: Optional[str] = None
+
+
 class SendToControllerRequest(BaseModel):
     controller_user_id: UUID
 
@@ -206,6 +212,24 @@ async def list_controllers(
     return [
         ControllerUser(id=u.id, username=u.username, full_name=u.full_name)
         for u in controllers
+    ]
+
+
+@router.get("/pickers", response_model=List[PickerUser], summary="List pickers (for assign return / send to picker)")
+@router.get("/pickers/", response_model=List[PickerUser], summary="List pickers")
+async def list_pickers(
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("picking:read")),
+):
+    pickers = (
+        db.query(UserModel)
+        .filter(UserModel.role == "picker", UserModel.is_active.is_(True))
+        .order_by(UserModel.full_name, UserModel.username)
+        .all()
+    )
+    return [
+        PickerUser(id=u.id, username=u.username, full_name=u.full_name)
+        for u in pickers
     ]
 
 
