@@ -63,6 +63,7 @@ export function KirimFormScreen() {
   const [loadingProduct, setLoadingProduct] = useState(false);
   const [productError, setProductError] = useState<string | null>(null);
   const [manualBarcode, setManualBarcode] = useState('');
+  const [manualLocationCode, setManualLocationCode] = useState('');
   const [pickerModalVisible, setPickerModalVisible] = useState(false);
   const [pickers, setPickers] = useState<PickerUser[]>([]);
   const [selectedPickerId, setSelectedPickerId] = useState<string | null>(null);
@@ -76,11 +77,13 @@ export function KirimFormScreen() {
     setCurrentProduct(null);
     setCurrentLocation(null);
     setCurrentQty('');
+    setManualLocationCode('');
     try {
       const res = await getPickerProductDetail(productId);
       setCurrentProduct(res);
       const sorted = sortLocations(res.locations);
       if (sorted.length > 0) setCurrentLocation(sorted[0]);
+      else setCurrentLocation(null);
     } catch (e) {
       setProductError(e instanceof Error ? e.message : t('invLoadError'));
     } finally {
@@ -107,7 +110,9 @@ export function KirimFormScreen() {
       setCurrentProduct(res);
       const sorted = sortLocations(res.locations);
       if (sorted.length > 0) setCurrentLocation(sorted[0]);
+      else setCurrentLocation(null);
       setManualBarcode('');
+      setManualLocationCode('');
     } catch (e) {
       setProductError(e instanceof Error ? e.message : t('invLoadError'));
     } finally {
@@ -136,29 +141,37 @@ export function KirimFormScreen() {
   }, [navigation, flow]);
 
   const addLine = useCallback(() => {
-    if (!currentProduct || !currentLocation) return;
+    const code = manualLocationCode.trim();
+    const loc = currentLocation;
+    if (!currentProduct) return;
+    if (!loc && !code) return;
     const qty = Math.floor(Number(currentQty) || 0);
-    const maxQty = Number(currentLocation.available_qty);
+    // Kirim: dono qo‘shiladi, mavjud zaxoraga bog‘lamaymiz; faqat 1–99999 oralig‘ida
+    const maxQty = 99999;
     if (qty < 1 || qty > maxQty) {
       Alert.alert(t('error'), t('qtyRangeError', { max: maxQty }));
       return;
     }
+    const locationCode = code || (loc?.location_code ?? '');
+    const locationId = loc?.location_id ?? '';
+    const lotId = loc?.lot_id ?? '';
     setLines((prev) => [
       ...prev,
       {
-        id: `${currentProduct.product_id}-${currentLocation.lot_id}-${Date.now()}`,
+        id: `${currentProduct.product_id}-${lotId || code || Date.now()}-${Date.now()}`,
         productId: currentProduct.product_id,
         productName: currentProduct.name,
-        locationCode: currentLocation.location_code,
-        locationId: currentLocation.location_id,
-        lotId: currentLocation.lot_id,
+        locationCode,
+        locationId,
+        lotId,
         qty,
       },
     ]);
     setCurrentProduct(null);
     setCurrentLocation(null);
     setCurrentQty('');
-  }, [currentProduct, currentLocation, currentQty, t]);
+    setManualLocationCode('');
+  }, [currentProduct, currentLocation, currentQty, manualLocationCode, t]);
 
   const removeLine = useCallback((id: string) => {
     setLines((prev) => prev.filter((l) => l.id !== id));
@@ -199,7 +212,8 @@ export function KirimFormScreen() {
   }, [flow, selectedPickerId, t]);
 
   const locations = currentProduct ? sortLocations(currentProduct.locations) : [];
-  const canAddLine = currentProduct && currentLocation && currentQty.trim().length > 0;
+  const hasLocation = !!(currentLocation || manualLocationCode.trim());
+  const canAddLine = currentProduct && hasLocation && currentQty.trim().length > 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -211,30 +225,6 @@ export function KirimFormScreen() {
       />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.scanRow}>
-          <TouchableOpacity style={styles.scanBtn} onPress={handleScan} activeOpacity={0.8}>
-            <Icon name="barcode-scan" size={28} color="#fff" />
-            <Text style={styles.scanBtnText}>{t('scanButton')}</Text>
-          </TouchableOpacity>
-          <View style={styles.manualEntryBlock}>
-            <Text style={styles.manualEntryLabel}>{t('kirimManualEntry')}</Text>
-            <View style={styles.manualEntryRow}>
-              <TextInput
-                style={styles.manualBarcodeInput}
-                value={manualBarcode}
-                onChangeText={(text) => { setManualBarcode(text); setProductError(null); }}
-                placeholder={t('kirimBarcodePlaceholder')}
-                placeholderTextColor="#999"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <TouchableOpacity style={styles.findProductBtn} onPress={handleManualFind} disabled={loadingProduct}>
-                <Text style={styles.findProductBtnText}>{t('kirimFindProduct')}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-
         {loadingProduct && (
           <View style={styles.loadingRow}>
             <ActivityIndicator size="small" color="#1a237e" />
@@ -261,23 +251,39 @@ export function KirimFormScreen() {
               placeholderTextColor="#999"
             />
             <Text style={styles.label}>{t('locationLabel')}</Text>
-            <View style={styles.locationRows}>
-              {locations.map((loc) => {
-                const isSelected = currentLocation?.lot_id === loc.lot_id && currentLocation?.location_id === loc.location_id;
-                return (
-                  <TouchableOpacity
-                    key={loc.lot_id + loc.location_id}
-                    style={[styles.locationRow, isSelected && styles.locationRowSelected]}
-                    onPress={() => setCurrentLocation(loc)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.locationRowText, isSelected && styles.locationRowTextSelected]}>
-                      {loc.location_code} — {loc.batch_no} {loc.expiry_date ? `(${loc.expiry_date})` : ''} — {Number(loc.available_qty)} {t('invAvailable')}
-                    </Text>
-                    {isSelected && <Icon name="check-circle" size={22} color="#2e7d32" />}
-                  </TouchableOpacity>
-                );
-              })}
+            {locations.length > 0 && (
+              <View style={styles.locationRows}>
+                {locations.map((loc) => {
+                  const isSelected = currentLocation?.lot_id === loc.lot_id && currentLocation?.location_id === loc.location_id;
+                  return (
+                    <TouchableOpacity
+                      key={loc.lot_id + loc.location_id}
+                      style={[styles.locationRow, isSelected && styles.locationRowSelected]}
+                      onPress={() => { setCurrentLocation(loc); setManualLocationCode(''); }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.locationRowText, isSelected && styles.locationRowTextSelected]}>
+                        {loc.location_code} — {loc.batch_no} {loc.expiry_date ? `(${loc.expiry_date})` : ''} — {Number(loc.available_qty)} {t('invAvailable')}
+                      </Text>
+                      {isSelected && <Icon name="check-circle" size={22} color="#2e7d32" />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+            <View style={styles.manualLocationRow}>
+              <Text style={styles.manualEntryLabel}>
+                {locations.length > 0 ? t('kirimLocationCodeOr') : t('kirimLocationCodePlaceholder')}
+              </Text>
+              <TextInput
+                style={styles.manualBarcodeInput}
+                value={manualLocationCode}
+                onChangeText={(text) => { setManualLocationCode(text); if (text.trim()) setCurrentLocation(null); }}
+                placeholder={t('kirimLocationCodePlaceholder')}
+                placeholderTextColor="#999"
+                autoCapitalize="characters"
+                autoCorrect={false}
+              />
             </View>
             <TouchableOpacity
               style={[styles.addLineBtn, !canAddLine && styles.addLineBtnDisabled]}
@@ -353,6 +359,30 @@ export function KirimFormScreen() {
             )}
           </TouchableOpacity>
         )}
+
+        <View style={styles.scanRow}>
+          <TouchableOpacity style={styles.scanBtn} onPress={handleScan} activeOpacity={0.8}>
+            <Icon name="barcode-scan" size={28} color="#fff" />
+            <Text style={styles.scanBtnText}>{t('scanButton')}</Text>
+          </TouchableOpacity>
+          <View style={styles.manualEntryBlock}>
+            <Text style={styles.manualEntryLabel}>{t('kirimManualEntry')}</Text>
+            <View style={styles.manualEntryRow}>
+              <TextInput
+                style={styles.manualBarcodeInput}
+                value={manualBarcode}
+                onChangeText={(text) => { setManualBarcode(text); setProductError(null); }}
+                placeholder={t('kirimBarcodePlaceholder')}
+                placeholderTextColor="#999"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity style={styles.findProductBtn} onPress={handleManualFind} disabled={loadingProduct}>
+                <Text style={styles.findProductBtnText}>{t('kirimFindProduct')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </ScrollView>
 
       {flow === 'return' && (
@@ -428,6 +458,7 @@ const styles = StyleSheet.create({
   },
   findProductBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   locationRows: { marginBottom: 12 },
+  manualLocationRow: { marginTop: 8, marginBottom: 12 },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -151,6 +151,8 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     kirimManualEntry: "Qo'lda kiritish",
     kirimBarcodePlaceholder: 'Barkod yoki SKU kiriting',
     kirimFindProduct: 'Topish',
+    kirimLocationCodePlaceholder: 'Lokatsiya kodi',
+    kirimLocationCodeOr: 'Yoki lokatsiya kodini kiriting',
   },
   ru: {
     brand: 'FB Warehouse',
@@ -293,6 +295,8 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     kirimManualEntry: 'Ввести вручную',
     kirimBarcodePlaceholder: 'Введите штрихкод или SKU',
     kirimFindProduct: 'Найти',
+    kirimLocationCodePlaceholder: 'Код локации',
+    kirimLocationCodeOr: 'Или введите код локации',
   },
   en: {
     brand: 'FB Warehouse',
@@ -435,6 +439,8 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     kirimManualEntry: 'Enter manually',
     kirimBarcodePlaceholder: 'Enter barcode or SKU',
     kirimFindProduct: 'Find',
+    kirimLocationCodePlaceholder: 'Location code',
+    kirimLocationCodeOr: 'Or enter location code',
   },
 };
 
