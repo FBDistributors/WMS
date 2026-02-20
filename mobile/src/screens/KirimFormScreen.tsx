@@ -50,6 +50,22 @@ function sortLocations(locs: PickerProductLocation[]): PickerProductLocation[] {
   });
 }
 
+const CALENDAR_YEARS = (() => {
+  const current = new Date().getFullYear();
+  const out: number[] = [];
+  for (let y = current - 2; y <= current + 12; y++) out.push(y);
+  return out;
+})();
+
+const MONTH_NAMES = [
+  '01', '02', '03', '04', '05', '06',
+  '07', '08', '09', '10', '11', '12',
+];
+
+function getDaysInMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate();
+}
+
 export function KirimFormScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<KirimFormRoute>();
@@ -75,6 +91,10 @@ export function KirimFormScreen() {
   const [pickers, setPickers] = useState<PickerUser[]>([]);
   const [selectedPickerId, setSelectedPickerId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [expiryCalendarOpen, setExpiryCalendarOpen] = useState(false);
+  const [calendarStep, setCalendarStep] = useState<'year' | 'month' | 'day'>('year');
+  const [pickerYear, setPickerYear] = useState<number | null>(null);
+  const [pickerMonth, setPickerMonth] = useState<number | null>(null);
 
   const title = flow === 'new' ? t('kirimNewProducts') : t('kirimCustomerReturns');
 
@@ -296,15 +316,26 @@ export function KirimFormScreen() {
               placeholderTextColor="#999"
             />
             <Text style={styles.label}>{t('locationLabel')}</Text>
-            <TouchableOpacity
-              style={styles.locationDropdownTrigger}
-              onPress={() => setLocationDropdownOpen(true)}
-            >
-              <Text style={styles.locationDropdownTriggerText} numberOfLines={1}>
-                {selectedLocation ? `${selectedLocation.code}${selectedLocation.name ? ` — ${selectedLocation.name}` : ''}` : t('returnsSelectLocation')}
-              </Text>
-              <Icon name="chevron-down" size={22} color="#555" />
-            </TouchableOpacity>
+            <View style={styles.locationInputRow}>
+              <TextInput
+                style={styles.locationInput}
+                value={selectedLocation ? selectedLocation.code : locationSearch}
+                onChangeText={(text) => {
+                  setLocationSearch(text);
+                  setSelectedLocation(null);
+                }}
+                placeholder={t('kirimLocationSearchPlaceholder')}
+                placeholderTextColor="#999"
+                autoCapitalize="characters"
+                autoCorrect={false}
+              />
+              <TouchableOpacity
+                style={styles.locationDropdownBtn}
+                onPress={() => setLocationDropdownOpen(true)}
+              >
+                <Icon name="chevron-down" size={24} color="#1a237e" />
+              </TouchableOpacity>
+            </View>
             <Text style={styles.label}>{t('kirimBatchLabel')}</Text>
             <TextInput
               style={styles.input}
@@ -316,15 +347,28 @@ export function KirimFormScreen() {
               autoCorrect={false}
             />
             <Text style={styles.label}>{t('kirimExpiryLabel')}</Text>
-            <TextInput
-              style={styles.input}
-              value={currentExpiry}
-              onChangeText={setCurrentExpiry}
-              placeholder={t('kirimExpiryPlaceholder')}
-              placeholderTextColor="#999"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            <View style={styles.expiryRow}>
+              <TextInput
+                style={styles.expiryInput}
+                value={currentExpiry}
+                onChangeText={setCurrentExpiry}
+                placeholder={t('kirimExpiryPlaceholder')}
+                placeholderTextColor="#999"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity
+                style={styles.expiryCalendarBtn}
+                onPress={() => {
+                  setPickerYear(null);
+                  setPickerMonth(null);
+                  setCalendarStep('year');
+                  setExpiryCalendarOpen(true);
+                }}
+              >
+                <Icon name="calendar" size={24} color="#1a237e" />
+              </TouchableOpacity>
+            </View>
             {locationDropdownOpen && (
               <Modal
                 visible={locationDropdownOpen}
@@ -334,15 +378,6 @@ export function KirimFormScreen() {
               >
                 <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setLocationDropdownOpen(false)}>
                   <TouchableOpacity style={styles.locationDropdownModal} activeOpacity={1} onPress={() => {}}>
-                    <TextInput
-                      style={styles.locationSearchInput}
-                      value={locationSearch}
-                      onChangeText={setLocationSearch}
-                      placeholder={t('kirimLocationSearchPlaceholder')}
-                      placeholderTextColor="#999"
-                      autoCapitalize="characters"
-                      autoCorrect={false}
-                    />
                     <ScrollView style={styles.locationDropdownList} keyboardShouldPersistTaps="handled">
                       {filteredLocations.map((loc) => (
                         <TouchableOpacity
@@ -350,12 +385,12 @@ export function KirimFormScreen() {
                           style={[styles.locationDropdownItem, selectedLocation?.id === loc.id && styles.locationDropdownItemSelected]}
                           onPress={() => {
                             setSelectedLocation(loc);
+                            setLocationSearch(loc.code);
                             setLocationDropdownOpen(false);
-                            setLocationSearch('');
                           }}
                         >
                           <Text style={styles.locationDropdownItemCode} numberOfLines={1}>{loc.code}</Text>
-                          {loc.name ? <Text style={styles.locationDropdownItemName} numberOfLines={1}>{loc.name}</Text> : null}
+                          {loc.name && loc.name !== loc.code ? <Text style={styles.locationDropdownItemName} numberOfLines={1}>{loc.name}</Text> : null}
                           {selectedLocation?.id === loc.id ? <Icon name="check-circle" size={20} color="#2e7d32" /> : null}
                         </TouchableOpacity>
                       ))}
@@ -364,6 +399,104 @@ export function KirimFormScreen() {
                 </TouchableOpacity>
               </Modal>
             )}
+
+            {expiryCalendarOpen && (
+              <Modal
+                visible={expiryCalendarOpen}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setExpiryCalendarOpen(false)}
+              >
+                <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setExpiryCalendarOpen(false)}>
+                  <View style={styles.calendarModal} onStartShouldSetResponder={() => true}>
+                    <View style={styles.calendarHeader}>
+                      {calendarStep !== 'year' ? (
+                        <TouchableOpacity
+                          onPress={() => {
+                            if (calendarStep === 'day') {
+                              setCalendarStep('month');
+                            } else {
+                              setPickerYear(null);
+                              setPickerMonth(null);
+                              setCalendarStep('year');
+                            }
+                          }}
+                          style={styles.calendarBackBtn}
+                        >
+                          <Icon name="chevron-left" size={24} color="#1a237e" />
+                        </TouchableOpacity>
+                      ) : (
+                        <View style={styles.calendarBackBtn} />
+                      )}
+                      <Text style={styles.calendarTitle}>
+                        {calendarStep === 'year' && t('kirimExpiryLabel')}
+                        {calendarStep === 'month' && pickerYear != null && `${pickerYear}`}
+                        {calendarStep === 'day' && pickerYear != null && pickerMonth != null && `${pickerYear}-${String(pickerMonth).padStart(2, '0')}`}
+                      </Text>
+                      <TouchableOpacity onPress={() => setExpiryCalendarOpen(false)}>
+                        <Icon name="close" size={24} color="#333" />
+                      </TouchableOpacity>
+                    </View>
+                    {calendarStep === 'year' && (
+                      <View style={styles.calendarGrid}>
+                        {CALENDAR_YEARS.map((y) => (
+                          <TouchableOpacity
+                            key={y}
+                            style={[styles.calendarCell, pickerYear === y && styles.calendarCellSelected]}
+                            onPress={() => {
+                              setPickerYear(y);
+                              setCalendarStep('month');
+                            }}
+                          >
+                            <Text style={[styles.calendarCellText, pickerYear === y && styles.calendarCellTextSelected]}>{y}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                    {calendarStep === 'month' && pickerYear != null && (
+                      <View style={styles.calendarGrid}>
+                        {MONTH_NAMES.map((m, i) => (
+                          <TouchableOpacity
+                            key={m}
+                            style={[styles.calendarCell, pickerMonth === i + 1 && styles.calendarCellSelected]}
+                            onPress={() => {
+                              setPickerMonth(i + 1);
+                              setCalendarStep('day');
+                            }}
+                          >
+                            <Text style={[styles.calendarCellText, pickerMonth === i + 1 && styles.calendarCellTextSelected]}>{m}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                    {calendarStep === 'day' && pickerYear != null && pickerMonth != null && (() => {
+                      const days = getDaysInMonth(pickerYear, pickerMonth);
+                      const dayNumbers = Array.from({ length: days }, (_, i) => i + 1);
+                      return (
+                        <View style={styles.calendarGrid}>
+                          {dayNumbers.map((d) => {
+                            const dateStr = `${pickerYear}-${String(pickerMonth).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                            return (
+                              <TouchableOpacity
+                                key={d}
+                                style={styles.calendarCell}
+                                onPress={() => {
+                                  setCurrentExpiry(dateStr);
+                                  setExpiryCalendarOpen(false);
+                                }}
+                              >
+                                <Text style={styles.calendarCellText}>{String(d).padStart(2, '0')}</Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      );
+                    })()}
+                  </View>
+                </TouchableOpacity>
+              </Modal>
+            )}
+
             <TouchableOpacity
               style={[styles.addLineBtn, !canAddLine && styles.addLineBtnDisabled]}
               onPress={addLine}
@@ -543,38 +676,41 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   findProductBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  locationDropdownTrigger: {
+  locationInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 12,
+  },
+  locationInput: {
+    flex: 1,
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
+    fontSize: 16,
     backgroundColor: '#fff',
-    marginBottom: 12,
+    color: '#333',
   },
-  locationDropdownTriggerText: { fontSize: 15, color: '#333', flex: 1 },
-  locationSearchInput: {
+  locationDropdownBtn: {
+    width: 48,
+    height: 44,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 14,
     backgroundColor: '#fff',
-    marginHorizontal: 12,
-    marginTop: 12,
-    marginBottom: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   locationDropdownModal: {
     backgroundColor: '#fff',
     borderRadius: 12,
     marginHorizontal: 24,
     maxHeight: 280,
+    paddingTop: 12,
   },
-  locationDropdownList: { maxHeight: 220 },
+  locationDropdownList: { maxHeight: 260 },
   locationDropdownItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -625,6 +761,73 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     backgroundColor: '#fff',
   },
+  expiryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  expiryInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    backgroundColor: '#fff',
+  },
+  expiryCalendarBtn: {
+    width: 48,
+    height: 44,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarModal: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    marginHorizontal: 20,
+    maxHeight: '80%',
+    overflow: 'hidden',
+  },
+  calendarHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  calendarBackBtn: { width: 40, alignItems: 'flex-start' },
+  calendarTitle: { fontSize: 18, fontWeight: '600', color: '#333', flex: 1, textAlign: 'center' },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: 12,
+    gap: 8,
+    justifyContent: 'flex-start',
+  },
+  calendarCell: {
+    width: '22%',
+    minWidth: 72,
+    aspectRatio: 1.2,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarCellSelected: {
+    backgroundColor: '#e8eaf6',
+    borderColor: '#1a237e',
+  },
+  calendarCellText: { fontSize: 16, color: '#333', fontWeight: '500' },
+  calendarCellTextSelected: { color: '#1a237e', fontWeight: '600' },
   addLineBtn: {
     backgroundColor: '#1a237e',
     paddingVertical: 12,
