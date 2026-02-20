@@ -86,7 +86,7 @@ export function LocationDetailPage() {
     }
     return (
       <>
-        <label className="block text-sm text-slate-600 dark:text-slate-300">
+        <label className="block w-full text-sm text-slate-600 dark:text-slate-300">
           <input
             type="text"
             className="mt-1 w-full max-w-md rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
@@ -95,18 +95,18 @@ export function LocationDetailPage() {
             placeholder={t('locations:detail_filter_placeholder')}
           />
         </label>
-        <div className="max-h-[calc(100vh-320px)] min-h-0 overflow-auto">
-          <TableScrollArea inline>
-            <table className="w-max min-w-[600px] text-sm">
+        <div className="w-full max-h-[calc(100vh-320px)] min-h-0 overflow-auto">
+          <TableScrollArea inline className="w-full">
+            <table className="w-full min-w-[600px] text-sm table-fixed">
               <thead className="text-xs uppercase text-slate-500 dark:text-slate-400">
                 <tr className="border-b border-slate-200 dark:border-slate-800">
-                  <th className="px-3 py-3 text-center">{t('locations:detail_col_code')}</th>
-                  <th className="min-w-[180px] max-w-[280px] px-3 py-3 text-center">{t('locations:detail_col_product_name')}</th>
-                  <th className="px-3 py-3 text-center">{t('locations:detail_col_barcode')}</th>
-                  <th className="px-3 py-3 text-center">{t('locations:detail_col_brand')}</th>
-                  <th className="px-3 py-3 text-center">{t('locations:detail_col_batch')}</th>
-                  <th className="px-3 py-3 text-center">{t('locations:detail_col_expiry')}</th>
-                  <th className="px-3 py-3 text-center">{t('locations:detail_col_qty')}</th>
+                  <th className="w-24 px-3 py-3 text-center">{t('locations:detail_col_code')}</th>
+                  <th className="min-w-0 px-3 py-3 text-center" style={{ width: '30%' }}>{t('locations:detail_col_product_name')}</th>
+                  <th className="w-28 px-3 py-3 text-center">{t('locations:detail_col_barcode')}</th>
+                  <th className="w-28 px-3 py-3 text-center">{t('locations:detail_col_brand')}</th>
+                  <th className="w-20 px-3 py-3 text-center">{t('locations:detail_col_batch')}</th>
+                  <th className="w-28 px-3 py-3 text-center">{t('locations:detail_col_expiry')}</th>
+                  <th className="w-20 px-3 py-3 text-center">{t('locations:detail_col_qty')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -125,7 +125,7 @@ export function LocationDetailPage() {
                       <td className="px-3 py-3 text-center font-medium text-slate-800 dark:text-slate-200">
                         {row.product_code}
                       </td>
-                      <td className="min-w-[180px] max-w-[280px] px-3 py-3 text-center text-slate-700 dark:text-slate-200">
+                      <td className="min-w-0 px-3 py-3 text-center text-slate-700 dark:text-slate-200" style={{ width: '30%' }}>
                         <span className="line-clamp-2 block">{row.product_name}</span>
                       </td>
                       <td className="px-3 py-3 text-center font-mono text-xs text-slate-700 dark:text-slate-200">
@@ -155,16 +155,20 @@ export function LocationDetailPage() {
   const title = location ? location.code : (id ?? '')
 
   return (
-    <AdminLayout
-      title={title}
-      actionSlot={
-        <Button variant="ghost" onClick={() => navigate('/admin/locations')}>
-          <ArrowLeft size={16} />
-          {t('locations:title')}
-        </Button>
-      }
-    >
-      <Card className="space-y-4">{content}</Card>
+    <AdminLayout title={title}>
+      <Card className="w-full max-w-full space-y-4">
+        <div>
+          <Button
+            variant="ghost"
+            className="p-2"
+            aria-label={t('common:buttons.back')}
+            onClick={() => navigate('/admin/locations')}
+          >
+            <ArrowLeft size={20} />
+          </Button>
+        </div>
+        {content}
+      </Card>
     </AdminLayout>
   )
 }
