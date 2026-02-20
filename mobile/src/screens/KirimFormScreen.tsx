@@ -359,31 +359,31 @@ export function KirimFormScreen() {
             )}
           </TouchableOpacity>
         )}
+      </ScrollView>
 
-        <View style={styles.scanRow}>
-          <TouchableOpacity style={styles.scanBtn} onPress={handleScan} activeOpacity={0.8}>
-            <Icon name="barcode-scan" size={28} color="#fff" />
-            <Text style={styles.scanBtnText}>{t('scanButton')}</Text>
-          </TouchableOpacity>
-          <View style={styles.manualEntryBlock}>
-            <Text style={styles.manualEntryLabel}>{t('kirimManualEntry')}</Text>
-            <View style={styles.manualEntryRow}>
-              <TextInput
-                style={styles.manualBarcodeInput}
-                value={manualBarcode}
-                onChangeText={(text) => { setManualBarcode(text); setProductError(null); }}
-                placeholder={t('kirimBarcodePlaceholder')}
-                placeholderTextColor="#999"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <TouchableOpacity style={styles.findProductBtn} onPress={handleManualFind} disabled={loadingProduct}>
-                <Text style={styles.findProductBtnText}>{t('kirimFindProduct')}</Text>
-              </TouchableOpacity>
-            </View>
+      <View style={styles.scanFooter}>
+        <TouchableOpacity style={styles.scanBtn} onPress={handleScan} activeOpacity={0.8}>
+          <Icon name="barcode-scan" size={28} color="#fff" />
+          <Text style={styles.scanBtnText}>{t('scanButton')}</Text>
+        </TouchableOpacity>
+        <View style={styles.manualEntryBlock}>
+          <Text style={styles.manualEntryLabel}>{t('kirimManualEntry')}</Text>
+          <View style={styles.manualEntryRow}>
+            <TextInput
+              style={styles.manualBarcodeInput}
+              value={manualBarcode}
+              onChangeText={(text) => { setManualBarcode(text); setProductError(null); }}
+              placeholder={t('kirimBarcodePlaceholder')}
+              placeholderTextColor="#999"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <TouchableOpacity style={styles.findProductBtn} onPress={handleManualFind} disabled={loadingProduct}>
+              <Text style={styles.findProductBtnText}>{t('kirimFindProduct')}</Text>
+            </TouchableOpacity>
           </View>
         </View>
-      </ScrollView>
+      </View>
 
       {flow === 'return' && (
         <Modal
@@ -423,8 +423,15 @@ export function KirimFormScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   scroll: { flex: 1 },
-  scrollContent: { padding: 20, paddingBottom: 40 },
-  scanRow: { marginBottom: 20 },
+  scrollContent: { padding: 20, paddingBottom: 24 },
+  scanFooter: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 24,
+    backgroundColor: '#fff',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#e0e0e0',
+  },
   scanBtn: {
     flexDirection: 'row',
     alignItems: 'center',
