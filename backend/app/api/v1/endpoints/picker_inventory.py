@@ -207,6 +207,7 @@ def _build_picker_items(
 
 
 def _get_product_by_barcode(db: Session, barcode: str) -> ProductModel | None:
+    """Find product by barcode, SKU, or smartup_code (for manual entry)."""
     barcode = (barcode or "").strip()
     if not barcode:
         return None
@@ -214,6 +215,8 @@ def _get_product_by_barcode(db: Session, barcode: str) -> ProductModel | None:
         db.query(ProductModel)
         .filter(
             (ProductModel.barcode == barcode)
+            | (ProductModel.sku == barcode)
+            | (ProductModel.smartup_code == barcode)
             | ProductModel.id.in_(
                 db.query(ProductBarcode.product_id).filter(ProductBarcode.barcode == barcode)
             )

@@ -14,6 +14,7 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     error: 'Xato',
     enterLoginPassword: 'Login va parolni kiriting',
     loginError: 'Kirish xatosi',
+    authErrorPleaseLogin: "Avtorizatsiya xatosi. Iltimos qayta kiring.",
 
     // PickerHome
     pickerTitle: "Yig'uvchi",
@@ -160,6 +161,7 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     error: 'Ошибка',
     enterLoginPassword: 'Введите логин и пароль',
     loginError: 'Ошибка входа',
+    authErrorPleaseLogin: 'Ошибка авторизации. Пожалуйста, войдите снова.',
 
     pickerTitle: 'Сборщик',
     controllerTitle: 'Контролёр',
@@ -282,7 +284,7 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     returnsSentToPicker: 'Отправлено сборщику',
 
     kirimTitle: 'Приход',
-    kirimNewProducts: 'Новые товары',
+    kirimNewProducts: 'Поступления товары',
     kirimCustomerReturns: 'Возвраты от клиента',
     kirimNewProductsDesc: 'Товары, вводимые на склад',
     kirimCustomerReturnsDesc: 'Размещение возвратов от клиента',
@@ -301,6 +303,7 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     error: 'Error',
     enterLoginPassword: 'Enter username and password',
     loginError: 'Sign in failed',
+    authErrorPleaseLogin: 'Authorization error. Please sign in again.',
 
     pickerTitle: 'Picker',
     controllerTitle: 'Controller',

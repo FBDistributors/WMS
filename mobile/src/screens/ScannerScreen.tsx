@@ -18,6 +18,8 @@ import {
 import { useCameraPermission } from '../hooks/useCameraPermission';
 import { useProductByBarcode } from '../hooks/useProductByBarcode';
 import { ProductCard } from '../components/ProductCard';
+import { UNAUTHORIZED_MSG } from '../api/client';
+import { useLocale } from '../i18n/LocaleContext';
 
 const DEBOUNCE_MS = 1500;
 const SUPPORTED_CODE_TYPES = ['ean-13', 'ean-8', 'code-128', 'qr'] as const;
@@ -27,6 +29,7 @@ type ScannerRoute = RouteProp<RootStackParamList, 'Scanner'>;
 export function ScannerScreen() {
   const navigation = useNavigation();
   const route = useRoute<ScannerRoute>();
+  const { t } = useLocale();
   const params = route.params ?? {};
   const device = useCameraDevice('back');
   const { status: permStatus, requestOrOpenSettings } = useCameraPermission();
@@ -183,10 +186,21 @@ export function ScannerScreen() {
 
       {fetchStatus === 'error' && error && (
         <View style={styles.resultBox}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.buttonSmall} onPress={handleScanAgain}>
-            <Text style={styles.buttonText}>Scan again</Text>
-          </TouchableOpacity>
+          <Text style={styles.errorText}>
+            {error === UNAUTHORIZED_MSG ? t('authErrorPleaseLogin') : error}
+          </Text>
+          {error === UNAUTHORIZED_MSG ? (
+            <TouchableOpacity
+              style={styles.buttonSmall}
+              onPress={() => navigation.replace('Login')}
+            >
+              <Text style={styles.buttonText}>{t('loginButton')}</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.buttonSmall} onPress={handleScanAgain}>
+              <Text style={styles.buttonText}>Scan again</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
