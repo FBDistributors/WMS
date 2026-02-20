@@ -136,6 +136,20 @@ class InventoryDetailRow(BaseModel):
     available: Decimal
 
 
+class InventoryByLocationRow(BaseModel):
+    """One row per (product, lot) at a location – for location detail page."""
+    product_id: UUID
+    product_code: str
+    product_name: str
+    barcode: Optional[str] = None
+    brand: Optional[str] = None
+    lot_id: UUID
+    batch: str
+    expiry_date: Optional[date] = None
+    on_hand: Decimal
+    available: Decimal
+
+
 class InventorySummaryWithLocationRow(BaseModel):
     """One row per (product, location) for inventory table with expandable location rows."""
     product_id: UUID
@@ -757,6 +771,80 @@ async def inventory_details(
             location_path=location_map.get(row.location_id, row.location_code),
             on_hand=row.on_hand,
             reserved=row.reserved,
+            available=row.available,
+        )
+        for row in rows
+    ]
+
+
+@router.get(
+    "/by-location/{location_id}",
+    response_model=List[InventoryByLocationRow],
+    summary="Inventory at a location (product code, barcode, brand, expiry, qty)",
+)
+async def inventory_by_location(
+    location_id: UUID,
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("inventory:read")),
+):
+    """List all product lots at the given location with product code, name, barcode, brand, expiry, qty."""
+    on_hand_expr = func.sum(
+        case(
+            (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
+            else_=0,
+        )
+    )
+    reserved_expr = func.sum(
+        case(
+            (StockMovementModel.movement_type.in_(("allocate", "unallocate")), StockMovementModel.qty_change),
+            else_=0,
+        )
+    )
+    available_expr = on_hand_expr - reserved_expr
+
+    rows = (
+        db.query(
+            ProductModel.id.label("product_id"),
+            ProductModel.sku.label("product_code"),
+            ProductModel.name.label("product_name"),
+            ProductModel.barcode.label("barcode"),
+            ProductModel.brand.label("brand"),
+            StockLotModel.id.label("lot_id"),
+            StockLotModel.batch.label("batch"),
+            StockLotModel.expiry_date.label("expiry_date"),
+            on_hand_expr.label("on_hand"),
+            available_expr.label("available"),
+        )
+        .select_from(StockMovementModel)
+        .join(StockLotModel, StockLotModel.id == StockMovementModel.lot_id)
+        .join(ProductModel, ProductModel.id == StockLotModel.product_id)
+        .join(LocationModel, LocationModel.id == StockMovementModel.location_id)
+        .filter(StockMovementModel.location_id == location_id)
+        .group_by(
+            ProductModel.id,
+            ProductModel.sku,
+            ProductModel.name,
+            ProductModel.barcode,
+            ProductModel.brand,
+            StockLotModel.id,
+            StockLotModel.batch,
+            StockLotModel.expiry_date,
+        )
+        .having(on_hand_expr != 0)
+        .order_by(ProductModel.sku.asc(), StockLotModel.expiry_date.asc().nullslast())
+        .all()
+    )
+    return [
+        InventoryByLocationRow(
+            product_id=row.product_id,
+            product_code=row.product_code,
+            product_name=row.product_name,
+            barcode=row.barcode,
+            brand=row.brand or None,
+            lot_id=row.lot_id,
+            batch=row.batch,
+            expiry_date=row.expiry_date,
+            on_hand=row.on_hand,
             available=row.available,
         )
         for row in rows

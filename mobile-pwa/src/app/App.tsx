@@ -14,6 +14,7 @@ import { BrandsPage } from '../pages/admin/BrandsPage'
 import { OrdersPage } from '../pages/admin/OrdersPage'
 import { OrderDetailsPage } from '../pages/admin/OrderDetailsPage'
 import { LocationsPage } from '../pages/admin/LocationsPage'
+import { LocationDetailPage } from '../pages/admin/LocationDetailPage'
 import { ReceivingPage } from '../pages/admin/ReceivingPage'
 import { InventorySummaryPage } from '../pages/admin/InventorySummaryPage'
 import { InventoryDetailsPage } from '../pages/admin/InventoryDetailsPage'
@@ -301,6 +302,16 @@ export function App() {
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">
               <RequirePermission permission="locations:manage">
                 <LocationsPage />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/locations/:id"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="inventory:read">
+                <LocationDetailPage />
               </RequirePermission>
             </RequirePermission>
           }

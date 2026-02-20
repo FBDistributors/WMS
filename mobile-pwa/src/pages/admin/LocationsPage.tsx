@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Download, Pencil, Plus, Printer, QrCode, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import JsBarcode from 'jsbarcode'
@@ -48,6 +49,7 @@ type DialogState = {
 
 export function LocationsPage() {
   const { t } = useTranslation(['locations', 'common'])
+  const navigate = useNavigate()
   const [items, setItems] = useState<Location[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -151,7 +153,19 @@ export function LocationsPage() {
               </tr>
             ) : (
               filteredItems.map((loc) => (
-              <tr key={loc.id} className="border-b border-slate-100 dark:border-slate-800">
+              <tr
+                key={loc.id}
+                className="cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                onClick={() => navigate(`/admin/locations/${loc.id}`)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    navigate(`/admin/locations/${loc.id}`)
+                  }
+                }}
+              >
                 <td className="whitespace-nowrap py-2 pr-3 font-medium text-slate-900 dark:text-slate-100 sm:pr-4">
                   {loc.code}
                 </td>
@@ -182,12 +196,15 @@ export function LocationsPage() {
                     </span>
                   )}
                 </td>
-                <td className="py-2 pl-2">
+                <td className="py-2 pl-2" onClick={(e) => e.stopPropagation()}>
                   <div className="flex flex-nowrap items-center gap-0.5 sm:gap-1">
                     <Button
                       variant="ghost"
                       className="shrink-0 py-1.5 px-1.5 text-xs sm:px-2"
-                      onClick={() => setDialog({ open: true, mode: 'edit', target: loc })}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setDialog({ open: true, mode: 'edit', target: loc })
+                      }}
                       aria-label={t('locations:edit')}
                     >
                       <Pencil size={14} />
@@ -195,7 +212,10 @@ export function LocationsPage() {
                     <Button
                       variant="ghost"
                       className="shrink-0 py-1.5 px-1.5 text-xs sm:px-2"
-                      onClick={() => setLocationForQr(loc)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setLocationForQr(loc)
+                      }}
                       aria-label={t('locations:qr_download')}
                     >
                       <QrCode size={14} className="sm:mr-1 sm:inline" />
@@ -210,7 +230,7 @@ export function LocationsPage() {
         </table>
       </TableScrollArea>
     )
-  }, [error, isLoading, items, filteredItems, load, t])
+  }, [error, isLoading, items, filteredItems, load, navigate, t])
 
   return (
     <AdminLayout

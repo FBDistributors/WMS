@@ -170,6 +170,24 @@ export async function getInventoryByProduct(productId: string) {
   return fetchJSON<InventoryByProductRow[]>(`/api/v1/inventory/by-product/${productId}`)
 }
 
+/** Inventory at a single location (for location detail page): product code, barcode, brand, expiry, qty */
+export type InventoryByLocationRow = {
+  product_id: string
+  product_code: string
+  product_name: string
+  barcode?: string | null
+  brand?: string | null
+  lot_id: string
+  batch: string
+  expiry_date?: string | null
+  on_hand: number
+  available: number
+}
+
+export async function getInventoryByLocation(locationId: string) {
+  return fetchJSON<InventoryByLocationRow[]>(`/api/v1/inventory/by-location/${locationId}`)
+}
+
 export type InventoryMovementsQuery = {
   product_id?: string
   lot_id?: string
