@@ -507,7 +507,7 @@ function LocationDialog({ mode, target, onClose, onSaved, onCreated }: DialogPro
               <Button
                 type="button"
                 variant="secondary"
-                className="w-full bg-emerald-700 text-white hover:bg-emerald-800 dark:bg-emerald-700 dark:hover:bg-emerald-800"
+                className="w-full bg-emerald-800 text-black hover:bg-emerald-900 dark:bg-emerald-800 dark:hover:bg-emerald-900 dark:text-black"
                 onClick={() => setShowActivateConfirm(true)}
                 disabled={isSubmitting}
               >
