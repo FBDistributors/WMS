@@ -5,11 +5,14 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Query, status
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.deps import require_permission
 from app.db import get_db
+from app.models.stock import StockMovement as StockMovementModel
+from app.models.stock import ON_HAND_MOVEMENT_TYPES
 from app.services.audit_service import (
     ACTION_CREATE,
     ACTION_DELETE,
@@ -243,6 +246,20 @@ async def deactivate_location(
     out = _to_location(location)
     old_data = {"code": location.code, "is_active": location.is_active, "name": location.name}
     if location.is_active:
+        # Joyda qoldiq (on_hand) bo'lsa faolsizlantirishni taqiqlash
+        on_hand = (
+            db.query(func.coalesce(func.sum(StockMovementModel.qty_change), 0))
+            .filter(
+                StockMovementModel.location_id == location_id,
+                StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES),
+            )
+            .scalar()
+        )
+        if on_hand is not None and float(on_hand) != 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Joyda mahsulot qoldig'i bor. Avval inventarni boshqa joyga ko'chiring yoki chiqaring.",
+            )
         location.is_active = False
         log_action(
             db,

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Download, Pencil, Plus, Printer, QrCode, Trash2, X } from 'lucide-react'
+import { Download, Pencil, Plus, Printer, QrCode, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import JsBarcode from 'jsbarcode'
 import QRCode from 'qrcode'
@@ -55,10 +55,6 @@ export function LocationsPage() {
   const [createdForBarcode, setCreatedForBarcode] = useState<Location | null>(null)
   const [locationForQr, setLocationForQr] = useState<Location | null>(null)
   const [includeInactive, setIncludeInactive] = useState(false)
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [confirmSingle, setConfirmSingle] = useState<Location | null>(null)
-  const [confirmBulk, setConfirmBulk] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -102,17 +98,6 @@ export function LocationsPage() {
         <table className="w-full min-w-[640px] table-fixed text-left text-sm sm:table-auto">
           <thead>
             <tr className="border-b border-slate-200 dark:border-slate-700">
-              <th className="w-10 shrink-0 pb-2 pr-2 font-semibold text-slate-700 dark:text-slate-300">
-                <input
-                  type="checkbox"
-                  checked={items.length > 0 && selectedIds.size === items.length}
-                  onChange={(e) => {
-                    if (e.target.checked) setSelectedIds(new Set(items.map((l) => l.id)))
-                    else setSelectedIds(new Set())
-                  }}
-                  aria-label={t('locations:select_all')}
-                />
-              </th>
               <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
                 {t('locations:fields.code')}
               </th>
@@ -145,21 +130,6 @@ export function LocationsPage() {
           <tbody>
             {items.map((loc) => (
               <tr key={loc.id} className="border-b border-slate-100 dark:border-slate-800">
-                <td className="w-10 shrink-0 py-2 pr-2">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.has(loc.id)}
-                    onChange={(e) => {
-                      setSelectedIds((prev) => {
-                        const next = new Set(prev)
-                        if (e.target.checked) next.add(loc.id)
-                        else next.delete(loc.id)
-                        return next
-                      })
-                    }}
-                    aria-label={t('locations:select_one')}
-                  />
-                </td>
                 <td className="whitespace-nowrap py-2 pr-3 font-medium text-slate-900 dark:text-slate-100 sm:pr-4">
                   {loc.code}
                 </td>
@@ -209,14 +179,6 @@ export function LocationsPage() {
                       <QrCode size={14} className="sm:mr-1 sm:inline" />
                       <span className="hidden sm:inline">{t('locations:qr_download')}</span>
                     </Button>
-                    <Button
-                      variant="ghost"
-                      className="shrink-0 py-1.5 px-1.5 text-xs text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10 sm:px-2"
-                      onClick={() => setConfirmSingle(loc)}
-                      aria-label={t('locations:delete_one')}
-                    >
-                      <Trash2 size={14} />
-                    </Button>
                   </div>
                 </td>
               </tr>
@@ -225,7 +187,7 @@ export function LocationsPage() {
         </table>
       </TableScrollArea>
     )
-  }, [error, isLoading, items, load, selectedIds, t])
+  }, [error, isLoading, items, load, t])
 
   return (
     <AdminLayout
@@ -256,16 +218,6 @@ export function LocationsPage() {
               />
               {t('locations:show_inactive')}
             </label>
-            {selectedIds.size > 0 ? (
-              <Button
-                variant="danger"
-                className="gap-1 text-sm"
-                onClick={() => setConfirmBulk(true)}
-              >
-                <Trash2 size={16} />
-                {t('locations:delete_selected')} ({selectedIds.size})
-              </Button>
-            ) : null}
           </div>
         </div>
         {content}
@@ -296,68 +248,6 @@ export function LocationsPage() {
           onClose={() => setLocationForQr(null)}
         />
       ) : null}
-      <ConfirmDialog
-        open={!!confirmSingle}
-        title={t('locations:confirm_delete_title')}
-        message={t('locations:confirm_delete_one', { code: confirmSingle?.code ?? '' })}
-        confirmLabel={t('locations:confirm_yes')}
-        cancelLabel={t('common:buttons.cancel')}
-        variant="danger"
-        loading={isDeleting}
-        onConfirm={async () => {
-          if (!confirmSingle) return
-          setIsDeleting(true)
-          setError(null)
-          try {
-            await deactivateLocation(confirmSingle.id)
-            setConfirmSingle(null)
-            await load()
-          } catch (err: unknown) {
-            const msg =
-              typeof err === 'object' && err !== null && 'details' in err &&
-              typeof (err as { details?: { detail?: string } }).details?.detail === 'string'
-                ? (err as { details: { detail: string } }).details.detail
-                : err instanceof Error ? err.message : t('locations:delete_failed')
-            setError(msg)
-            setConfirmSingle(null)
-          } finally {
-            setIsDeleting(false)
-          }
-        }}
-        onCancel={() => setConfirmSingle(null)}
-      />
-      <ConfirmDialog
-        open={confirmBulk}
-        title={t('locations:confirm_delete_title')}
-        message={t('locations:confirm_delete_selected', { count: selectedIds.size })}
-        confirmLabel={t('locations:confirm_yes')}
-        cancelLabel={t('common:buttons.cancel')}
-        variant="danger"
-        loading={isDeleting}
-        onConfirm={async () => {
-          setIsDeleting(true)
-          setError(null)
-          try {
-            for (const id of selectedIds) {
-              await deactivateLocation(id)
-            }
-            setSelectedIds(new Set())
-            setConfirmBulk(false)
-            await load()
-          } catch (err: unknown) {
-            const msg =
-              typeof err === 'object' && err !== null && 'details' in err &&
-              typeof (err as { details?: { detail?: string } }).details?.detail === 'string'
-                ? (err as { details: { detail: string } }).details.detail
-                : err instanceof Error ? err.message : t('locations:delete_failed')
-            setError(msg)
-            setConfirmBulk(false)
-          } finally {
-            setIsDeleting(false)
-          }
-        }}
-        onCancel={() => setConfirmBulk(false)}
-      />
     </AdminLayout>
   )
 }
@@ -383,6 +273,8 @@ function LocationDialog({ mode, target, onClose, onSaved, onCreated }: DialogPro
   const [isActive, setIsActive] = useState(target?.is_active ?? true)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false)
+  const [isDeactivating, setIsDeactivating] = useState(false)
 
   const preview = useMemo(
     () =>
@@ -575,6 +467,20 @@ function LocationDialog({ mode, target, onClose, onSaved, onCreated }: DialogPro
             {t('locations:fields.active')}
           </label>
 
+          {mode === 'edit' && target?.is_active && (
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/40"
+                onClick={() => setShowDeactivateConfirm(true)}
+                disabled={isSubmitting}
+              >
+                {t('locations:deactivate')}
+              </Button>
+            </div>
+          )}
+
           <div className="flex items-center justify-end gap-2">
             <Button variant="ghost" onClick={onClose}>
               {t('common:buttons.cancel')}
@@ -585,6 +491,38 @@ function LocationDialog({ mode, target, onClose, onSaved, onCreated }: DialogPro
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={showDeactivateConfirm}
+        title={t('locations:confirm_delete_title')}
+        message={t('locations:confirm_delete_one', { code: target?.code ?? '' })}
+        confirmLabel={t('locations:confirm_yes')}
+        cancelLabel={t('common:buttons.cancel')}
+        variant="danger"
+        loading={isDeactivating}
+        onConfirm={async () => {
+          if (!target) return
+          setIsDeactivating(true)
+          setError(null)
+          try {
+            await deactivateLocation(target.id)
+            setShowDeactivateConfirm(false)
+            onSaved()
+            onClose()
+          } catch (err: unknown) {
+            const msg =
+              typeof err === 'object' && err !== null && 'details' in err &&
+              typeof (err as { details?: { detail?: string } }).details?.detail === 'string'
+                ? (err as { details: { detail: string } }).details.detail
+                : err instanceof Error ? err.message : t('locations:delete_failed')
+            setError(msg)
+            setShowDeactivateConfirm(false)
+          } finally {
+            setIsDeactivating(false)
+          }
+        }}
+        onCancel={() => setShowDeactivateConfirm(false)}
+      />
     </div>
   )
 }
