@@ -21,7 +21,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { RootStackParamList } from '../types/navigation';
 import { useLocale } from '../i18n/LocaleContext';
 import { useNetwork } from '../network';
-import { getPickerProductDetail, getInventoryByBarcode, type PickerProductDetailResponse, type PickerProductLocation } from '../api/inventory';
+import { getPickerProductDetail, getInventoryByBarcode, listPickerLocations, type PickerProductDetailResponse, type PickerProductLocation, type PickerLocationOption } from '../api/inventory';
 import { getPickers, type PickerUser } from '../api/picking';
 import { AppHeader } from '../components/AppHeader';
 
@@ -59,11 +59,13 @@ export function KirimFormScreen() {
   const [finished, setFinished] = useState(false);
   const [currentProduct, setCurrentProduct] = useState<PickerProductDetailResponse | null>(null);
   const [currentQty, setCurrentQty] = useState('');
-  const [currentLocation, setCurrentLocation] = useState<PickerProductLocation | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<PickerLocationOption | null>(null);
+  const [allLocations, setAllLocations] = useState<PickerLocationOption[]>([]);
+  const [locationSearch, setLocationSearch] = useState('');
+  const [locationDropdownOpen, setLocationDropdownOpen] = useState(false);
   const [loadingProduct, setLoadingProduct] = useState(false);
   const [productError, setProductError] = useState<string | null>(null);
   const [manualBarcode, setManualBarcode] = useState('');
-  const [manualLocationCode, setManualLocationCode] = useState('');
   const [pickerModalVisible, setPickerModalVisible] = useState(false);
   const [pickers, setPickers] = useState<PickerUser[]>([]);
   const [selectedPickerId, setSelectedPickerId] = useState<string | null>(null);
@@ -75,15 +77,10 @@ export function KirimFormScreen() {
     setLoadingProduct(true);
     setProductError(null);
     setCurrentProduct(null);
-    setCurrentLocation(null);
     setCurrentQty('');
-    setManualLocationCode('');
     try {
       const res = await getPickerProductDetail(productId);
       setCurrentProduct(res);
-      const sorted = sortLocations(res.locations);
-      if (sorted.length > 0) setCurrentLocation(sorted[0]);
-      else setCurrentLocation(null);
     } catch (e) {
       setProductError(e instanceof Error ? e.message : t('invLoadError'));
     } finally {
@@ -102,17 +99,12 @@ export function KirimFormScreen() {
     setLoadingProduct(true);
     setProductError(null);
     setCurrentProduct(null);
-    setCurrentLocation(null);
     setCurrentQty('');
     try {
       const byBarcode = await getInventoryByBarcode(barcode);
       const res = await getPickerProductDetail(byBarcode.product_id);
       setCurrentProduct(res);
-      const sorted = sortLocations(res.locations);
-      if (sorted.length > 0) setCurrentLocation(sorted[0]);
-      else setCurrentLocation(null);
       setManualBarcode('');
-      setManualLocationCode('');
     } catch (e) {
       setProductError(e instanceof Error ? e.message : t('invLoadError'));
     } finally {
@@ -131,6 +123,23 @@ export function KirimFormScreen() {
   );
 
   useEffect(() => {
+    if (isOnline) {
+      listPickerLocations().then(setAllLocations).catch(() => setAllLocations([]));
+    }
+  }, [isOnline]);
+
+  useEffect(() => {
+    if (!currentProduct || allLocations.length === 0) return;
+    setSelectedLocation((prev) => {
+      if (prev != null) return prev;
+      const sorted = sortLocations(currentProduct.locations);
+      const firstCode = sorted.length > 0 ? sorted[0].location_code : null;
+      const found = firstCode ? allLocations.find((l) => l.code === firstCode) : null;
+      return found ?? allLocations[0] ?? null;
+    });
+  }, [currentProduct?.product_id, allLocations.length]);
+
+  useEffect(() => {
     if (pickerModalVisible && isOnline && flow === 'return') {
       getPickers().then(setPickers).catch(() => setPickers([]));
     }
@@ -141,10 +150,7 @@ export function KirimFormScreen() {
   }, [navigation, flow]);
 
   const addLine = useCallback(() => {
-    const code = manualLocationCode.trim();
-    const loc = currentLocation;
-    if (!currentProduct) return;
-    if (!loc && !code) return;
+    if (!currentProduct || !selectedLocation) return;
     const qty = Math.floor(Number(currentQty) || 0);
     // Kirim: dono qo‘shiladi, mavjud zaxoraga bog‘lamaymiz; faqat 1–99999 oralig‘ida
     const maxQty = 99999;
@@ -152,26 +158,21 @@ export function KirimFormScreen() {
       Alert.alert(t('error'), t('qtyRangeError', { max: maxQty }));
       return;
     }
-    const locationCode = code || (loc?.location_code ?? '');
-    const locationId = loc?.location_id ?? '';
-    const lotId = loc?.lot_id ?? '';
     setLines((prev) => [
       ...prev,
       {
-        id: `${currentProduct.product_id}-${lotId || code || Date.now()}-${Date.now()}`,
+        id: `${currentProduct.product_id}-${selectedLocation.id}-${Date.now()}`,
         productId: currentProduct.product_id,
         productName: currentProduct.name,
-        locationCode,
-        locationId,
-        lotId,
+        locationCode: selectedLocation.code,
+        locationId: selectedLocation.id,
+        lotId: '',
         qty,
       },
     ]);
     setCurrentProduct(null);
-    setCurrentLocation(null);
     setCurrentQty('');
-    setManualLocationCode('');
-  }, [currentProduct, currentLocation, currentQty, manualLocationCode, t]);
+  }, [currentProduct, selectedLocation, currentQty, t]);
 
   const removeLine = useCallback((id: string) => {
     setLines((prev) => prev.filter((l) => l.id !== id));
@@ -211,9 +212,16 @@ export function KirimFormScreen() {
     }
   }, [flow, selectedPickerId, t]);
 
-  const locations = currentProduct ? sortLocations(currentProduct.locations) : [];
-  const hasLocation = !!(currentLocation || manualLocationCode.trim());
-  const canAddLine = currentProduct && hasLocation && currentQty.trim().length > 0;
+  const filteredLocations = locationSearch.trim()
+    ? allLocations
+        .filter(
+          (l) =>
+            l.code.toLowerCase().includes(locationSearch.toLowerCase()) ||
+            (l.name && l.name.toLowerCase().includes(locationSearch.toLowerCase()))
+        )
+        .slice(0, 10)
+    : allLocations.slice(0, 10);
+  const canAddLine = currentProduct && selectedLocation && currentQty.trim().length > 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -251,40 +259,54 @@ export function KirimFormScreen() {
               placeholderTextColor="#999"
             />
             <Text style={styles.label}>{t('locationLabel')}</Text>
-            {locations.length > 0 && (
-              <View style={styles.locationRows}>
-                {locations.map((loc) => {
-                  const isSelected = currentLocation?.lot_id === loc.lot_id && currentLocation?.location_id === loc.location_id;
-                  return (
-                    <TouchableOpacity
-                      key={loc.lot_id + loc.location_id}
-                      style={[styles.locationRow, isSelected && styles.locationRowSelected]}
-                      onPress={() => { setCurrentLocation(loc); setManualLocationCode(''); }}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.locationRowText, isSelected && styles.locationRowTextSelected]}>
-                        {loc.location_code} — {loc.batch_no} {loc.expiry_date ? `(${loc.expiry_date})` : ''} — {Number(loc.available_qty)} {t('invAvailable')}
-                      </Text>
-                      {isSelected && <Icon name="check-circle" size={22} color="#2e7d32" />}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
-            <View style={styles.manualLocationRow}>
-              <Text style={styles.manualEntryLabel}>
-                {locations.length > 0 ? t('kirimLocationCodeOr') : t('kirimLocationCodePlaceholder')}
+            <TouchableOpacity
+              style={styles.locationDropdownTrigger}
+              onPress={() => setLocationDropdownOpen(true)}
+            >
+              <Text style={styles.locationDropdownTriggerText} numberOfLines={1}>
+                {selectedLocation ? `${selectedLocation.code}${selectedLocation.name ? ` — ${selectedLocation.name}` : ''}` : t('returnsSelectLocation')}
               </Text>
-              <TextInput
-                style={styles.manualBarcodeInput}
-                value={manualLocationCode}
-                onChangeText={(text) => { setManualLocationCode(text); if (text.trim()) setCurrentLocation(null); }}
-                placeholder={t('kirimLocationCodePlaceholder')}
-                placeholderTextColor="#999"
-                autoCapitalize="characters"
-                autoCorrect={false}
-              />
-            </View>
+              <Icon name="chevron-down" size={22} color="#555" />
+            </TouchableOpacity>
+            {locationDropdownOpen && (
+              <Modal
+                visible={locationDropdownOpen}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setLocationDropdownOpen(false)}
+              >
+                <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setLocationDropdownOpen(false)}>
+                  <TouchableOpacity style={styles.locationDropdownModal} activeOpacity={1} onPress={() => {}}>
+                    <TextInput
+                      style={styles.locationSearchInput}
+                      value={locationSearch}
+                      onChangeText={setLocationSearch}
+                      placeholder={t('kirimLocationSearchPlaceholder')}
+                      placeholderTextColor="#999"
+                      autoCapitalize="characters"
+                      autoCorrect={false}
+                    />
+                    <ScrollView style={styles.locationDropdownList} keyboardShouldPersistTaps="handled">
+                      {filteredLocations.map((loc) => (
+                        <TouchableOpacity
+                          key={loc.id}
+                          style={[styles.locationDropdownItem, selectedLocation?.id === loc.id && styles.locationDropdownItemSelected]}
+                          onPress={() => {
+                            setSelectedLocation(loc);
+                            setLocationDropdownOpen(false);
+                            setLocationSearch('');
+                          }}
+                        >
+                          <Text style={styles.locationDropdownItemCode} numberOfLines={1}>{loc.code}</Text>
+                          {loc.name ? <Text style={styles.locationDropdownItemName} numberOfLines={1}>{loc.name}</Text> : null}
+                          {selectedLocation?.id === loc.id ? <Icon name="check-circle" size={20} color="#2e7d32" /> : null}
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              </Modal>
+            )}
             <TouchableOpacity
               style={[styles.addLineBtn, !canAddLine && styles.addLineBtnDisabled]}
               onPress={addLine}
@@ -464,6 +486,49 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   findProductBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  locationDropdownTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#fff',
+    marginBottom: 12,
+  },
+  locationDropdownTriggerText: { fontSize: 15, color: '#333', flex: 1 },
+  locationSearchInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 14,
+    backgroundColor: '#fff',
+    marginHorizontal: 12,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  locationDropdownModal: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginHorizontal: 24,
+    maxHeight: 280,
+  },
+  locationDropdownList: { maxHeight: 220 },
+  locationDropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#eee',
+  },
+  locationDropdownItemSelected: { backgroundColor: '#e8f5e9' },
+  locationDropdownItemCode: { fontSize: 14, fontWeight: '600', color: '#333', marginRight: 8 },
+  locationDropdownItemName: { fontSize: 12, color: '#666', flex: 1 },
   locationRows: { marginBottom: 12 },
   manualLocationRow: { marginTop: 8, marginBottom: 12 },
   locationRow: {
