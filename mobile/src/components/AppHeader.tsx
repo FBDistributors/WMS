@@ -16,6 +16,8 @@ export type AppHeaderProps = {
   showLogo?: boolean;
   onRefresh?: () => void;
   refreshing?: boolean;
+  /** Chap tomonda (logo/back dan oldin) */
+  leftTrailing?: React.ReactNode;
   /** O'ng tomonda refresh dan oldin (masalan offline badge) */
   rightTrailing?: React.ReactNode;
 };
@@ -27,10 +29,12 @@ export function AppHeader({
   showLogo = true,
   onRefresh,
   refreshing = false,
+  leftTrailing,
   rightTrailing,
 }: AppHeaderProps) {
   return (
     <View style={styles.header}>
+      {leftTrailing}
       {showBack && (
         <TouchableOpacity
           onPress={onBack}

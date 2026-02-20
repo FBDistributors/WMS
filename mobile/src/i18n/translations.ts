@@ -33,6 +33,7 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     tabPickLists: "Buyurtmalar",
     tabInventory: "Mahsulotlar",
     tabReturns: 'Qaytish',
+    tabKirim: 'Kirim',
     tabAccount: 'Hisob',
     statsTotalCompleted: "Jami yig'ilgan",
     statsCompletedToday: "Bugun yig'ilgan",
@@ -138,6 +139,14 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     returnsSelectLocation: "Lokatsiyani tanlang",
     returnsAddAtLeastOne: "Kamida bitta qator qo'shing",
     returnsSentToPicker: "Yig'uvchiga yuborildi",
+
+    kirimTitle: 'Kirim',
+    kirimNewProducts: "Yangi mahsulotlar",
+    kirimCustomerReturns: "Mijozdan qaytgan mahsulotlar",
+    kirimNewProductsDesc: "Omborga yangi kiritiladigan mahsulotlar",
+    kirimCustomerReturnsDesc: "Mijozdan qaytgan mahsulotlarni joylashtirish",
+    kirimSubmit: 'Yuborish',
+    kirimSubmitDone: 'Yuborildi',
   },
   ru: {
     brand: 'FB Warehouse',
@@ -166,6 +175,7 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     tabPickLists: 'Заказы',
     tabInventory: 'Товары',
     tabReturns: 'Возврат',
+    tabKirim: 'Приход',
     tabAccount: 'Аккаунт',
     statsTotalCompleted: 'Всего собрано',
     statsCompletedToday: 'Собрано сегодня',
@@ -267,6 +277,14 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     returnsSelectLocation: 'Выберите локацию',
     returnsAddAtLeastOne: 'Добавьте хотя бы одну позицию',
     returnsSentToPicker: 'Отправлено сборщику',
+
+    kirimTitle: 'Приход',
+    kirimNewProducts: 'Новые товары',
+    kirimCustomerReturns: 'Возвраты от клиента',
+    kirimNewProductsDesc: 'Товары, вводимые на склад',
+    kirimCustomerReturnsDesc: 'Размещение возвратов от клиента',
+    kirimSubmit: 'Отправить',
+    kirimSubmitDone: 'Отправлено',
   },
   en: {
     brand: 'FB Warehouse',
@@ -295,6 +313,7 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     tabPickLists: 'Orders',
     tabInventory: 'Products',
     tabReturns: 'Returns',
+    tabKirim: 'Inbound',
     tabAccount: 'Account',
     statsTotalCompleted: 'Total completed',
     statsCompletedToday: 'Completed today',
@@ -396,6 +415,14 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     returnsSelectLocation: 'Select location',
     returnsAddAtLeastOne: 'Add at least one line',
     returnsSentToPicker: 'Sent to picker',
+
+    kirimTitle: 'Inbound',
+    kirimNewProducts: 'New products',
+    kirimCustomerReturns: 'Customer returns',
+    kirimNewProductsDesc: 'Products to be received into warehouse',
+    kirimCustomerReturnsDesc: 'Place customer returns',
+    kirimSubmit: 'Submit',
+    kirimSubmitDone: 'Submitted',
   },
 };
 

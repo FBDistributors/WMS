@@ -92,12 +92,22 @@ export function ScannerScreen() {
   }, [reset]);
 
   // Terish uchun skaner: PickTaskDetails ga yo'naltirish (onCodeScanned da bajariladi)
-  // Qaytish uchun skaner: Returns sahifasiga productId bilan qaytish
+  // Kirim forma uchun: KirimForm ga flow + productId bilan qaytish
+  // Eski Returns: Returns sahifasiga productId bilan qaytish
   useEffect(() => {
     if (fetchStatus !== 'success' || !product) return;
     if (params.returnToPick) return;
+    if (params.returnToKirimForm) {
+      (navigation as any).navigate('KirimForm', {
+        flow: params.flow ?? 'return',
+        scannedProductId: product.product_id,
+        scannedBarcode: product.barcode ?? undefined,
+      });
+      return;
+    }
     if (params.returnToReturns) {
-      (navigation as any).navigate('Returns', {
+      (navigation as any).navigate('KirimForm', {
+        flow: 'return',
         scannedProductId: product.product_id,
         scannedBarcode: product.barcode ?? undefined,
       });
@@ -106,7 +116,7 @@ export function ScannerScreen() {
     (navigation as any).replace('InventoryDetail', {
       productId: product.product_id,
     });
-  }, [fetchStatus, product, params.returnToPick, params.returnToReturns, navigation]);
+  }, [fetchStatus, product, params.returnToPick, params.returnToReturns, params.returnToKirimForm, params.flow, navigation]);
 
   // Loading or no device: show visible UI (not black)
   if (permStatus === 'loading' || !device) {

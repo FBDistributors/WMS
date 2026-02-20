@@ -22,7 +22,9 @@ import { AccountScreen } from './src/screens/AccountScreen';
 import { InventoryScreen } from './src/screens/InventoryScreen';
 import { InventoryDetailScreen } from './src/screens/InventoryDetailScreen';
 import { QueueScreen } from './src/screens/QueueScreen';
-import { ReturnsScreen } from './src/screens/ReturnsScreen';
+import { ReturnsRedirectScreen } from './src/screens/ReturnsRedirectScreen';
+import { KirimScreen } from './src/screens/KirimScreen';
+import { KirimFormScreen } from './src/screens/KirimFormScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -60,7 +62,9 @@ export default function App() {
         <Stack.Screen name="Inventory" component={InventoryScreen} />
         <Stack.Screen name="InventoryDetail" component={InventoryDetailScreen} />
         <Stack.Screen name="QueueScreen" component={QueueScreen} />
-        <Stack.Screen name="Returns" component={ReturnsScreen} />
+        <Stack.Screen name="Returns" component={ReturnsRedirectScreen} />
+        <Stack.Screen name="Kirim" component={KirimScreen} />
+        <Stack.Screen name="KirimForm" component={KirimFormScreen} />
       </Stack.Navigator>
     </NavigationContainer>
     </NetworkProvider>

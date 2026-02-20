@@ -159,6 +159,16 @@ export function PickerHome() {
         showLogo={true}
         onRefresh={onHeaderRefresh}
         refreshing={refreshing}
+        leftTrailing={
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Hisob')}
+            style={styles.headerHisobBtn}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            accessibilityLabel={t('tabAccount')}
+          >
+            <Icon name="account-outline" size={24} color={HEADER_ACCENT} />
+          </TouchableOpacity>
+        }
         rightTrailing={!isOnline ? (
           <View style={styles.onlineBadge}>
             <Text style={styles.onlineBadgeText}>Offline</Text>
@@ -254,16 +264,10 @@ export function PickerHome() {
           onPress={() => navigation.navigate('Inventory')}
         />
         <BottomNavTab
-          iconName="undo"
-          label={t('tabReturns')}
+          iconName="package-down"
+          label={t('tabKirim')}
           active={false}
-          onPress={() => navigation.navigate('Returns')}
-        />
-        <BottomNavTab
-          iconName="account-outline"
-          label={t('tabAccount')}
-          active={false}
-          onPress={() => navigation.navigate('Hisob')}
+          onPress={() => navigation.navigate('Kirim')}
         />
       </View>
     </SafeAreaView>
@@ -274,6 +278,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  headerHisobBtn: {
+    marginRight: 12,
   },
   onlineBadge: {
     backgroundColor: '#ff9800',
