@@ -13,6 +13,8 @@
   "empty": "Joylashuvlar topilmadi",
   "empty_desc": "Birinchi joylashuvni qo'shing.",
   "show_inactive": "Faol emaslarni ko'rsatish",
+  "filter_placeholder": "Kod yoki raqam bo'yicha qidirish",
+  "filter_no_results": "Qidiruv bo'yicha natija topilmadi",
   "inactive": "Faol emas",
   "active": "Faol",
   "status": "Holat",

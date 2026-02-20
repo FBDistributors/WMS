@@ -14,6 +14,8 @@
   "empty": "No locations found",
   "empty_desc": "Create the first location.",
   "show_inactive": "Show inactive",
+  "filter_placeholder": "Search by code or number",
+  "filter_no_results": "No results for this search",
   "inactive": "Inactive",
   "active": "Active",
   "status": "Status",

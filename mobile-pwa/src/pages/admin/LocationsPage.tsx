@@ -55,6 +55,7 @@ export function LocationsPage() {
   const [createdForBarcode, setCreatedForBarcode] = useState<Location | null>(null)
   const [locationForQr, setLocationForQr] = useState<Location | null>(null)
   const [includeInactive, setIncludeInactive] = useState(false)
+  const [filterQuery, setFilterQuery] = useState('')
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -73,6 +74,20 @@ export function LocationsPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  const filteredItems = useMemo(() => {
+    const q = filterQuery.trim().toLowerCase()
+    if (!q) return items
+    return items.filter((loc) => {
+      if (loc.code.toLowerCase().includes(q)) return true
+      if (loc.sector && loc.sector.toLowerCase().includes(q)) return true
+      if (loc.level_no != null && String(loc.level_no).includes(q)) return true
+      if (loc.row_no != null && String(loc.row_no).includes(q)) return true
+      if (loc.pallet_no != null && String(loc.pallet_no).includes(q)) return true
+      if (loc.pick_sequence != null && String(loc.pick_sequence).includes(q)) return true
+      return false
+    })
+  }, [items, filterQuery])
 
   const content = useMemo(() => {
     if (isLoading) {
@@ -128,7 +143,14 @@ export function LocationsPage() {
             </tr>
           </thead>
           <tbody>
-            {items.map((loc) => (
+            {filteredItems.length === 0 ? (
+              <tr>
+                <td colSpan={9} className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+                  {filterQuery.trim() ? t('locations:filter_no_results') : t('locations:empty')}
+                </td>
+              </tr>
+            ) : (
+              filteredItems.map((loc) => (
               <tr key={loc.id} className="border-b border-slate-100 dark:border-slate-800">
                 <td className="whitespace-nowrap py-2 pr-3 font-medium text-slate-900 dark:text-slate-100 sm:pr-4">
                   {loc.code}
@@ -155,7 +177,7 @@ export function LocationsPage() {
                       {t('locations:active')}
                     </span>
                   ) : (
-                    <span className="text-slate-500 dark:text-slate-400">
+                    <span className="font-medium text-red-600 dark:text-red-400">
                       {t('locations:inactive')}
                     </span>
                   )}
@@ -182,12 +204,13 @@ export function LocationsPage() {
                   </div>
                 </td>
               </tr>
-            ))}
+            ))
+            )}
           </tbody>
         </table>
       </TableScrollArea>
     )
-  }, [error, isLoading, items, load, t])
+  }, [error, isLoading, items, filteredItems, load, t])
 
   return (
     <AdminLayout
@@ -210,6 +233,13 @@ export function LocationsPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            <input
+              type="text"
+              placeholder={t('locations:filter_placeholder')}
+              value={filterQuery}
+              onChange={(e) => setFilterQuery(e.target.value)}
+              className="max-w-56 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            />
             <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
               <input
                 type="checkbox"
@@ -477,7 +507,7 @@ function LocationDialog({ mode, target, onClose, onSaved, onCreated }: DialogPro
               <Button
                 type="button"
                 variant="secondary"
-                className="w-full bg-green-600 text-white hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700"
+                className="w-full bg-emerald-700 text-white hover:bg-emerald-800 dark:bg-emerald-700 dark:hover:bg-emerald-800"
                 onClick={() => setShowActivateConfirm(true)}
                 disabled={isSubmitting}
               >
