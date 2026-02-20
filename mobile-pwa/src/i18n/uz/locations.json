@@ -4,6 +4,8 @@
   "add": "Joylashuv qo'shish",
   "edit": "Tahrirlash",
   "deactivate": "Faolsizlantirish",
+  "activate": "Faollashtirish",
+  "confirm_activate_one": "«{{code}}» joylashuvni faollashtirish?","confirm_activate_yes": "Ha, faollashtirish",
   "save": "Joylashuvni saqlash",
   "saving": "Saqlanmoqda...",
   "load_failed": "Joylashuvlar yuklanmadi.",

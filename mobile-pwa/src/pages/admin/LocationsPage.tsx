@@ -274,6 +274,8 @@ function LocationDialog({ mode, target, onClose, onSaved, onCreated }: DialogPro
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false)
   const [isDeactivating, setIsDeactivating] = useState(false)
+  const [showActivateConfirm, setShowActivateConfirm] = useState(false)
+  const [isActivating, setIsActivating] = useState(false)
 
   const preview = useMemo(
     () =>
@@ -470,6 +472,19 @@ function LocationDialog({ mode, target, onClose, onSaved, onCreated }: DialogPro
               </Button>
             </div>
           )}
+          {mode === 'edit' && target && !target.is_active && (
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full bg-green-600 text-white hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700"
+                onClick={() => setShowActivateConfirm(true)}
+                disabled={isSubmitting}
+              >
+                {t('locations:activate')}
+              </Button>
+            </div>
+          )}
 
           <div className="flex items-center justify-end gap-2">
             <Button variant="ghost" onClick={onClose}>
@@ -512,6 +527,36 @@ function LocationDialog({ mode, target, onClose, onSaved, onCreated }: DialogPro
           }
         }}
         onCancel={() => setShowDeactivateConfirm(false)}
+      />
+      <ConfirmDialog
+        open={showActivateConfirm}
+        title={t('locations:confirm_delete_title')}
+        message={t('locations:confirm_activate_one', { code: target?.code ?? '' })}
+        confirmLabel={t('locations:confirm_activate_yes')}
+        cancelLabel={t('common:buttons.cancel')}
+        loading={isActivating}
+        onConfirm={async () => {
+          if (!target) return
+          setIsActivating(true)
+          setError(null)
+          try {
+            await updateLocation(target.id, { is_active: true })
+            setShowActivateConfirm(false)
+            onSaved()
+            onClose()
+          } catch (err: unknown) {
+            const msg =
+              typeof err === 'object' && err !== null && 'details' in err &&
+              typeof (err as { details?: { detail?: string } }).details?.detail === 'string'
+                ? (err as { details: { detail: string } }).details.detail
+                : err instanceof Error ? err.message : t('locations:save_failed')
+            setError(msg)
+            setShowActivateConfirm(false)
+          } finally {
+            setIsActivating(false)
+          }
+        }}
+        onCancel={() => setShowActivateConfirm(false)}
       />
     </div>
   )
