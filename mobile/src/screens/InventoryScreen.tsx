@@ -68,27 +68,52 @@ export function InventoryScreen() {
   const [locationId, setLocationId] = useState('');
   const [locations, setLocations] = useState<PickerLocationOption[]>([]);
   const [items, setItems] = useState<PickerInventoryItem[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [locationModalVisible, setLocationModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  const PAGE_SIZE = 100;
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setNextCursor(null);
     try {
       const res = await listPickerInventory({
         q: query || undefined,
         location_id: locationId || undefined,
-        limit: 30,
+        limit: PAGE_SIZE,
       });
       setItems(res.items);
+      setNextCursor(res.next_cursor);
     } catch (e) {
       setError(e instanceof Error ? e.message : t('invLoadError'));
     } finally {
       setLoading(false);
     }
   }, [query, locationId, t]);
+
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await listPickerInventory({
+        q: query || undefined,
+        location_id: locationId || undefined,
+        limit: PAGE_SIZE,
+        cursor: nextCursor,
+      });
+      setItems((prev) => [...prev, ...res.items]);
+      setNextCursor(res.next_cursor);
+    } catch {
+      // keep current nextCursor so user can retry by scrolling again
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [nextCursor, loadingMore, query, locationId]);
 
   const loadLocations = useCallback(async () => {
     try {
@@ -237,6 +262,15 @@ export function InventoryScreen() {
           keyExtractor={(item) => item.product_id}
           contentContainerStyle={styles.listContent}
           style={styles.list}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.3}
+          ListFooterComponent={
+            loadingMore ? (
+              <View style={styles.footerLoader}>
+                <ActivityIndicator size="small" color="#1a237e" />
+              </View>
+            ) : null
+          }
         />
       )}
     </View>
@@ -336,6 +370,10 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 16,
     paddingBottom: 24,
+  },
+  footerLoader: {
+    paddingVertical: 16,
+    alignItems: 'center',
   },
   card: {
     backgroundColor: '#fff',
