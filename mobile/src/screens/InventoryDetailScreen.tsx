@@ -23,10 +23,15 @@ import {
 type Nav = StackNavigationProp<RootStackParamList, 'InventoryDetail'>;
 type DetailRoute = RouteProp<RootStackParamList, 'InventoryDetail'>;
 
+/** Format: "31 Dec 2026" */
 function formatExpiry(d: string | null): string {
   if (!d) return '—';
   try {
-    return new Date(d).toLocaleDateString();
+    const date = new Date(d);
+    const day = date.getDate();
+    const month = date.toLocaleDateString('en-GB', { month: 'short' });
+    const year = date.getFullYear();
+    return `${day} ${month} ${year}`;
   } catch {
     return d;
   }
@@ -116,9 +121,9 @@ export function InventoryDetailScreen() {
         <View style={styles.card}>
           <Text style={styles.productName}>{data.name}</Text>
           {data.main_barcode ? (
-            <Text style={styles.barcode}>{data.main_barcode}</Text>
+            <Text style={styles.barcode}>{t('invShtrixKod')}: {data.main_barcode}</Text>
           ) : null}
-          <Text style={styles.productCode}>{data.code}</Text>
+          <Text style={styles.productCode}>{t('invKod')}: {data.code}</Text>
         </View>
         <Text style={styles.sectionLabel}>{t('invMoreLocations')}</Text>
         {data.locations.map((loc) => (
@@ -128,7 +133,7 @@ export function InventoryDetailScreen() {
               <Text style={styles.locExpiry}>{formatExpiry(loc.expiry_date)}</Text>
             </View>
             <Text style={styles.locMeta}>
-              {t('invQoldiq')}: {loc.available_qty} · {t('invExpiry')}: {formatExpiry(loc.expiry_date)}
+              {t('invQoldiq')}: {Math.round(loc.available_qty)}
             </Text>
           </View>
         ))}
