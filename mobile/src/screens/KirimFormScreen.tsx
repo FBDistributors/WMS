@@ -73,7 +73,6 @@ export function KirimFormScreen() {
   const [selectedLocation, setSelectedLocation] = useState<PickerLocationOption | null>(null);
   const [allLocations, setAllLocations] = useState<PickerLocationOption[]>([]);
   const [locationSearch, setLocationSearch] = useState('');
-  const [locationDropdownOpen, setLocationDropdownOpen] = useState(false);
   const [loadingProduct, setLoadingProduct] = useState(false);
   const [productError, setProductError] = useState<string | null>(null);
   const [manualBarcode, setManualBarcode] = useState('');
@@ -141,15 +140,11 @@ export function KirimFormScreen() {
   }, [isOnline]);
 
   useEffect(() => {
-    if (!currentProduct || allLocations.length === 0) return;
-    setSelectedLocation((prev) => {
-      if (prev != null) return prev;
-      const sorted = sortLocations(currentProduct.locations);
-      const firstCode = sorted.length > 0 ? sorted[0].location_code : null;
-      const found = firstCode ? allLocations.find((l) => l.code === firstCode) : null;
-      return found ?? allLocations[0] ?? null;
-    });
-  }, [currentProduct?.product_id, allLocations.length]);
+    if (currentProduct) {
+      setSelectedLocation(null);
+      setLocationSearch('');
+    }
+  }, [currentProduct?.product_id]);
 
   useEffect(() => {
     if (pickerModalVisible && isOnline && flow === 'return') {
@@ -263,7 +258,10 @@ export function KirimFormScreen() {
           (l.code && l.code.toLowerCase().includes(searchTrim.toLowerCase())) ||
           (l.name != null && String(l.name).toLowerCase().includes(searchTrim.toLowerCase()))
       ).slice(0, 30)
-    : allLocations.slice(0, 30);
+    : [];
+  const showLocationDropdown =
+    searchTrim.length > 0 &&
+    (!selectedLocation || selectedLocation.code !== searchTrim);
   const canAddLine = currentProduct && selectedLocation && currentQty.trim().length > 0 && currentBatch.trim().length > 0;
 
   return (
@@ -302,20 +300,55 @@ export function KirimFormScreen() {
               placeholderTextColor="#999"
             />
             <Text style={styles.label}>{t('locationLabel')}</Text>
-            <TextInput
-              style={styles.locationInputFull}
-              value={selectedLocation ? selectedLocation.code : locationSearch}
-              onChangeText={(text) => {
-                setLocationSearch(text);
-                setSelectedLocation(null);
-                if (text.trim().length > 0) setLocationDropdownOpen(true);
-              }}
-              onFocus={() => setLocationDropdownOpen(true)}
-              placeholder={t('kirimLocationSearchPlaceholder')}
-              placeholderTextColor="#999"
-              autoCapitalize="characters"
-              autoCorrect={false}
-            />
+            <View style={styles.locationWrap}>
+              <TextInput
+                style={styles.locationInputFull}
+                value={selectedLocation ? selectedLocation.code : locationSearch}
+                onChangeText={(text) => {
+                  setLocationSearch(text);
+                  setSelectedLocation(null);
+                }}
+                placeholder={t('kirimLocationSearchPlaceholder')}
+                placeholderTextColor="#999"
+                autoCapitalize="characters"
+                autoCorrect={false}
+              />
+              {showLocationDropdown && (
+                <View style={styles.locationDropdownInline}>
+                  <ScrollView
+                    style={styles.locationDropdownScroll}
+                    keyboardShouldPersistTaps="handled"
+                  >
+                    {filteredLocations.length === 0 ? (
+                      <View style={styles.locationDropdownEmpty}>
+                        <Text style={styles.locationDropdownEmptyText}>
+                          {t('kirimLocationNoResults')}
+                        </Text>
+                      </View>
+                    ) : (
+                      filteredLocations.map((loc) => (
+                        <TouchableOpacity
+                          key={loc.id}
+                          style={[
+                            styles.locationDropdownItem,
+                            selectedLocation?.id === loc.id && styles.locationDropdownItemSelected,
+                          ]}
+                          onPress={() => {
+                            setSelectedLocation(loc);
+                            setLocationSearch(loc.code);
+                          }}
+                        >
+                          <Text style={styles.locationDropdownItemCode} numberOfLines={1}>{loc.code}</Text>
+                          {loc.name && loc.name !== loc.code ? (
+                            <Text style={styles.locationDropdownItemName} numberOfLines={1}>{loc.name}</Text>
+                          ) : null}
+                        </TouchableOpacity>
+                      ))
+                    )}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
             <Text style={styles.label}>{t('kirimBatchLabel')}</Text>
             <TextInput
               style={styles.input}
@@ -364,45 +397,6 @@ export function KirimFormScreen() {
               locale={locale}
               darkMode={false}
             />
-            {locationDropdownOpen && (
-              <Modal
-                visible={locationDropdownOpen}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setLocationDropdownOpen(false)}
-              >
-                <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setLocationDropdownOpen(false)}>
-                  <TouchableOpacity style={styles.locationDropdownModal} activeOpacity={1} onPress={() => {}}>
-                    <ScrollView style={styles.locationDropdownList} keyboardShouldPersistTaps="handled">
-                      {filteredLocations.length === 0 ? (
-                        <View style={styles.locationDropdownEmpty}>
-                          <Text style={styles.locationDropdownEmptyText}>
-                            {searchTrim ? t('kirimLocationNoResults') : t('kirimLocationLoadFirst')}
-                          </Text>
-                        </View>
-                      ) : (
-                        filteredLocations.map((loc) => (
-                          <TouchableOpacity
-                            key={loc.id}
-                            style={[styles.locationDropdownItem, selectedLocation?.id === loc.id && styles.locationDropdownItemSelected]}
-                            onPress={() => {
-                              setSelectedLocation(loc);
-                              setLocationSearch(loc.code);
-                              setLocationDropdownOpen(false);
-                            }}
-                          >
-                            <Text style={styles.locationDropdownItemCode} numberOfLines={1}>{loc.code}</Text>
-                            {loc.name && loc.name !== loc.code ? <Text style={styles.locationDropdownItemName} numberOfLines={1}>{loc.name}</Text> : null}
-                            {selectedLocation?.id === loc.id ? <Icon name="check-circle" size={20} color="#2e7d32" /> : null}
-                          </TouchableOpacity>
-                        ))
-                      )}
-                    </ScrollView>
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              </Modal>
-            )}
-
             <TouchableOpacity
               style={[styles.addLineBtn, !canAddLine && styles.addLineBtnDisabled]}
               onPress={addLine}
@@ -582,6 +576,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   findProductBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  locationWrap: { marginBottom: 12 },
   locationInputFull: {
     borderWidth: 1,
     borderColor: '#ddd',
@@ -591,16 +586,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: '#fff',
     color: '#333',
-    marginBottom: 12,
   },
-  locationDropdownModal: {
+  locationDropdownInline: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: '100%',
+    marginTop: 4,
     backgroundColor: '#fff',
-    borderRadius: 12,
-    marginHorizontal: 24,
-    maxHeight: 280,
-    paddingTop: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    maxHeight: 220,
+    zIndex: 10,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
   },
-  locationDropdownList: { maxHeight: 260 },
+  locationDropdownScroll: { maxHeight: 216 },
   locationDropdownEmpty: { padding: 20, alignItems: 'center' },
   locationDropdownEmptyText: { fontSize: 14, color: '#666' },
   locationDropdownItem: {
