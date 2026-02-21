@@ -25,6 +25,7 @@ import { getPickerProductDetail, getInventoryByBarcode, listPickerLocations, typ
 import { getPickers, type PickerUser } from '../api/picking';
 import { createReceipt, completeReceipt } from '../api/receiving';
 import { AppHeader } from '../components/AppHeader';
+import { ExpiryDatePicker, formatExpiryDisplay } from '../components/ExpiryDatePicker';
 
 type Nav = StackNavigationProp<RootStackParamList, 'KirimForm'>;
 type KirimFormRoute = RouteProp<RootStackParamList, 'KirimForm'>;
@@ -50,49 +51,15 @@ function sortLocations(locs: PickerProductLocation[]): PickerProductLocation[] {
   });
 }
 
-const YEARS_PER_PAGE = 12;
-const MIN_YEAR = 2020;
-const MAX_YEAR = 2040;
-
-const MONTH_SHORT_NAMES = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-];
-
-const WEEKDAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-
-function getDaysInMonth(year: number, month: number): number {
-  return new Date(year, month, 0).getDate();
-}
-
-type DayCell = { type: 'prev' | 'current' | 'next'; year: number; month: number; day: number };
-
-function buildCalendarDays(year: number, month: number): DayCell[] {
-  const firstDay = new Date(year, month - 1, 1).getDay();
-  const daysInMonth = getDaysInMonth(year, month);
-  const prevYear = month === 1 ? year - 1 : year;
-  const prevMonth = month === 1 ? 12 : month - 1;
-  const prevDaysCount = getDaysInMonth(prevYear, prevMonth);
-  const nextYear = month === 12 ? year + 1 : year;
-  const nextMonth = month === 12 ? 1 : month + 1;
-  const cells: DayCell[] = [];
-  for (let i = 0; i < firstDay; i++) {
-    cells.push({ type: 'prev', year: prevYear, month: prevMonth, day: prevDaysCount - firstDay + 1 + i });
-  }
-  for (let d = 1; d <= daysInMonth; d++) {
-    cells.push({ type: 'current', year, month, day: d });
-  }
-  const rest = 42 - cells.length;
-  for (let d = 1; d <= rest; d++) {
-    cells.push({ type: 'next', year: nextYear, month: nextMonth, day: d });
-  }
-  return cells;
+function todayISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 export function KirimFormScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<KirimFormRoute>();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const { isOnline } = useNetwork();
   const flow = route.params?.flow ?? 'return';
   const params = route.params as { flow: 'new' | 'return'; scannedProductId?: string; scannedBarcode?: string } | undefined;
@@ -115,13 +82,6 @@ export function KirimFormScreen() {
   const [selectedPickerId, setSelectedPickerId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [expiryCalendarOpen, setExpiryCalendarOpen] = useState(false);
-  const [calendarStep, setCalendarStep] = useState<'year' | 'month' | 'day'>('year');
-  const [pickerYear, setPickerYear] = useState<number | null>(null);
-  const [pickerMonth, setPickerMonth] = useState<number | null>(null);
-  const [yearBlockStart, setYearBlockStart] = useState(() => {
-    const y = new Date().getFullYear();
-    return Math.floor(y / YEARS_PER_PAGE) * YEARS_PER_PAGE;
-  });
 
   const title = flow === 'new' ? t('kirimNewProducts') : t('kirimCustomerReturns');
 
@@ -375,27 +335,42 @@ export function KirimFormScreen() {
             />
             <Text style={styles.label}>{t('kirimExpiryLabel')}</Text>
             <View style={styles.expiryRow}>
-              <TextInput
-                style={styles.expiryInput}
-                value={currentExpiry}
-                onChangeText={setCurrentExpiry}
-                placeholder={t('kirimExpiryPlaceholder')}
-                placeholderTextColor="#999"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
+              <TouchableOpacity
+                style={styles.expiryInputTouchable}
+                onPress={() => setExpiryCalendarOpen(true)}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.expiryInputText,
+                    !currentExpiry && styles.expiryInputPlaceholder,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {currentExpiry && /^\d{4}-\d{2}-\d{2}$/.test(currentExpiry)
+                    ? formatExpiryDisplay(currentExpiry, locale)
+                    : t('kirimExpiryPlaceholder')}
+                </Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.expiryCalendarBtn}
-                onPress={() => {
-                  setPickerYear(null);
-                  setPickerMonth(null);
-                  setCalendarStep('year');
-                  setExpiryCalendarOpen(true);
-                }}
+                onPress={() => setExpiryCalendarOpen(true)}
               >
                 <Icon name="calendar" size={24} color="#1a237e" />
               </TouchableOpacity>
             </View>
+            <ExpiryDatePicker
+              visible={expiryCalendarOpen}
+              onClose={() => setExpiryCalendarOpen(false)}
+              value={currentExpiry || null}
+              onChange={(iso) => {
+                setCurrentExpiry(iso || '');
+                setExpiryCalendarOpen(false);
+              }}
+              minDate={todayISO()}
+              locale={locale}
+              darkMode={false}
+            />
             {locationDropdownOpen && (
               <Modal
                 visible={locationDropdownOpen}
@@ -431,168 +406,6 @@ export function KirimFormScreen() {
                       )}
                     </ScrollView>
                   </TouchableOpacity>
-                </TouchableOpacity>
-              </Modal>
-            )}
-
-            {expiryCalendarOpen && (
-              <Modal
-                visible={expiryCalendarOpen}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setExpiryCalendarOpen(false)}
-              >
-                <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setExpiryCalendarOpen(false)}>
-                  <View style={styles.calendarModal} onStartShouldSetResponder={() => true}>
-                    {/* Year step: header "2026 - 2037" + up/down arrows, grid 4×3 */}
-                    {calendarStep === 'year' && (
-                      <>
-                        <View style={styles.calendarHeaderRow}>
-                          <View style={styles.calendarBackBtn} />
-                          <Text style={styles.calendarTitle}>
-                            {yearBlockStart} — {yearBlockStart + YEARS_PER_PAGE - 1}
-                          </Text>
-                          <View style={styles.calendarYearArrows}>
-                            <TouchableOpacity
-                              onPress={() => setYearBlockStart((b) => Math.max(MIN_YEAR, b - YEARS_PER_PAGE))}
-                              style={styles.calendarArrowBtn}
-                            >
-                              <Icon name="chevron-up" size={22} color="#555" />
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              onPress={() => setYearBlockStart((b) => Math.min(MAX_YEAR - YEARS_PER_PAGE + 1, b + YEARS_PER_PAGE))}
-                              style={styles.calendarArrowBtn}
-                            >
-                              <Icon name="chevron-down" size={22} color="#555" />
-                            </TouchableOpacity>
-                          </View>
-                          <TouchableOpacity onPress={() => setExpiryCalendarOpen(false)} style={styles.calendarCloseBtn}>
-                            <Icon name="close" size={24} color="#333" />
-                          </TouchableOpacity>
-                        </View>
-                        <View style={styles.calendarGrid4}>
-                          {Array.from({ length: YEARS_PER_PAGE }, (_, i) => yearBlockStart + i).map((y) => (
-                            <TouchableOpacity
-                              key={y}
-                              style={[styles.calendarCell, pickerYear === y && styles.calendarCellSelected]}
-                              onPress={() => {
-                                setPickerYear(y);
-                                setCalendarStep('month');
-                              }}
-                            >
-                              <Text style={[styles.calendarCellText, pickerYear === y && styles.calendarCellTextSelected]}>{y}</Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      </>
-                    )}
-
-                    {/* Month step: year + up/down, grid 4×3 Jan..Dec */}
-                    {calendarStep === 'month' && pickerYear != null && (
-                      <>
-                        <View style={styles.calendarHeaderRow}>
-                          <TouchableOpacity
-                            onPress={() => {
-                              setPickerYear(null);
-                              setPickerMonth(null);
-                              setCalendarStep('year');
-                            }}
-                            style={styles.calendarBackBtn}
-                          >
-                            <Icon name="chevron-left" size={24} color="#1a237e" />
-                          </TouchableOpacity>
-                          <Text style={styles.calendarTitle}>{pickerYear}</Text>
-                          <View style={styles.calendarYearArrows}>
-                            <TouchableOpacity
-                              onPress={() => setPickerYear((py) => (py != null ? py - 1 : null))}
-                              style={styles.calendarArrowBtn}
-                            >
-                              <Icon name="chevron-up" size={22} color="#555" />
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              onPress={() => setPickerYear((py) => (py != null ? py + 1 : null))}
-                              style={styles.calendarArrowBtn}
-                            >
-                              <Icon name="chevron-down" size={22} color="#555" />
-                            </TouchableOpacity>
-                          </View>
-                          <TouchableOpacity onPress={() => setExpiryCalendarOpen(false)} style={styles.calendarCloseBtn}>
-                            <Icon name="close" size={24} color="#333" />
-                          </TouchableOpacity>
-                        </View>
-                        <View style={styles.calendarGrid4}>
-                          {MONTH_SHORT_NAMES.map((name, i) => (
-                            <TouchableOpacity
-                              key={name}
-                              style={[styles.calendarCell, pickerMonth === i + 1 && styles.calendarCellSelected]}
-                              onPress={() => {
-                                setPickerMonth(i + 1);
-                                setCalendarStep('day');
-                              }}
-                            >
-                              <Text style={[styles.calendarCellText, pickerMonth === i + 1 && styles.calendarCellTextSelected]}>{name}</Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      </>
-                    )}
-
-                    {/* Day step: S M T W T F S + calendar grid */}
-                    {calendarStep === 'day' && pickerYear != null && pickerMonth != null && (() => {
-                      const cells = buildCalendarDays(pickerYear, pickerMonth);
-                      const parsed = currentExpiry.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-                      const [selY, selM, selD] = parsed ? [parseInt(parsed[1], 10), parseInt(parsed[2], 10), parseInt(parsed[3], 10)] : [null, null, null];
-                      return (
-                        <>
-                          <View style={styles.calendarHeaderRow}>
-                            <TouchableOpacity
-                              onPress={() => setCalendarStep('month')}
-                              style={styles.calendarBackBtn}
-                            >
-                              <Icon name="chevron-left" size={24} color="#1a237e" />
-                            </TouchableOpacity>
-                            <Text style={styles.calendarTitle}>
-                              {pickerYear}-{String(pickerMonth).padStart(2, '0')}
-                            </Text>
-                            <View style={styles.calendarBackBtn} />
-                            <TouchableOpacity onPress={() => setExpiryCalendarOpen(false)} style={styles.calendarCloseBtn}>
-                              <Icon name="close" size={24} color="#333" />
-                            </TouchableOpacity>
-                          </View>
-                          <View style={styles.calendarWeekRow}>
-                            {WEEKDAY_LETTERS.map((letter, idx) => (
-                              <Text key={idx} style={styles.calendarWeekDay}>{letter}</Text>
-                            ))}
-                          </View>
-                          <View style={styles.calendarDayGrid}>
-                            {cells.map((cell, idx) => {
-                              const dateStr = `${cell.year}-${String(cell.month).padStart(2, '0')}-${String(cell.day).padStart(2, '0')}`;
-                              const isSelected = selY === cell.year && selM === cell.month && selD === cell.day;
-                              const isOtherMonth = cell.type !== 'current';
-                              return (
-                                <TouchableOpacity
-                                  key={idx}
-                                  style={[
-                                    styles.calendarDayCell,
-                                    isOtherMonth && styles.calendarDayCellOther,
-                                    isSelected && styles.calendarDayCellSelected,
-                                  ]}
-                                  onPress={() => {
-                                    setCurrentExpiry(dateStr);
-                                    setExpiryCalendarOpen(false);
-                                  }}
-                                >
-                                  <Text style={[styles.calendarDayCellText, isOtherMonth && styles.calendarDayCellTextOther, isSelected && styles.calendarDayCellTextSelected]}>
-                                    {cell.day}
-                                  </Text>
-                                </TouchableOpacity>
-                              );
-                            })}
-                          </View>
-                        </>
-                      );
-                    })()}
-                  </View>
                 </TouchableOpacity>
               </Modal>
             )}
@@ -869,16 +682,18 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 12,
   },
-  expiryInput: {
+  expiryInputTouchable: {
     flex: 1,
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
+    paddingVertical: 12,
     backgroundColor: '#fff',
+    justifyContent: 'center',
   },
+  expiryInputText: { fontSize: 16, color: '#333' },
+  expiryInputPlaceholder: { color: '#999' },
   expiryCalendarBtn: {
     width: 48,
     height: 44,
@@ -889,94 +704,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  calendarModal: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    marginHorizontal: 20,
-    maxHeight: '85%',
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 12,
-  },
-  calendarHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    backgroundColor: '#fafafa',
-  },
-  calendarBackBtn: { width: 40, alignItems: 'center', justifyContent: 'center' },
-  calendarTitle: { fontSize: 18, fontWeight: '600', color: '#333', flex: 1, textAlign: 'center' },
-  calendarYearArrows: { flexDirection: 'column', alignItems: 'center', marginRight: 4 },
-  calendarArrowBtn: { padding: 6 },
-  calendarCloseBtn: { padding: 6 },
-  calendarGrid4: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 14,
-    gap: 12,
-    justifyContent: 'space-between',
-  },
-  calendarCell: {
-    width: '30%',
-    aspectRatio: 1.5,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  calendarCellSelected: {
-    backgroundColor: '#e8eaf6',
-    borderColor: '#1a237e',
-    borderWidth: 1.5,
-  },
-  calendarCellText: { fontSize: 17, color: '#333', fontWeight: '500' },
-  calendarCellTextSelected: { color: '#1a237e', fontWeight: '600' },
-  calendarWeekRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    backgroundColor: '#fafafa',
-  },
-  calendarWeekDay: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#555',
-  },
-  calendarDayGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 10,
-    gap: 2,
-  },
-  calendarDayCell: {
-    width: '13.8%',
-    aspectRatio: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 10,
-  },
-  calendarDayCellOther: { opacity: 0.4 },
-  calendarDayCellSelected: {
-    backgroundColor: '#e3f2fd',
-    borderWidth: 1.5,
-    borderColor: '#1976d2',
-    borderRadius: 10,
-  },
-  calendarDayCellText: { fontSize: 15, color: '#333', fontWeight: '500' },
-  calendarDayCellTextOther: { color: '#888' },
-  calendarDayCellTextSelected: { color: '#1976d2', fontWeight: '600' },
   addLineBtn: {
     backgroundColor: '#1a237e',
     paddingVertical: 12,
