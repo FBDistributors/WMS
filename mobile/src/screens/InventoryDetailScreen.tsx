@@ -116,8 +116,9 @@ export function InventoryDetailScreen() {
         <View style={styles.card}>
           <Text style={styles.productName}>{data.name}</Text>
           {data.main_barcode ? (
-            <Text style={styles.barcode}>Barcode: {data.main_barcode}</Text>
+            <Text style={styles.barcode}>{data.main_barcode}</Text>
           ) : null}
+          <Text style={styles.productCode}>{data.code}</Text>
         </View>
         <Text style={styles.sectionLabel}>{t('invMoreLocations')}</Text>
         {data.locations.map((loc) => (
@@ -127,8 +128,7 @@ export function InventoryDetailScreen() {
               <Text style={styles.locExpiry}>{formatExpiry(loc.expiry_date)}</Text>
             </View>
             <Text style={styles.locMeta}>
-              Batch: {loc.batch_no} • On hand: {loc.on_hand_qty} • Reserved:{' '}
-              {loc.reserved_qty} • Available: {loc.available_qty}
+              {t('invQoldiq')}: {loc.available_qty} · {t('invExpiry')}: {formatExpiry(loc.expiry_date)}
             </Text>
           </View>
         ))}
@@ -182,6 +182,12 @@ const styles = StyleSheet.create({
   barcode: {
     fontSize: 13,
     color: '#666',
+    marginTop: 4,
+  },
+  productCode: {
+    fontSize: 14,
+    color: '#1a237e',
+    fontWeight: '600',
     marginTop: 4,
   },
   sectionLabel: {

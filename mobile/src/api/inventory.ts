@@ -16,6 +16,7 @@ export type PickerLotInfo = {
 export type PickerInventoryItem = {
   product_id: string;
   name: string;
+  code: string;
   main_barcode: string | null;
   best_location: string | null;
   available_qty: number;
@@ -42,6 +43,7 @@ export type PickerProductLocation = {
 export type PickerProductDetailResponse = {
   product_id: string;
   name: string;
+  code: string;
   main_barcode: string | null;
   locations: PickerProductLocation[];
 };

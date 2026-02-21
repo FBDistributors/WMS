@@ -29,15 +29,6 @@ import { AppHeader } from '../components/AppHeader';
 
 type Nav = StackNavigationProp<RootStackParamList, 'Inventory'>;
 
-function formatExpiry(d: string | null): string {
-  if (!d) return '—';
-  try {
-    return new Date(d).toLocaleDateString();
-  } catch {
-    return d;
-  }
-}
-
 function InventoryCard({
   item,
   onPress,
@@ -59,19 +50,12 @@ function InventoryCard({
           {item.main_barcode ? (
             <Text style={styles.cardBarcode}>{item.main_barcode}</Text>
           ) : null}
+          <Text style={styles.cardCode}>{item.code}</Text>
+          <Text style={styles.cardMetaText}>
+            {t('invQoldiq')}: {item.available_qty}
+          </Text>
         </View>
         <Icon name="chevron-right" size={22} color="#666" />
-      </View>
-      <View style={styles.cardMeta}>
-        <Text style={styles.cardMetaText}>
-          {t('invBestLocation')}: {item.best_location ?? '—'}
-        </Text>
-        <Text style={styles.cardMetaText}>
-          {t('invAvailable')}: {item.available_qty}
-        </Text>
-        <Text style={styles.cardMetaText}>
-          {t('invExpiry')}: {formatExpiry(item.nearest_expiry)}
-        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -380,6 +364,12 @@ const styles = StyleSheet.create({
   cardBarcode: {
     fontSize: 12,
     color: '#666',
+    marginTop: 2,
+  },
+  cardCode: {
+    fontSize: 13,
+    color: '#1a237e',
+    fontWeight: '600',
     marginTop: 2,
   },
   cardMeta: {

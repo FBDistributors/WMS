@@ -41,6 +41,7 @@ class PickerLotInfo(BaseModel):
 class PickerInventoryItem(BaseModel):
     product_id: UUID
     name: str
+    code: str
     main_barcode: str | None
     best_location: str | None
     available_qty: Decimal
@@ -67,6 +68,7 @@ class PickerProductLocation(BaseModel):
 class PickerProductDetailResponse(BaseModel):
     product_id: UUID
     name: str
+    code: str
     main_barcode: str | None
     locations: list[PickerProductLocation]
 
@@ -196,6 +198,7 @@ def _build_picker_items(
             PickerInventoryItem(
                 product_id=p.id,
                 name=p.name,
+                code=p.sku or str(p.id),
                 main_barcode=main_barcode,
                 best_location=best_location,
                 available_qty=total_available,
@@ -446,6 +449,7 @@ async def get_picker_product_detail(
     return PickerProductDetailResponse(
         product_id=product.id,
         name=product.name,
+        code=product.sku or str(product.id),
         main_barcode=main_barcode,
         locations=locations,
     )
