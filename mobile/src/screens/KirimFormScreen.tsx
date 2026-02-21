@@ -317,7 +317,10 @@ export function KirimFormScreen() {
                 <View style={styles.locationDropdownInline}>
                   <ScrollView
                     style={styles.locationDropdownScroll}
+                    contentContainerStyle={styles.locationDropdownScrollContent}
                     keyboardShouldPersistTaps="handled"
+                    nestedScrollEnabled={true}
+                    showsVerticalScrollIndicator={true}
                   >
                     {filteredLocations.length === 0 ? (
                       <View style={styles.locationDropdownEmpty}>
@@ -597,7 +600,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#ddd',
-    maxHeight: 220,
+    height: 220,
     zIndex: 10,
     elevation: 4,
     shadowColor: '#000',
@@ -605,7 +608,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 6,
   },
-  locationDropdownScroll: { maxHeight: 216 },
+  locationDropdownScroll: { flex: 1 },
+  locationDropdownScrollContent: { paddingBottom: 8 },
   locationDropdownEmpty: { padding: 20, alignItems: 'center' },
   locationDropdownEmptyText: { fontSize: 14, color: '#666' },
   locationDropdownItem: {

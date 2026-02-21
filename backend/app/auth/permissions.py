@@ -103,6 +103,10 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "picking:send_to_controller",
         "waves:read",
         "waves:pick",
+        "receiving:read",
+        "receiving:write",
+        "inventory:read",
+        "products:read",
     ],
     "receiver": [
         "admin:access",
