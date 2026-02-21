@@ -302,27 +302,20 @@ export function KirimFormScreen() {
               placeholderTextColor="#999"
             />
             <Text style={styles.label}>{t('locationLabel')}</Text>
-            <View style={styles.locationInputRow}>
-              <TextInput
-                style={styles.locationInput}
-                value={selectedLocation ? selectedLocation.code : locationSearch}
-                onChangeText={(text) => {
-                  setLocationSearch(text);
-                  setSelectedLocation(null);
-                }}
-                onFocus={() => setLocationDropdownOpen(true)}
-                placeholder={t('kirimLocationSearchPlaceholder')}
-                placeholderTextColor="#999"
-                autoCapitalize="characters"
-                autoCorrect={false}
-              />
-              <TouchableOpacity
-                style={styles.locationDropdownBtn}
-                onPress={() => setLocationDropdownOpen(true)}
-              >
-                <Icon name="chevron-down" size={24} color="#1a237e" />
-              </TouchableOpacity>
-            </View>
+            <TextInput
+              style={styles.locationInputFull}
+              value={selectedLocation ? selectedLocation.code : locationSearch}
+              onChangeText={(text) => {
+                setLocationSearch(text);
+                setSelectedLocation(null);
+                if (text.trim().length > 0) setLocationDropdownOpen(true);
+              }}
+              onFocus={() => setLocationDropdownOpen(true)}
+              placeholder={t('kirimLocationSearchPlaceholder')}
+              placeholderTextColor="#999"
+              autoCapitalize="characters"
+              autoCorrect={false}
+            />
             <Text style={styles.label}>{t('kirimBatchLabel')}</Text>
             <TextInput
               style={styles.input}
@@ -589,14 +582,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   findProductBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  locationInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  locationInput: {
-    flex: 1,
+  locationInputFull: {
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
@@ -605,16 +591,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: '#fff',
     color: '#333',
-  },
-  locationDropdownBtn: {
-    width: 48,
-    height: 44,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: 12,
   },
   locationDropdownModal: {
     backgroundColor: '#fff',
