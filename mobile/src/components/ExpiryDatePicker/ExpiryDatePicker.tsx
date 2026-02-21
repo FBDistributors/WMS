@@ -2,9 +2,10 @@
  * Reusable ExpiryDatePicker — Yil → Oy → Kun, WMS style, dark mode, ru/uz.
  * Returns ISO date "YYYY-MM-DD". Past dates disabled; today allowed.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Modal,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -20,9 +21,8 @@ import {
 import type { ExpiryDatePickerTheme } from './theme';
 import { expiryPickerThemes } from './theme';
 
-const YEARS_PER_PAGE = 12;
 const MIN_YEAR = 2020;
-const MAX_YEAR = 2040;
+const MAX_YEAR = 2050;
 
 function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
@@ -70,10 +70,6 @@ function isBefore(a: string, b: string): boolean {
   return a < b;
 }
 
-function isSameOrAfter(dateISO: string, minISO: string): boolean {
-  return dateISO >= minISO;
-}
-
 export type ExpiryDatePickerProps = {
   visible: boolean;
   onClose: () => void;
@@ -114,10 +110,11 @@ export function ExpiryDatePicker({
   const [pickerYear, setPickerYear] = useState<number | null>(null);
   const [pickerMonth, setPickerMonth] = useState<number | null>(null);
   const [pendingDay, setPendingDay] = useState<{ year: number; month: number; day: number } | null>(null);
-  const [yearBlockStart, setYearBlockStart] = useState(() => {
-    const y = new Date().getFullYear();
-    return Math.max(MIN_YEAR, Math.floor(y / YEARS_PER_PAGE) * YEARS_PER_PAGE);
-  });
+
+  const allYears = useMemo(
+    () => Array.from({ length: MAX_YEAR - MIN_YEAR + 1 }, (_, i) => MIN_YEAR + i),
+    []
+  );
 
   useEffect(() => {
     if (visible) {
@@ -128,14 +125,9 @@ export function ExpiryDatePicker({
         setPickerYear(y);
         setPickerMonth(m);
         setPendingDay({ year: y, month: m, day: d });
-        setYearBlockStart(Math.max(MIN_YEAR, Math.floor(y / YEARS_PER_PAGE) * YEARS_PER_PAGE));
       } else {
         setPickerYear(null);
         setPickerMonth(null);
-        setYearBlockStart(() => {
-          const y = new Date().getFullYear();
-          return Math.max(MIN_YEAR, Math.floor(y / YEARS_PER_PAGE) * YEARS_PER_PAGE);
-        });
       }
     }
   }, [visible, value]);
@@ -151,24 +143,16 @@ export function ExpiryDatePicker({
     }
   }, [step]);
 
-  const handleApply = useCallback(() => {
-    if (step === 3 && pendingDay) {
-      const iso = toISODate(pendingDay.year, pendingDay.month, pendingDay.day);
-      if (isSameOrAfter(iso, min) && (!max || !isBefore(max, iso))) {
-        onChange(iso);
-      }
-    }
-    onClose();
-  }, [step, pendingDay, min, max, onChange, onClose]);
-
   const handleSelectDay = useCallback(
     (cell: DayCell) => {
       const iso = toISODate(cell.year, cell.month, cell.day);
       if (isBefore(iso, min)) return;
       if (max && isBefore(max, iso)) return;
       setPendingDay({ year: cell.year, month: cell.month, day: cell.day });
+      onChange(iso);
+      onClose();
     },
-    [min, max]
+    [min, max, onChange, onClose]
   );
 
   const isDayDisabled = useCallback(
@@ -181,22 +165,12 @@ export function ExpiryDatePicker({
 
   const title =
     step === 1
-      ? `${yearBlockStart} – ${yearBlockStart + YEARS_PER_PAGE - 1}`
+      ? `${MIN_YEAR} – ${MAX_YEAR}`
       : step === 2 && pickerYear != null
         ? String(pickerYear)
         : step === 3 && pickerYear != null && pickerMonth != null
           ? `${pickerYear}-${String(pickerMonth).padStart(2, '0')}`
           : labels.year;
-
-  const canApply =
-    step === 3 &&
-    pendingDay != null &&
-    !isDayDisabled({
-      type: 'current',
-      year: pendingDay.year,
-      month: pendingDay.month,
-      day: pendingDay.day,
-    });
 
   const dynamicStyles = {
     modal: { backgroundColor: theme.modal, borderColor: theme.modalBorder },
@@ -274,43 +248,46 @@ export function ExpiryDatePicker({
             </Text>
           </View>
 
-          {/* Step 1: Year grid */}
+          {/* Step 1: Year list (scrollable, centered) */}
           {step === 1 && (
-            <View style={styles.grid}>
-              {Array.from(
-                { length: YEARS_PER_PAGE },
-                (_, i) => yearBlockStart + i
-              ).map((y) => (
-                <TouchableOpacity
-                  key={y}
-                  style={[
-                    styles.cell,
-                    dynamicStyles.cell,
-                    pickerYear === y && styles.cellSelected,
-                    pickerYear === y && dynamicStyles.cellSelected,
-                  ]}
-                  onPress={() => {
-                    setPickerYear(y);
-                    setStep(2);
-                  }}
-                >
-                  <Text
+            <ScrollView
+              style={styles.yearScroll}
+              contentContainerStyle={styles.yearScrollContent}
+              showsVerticalScrollIndicator={true}
+            >
+              <View style={styles.gridCentered}>
+                {allYears.map((y) => (
+                  <TouchableOpacity
+                    key={y}
                     style={[
-                      styles.cellText,
-                      dynamicStyles.cellText,
-                      pickerYear === y && dynamicStyles.cellSelectedText,
+                      styles.cell,
+                      dynamicStyles.cell,
+                      pickerYear === y && styles.cellSelected,
+                      pickerYear === y && dynamicStyles.cellSelected,
                     ]}
+                    onPress={() => {
+                      setPickerYear(y);
+                      setStep(2);
+                    }}
                   >
-                    {y}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                    <Text
+                      style={[
+                        styles.cellText,
+                        dynamicStyles.cellText,
+                        pickerYear === y && dynamicStyles.cellSelectedText,
+                      ]}
+                    >
+                      {y}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
           )}
 
-          {/* Step 2: Month grid */}
+          {/* Step 2: Month grid (centered) */}
           {step === 2 && pickerYear != null && (
-            <View style={styles.grid}>
+            <View style={styles.gridCentered}>
               {months.map((name, i) => (
                 <TouchableOpacity
                   key={name}
@@ -402,32 +379,6 @@ export function ExpiryDatePicker({
               </>
             );
           })()}
-
-          {/* Sticky footer: Cancel | Apply */}
-          <View style={[styles.footer, dynamicStyles.footer]}>
-            <TouchableOpacity
-              style={[styles.footerBtn, dynamicStyles.cancelBtn]}
-              onPress={onClose}
-            >
-              <Text style={[styles.footerBtnText, dynamicStyles.cancelBtnText]}>
-                {labels.cancel}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.footerBtn,
-                styles.footerBtnPrimary,
-                dynamicStyles.applyBtn,
-                !canApply && styles.footerBtnDisabled,
-              ]}
-              onPress={handleApply}
-              disabled={!canApply}
-            >
-              <Text style={[styles.footerBtnText, dynamicStyles.applyBtnText]}>
-                {labels.save}
-              </Text>
-            </TouchableOpacity>
-          </View>
         </TouchableOpacity>
       </TouchableOpacity>
     </Modal>
@@ -476,12 +427,23 @@ const styles = StyleSheet.create({
   },
   progressFill: { height: '100%', borderRadius: 3 },
   progressText: { fontSize: 13, fontWeight: '600', minWidth: 28 },
+  yearScroll: { maxHeight: 320 },
+  yearScrollContent: { padding: 14, paddingBottom: 24, alignItems: 'center' },
+  gridCentered: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 14,
+  },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     padding: 14,
     gap: 12,
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   cell: {
     width: '30%',
@@ -521,22 +483,6 @@ const styles = StyleSheet.create({
   },
   dayCellOther: { opacity: 0.5 },
   dayCellText: { fontSize: 15, fontWeight: '500' },
-  footer: {
-    flexDirection: 'row',
-    padding: 14,
-    gap: 12,
-    borderTopWidth: 1,
-  },
-  footerBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  footerBtnPrimary: {},
-  footerBtnDisabled: { opacity: 0.5 },
-  footerBtnText: { fontSize: 16, fontWeight: '600' },
 });
 
 /** Format ISO date for display: "16.02.2026" */
