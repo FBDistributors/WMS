@@ -296,15 +296,14 @@ export function KirimFormScreen() {
     }
   }, [flow, selectedPickerId, lines, t]);
 
-  const filteredLocations = locationSearch.trim()
-    ? allLocations
-        .filter(
-          (l) =>
-            l.code.toLowerCase().includes(locationSearch.toLowerCase()) ||
-            (l.name && l.name.toLowerCase().includes(locationSearch.toLowerCase()))
-        )
-        .slice(0, 10)
-    : allLocations.slice(0, 10);
+  const searchTrim = locationSearch.trim();
+  const filteredLocations = searchTrim
+    ? allLocations.filter(
+        (l) =>
+          (l.code && l.code.toLowerCase().includes(searchTrim.toLowerCase())) ||
+          (l.name != null && String(l.name).toLowerCase().includes(searchTrim.toLowerCase()))
+      ).slice(0, 30)
+    : allLocations.slice(0, 30);
   const canAddLine = currentProduct && selectedLocation && currentQty.trim().length > 0 && currentBatch.trim().length > 0;
 
   return (
@@ -351,6 +350,7 @@ export function KirimFormScreen() {
                   setLocationSearch(text);
                   setSelectedLocation(null);
                 }}
+                onFocus={() => setLocationDropdownOpen(true)}
                 placeholder={t('kirimLocationSearchPlaceholder')}
                 placeholderTextColor="#999"
                 autoCapitalize="characters"
@@ -406,21 +406,29 @@ export function KirimFormScreen() {
                 <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setLocationDropdownOpen(false)}>
                   <TouchableOpacity style={styles.locationDropdownModal} activeOpacity={1} onPress={() => {}}>
                     <ScrollView style={styles.locationDropdownList} keyboardShouldPersistTaps="handled">
-                      {filteredLocations.map((loc) => (
-                        <TouchableOpacity
-                          key={loc.id}
-                          style={[styles.locationDropdownItem, selectedLocation?.id === loc.id && styles.locationDropdownItemSelected]}
-                          onPress={() => {
-                            setSelectedLocation(loc);
-                            setLocationSearch(loc.code);
-                            setLocationDropdownOpen(false);
-                          }}
-                        >
-                          <Text style={styles.locationDropdownItemCode} numberOfLines={1}>{loc.code}</Text>
-                          {loc.name && loc.name !== loc.code ? <Text style={styles.locationDropdownItemName} numberOfLines={1}>{loc.name}</Text> : null}
-                          {selectedLocation?.id === loc.id ? <Icon name="check-circle" size={20} color="#2e7d32" /> : null}
-                        </TouchableOpacity>
-                      ))}
+                      {filteredLocations.length === 0 ? (
+                        <View style={styles.locationDropdownEmpty}>
+                          <Text style={styles.locationDropdownEmptyText}>
+                            {searchTrim ? t('kirimLocationNoResults') : t('kirimLocationLoadFirst')}
+                          </Text>
+                        </View>
+                      ) : (
+                        filteredLocations.map((loc) => (
+                          <TouchableOpacity
+                            key={loc.id}
+                            style={[styles.locationDropdownItem, selectedLocation?.id === loc.id && styles.locationDropdownItemSelected]}
+                            onPress={() => {
+                              setSelectedLocation(loc);
+                              setLocationSearch(loc.code);
+                              setLocationDropdownOpen(false);
+                            }}
+                          >
+                            <Text style={styles.locationDropdownItemCode} numberOfLines={1}>{loc.code}</Text>
+                            {loc.name && loc.name !== loc.code ? <Text style={styles.locationDropdownItemName} numberOfLines={1}>{loc.name}</Text> : null}
+                            {selectedLocation?.id === loc.id ? <Icon name="check-circle" size={20} color="#2e7d32" /> : null}
+                          </TouchableOpacity>
+                        ))
+                      )}
                     </ScrollView>
                   </TouchableOpacity>
                 </TouchableOpacity>
@@ -803,6 +811,8 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   locationDropdownList: { maxHeight: 260 },
+  locationDropdownEmpty: { padding: 20, alignItems: 'center' },
+  locationDropdownEmptyText: { fontSize: 14, color: '#666' },
   locationDropdownItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -881,37 +891,43 @@ const styles = StyleSheet.create({
   },
   calendarModal: {
     backgroundColor: '#fff',
-    borderRadius: 16,
+    borderRadius: 20,
     marginHorizontal: 20,
     maxHeight: '85%',
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 12,
   },
   calendarHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    backgroundColor: '#fafafa',
   },
   calendarBackBtn: { width: 40, alignItems: 'center', justifyContent: 'center' },
-  calendarTitle: { fontSize: 17, fontWeight: '600', color: '#333', flex: 1, textAlign: 'center' },
+  calendarTitle: { fontSize: 18, fontWeight: '600', color: '#333', flex: 1, textAlign: 'center' },
   calendarYearArrows: { flexDirection: 'column', alignItems: 'center', marginRight: 4 },
-  calendarArrowBtn: { padding: 4 },
-  calendarCloseBtn: { padding: 4 },
+  calendarArrowBtn: { padding: 6 },
+  calendarCloseBtn: { padding: 6 },
   calendarGrid4: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: 12,
-    gap: 10,
+    padding: 14,
+    gap: 12,
     justifyContent: 'space-between',
   },
   calendarCell: {
-    width: '23%',
-    aspectRatio: 1.4,
-    borderRadius: 10,
+    width: '30%',
+    aspectRatio: 1.5,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#e5e5e5',
     backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
@@ -921,40 +937,42 @@ const styles = StyleSheet.create({
     borderColor: '#1a237e',
     borderWidth: 1.5,
   },
-  calendarCellText: { fontSize: 16, color: '#333', fontWeight: '500' },
+  calendarCellText: { fontSize: 17, color: '#333', fontWeight: '500' },
   calendarCellTextSelected: { color: '#1a237e', fontWeight: '600' },
   calendarWeekRow: {
     flexDirection: 'row',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    backgroundColor: '#fafafa',
   },
   calendarWeekDay: {
     flex: 1,
     textAlign: 'center',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#666',
+    color: '#555',
   },
   calendarDayGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: 8,
+    padding: 10,
+    gap: 2,
   },
   calendarDayCell: {
-    width: '14.28%',
+    width: '13.8%',
     aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
+    borderRadius: 10,
   },
-  calendarDayCellOther: { opacity: 0.45 },
+  calendarDayCellOther: { opacity: 0.4 },
   calendarDayCellSelected: {
     backgroundColor: '#e3f2fd',
     borderWidth: 1.5,
     borderColor: '#1976d2',
-    borderRadius: 8,
+    borderRadius: 10,
   },
   calendarDayCellText: { fontSize: 15, color: '#333', fontWeight: '500' },
   calendarDayCellTextOther: { color: '#888' },
