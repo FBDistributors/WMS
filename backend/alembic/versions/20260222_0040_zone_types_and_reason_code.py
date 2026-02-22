@@ -1,11 +1,14 @@
-"""Add zone_type to locations, reason_code to stock_movements; movement_type CHECK (on-hand only).
+"""Add zone_type to locations, reason_code to stock_movements.
 
 Revision ID: 20260222_0040
 Revises: 20260219_0039
 Create Date: 2026-02-22
 
 Zone types: NORMAL, EXPIRED, DAMAGED, QUARANTINE.
-Movement types: on-hand only (no allocate, unallocate).
+NOTE: movement_type CHECK is NOT changed here so existing allocate/unallocate
+rows on Render (and other envs) do not violate the constraint. App validates
+new movements via ON_HAND_MOVEMENT_TYPES. When all envs have no allocate/
+unallocate rows, add a separate migration to tighten the CHECK.
 """
 from __future__ import annotations
 
@@ -19,16 +22,6 @@ branch_labels = None
 depends_on = None
 
 ZONE_TYPES = ("NORMAL", "EXPIRED", "DAMAGED", "QUARANTINE")
-MOVEMENT_TYPES = (
-    "opening_balance",
-    "receipt",
-    "putaway",
-    "pick",
-    "ship",
-    "adjust",
-    "transfer_in",
-    "transfer_out",
-)
 
 
 def upgrade():
@@ -73,24 +66,12 @@ def upgrade():
     )
     op.create_index("ix_stock_movements_reason_code", "stock_movements", ["reason_code"])
 
-    # --- stock_movements: movement_type CHECK (on-hand only, no allocate/unallocate) ---
-    op.drop_constraint("ck_stock_movements_type", "stock_movements", type_="check")
-    op.create_check_constraint(
-        "ck_stock_movements_type",
-        "stock_movements",
-        f"movement_type IN {MOVEMENT_TYPES}",
-    )
+    # movement_type CHECK left unchanged: existing allocate/unallocate rows must remain valid
 
 
 def downgrade():
     op.drop_index("ix_stock_movements_reason_code", table_name="stock_movements")
     op.drop_column("stock_movements", "reason_code")
-    op.drop_constraint("ck_stock_movements_type", "stock_movements", type_="check")
-    op.create_check_constraint(
-        "ck_stock_movements_type",
-        "stock_movements",
-        "movement_type IN ('opening_balance','receipt','putaway','allocate','unallocate','pick','ship','adjust','transfer_in','transfer_out')",
-    )
     op.drop_index("ix_locations_warehouse_id", table_name="locations")
     op.drop_constraint("fk_locations_warehouse_id", "locations", type_="foreignkey")
     op.drop_column("locations", "warehouse_id")
