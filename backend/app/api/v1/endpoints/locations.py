@@ -37,6 +37,7 @@ class LocationOut(BaseModel):
     name: str
     type: str
     location_type: Optional[str] = None
+    zone_type: str = "NORMAL"
     sector: Optional[str] = None
     level_no: Optional[int] = None
     row_no: Optional[int] = None
@@ -77,6 +78,7 @@ def _to_location(location: LocationModel) -> LocationOut:
         name=location.name,
         type=location.type,
         location_type=location.location_type,
+        zone_type=location.zone_type or "NORMAL",
         sector=location.sector,
         level_no=location.level,
         row_no=location.row_no,

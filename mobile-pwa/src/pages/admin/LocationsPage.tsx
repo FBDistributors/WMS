@@ -122,6 +122,9 @@ export function LocationsPage() {
                 {t('locations:type_label')}
               </th>
               <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
+                {t('locations:zone_type')}
+              </th>
+              <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
                 {t('locations:sector')}
               </th>
               <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
@@ -147,7 +150,7 @@ export function LocationsPage() {
           <tbody>
             {filteredItems.length === 0 ? (
               <tr>
-                <td colSpan={9} className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+                <td colSpan={10} className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
                   {filterQuery.trim() ? t('locations:filter_no_results') : t('locations:empty')}
                 </td>
               </tr>
@@ -171,6 +174,17 @@ export function LocationsPage() {
                 </td>
                 <td className="whitespace-nowrap py-2 pr-3 text-slate-600 dark:text-slate-400 sm:pr-4">
                   {loc.location_type ?? '—'}
+                </td>
+                <td className="whitespace-nowrap py-2 pr-3 sm:pr-4">
+                  <span className={`inline-flex rounded px-1.5 py-0.5 text-xs font-medium ${
+                    loc.zone_type === 'NORMAL' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
+                    loc.zone_type === 'EXPIRED' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' :
+                    loc.zone_type === 'DAMAGED' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
+                    loc.zone_type === 'QUARANTINE' ? 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-300' :
+                    'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
+                  }`}>
+                    {loc.zone_type ?? 'NORMAL'}
+                  </span>
                 </td>
                 <td className="whitespace-nowrap py-2 pr-3 text-slate-600 dark:text-slate-400 sm:pr-4">{loc.sector ?? '—'}</td>
                 <td className="whitespace-nowrap py-2 pr-3 text-slate-600 dark:text-slate-400 sm:pr-4">

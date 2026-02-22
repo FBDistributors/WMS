@@ -22,6 +22,7 @@
   "sector": "Sector",
   "actions": "Actions",
   "type_label": "Type",
+  "zone_type": "Zone",
   "level_no": "Level",
   "row_no": "Row",
   "pallet_no": "Pallet no.",

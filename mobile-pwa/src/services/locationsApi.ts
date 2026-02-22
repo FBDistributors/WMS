@@ -3,6 +3,9 @@ import { fetchJSON } from './apiClient'
 export type LocationType = 'zone' | 'rack' | 'shelf' | 'bin'
 export type LocationTypeEnum = 'RACK' | 'FLOOR'
 
+/** Zone: NORMAL (default), EXPIRED, DAMAGED, QUARANTINE. FEFO/picking only from NORMAL. */
+export type ZoneType = 'NORMAL' | 'EXPIRED' | 'DAMAGED' | 'QUARANTINE'
+
 export type Location = {
   id: string
   code: string
@@ -11,6 +14,8 @@ export type Location = {
   name: string
   type: LocationType
   location_type?: LocationTypeEnum | null
+  /** Zona turi: FEFO va terish faqat NORMAL dan. */
+  zone_type?: ZoneType | string
   sector?: string | null
   level_no?: number | null
   row_no?: number | null
