@@ -80,8 +80,8 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
       ? 'B#S'
       : (GROUP_TO_STATUS[group] ?? GROUP_TO_STATUS.all)
   const { has } = useAuth()
-  const canSync = has('orders:sync')
-  const canSend = has('orders:send_to_picking') && has('picking:assign')
+  const canSync = has('orders:write')
+  const canSend = has('orders:write')
 
   const { config, updateConfig, resetConfig } = useOrdersTableConfig()
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
