@@ -11,7 +11,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.auth.deps import require_any_permission, require_permission
-from app.auth.permissions import ROLE_PERMISSIONS
+from app.auth.permissions import PERMISSIONS, ROLE_PERMISSIONS
 from app.services.audit_service import (
     ACTION_CREATE,
     ACTION_DELETE,
@@ -45,6 +45,7 @@ class UserOut(BaseModel):
     is_active: bool
     created_at: datetime
     last_login_at: Optional[datetime] = None
+    granted_permissions: list[str] = []
 
 
 class UserListOut(BaseModel):
@@ -67,6 +68,7 @@ class UserUpdateIn(BaseModel):
     full_name: Optional[str] = Field(default=None, max_length=255)
     role: Optional[str] = None
     is_active: Optional[bool] = None
+    granted_permissions: Optional[list[str]] = None
 
 
 class ResetPasswordIn(BaseModel):
@@ -82,6 +84,7 @@ def _to_user_out(user: User) -> UserOut:
         is_active=user.is_active,
         created_at=user.created_at,
         last_login_at=user.last_login_at,
+        granted_permissions=list(user.granted_permissions or []),
     )
 
 
@@ -191,6 +194,18 @@ async def update_user(
         user.role = updates["role"]
     if "is_active" in updates:
         user.is_active = updates["is_active"]
+    if "granted_permissions" in updates:
+        raw = updates["granted_permissions"]
+        if raw is not None:
+            invalid = [p for p in raw if p not in PERMISSIONS]
+            if invalid:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid permission(s): {invalid}. Allowed: from PERMISSIONS set.",
+                )
+            user.granted_permissions = list(raw)
+        else:
+            user.granted_permissions = []
 
     new_data = {"username": user.username, "role": user.role, "is_active": user.is_active}
     log_action(

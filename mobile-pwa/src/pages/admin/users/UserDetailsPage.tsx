@@ -9,6 +9,25 @@ import { useAuth } from '../../../rbac/AuthProvider'
 import { getUser, resetPassword, updateUser } from '../../../services/usersApi'
 import type { UserRecord, UserRole } from '../../../types/users'
 
+const GRANTABLE_PERMISSIONS = [
+  'receiving:read',
+  'receiving:write',
+  'inventory:read',
+  'inventory:adjust',
+  'inventory:count',
+  'inventory:move_zone',
+  'documents:read',
+  'documents:edit_status',
+  'orders:read',
+  'orders:write',
+  'picking:read',
+  'picking:write',
+  'locations:read',
+  'movements:read',
+  'audit:read',
+  'reports:read',
+] as const
+
 export function UserDetailsPage() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -21,6 +40,7 @@ export function UserDetailsPage() {
   const [fullName, setFullName] = useState('')
   const [role, setRole] = useState<UserRole>('picker')
   const [isActive, setIsActive] = useState(true)
+  const [grantedPermissions, setGrantedPermissions] = useState<string[]>([])
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isSaving, setIsSaving] = useState(false)
@@ -37,6 +57,7 @@ export function UserDetailsPage() {
       setFullName(data.full_name ?? '')
       setRole(data.role)
       setIsActive(data.is_active)
+      setGrantedPermissions(data.granted_permissions ?? [])
     } catch {
       setError(t('users:messages.load_failed'))
     } finally {
@@ -68,6 +89,7 @@ export function UserDetailsPage() {
         full_name: fullName.trim() || null,
         role,
         is_active: isActive,
+        granted_permissions: grantedPermissions,
       })
       navigate('/admin/users')
     } catch {
@@ -171,6 +193,37 @@ export function UserDetailsPage() {
             />
             {t('users:form.active')}
           </label>
+
+          <div className="border-t border-slate-200 pt-4 mt-4">
+            <div className="text-sm font-semibold text-slate-700">
+              {t('users:granted_permissions_title')}
+            </div>
+            <p className="mt-1 text-xs text-slate-500">{t('users:granted_permissions_hint')}</p>
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {GRANTABLE_PERMISSIONS.map((perm) => (
+                <label
+                  key={perm}
+                  className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm hover:bg-slate-100"
+                >
+                  <input
+                    type="checkbox"
+                    checked={grantedPermissions.includes(perm)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setGrantedPermissions((prev) => [...prev, perm])
+                      } else {
+                        setGrantedPermissions((prev) => prev.filter((p) => p !== perm))
+                      }
+                    }}
+                  />
+                  <span className="text-slate-700">
+                    {t(`users:permissions.${perm}` as any) || perm}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+
           {error ? <div className="text-sm text-red-600">{error}</div> : null}
           <div className="flex items-center gap-2">
             <Button type="submit" disabled={isSaving}>

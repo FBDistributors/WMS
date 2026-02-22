@@ -46,5 +46,25 @@
     "not_found": "User not found.",
     "disable_confirm": "Do you want to disable this user?",
     "self_lockout": "This may remove your admin access or disable your account. Continue?"
+  },
+  "granted_permissions_title": "Additional permissions",
+  "granted_permissions_hint": "Extra permissions for this user (optional).",
+  "permissions": {
+    "receiving:read": "Receiving read",
+    "receiving:write": "Receiving write",
+    "inventory:read": "Inventory read",
+    "inventory:adjust": "Inventory adjust",
+    "inventory:count": "Inventory count",
+    "inventory:move_zone": "Move to zone",
+    "documents:read": "Documents read",
+    "documents:edit_status": "Document status (cancel)",
+    "orders:read": "Orders read",
+    "orders:write": "Orders write",
+    "picking:read": "Picking read",
+    "picking:write": "Picking write",
+    "locations:read": "Locations read",
+    "movements:read": "Movements read",
+    "audit:read": "Audit log",
+    "reports:read": "Reports"
   }
 }

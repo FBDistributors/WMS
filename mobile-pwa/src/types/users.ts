@@ -13,6 +13,7 @@ export type UserRecord = {
   is_active: boolean
   created_at: string
   last_login_at?: string | null
+  granted_permissions?: string[]
 }
 
 export type UsersListResponse = {
@@ -35,6 +36,7 @@ export type UpdateUserPayload = {
   full_name?: string | null
   role?: UserRole
   is_active?: boolean
+  granted_permissions?: string[] | null
 }
 
 export type ResetPasswordPayload = {

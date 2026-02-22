@@ -62,7 +62,8 @@ export function KirimFormScreen() {
   const { t, locale } = useLocale();
   const { isOnline } = useNetwork();
   const flow = route.params?.flow ?? 'return';
-  const params = route.params as { flow: 'new' | 'return'; scannedProductId?: string; scannedBarcode?: string } | undefined;
+  const params = route.params as { flow: 'new' | 'return' | 'inventory'; scannedProductId?: string; scannedBarcode?: string } | undefined;
+  const isDirectSubmit = flow === 'new' || flow === 'inventory';
 
   const [lines, setLines] = useState<FormLine[]>([]);
   const [finished, setFinished] = useState(false);
@@ -82,7 +83,7 @@ export function KirimFormScreen() {
   const [sending, setSending] = useState(false);
   const [expiryCalendarOpen, setExpiryCalendarOpen] = useState(false);
 
-  const title = flow === 'new' ? t('kirimNewProducts') : t('kirimCustomerReturns');
+  const title = flow === 'new' ? t('kirimNewProducts') : flow === 'inventory' ? t('kirimInventory') : t('kirimCustomerReturns');
 
   const loadProductById = useCallback(async (productId: string) => {
     setLoadingProduct(true);
@@ -242,10 +243,15 @@ export function KirimFormScreen() {
       setFinished(false);
       Alert.alert(t('success'), t('kirimSubmitDone'));
     } catch (e: unknown) {
-      const msg = e && typeof e === 'object' && 'response' in e && e.response && typeof e.response === 'object' && 'data' in e.response
-        ? (e.response as { data?: { detail?: string } }).data?.detail
-        : e instanceof Error ? e.message : t('kirimSubmitError');
-      Alert.alert(t('error'), String(msg));
+      let msg: string = e instanceof Error ? e.message : t('kirimSubmitError');
+      if (e && typeof e === 'object' && 'response' in e && e.response && typeof e.response === 'object' && 'data' in e.response) {
+        const detail = (e.response as { data?: { detail?: string } }).data?.detail;
+        if (typeof detail === 'string') msg = detail;
+      }
+      if (msg === 'Insufficient permissions' || msg.toLowerCase().includes('insufficient permissions')) {
+        msg = t('kirimInsufficientPermissions');
+      }
+      Alert.alert(t('error'), msg);
     } finally {
       setSending(false);
     }
@@ -427,9 +433,23 @@ export function KirimFormScreen() {
           </View>
         )}
 
-        {lines.length > 0 && !finished && (
+        {lines.length > 0 && !finished && !isDirectSubmit && (
           <TouchableOpacity style={styles.primaryBtn} onPress={handleYakunlash}>
             <Text style={styles.primaryBtnText}>{t('returnsFinish')}</Text>
+          </TouchableOpacity>
+        )}
+
+        {lines.length > 0 && isDirectSubmit && (
+          <TouchableOpacity
+            style={[styles.primaryBtn, styles.primaryBtnSmall]}
+            onPress={handleSendToPicker}
+            disabled={sending}
+          >
+            {sending ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.primaryBtnText}>{t('kirimSubmit')}</Text>
+            )}
           </TouchableOpacity>
         )}
 
@@ -461,19 +481,6 @@ export function KirimFormScreen() {
           </View>
         )}
 
-        {finished && lines.length > 0 && flow === 'new' && (
-          <TouchableOpacity
-            style={[styles.primaryBtn, styles.primaryBtnSmall]}
-            onPress={handleSendToPicker}
-            disabled={sending}
-          >
-            {sending ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Text style={styles.primaryBtnText}>{t('kirimSubmit')}</Text>
-            )}
-          </TouchableOpacity>
-        )}
       </ScrollView>
 
       <View style={styles.scanFooter}>

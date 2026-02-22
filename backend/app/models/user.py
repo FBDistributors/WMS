@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, Index, String, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -23,7 +23,10 @@ class User(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    
+
+    # Ruxsatlar roldan tashqari admin tomonidan beriladi (masalan: picker + receiving:write)
+    granted_permissions: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+
     # Session tracking for single-device login
     active_session_token: Mapped[str | None] = mapped_column(String(512), nullable=True)
     last_device_info: Mapped[str | None] = mapped_column(String(512), nullable=True)

@@ -56,9 +56,16 @@ def get_current_user(
     return user
 
 
+def get_effective_permissions(user: User) -> set[str]:
+    """Role permissions + per-user granted_permissions."""
+    role_perms = set(get_permissions_for_role(user.role))
+    extra = getattr(user, "granted_permissions", None) or []
+    return role_perms | set(extra)
+
+
 def require_permission(permission: str) -> Callable[[User], User]:
     def _guard(user: User = Depends(get_current_user)) -> User:
-        permissions = get_permissions_for_role(user.role)
+        permissions = get_effective_permissions(user)
         if permission not in permissions:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -71,7 +78,7 @@ def require_permission(permission: str) -> Callable[[User], User]:
 
 def require_any_permission(permissions: list[str]) -> Callable[[User], User]:
     def _guard(user: User = Depends(get_current_user)) -> User:
-        granted = set(get_permissions_for_role(user.role))
+        granted = get_effective_permissions(user)
         if not any(permission in granted for permission in permissions):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

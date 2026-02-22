@@ -59,6 +59,21 @@ export function KirimScreen() {
           </View>
           <Icon name="chevron-right" size={24} color="#777" />
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.card}
+          onPress={() => navigation.navigate('KirimForm', { flow: 'inventory' })}
+          activeOpacity={0.7}
+        >
+          <View style={styles.cardIconWrap}>
+            <Icon name="clipboard-list-outline" size={CARD_ICON_SIZE} color={HEADER_ACCENT} />
+          </View>
+          <View style={styles.cardBody}>
+            <Text style={styles.cardTitle}>{t('kirimInventory')}</Text>
+            <Text style={styles.cardSubtitle}>{t('kirimInventoryDesc')}</Text>
+          </View>
+          <Icon name="chevron-right" size={24} color="#777" />
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );

@@ -46,5 +46,25 @@
     "not_found": "Пользователь не найден.",
     "disable_confirm": "Отключить пользователя?",
     "self_lockout": "Это может лишить вас админ‑прав или заблокировать аккаунт. Продолжить?"
+  },
+  "granted_permissions_title": "Доп. права",
+  "granted_permissions_hint": "Дополнительные права для этого пользователя (необяз.).",
+  "permissions": {
+    "receiving:read": "Приём чтение",
+    "receiving:write": "Приём запись",
+    "inventory:read": "Инвентарь чтение",
+    "inventory:adjust": "Инвентарь корректировка",
+    "inventory:count": "Инвентарь пересчёт",
+    "inventory:move_zone": "Перемещение по зонам",
+    "documents:read": "Документы чтение",
+    "documents:edit_status": "Статус документа (отмена)",
+    "orders:read": "Заказы чтение",
+    "orders:write": "Заказы запись",
+    "picking:read": "Сбор чтение",
+    "picking:write": "Сбор запись",
+    "locations:read": "Ячейки чтение",
+    "movements:read": "Движения чтение",
+    "audit:read": "Аудит",
+    "reports:read": "Отчёты"
   }
 }

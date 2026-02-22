@@ -46,5 +46,25 @@
     "not_found": "User topilmadi.",
     "disable_confirm": "Foydalanuvchini o‘chirib qo‘ymoqchimisiz?",
     "self_lockout": "Bu amal sizni admin huquqidan mahrum qilishi yoki hisobingizni bloklashi mumkin. Davom etasizmi?"
+  },
+  "granted_permissions_title": "Qo'shimcha ruxsatlar",
+  "granted_permissions_hint": "Roldan tashqari ushbu foydalanuvchiga beriladigan ruxsatlar (ixtiyoriy).",
+  "permissions": {
+    "receiving:read": "Kirim ko'rish",
+    "receiving:write": "Kirim yozish",
+    "inventory:read": "Inventar ko'rish",
+    "inventory:adjust": "Inventar tuzatish",
+    "inventory:count": "Inventar sanash",
+    "inventory:move_zone": "Zonaga ko'chirish",
+    "documents:read": "Hujjatlar ko'rish",
+    "documents:edit_status": "Hujjat statusi (bekor qilish)",
+    "orders:read": "Buyurtmalar ko'rish",
+    "orders:write": "Buyurtma yozish",
+    "picking:read": "Terish ko'rish",
+    "picking:write": "Terish yozish",
+    "locations:read": "Joylar ko'rish",
+    "movements:read": "Harakatlar ko'rish",
+    "audit:read": "Audit log",
+    "reports:read": "Hisobotlar"
   }
 }
