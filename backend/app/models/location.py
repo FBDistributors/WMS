@@ -93,7 +93,12 @@ class Location(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    parent = relationship("Location", remote_side="Location.id", backref="children")
+    parent = relationship(
+        "Location",
+        foreign_keys=[parent_id],
+        remote_side="Location.id",
+        backref="children",
+    )
 
     __table_args__ = (
         CheckConstraint(
