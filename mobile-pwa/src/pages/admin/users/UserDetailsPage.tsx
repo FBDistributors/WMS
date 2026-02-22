@@ -2,9 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
+import { Info } from 'lucide-react'
+
 import { AdminLayout } from '../../../admin/components/AdminLayout'
 import { Button } from '../../../components/ui/button'
 import { Card } from '../../../components/ui/card'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../../components/ui/tooltip'
 import { useAuth } from '../../../rbac/AuthProvider'
 import { getUser, resetPassword, updateUser } from '../../../services/usersApi'
 import type { UserRecord, UserRole } from '../../../types/users'
@@ -200,27 +203,49 @@ export function UserDetailsPage() {
             </div>
             <p className="mt-1 text-xs text-slate-500">{t('users:granted_permissions_hint')}</p>
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {GRANTABLE_PERMISSIONS.map((perm) => (
-                <label
-                  key={perm}
-                  className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm hover:bg-slate-100"
-                >
-                  <input
-                    type="checkbox"
-                    checked={grantedPermissions.includes(perm)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setGrantedPermissions((prev) => [...prev, perm])
-                      } else {
-                        setGrantedPermissions((prev) => prev.filter((p) => p !== perm))
-                      }
-                    }}
-                  />
-                  <span className="text-slate-700">
-                    {t(`users:permissions.${perm}` as any) || perm}
-                  </span>
-                </label>
-              ))}
+              <TooltipProvider delayDuration={200}>
+                {GRANTABLE_PERMISSIONS.map((perm) => {
+                  const permKey = perm.replace(/:/g, '_')
+                  const label = t(`users:permissions.${permKey}`)
+                  const info = t(`users:permission_info.${permKey}`)
+                  return (
+                    <label
+                      key={perm}
+                      className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm hover:bg-slate-100"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={grantedPermissions.includes(perm)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setGrantedPermissions((prev) => [...prev, perm])
+                          } else {
+                            setGrantedPermissions((prev) => prev.filter((p) => p !== perm))
+                          }
+                        }}
+                      />
+                      <span className="min-w-0 flex-1 text-slate-700">{label || perm}</span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span
+                            className="shrink-0 text-slate-400 hover:text-slate-600"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                            }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                          >
+                            <Info size={16} aria-hidden />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="left" className="max-w-xs text-left text-xs font-normal">
+                          {info}
+                        </TooltipContent>
+                      </Tooltip>
+                    </label>
+                  )
+                })}
+              </TooltipProvider>
             </div>
           </div>
 
