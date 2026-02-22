@@ -157,7 +157,9 @@ def _fefo_available_lots(db: Session, product_id: UUID):
         .join(LocationModel, LocationModel.id == StockMovementModel.location_id)
         .filter(
             StockLotModel.product_id == product_id,
-            StockMovementModel.movement_type.notin_(("allocate", "unallocate")),
+            LocationModel.zone_type == "NORMAL",
+            LocationModel.is_active.is_(True),
+            (StockLotModel.expiry_date.is_(None) | (StockLotModel.expiry_date >= date.today())),
         )
         .group_by(
             StockMovementModel.lot_id,

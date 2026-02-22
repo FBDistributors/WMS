@@ -17,6 +17,7 @@ from app.auth.deps import get_current_user, require_permission
 from app.db import get_db
 from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
+from app.models.location import Location as LocationModel
 from app.models.order import Order as OrderModel
 from app.models.picking import PickRequest
 from app.models.stock import StockMovement as StockMovementModel
@@ -434,6 +435,12 @@ def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
         raise HTTPException(
             status_code=409,
             detail="Pick line missing allocation details (product/lot/location). Allocate the order first.",
+        )
+    loc = db.query(LocationModel).filter(LocationModel.id == line.location_id).one_or_none()
+    if not loc or loc.zone_type != "NORMAL":
+        raise HTTPException(
+            status_code=400,
+            detail="Pick only from NORMAL zone. Line location is not NORMAL.",
         )
 
     line.picked_qty = next_qty

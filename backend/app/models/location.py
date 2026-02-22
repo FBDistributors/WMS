@@ -4,11 +4,13 @@ import re
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
+
+ZONE_TYPES = ("NORMAL", "EXPIRED", "DAMAGED", "QUARANTINE")
 
 # Rack: S-{sector}-{level}-{row} e.g. S-15-01-02
 # Floor: P-{sector}-{palletNo} e.g. P-AS-02
@@ -81,6 +83,12 @@ class Location(Base):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     pick_sequence: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    zone_type: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="NORMAL", server_default="NORMAL"
+    )
+    warehouse_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("locations.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -88,9 +96,15 @@ class Location(Base):
     parent = relationship("Location", remote_side="Location.id", backref="children")
 
     __table_args__ = (
+        CheckConstraint(
+            f"zone_type IN {ZONE_TYPES}",
+            name="ck_locations_zone_type",
+        ),
         Index("ix_locations_parent_id", "parent_id"),
         Index("ix_locations_type", "type"),
         Index("ix_locations_is_active", "is_active"),
         Index("ix_locations_sector", "sector"),
         Index("ix_locations_location_type", "location_type"),
+        Index("ix_locations_zone_type", "zone_type"),
+        Index("ix_locations_warehouse_id", "warehouse_id"),
     )

@@ -27,18 +27,8 @@ from app.models.user import User as UserModel
 
 router = APIRouter()
 
-MOVEMENT_TYPES = {
-    "opening_balance",
-    "receipt",
-    "putaway",
-    "allocate",
-    "unallocate",
-    "pick",
-    "ship",
-    "adjust",
-    "transfer_in",
-    "transfer_out",
-}
+# On-hand only (zone implementation / Variant A); allocate/unallocate not in ledger
+MOVEMENT_TYPES = set(ON_HAND_MOVEMENT_TYPES)
 
 
 class StockLotOut(BaseModel):

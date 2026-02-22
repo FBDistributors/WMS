@@ -2,7 +2,7 @@
 
 ## Umumiy ma'lumot
 
-**WMS (Warehouse Management System)** — ombor boshqaruv tizimi. Backend (FastAPI + PostgreSQL) va frontend (React PWA + Android) dan iborat, receiving, picking, inventory, FEFO, offline rejim va audit qo'llab-quvvatlanadi.
+**WMS (Warehouse Management System)** — ombor boshqaruv tizimi. Backend (FastAPI + PostgreSQL), veb-admin (React PWA) va **ikkita mobil ilova** — **React Native (Android)** va **PWA/Capacitor (Android)** dan iborat; receiving, picking, inventory, FEFO, offline rejim, push va audit qo'llab-quvvatlanadi.
 
 ---
 
@@ -11,10 +11,11 @@
 | Qatlam   | Texnologiya |
 |----------|-------------|
 | **Backend**  | FastAPI, SQLAlchemy, Alembic, PostgreSQL (psycopg2), Pydantic, JWT (python-jose), Passlib |
-| **Frontend** | React 19, TypeScript, Vite 7, TailwindCSS, React Router 7 |
+| **Frontend (veb)** | React 19, TypeScript, Vite 7, TailwindCSS, React Router 7 |
 | **Tillar**   | i18next (o'zbek, rus, ingliz) |
-| **Mobil**    | PWA (Vite PWA), Capacitor 8 (Android) |
-| **Skaner**   | ML Kit, ZXing, html5-qrcode, JsBarcode, QRCode |
+| **Mobil (native)** | React Native 0.76, TypeScript, Vision Camera (barcode), React Navigation, AsyncStorage, SQLite, FCM (push) |
+| **Mobil (PWA)**    | Vite PWA, Capacitor 8 (Android), ML Kit, ZXing |
+| **Skaner**   | Native: react-native-vision-camera; PWA: ML Kit, ZXing, html5-qrcode, JsBarcode, QRCode |
 | **Integratsiya** | SmartUP (mahsulotlar/inventory sync) |
 
 ---
@@ -36,7 +37,18 @@ WMS/
 │   ├── alembic/       # Migratsiyalar
 │   ├── scripts/       # seed, import va boshqa skriptlar
 │   └── tests/
-├── mobile-pwa/        # React PWA + Android
+├── mobile/            # React Native Android (native ilova)
+│   ├── App.tsx        # Kirish: Login, Home, PickerHome, PickTask*, Scanner, Hisob, Inventory, Queue, Returns, Kirim
+│   ├── src/
+│   │   ├── config/    # API URL (env.ts)
+│   │   ├── api/       # API client (auth, picking, inventory, kirim va h.k.)
+│   │   ├── i18n/      # Til (LocaleContext)
+│   │   ├── network/   # Offline: NetworkProvider
+│   │   ├── notifications/  # FCM, push ochilganda buyurtmaga yo'naltirish
+│   │   ├── screens/   # Login, Home, PickerHome, PickTaskList, PickTaskDetails, Scanner, Hisob, Inventory, Queue, Returns, Kirim
+│   │   └── types/     # navigation va boshqa
+│   └── android/       # Native Android (Gradle, Vision Camera, FCM)
+├── mobile-pwa/        # React PWA + Capacitor (Android)
 │   └── src/
 │       ├── admin/     # Admin panel
 │       ├── picking/   # Picking (skaner, FEFO)
@@ -92,6 +104,30 @@ WMS/
 
 ---
 
+## Mobile (React Native) — native Android ilova
+
+**mobile/** — wms-api ga ulangan React Native (TypeScript) ilova, Android-first. Asosiy stack: Login → Home / PickerHome → PickTaskList → PickTaskDetails, Scanner, Hisob, Inventory, Queue, Returns, Kirim/KirimForm.
+
+| Ekran / funksiya | Vazifasi |
+|------------------|----------|
+| **Login** | Kirish, JWT, sessiya |
+| **Home** | Asosiy menyu (rol bo‘yicha) |
+| **PickerHome** | Terishchi uy sahifasi |
+| **PickTaskList / PickTaskDetails** | Terish vazifalari ro‘yxati va batafsil |
+| **Scanner** | Shtrixkod/QR — react-native-vision-camera (EAN-13, EAN-8, Code 128, QR) |
+| **Hisob** | Profil / sozlamalar |
+| **Inventory / InventoryDetail** | Ombor qoldiqlari |
+| **QueueScreen** | Offline navbat (keyin sync) |
+| **Returns** | Qaytarishlar (redirect) |
+| **Kirim / KirimForm** | Kirim (qabul) hujjatlari |
+
+- **Offline MVP:** cache + queue + sync (NetworkProvider, SQLite/AsyncStorage).
+- **Push (FCM):** bildirishnoma bosilganda `PickTaskDetails` ga taskId bilan ochiladi (PUSH_SETUP.md).
+- **Tillar:** LocaleProvider (i18n).
+- **API:** `src/config/env.ts` da base URL (emulyator: `10.0.2.2:8000`, ishlab chiqish/prod sozlanadi).
+
+---
+
 ## Frontend: rollar va sahifalar
 
 - **Picker (terishchi):** `/picker`, `/picking/mobile-pwa`, `/picker/inventory`, profil, sozlamalar.
@@ -108,9 +144,10 @@ RBAC orqali har bir rol uchun alohida route va ruxsatlar (`getHomeRouteForRole`,
 2. **FEFO** — `expiry_date` bo'yicha "avval muddati tugaydigan birinchi" terish, index va allocation mantiqi qo'shilgan.
 3. **Muddati** — receiving'da o'tgan sana rad etiladi, lot'larda `expiry_date` va `batch` qo'llab-quvvatlanadi.
 4. **Sessiya** — bitta profil uchun bitta qurilma: yangi kirish eski token'ni bekor qiladi, `active_session_token` va device ma'lumotlari saqlanadi.
-5. **Offline** — PWA'da offline navbat (queue) va keyin sync.
-6. **Skaner** — PWA/Capacitor orqali штрихкод/QR skanerlash.
-7. **SmartUP** — mahsulotlar va inventory sync.
+5. **Offline** — PWA'da va **React Native** da offline navbat (queue) + cache, keyin sync.
+6. **Skaner** — **Native:** Vision Camera (EAN, Code 128, QR); **PWA/Capacitor:** ML Kit, ZXing orqali shtrixkod/QR.
+7. **Push (native)** — FCM: bildirishnoma bosilganda terish vazifasiga (PickTaskDetails) ochiladi.
+8. **SmartUP** — mahsulotlar va inventory sync.
 
 ---
 
@@ -119,9 +156,10 @@ RBAC orqali har bir rol uchun alohida route va ruxsatlar (`getHomeRouteForRole`,
 - **AUDIT_REPORT.md** — tizim audit'i: 7 ta muhim risk (qty constraint'lar, index'lar, view mantiqi va h.k.), taxminiy ishonchlilik ~65%.
 - **EXPIRY_SUMMARY.md** — muddati va FEFO implementatsiyasi (DB, receiving, orders).
 - **SESSION_MANAGEMENT.md** — bitta qurilma sessiya sxemasi va backend o'zgarishlari.
+- **mobile/README.md**, **PUSH_SETUP.md**, **OFFLINE_MVP.md**, **BOSHDAN_ISHGA_TUSHIRISH.md** — React Native ilova yo'riqnomalari.
 
 ---
 
 ## Xulosa
 
-Loyiha to'liq stack WMS: backend (FastAPI + PostgreSQL), React PWA, Android (Capacitor), FEFO, sessiya boshqaruvi, offline va audit hujjatlashtirilgan. Keyingi qadam — AUDIT_REPORT.md dagi kritik masalalar (constraint'lar, index'lar, view) ni bartaraf etish va production uchun tayyorgarlikni oshirish.
+Loyiha to'liq stack WMS: backend (FastAPI + PostgreSQL), veb-admin (React PWA), **React Native Android** (terish, skaner, offline, FCM push) va PWA/Capacitor (admin + skaner). FEFO, sessiya boshqaruvi, offline va audit hujjatlashtirilgan. Keyingi qadam — AUDIT_REPORT.md dagi kritik masalalar (constraint'lar, index'lar, view) ni bartaraf etish va production uchun tayyorgarlikni oshirish.

@@ -4,14 +4,23 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, DateTime, ForeignKey, Index, Numeric, String, func
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index, Numeric, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
 
-# Qoldiq (on_hand): faqat Kirim (receipt) va Yig'uvchi yig'di (pick) — kirim va chiqim
-ON_HAND_MOVEMENT_TYPES = ("receipt", "pick")
+# On-hand movement types only (no allocate/unallocate). Used for ledger and CHECK.
+ON_HAND_MOVEMENT_TYPES = (
+    "opening_balance",
+    "receipt",
+    "putaway",
+    "pick",
+    "ship",
+    "adjust",
+    "transfer_in",
+    "transfer_out",
+)
 
 
 class StockLot(Base):
@@ -67,12 +76,17 @@ class StockMovement(Base):
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+    reason_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     product = relationship("Product", lazy="joined")
     lot = relationship("StockLot", lazy="joined")
     location = relationship("Location", lazy="joined")
 
     __table_args__ = (
+        CheckConstraint(
+            f"movement_type IN {ON_HAND_MOVEMENT_TYPES}",
+            name="ck_stock_movements_type",
+        ),
         Index("ix_stock_movements_product_id", "product_id"),
         Index("ix_stock_movements_lot_id", "lot_id"),
         Index("ix_stock_movements_location_id", "location_id"),
@@ -80,4 +94,5 @@ class StockMovement(Base):
         Index("ix_stock_movements_created_at", "created_at"),
         Index("ix_stock_movements_source_doc", "source_document_type", "source_document_id"),
         Index("ix_stock_movements_product_lot_location", "product_id", "lot_id", "location_id"),
+        Index("ix_stock_movements_reason_code", "reason_code"),
     )
