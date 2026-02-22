@@ -206,7 +206,7 @@ export function ReceivingPage() {
             {t('receiving:create_subtitle')}
           </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={() => setCreateModalOpen(false)} aria-label={t('common:buttons.close')}>
+        <Button variant="ghost" className="shrink-0 p-2" onClick={() => setCreateModalOpen(false)} aria-label={t('common:buttons.close')}>
           <X size={20} />
         </Button>
       </div>
