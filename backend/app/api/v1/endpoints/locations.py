@@ -9,7 +9,7 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.auth.deps import require_permission
+from app.auth.deps import require_any_permission, require_permission
 from app.db import get_db
 from app.models.stock import StockMovement as StockMovementModel
 from app.models.stock import ON_HAND_MOVEMENT_TYPES
@@ -95,7 +95,7 @@ def _to_location(location: LocationModel) -> LocationOut:
 async def list_locations(
     include_inactive: bool = Query(False),
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("locations:manage")),
+    _user=Depends(require_any_permission(["locations:read", "locations:manage"])),
 ):
     query = db.query(LocationModel)
     if not include_inactive:
@@ -114,7 +114,7 @@ async def list_locations(
 async def get_location(
     location_id: UUID,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("locations:manage")),
+    _user=Depends(require_any_permission(["locations:read", "locations:manage"])),
 ):
     location = db.query(LocationModel).filter(LocationModel.id == location_id).one_or_none()
     if not location:
@@ -128,7 +128,7 @@ async def create_location(
     request: Request,
     payload: LocationCreate,
     db: Session = Depends(get_db),
-    user=Depends(require_permission("locations:manage")),
+    user=Depends(require_any_permission(["locations:write", "locations:manage"])),
 ):
     if payload.location_type not in LOCATION_TYPE_ENUM:
         raise HTTPException(status_code=400, detail="location_type must be RACK or FLOOR")
@@ -181,7 +181,7 @@ async def update_location(
     location_id: UUID,
     payload: LocationUpdate,
     db: Session = Depends(get_db),
-    user=Depends(require_permission("locations:manage")),
+    user=Depends(require_any_permission(["locations:write", "locations:manage"])),
 ):
     location = db.query(LocationModel).filter(LocationModel.id == location_id).one_or_none()
     if not location:
@@ -240,7 +240,7 @@ async def deactivate_location(
     request: Request,
     location_id: UUID,
     db: Session = Depends(get_db),
-    user=Depends(require_permission("locations:manage")),
+    user=Depends(require_any_permission(["locations:write", "locations:manage"])),
 ):
     location = db.query(LocationModel).filter(LocationModel.id == location_id).one_or_none()
     if not location:

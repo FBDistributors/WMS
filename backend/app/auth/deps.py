@@ -84,3 +84,17 @@ def require_any_permission(permissions: list[str]) -> Callable[[User], User]:
 
 def require_admin_access() -> Callable[[User], User]:
     return require_permission("admin:access")
+
+
+def require_role(allowed_roles: list[str]) -> Callable[[User], User]:
+    """Fast path: allow only these roles (e.g. block picker from admin routes)."""
+
+    def _guard(user: User = Depends(get_current_user)) -> User:
+        if user.role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient role",
+            )
+        return user
+
+    return _guard

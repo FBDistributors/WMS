@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
-from app.auth.deps import require_permission
+from app.auth.deps import require_any_permission, require_permission
 from app.db import get_db
 from app.models.document import Document as DocumentModel
 from app.models.order import Order as OrderModel
@@ -59,7 +59,7 @@ def _today_utc() -> date:
 @router.get("/summary", response_model=DashboardSummaryResponse, summary="Dashboard summary")
 async def get_dashboard_summary(
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("admin:access")),
+    _user=Depends(require_any_permission(["reports:read", "audit:read", "admin:access"])),
 ):
     today = _today_utc()
 
@@ -154,7 +154,7 @@ ORDER_STATUSES_FOR_COUNTS = (
 )
 async def get_orders_by_status(
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("admin:access")),
+    _user=Depends(require_any_permission(["reports:read", "audit:read", "admin:access"])),
 ):
     def _order_base(q):
         return q.filter(OrderModel.filial_id == DEFAULT_FILIAL_ID) if DEFAULT_FILIAL_ID else q
@@ -184,7 +184,7 @@ async def get_pick_documents(
     offset: int = Query(0, ge=0),
     status: Optional[str] = Query(None, description="Filter by status: new, partial, in_progress, picked, completed"),
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("admin:access")),
+    _user=Depends(require_any_permission(["reports:read", "audit:read", "admin:access"])),
 ):
     query = (
         db.query(DocumentModel)

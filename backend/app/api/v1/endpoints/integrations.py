@@ -33,7 +33,7 @@ class SmartupImportResponse(BaseModel):
 async def import_smartup_orders(
     payload: SmartupImportRequest,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("admin:access")),
+    _user=Depends(require_permission("integrations:write")),
 ):
     if payload.begin_deal_date > payload.end_deal_date:
         raise HTTPException(status_code=400, detail="begin_deal_date must be <= end_deal_date")

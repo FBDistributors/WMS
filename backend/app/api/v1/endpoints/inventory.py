@@ -11,6 +11,7 @@ from sqlalchemy import case, distinct, exists, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth.deps import get_current_user, require_permission
+from app.auth.guards import check_controller_adjust_reason
 from app.services.audit_service import ACTION_CREATE, get_client_ip, log_action
 
 from app.api.v1.endpoints import picker_inventory
@@ -68,6 +69,7 @@ class StockMovementCreate(BaseModel):
     movement_type: str = Field(..., min_length=1, max_length=32)
     source_document_type: Optional[str] = Field(default=None, max_length=32)
     source_document_id: Optional[UUID] = None
+    reason_code: Optional[str] = Field(default=None, max_length=64)
 
 
 class StockBalanceOut(BaseModel):
@@ -391,6 +393,9 @@ async def create_stock_movement(
     if not location:
         raise HTTPException(status_code=400, detail="Location not found")
 
+    if payload.movement_type == "adjust":
+        check_controller_adjust_reason(user, payload.reason_code)
+
     movement = StockMovementModel(
         product_id=payload.product_id,
         lot_id=payload.lot_id,
@@ -400,6 +405,7 @@ async def create_stock_movement(
         source_document_type=payload.source_document_type,
         source_document_id=payload.source_document_id,
         created_by_user_id=user.id,
+        reason_code=payload.reason_code,
     )
     db.add(movement)
     log_action(
@@ -1125,7 +1131,7 @@ class FixDuplicatePickResponse(BaseModel):
 async def fix_duplicate_pick(
     body: FixDuplicatePickRequest,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("inventory:adjust")),
+    _user=Depends(require_permission("maintenance:write")),
 ):
     """
     Bir xil hujjat/mahsulot/lot/joy uchun ortiqcha yozilgan pick+unallocate juftini o'chiradi.

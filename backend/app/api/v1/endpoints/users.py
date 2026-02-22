@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from app.auth.deps import require_permission
+from app.auth.deps import require_any_permission, require_permission
 from app.auth.permissions import ROLE_PERMISSIONS
 from app.services.audit_service import (
     ACTION_CREATE,
@@ -92,7 +92,7 @@ async def list_users(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("users:manage")),
+    _user=Depends(require_any_permission(["users:read", "users:manage"])),
 ):
     query = db.query(User)
     if q:
@@ -114,7 +114,7 @@ async def list_users(
 async def get_user(
     user_id: UUID,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("users:manage")),
+    _user=Depends(require_any_permission(["users:read", "users:manage"])),
 ):
     user = db.query(User).filter(User.id == user_id).one_or_none()
     if not user:
