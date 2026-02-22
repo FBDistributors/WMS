@@ -16,6 +16,7 @@ export type Receipt = {
   doc_no: string
   status: ReceiptStatus
   created_by?: string | null
+  created_by_username?: string | null
   created_at: string
   updated_at: string
   lines: ReceiptLine[]

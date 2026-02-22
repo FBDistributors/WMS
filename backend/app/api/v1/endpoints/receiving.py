@@ -59,17 +59,19 @@ class ReceiptOut(BaseModel):
     doc_no: str
     status: str
     created_by: Optional[UUID] = None
+    created_by_username: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     lines: List[ReceiptLineOut]
 
 
-def _to_receipt(receipt: ReceiptModel) -> ReceiptOut:
+def _to_receipt(receipt: ReceiptModel, created_by_username: Optional[str] = None) -> ReceiptOut:
     return ReceiptOut(
         id=receipt.id,
         doc_no=receipt.doc_no,
         status=receipt.status,
         created_by=receipt.created_by,
+        created_by_username=created_by_username,
         created_at=receipt.created_at,
         updated_at=receipt.updated_at,
         lines=[
@@ -109,7 +111,18 @@ async def list_receipts(
             raise HTTPException(status_code=400, detail="Invalid receipt status")
         query = query.filter(ReceiptModel.status.in_(tokens))
     receipts = query.order_by(ReceiptModel.created_at.desc()).offset(offset).limit(limit).all()
-    return [_to_receipt(receipt) for receipt in receipts]
+    creator_ids = {r.created_by for r in receipts if r.created_by}
+    creator_map: dict[UUID, str] = {}
+    if creator_ids:
+        users = db.query(UserModel.id, UserModel.full_name, UserModel.username).filter(
+            UserModel.id.in_(creator_ids)
+        ).all()
+        for u in users:
+            creator_map[u.id] = (u.full_name or u.username) if u else ""
+    return [
+        _to_receipt(receipt, created_by_username=creator_map.get(receipt.created_by))
+        for receipt in receipts
+    ]
 
 
 @router.get("/receipts/{receipt_id}", response_model=ReceiptOut, summary="Get receipt")
@@ -126,7 +139,12 @@ async def get_receipt(
     )
     if not receipt:
         raise HTTPException(status_code=404, detail="Receipt not found")
-    return _to_receipt(receipt)
+    created_by_username = None
+    if receipt.created_by:
+        creator = db.query(UserModel).filter(UserModel.id == receipt.created_by).one_or_none()
+        if creator:
+            created_by_username = creator.full_name or creator.username
+    return _to_receipt(receipt, created_by_username=created_by_username)
 
 
 @router.post("/receipts", response_model=ReceiptOut, status_code=status.HTTP_201_CREATED)
@@ -153,7 +171,12 @@ async def create_receipt(
 
     existing = db.query(ReceiptModel).filter(ReceiptModel.doc_no == doc_no).one_or_none()
     if existing:
-        return _to_receipt(existing)
+        uname = None
+        if existing.created_by:
+            c = db.query(UserModel).filter(UserModel.id == existing.created_by).one_or_none()
+            if c:
+                uname = c.full_name or c.username
+        return _to_receipt(existing, created_by_username=uname)
 
     receipt = ReceiptModel(doc_no=doc_no, status="draft", created_by=user.id)
     receipt.lines = []
@@ -182,7 +205,8 @@ async def create_receipt(
     db.add(receipt)
     db.commit()
     db.refresh(receipt)
-    return _to_receipt(receipt)
+    creator_name = user.full_name or user.username
+    return _to_receipt(receipt, created_by_username=creator_name)
 
 
 @router.post(
@@ -257,4 +281,9 @@ async def complete_receipt(
     receipt.status = "completed"
     db.commit()
     db.refresh(receipt)
-    return _to_receipt(receipt)
+    created_by_username = None
+    if receipt.created_by:
+        creator = db.query(UserModel).filter(UserModel.id == receipt.created_by).one_or_none()
+        if creator:
+            created_by_username = creator.full_name or creator.username
+    return _to_receipt(receipt, created_by_username=created_by_username)

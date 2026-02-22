@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -31,9 +30,24 @@ const EMPTY_LINE: LineDraft = {
   location_id: '',
 }
 
+function formatReceiptDate(iso: string): string {
+  try {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return iso
+    return d.toLocaleString(undefined, {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  } catch {
+    return iso
+  }
+}
+
 export function ReceivingPage() {
   const { t } = useTranslation(['receiving', 'common'])
-  const navigate = useNavigate()
   const { has } = useAuth()
   const canWrite = has('receiving:write')
 
@@ -41,6 +55,7 @@ export function ReceivingPage() {
   const [selectedProducts, setSelectedProducts] = useState<Map<string, Product>>(new Map())
   const [locations, setLocations] = useState<Location[]>([])
   const [receipts, setReceipts] = useState<Receipt[]>([])
+  const [createModalOpen, setCreateModalOpen] = useState(false)
   const [docNo, setDocNo] = useState('')
   const [lines, setLines] = useState<LineDraft[]>([{ ...EMPTY_LINE }])
   const [isLoading, setIsLoading] = useState(true)
@@ -109,6 +124,14 @@ export function ReceivingPage() {
     setLines((prev) => prev.map((line) => (line.id === id ? { ...line, ...patch } : line)))
   }
 
+  const openCreateModal = () => {
+    setError(null)
+    setDocNo('')
+    setLines([{ ...EMPTY_LINE }])
+    setSelectedProducts(new Map())
+    setCreateModalOpen(true)
+  }
+
   const handleSubmit = async () => {
     if (!canWrite) return
     if (!lines.length) {
@@ -140,6 +163,7 @@ export function ReceivingPage() {
         })),
       })
       await completeReceipt(created.id)
+      setCreateModalOpen(false)
       setDocNo('')
       setLines([{ ...EMPTY_LINE }])
       setSelectedProducts(new Map())
@@ -171,159 +195,179 @@ export function ReceivingPage() {
     }
   }
 
-  return (
-    <AdminLayout title={t('receiving:title')}>
-      <Card className="space-y-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <Button
-            variant="ghost"
-            className="-ml-2 shrink-0 gap-2"
-            onClick={() => navigate(-1)}
-            aria-label={t('common:buttons.back')}
-          >
-            <ArrowLeft size={20} />
-            <span>{t('common:buttons.back')}</span>
-          </Button>
-          <div>
-            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              {t('receiving:create_title')}
-            </div>
-            <div className="text-sm text-slate-500 dark:text-slate-400">
-              {t('receiving:create_subtitle')}
-            </div>
+  const createForm = (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            {t('receiving:create_title')}
+          </div>
+          <div className="text-sm text-slate-500 dark:text-slate-400">
+            {t('receiving:create_subtitle')}
           </div>
         </div>
-        {error ? (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-500/30 dark:bg-red-500/10">
-            {error}
-          </div>
-        ) : null}
-        <label className="text-sm text-slate-600 dark:text-slate-300">
-          {t('receiving:fields.doc_no')}
-          <input
-            className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-            value={docNo}
-            onChange={(event) => setDocNo(event.target.value)}
-            placeholder={t('receiving:fields.doc_no_placeholder')}
-          />
-        </label>
+        <Button variant="ghost" size="icon" onClick={() => setCreateModalOpen(false)} aria-label={t('common:buttons.close')}>
+          <X size={20} />
+        </Button>
+      </div>
+      {error ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-500/30 dark:bg-red-500/10">
+          {error}
+        </div>
+      ) : null}
+      <label className="text-sm text-slate-600 dark:text-slate-300">
+        {t('receiving:fields.doc_no')}
+        <input
+          className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+          value={docNo}
+          onChange={(event) => setDocNo(event.target.value)}
+          placeholder={t('receiving:fields.doc_no_placeholder')}
+        />
+      </label>
 
-        <div className="space-y-3">
-          {lines.map((line, index) => (
-            <div key={line.id} className="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                  {t('receiving:line')} {index + 1}
-                </div>
-                <Button variant="ghost" onClick={() => removeLine(line.id)}>
-                  <Trash2 size={16} />
-                </Button>
+      <div className="space-y-3 max-h-[50vh] overflow-y-auto">
+        {lines.map((line, index) => (
+          <div key={line.id} className="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                {t('receiving:line')} {index + 1}
               </div>
-              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                <label className="text-sm text-slate-600 dark:text-slate-300">
-                  {t('receiving:fields.product')}
-                  <div className="mt-1">
-                    <ProductSearchCombobox
-                      value={line.product_id}
-                      placeholder={t('receiving:fields.select_product')}
-                      displayLabel={
-                        line.product_id
-                          ? (() => {
-                              const p = productLookup.get(line.product_id)
-                              return p ? formatProductLabel(p) : ''
-                            })()
-                          : undefined
-                      }
-                      onSelect={(product) => {
-                        if (product) {
-                          setSelectedProducts((prev) => new Map(prev).set(product.id, product))
-                          updateLine(line.id, { product_id: product.id })
-                        } else {
-                          updateLine(line.id, { product_id: '' })
-                        }
-                      }}
-                      className="w-full"
-                    />
-                  </div>
-                </label>
-                <label className="text-sm text-slate-600 dark:text-slate-300">
-                  {t('receiving:fields.location')}
-                  <LocationSearchCombobox
-                    locations={locations}
-                    value={line.location_id}
+              <Button variant="ghost" onClick={() => removeLine(line.id)}>
+                <Trash2 size={16} />
+              </Button>
+            </div>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <label className="text-sm text-slate-600 dark:text-slate-300">
+                {t('receiving:fields.product')}
+                <div className="mt-1">
+                  <ProductSearchCombobox
+                    value={line.product_id}
+                    placeholder={t('receiving:fields.select_product')}
                     displayLabel={
-                      line.location_id
+                      line.product_id
                         ? (() => {
-                            const loc = locationLookup.get(line.location_id)
-                            return loc ? formatLocationLabel(loc) : ''
+                            const p = productLookup.get(line.product_id)
+                            return p ? formatProductLabel(p) : ''
                           })()
                         : undefined
                     }
-                    onSelect={(loc) =>
-                      updateLine(line.id, { location_id: loc?.id ?? '' })
-                    }
-                    placeholder={t('receiving:fields.select_location')}
-                    className="mt-1 w-full"
-                  />
-                </label>
-                <label className="text-sm text-slate-600 dark:text-slate-300">
-                  {t('receiving:fields.qty')}
-                  <input
-                    type="number"
-                    min={0}
-                    step={1}
-                    inputMode="numeric"
-                    placeholder=""
-                    className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-                    value={line.qty === '' ? '' : line.qty}
-                    onChange={(event) => {
-                      const raw = event.target.value
-                      if (raw === '') {
-                        updateLine(line.id, { qty: '' })
-                        return
-                      }
-                      const num = parseInt(raw, 10)
-                      if (!isNaN(num) && num >= 0) {
-                        updateLine(line.id, { qty: num })
+                    onSelect={(product) => {
+                      if (product) {
+                        setSelectedProducts((prev) => new Map(prev).set(product.id, product))
+                        updateLine(line.id, { product_id: product.id })
+                      } else {
+                        updateLine(line.id, { product_id: '' })
                       }
                     }}
+                    className="w-full"
                   />
-                </label>
-                <label className="text-sm text-slate-600 dark:text-slate-300">
-                  {t('receiving:fields.batch')}
-                  <input
-                    className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-                    value={line.batch}
-                    onChange={(event) => updateLine(line.id, { batch: event.target.value })}
-                  />
-                </label>
-                <label className="text-sm text-slate-600 dark:text-slate-300">
-                  {t('receiving:fields.expiry_date')}
-                  <input
-                    type="date"
-                    className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-                    value={line.expiry_date ?? ''}
-                    onChange={(event) =>
-                      updateLine(line.id, { expiry_date: event.target.value || null })
+                </div>
+              </label>
+              <label className="text-sm text-slate-600 dark:text-slate-300">
+                {t('receiving:fields.location')}
+                <LocationSearchCombobox
+                  locations={locations}
+                  value={line.location_id}
+                  displayLabel={
+                    line.location_id
+                      ? (() => {
+                          const loc = locationLookup.get(line.location_id)
+                          return loc ? formatLocationLabel(loc) : ''
+                        })()
+                      : undefined
+                  }
+                  onSelect={(loc) =>
+                    updateLine(line.id, { location_id: loc?.id ?? '' })
+                  }
+                  placeholder={t('receiving:fields.select_location')}
+                  className="mt-1 w-full"
+                />
+              </label>
+              <label className="text-sm text-slate-600 dark:text-slate-300">
+                {t('receiving:fields.qty')}
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  inputMode="numeric"
+                  placeholder=""
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                  value={line.qty === '' ? '' : line.qty}
+                  onChange={(event) => {
+                    const raw = event.target.value
+                    if (raw === '') {
+                      updateLine(line.id, { qty: '' })
+                      return
                     }
-                  />
-                </label>
-              </div>
+                    const num = parseInt(raw, 10)
+                    if (!isNaN(num) && num >= 0) {
+                      updateLine(line.id, { qty: num })
+                    }
+                  }}
+                />
+              </label>
+              <label className="text-sm text-slate-600 dark:text-slate-300">
+                {t('receiving:fields.batch')}
+                <input
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                  value={line.batch}
+                  onChange={(event) => updateLine(line.id, { batch: event.target.value })}
+                />
+              </label>
+              <label className="text-sm text-slate-600 dark:text-slate-300">
+                {t('receiving:fields.expiry_date')}
+                <input
+                  type="date"
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                  value={line.expiry_date ?? ''}
+                  onChange={(event) =>
+                    updateLine(line.id, { expiry_date: event.target.value || null })
+                  }
+                />
+              </label>
             </div>
-          ))}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="secondary" onClick={addLine}>
-            <Plus size={16} />
-            {t('receiving:add_line')}
-          </Button>
-          <Button onClick={handleSubmit} disabled={!canWrite || isSubmitting}>
-            {isSubmitting ? t('receiving:saving') : t('receiving:create')}
-          </Button>
-        </div>
-      </Card>
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="secondary" onClick={addLine}>
+          <Plus size={16} />
+          {t('receiving:add_line')}
+        </Button>
+        <Button onClick={handleSubmit} disabled={!canWrite || isSubmitting}>
+          {isSubmitting ? t('receiving:saving') : t('receiving:create')}
+        </Button>
+      </div>
+    </div>
+  )
 
-      <Card className="mt-6 space-y-4">
+  return (
+    <AdminLayout
+      title={t('receiving:title')}
+      actionSlot={
+        canWrite ? (
+          <Button onClick={openCreateModal}>
+            <Plus size={18} />
+            {t('receiving:create')}
+          </Button>
+        ) : null
+      }
+    >
+      {createModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
+          <button
+            type="button"
+            className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm"
+            onClick={() => !isSubmitting && setCreateModalOpen(false)}
+            aria-hidden
+          />
+          <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+            {createForm}
+          </div>
+        </div>
+      ) : null}
+
+      <Card className="space-y-4">
         <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
           {t('receiving:list_title')}
         </div>
@@ -343,12 +387,26 @@ export function ReceivingPage() {
                     <div className="font-semibold text-slate-900 dark:text-slate-100">
                       {receipt.doc_no}
                     </div>
-                    <div className="text-xs text-slate-500">
+                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                       {t('receiving:status')}: {t(`receiving:statuses.${receipt.status}`)}
                     </div>
+                    {(receipt.created_by_username || receipt.created_at) && (
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex flex-wrap gap-x-3 gap-y-0">
+                        {receipt.created_by_username && (
+                          <span>
+                            {t('receiving:received_by')}: {receipt.created_by_username}
+                          </span>
+                        )}
+                        {receipt.created_at && (
+                          <span>
+                            {t('receiving:received_at')}: {formatReceiptDate(receipt.created_at)}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
                       {t('receiving:lines_count', { count: receipt.lines.length })}
                     </span>
                     {receipt.status === 'draft' ? (

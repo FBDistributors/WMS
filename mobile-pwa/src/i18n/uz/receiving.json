@@ -15,6 +15,8 @@
   "add_line": "Qator qo'shish",
   "status": "Holat",
   "lines_count": "{{count}} qator",
+  "received_by": "Qabul qiluvchi",
+  "received_at": "Qabul qilindi",
   "statuses": {
     "draft": "Qoralama",
     "completed": "Yakunlangan",

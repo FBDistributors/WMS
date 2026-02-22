@@ -433,13 +433,15 @@ export function KirimFormScreen() {
           </View>
         )}
 
-        {lines.length > 0 && !finished && !isDirectSubmit && (
+        {/* Faqat mijozdan qaytgan (return) da: avval Yakunlash, keyin yig'uvchi tanlash va Yuborish */}
+        {lines.length > 0 && !finished && flow === 'return' && (
           <TouchableOpacity style={styles.primaryBtn} onPress={handleYakunlash}>
             <Text style={styles.primaryBtnText}>{t('returnsFinish')}</Text>
           </TouchableOpacity>
         )}
 
-        {lines.length > 0 && isDirectSubmit && (
+        {/* Yangi mahsulotlar va inventarizatsiya: bitta Yuborish (yakunlash + backend ga yuborish) */}
+        {lines.length > 0 && (flow === 'new' || flow === 'inventory') && (
           <TouchableOpacity
             style={[styles.primaryBtn, styles.primaryBtnSmall]}
             onPress={handleSendToPicker}
