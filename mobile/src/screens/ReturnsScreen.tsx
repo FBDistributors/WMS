@@ -23,6 +23,7 @@ import { useNetwork } from '../network';
 import { getPickerProductDetail, type PickerProductDetailResponse, type PickerProductLocation } from '../api/inventory';
 import { getPickers, type PickerUser } from '../api/picking';
 import { AppHeader } from '../components/AppHeader';
+import { BarcodeSearchInput } from '../components/BarcodeSearchInput';
 
 type Nav = StackNavigationProp<RootStackParamList, 'Returns'>;
 type ReturnsRoute = RouteProp<RootStackParamList, 'Returns'>;
@@ -66,6 +67,7 @@ export function ReturnsScreen() {
   const [pickers, setPickers] = useState<PickerUser[]>([]);
   const [selectedPickerId, setSelectedPickerId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [barcodeSearchValue, setBarcodeSearchValue] = useState('');
 
   const loadProductByScan = useCallback(async (productId: string) => {
     setLoadingProduct(true);
@@ -177,6 +179,18 @@ export function ReturnsScreen() {
           <Icon name="barcode-scan" size={32} color="#fff" />
           <Text style={styles.scanBtnText}>{t('scanButton')}</Text>
         </TouchableOpacity>
+
+        <Text style={styles.manualEntryLabel}>{t('kirimManualEntry')}</Text>
+        <BarcodeSearchInput
+          value={barcodeSearchValue}
+          onChangeText={setBarcodeSearchValue}
+          onSelectProduct={(productId) => loadProductByScan(productId)}
+          placeholder={t('kirimBarcodePlaceholder')}
+          emptyLabel={t('barcodeSearchNoResults')}
+          loading={loadingProduct}
+          error={productError}
+          onClearError={() => setProductError(null)}
+        />
 
         {loadingProduct && (
           <View style={styles.loadingRow}>
@@ -349,6 +363,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   scanBtnText: { color: '#fff', fontSize: 18, fontWeight: '600' },
+  manualEntryLabel: { fontSize: 13, color: '#666', marginTop: 8, marginBottom: 6 },
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   loadingText: { fontSize: 14, color: '#666' },
   errorRow: { marginBottom: 12 },

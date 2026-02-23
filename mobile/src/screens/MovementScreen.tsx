@@ -24,6 +24,7 @@ import { getPickerProductDetail, listPickerLocations } from '../api/inventory';
 import type { PickerProductDetailResponse, PickerProductLocation, PickerLocationOption } from '../api/inventory';
 import { createStockMovement } from '../api/movements';
 import { AppHeader } from '../components/AppHeader';
+import { BarcodeSearchInput } from '../components/BarcodeSearchInput';
 
 type Nav = StackNavigationProp<RootStackParamList, 'Movement'>;
 type MovementRoute = RouteProp<RootStackParamList, 'Movement'>;
@@ -44,6 +45,7 @@ export function MovementScreen() {
   const [qty, setQty] = useState('');
   const [locationSearch, setLocationSearch] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [barcodeSearchValue, setBarcodeSearchValue] = useState('');
 
   const loadProduct = useCallback(async (productId: string) => {
     setLoadingProduct(true);
@@ -163,6 +165,17 @@ export function MovementScreen() {
               <Icon name="barcode-scan" size={32} color="#fff" />
               <Text style={styles.scanBtnText}>{t('movementScan')}</Text>
             </TouchableOpacity>
+            <Text style={styles.manualEntryLabel}>{t('kirimManualEntry')}</Text>
+            <BarcodeSearchInput
+              value={barcodeSearchValue}
+              onChangeText={setBarcodeSearchValue}
+              onSelectProduct={(productId) => loadProduct(productId)}
+              placeholder={t('kirimBarcodePlaceholder')}
+              emptyLabel={t('barcodeSearchNoResults')}
+              loading={loadingProduct}
+              error={productError}
+              onClearError={() => setProductError(null)}
+            />
             {productError ? (
               <Text style={styles.errorText}>{productError}</Text>
             ) : null}
@@ -285,6 +298,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   scanBtnText: { color: '#fff', fontSize: 18, fontWeight: '600' },
+  manualEntryLabel: { fontSize: 13, color: '#666', marginTop: 16, marginBottom: 6 },
   errorText: { color: '#c62828', marginTop: 12, textAlign: 'center' },
   productCard: {
     backgroundColor: '#f0f0f0',

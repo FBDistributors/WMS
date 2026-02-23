@@ -21,10 +21,11 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { RootStackParamList } from '../types/navigation';
 import { useLocale } from '../i18n/LocaleContext';
 import { useNetwork } from '../network';
-import { getPickerProductDetail, getInventoryByBarcode, listPickerLocations, type PickerProductDetailResponse, type PickerProductLocation, type PickerLocationOption } from '../api/inventory';
+import { getPickerProductDetail, listPickerLocations, type PickerProductDetailResponse, type PickerProductLocation, type PickerLocationOption } from '../api/inventory';
 import { getPickers, type PickerUser } from '../api/picking';
 import { createReceipt, completeReceipt } from '../api/receiving';
 import { AppHeader } from '../components/AppHeader';
+import { BarcodeSearchInput } from '../components/BarcodeSearchInput';
 import { ExpiryDatePicker, formatExpiryDisplay } from '../components/ExpiryDatePicker';
 
 type Nav = StackNavigationProp<RootStackParamList, 'KirimForm'>;
@@ -102,27 +103,12 @@ export function KirimFormScreen() {
 
   const loadProductByScan = loadProductById;
 
-  const handleManualFind = useCallback(async () => {
-    const barcode = manualBarcode.trim();
-    if (!barcode) {
-      setProductError(t('kirimBarcodePlaceholder'));
-      return;
-    }
-    setLoadingProduct(true);
-    setProductError(null);
-    setCurrentProduct(null);
-    setCurrentQty('');
-    try {
-      const byBarcode = await getInventoryByBarcode(barcode);
-      const res = await getPickerProductDetail(byBarcode.product_id);
-      setCurrentProduct(res);
-      setManualBarcode('');
-    } catch (e) {
-      setProductError(e instanceof Error ? e.message : t('invLoadError'));
-    } finally {
-      setLoadingProduct(false);
-    }
-  }, [manualBarcode, t]);
+  const handleSelectProductFromBarcode = useCallback(
+    (productId: string) => {
+      loadProductById(productId);
+    },
+    [loadProductById]
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -492,20 +478,16 @@ export function KirimFormScreen() {
         </TouchableOpacity>
         <View style={styles.manualEntryBlock}>
           <Text style={styles.manualEntryLabel}>{t('kirimManualEntry')}</Text>
-          <View style={styles.manualEntryRow}>
-            <TextInput
-              style={styles.manualBarcodeInput}
-              value={manualBarcode}
-              onChangeText={(text) => { setManualBarcode(text); setProductError(null); }}
-              placeholder={t('kirimBarcodePlaceholder')}
-              placeholderTextColor="#999"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <TouchableOpacity style={styles.findProductBtn} onPress={handleManualFind} disabled={loadingProduct}>
-              <Text style={styles.findProductBtnText}>{t('kirimFindProduct')}</Text>
-            </TouchableOpacity>
-          </View>
+          <BarcodeSearchInput
+            value={manualBarcode}
+            onChangeText={setManualBarcode}
+            onSelectProduct={handleSelectProductFromBarcode}
+            placeholder={t('kirimBarcodePlaceholder')}
+            emptyLabel={t('barcodeSearchNoResults')}
+            loading={loadingProduct}
+            error={productError}
+            onClearError={() => setProductError(null)}
+          />
         </View>
       </View>
 
@@ -569,25 +551,6 @@ const styles = StyleSheet.create({
   scanBtnText: { color: '#fff', fontSize: 18, fontWeight: '600' },
   manualEntryBlock: { marginTop: 8 },
   manualEntryLabel: { fontSize: 13, color: '#666', marginBottom: 6 },
-  manualEntryRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  manualBarcodeInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    backgroundColor: '#fff',
-  },
-  findProductBtn: {
-    backgroundColor: '#1a237e',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    justifyContent: 'center',
-  },
-  findProductBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   locationWrap: { marginBottom: 12 },
   locationInputFull: {
     borderWidth: 1,
