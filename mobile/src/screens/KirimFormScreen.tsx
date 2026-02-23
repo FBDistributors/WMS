@@ -85,6 +85,7 @@ export function KirimFormScreen() {
   const [expiryCalendarOpen, setExpiryCalendarOpen] = useState(false);
   const [inventoryLocation, setInventoryLocation] = useState<PickerLocationOption | null>(null);
   const [inventoryLocationSearch, setInventoryLocationSearch] = useState('');
+  const [inventoryStep, setInventoryStep] = useState<1 | 2>(1);
 
   const title = flow === 'new' ? t('kirimNewProducts') : flow === 'inventory' ? t('kirimInventory') : t('kirimCustomerReturns');
 
@@ -285,96 +286,121 @@ export function KirimFormScreen() {
       />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        {/* Shtrix maydoni eng yuqorida — dropdown uchun joy */}
-        <View style={styles.barcodeBlockTop}>
-          <Text style={styles.manualEntryLabel}>{t('kirimManualEntry')}</Text>
-          <BarcodeSearchInput
-            value={manualBarcode}
-            onChangeText={setManualBarcode}
-            onSelectProduct={handleSelectProductFromBarcode}
-            placeholder={t('kirimBarcodePlaceholder')}
-            emptyLabel={t('barcodeSearchNoResults')}
-            loading={loadingProduct}
-            error={productError}
-            onClearError={() => setProductError(null)}
-            dropdownMaxHeight={200}
-          />
-        </View>
-        <TouchableOpacity style={styles.scanBtnTop} onPress={handleScan} activeOpacity={0.8}>
-          <Icon name="barcode-scan" size={28} color="#fff" />
-          <Text style={styles.scanBtnText}>{t('scanButton')}</Text>
-        </TouchableOpacity>
-
-        {flow === 'inventory' && (
-          <View style={styles.inventoryLocationBlock}>
-            <Text style={styles.inventoryLocationLabel}>{t('inventorySelectLocationFirst')}</Text>
-            <View style={styles.locationWrap}>
-              <TextInput
-                style={styles.locationInputFull}
-                value={inventoryLocation ? inventoryLocation.code : inventoryLocationSearch}
-                onChangeText={(text) => {
-                  setInventoryLocationSearch(text);
-                  setInventoryLocation(null);
-                }}
-                placeholder={t('kirimLocationSearchPlaceholder')}
-                placeholderTextColor="#999"
-                autoCapitalize="characters"
-                autoCorrect={false}
-              />
-              {showInventoryLocationDropdown && (
-                <View style={styles.locationDropdownInline}>
-                  <ScrollView
-                    style={styles.locationDropdownScroll}
-                    contentContainerStyle={styles.locationDropdownScrollContent}
-                    keyboardShouldPersistTaps="handled"
-                    nestedScrollEnabled
-                    showsVerticalScrollIndicator
-                  >
-                    {filteredInventoryLocations.length === 0 ? (
-                      <View style={styles.locationDropdownEmpty}>
-                        <Text style={styles.locationDropdownEmptyText}>{t('kirimLocationNoResults')}</Text>
-                      </View>
-                    ) : (
-                      filteredInventoryLocations.map((loc) => (
-                        <TouchableOpacity
-                          key={loc.id}
-                          style={[
-                            styles.locationDropdownItem,
-                            inventoryLocation?.id === loc.id && styles.locationDropdownItemSelected,
-                          ]}
-                          onPress={() => {
-                            setInventoryLocation(loc);
-                            setInventoryLocationSearch(loc.code);
-                          }}
-                        >
-                          <Text style={styles.locationDropdownItemCode} numberOfLines={1}>{loc.code}</Text>
-                          {loc.name && loc.name !== loc.code ? (
-                            <Text style={styles.locationDropdownItemName} numberOfLines={1}>{loc.name}</Text>
-                          ) : null}
-                        </TouchableOpacity>
-                      ))
-                    )}
-                  </ScrollView>
-                </View>
-              )}
+        {/* Inventarizatsiya: 1-qadam — faqat lokatsiya tanlash */}
+        {flow === 'inventory' && inventoryStep === 1 && (
+          <>
+            <View style={styles.inventoryLocationBlock}>
+              <Text style={styles.inventoryLocationLabel}>{t('inventorySelectLocationFirst')}</Text>
+              <View style={styles.locationWrap}>
+                <TextInput
+                  style={styles.locationInputFull}
+                  value={inventoryLocation ? inventoryLocation.code : inventoryLocationSearch}
+                  onChangeText={(text) => {
+                    setInventoryLocationSearch(text);
+                    setInventoryLocation(null);
+                  }}
+                  placeholder={t('kirimLocationSearchPlaceholder')}
+                  placeholderTextColor="#999"
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                />
+                {showInventoryLocationDropdown && (
+                  <View style={styles.locationDropdownInline}>
+                    <ScrollView
+                      style={styles.locationDropdownScroll}
+                      contentContainerStyle={styles.locationDropdownScrollContent}
+                      keyboardShouldPersistTaps="handled"
+                      nestedScrollEnabled
+                      showsVerticalScrollIndicator
+                    >
+                      {filteredInventoryLocations.length === 0 ? (
+                        <View style={styles.locationDropdownEmpty}>
+                          <Text style={styles.locationDropdownEmptyText}>{t('kirimLocationNoResults')}</Text>
+                        </View>
+                      ) : (
+                        filteredInventoryLocations.map((loc) => (
+                          <TouchableOpacity
+                            key={loc.id}
+                            style={[
+                              styles.locationDropdownItem,
+                              inventoryLocation?.id === loc.id && styles.locationDropdownItemSelected,
+                            ]}
+                            onPress={() => {
+                              setInventoryLocation(loc);
+                              setInventoryLocationSearch(loc.code);
+                            }}
+                          >
+                            <Text style={styles.locationDropdownItemCode} numberOfLines={1}>{loc.code}</Text>
+                            {loc.name && loc.name !== loc.code ? (
+                              <Text style={styles.locationDropdownItemName} numberOfLines={1}>{loc.name}</Text>
+                            ) : null}
+                          </TouchableOpacity>
+                        ))
+                      )}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
             </View>
-          </View>
+            <TouchableOpacity
+              style={[styles.scanBtnTop, !inventoryLocation && styles.buttonDisabled]}
+              onPress={() => inventoryLocation && setInventoryStep(2)}
+              activeOpacity={0.8}
+              disabled={!inventoryLocation}
+            >
+              <Text style={styles.scanBtnText}>{t('inventoryContinueToScan')}</Text>
+            </TouchableOpacity>
+          </>
         )}
 
-        {loadingProduct && (
+        {/* Inventarizatsiya 2-qadam: tanlangan joy + skaner; boshqa flow: barcode/skaner */}
+        {((flow === 'inventory' && inventoryStep === 2) || flow !== 'inventory') && (
+          <>
+            {flow === 'inventory' && inventoryStep === 2 && inventoryLocation && (
+              <View style={styles.inventoryLocationChosenBar}>
+                <Text style={styles.inventoryLocationChosenText}>
+                  {t('inventorySelectedLocation')}: {inventoryLocation.code}
+                </Text>
+                <TouchableOpacity onPress={() => setInventoryStep(1)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                  <Text style={styles.inventoryLocationChangeLink}>{t('inventoryChangeLocation')}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            <View style={styles.barcodeBlockTop}>
+              <Text style={styles.manualEntryLabel}>{t('kirimManualEntry')}</Text>
+              <BarcodeSearchInput
+                value={manualBarcode}
+                onChangeText={setManualBarcode}
+                onSelectProduct={handleSelectProductFromBarcode}
+                placeholder={t('kirimBarcodePlaceholder')}
+                emptyLabel={t('barcodeSearchNoResults')}
+                loading={loadingProduct}
+                error={productError}
+                onClearError={() => setProductError(null)}
+                dropdownMaxHeight={200}
+              />
+            </View>
+            <TouchableOpacity style={styles.scanBtnTop} onPress={handleScan} activeOpacity={0.8}>
+              <Icon name="barcode-scan" size={28} color="#fff" />
+              <Text style={styles.scanBtnText}>{t('scanButton')}</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {!(flow === 'inventory' && inventoryStep === 1) && loadingProduct && (
           <View style={styles.loadingRow}>
             <ActivityIndicator size="small" color="#1a237e" />
             <Text style={styles.loadingText}>{t('loading')}</Text>
           </View>
         )}
 
-        {productError && (
+        {!(flow === 'inventory' && inventoryStep === 1) && productError && (
           <View style={styles.errorRow}>
             <Text style={styles.errorText}>{productError}</Text>
           </View>
         )}
 
-        {(flow === 'inventory' ? inventoryLocation && currentProduct : currentProduct) && !loadingProduct && (
+        {!(flow === 'inventory' && inventoryStep === 1) && (flow === 'inventory' ? inventoryLocation && currentProduct : currentProduct) && !loadingProduct && (
           <View style={styles.card}>
             <Text style={styles.productName} numberOfLines={2}>{currentProduct.name}</Text>
             <Text style={styles.label}>{t('quantity')}</Text>
@@ -643,6 +669,19 @@ const styles = StyleSheet.create({
   inventoryLocationLabel: { fontSize: 13, color: '#666', marginBottom: 6 },
   inventoryLocationReadOnly: { marginBottom: 12 },
   inventoryLocationCode: { fontSize: 14, fontWeight: '600', color: '#333' },
+  inventoryLocationChosenBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#e3f2fd',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  inventoryLocationChosenText: { fontSize: 14, color: '#1565c0', fontWeight: '600' },
+  inventoryLocationChangeLink: { fontSize: 14, color: '#1976d2', textDecorationLine: 'underline' },
+  buttonDisabled: { opacity: 0.6 },
   locationWrap: { marginBottom: 12 },
   locationInputFull: {
     borderWidth: 1,
