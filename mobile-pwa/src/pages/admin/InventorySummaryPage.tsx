@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Search, PackagePlus, Settings } from 'lucide-react'
+import { Search, PackagePlus, Settings, FileSpreadsheet } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import * as XLSX from 'xlsx'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { InventoryTableSettings } from '../../admin/components/inventory/InventoryTableSettings'
@@ -22,11 +23,11 @@ const COLUMN_OPTIONS = [
   { id: 'brand', labelKey: 'inventory:columns.brand' },
   { id: 'total_qty', labelKey: 'inventory:columns.total_qty' },
   { id: 'available', labelKey: 'inventory:columns.available' },
-  { id: 'location', labelKey: 'inventory:columns.location' },
 ]
 
 const DEBOUNCE_MS = 400
 const PAGE_SIZE = 50
+const EXPORT_LIMIT = 10000
 
 export function InventorySummaryPage() {
   const navigate = useNavigate()
@@ -43,6 +44,7 @@ export function InventorySummaryPage() {
   const [onlyAvailable, setOnlyAvailable] = useState(true)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isExporting, setIsExporting] = useState(false)
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), DEBOUNCE_MS)
@@ -94,6 +96,56 @@ export function InventorySummaryPage() {
   const hasNext = offset + PAGE_SIZE < data.total
   const pageStart = data.total === 0 ? 0 : offset + 1
   const pageEnd = Math.min(offset + PAGE_SIZE, data.total)
+
+  const handleExportExcel = useCallback(async () => {
+    setIsExporting(true)
+    setError(null)
+    try {
+      const res = await getInventorySummaryLight({
+        search: debouncedSearch.trim() || undefined,
+        only_available: onlyAvailable,
+        include_locations: true,
+        limit: EXPORT_LIMIT,
+        offset: 0,
+      })
+      const headers = [
+        t('inventory:columns.code'),
+        t('inventory:columns.barcode'),
+        t('inventory:columns.product'),
+        t('inventory:columns.brand'),
+        t('inventory:columns.total_qty'),
+        t('inventory:columns.available'),
+        t('inventory:columns.location'),
+      ]
+      const rows = res.items.map((row) => {
+        const locs = row.locations ?? []
+        const locationStr =
+          locs.length === 0
+            ? ''
+            : locs
+                .map((loc) => `${loc.location_code}${loc.expiry_date ? ` (${loc.expiry_date})` : ''} – ${Math.round(Number(loc.available_qty))}`)
+                .join('; ')
+        return [
+          row.product_code,
+          row.barcode ?? '',
+          row.product_name,
+          row.brand_name ?? '',
+          Math.round(Number(row.total_qty)),
+          Math.round(Number(row.available_qty)),
+          locationStr,
+        ]
+      })
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, t('inventory:title'))
+      const fileName = `qoldiq_${new Date().toISOString().slice(0, 10)}.xlsx`
+      XLSX.writeFile(wb, fileName)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('inventory:load_failed'))
+    } finally {
+      setIsExporting(false)
+    }
+  }, [debouncedSearch, onlyAvailable, t])
 
   const content = useMemo(() => {
     if (isLoading) {
@@ -241,6 +293,16 @@ export function InventorySummaryPage() {
             aria-label={t('inventory:table.settings_title')}
           >
             <Settings size={18} />
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={handleExportExcel}
+            disabled={isExporting}
+            title={t('inventory:export_excel')}
+            aria-label={t('inventory:export_excel')}
+          >
+            <FileSpreadsheet size={18} />
+            <span className="hidden sm:inline">{t('inventory:export_excel')}</span>
           </Button>
           <Button variant="secondary" onClick={load}>
             {t('common:buttons.refresh')}

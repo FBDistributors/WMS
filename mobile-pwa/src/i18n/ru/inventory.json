@@ -9,6 +9,7 @@
   "empty": "Остатков нет",
   "empty_desc": "Остатки появятся после приёмки.",
   "enter_stock": "Ввести остаток",
+  "export_excel": "Скачать в Excel",
   "empty_details": "Детали не найдены",
   "empty_details_desc": "Измените фильтры, чтобы увидеть детали.",
   "movements_empty": "Движений не найдено",

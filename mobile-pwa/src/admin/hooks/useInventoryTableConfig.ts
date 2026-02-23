@@ -14,7 +14,6 @@ export const INVENTORY_TABLE_COLUMN_IDS = [
   'brand',
   'total_qty',
   'available',
-  'location',
 ]
 
 export const DEFAULT_VISIBLE_COLUMNS = [
@@ -24,7 +23,6 @@ export const DEFAULT_VISIBLE_COLUMNS = [
   'brand',
   'total_qty',
   'available',
-  'location',
 ]
 
 const DEFAULT_CONFIG: InventoryTableConfig = {
