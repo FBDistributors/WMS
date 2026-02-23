@@ -114,26 +114,15 @@ export function InventorySummaryPage() {
         t('inventory:columns.brand'),
         t('inventory:columns.total_qty'),
         t('inventory:columns.available'),
-        t('inventory:columns.location'),
       ]
-      const rows = (res.items ?? []).map((row) => {
-        const locs = row.locations ?? []
-        const locationStr =
-          locs.length === 0
-            ? ''
-            : locs
-                .map((loc) => `${loc.location_code}${loc.expiry_date ? ` (${loc.expiry_date})` : ''} – ${Math.round(Number(loc.available_qty))}`)
-                .join('; ')
-        return [
-          row.product_code,
-          row.barcode ?? '',
-          row.product_name,
-          row.brand_name ?? '',
-          Math.round(Number(row.total_qty)),
-          Math.round(Number(row.available_qty)),
-          locationStr,
-        ]
-      })
+      const rows = (res.items ?? []).map((row) => [
+        row.product_code,
+        row.barcode ?? '',
+        row.product_name,
+        row.brand_name ?? '',
+        Math.round(Number(row.total_qty)),
+        Math.round(Number(row.available_qty)),
+      ])
       const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
       const wb = XLSX.utils.book_new()
       const sheetName = (t('inventory:title') || 'Qoldiq').slice(0, 31)
