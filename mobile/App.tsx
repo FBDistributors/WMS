@@ -25,6 +25,7 @@ import { QueueScreen } from './src/screens/QueueScreen';
 import { ReturnsRedirectScreen } from './src/screens/ReturnsRedirectScreen';
 import { KirimScreen } from './src/screens/KirimScreen';
 import { KirimFormScreen } from './src/screens/KirimFormScreen';
+import { MovementScreen } from './src/screens/MovementScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -65,6 +66,7 @@ export default function App() {
         <Stack.Screen name="Returns" component={ReturnsRedirectScreen} />
         <Stack.Screen name="Kirim" component={KirimScreen} />
         <Stack.Screen name="KirimForm" component={KirimFormScreen} />
+        <Stack.Screen name="Movement" component={MovementScreen} />
       </Stack.Navigator>
     </NavigationContainer>
     </NetworkProvider>

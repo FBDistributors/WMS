@@ -74,6 +74,21 @@ export function KirimScreen() {
           </View>
           <Icon name="chevron-right" size={24} color="#777" />
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.card}
+          onPress={() => navigation.navigate('Movement')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.cardIconWrap}>
+            <Icon name="swap-horizontal" size={CARD_ICON_SIZE} color={HEADER_ACCENT} />
+          </View>
+          <View style={styles.cardBody}>
+            <Text style={styles.cardTitle}>{t('movementTitle')}</Text>
+            <Text style={styles.cardSubtitle}>{t('movementDesc')}</Text>
+          </View>
+          <Icon name="chevron-right" size={24} color="#777" />
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
