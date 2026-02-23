@@ -83,6 +83,8 @@ export function KirimFormScreen() {
   const [selectedPickerId, setSelectedPickerId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [expiryCalendarOpen, setExpiryCalendarOpen] = useState(false);
+  const [inventoryLocation, setInventoryLocation] = useState<PickerLocationOption | null>(null);
+  const [inventoryLocationSearch, setInventoryLocationSearch] = useState('');
 
   const title = flow === 'new' ? t('kirimNewProducts') : flow === 'inventory' ? t('kirimInventory') : t('kirimCustomerReturns');
 
@@ -144,7 +146,8 @@ export function KirimFormScreen() {
   }, [navigation, flow]);
 
   const addLine = useCallback(() => {
-    if (!currentProduct || !selectedLocation) return;
+    const location = flow === 'inventory' ? inventoryLocation : selectedLocation;
+    if (!currentProduct || !location) return;
     const qty = Math.floor(Number(currentQty) || 0);
     // Kirim: dono qo‘shiladi, mavjud zaxoraga bog‘lamaymiz; faqat 1–99999 oralig‘ida
     const maxQty = 99999;
@@ -165,11 +168,11 @@ export function KirimFormScreen() {
     setLines((prev) => [
       ...prev,
       {
-        id: `${currentProduct.product_id}-${selectedLocation.id}-${Date.now()}`,
+        id: `${currentProduct.product_id}-${location.id}-${Date.now()}`,
         productId: currentProduct.product_id,
         productName: currentProduct.name,
-        locationCode: selectedLocation.code,
-        locationId: selectedLocation.id,
+        locationCode: location.code,
+        locationId: location.id,
         lotId: '',
         qty,
         batch,
@@ -180,7 +183,7 @@ export function KirimFormScreen() {
     setCurrentQty('');
     setCurrentBatch('');
     setCurrentExpiry('');
-  }, [currentProduct, selectedLocation, currentQty, currentBatch, currentExpiry, t]);
+  }, [flow, currentProduct, selectedLocation, inventoryLocation, currentQty, currentBatch, currentExpiry, t]);
 
   const removeLine = useCallback((id: string) => {
     setLines((prev) => prev.filter((l) => l.id !== id));
@@ -254,7 +257,23 @@ export function KirimFormScreen() {
   const showLocationDropdown =
     searchTrim.length > 0 &&
     (!selectedLocation || selectedLocation.code !== searchTrim);
-  const canAddLine = currentProduct && selectedLocation && currentQty.trim().length > 0 && currentBatch.trim().length > 0;
+  const inventorySearchTrim = inventoryLocationSearch.trim();
+  const filteredInventoryLocations = inventorySearchTrim
+    ? allLocations.filter(
+        (l) =>
+          (l.code && l.code.toLowerCase().includes(inventorySearchTrim.toLowerCase())) ||
+          (l.name != null && String(l.name).toLowerCase().includes(inventorySearchTrim.toLowerCase()))
+      ).slice(0, 30)
+    : [];
+  const showInventoryLocationDropdown =
+    flow === 'inventory' &&
+    inventorySearchTrim.length > 0 &&
+    (!inventoryLocation || inventoryLocation.code !== inventorySearchTrim);
+  const canAddLine =
+    currentProduct &&
+    (flow === 'inventory' ? inventoryLocation : selectedLocation) &&
+    currentQty.trim().length > 0 &&
+    currentBatch.trim().length > 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -286,6 +305,62 @@ export function KirimFormScreen() {
           <Text style={styles.scanBtnText}>{t('scanButton')}</Text>
         </TouchableOpacity>
 
+        {flow === 'inventory' && (
+          <View style={styles.inventoryLocationBlock}>
+            <Text style={styles.inventoryLocationLabel}>{t('inventorySelectLocationFirst')}</Text>
+            <View style={styles.locationWrap}>
+              <TextInput
+                style={styles.locationInputFull}
+                value={inventoryLocation ? inventoryLocation.code : inventoryLocationSearch}
+                onChangeText={(text) => {
+                  setInventoryLocationSearch(text);
+                  setInventoryLocation(null);
+                }}
+                placeholder={t('kirimLocationSearchPlaceholder')}
+                placeholderTextColor="#999"
+                autoCapitalize="characters"
+                autoCorrect={false}
+              />
+              {showInventoryLocationDropdown && (
+                <View style={styles.locationDropdownInline}>
+                  <ScrollView
+                    style={styles.locationDropdownScroll}
+                    contentContainerStyle={styles.locationDropdownScrollContent}
+                    keyboardShouldPersistTaps="handled"
+                    nestedScrollEnabled
+                    showsVerticalScrollIndicator
+                  >
+                    {filteredInventoryLocations.length === 0 ? (
+                      <View style={styles.locationDropdownEmpty}>
+                        <Text style={styles.locationDropdownEmptyText}>{t('kirimLocationNoResults')}</Text>
+                      </View>
+                    ) : (
+                      filteredInventoryLocations.map((loc) => (
+                        <TouchableOpacity
+                          key={loc.id}
+                          style={[
+                            styles.locationDropdownItem,
+                            inventoryLocation?.id === loc.id && styles.locationDropdownItemSelected,
+                          ]}
+                          onPress={() => {
+                            setInventoryLocation(loc);
+                            setInventoryLocationSearch(loc.code);
+                          }}
+                        >
+                          <Text style={styles.locationDropdownItemCode} numberOfLines={1}>{loc.code}</Text>
+                          {loc.name && loc.name !== loc.code ? (
+                            <Text style={styles.locationDropdownItemName} numberOfLines={1}>{loc.name}</Text>
+                          ) : null}
+                        </TouchableOpacity>
+                      ))
+                    )}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
         {loadingProduct && (
           <View style={styles.loadingRow}>
             <ActivityIndicator size="small" color="#1a237e" />
@@ -299,7 +374,7 @@ export function KirimFormScreen() {
           </View>
         )}
 
-        {currentProduct && !loadingProduct && (
+        {(flow === 'inventory' ? inventoryLocation && currentProduct : currentProduct) && !loadingProduct && (
           <View style={styles.card}>
             <Text style={styles.productName} numberOfLines={2}>{currentProduct.name}</Text>
             <Text style={styles.label}>{t('quantity')}</Text>
@@ -311,21 +386,28 @@ export function KirimFormScreen() {
               placeholder="0"
               placeholderTextColor="#999"
             />
-            <Text style={styles.label}>{t('locationLabel')}</Text>
-            <View style={styles.locationWrap}>
-              <TextInput
-                style={styles.locationInputFull}
-                value={selectedLocation ? selectedLocation.code : locationSearch}
-                onChangeText={(text) => {
-                  setLocationSearch(text);
-                  setSelectedLocation(null);
-                }}
-                placeholder={t('kirimLocationSearchPlaceholder')}
-                placeholderTextColor="#999"
-                autoCapitalize="characters"
-                autoCorrect={false}
-              />
-              {showLocationDropdown && (
+            {flow === 'inventory' ? (
+              <View style={styles.inventoryLocationReadOnly}>
+                <Text style={styles.label}>{t('inventorySelectedLocation')}</Text>
+                <Text style={styles.inventoryLocationCode}>{inventoryLocation?.code}</Text>
+              </View>
+            ) : (
+              <>
+                <Text style={styles.label}>{t('locationLabel')}</Text>
+                <View style={styles.locationWrap}>
+                  <TextInput
+                    style={styles.locationInputFull}
+                    value={selectedLocation ? selectedLocation.code : locationSearch}
+                    onChangeText={(text) => {
+                      setLocationSearch(text);
+                      setSelectedLocation(null);
+                    }}
+                    placeholder={t('kirimLocationSearchPlaceholder')}
+                    placeholderTextColor="#999"
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                  />
+                  {showLocationDropdown && (
                 <View style={styles.locationDropdownInline}>
                   <ScrollView
                     style={styles.locationDropdownScroll}
@@ -364,6 +446,8 @@ export function KirimFormScreen() {
                 </View>
               )}
             </View>
+              </>
+            )}
             <Text style={styles.label}>{t('kirimBatchLabel')}</Text>
             <TextInput
               style={styles.input}
@@ -555,6 +639,10 @@ const styles = StyleSheet.create({
   },
   scanBtnText: { color: '#fff', fontSize: 18, fontWeight: '600' },
   manualEntryLabel: { fontSize: 13, color: '#666', marginBottom: 6 },
+  inventoryLocationBlock: { marginBottom: 16 },
+  inventoryLocationLabel: { fontSize: 13, color: '#666', marginBottom: 6 },
+  inventoryLocationReadOnly: { marginBottom: 12 },
+  inventoryLocationCode: { fontSize: 14, fontWeight: '600', color: '#333' },
   locationWrap: { marginBottom: 12 },
   locationInputFull: {
     borderWidth: 1,

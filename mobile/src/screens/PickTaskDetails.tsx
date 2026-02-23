@@ -31,6 +31,16 @@ function barcodeMatchesLine(value: string, line: PickingLine): boolean {
   return false;
 }
 
+/** API dan kelgan documentni xavfsiz ko‘rsatish uchun normalizatsiya (lines/progress bo‘lmasa crash bo‘lmasin). */
+function normalizeDocument(raw: PickingDocument | null): PickingDocument | null {
+  if (!raw) return null;
+  const lines = Array.isArray(raw.lines) ? raw.lines : [];
+  const progress = raw.progress && typeof raw.progress === 'object'
+    ? { picked: Number(raw.progress.picked) || 0, required: Number(raw.progress.required) || 0 }
+    : { picked: 0, required: lines.reduce((s, l) => s + (l.qty_required ?? 0), 0) };
+  return { ...raw, lines, progress };
+}
+
 type Nav = StackNavigationProp<RootStackParamList, 'PickTaskDetails'>;
 type Route = RouteProp<RootStackParamList, 'PickTaskDetails'>;
 
@@ -60,18 +70,24 @@ export function PickTaskDetails() {
   const [qtyInput, setQtyInput] = useState('');
 
   const load = useCallback(async () => {
-    if (!taskId) return;
+    if (!taskId || typeof taskId !== 'string') {
+      setLoading(false);
+      setError(t('notFound'));
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       if (isOnline) {
         const data = await getTaskById(taskId);
-        setDoc(data);
-        await saveCachedPickTaskDetail(taskId, data);
+        const normalized = normalizeDocument(data);
+        setDoc(normalized);
+        if (normalized) await saveCachedPickTaskDetail(taskId, normalized);
       } else {
         const cached = await getCachedPickTaskDetail(taskId);
-        setDoc(cached as PickingDocument | null);
-        if (!cached) setError(t('notFound'));
+        const normalized = normalizeDocument(cached as PickingDocument | null);
+        setDoc(normalized);
+        if (!normalized) setError(t('notFound'));
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : t('loadError');
@@ -92,8 +108,9 @@ export function PickTaskDetails() {
       if (!scannedBarcode || !doc) return;
       navigation.setParams({ scannedBarcode: undefined, lineId: undefined });
 
+      const lines = doc.lines ?? [];
       if (lineId) {
-        const line = doc.lines.find((l) => l.id === lineId);
+        const line = lines.find((l) => l.id === lineId);
         if (!line) return;
         if (barcodeMatchesLine(scannedBarcode, line)) {
           setSelectedLine(line);
@@ -114,7 +131,7 @@ export function PickTaskDetails() {
 
       if (isController) {
         const q = scannedBarcode.trim().toLowerCase();
-        const line = doc.lines.find(
+        const line = lines.find(
           (l) =>
             (l.barcode && l.barcode.toLowerCase() === q) ||
             (l.sku && l.sku.toLowerCase() === q)
@@ -188,7 +205,7 @@ export function PickTaskDetails() {
       if (isOnline) {
         const res = await submitScan(taskId, { barcode: scannedBarcodeForQty, qty });
         setDoc((prev) => (prev ? { ...prev, lines: prev.lines.map((l) => (l.id === res.line.id ? res.line : l)), progress: res.progress, status: res.document_status } : prev));
-        await saveCachedPickTaskDetail(taskId, { ...doc, lines: doc.lines.map((l) => (l.id === res.line.id ? res.line : l)), progress: res.progress, status: res.document_status } as PickingDocument);
+        await saveCachedPickTaskDetail(taskId, { ...doc, lines: (doc.lines ?? []).map((l) => (l.id === res.line.id ? res.line : l)), progress: res.progress, status: res.document_status } as PickingDocument);
         closeLineScan();
       } else {
         const additional = qty - 1;
@@ -197,7 +214,7 @@ export function PickTaskDetails() {
         }
         const newPicked = selectedLine.qty_picked + (additional > 0 ? additional : 0);
         const updatedLine = { ...selectedLine, qty_picked: newPicked };
-        const newLines = doc.lines.map((l) => (l.id === selectedLine.id ? updatedLine : l));
+        const newLines = (doc.lines ?? []).map((l) => (l.id === selectedLine.id ? updatedLine : l));
         const updated = { ...doc, lines: newLines, progress: { ...doc.progress, picked: doc.progress.picked + (additional > 0 ? additional : 0) } };
         setDoc(updated);
         await saveCachedPickTaskDetail(taskId, updated);
@@ -215,7 +232,7 @@ export function PickTaskDetails() {
   const handleComplete = useCallback(async () => {
     if (!taskId) return;
     if (!isController) {
-      const incomplete = doc?.lines.filter((l) => l.qty_picked < l.qty_required);
+      const incomplete = (doc?.lines ?? []).filter((l) => l.qty_picked < l.qty_required);
       if (incomplete?.length) {
         Alert.alert(t('incomplete'), t('incompleteLines', { count: incomplete.length }));
         return;
@@ -289,7 +306,7 @@ export function PickTaskDetails() {
           </Text>
         </View>
         <Text style={styles.progressText}>
-          {t('picked')}: {doc.progress.picked} / {doc.progress.required}
+          {t('picked')}: {(doc.progress?.picked ?? 0)} / {(doc.progress?.required ?? 0)}
         </Text>
       </View>
 
@@ -299,7 +316,7 @@ export function PickTaskDetails() {
         keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.sectionTitle}>{t('positions')}</Text>
-        {doc.lines.map((line) => (
+        {(doc.lines ?? []).map((line) => (
           <LineCard
             key={line.id}
             line={line}
@@ -437,14 +454,16 @@ function LineCard({
   t: (key: string, params?: Record<string, string | number>) => string;
   readOnly?: boolean;
 }) {
-  const isDone = line.qty_picked >= line.qty_required;
+  const qtyPicked = Number(line.qty_picked) || 0;
+  const qtyRequired = Number(line.qty_required) || 0;
+  const isDone = qtyPicked >= qtyRequired;
   const content = (
     <>
-      <Text style={styles.lineName}>{line.product_name}</Text>
-      <Text style={styles.lineMeta}>{t('locationLabel')}: {line.location_code}</Text>
+      <Text style={styles.lineName}>{line.product_name ?? '—'}</Text>
+      <Text style={styles.lineMeta}>{t('locationLabel')}: {line.location_code ?? '—'}</Text>
       <Text style={styles.lineMeta}>{t('barcodeLabel')}: {line.barcode ?? '—'}</Text>
       <Text style={styles.lineQty}>
-        {line.qty_picked} / {line.qty_required}
+        {qtyPicked} / {qtyRequired}
       </Text>
       {isDone && (
         <View style={styles.doneBadge}>
