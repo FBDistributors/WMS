@@ -220,29 +220,36 @@ export function MovementScreen() {
                   style={styles.searchInput}
                   placeholder={t('movementToSearch')}
                   placeholderTextColor="#999"
-                  value={locationSearch}
-                  onChangeText={setLocationSearch}
+                  value={toLocation ? toLocation.code : locationSearch}
+                  onChangeText={(text) => {
+                    setLocationSearch(text);
+                    setToLocation(null);
+                  }}
                 />
-                <View style={styles.toList}>
-                  {filteredToLocations
-                    .filter((l) => l.id !== fromLocation.location_id)
-                    .map((loc) => {
-                      const selected = toLocation?.id === loc.id;
-                      return (
-                        <TouchableOpacity
-                          key={loc.id}
-                          style={[styles.locationRow, selected && styles.locationRowSelected]}
-                          onPress={() => setToLocation(loc)}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={styles.locCode}>{loc.code}</Text>
-                          {loc.name ? <Text style={styles.locBatch}>{loc.name}</Text> : null}
-                        </TouchableOpacity>
-                      );
-                    })}
-                </View>
-                {filteredToLocations.length === 0 && (
-                  <Text style={styles.muted}>{t('kirimLocationNoResults')}</Text>
+                {!toLocation && (
+                  <>
+                    <View style={styles.toList}>
+                      {filteredToLocations
+                        .filter((l) => l.id !== fromLocation.location_id)
+                        .map((loc) => (
+                          <TouchableOpacity
+                            key={loc.id}
+                            style={styles.locationRow}
+                            onPress={() => {
+                              setToLocation(loc);
+                              setLocationSearch(loc.code);
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={styles.locCode}>{loc.code}</Text>
+                            {loc.name ? <Text style={styles.locBatch}>{loc.name}</Text> : null}
+                          </TouchableOpacity>
+                        ))}
+                    </View>
+                    {filteredToLocations.filter((l) => l.id !== fromLocation.location_id).length === 0 && locationSearch.trim().length > 0 && (
+                      <Text style={styles.muted}>{t('kirimLocationNoResults')}</Text>
+                    )}
+                  </>
                 )}
 
                 <Text style={styles.sectionLabel}>{t('movementQty')}</Text>
