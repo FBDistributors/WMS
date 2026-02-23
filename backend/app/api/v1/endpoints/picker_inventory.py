@@ -277,6 +277,8 @@ async def get_inventory_by_barcode(
 
 class LocationContentsItem(BaseModel):
     product_id: str
+    lot_id: str
+    location_id: str
     product_name: str
     barcode: str | None
     batch_no: str
@@ -320,6 +322,8 @@ async def get_location_contents(
         items.append(
             LocationContentsItem(
                 product_id=str(r["product_id"]),
+                lot_id=str(r["lot_id"]),
+                location_id=str(location.id),
                 product_name=p.name if p else "?",
                 barcode=main_barcode,
                 batch_no=r["batch"],

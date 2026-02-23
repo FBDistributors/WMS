@@ -17,7 +17,7 @@ export type RootStackParamList = {
     taskId?: string;
     lineId?: string;
     profileType?: 'picker' | 'controller';
-    inventoryStep?: 1 | 2;
+    inventoryStep?: 1 | 2 | 3;
     inventoryLocationId?: string;
     inventoryLocationCode?: string;
   };
@@ -32,7 +32,7 @@ export type RootStackParamList = {
         flow: 'new' | 'return' | 'inventory';
         scannedProductId?: string;
         scannedBarcode?: string;
-        inventoryStep?: 1 | 2;
+        inventoryStep?: 1 | 2 | 3;
         inventoryLocationId?: string;
         inventoryLocationCode?: string;
       }

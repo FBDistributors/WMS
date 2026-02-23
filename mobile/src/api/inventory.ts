@@ -110,3 +110,32 @@ export async function getInventoryByBarcode(
   );
   return data;
 }
+
+/** Lokatsiya tarkibi — inventarizatsiya: shu joydagi mahsulotlar va qoldiqlar */
+export type LocationContentsItem = {
+  product_id: string;
+  lot_id: string;
+  location_id: string;
+  product_name: string;
+  barcode: string | null;
+  batch_no: string;
+  expiry_date: string | null;
+  available_qty: number;
+};
+
+export type LocationContentsResponse = {
+  location_id: string;
+  location_code: string;
+  items: LocationContentsItem[];
+};
+
+export async function getLocationContents(
+  locationCode: string
+): Promise<LocationContentsResponse> {
+  const code = locationCode.trim();
+  if (!code) throw new Error('Lokatsiya kodi bo‘sh bo‘lmasligi kerak');
+  const { data } = await apiClient.get<LocationContentsResponse>(
+    `${INV}/location/${encodeURIComponent(code)}`
+  );
+  return data;
+}
