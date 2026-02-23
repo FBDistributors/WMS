@@ -542,7 +542,7 @@ export function KirimFormScreen() {
                 </TouchableOpacity>
               </View>
             )}
-            <View style={styles.barcodeBlockTop">
+            <View style={styles.barcodeBlockTop}>
               <Text style={styles.manualEntryLabel}>{t('kirimManualEntry')}</Text>
               <BarcodeSearchInput
                 value={manualBarcode}
