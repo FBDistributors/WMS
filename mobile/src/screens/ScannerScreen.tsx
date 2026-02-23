@@ -102,7 +102,7 @@ export function ScannerScreen() {
     if (fetchStatus !== 'success' || !product) return;
     if (params.returnToPick) return;
     if (params.returnToKirimForm) {
-      (navigation as any).replace('KirimForm', {
+      (navigation as any).navigate('KirimForm', {
         flow: params.flow ?? 'return',
         scannedProductId: product.product_id,
         scannedBarcode: product.barcode ?? undefined,
