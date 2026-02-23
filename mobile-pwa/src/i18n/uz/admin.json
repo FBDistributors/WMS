@@ -15,6 +15,29 @@
     "smartup_orders": "Smartup buyurtmalar",
     "profile": "Profil"
   },
+  "movement_page": {
+    "do_button": "Ko'chirish qilish",
+    "history": "Tarix",
+    "type_expired": "Muddati o'tkan",
+    "type_damaged": "Yaroqsiz",
+    "type_simple": "Oddiy lokatsiya ko'chirish",
+    "from": "Qayerdan",
+    "to": "Qayerga",
+    "qty": "Miqdor",
+    "product_search": "Mahsulot qidirish",
+    "select_product": "Mahsulotni tanlang",
+    "select_from": "Qayerdan (joy + partiya) tanlang",
+    "select_to": "Qayerga tanlang",
+    "submit": "Tasdiqlash",
+    "success": "Ko'chirish bajarildi",
+    "error": "Xato",
+    "cancel": "Bekor qilish",
+    "kind_label": "Ko'chirish turi",
+    "no_expired_zone": "EXPIRED zonadagi joy topilmadi",
+    "no_damaged_zone": "DAMAGED zonadagi joy topilmadi",
+    "select_other": "Boshqa joy tanlang",
+    "pcs": "dono"
+  },
   "settings": {
     "title": "Sozlamalar",
     "tabs": {

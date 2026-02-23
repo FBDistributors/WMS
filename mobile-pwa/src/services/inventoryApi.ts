@@ -204,3 +204,19 @@ export async function getInventoryMovements(query: InventoryMovementsQuery = {})
     query,
   })
 }
+
+export type CreateMovementPayload = {
+  product_id: string
+  lot_id: string
+  location_id: string
+  qty_change: number
+  movement_type: 'adjust'
+  reason_code?: string
+}
+
+export async function createMovement(payload: CreateMovementPayload) {
+  return fetchJSON<InventoryMovement>('/api/v1/inventory/movements', {
+    method: 'POST',
+    body: payload,
+  })
+}

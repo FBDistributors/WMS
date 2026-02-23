@@ -15,6 +15,29 @@
     "smartup_orders": "Smartup Orders",
     "profile": "Profile"
   },
+  "movement_page": {
+    "do_button": "Do movement",
+    "history": "History",
+    "type_expired": "Expired",
+    "type_damaged": "Damaged",
+    "type_simple": "Simple location transfer",
+    "from": "From",
+    "to": "To",
+    "qty": "Qty",
+    "product_search": "Search product",
+    "select_product": "Select product",
+    "select_from": "Select from (location + lot)",
+    "select_to": "Select to",
+    "submit": "Confirm",
+    "success": "Movement completed",
+    "error": "Error",
+    "cancel": "Cancel",
+    "kind_label": "Movement type",
+    "no_expired_zone": "No location in EXPIRED zone",
+    "no_damaged_zone": "No location in DAMAGED zone",
+    "select_other": "Select another location",
+    "pcs": "pcs"
+  },
   "settings": {
     "title": "Settings",
     "tabs": {

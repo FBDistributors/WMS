@@ -15,6 +15,29 @@
     "smartup_orders": "Заказы Smartup",
     "profile": "Профиль"
   },
+  "movement_page": {
+    "do_button": "Выполнить перемещение",
+    "history": "История",
+    "type_expired": "Просроченный",
+    "type_damaged": "Повреждённый",
+    "type_simple": "Простое перемещение по локациям",
+    "from": "Откуда",
+    "to": "Куда",
+    "qty": "Кол-во",
+    "product_search": "Поиск товара",
+    "select_product": "Выберите товар",
+    "select_from": "Выберите откуда (локация + партия)",
+    "select_to": "Выберите куда",
+    "submit": "Подтвердить",
+    "success": "Перемещение выполнено",
+    "error": "Ошибка",
+    "cancel": "Отмена",
+    "kind_label": "Тип перемещения",
+    "no_expired_zone": "Нет ячейки в зоне EXPIRED",
+    "no_damaged_zone": "Нет ячейки в зоне DAMAGED",
+    "select_other": "Выберите другую ячейку",
+    "pcs": "шт."
+  },
   "settings": {
     "title": "Настройки",
     "tabs": {
