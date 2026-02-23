@@ -27,7 +27,7 @@ export function KirimScreen() {
         title={t('kirimTitle')}
         showLogo={false}
         showBack={true}
-        onBack={() => navigation.goBack()}
+        onBack={() => navigation.navigate('PickerHome')}
       />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         <TouchableOpacity
