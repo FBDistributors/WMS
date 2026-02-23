@@ -106,6 +106,9 @@ export function ScannerScreen() {
         flow: params.flow ?? 'return',
         scannedProductId: product.product_id,
         scannedBarcode: product.barcode ?? undefined,
+        inventoryStep: params.inventoryStep,
+        inventoryLocationId: params.inventoryLocationId,
+        inventoryLocationCode: params.inventoryLocationCode,
       });
       return;
     }

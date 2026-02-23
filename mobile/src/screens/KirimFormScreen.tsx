@@ -63,7 +63,14 @@ export function KirimFormScreen() {
   const { t, locale } = useLocale();
   const { isOnline } = useNetwork();
   const flow = route.params?.flow ?? 'return';
-  const params = route.params as { flow: 'new' | 'return' | 'inventory'; scannedProductId?: string; scannedBarcode?: string } | undefined;
+  const params = route.params as {
+    flow: 'new' | 'return' | 'inventory';
+    scannedProductId?: string;
+    scannedBarcode?: string;
+    inventoryStep?: 1 | 2;
+    inventoryLocationId?: string;
+    inventoryLocationCode?: string;
+  } | undefined;
   const isDirectSubmit = flow === 'new' || flow === 'inventory';
 
   const [lines, setLines] = useState<FormLine[]>([]);
@@ -118,9 +125,28 @@ export function KirimFormScreen() {
       const pid = params?.scannedProductId;
       if (pid) {
         loadProductById(pid);
-        navigation.setParams({ flow: route.params?.flow ?? 'return', scannedProductId: undefined, scannedBarcode: undefined } as any);
+        navigation.setParams({
+          flow: route.params?.flow ?? 'return',
+          scannedProductId: undefined,
+          scannedBarcode: undefined,
+        } as any);
       }
-    }, [params?.scannedProductId, loadProductById, navigation, route.params])
+      if (flow === 'inventory' && params?.inventoryLocationId && params?.inventoryLocationCode) {
+        setInventoryStep(2);
+        setInventoryLocation({
+          id: params.inventoryLocationId,
+          code: params.inventoryLocationCode,
+          name: params.inventoryLocationCode,
+        });
+        setInventoryLocationSearch(params.inventoryLocationCode);
+        navigation.setParams({
+          ...route.params,
+          inventoryStep: undefined,
+          inventoryLocationId: undefined,
+          inventoryLocationCode: undefined,
+        } as any);
+      }
+    }, [flow, params?.scannedProductId, params?.inventoryLocationId, params?.inventoryLocationCode, loadProductById, navigation, route.params])
   );
 
   useEffect(() => {
@@ -143,8 +169,17 @@ export function KirimFormScreen() {
   }, [pickerModalVisible, isOnline, flow]);
 
   const handleScan = useCallback(() => {
-    navigation.navigate('Scanner', { returnToKirimForm: true, flow });
-  }, [navigation, flow]);
+    const scanParams: { returnToKirimForm: true; flow: typeof flow; inventoryStep?: 1 | 2; inventoryLocationId?: string; inventoryLocationCode?: string } = {
+      returnToKirimForm: true,
+      flow,
+    };
+    if (flow === 'inventory' && inventoryStep === 2 && inventoryLocation) {
+      scanParams.inventoryStep = 2;
+      scanParams.inventoryLocationId = inventoryLocation.id;
+      scanParams.inventoryLocationCode = inventoryLocation.code;
+    }
+    navigation.navigate('Scanner', scanParams);
+  }, [navigation, flow, inventoryStep, inventoryLocation]);
 
   const addLine = useCallback(() => {
     const location = flow === 'inventory' ? inventoryLocation : selectedLocation;
