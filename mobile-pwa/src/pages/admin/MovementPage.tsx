@@ -279,7 +279,6 @@ export function MovementPage() {
                   <Button
                     key={kind}
                     variant={movementKind === kind ? 'default' : 'secondary'}
-                    size="sm"
                     onClick={() => {
                       setMovementKind(kind)
                       setToLocationId('')
