@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -168,14 +169,12 @@ export function AccountScreen() {
     ]);
   };
 
-  const handleLanguagePress = () => {
-    Alert.alert(t('language'), undefined, [
-      ...LOCALES.map((code) => ({
-        text: localeLabels[code],
-        onPress: () => setLocale(code),
-      })),
-      { text: t('cancel'), style: 'cancel' as const },
-    ]);
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
+  const handleLanguagePress = () => setLanguageModalVisible(true);
+  const handleCloseLanguageModal = () => setLanguageModalVisible(false);
+  const handleSelectLocale = (code: LocaleCode) => {
+    setLocale(code);
+    setLanguageModalVisible(false);
   };
 
   return (
@@ -246,6 +245,42 @@ export function AccountScreen() {
           </TouchableOpacity>
         </View>
       ) : null}
+
+      <Modal
+        visible={languageModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCloseLanguageModal}
+      >
+        <TouchableOpacity
+          style={styles.languageModalOverlay}
+          activeOpacity={1}
+          onPress={handleCloseLanguageModal}
+        >
+          <View style={styles.languageModalContent} onStartShouldSetResponder={() => true}>
+            <View style={styles.languageModalHeader}>
+              <Text style={styles.languageModalTitle}>{t('language')}</Text>
+              <TouchableOpacity
+                onPress={handleCloseLanguageModal}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                style={styles.languageModalCloseBtn}
+              >
+                <Icon name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            {LOCALES.map((code) => (
+              <TouchableOpacity
+                key={code}
+                style={styles.languageModalOption}
+                onPress={() => handleSelectLocale(code)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.languageModalOptionText}>{localeLabels[code]}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -390,5 +425,46 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#c62828',
+  },
+  languageModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  languageModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingBottom: 16,
+    minWidth: 280,
+    maxWidth: 320,
+  },
+  languageModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#eee',
+  },
+  languageModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111',
+  },
+  languageModalCloseBtn: {
+    padding: 4,
+  },
+  languageModalOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  languageModalOptionText: {
+    fontSize: 16,
+    color: '#1976d2',
+    fontWeight: '500',
   },
 });

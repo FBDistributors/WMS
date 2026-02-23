@@ -110,9 +110,12 @@ export function BarcodeSearchInput({
       {showDropdown && searchResults.length > 0 && (
         <View style={[styles.dropdown, { maxHeight: dropdownMaxHeight }]}>
           <ScrollView
+            style={{ maxHeight: dropdownMaxHeight }}
+            contentContainerStyle={styles.dropdownScrollContent}
             keyboardShouldPersistTaps="handled"
             nestedScrollEnabled
-            showsVerticalScrollIndicator
+            showsVerticalScrollIndicator={true}
+            bounces={false}
           >
             {searchResults.map((item) => (
               <TouchableOpacity
@@ -184,6 +187,10 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 8,
     zIndex: 1000,
+    overflow: 'hidden',
+  },
+  dropdownScrollContent: {
+    paddingBottom: 8,
   },
   dropdownItem: {
     paddingHorizontal: 12,
