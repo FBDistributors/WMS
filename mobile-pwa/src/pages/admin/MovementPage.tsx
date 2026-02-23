@@ -47,6 +47,7 @@ export function MovementPage() {
     setError(null)
     try {
       const data = await getInventoryMovements({
+        movement_type: 'adjust',
         limit: PAGE_SIZE,
         offset: 0,
       })
