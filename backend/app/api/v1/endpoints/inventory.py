@@ -544,7 +544,7 @@ async def inventory_summary_light(
     search: Optional[str] = None,
     only_available: bool = Query(True, description="Default true for fast load"),
     include_locations: bool = Query(True, description="Include location breakdown per product"),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=10000),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     _user=Depends(require_permission("inventory:read")),
