@@ -99,7 +99,6 @@ export function InventorySummaryPage() {
 
   const handleExportExcel = useCallback(async () => {
     setIsExporting(true)
-    setError(null)
     try {
       const res = await getInventorySummaryLight({
         search: debouncedSearch.trim() || undefined,
@@ -117,7 +116,7 @@ export function InventorySummaryPage() {
         t('inventory:columns.available'),
         t('inventory:columns.location'),
       ]
-      const rows = res.items.map((row) => {
+      const rows = (res.items ?? []).map((row) => {
         const locs = row.locations ?? []
         const locationStr =
           locs.length === 0
@@ -137,11 +136,14 @@ export function InventorySummaryPage() {
       })
       const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
       const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, t('inventory:title'))
+      const sheetName = (t('inventory:title') || 'Qoldiq').slice(0, 31)
+      XLSX.utils.book_append_sheet(wb, ws, sheetName)
       const fileName = `qoldiq_${new Date().toISOString().slice(0, 10)}.xlsx`
       XLSX.writeFile(wb, fileName)
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('inventory:load_failed'))
+      const msg = err instanceof Error ? err.message : t('inventory:load_failed')
+      setError(msg)
+      window.alert(`${t('inventory:export_failed')}\n\n${msg}`)
     } finally {
       setIsExporting(false)
     }
