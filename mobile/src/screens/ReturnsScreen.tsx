@@ -173,13 +173,8 @@ export function ReturnsScreen() {
         onBack={() => navigation.goBack()}
       />
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-        {/* Scan button */}
-        <TouchableOpacity style={styles.scanBtn} onPress={handleScan} activeOpacity={0.8}>
-          <Icon name="barcode-scan" size={32} color="#fff" />
-          <Text style={styles.scanBtnText}>{t('scanButton')}</Text>
-        </TouchableOpacity>
-
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        {/* Shtrix maydoni eng yuqorida — dropdown uchun joy */}
         <Text style={styles.manualEntryLabel}>{t('kirimManualEntry')}</Text>
         <BarcodeSearchInput
           value={barcodeSearchValue}
@@ -190,7 +185,12 @@ export function ReturnsScreen() {
           loading={loadingProduct}
           error={productError}
           onClearError={() => setProductError(null)}
+          dropdownMaxHeight={200}
         />
+        <TouchableOpacity style={styles.scanBtn} onPress={handleScan} activeOpacity={0.8}>
+          <Icon name="barcode-scan" size={32} color="#fff" />
+          <Text style={styles.scanBtnText}>{t('scanButton')}</Text>
+        </TouchableOpacity>
 
         {loadingProduct && (
           <View style={styles.loadingRow}>

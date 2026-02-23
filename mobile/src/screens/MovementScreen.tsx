@@ -160,11 +160,6 @@ export function MovementScreen() {
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         {!product ? (
           <>
-            <Text style={styles.hint}>{t('movementScanHint')}</Text>
-            <TouchableOpacity style={styles.scanBtn} onPress={handleScan} activeOpacity={0.8}>
-              <Icon name="barcode-scan" size={32} color="#fff" />
-              <Text style={styles.scanBtnText}>{t('movementScan')}</Text>
-            </TouchableOpacity>
             <Text style={styles.manualEntryLabel}>{t('kirimManualEntry')}</Text>
             <BarcodeSearchInput
               value={barcodeSearchValue}
@@ -175,7 +170,13 @@ export function MovementScreen() {
               loading={loadingProduct}
               error={productError}
               onClearError={() => setProductError(null)}
+              dropdownMaxHeight={200}
             />
+            <Text style={styles.hint}>{t('movementScanHint')}</Text>
+            <TouchableOpacity style={styles.scanBtn} onPress={handleScan} activeOpacity={0.8}>
+              <Icon name="barcode-scan" size={32} color="#fff" />
+              <Text style={styles.scanBtnText}>{t('movementScan')}</Text>
+            </TouchableOpacity>
             {productError ? (
               <Text style={styles.errorText}>{productError}</Text>
             ) : null}

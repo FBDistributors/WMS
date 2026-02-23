@@ -265,7 +265,27 @@ export function KirimFormScreen() {
         onBack={() => navigation.goBack()}
       />
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        {/* Shtrix maydoni eng yuqorida — dropdown uchun joy */}
+        <View style={styles.barcodeBlockTop}>
+          <Text style={styles.manualEntryLabel}>{t('kirimManualEntry')}</Text>
+          <BarcodeSearchInput
+            value={manualBarcode}
+            onChangeText={setManualBarcode}
+            onSelectProduct={handleSelectProductFromBarcode}
+            placeholder={t('kirimBarcodePlaceholder')}
+            emptyLabel={t('barcodeSearchNoResults')}
+            loading={loadingProduct}
+            error={productError}
+            onClearError={() => setProductError(null)}
+            dropdownMaxHeight={200}
+          />
+        </View>
+        <TouchableOpacity style={styles.scanBtnTop} onPress={handleScan} activeOpacity={0.8}>
+          <Icon name="barcode-scan" size={28} color="#fff" />
+          <Text style={styles.scanBtnText}>{t('scanButton')}</Text>
+        </TouchableOpacity>
+
         {loadingProduct && (
           <View style={styles.loadingRow}>
             <ActivityIndicator size="small" color="#1a237e" />
@@ -471,26 +491,6 @@ export function KirimFormScreen() {
 
       </ScrollView>
 
-      <View style={styles.scanFooter}>
-        <TouchableOpacity style={styles.scanBtn} onPress={handleScan} activeOpacity={0.8}>
-          <Icon name="barcode-scan" size={28} color="#fff" />
-          <Text style={styles.scanBtnText}>{t('scanButton')}</Text>
-        </TouchableOpacity>
-        <View style={styles.manualEntryBlock}>
-          <Text style={styles.manualEntryLabel}>{t('kirimManualEntry')}</Text>
-          <BarcodeSearchInput
-            value={manualBarcode}
-            onChangeText={setManualBarcode}
-            onSelectProduct={handleSelectProductFromBarcode}
-            placeholder={t('kirimBarcodePlaceholder')}
-            emptyLabel={t('barcodeSearchNoResults')}
-            loading={loadingProduct}
-            error={productError}
-            onClearError={() => setProductError(null)}
-          />
-        </View>
-      </View>
-
       {flow === 'return' && (
         <Modal
           visible={pickerModalVisible}
@@ -530,13 +530,18 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   scroll: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 24 },
-  scanFooter: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 24,
-    backgroundColor: '#fff',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#e0e0e0',
+  barcodeBlockTop: {
+    marginBottom: 12,
+  },
+  scanBtnTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: '#1976d2',
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginBottom: 20,
   },
   scanBtn: {
     flexDirection: 'row',
@@ -549,7 +554,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   scanBtnText: { color: '#fff', fontSize: 18, fontWeight: '600' },
-  manualEntryBlock: { marginTop: 8 },
   manualEntryLabel: { fontSize: 13, color: '#666', marginBottom: 6 },
   locationWrap: { marginBottom: 12 },
   locationInputFull: {
