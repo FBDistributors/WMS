@@ -6,6 +6,7 @@
     "orders": "Orders",
     "locations": "Locations",
     "inventory": "Inventory",
+    "movement": "Movement",
     "picking": "Picking",
     "receiving": "Receiving",
     "users": "Users & Access",

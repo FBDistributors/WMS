@@ -6,6 +6,7 @@
     "orders": "Заказы",
     "locations": "Локации",
     "inventory": "Запасы",
+    "movement": "Перемещение",
     "picking": "Подбор",
     "receiving": "Приёмка",
     "users": "Пользователи и доступ",

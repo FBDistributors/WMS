@@ -10,6 +10,7 @@ import {
   Tag,
   MapPin,
   FileText,
+  ArrowLeftRight,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
@@ -31,6 +32,7 @@ const MENU_ITEMS: Array<MenuItem & { key: string }> = [
   { key: 'orders', label: 'Orders', path: '/admin/orders', icon: ClipboardList, required: 'orders:read' },
   { key: 'locations', label: 'Locations', path: '/admin/locations', icon: MapPin, required: 'locations:manage' },
   { key: 'inventory', label: 'Inventory', path: '/admin/inventory', icon: Boxes, required: 'inventory:read' },
+  { key: 'movement', label: 'Movement', path: '/admin/movement', icon: ArrowLeftRight, required: 'inventory:adjust' },
   { key: 'receiving', label: 'Receiving', path: '/admin/receiving', icon: Inbox, required: 'receiving:read' },
   { key: 'users', label: 'Users & Access', path: '/admin/users', icon: Users, required: 'users:manage' },
   { key: 'audit', label: 'Audit Logs', path: '/admin/audit', icon: FileText, required: 'audit:read' },

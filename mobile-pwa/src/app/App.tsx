@@ -19,6 +19,7 @@ import { ReceivingPage } from '../pages/admin/ReceivingPage'
 import { InventorySummaryPage } from '../pages/admin/InventorySummaryPage'
 import { InventoryDetailsPage } from '../pages/admin/InventoryDetailsPage'
 import { InventoryMovementsPage } from '../pages/admin/InventoryMovementsPage'
+import { MovementPage } from '../pages/admin/MovementPage'
 import { UsersPage } from '../pages/admin/UsersPage'
 import { UserCreatePage } from '../pages/admin/users/UserCreatePage'
 import { UserDetailsPage } from '../pages/admin/users/UserDetailsPage'
@@ -332,6 +333,16 @@ export function App() {
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">
               <RequirePermission permission="movements:read">
                 <InventoryMovementsPage />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/movement"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="inventory:adjust">
+                <MovementPage />
               </RequirePermission>
             </RequirePermission>
           }

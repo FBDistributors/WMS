@@ -6,6 +6,7 @@
     "orders": "Buyurtmalar",
     "locations": "Joylashuvlar",
     "inventory": "Inventar",
+    "movement": "Ko'chirish",
     "picking": "Picking",
     "receiving": "Qabul",
     "users": "Users & Access",
