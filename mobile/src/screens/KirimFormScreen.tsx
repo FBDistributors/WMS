@@ -317,7 +317,13 @@ export function KirimFormScreen() {
         title={title}
         showLogo={false}
         showBack={true}
-        onBack={() => navigation.goBack()}
+        onBack={() => {
+          if (flow === 'inventory') {
+            navigation.navigate('Kirim');
+          } else {
+            navigation.goBack();
+          }
+        }}
       />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
