@@ -52,5 +52,13 @@
   "date_to": "Gacha",
   "pagination_range": "{{from}}–{{to}} / {{total}} ta",
   "prev_page": "Oldingi",
-  "next_page": "Keyingi"
+  "next_page": "Keyingi",
+  "not_found": "Qabul hujjati topilmadi",
+  "detail_title": "Qabul hujjati",
+  "back_to_list": "Ro'yxatga qaytish",
+  "detail_lines": "Qabul qatorlari",
+  "detail_col_code": "Kod",
+  "detail_col_barcode": "Barkod",
+  "detail_col_product": "Mahsulot",
+  "detail_col_qoldiq": "Qoldiq"
 }

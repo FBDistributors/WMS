@@ -52,5 +52,13 @@
   "date_to": "По",
   "pagination_range": "{{from}}–{{to}} из {{total}}",
   "prev_page": "Назад",
-  "next_page": "Далее"
+  "next_page": "Далее",
+  "not_found": "Приход не найден",
+  "detail_title": "Детали прихода",
+  "back_to_list": "К списку",
+  "detail_lines": "Строки прихода",
+  "detail_col_code": "Код",
+  "detail_col_barcode": "Штрихкод",
+  "detail_col_product": "Товар",
+  "detail_col_qoldiq": "Остаток"
 }

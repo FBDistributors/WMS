@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Plus, Search, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -52,6 +53,7 @@ function formatReceiptDate(iso: string): string {
 
 export function ReceivingPage() {
   const { t } = useTranslation(['receiving', 'common'])
+  const navigate = useNavigate()
   const { has } = useAuth()
   const canWrite = has('receiving:write')
 
@@ -433,8 +435,7 @@ export function ReceivingPage() {
               <option value="completed">{t('receiving:statuses.completed')}</option>
               <option value="cancelled">{t('receiving:statuses.cancelled')}</option>
             </select>
-            <label className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-400">
-              <span className="whitespace-nowrap">{t('receiving:date_from')}</span>
+            <div className="flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-2 py-1 dark:border-slate-700 dark:bg-slate-900">
               <input
                 type="date"
                 value={dateFrom}
@@ -442,12 +443,11 @@ export function ReceivingPage() {
                   setDateFrom(e.target.value)
                   setOffset(0)
                 }}
-                className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                className="min-w-0 border-0 bg-transparent py-2 pl-2 pr-1 text-sm text-slate-900 outline-none dark:text-slate-100"
                 aria-label={t('receiving:date_from')}
+                title={t('receiving:date_from')}
               />
-            </label>
-            <label className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-400">
-              <span className="whitespace-nowrap">{t('receiving:date_to')}</span>
+              <span className="text-slate-400" aria-hidden>–</span>
               <input
                 type="date"
                 value={dateTo}
@@ -455,10 +455,11 @@ export function ReceivingPage() {
                   setDateTo(e.target.value)
                   setOffset(0)
                 }}
-                className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                className="min-w-0 border-0 bg-transparent py-2 pl-1 pr-2 text-sm text-slate-900 outline-none dark:text-slate-100"
                 aria-label={t('receiving:date_to')}
+                title={t('receiving:date_to')}
               />
-            </label>
+            </div>
           </div>
         </div>
         {isLoading ? (
@@ -499,7 +500,16 @@ export function ReceivingPage() {
                 {filteredReceipts.map((receipt) => (
                   <tr
                     key={receipt.id}
-                    className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => navigate(`/admin/receiving/${receipt.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        navigate(`/admin/receiving/${receipt.id}`)
+                      }
+                    }}
+                    className="cursor-pointer border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50"
                   >
                     <td className="py-2.5 px-2 text-slate-900 dark:text-slate-100 font-medium">
                       {receipt.doc_no}
@@ -516,11 +526,14 @@ export function ReceivingPage() {
                     <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300">
                       {t('receiving:lines_count', { count: receipt.lines.length })}
                     </td>
-                    <td className="py-2.5 px-2">
+                    <td className="py-2.5 px-2" onClick={(e) => e.stopPropagation()}>
                       {receipt.status === 'draft' ? (
                         <Button
                           className="py-2 px-3 text-xs"
-                          onClick={() => handleComplete(receipt.id)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleComplete(receipt.id)
+                          }}
                           disabled={!canWrite || isSubmitting}
                         >
                           {t('receiving:complete')}

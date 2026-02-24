@@ -52,5 +52,13 @@
   "date_to": "To",
   "pagination_range": "{{from}}–{{to}} of {{total}}",
   "prev_page": "Previous",
-  "next_page": "Next"
+  "next_page": "Next",
+  "not_found": "Receipt not found",
+  "detail_title": "Receipt details",
+  "back_to_list": "Back to list",
+  "detail_lines": "Receipt lines",
+  "detail_col_code": "Code",
+  "detail_col_barcode": "Barcode",
+  "detail_col_product": "Product",
+  "detail_col_qoldiq": "On hand"
 }

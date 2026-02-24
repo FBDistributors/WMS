@@ -77,6 +77,10 @@ export async function createReceipt(payload: ReceiptCreateInput) {
   })
 }
 
+export async function getReceipt(receiptId: string) {
+  return fetchJSON<Receipt>(`/api/v1/receiving/receipts/${receiptId}`)
+}
+
 export async function completeReceipt(receiptId: string) {
   return fetchJSON<Receipt>(`/api/v1/receiving/receipts/${receiptId}/complete`, {
     method: 'POST',
