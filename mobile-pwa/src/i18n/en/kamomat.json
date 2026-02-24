@@ -1,5 +1,5 @@
 {
-  "title": "Documents history (Kamomatlar)",
+  "title": "Inventory count",
   "write_off_button": "Write off product",
   "load_error": "Failed to load history.",
   "empty": "No document history",
@@ -35,6 +35,6 @@
     "success": "Changes saved. All changes are recorded in Audit log (stock_movement) with full detail.",
     "error": "Error",
     "empty_location": "No products at this location.",
-    "back": "Back to Kamomatlar"
+    "back": "Back to Inventory count"
   }
 }

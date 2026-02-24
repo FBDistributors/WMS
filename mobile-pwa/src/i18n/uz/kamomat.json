@@ -1,5 +1,5 @@
 {
-  "title": "Kamomatlar (Hujjatlar tarixi)",
+  "title": "Inventarizatsiya (Hujjatlar tarixi)",
   "write_off_button": "Mahsulotni yo'q qilish",
   "load_error": "Tarix yuklanmadi.",
   "empty": "Hujjatlar tarixi boʻsh",
@@ -35,6 +35,6 @@
     "success": "O'zgarishlar saqlandi. Barcha o'zgarishlar Audit log da (stock_movement) batafsil yoziladi.",
     "error": "Xato",
     "empty_location": "Bu lokatsiyada mahsulot yo'q.",
-    "back": "Kamomatlar ga qaytish"
+    "back": "Inventarizatsiya ga qaytish"
   }
 }
