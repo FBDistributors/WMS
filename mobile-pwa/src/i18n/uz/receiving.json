@@ -37,5 +37,15 @@
     "lines_required": "Kamida bitta qator kerak.",
     "line_invalid": "Har qator uchun mahsulot, joylashuv, partiya va miqdorni kiriting."
   },
-  "no_results": "Natija topilmadi"
+  "no_results": "Natija topilmadi",
+  "no_results_desc": "Qidiruv yoki filterni o'zgartiring.",
+  "search_placeholder": "Hujjat raqami yoki qabul qiluvchi bo'yicha qidirish",
+  "filter_status": "Holat",
+  "filter_all": "Barchasi",
+  "col_doc_no": "Hujjat raqami",
+  "col_status": "Holat",
+  "col_received_by": "Qabul qiluvchi",
+  "col_received_at": "Sana",
+  "col_lines": "Qatorlar",
+  "col_actions": "Amallar"
 }

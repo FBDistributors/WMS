@@ -37,5 +37,15 @@
     "lines_required": "At least one line is required.",
     "line_invalid": "Fill product, location, batch and qty for each line."
   },
-  "no_results": "No results"
+  "no_results": "No results",
+  "no_results_desc": "Try changing search or filter.",
+  "search_placeholder": "Search by doc no or receiver",
+  "filter_status": "Status",
+  "filter_all": "All",
+  "col_doc_no": "Doc No",
+  "col_status": "Status",
+  "col_received_by": "Received by",
+  "col_received_at": "Date",
+  "col_lines": "Lines",
+  "col_actions": "Actions"
 }

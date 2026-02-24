@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Plus, Trash2, X } from 'lucide-react'
+import { Plus, Search, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -8,6 +8,7 @@ import { LocationSearchCombobox, formatLocationLabel } from '../../components/Lo
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { TableScrollArea } from '../../components/TableScrollArea'
 import { getProducts, type Product } from '../../services/productsApi'
 import { getLocations, type Location } from '../../services/locationsApi'
 import {
@@ -16,6 +17,7 @@ import {
   completeReceipt,
   type Receipt,
   type ReceiptLineCreate,
+  type ReceiptStatus,
 } from '../../services/receivingApi'
 import { useAuth } from '../../rbac/AuthProvider'
 
@@ -55,6 +57,8 @@ export function ReceivingPage() {
   const [selectedProducts, setSelectedProducts] = useState<Map<string, Product>>(new Map())
   const [locations, setLocations] = useState<Location[]>([])
   const [receipts, setReceipts] = useState<Receipt[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<ReceiptStatus | 'all'>('all')
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [docNo, setDocNo] = useState('')
   const [lines, setLines] = useState<LineDraft[]>([{ ...EMPTY_LINE }])
@@ -66,9 +70,11 @@ export function ReceivingPage() {
     setIsLoading(true)
     setError(null)
     try {
+      const statusParam =
+        statusFilter === 'all' ? undefined : (statusFilter as ReceiptStatus)
       const [locationsResponse, receiptsResponse] = await Promise.all([
         getLocations(false),
-        listReceipts(),
+        listReceipts(statusParam),
       ])
       setLocations(locationsResponse)
       setReceipts(receiptsResponse)
@@ -92,11 +98,21 @@ export function ReceivingPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [t])
+  }, [t, statusFilter])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  const filteredReceipts = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return receipts
+    return receipts.filter((r) => {
+      const matchDoc = r.doc_no?.toLowerCase().includes(q)
+      const matchUser = r.created_by_username?.toLowerCase().includes(q)
+      return matchDoc || matchUser
+    })
+  }, [receipts, searchQuery])
 
   const productLookup = useMemo(() => {
     const map = new Map<string, Product>(products.map((p) => [p.id, p]))
@@ -368,86 +384,114 @@ export function ReceivingPage() {
       ) : null}
 
       <Card className="space-y-4">
-        <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-          {t('receiving:list_title')}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            {t('receiving:list_title')}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[180px] max-w-xs">
+              <Search
+                size={18}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                aria-hidden
+              />
+              <input
+                type="search"
+                placeholder={t('receiving:search_placeholder')}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded-2xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+                aria-label={t('receiving:search_placeholder')}
+              />
+            </div>
+            <select
+              value={statusFilter}
+              onChange={(e) =>
+                setStatusFilter((e.target.value === 'all' ? 'all' : e.target.value) as ReceiptStatus | 'all')
+              }
+              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              aria-label={t('receiving:filter_status')}
+            >
+              <option value="all">{t('receiving:filter_all')}</option>
+              <option value="draft">{t('receiving:statuses.draft')}</option>
+              <option value="completed">{t('receiving:statuses.completed')}</option>
+              <option value="cancelled">{t('receiving:statuses.cancelled')}</option>
+            </select>
+          </div>
         </div>
         {isLoading ? (
           <div className="h-24 w-full animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800" />
         ) : receipts.length === 0 ? (
           <EmptyState title={t('receiving:empty')} description={t('receiving:empty_desc')} />
+        ) : filteredReceipts.length === 0 ? (
+          <EmptyState
+            title={t('receiving:no_results')}
+            description={t('receiving:no_results_desc')}
+          />
         ) : (
-          <div className="space-y-3">
-            {receipts.map((receipt) => (
-              <div
-                key={receipt.id}
-                className="rounded-2xl border border-slate-200 p-4 text-sm dark:border-slate-800"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="font-semibold text-slate-900 dark:text-slate-100">
+          <TableScrollArea>
+            <table className="w-full min-w-[640px] border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 dark:border-slate-700">
+                  <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                    {t('receiving:col_doc_no')}
+                  </th>
+                  <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                    {t('receiving:col_status')}
+                  </th>
+                  <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                    {t('receiving:col_received_by')}
+                  </th>
+                  <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                    {t('receiving:col_received_at')}
+                  </th>
+                  <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                    {t('receiving:col_lines')}
+                  </th>
+                  <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                    {t('receiving:col_actions')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredReceipts.map((receipt) => (
+                  <tr
+                    key={receipt.id}
+                    className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                  >
+                    <td className="py-2.5 px-2 text-slate-900 dark:text-slate-100 font-medium">
                       {receipt.doc_no}
-                    </div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                      {t('receiving:status')}: {t(`receiving:statuses.${receipt.status}`)}
-                    </div>
-                    {(receipt.created_by_username || receipt.created_at) && (
-                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex flex-wrap gap-x-3 gap-y-0">
-                        {receipt.created_by_username && (
-                          <span>
-                            {t('receiving:received_by')}: {receipt.created_by_username}
-                          </span>
-                        )}
-                        {receipt.created_at && (
-                          <span>
-                            {t('receiving:received_at')}: {formatReceiptDate(receipt.created_at)}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                    </td>
+                    <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300">
+                      {t(`receiving:statuses.${receipt.status}`)}
+                    </td>
+                    <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300">
+                      {receipt.created_by_username ?? '—'}
+                    </td>
+                    <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                      {receipt.created_at ? formatReceiptDate(receipt.created_at) : '—'}
+                    </td>
+                    <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300">
                       {t('receiving:lines_count', { count: receipt.lines.length })}
-                    </span>
-                    {receipt.status === 'draft' ? (
-                      <Button
-                        onClick={() => handleComplete(receipt.id)}
-                        disabled={!canWrite || isSubmitting}
-                      >
-                        {t('receiving:complete')}
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-                <div className="mt-3 grid gap-2 text-xs text-slate-600 dark:text-slate-300">
-                  {receipt.lines.map((line) => {
-                    const product = productLookup.get(line.product_id)
-                    const location = locationLookup.get(line.location_id)
-                    return (
-                      <div key={line.id} className="flex flex-wrap gap-2">
-                        <span className="font-semibold text-slate-800 dark:text-slate-100">
-                          {product ? `${product.sku} · ${product.name}` : line.product_id}
-                        </span>
-                        <span>
-                          {t('receiving:fields.qty')}: {Math.round(Number(line.qty))}
-                        </span>
-                        <span>
-                          {t('receiving:fields.batch')}: {line.batch}
-                        </span>
-                        <span>
-                          {t('receiving:fields.expiry_date')}: {line.expiry_date ?? '—'}
-                        </span>
-                        <span>
-                          {t('receiving:fields.location')}:{' '}
-                          {location ? `${location.code}` : line.location_id}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
+                    </td>
+                    <td className="py-2.5 px-2">
+                      {receipt.status === 'draft' ? (
+                        <Button
+                          className="py-2 px-3 text-xs"
+                          onClick={() => handleComplete(receipt.id)}
+                          disabled={!canWrite || isSubmitting}
+                        >
+                          {t('receiving:complete')}
+                        </Button>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableScrollArea>
         )}
       </Card>
     </AdminLayout>

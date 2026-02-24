@@ -37,5 +37,15 @@
     "lines_required": "Нужна хотя бы одна строка.",
     "line_invalid": "Заполните товар, локацию, партию и количество для каждой строки."
   },
-  "no_results": "Результаты не найдены"
+  "no_results": "Результаты не найдены",
+  "no_results_desc": "Измените поиск или фильтр.",
+  "search_placeholder": "Поиск по номеру или получателю",
+  "filter_status": "Статус",
+  "filter_all": "Все",
+  "col_doc_no": "№ документа",
+  "col_status": "Статус",
+  "col_received_by": "Принял(а)",
+  "col_received_at": "Дата",
+  "col_lines": "Строки",
+  "col_actions": "Действия"
 }
