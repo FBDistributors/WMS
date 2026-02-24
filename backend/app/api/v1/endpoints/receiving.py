@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID, uuid4
@@ -65,6 +65,11 @@ class ReceiptOut(BaseModel):
     lines: List[ReceiptLineOut]
 
 
+class ReceiptListOut(BaseModel):
+    items: List[ReceiptOut]
+    total: int
+
+
 def _to_receipt(receipt: ReceiptModel, created_by_username: Optional[str] = None) -> ReceiptOut:
     return ReceiptOut(
         id=receipt.id,
@@ -94,10 +99,12 @@ def _generate_doc_no() -> str:
     return f"RCPT-{today}-{token}"
 
 
-@router.get("/receipts", response_model=List[ReceiptOut], summary="List receipts")
-@router.get("/receipts/", response_model=List[ReceiptOut], summary="List receipts")
+@router.get("/receipts", response_model=ReceiptListOut, summary="List receipts")
+@router.get("/receipts/", response_model=ReceiptListOut, summary="List receipts")
 async def list_receipts(
     status: Optional[str] = None,
+    date_from: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -110,6 +117,21 @@ async def list_receipts(
         if invalid:
             raise HTTPException(status_code=400, detail="Invalid receipt status")
         query = query.filter(ReceiptModel.status.in_(tokens))
+    if date_from:
+        try:
+            d = date.fromisoformat(date_from)
+            query = query.filter(ReceiptModel.created_at >= datetime.combine(d, time.min))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date_from")
+    if date_to:
+        try:
+            d = date.fromisoformat(date_to)
+            query = query.filter(
+                ReceiptModel.created_at <= datetime.combine(d, time.max)
+            )
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date_to")
+    total = query.count()
     receipts = query.order_by(ReceiptModel.created_at.desc()).offset(offset).limit(limit).all()
     creator_ids = {r.created_by for r in receipts if r.created_by}
     creator_map: dict[UUID, str] = {}
@@ -119,10 +141,11 @@ async def list_receipts(
         ).all()
         for u in users:
             creator_map[u.id] = (u.full_name or u.username) if u else ""
-    return [
+    items = [
         _to_receipt(receipt, created_by_username=creator_map.get(receipt.created_by))
         for receipt in receipts
     ]
+    return ReceiptListOut(items=items, total=total)
 
 
 @router.get("/receipts/{receipt_id}", response_model=ReceiptOut, summary="Get receipt")

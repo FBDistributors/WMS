@@ -47,5 +47,10 @@
   "col_received_by": "Принял(а)",
   "col_received_at": "Дата",
   "col_lines": "Строки",
-  "col_actions": "Действия"
+  "col_actions": "Действия",
+  "date_from": "С",
+  "date_to": "По",
+  "pagination_range": "{{from}}–{{to}} из {{total}}",
+  "prev_page": "Назад",
+  "next_page": "Далее"
 }

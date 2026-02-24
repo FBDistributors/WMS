@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Plus, Search, Trash2, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Search, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -32,6 +32,8 @@ const EMPTY_LINE: LineDraft = {
   location_id: '',
 }
 
+const PAGE_SIZE = 50
+
 function formatReceiptDate(iso: string): string {
   try {
     const d = new Date(iso)
@@ -57,8 +59,12 @@ export function ReceivingPage() {
   const [selectedProducts, setSelectedProducts] = useState<Map<string, Product>>(new Map())
   const [locations, setLocations] = useState<Location[]>([])
   const [receipts, setReceipts] = useState<Receipt[]>([])
+  const [totalReceipts, setTotalReceipts] = useState(0)
+  const [offset, setOffset] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<ReceiptStatus | 'all'>('all')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [docNo, setDocNo] = useState('')
   const [lines, setLines] = useState<LineDraft[]>([{ ...EMPTY_LINE }])
@@ -74,14 +80,23 @@ export function ReceivingPage() {
         statusFilter === 'all' ? undefined : (statusFilter as ReceiptStatus)
       const [locationsResponse, receiptsResponse] = await Promise.all([
         getLocations(false),
-        listReceipts(statusParam),
+        listReceipts({
+          status: statusParam,
+          date_from: dateFrom.trim() || undefined,
+          date_to: dateTo.trim() || undefined,
+          limit: PAGE_SIZE,
+          offset,
+        }),
       ])
       setLocations(locationsResponse)
-      setReceipts(receiptsResponse)
+      setReceipts(receiptsResponse.items)
+      setTotalReceipts(receiptsResponse.total)
 
       const productIds = [
         ...new Set(
-          receiptsResponse.flatMap((r) => r.lines.map((l) => l.product_id).filter(Boolean))
+          receiptsResponse.items.flatMap((r) =>
+            r.lines.map((l) => l.product_id).filter(Boolean)
+          ),
         ),
       ]
       if (productIds.length > 0) {
@@ -98,7 +113,7 @@ export function ReceivingPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [t, statusFilter])
+  }, [t, statusFilter, dateFrom, dateTo, offset])
 
   useEffect(() => {
     void load()
@@ -406,9 +421,10 @@ export function ReceivingPage() {
             </div>
             <select
               value={statusFilter}
-              onChange={(e) =>
+              onChange={(e) => {
                 setStatusFilter((e.target.value === 'all' ? 'all' : e.target.value) as ReceiptStatus | 'all')
-              }
+                setOffset(0)
+              }}
               className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               aria-label={t('receiving:filter_status')}
             >
@@ -417,6 +433,32 @@ export function ReceivingPage() {
               <option value="completed">{t('receiving:statuses.completed')}</option>
               <option value="cancelled">{t('receiving:statuses.cancelled')}</option>
             </select>
+            <label className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-400">
+              <span className="whitespace-nowrap">{t('receiving:date_from')}</span>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => {
+                  setDateFrom(e.target.value)
+                  setOffset(0)
+                }}
+                className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                aria-label={t('receiving:date_from')}
+              />
+            </label>
+            <label className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-400">
+              <span className="whitespace-nowrap">{t('receiving:date_to')}</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => {
+                  setDateTo(e.target.value)
+                  setOffset(0)
+                }}
+                className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                aria-label={t('receiving:date_to')}
+              />
+            </label>
           </div>
         </div>
         {isLoading ? (
@@ -492,6 +534,37 @@ export function ReceivingPage() {
               </tbody>
             </table>
           </TableScrollArea>
+        )}
+        {!isLoading && totalReceipts > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-3 dark:border-slate-700">
+            <span className="text-sm text-slate-600 dark:text-slate-400">
+              {t('receiving:pagination_range', {
+                from: offset + 1,
+                to: Math.min(offset + PAGE_SIZE, totalReceipts),
+                total: totalReceipts,
+              })}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setOffset((prev) => Math.max(0, prev - PAGE_SIZE))}
+                disabled={offset === 0}
+                className="gap-1"
+              >
+                <ChevronLeft size={16} />
+                {t('receiving:prev_page')}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setOffset((prev) => prev + PAGE_SIZE)}
+                disabled={offset + PAGE_SIZE >= totalReceipts}
+                className="gap-1"
+              >
+                {t('receiving:next_page')}
+                <ChevronRight size={16} />
+              </Button>
+            </div>
+          </div>
         )}
       </Card>
     </AdminLayout>

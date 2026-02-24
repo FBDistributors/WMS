@@ -35,9 +35,38 @@ export type ReceiptCreateInput = {
   lines: ReceiptLineCreate[]
 }
 
-export async function listReceipts(status?: ReceiptStatus) {
-  return fetchJSON<Receipt[]>('/api/v1/receiving/receipts', {
-    query: { status },
+export type ListReceiptsParams = {
+  status?: ReceiptStatus
+  date_from?: string
+  date_to?: string
+  limit?: number
+  offset?: number
+}
+
+export type ReceiptListResponse = {
+  items: Receipt[]
+  total: number
+}
+
+export async function listReceipts(
+  params?: ListReceiptsParams | ReceiptStatus
+): Promise<ReceiptListResponse> {
+  const query: Record<string, string | number | undefined> =
+    typeof params === 'string' || params == null
+      ? params != null
+        ? { status: params }
+        : {}
+      : {
+          status: params.status,
+          date_from: params.date_from,
+          date_to: params.date_to,
+          limit: params.limit,
+          offset: params.offset,
+        }
+  return fetchJSON<ReceiptListResponse>('/api/v1/receiving/receipts', {
+    query: Object.fromEntries(
+      Object.entries(query).filter(([, v]) => v !== undefined && v !== '')
+    ) as Record<string, string | number>,
   })
 }
 

@@ -47,5 +47,10 @@
   "col_received_by": "Received by",
   "col_received_at": "Date",
   "col_lines": "Lines",
-  "col_actions": "Actions"
+  "col_actions": "Actions",
+  "date_from": "From",
+  "date_to": "To",
+  "pagination_range": "{{from}}–{{to}} of {{total}}",
+  "prev_page": "Previous",
+  "next_page": "Next"
 }

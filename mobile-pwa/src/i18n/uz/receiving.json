@@ -47,5 +47,10 @@
   "col_received_by": "Qabul qiluvchi",
   "col_received_at": "Sana",
   "col_lines": "Qatorlar",
-  "col_actions": "Amallar"
+  "col_actions": "Amallar",
+  "date_from": "Dan",
+  "date_to": "Gacha",
+  "pagination_range": "{{from}}–{{to}} / {{total}} ta",
+  "prev_page": "Oldingi",
+  "next_page": "Keyingi"
 }
