@@ -170,7 +170,9 @@ export function MahsulotYoqQilishPage() {
               role="listbox"
             >
               {filteredLocations.map((loc) => {
-                const label = `${loc.code}${loc.name ? ` — ${loc.name}` : ''}`
+                const code = loc.code ?? ''
+                const name = (loc.name ?? '').trim()
+                const label = name && name !== code ? `${code} — ${loc.name}` : code
                 return (
                   <li key={loc.id} role="option">
                     <button
