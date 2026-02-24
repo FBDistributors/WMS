@@ -225,7 +225,7 @@ export function PickerInventoryPage() {
                     {t('inventory.best_location')}: {item.best_location ?? '—'}
                   </span>
                   <span>
-                    {t('inventory.available')}: {item.available_qty}
+                    {t('inventory.available')}: {Math.round(Number(item.available_qty))}
                   </span>
                   <span className={getExpiryColorClass(item.nearest_expiry)}>
                     {t('inventory.expiry')}: {formatExpiry(item.nearest_expiry)}
@@ -242,7 +242,7 @@ export function PickerInventoryPage() {
                         className="flex justify-between text-sm text-slate-600 dark:text-slate-400"
                       >
                         <span>{lot.location_code} / {lot.batch_no}</span>
-                        <span>{lot.available_qty} {formatExpiry(lot.expiry_date)}</span>
+                        <span>{Math.round(Number(lot.available_qty))} {formatExpiry(lot.expiry_date)}</span>
                       </div>
                     ))}
                   </div>

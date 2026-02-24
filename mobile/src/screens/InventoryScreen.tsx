@@ -52,7 +52,7 @@ function InventoryCard({
           ) : null}
           <Text style={styles.cardCode}>{item.code}</Text>
           <Text style={styles.cardMetaText}>
-            {t('invQoldiq')}: {item.available_qty}
+            {t('invQoldiq')}: {Math.round(Number(item.available_qty))}
           </Text>
         </View>
         <Icon name="chevron-right" size={22} color="#666" />

@@ -97,7 +97,7 @@ export function PickerInventoryDetailPage() {
               </span>
             </div>
             <div className="mt-1 text-xs text-slate-500">
-              Batch: {loc.batch_no} • On hand: {loc.on_hand_qty} • Reserved: {loc.reserved_qty} • Available: {loc.available_qty}
+              Batch: {loc.batch_no} • On hand: {Math.round(Number(loc.on_hand_qty))} • Reserved: {Math.round(Number(loc.reserved_qty))} • Available: {Math.round(Number(loc.available_qty))}
             </div>
           </Card>
         ))}

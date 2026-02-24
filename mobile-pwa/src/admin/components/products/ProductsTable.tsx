@@ -146,13 +146,13 @@ export function ProductsTable({
         id: 'on_hand_total',
         label: t('products:columns.on_hand_total'),
         className: 'w-[140px] text-slate-600 dark:text-slate-300',
-        render: (item) => item.on_hand_total ?? '—',
+        render: (item) => (item.on_hand_total != null ? Math.round(Number(item.on_hand_total)) : '—'),
       },
       {
         id: 'available_total',
         label: t('products:columns.available_total'),
         className: 'w-[140px] text-slate-600 dark:text-slate-300',
-        render: (item) => item.available_total ?? '—',
+        render: (item) => (item.available_total != null ? Math.round(Number(item.available_total)) : '—'),
       },
       {
         id: 'inventory_link',

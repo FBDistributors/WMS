@@ -78,7 +78,6 @@ export function KirimFormScreen() {
   const [finished, setFinished] = useState(false);
   const [currentProduct, setCurrentProduct] = useState<PickerProductDetailResponse | null>(null);
   const [currentQty, setCurrentQty] = useState('');
-  const [currentBatch, setCurrentBatch] = useState('');
   const [currentExpiry, setCurrentExpiry] = useState('');
   const [selectedLocation, setSelectedLocation] = useState<PickerLocationOption | null>(null);
   const [allLocations, setAllLocations] = useState<PickerLocationOption[]>([]);
@@ -251,11 +250,6 @@ export function KirimFormScreen() {
       Alert.alert(t('error'), t('qtyRangeError', { max: maxQty }));
       return;
     }
-    const batch = currentBatch.trim();
-    if (batch.length < 1 || batch.length > 64) {
-      Alert.alert(t('error'), t('kirimBatchRequired'));
-      return;
-    }
     const expiryVal = currentExpiry.trim() || null;
     if (expiryVal && !/^\d{4}-\d{2}-\d{2}$/.test(expiryVal)) {
       Alert.alert(t('error'), t('kirimExpiryFormat'));
@@ -271,15 +265,14 @@ export function KirimFormScreen() {
         locationId: location.id,
         lotId: '',
         qty,
-        batch,
+        batch: '',
         expiryDate: expiryVal,
       },
     ]);
     setCurrentProduct(null);
     setCurrentQty('');
-    setCurrentBatch('');
     setCurrentExpiry('');
-  }, [flow, currentProduct, selectedLocation, inventoryLocation, currentQty, currentBatch, currentExpiry, t]);
+  }, [flow, currentProduct, selectedLocation, inventoryLocation, currentQty, currentExpiry, t]);
 
   const removeLine = useCallback((id: string) => {
     setLines((prev) => prev.filter((l) => l.id !== id));
@@ -317,7 +310,7 @@ export function KirimFormScreen() {
         lines: lines.map((l) => ({
           product_id: l.productId,
           qty: l.qty,
-          batch: l.batch,
+          batch: l.batch || '',
           expiry_date: l.expiryDate || null,
           location_id: l.locationId,
         })),
@@ -368,8 +361,7 @@ export function KirimFormScreen() {
   const canAddLine =
     currentProduct &&
     (flow === 'inventory' ? inventoryLocation : selectedLocation) &&
-    currentQty.trim().length > 0 &&
-    currentBatch.trim().length > 0;
+    currentQty.trim().length > 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -491,7 +483,7 @@ export function KirimFormScreen() {
                             <Text style={styles.contentsRowName} numberOfLines={2}>{item.product_name}</Text>
                             <Text style={styles.contentsRowMeta}>
                               {item.batch_no}
-                              {item.expiry_date ? ` • ${item.expiry_date}` : ''} • {t('inventorySystemQty')}: {item.available_qty}
+                              {item.expiry_date ? ` • ${item.expiry_date}` : ''} • {t('inventorySystemQty')}: {Math.round(Number(item.available_qty))}
                             </Text>
                           </View>
                           <TextInput
@@ -650,16 +642,6 @@ export function KirimFormScreen() {
             </View>
               </>
             )}
-            <Text style={styles.label}>{t('kirimBatchLabel')}</Text>
-            <TextInput
-              style={styles.input}
-              value={currentBatch}
-              onChangeText={setCurrentBatch}
-              placeholder={t('kirimBatchPlaceholder')}
-              placeholderTextColor="#999"
-              autoCapitalize="characters"
-              autoCorrect={false}
-            />
             <Text style={styles.label}>{t('kirimExpiryLabel')}</Text>
             <View style={styles.expiryRow}>
               <TouchableOpacity
@@ -715,7 +697,7 @@ export function KirimFormScreen() {
               <View key={line.id} style={styles.lineRow}>
                 <View style={styles.lineInfo}>
                   <Text style={styles.lineProduct} numberOfLines={1}>{line.productName}</Text>
-                  <Text style={styles.lineMeta}>{line.locationCode} · {line.qty} dona · {line.batch}{line.expiryDate ? ` · ${line.expiryDate}` : ''}</Text>
+                  <Text style={styles.lineMeta}>{line.locationCode} · {line.qty} dona{line.expiryDate ? ` · ${line.expiryDate}` : ''}</Text>
                 </View>
                 <TouchableOpacity onPress={() => removeLine(line.id)} hitSlop={12}>
                   <Icon name="close-circle-outline" size={24} color="#c62828" />

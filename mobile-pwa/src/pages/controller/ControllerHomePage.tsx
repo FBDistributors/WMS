@@ -98,7 +98,7 @@ export function ControllerHomePage() {
                 <ul className="mt-1 space-y-1">
                   {resultData.product.locations.map((l, i) => (
                     <li key={i}>
-                      {l.location_code} → {l.available_qty}
+                      {l.location_code} → {Math.round(Number(l.available_qty))}
                     </li>
                   ))}
                 </ul>
@@ -112,12 +112,12 @@ export function ControllerHomePage() {
                 <div className="mt-1">
                   {resultData.product.fefo_lots[0].batch_no} /{' '}
                   {formatExpiry(resultData.product.fefo_lots[0].expiry_date)} →{' '}
-                  {resultData.product.fefo_lots[0].available_qty}
+                  {Math.round(Number(resultData.product.fefo_lots[0].available_qty))}
                 </div>
               </div>
             )}
             <div className="mt-3 font-semibold text-slate-900 dark:text-slate-100">
-              {t('home.total_available')}: {resultData.product.total_available}
+              {t('home.total_available')}: {Math.round(Number(resultData.product.total_available))}
             </div>
             <div className="mt-4 flex gap-2">
               <button

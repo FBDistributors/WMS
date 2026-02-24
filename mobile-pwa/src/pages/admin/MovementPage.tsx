@@ -359,7 +359,7 @@ export function MovementPage() {
                         setToLocationId('')
                       }}
                     >
-                      {row.location_code} | {row.batch} | {row.available} {t('admin:movement_page.pcs')}
+                      {row.location_code} | {row.batch} | {Math.round(Number(row.available))} {t('admin:movement_page.pcs')}
                     </button>
                   ))}
                 </div>

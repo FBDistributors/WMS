@@ -242,7 +242,7 @@ export function ReturnsScreen() {
                       }}
                     >
                       <Text style={styles.dropdownItemText}>
-                        {loc.location_code} — {loc.batch_no} {loc.expiry_date ? `(${loc.expiry_date})` : ''} — {Number(loc.available_qty)} {t('invAvailable')}
+                        {loc.location_code} — {loc.batch_no} {loc.expiry_date ? `(${loc.expiry_date})` : ''} — {Math.round(Number(loc.available_qty))} {t('invAvailable')}
                       </Text>
                     </TouchableOpacity>
                   ))}

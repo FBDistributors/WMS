@@ -75,7 +75,7 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product }: ProductCardProps) {
-  const total = Number(product.total_available ?? 0);
+  const total = Math.round(Number(product.total_available ?? 0));
   const locations = product.best_locations ?? [];
 
   return (
@@ -106,7 +106,7 @@ export function ProductCard({ product }: ProductCardProps) {
           {locations.map((loc, i) => (
             <View key={`${loc.location_code}-${i}`} style={styles.locationRow}>
               <Text style={styles.locationCode}>{loc.location_code}</Text>
-              <Text style={styles.locationQty}>{Number(loc.available_qty)} dona</Text>
+              <Text style={styles.locationQty}>{Math.round(Number(loc.available_qty))} dona</Text>
             </View>
           ))}
         </>

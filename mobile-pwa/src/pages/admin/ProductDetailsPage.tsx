@@ -394,7 +394,7 @@ export function ProductDetailsPage() {
                       {t('products:history.on_hand')}
                     </dt>
                     <dd className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-100">
-                      {onHand ?? '—'}
+                      {onHand != null ? Math.round(Number(onHand)) : '—'}
                     </dd>
                   </div>
                   <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/50">
@@ -410,7 +410,7 @@ export function ProductDetailsPage() {
                       {t('products:history.available')}
                     </dt>
                     <dd className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-100">
-                      {available ?? '—'}
+                      {available != null ? Math.round(Number(available)) : '—'}
                     </dd>
                   </div>
                 </dl>
@@ -452,13 +452,13 @@ export function ProductDetailsPage() {
                               {row.location_code}
                             </td>
                             <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">
-                              {Number(row.on_hand)}
+                              {Math.round(Number(row.on_hand))}
                             </td>
                             <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">
-                              {Number(row.reserved)}
+                              {Math.round(Number(row.reserved))}
                             </td>
                             <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">
-                              {Number(row.available)}
+                              {Math.round(Number(row.available))}
                             </td>
                           </tr>
                         ))}

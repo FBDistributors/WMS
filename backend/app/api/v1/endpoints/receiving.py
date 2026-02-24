@@ -28,7 +28,7 @@ RECEIPT_STATUSES = {"draft", "completed", "cancelled"}
 class ReceiptLineCreate(BaseModel):
     product_id: UUID
     qty: Decimal = Field(..., gt=0)
-    batch: str = Field(..., min_length=1, max_length=64)
+    batch: Optional[str] = Field(default=None, max_length=64)
     expiry_date: Optional[date] = None
     location_id: UUID
 
@@ -192,11 +192,14 @@ async def create_receipt(
         )
         if not location:
             raise HTTPException(status_code=400, detail="Location not found")
+        batch_val = (line.batch or "").strip()
+        if not batch_val:
+            batch_val = uuid4().hex[:12]
         receipt.lines.append(
             ReceiptLineModel(
                 product_id=line.product_id,
                 qty=line.qty,
-                batch=line.batch.strip(),
+                batch=batch_val,
                 expiry_date=line.expiry_date,
                 location_id=line.location_id,
             )

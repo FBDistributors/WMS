@@ -271,13 +271,13 @@ export function MahsulotYoqQilishPage() {
                             {row.expiry_date ? ` (${row.expiry_date})` : ''}
                           </td>
                           <td className="whitespace-nowrap px-3 py-3 text-right font-mono text-slate-700 dark:text-slate-200 sm:px-4">
-                            {row.on_hand}
+                            {Math.round(Number(row.on_hand))}
                           </td>
                           <td className="px-3 py-3 sm:px-4">
                             <input
                               type="number"
                               min={0}
-                              max={available}
+                              max={Math.round(available)}
                               step={1}
                               className={`w-24 rounded-xl border px-2 py-1.5 text-right font-mono text-sm outline-none dark:bg-slate-900 dark:text-slate-100 ${
                                 over
@@ -292,7 +292,7 @@ export function MahsulotYoqQilishPage() {
                             />
                             {over && (
                               <span className="ml-1 text-xs text-red-600 dark:text-red-400">
-                                ≤ {available}
+                                ≤ {Math.round(available)}
                               </span>
                             )}
                           </td>

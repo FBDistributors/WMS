@@ -207,7 +207,7 @@ export function MovementScreen() {
                   >
                     <Text style={styles.locCode}>{loc.location_code}</Text>
                     <Text style={styles.locBatch}>{loc.batch_no}</Text>
-                    <Text style={styles.locQty}>{loc.available_qty} dono</Text>
+                    <Text style={styles.locQty}>{Math.round(Number(loc.available_qty))} dono</Text>
                   </TouchableOpacity>
                 );
               })
