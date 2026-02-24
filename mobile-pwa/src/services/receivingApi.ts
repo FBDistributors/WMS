@@ -35,8 +35,13 @@ export type ReceiptCreateInput = {
   lines: ReceiptLineCreate[]
 }
 
+export type Receiver = {
+  id: string
+  name: string
+}
+
 export type ListReceiptsParams = {
-  status?: ReceiptStatus
+  created_by?: string
   date_from?: string
   date_to?: string
   limit?: number
@@ -48,21 +53,23 @@ export type ReceiptListResponse = {
   total: number
 }
 
+export async function getReceivers() {
+  return fetchJSON<Receiver[]>('/api/v1/receiving/receipts/receivers')
+}
+
 export async function listReceipts(
-  params?: ListReceiptsParams | ReceiptStatus
+  params?: ListReceiptsParams
 ): Promise<ReceiptListResponse> {
-  const query: Record<string, string | number | undefined> =
-    typeof params === 'string' || params == null
-      ? params != null
-        ? { status: params }
-        : {}
-      : {
-          status: params.status,
-          date_from: params.date_from,
-          date_to: params.date_to,
-          limit: params.limit,
-          offset: params.offset,
-        }
+  if (params == null) {
+    return fetchJSON<ReceiptListResponse>('/api/v1/receiving/receipts', {})
+  }
+  const query: Record<string, string | number | undefined> = {
+    created_by: params.created_by,
+    date_from: params.date_from,
+    date_to: params.date_to,
+    limit: params.limit,
+    offset: params.offset,
+  }
   return fetchJSON<ReceiptListResponse>('/api/v1/receiving/receipts', {
     query: Object.fromEntries(
       Object.entries(query).filter(([, v]) => v !== undefined && v !== '')

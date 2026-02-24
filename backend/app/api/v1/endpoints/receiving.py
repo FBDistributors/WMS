@@ -70,6 +70,11 @@ class ReceiptListOut(BaseModel):
     total: int
 
 
+class ReceiverOut(BaseModel):
+    id: UUID
+    name: str
+
+
 def _to_receipt(receipt: ReceiptModel, created_by_username: Optional[str] = None) -> ReceiptOut:
     return ReceiptOut(
         id=receipt.id,
@@ -99,10 +104,39 @@ def _generate_doc_no() -> str:
     return f"RCPT-{today}-{token}"
 
 
+@router.get("/receipts/receivers", response_model=List[ReceiverOut], summary="List receivers")
+@router.get("/receipts/receivers/", response_model=List[ReceiverOut], summary="List receivers")
+async def list_receipt_receivers(
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("receiving:read")),
+):
+    creator_ids = (
+        db.query(ReceiptModel.created_by)
+        .filter(ReceiptModel.created_by.isnot(None))
+        .distinct()
+        .all()
+    )
+    creator_ids = [row[0] for row in creator_ids]
+    if not creator_ids:
+        return []
+    users = (
+        db.query(UserModel.id, UserModel.full_name, UserModel.username)
+        .filter(UserModel.id.in_(creator_ids))
+        .all()
+    )
+    return [
+        ReceiverOut(
+            id=u.id,
+            name=(u.full_name or u.username or str(u.id)),
+        )
+        for u in users
+    ]
+
+
 @router.get("/receipts", response_model=ReceiptListOut, summary="List receipts")
 @router.get("/receipts/", response_model=ReceiptListOut, summary="List receipts")
 async def list_receipts(
-    status: Optional[str] = None,
+    created_by: Optional[UUID] = Query(None, description="Filter by receiver user ID"),
     date_from: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
     limit: int = Query(50, ge=1, le=200),
@@ -111,12 +145,8 @@ async def list_receipts(
     _user=Depends(require_permission("receiving:read")),
 ):
     query = db.query(ReceiptModel).options(selectinload(ReceiptModel.lines))
-    if status:
-        tokens = [token.strip() for token in status.split(",") if token.strip()]
-        invalid = [token for token in tokens if token not in RECEIPT_STATUSES]
-        if invalid:
-            raise HTTPException(status_code=400, detail="Invalid receipt status")
-        query = query.filter(ReceiptModel.status.in_(tokens))
+    if created_by:
+        query = query.filter(ReceiptModel.created_by == created_by)
     if date_from:
         try:
             d = date.fromisoformat(date_from)

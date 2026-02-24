@@ -15,10 +15,11 @@ import { getLocations, type Location } from '../../services/locationsApi'
 import {
   createReceipt,
   listReceipts,
+  getReceivers,
   completeReceipt,
   type Receipt,
   type ReceiptLineCreate,
-  type ReceiptStatus,
+  type Receiver,
 } from '../../services/receivingApi'
 import { useAuth } from '../../rbac/AuthProvider'
 
@@ -64,7 +65,8 @@ export function ReceivingPage() {
   const [totalReceipts, setTotalReceipts] = useState(0)
   const [offset, setOffset] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<ReceiptStatus | 'all'>('all')
+  const [receivers, setReceivers] = useState<Receiver[]>([])
+  const [receiverFilter, setReceiverFilter] = useState<string>('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [createModalOpen, setCreateModalOpen] = useState(false)
@@ -78,12 +80,10 @@ export function ReceivingPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const statusParam =
-        statusFilter === 'all' ? undefined : (statusFilter as ReceiptStatus)
       const [locationsResponse, receiptsResponse] = await Promise.all([
         getLocations(false),
         listReceipts({
-          status: statusParam,
+          created_by: receiverFilter.trim() || undefined,
           date_from: dateFrom.trim() || undefined,
           date_to: dateTo.trim() || undefined,
           limit: PAGE_SIZE,
@@ -115,7 +115,20 @@ export function ReceivingPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [t, statusFilter, dateFrom, dateTo, offset])
+  }, [t, receiverFilter, dateFrom, dateTo, offset])
+
+  const loadReceivers = useCallback(async () => {
+    try {
+      const list = await getReceivers()
+      setReceivers(list)
+    } catch {
+      setReceivers([])
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadReceivers()
+  }, [loadReceivers])
 
   useEffect(() => {
     void load()
@@ -422,18 +435,20 @@ export function ReceivingPage() {
               />
             </div>
             <select
-              value={statusFilter}
+              value={receiverFilter}
               onChange={(e) => {
-                setStatusFilter((e.target.value === 'all' ? 'all' : e.target.value) as ReceiptStatus | 'all')
+                setReceiverFilter(e.target.value)
                 setOffset(0)
               }}
               className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-              aria-label={t('receiving:filter_status')}
+              aria-label={t('receiving:filter_receiver')}
             >
-              <option value="all">{t('receiving:filter_all')}</option>
-              <option value="draft">{t('receiving:statuses.draft')}</option>
-              <option value="completed">{t('receiving:statuses.completed')}</option>
-              <option value="cancelled">{t('receiving:statuses.cancelled')}</option>
+              <option value="">{t('receiving:filter_all_receivers')}</option>
+              {receivers.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
             </select>
             <div className="flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-2 py-1 dark:border-slate-700 dark:bg-slate-900">
               <input
