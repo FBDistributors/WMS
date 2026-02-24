@@ -137,6 +137,7 @@ async def list_receipt_receivers(
 @router.get("/receipts/", response_model=ReceiptListOut, summary="List receipts")
 async def list_receipts(
     created_by: Optional[UUID] = Query(None, description="Filter by receiver user ID"),
+    product_id: Optional[UUID] = Query(None, description="Filter by product ID (receipts containing this product)"),
     date_from: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
     limit: int = Query(50, ge=1, le=200),
@@ -147,6 +148,10 @@ async def list_receipts(
     query = db.query(ReceiptModel).options(selectinload(ReceiptModel.lines))
     if created_by:
         query = query.filter(ReceiptModel.created_by == created_by)
+    if product_id:
+        query = query.join(
+            ReceiptLineModel, ReceiptModel.id == ReceiptLineModel.receipt_id
+        ).filter(ReceiptLineModel.product_id == product_id).distinct()
     if date_from:
         try:
             d = date.fromisoformat(date_from)

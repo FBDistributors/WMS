@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Plus, Search, Trash2, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Filter, Plus, Search, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -67,8 +67,12 @@ export function ReceivingPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [receivers, setReceivers] = useState<Receiver[]>([])
   const [receiverFilter, setReceiverFilter] = useState<string>('')
+  const [productFilter, setProductFilter] = useState<string>('')
+  const [filterProduct, setFilterProduct] = useState<Product | null>(null)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [docNo, setDocNo] = useState('')
   const [lines, setLines] = useState<LineDraft[]>([{ ...EMPTY_LINE }])
@@ -84,6 +88,7 @@ export function ReceivingPage() {
         getLocations(false),
         listReceipts({
           created_by: receiverFilter.trim() || undefined,
+          product_id: productFilter.trim() || undefined,
           date_from: dateFrom.trim() || undefined,
           date_to: dateTo.trim() || undefined,
           limit: PAGE_SIZE,
@@ -115,7 +120,7 @@ export function ReceivingPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [t, receiverFilter, dateFrom, dateTo, offset])
+  }, [t, receiverFilter, productFilter, dateFrom, dateTo, offset])
 
   const loadReceivers = useCallback(async () => {
     try {
@@ -447,46 +452,126 @@ export function ReceivingPage() {
                 aria-label={t('receiving:search_placeholder')}
               />
             </div>
-            <select
-              value={receiverFilter}
-              onChange={(e) => {
-                setReceiverFilter(e.target.value)
-                setOffset(0)
-              }}
-              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-              aria-label={t('receiving:filter_receiver')}
-            >
-              <option value="">{t('receiving:filter_all_receivers')}</option>
-              {receiverOptions.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
-            <div className="flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-2 py-1 dark:border-slate-700 dark:bg-slate-900">
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => {
-                  setDateFrom(e.target.value)
-                  setOffset(0)
-                }}
-                className="min-w-0 border-0 bg-transparent py-2 pl-2 pr-1 text-sm text-slate-900 outline-none dark:text-slate-100"
-                aria-label={t('receiving:date_from')}
-                title={t('receiving:date_from')}
-              />
-              <span className="text-slate-400" aria-hidden>–</span>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => {
-                  setDateTo(e.target.value)
-                  setOffset(0)
-                }}
-                className="min-w-0 border-0 bg-transparent py-2 pl-1 pr-2 text-sm text-slate-900 outline-none dark:text-slate-100"
-                aria-label={t('receiving:date_to')}
-                title={t('receiving:date_to')}
-              />
+            <div className="relative" ref={filterPanelRef}>
+              <Button
+                variant="outline"
+                onClick={() => setFilterPanelOpen((open) => !open)}
+                className="gap-2"
+                aria-label={t('receiving:filter_btn')}
+                aria-expanded={filterPanelOpen}
+              >
+                <Filter size={18} />
+                {t('receiving:filter_btn')}
+              </Button>
+              {filterPanelOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    aria-hidden
+                    onClick={() => setFilterPanelOpen(false)}
+                  />
+                  <div className="absolute right-0 top-full z-50 mt-2 w-full min-w-[280px] max-w-sm rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                    <div className="mb-3 flex items-center justify-between">
+                      <span className="font-semibold text-slate-900 dark:text-slate-100">
+                        {t('receiving:filter_panel_title')}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setFilterPanelOpen(false)}
+                        className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 dark:hover:text-slate-400 dark:hover:bg-slate-800"
+                        aria-label={t('common:close')}
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      <label className="block text-sm text-slate-600 dark:text-slate-400">
+                        {t('receiving:col_doc_no')}
+                        <input
+                          type="text"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          placeholder={t('receiving:filter_doc_placeholder')}
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                        />
+                      </label>
+                      <label className="block text-sm text-slate-600 dark:text-slate-400">
+                        {t('receiving:filter_by_product')}
+                        <ProductSearchCombobox
+                          value={filterProduct?.id ?? ''}
+                          displayLabel={filterProduct ? formatProductLabel(filterProduct) : undefined}
+                          onSelect={(p) => {
+                            setFilterProduct(p ?? null)
+                          }}
+                          placeholder={t('receiving:fields.select_product')}
+                          className="mt-1 w-full"
+                        />
+                      </label>
+                      <label className="block text-sm text-slate-600 dark:text-slate-400">
+                        {t('receiving:filter_receiver')}
+                        <select
+                          value={receiverFilter}
+                          onChange={(e) => setReceiverFilter(e.target.value)}
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                        >
+                          <option value="">{t('receiving:filter_all_receivers')}</option>
+                          {receiverOptions.map((r) => (
+                            <option key={r.id} value={r.id}>
+                              {r.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="block text-sm text-slate-600 dark:text-slate-400">
+                          {t('receiving:date_from')}
+                          <input
+                            type="date"
+                            value={dateFrom}
+                            onChange={(e) => setDateFrom(e.target.value)}
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                          />
+                        </label>
+                        <label className="block text-sm text-slate-600 dark:text-slate-400">
+                          {t('receiving:date_to')}
+                          <input
+                            type="date"
+                            value={dateTo}
+                            onChange={(e) => setDateTo(e.target.value)}
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          setSearchQuery('')
+                          setFilterProduct(null)
+                          setProductFilter('')
+                          setReceiverFilter('')
+                          setDateFrom('')
+                          setDateTo('')
+                          setOffset(0)
+                          setFilterPanelOpen(false)
+                        }}
+                      >
+                        {t('receiving:filter_clear')}
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setProductFilter(filterProduct?.id ?? '')
+                          setOffset(0)
+                          setFilterPanelOpen(false)
+                        }}
+                      >
+                        {t('receiving:filter_apply')}
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
