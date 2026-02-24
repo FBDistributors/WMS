@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Package } from 'lucide-react'
@@ -22,6 +22,8 @@ export function MahsulotYoqQilishPage() {
   const navigate = useNavigate()
   const [locations, setLocations] = useState<Location[]>([])
   const [locationId, setLocationId] = useState('')
+  const [locationSearch, setLocationSearch] = useState('')
+  const [locationDropdownOpen, setLocationDropdownOpen] = useState(false)
   const [products, setProducts] = useState<InventoryByLocationRow[]>([])
   const [loading, setLoading] = useState(false)
   const [submitLoading, setSubmitLoading] = useState(false)
@@ -35,6 +37,16 @@ export function MahsulotYoqQilishPage() {
       .then(setLocations)
       .catch(() => setLocations([]))
   }, [])
+
+  const filteredLocations = useMemo(() => {
+    const q = locationSearch.trim().toLowerCase()
+    if (!q) return locations
+    return locations.filter((loc) => {
+      const code = (loc.code ?? '').toLowerCase()
+      const name = (loc.name ?? '').toLowerCase()
+      return code.includes(q) || name.includes(q)
+    })
+  }, [locations, locationSearch])
 
   const loadProducts = useCallback(() => {
     if (!locationId.trim()) {
@@ -141,19 +153,45 @@ export function MahsulotYoqQilishPage() {
         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
           {t('kamomat:write_off.select_location')}
         </label>
-        <div className="flex flex-wrap items-center gap-3">
-          <select
-            className="min-w-[200px] rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-            value={locationId}
-            onChange={(e) => setLocationId(e.target.value)}
-          >
-            <option value="">{t('kamomat:write_off.location_placeholder')}</option>
-            {locations.map((loc) => (
-              <option key={loc.id} value={loc.id}>
-                {loc.code} {loc.name ? `— ${loc.name}` : ''}
-              </option>
-            ))}
-          </select>
+        <div className="relative flex flex-wrap items-center gap-3">
+          <input
+            type="text"
+            className="min-w-[240px] rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+            value={locationSearch}
+            onChange={(e) => setLocationSearch(e.target.value)}
+            onFocus={() => setLocationDropdownOpen(true)}
+            onBlur={() => setTimeout(() => setLocationDropdownOpen(false), 150)}
+            placeholder={t('kamomat:write_off.location_placeholder')}
+            autoComplete="off"
+          />
+          {locationDropdownOpen && filteredLocations.length > 0 && (
+            <ul
+              className="absolute left-0 top-full z-10 mt-1 max-h-48 w-full min-w-[240px] overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900"
+              role="listbox"
+            >
+              {filteredLocations.map((loc) => {
+                const label = `${loc.code}${loc.name ? ` — ${loc.name}` : ''}`
+                return (
+                  <li key={loc.id} role="option">
+                    <button
+                      type="button"
+                      className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800 ${
+                        locationId === loc.id ? 'bg-blue-50 dark:bg-blue-950/50' : ''
+                      }`}
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        setLocationId(loc.id)
+                        setLocationSearch(label)
+                        setLocationDropdownOpen(false)
+                      }}
+                    >
+                      {label}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
           {locationId && (
             <Button variant="secondary" onClick={loadProducts} disabled={loading}>
               {loading ? t('common:messages.loading') : t('kamomat:write_off.load_products')}
