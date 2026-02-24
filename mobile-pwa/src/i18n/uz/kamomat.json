@@ -1,0 +1,24 @@
+{
+  "title": "Kamomatlar (Hujjatlar tarixi)",
+  "load_error": "Tarix yuklanmadi.",
+  "empty": "Hujjatlar tarixi boʻsh",
+  "empty_desc": "Hujjatlar yaratilganda yoki oʻzgartirilganda bu yerda koʻrinadi.",
+  "total": "Jami {{count}} ta",
+  "columns": {
+    "date": "Sana",
+    "user": "Foydalanuvchi",
+    "action": "Amal",
+    "document": "Hujjat"
+  },
+  "filters": {
+    "document": "Hujjat",
+    "all_documents": "Barcha hujjatlar",
+    "date_from": "Boshlanish",
+    "date_to": "Tugash",
+    "apply": "Qoʻllash"
+  },
+  "detail": {
+    "old_data": "Eski maʼlumot",
+    "new_data": "Yangi maʼlumot"
+  }
+}

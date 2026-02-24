@@ -22,6 +22,7 @@ export type AuditLogListResponse = {
 
 export type ListAuditLogsParams = {
   entity_type?: string
+  entity_id?: string
   user_id?: string
   date_from?: string
   date_to?: string
@@ -35,6 +36,7 @@ export async function listAuditLogs(params: ListAuditLogsParams = {}) {
     offset: params.offset,
   }
   if (params.entity_type) query.entity_type = params.entity_type
+  if (params.entity_id) query.entity_id = params.entity_id
   if (params.user_id) query.user_id = params.user_id
   if (params.date_from) query.date_from = params.date_from
   if (params.date_to) query.date_to = params.date_to

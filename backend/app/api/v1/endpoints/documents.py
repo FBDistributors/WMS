@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.auth.deps import require_permission
 from app.db import get_db
-from app.services.audit_service import ACTION_UPDATE, get_client_ip, log_action
+from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_ip, log_action
 from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
 
@@ -144,9 +144,10 @@ def _parse_status_filter(status: Optional[str]) -> Optional[List[DocumentStatus]
 @router.post("", response_model=DocumentDetails, summary="Create Document")
 @router.post("/", response_model=DocumentDetails, summary="Create Document")
 async def create_document(
+    request: Request,
     payload: CreateDocumentRequest,
     db: Session = Depends(get_db),
-    _user=Depends(require_permission("documents:create")),
+    user=Depends(require_permission("documents:create")),
 ):
     if not payload.doc_type or not payload.doc_type.strip():
         raise HTTPException(status_code=400, detail="doc_type must not be empty")
@@ -211,6 +212,16 @@ async def create_document(
         raise HTTPException(status_code=409, detail="Document already exists")
 
     db.refresh(document)
+    log_action(
+        db,
+        user_id=user.id,
+        action=ACTION_CREATE,
+        entity_type="document",
+        entity_id=str(document.id),
+        new_data={"doc_no": document.doc_no, "doc_type": document.doc_type, "status": document.status},
+        ip_address=get_client_ip(request),
+    )
+    db.commit()
     return _to_document(document)
 
 

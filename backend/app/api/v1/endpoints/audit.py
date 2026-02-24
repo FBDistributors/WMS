@@ -48,6 +48,7 @@ class AuditLogListOut(BaseModel):
 @router.get("/", response_model=AuditLogListOut, summary="List audit logs")
 async def list_audit_logs(
     entity_type: Optional[str] = Query(None, description="Filter by entity type"),
+    entity_id: Optional[str] = Query(None, description="Filter by entity ID"),
     user_id: Optional[UUID] = Query(None, description="Filter by user ID"),
     date_from: Optional[str] = Query(None, description="From date YYYY-MM-DD"),
     date_to: Optional[str] = Query(None, description="To date YYYY-MM-DD"),
@@ -60,6 +61,8 @@ async def list_audit_logs(
     query = db.query(AuditLog)
     if entity_type:
         query = query.filter(AuditLog.entity_type == entity_type)
+    if entity_id:
+        query = query.filter(AuditLog.entity_id == entity_id)
     if user_id:
         query = query.filter(AuditLog.user_id == user_id)
     if date_from:

@@ -46,6 +46,7 @@ export const ADMIN_MENU: MenuItem[] = [
   { path: '/admin/brands', labelKey: 'menu.brands', permissions: ['brands:manage'] },
   { path: '/admin/users', labelKey: 'menu.users', permissions: ['users:read', 'users:manage'] },
   { path: '/admin/audit', labelKey: 'menu.audit', permissions: ['audit:read'] },
+  { path: '/admin/kamomat', labelKey: 'menu.kamomat', permissions: ['audit:read'] },
   { path: '/admin/profile', labelKey: 'menu.profile', permissions: ['admin:access'] },
 ]
 

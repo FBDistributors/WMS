@@ -1,0 +1,24 @@
+{
+  "title": "Documents history (Kamomatlar)",
+  "load_error": "Failed to load history.",
+  "empty": "No document history",
+  "empty_desc": "History will appear when documents are created or updated.",
+  "total": "{{count}} total",
+  "columns": {
+    "date": "Date",
+    "user": "User",
+    "action": "Action",
+    "document": "Document"
+  },
+  "filters": {
+    "document": "Document",
+    "all_documents": "All documents",
+    "date_from": "From date",
+    "date_to": "To date",
+    "apply": "Apply"
+  },
+  "detail": {
+    "old_data": "Old data",
+    "new_data": "New data"
+  }
+}

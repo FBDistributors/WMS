@@ -24,6 +24,7 @@ import { UsersPage } from '../pages/admin/UsersPage'
 import { UserCreatePage } from '../pages/admin/users/UserCreatePage'
 import { UserDetailsPage } from '../pages/admin/users/UserDetailsPage'
 import { AuditLogsPage } from '../pages/admin/AuditLogsPage'
+import { KamomatlarPage } from '../pages/admin/KamomatlarPage'
 import { PickListsPage } from '../pages/admin/PickListsPage'
 import { OfflineQueuePage } from '../pages/offline/OfflineQueuePage'
 import { PickCompletePage } from '../pages/PickCompletePage'
@@ -383,6 +384,16 @@ export function App() {
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">
               <RequirePermission permission="audit:read">
                 <AuditLogsPage />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/kamomat"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="audit:read">
+                <KamomatlarPage />
               </RequirePermission>
             </RequirePermission>
           }
