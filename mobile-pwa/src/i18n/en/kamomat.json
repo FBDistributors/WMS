@@ -1,5 +1,6 @@
 {
   "title": "Documents history (Kamomatlar)",
+  "write_off_button": "Write off product",
   "load_error": "Failed to load history.",
   "empty": "No document history",
   "empty_desc": "History will appear when documents are created or updated.",
@@ -20,5 +21,20 @@
   "detail": {
     "old_data": "Old data",
     "new_data": "New data"
+  },
+  "write_off": {
+    "title": "Write off product",
+    "select_location": "Select location",
+    "location_placeholder": "Location...",
+    "load_products": "Load products",
+    "product": "Product",
+    "batch": "Batch",
+    "on_hand": "On hand",
+    "write_off_qty": "Write-off qty",
+    "submit": "Save (recorded in history)",
+    "success": "Changes saved. All changes are recorded in Audit log (stock_movement) with full detail.",
+    "error": "Error",
+    "empty_location": "No products at this location.",
+    "back": "Back to Kamomatlar"
   }
 }

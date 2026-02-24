@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { FileText } from 'lucide-react'
+import { FileText, MinusCircle } from 'lucide-react'
 
+import { useAuth } from '../../rbac/AuthProvider'
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
@@ -16,6 +18,8 @@ const PAGE_SIZE = 50
 
 export function KamomatlarPage() {
   const { t } = useTranslation(['kamomat', 'common'])
+  const { has } = useAuth()
+  const canWriteOff = has('inventory:adjust')
   const [items, setItems] = useState<AuditLogRecord[]>([])
   const [total, setTotal] = useState(0)
   const [offset, setOffset] = useState(0)
@@ -155,6 +159,17 @@ export function KamomatlarPage() {
 
   return (
     <AdminLayout title={t('kamomat:title')}>
+      {canWriteOff && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <Link
+            to="/admin/kamomat/yoq-qilish"
+            className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200 dark:hover:bg-amber-900/50"
+          >
+            <MinusCircle size={18} />
+            {t('kamomat:write_off_button')}
+          </Link>
+        </div>
+      )}
       <Card className="mb-4 space-y-3">
         <div className="grid gap-3 md:grid-cols-4">
           <label className="text-sm text-slate-600 dark:text-slate-300">

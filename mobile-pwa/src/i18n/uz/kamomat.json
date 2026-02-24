@@ -1,5 +1,6 @@
 {
   "title": "Kamomatlar (Hujjatlar tarixi)",
+  "write_off_button": "Mahsulotni yo'q qilish",
   "load_error": "Tarix yuklanmadi.",
   "empty": "Hujjatlar tarixi boʻsh",
   "empty_desc": "Hujjatlar yaratilganda yoki oʻzgartirilganda bu yerda koʻrinadi.",
@@ -20,5 +21,20 @@
   "detail": {
     "old_data": "Eski maʼlumot",
     "new_data": "Yangi maʼlumot"
+  },
+  "write_off": {
+    "title": "Mahsulotni yo'q qilish",
+    "select_location": "Lokatsiyani tanlang",
+    "location_placeholder": "Lokatsiya...",
+    "load_products": "Mahsulotlarni yuklash",
+    "product": "Mahsulot",
+    "batch": "Partiya",
+    "on_hand": "Qoldiq",
+    "write_off_qty": "Yo'q qilish miqdori",
+    "submit": "Saqlash (tarixga yoziladi)",
+    "success": "O'zgarishlar saqlandi. Barcha o'zgarishlar Audit log da (stock_movement) batafsil yoziladi.",
+    "error": "Xato",
+    "empty_location": "Bu lokatsiyada mahsulot yo'q.",
+    "back": "Kamomatlar ga qaytish"
   }
 }
