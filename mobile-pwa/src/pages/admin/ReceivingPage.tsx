@@ -144,6 +144,19 @@ export function ReceivingPage() {
     })
   }, [receipts, searchQuery])
 
+  const receiverOptions = useMemo(() => {
+    const byId = new Map<string, Receiver>()
+    receivers.forEach((r) => byId.set(r.id, r))
+    receipts.forEach((r) => {
+      if (r.created_by && r.created_by_username && !byId.has(r.created_by)) {
+        byId.set(r.created_by, { id: r.created_by, name: r.created_by_username })
+      }
+    })
+    return Array.from(byId.values()).sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+    )
+  }, [receivers, receipts])
+
   const productLookup = useMemo(() => {
     const map = new Map<string, Product>(products.map((p) => [p.id, p]))
     selectedProducts.forEach((p) => map.set(p.id, p))
@@ -444,7 +457,7 @@ export function ReceivingPage() {
               aria-label={t('receiving:filter_receiver')}
             >
               <option value="">{t('receiving:filter_all_receivers')}</option>
-              {receivers.map((r) => (
+              {receiverOptions.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.name}
                 </option>
