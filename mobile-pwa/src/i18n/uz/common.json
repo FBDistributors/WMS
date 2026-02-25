@@ -12,7 +12,8 @@
     "login": "Kirish",
     "logout": "Chiqish",
     "home": "Bosh sahifa",
-    "close": "Yopish"
+    "close": "Yopish",
+    "clear": "Tozalash"
   },
   "actions": {
     "sign_out": "Chiqish"

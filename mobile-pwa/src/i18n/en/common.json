@@ -12,7 +12,8 @@
     "login": "Login",
     "logout": "Logout",
     "home": "Home",
-    "close": "Close"
+    "close": "Close",
+    "clear": "Clear"
   },
   "actions": {
     "sign_out": "Sign out"

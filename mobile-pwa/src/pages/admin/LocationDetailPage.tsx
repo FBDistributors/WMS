@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -87,13 +87,25 @@ export function LocationDetailPage() {
     return (
       <>
         <label className="block w-full text-sm text-slate-600 dark:text-slate-300">
-          <input
-            type="text"
-            className="mt-1 w-full max-w-md rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-            value={filterQuery}
-            onChange={(e) => setFilterQuery(e.target.value)}
-            placeholder={t('locations:detail_filter_placeholder')}
-          />
+          <div className="relative mt-1 max-w-md">
+            <input
+              type="text"
+              className="w-full rounded-2xl border border-slate-200 bg-white py-2 pl-3 pr-9 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+              value={filterQuery}
+              onChange={(e) => setFilterQuery(e.target.value)}
+              placeholder={t('locations:detail_filter_placeholder')}
+            />
+            {filterQuery && (
+              <button
+                type="button"
+                onClick={() => setFilterQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-300"
+                aria-label={t('common:buttons.clear')}
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
         </label>
         <div className="w-full max-h-[calc(100vh-320px)] min-h-0 overflow-auto">
           <TableScrollArea inline className="w-full">
