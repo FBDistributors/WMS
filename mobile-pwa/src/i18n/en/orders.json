@@ -11,6 +11,7 @@
   "ship": "Ship",
   "shipping": "Shipping...",
   "pack_failed": "Failed to pack order.",
+  "status_update_failed": "Failed to update status.",
   "ship_failed": "Failed to ship order.",
   "empty": "No orders found",
   "empty_desc": "Sync Smartup to load orders.",

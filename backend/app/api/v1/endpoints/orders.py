@@ -113,6 +113,13 @@ class SendToPickingResponse(BaseModel):
     assigned_to: UUID
 
 
+class OrderStatusUpdateRequest(BaseModel):
+    status: str = Field(..., description="picked, packed, shipped yoki boshqa ruxsat etilgan status")
+
+
+ALLOWED_ADMIN_ORDER_STATUSES = {"imported", "B#S", "allocated", "ready_for_picking", "picking", "picked", "packed", "shipped", "cancelled"}
+
+
 class PickerUser(BaseModel):
     id: UUID
     name: str
@@ -429,6 +436,43 @@ async def get_order(
     return _to_order_details(order)
 
 
+@router.patch("/{order_id}/status", response_model=OrderDetails, summary="Admin: buyurtma statusini o'zgartirish")
+async def update_order_status(
+    request: Request,
+    order_id: UUID,
+    payload: OrderStatusUpdateRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("documents:edit_status")),
+):
+    if payload.status not in ALLOWED_ADMIN_ORDER_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Status must be one of: {', '.join(sorted(ALLOWED_ADMIN_ORDER_STATUSES))}",
+        )
+    order = (
+        db.query(OrderModel)
+        .options(selectinload(OrderModel.lines))
+        .filter(OrderModel.id == order_id)
+        .one_or_none()
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    old_status = order.status
+    order.status = payload.status
+    log_action(
+        db,
+        user_id=user.id,
+        action=ACTION_UPDATE,
+        entity_type="order",
+        entity_id=str(order_id),
+        old_data={"status": old_status},
+        new_data={"status": payload.status},
+        ip_address=get_client_ip(request),
+    )
+    db.commit()
+    return _to_order_details(order)
+
+
 @router.post("/sync-smartup", response_model=SmartupSyncResponse, summary="Sync orders from Smartup")
 async def sync_orders_from_smartup(
     payload: SmartupSyncRequest,
@@ -555,8 +599,8 @@ async def pack_order(
         .filter(DocumentModel.order_id == order.id)
         .one_or_none()
     )
-    if not document or document.status != "completed":
-        raise HTTPException(status_code=409, detail="Picking document is not completed")
+    if document and document.status not in ("picked", "completed"):
+        raise HTTPException(status_code=409, detail="Picking document must be picked or completed")
 
     old_status = order.status
     order.status = "packed"

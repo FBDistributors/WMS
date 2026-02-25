@@ -8,7 +8,7 @@ import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { getOrder, packOrder, shipOrder, type OrderDetails } from '../../services/ordersApi'
+import { getOrder, packOrder, shipOrder, updateOrderStatus, type OrderDetails } from '../../services/ordersApi'
 import { useAuth } from '../../rbac/AuthProvider'
 
 export function OrderDetailsPage() {
@@ -23,6 +23,32 @@ export function OrderDetailsPage() {
   const [isUpdating, setIsUpdating] = useState(false)
 
   const canEditStatus = has('documents:edit_status')
+
+  const ORDER_STATUS_OPTIONS = [
+    'imported',
+    'B#S',
+    'allocated',
+    'ready_for_picking',
+    'picking',
+    'picked',
+    'packed',
+    'shipped',
+    'cancelled',
+  ] as const
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (!order || newStatus === order.status) return
+    setIsUpdating(true)
+    setActionError(null)
+    try {
+      const data = await updateOrderStatus(order.id, newStatus)
+      setOrder(data)
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : t('orders:status_update_failed'))
+    } finally {
+      setIsUpdating(false)
+    }
+  }
 
   const load = useCallback(async () => {
     if (!id) {
@@ -134,9 +160,24 @@ export function OrderDetailsPage() {
           </div>
           <div>
             <div className="text-xs text-slate-500">{t('orders:columns.status')}</div>
-            <div className="text-sm text-slate-700 dark:text-slate-200">
-              {t(`orders:status.${order.status === 'B#S' ? 'b#s' : order.status}`, order.status)}
-            </div>
+            {canEditStatus ? (
+              <select
+                value={order.status}
+                onChange={(e) => handleStatusChange(e.target.value)}
+                disabled={isUpdating}
+                className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              >
+                {ORDER_STATUS_OPTIONS.map((s) => (
+                  <option key={s} value={s}>
+                    {t(`orders:status.${s === 'B#S' ? 'b#s' : s}`, s)}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="text-sm text-slate-700 dark:text-slate-200">
+                {t(`orders:status.${order.status === 'B#S' ? 'b#s' : order.status}`, order.status)}
+              </div>
+            )}
           </div>
           <div>
             <div className="text-xs text-slate-500">{t('orders:columns.customer')}</div>

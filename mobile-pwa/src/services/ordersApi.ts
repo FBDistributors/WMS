@@ -116,3 +116,11 @@ export async function shipOrder(orderId: string) {
     method: 'POST',
   })
 }
+
+/** Admin: buyurtma statusini o'zgartirish (documents:edit_status kerak). */
+export async function updateOrderStatus(orderId: string, status: string) {
+  return fetchJSON<OrderDetails>(`/api/v1/orders/${orderId}/status`, {
+    method: 'PATCH',
+    body: { status },
+  })
+}
