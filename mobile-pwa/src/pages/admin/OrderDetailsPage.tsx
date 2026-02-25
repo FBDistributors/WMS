@@ -31,6 +31,7 @@ export function OrderDetailsPage() {
     'ready_for_picking',
     'picking',
     'picked',
+    'completed',
     'packed',
     'shipped',
     'cancelled',
@@ -130,7 +131,7 @@ export function OrderDetailsPage() {
             {t('common:buttons.back')}
           </Button>
           <div className="flex flex-wrap items-center gap-2">
-            {canEditStatus && order.status === 'picked' ? (
+            {canEditStatus && (order.status === 'picked' || order.status === 'completed') ? (
               <Button onClick={handlePack} disabled={isUpdating}>
                 {isUpdating ? t('orders:packing') : t('orders:pack')}
               </Button>

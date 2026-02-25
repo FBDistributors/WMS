@@ -38,6 +38,7 @@ ORDER_STATUSES = {
     "ready_for_picking",
     "picking",
     "picked",
+    "completed",
     "packed",
     "shipped",
     "cancelled",
@@ -59,6 +60,7 @@ class OrderListItem(BaseModel):
     lines_total: int
     picker_name: Optional[str] = None
     controller_name: Optional[str] = None
+    is_incomplete: bool = False
 
 
 class OrderLineOut(BaseModel):
@@ -117,7 +119,7 @@ class OrderStatusUpdateRequest(BaseModel):
     status: str = Field(..., description="picked, packed, shipped yoki boshqa ruxsat etilgan status")
 
 
-ALLOWED_ADMIN_ORDER_STATUSES = {"imported", "B#S", "allocated", "ready_for_picking", "picking", "picked", "packed", "shipped", "cancelled"}
+ALLOWED_ADMIN_ORDER_STATUSES = {"imported", "B#S", "allocated", "ready_for_picking", "picking", "picked", "completed", "packed", "shipped", "cancelled"}
 
 
 class PickerUser(BaseModel):
@@ -388,6 +390,7 @@ async def list_orders(
     items = []
     for order in orders:
         doc = doc_by_order.get(order.id)
+        is_incomplete = doc is not None and doc.incomplete_reason is not None
         items.append(
             OrderListItem(
                 id=order.id,
@@ -404,6 +407,7 @@ async def list_orders(
                 lines_total=len(order.lines),
                 picker_name=_picker_name(doc),
                 controller_name=_controller_name(doc),
+                is_incomplete=is_incomplete,
             )
         )
 
@@ -591,8 +595,8 @@ async def pack_order(
     )
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    if order.status != "picked":
-        raise HTTPException(status_code=409, detail="Order must be picked before packing")
+    if order.status not in ("picked", "completed"):
+        raise HTTPException(status_code=409, detail="Order must be picked or completed before packing")
 
     document = (
         db.query(DocumentModel)

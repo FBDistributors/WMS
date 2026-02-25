@@ -62,7 +62,7 @@ const GROUP_TO_STATUS: Record<string, string | undefined> = {
   xom: 'imported,B#S', // Yangi: Smartupdan kelgan, admin yig'uvchiga yubormagan
   yigishda: 'allocated,ready_for_picking,picking', // Yig'uvchi yig'ishda / controllerga yubormagan
   tekshiruvda: 'picked', // Controllerga yuborilgan, controller yakunlamagan
-  yakunlangan: 'packed,shipped', // Controller yakunlagan
+  yakunlangan: 'completed,packed,shipped', // Controller yakunlagan yoki qadoqlangan
   all: undefined,
 }
 
@@ -214,12 +214,15 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
         : config.columnOrder.filter((id) =>
             columnOptionsForMode.some((column) => column.id === id)
           )
-    const getStatusRowClass = (status: string) => {
+    const getStatusRowClass = (order: OrderListItem) => {
       if (mode !== 'statuses') return ''
+      if (order.is_incomplete) return 'bg-red-50 dark:bg-red-950/30'
+      const status = order.status
       if (status === 'allocated' || status === 'ready_for_picking' || status === 'picking')
         return 'bg-blue-50 dark:bg-blue-950/30'
       if (status === 'picked') return 'bg-amber-50 dark:bg-amber-950/30'
-      if (status === 'packed' || status === 'shipped') return 'bg-emerald-50 dark:bg-emerald-950/30'
+      if (status === 'completed' || status === 'packed' || status === 'shipped')
+        return 'bg-emerald-50 dark:bg-emerald-950/30'
       return ''
     }
     const columnLabels = new Map(
@@ -292,7 +295,14 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
         case 'status':
           return (
             <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-              {t(`orders:status.${order.status === 'B#S' ? 'b#s' : order.status}`, order.status)}
+              <span className="inline-flex items-center gap-1.5">
+                {t(`orders:status.${order.status === 'B#S' ? 'b#s' : order.status}`, order.status)}
+                {order.is_incomplete && (
+                  <span className="rounded bg-red-200 px-1.5 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/60 dark:text-red-200">
+                    {t('orders:incomplete_badge', 'To\'liq emas')}
+                  </span>
+                )}
+              </span>
             </td>
           )
         case 'picker':
@@ -391,7 +401,7 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
             {items.map((order) => (
               <tr
                 key={order.id}
-                className={`border-b border-slate-100 dark:border-slate-800 ${getStatusRowClass(order.status)}`}
+                className={`border-b border-slate-100 dark:border-slate-800 ${getStatusRowClass(order)}`}
               >
                 {orderedColumns.map((columnId) =>
                   visibleColumns.has(columnId) ? renderCell(columnId, order) : null

@@ -65,11 +65,13 @@
     "allocated": "Резервировано",
     "ready_for_picking": "Готово к подбору",
     "picking": "В подборе",
-    "picked": "Собрано",
+    "picked": "На проверке",
+    "completed": "Завершён",
     "packed": "Упаковано",
     "shipped": "Отгружено",
     "cancelled": "Отменено"
   },
+  "incomplete_badge": "Не полностью",
   "columns": {
     "order_number": "Заказ",
     "external_id": "Внешний ID",

@@ -228,7 +228,7 @@ async def list_picking_documents(
     user=Depends(require_permission("picking:read")),
 ):
     # Admin buyurtmani packed/shipped/cancelled qilsa — yig'uvchi va controller ro'yxatida ko'rinmasin
-    ORDER_HIDDEN_STATUSES = ("packed", "shipped", "cancelled")
+    ORDER_HIDDEN_STATUSES = ("completed", "packed", "shipped", "cancelled")
     query = (
         db.query(DocumentModel)
         .options(selectinload(DocumentModel.lines))
@@ -670,6 +670,15 @@ async def complete_picking_document(
         if document.status != "picked":
             raise HTTPException(status_code=409, detail="Document must be in picked status")
         document.status = "completed"
+        if document.order_id:
+            order = (
+                db.query(OrderModel)
+                .filter(OrderModel.id == document.order_id)
+                .with_for_update()
+                .one_or_none()
+            )
+            if order and order.status in {"picked", "picking", "allocated"}:
+                order.status = "completed"
     else:
         if document.assigned_to_user_id != user.id:
             raise HTTPException(status_code=403, detail="Document not assigned to you")

@@ -15,6 +15,7 @@ export type OrderListItem = {
   lines_total: number
   picker_name?: string | null
   controller_name?: string | null
+  is_incomplete?: boolean
 }
 
 export type OrdersListResponse = {

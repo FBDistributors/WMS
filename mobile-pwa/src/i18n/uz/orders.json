@@ -67,11 +67,13 @@
     "allocated": "Ajratilgan",
     "ready_for_picking": "Yig'ishga tayyor",
     "picking": "Pickingda",
-    "picked": "Terildi",
+    "picked": "Tekshiruvda",
+    "completed": "Yakunlangan",
     "packed": "Qadoqlandi",
     "shipped": "Yuborildi",
     "cancelled": "Bekor qilingan"
   },
+  "incomplete_badge": "To'liq emas",
   "columns": {
     "select": "",
     "order_number": "Buyurtma",

@@ -67,11 +67,13 @@
     "allocated": "Allocated",
     "ready_for_picking": "Ready for picking",
     "picking": "Picking",
-    "picked": "Picked",
+    "picked": "Pending verification",
+    "completed": "Completed",
     "packed": "Packed",
     "shipped": "Shipped",
     "cancelled": "Cancelled"
   },
+  "incomplete_badge": "Incomplete",
   "columns": {
     "select": "",
     "order_number": "Order",
