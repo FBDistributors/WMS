@@ -66,6 +66,30 @@ export async function getTaskById(documentId: string): Promise<PickingDocument> 
   return data;
 }
 
+/** To'liq yig'maganda sabab kodlari (backend INCOMPLETE_REASON_CODES ga mos). */
+export const INCOMPLETE_REASON_KEYS = [
+  'expired',
+  'out_of_stock',
+  'product_not_found',
+  'not_enough_time',
+  'damaged',
+  'wrong_location',
+  'other',
+] as const;
+
+export type IncompleteReasonKey = (typeof INCOMPLETE_REASON_KEYS)[number];
+
+export async function completePickDocument(
+  documentId: string,
+  options?: { incomplete_reason?: string }
+): Promise<PickingDocument> {
+  const { data } = await apiClient.post<PickingDocument>(
+    `${PICKING}/documents/${documentId}/complete`,
+    options ?? {}
+  );
+  return data;
+}
+
 /** Bitta qator uchun +1 yoki -1 (backend: delta + request_id). */
 export async function pickLine(
   lineId: string,

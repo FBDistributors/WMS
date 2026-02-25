@@ -15,7 +15,7 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../types/navigation';
 import type { PickingDocument, PickingLine } from '../api/picking.types';
 import apiClient, { UNAUTHORIZED_MSG } from '../api/client';
-import { getTaskById, submitScan } from '../api/picking';
+import { completePickDocument, getTaskById, INCOMPLETE_REASON_KEYS, submitScan } from '../api/picking';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { ScanInput } from '../components/ScanInput';
 import { useLocale } from '../i18n/LocaleContext';
@@ -68,6 +68,8 @@ export function PickTaskDetails() {
   const [selectedLine, setSelectedLine] = useState<PickingLine | null>(null);
   const [scannedBarcodeForQty, setScannedBarcodeForQty] = useState<string | null>(null);
   const [qtyInput, setQtyInput] = useState('');
+  const [incompleteReasonModalVisible, setIncompleteReasonModalVisible] = useState(false);
+  const [selectedIncompleteReason, setSelectedIncompleteReason] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!taskId || typeof taskId !== 'string') {
@@ -234,35 +236,51 @@ export function PickTaskDetails() {
     }
   }, [taskId, doc, selectedLine, scannedBarcodeForQty, qtyInput, closeLineScan, navigation, t, isOnline, isController]);
 
+  const doComplete = useCallback(
+    async (incompleteReason: string | undefined) => {
+      if (!taskId) return;
+      setIncompleteReasonModalVisible(false);
+      setSelectedIncompleteReason(null);
+      setSubmitting(true);
+      try {
+        const profileType = isController ? 'controller' : 'picker';
+        if (isOnline) {
+          await completePickDocument(taskId, incompleteReason ? { incomplete_reason: incompleteReason } : undefined);
+          navigation.replace('PickTaskList', { profileType });
+          Alert.alert(t('success'), t('pickingComplete'));
+        } else {
+          await addToQueue('PICK_CLOSE_TASK', { taskId, ts: Date.now(), incomplete_reason: incompleteReason });
+          navigation.replace('PickTaskList', { profileType });
+          Alert.alert(t('success'), t('pickingComplete'));
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : t('completeError');
+        if (msg === UNAUTHORIZED_MSG) navigation.replace('Login');
+        else Alert.alert(t('error'), msg);
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [taskId, navigation, t, isOnline, isController]
+  );
+
   const handleComplete = useCallback(async () => {
     if (!taskId) return;
     if (!isController) {
       const incomplete = (doc?.lines ?? []).filter((l) => l.qty_picked < l.qty_required);
       if (incomplete?.length) {
-        Alert.alert(t('incomplete'), t('incompleteLines', { count: incomplete.length }));
+        setSelectedIncompleteReason(null);
+        setIncompleteReasonModalVisible(true);
         return;
       }
     }
-    setSubmitting(true);
-    try {
-      const profileType = isController ? 'controller' : 'picker';
-      if (isOnline) {
-        await apiClient.post(`/picking/documents/${taskId}/complete`);
-        navigation.replace('PickTaskList', { profileType });
-        Alert.alert(t('success'), t('pickingComplete'));
-      } else {
-        await addToQueue('PICK_CLOSE_TASK', { taskId, ts: Date.now() });
-        navigation.replace('PickTaskList', { profileType });
-        Alert.alert(t('success'), t('pickingComplete'));
-      }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : t('completeError');
-      if (msg === UNAUTHORIZED_MSG) navigation.replace('Login');
-      else Alert.alert(t('error'), msg);
-    } finally {
-      setSubmitting(false);
-    }
-  }, [taskId, doc, navigation, t, isOnline, isController]);
+    await doComplete(undefined);
+  }, [taskId, doc, isController, doComplete]);
+
+  const handleConfirmIncompleteReason = useCallback(() => {
+    if (!selectedIncompleteReason) return;
+    doComplete(selectedIncompleteReason);
+  }, [selectedIncompleteReason, doComplete]);
 
   const goBack = useCallback(() => {
     const pType = isController ? 'controller' : 'picker';
@@ -314,6 +332,15 @@ export function PickTaskDetails() {
           {t('picked')}: {(doc.progress?.picked ?? 0)} / {(doc.progress?.required ?? 0)}
         </Text>
       </View>
+
+      {isController && doc.incomplete_reason && (
+        <View style={styles.incompleteReasonBanner}>
+          <Text style={styles.incompleteReasonBannerLabel}>{t('incompleteReasonLabel')}</Text>
+          <Text style={styles.incompleteReasonBannerValue}>
+            {t(`reason_${doc.incomplete_reason}` as 'reason_expired') || doc.incomplete_reason}
+          </Text>
+        </View>
+      )}
 
       <ScrollView
         style={styles.scroll}
@@ -413,6 +440,53 @@ export function PickTaskDetails() {
                 )}
               </>
             )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      <Modal
+        visible={incompleteReasonModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIncompleteReasonModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setIncompleteReasonModalVisible(false)}
+        >
+          <View style={[styles.modalContent, styles.incompleteReasonModal]} onStartShouldSetResponder={() => true}>
+            <Text style={styles.incompleteReasonTitle}>{t('incompleteReasonTitle')}</Text>
+            <Text style={styles.incompleteReasonHint}>{t('incompleteReasonSelect')}</Text>
+            <ScrollView style={styles.incompleteReasonList} nestedScrollEnabled>
+              {INCOMPLETE_REASON_KEYS.map((key) => (
+                <TouchableOpacity
+                  key={key}
+                  style={[styles.incompleteReasonRow, selectedIncompleteReason === key && styles.incompleteReasonRowSelected]}
+                  onPress={() => setSelectedIncompleteReason(key)}
+                  activeOpacity={0.7}
+                >
+                  <Icon
+                    name={selectedIncompleteReason === key ? 'radiobox-marked' : 'radiobox-blank'}
+                    size={22}
+                    color={selectedIncompleteReason === key ? '#1976d2' : '#666'}
+                  />
+                  <Text style={styles.incompleteReasonRowText}>{t(`reason_${key}`)}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <View style={styles.incompleteReasonActions}>
+              <TouchableOpacity
+                style={[styles.incompleteReasonConfirm, !selectedIncompleteReason && styles.incompleteReasonConfirmDisabled]}
+                onPress={handleConfirmIncompleteReason}
+                disabled={!selectedIncompleteReason}
+              >
+                <Text style={styles.incompleteReasonConfirmText}>{t('incompleteConfirmComplete')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.incompleteReasonCancel} onPress={() => setIncompleteReasonModalVisible(false)}>
+                <Text style={styles.incompleteReasonCancelText}>{t('cancel')}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </TouchableOpacity>
       </Modal>
@@ -660,4 +734,54 @@ const styles = StyleSheet.create({
   },
   modalSubmitDisabled: { opacity: 0.7 },
   modalSubmitText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  incompleteReasonModal: { maxHeight: '80%' },
+  incompleteReasonTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111',
+    marginBottom: 8,
+  },
+  incompleteReasonHint: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 12,
+  },
+  incompleteReasonList: { maxHeight: 280, marginBottom: 16 },
+  incompleteReasonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginBottom: 6,
+    backgroundColor: '#f5f5f5',
+    gap: 12,
+  },
+  incompleteReasonRowSelected: {
+    backgroundColor: '#e3f2fd',
+  },
+  incompleteReasonRowText: { fontSize: 16, color: '#111', flex: 1 },
+  incompleteReasonActions: { gap: 10 },
+  incompleteReasonConfirm: {
+    backgroundColor: '#1976d2',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  incompleteReasonConfirmDisabled: { opacity: 0.5 },
+  incompleteReasonConfirmText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  incompleteReasonCancel: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  incompleteReasonCancelText: { color: '#666', fontSize: 16 },
+  incompleteReasonBanner: {
+    backgroundColor: '#fff3e0',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ffe0b2',
+  },
+  incompleteReasonBannerLabel: { fontSize: 12, color: '#e65100', marginBottom: 2 },
+  incompleteReasonBannerValue: { fontSize: 15, fontWeight: '600', color: '#bf360c' },
 });

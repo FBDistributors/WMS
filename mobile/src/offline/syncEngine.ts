@@ -3,7 +3,7 @@
  * PICK_SCAN -> submitScan; PICK_SET_QTY / PICK_CONFIRM_ITEM -> pickLine; PICK_CLOSE_TASK -> complete.
  */
 import apiClient, { UNAUTHORIZED_MSG } from '../api/client';
-import { getTaskById, pickLine, submitScan } from '../api/picking';
+import { completePickDocument, getTaskById, pickLine, submitScan } from '../api/picking';
 import { queueGetPending, queueUpdateStatus } from './offlineDb';
 import type { PickScanPayload, PickSetQtyPayload, PickCloseTaskPayload } from './offlineQueue';
 
@@ -32,7 +32,7 @@ export async function syncPendingQueue(onItemDone?: (id: string) => void): Promi
         }
         case 'PICK_CLOSE_TASK': {
           const p = payload as unknown as PickCloseTaskPayload;
-          await apiClient.post(`/picking/documents/${p.taskId}/complete`);
+          await completePickDocument(p.taskId, p.incomplete_reason ? { incomplete_reason: p.incomplete_reason } : undefined);
           break;
         }
         default:

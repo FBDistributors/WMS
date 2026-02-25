@@ -5,7 +5,7 @@ from uuid import UUID
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -50,6 +50,7 @@ class PickingDocument(BaseModel):
     status: str
     lines: List[PickingLine]
     progress: PickingProgress
+    incomplete_reason: Optional[str] = None
 
 
 class PickingListItem(BaseModel):
@@ -93,6 +94,26 @@ class FCMTokenRequest(BaseModel):
     device_id: Optional[str] = None
 
 
+INCOMPLETE_REASON_CODES = (
+    "expired",
+    "out_of_stock",
+    "product_not_found",
+    "not_enough_time",
+    "damaged",
+    "wrong_location",
+    "other",
+)
+
+
+class CompletePickingRequest(BaseModel):
+    incomplete_reason: Optional[str] = None
+
+    class Config:
+        json_schema_extra = {
+            "example": {"incomplete_reason": "out_of_stock"},
+        }
+
+
 class MyPickerStatsDay(BaseModel):
     date: str  # YYYY-MM-DD
     count: int
@@ -131,6 +152,7 @@ def _to_picking_document(doc: DocumentModel) -> PickingDocument:
         status=doc.status,
         lines=[_to_picking_line(line) for line in doc.lines],
         progress=_calculate_progress(doc.lines),
+        incomplete_reason=getattr(doc, "incomplete_reason", None),
     )
 
 
@@ -575,6 +597,7 @@ def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
 )
 async def complete_picking_document(
     document_id: UUID,
+    body: Optional[CompletePickingRequest] = Body(None),
     db: Session = Depends(get_db),
     user=Depends(require_permission("picking:complete")),
 ):
@@ -594,11 +617,14 @@ async def complete_picking_document(
         .all()
     )
     incomplete = [line.id for line in lines if line.picked_qty < line.required_qty]
+    incomplete_reason = (body or CompletePickingRequest()).incomplete_reason if body else None
     if incomplete:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={"message": "Incomplete lines", "lines": incomplete},
-        )
+        if not incomplete_reason or incomplete_reason not in INCOMPLETE_REASON_CODES:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"message": "Incomplete lines", "lines": incomplete},
+            )
+        document.incomplete_reason = incomplete_reason
 
     if user.role == "inventory_controller":
         if document.controlled_by_user_id != user.id:

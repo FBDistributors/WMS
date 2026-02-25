@@ -24,6 +24,8 @@ export interface PickingDocument {
   status: string;
   lines: PickingLine[];
   progress: PickingProgress;
+  /** Yig'uvchi to'liq yig'maganda tanlagan sabab (controller ko'radi). */
+  incomplete_reason?: string | null;
 }
 
 export interface PickingListItem {

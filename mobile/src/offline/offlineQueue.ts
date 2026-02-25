@@ -42,6 +42,7 @@ export interface PickConfirmItemPayload {
 export interface PickCloseTaskPayload {
   taskId: string;
   ts: number;
+  incomplete_reason?: string;
 }
 
 export type QueuePayload = PickScanPayload | PickSetQtyPayload | PickConfirmItemPayload | PickCloseTaskPayload;
