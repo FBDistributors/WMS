@@ -2,7 +2,7 @@
  * Kirim forma — flow: new (yangi mahsulotlar) yoki return (mijozdan qaytgan).
  * Skan, miqdor, lokatsiya avtomat (FEFO), qatorlar, yakunlash; return da yig'uvchiga yuborish.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -98,6 +98,7 @@ export function KirimFormScreen() {
   const [contentsError, setContentsError] = useState<string | null>(null);
   const [actualQtyByKey, setActualQtyByKey] = useState<Record<string, string>>({});
   const [submittingAdjust, setSubmittingAdjust] = useState(false);
+  const submittingAdjustRef = useRef(false);
 
   const title = flow === 'new' ? t('kirimNewProducts') : flow === 'inventory' ? t('kirimInventory') : t('kirimCustomerReturns');
 
@@ -203,18 +204,23 @@ export function KirimFormScreen() {
   }, [navigation, flow, inventoryStep, inventoryLocation]);
 
   const handleSubmitAdjust = useCallback(async () => {
-    if (!locationContents?.items?.length || submittingAdjust) return;
+    if (!locationContents?.items?.length) return;
+    if (submittingAdjustRef.current) return;
+    submittingAdjustRef.current = true;
     setSubmittingAdjust(true);
     let hadError = false;
     let permissionError = false;
+    const sentKeys = new Set<string>();
     for (const item of locationContents.items) {
-      const key = `${item.product_id}-${item.lot_id}`;
-      const actualStr = actualQtyByKey[key]?.trim();
+      const key = `${item.product_id}-${item.lot_id}-${item.location_id}`;
+      if (sentKeys.has(key)) continue;
+      const actualStr = actualQtyByKey[`${item.product_id}-${item.lot_id}`]?.trim();
       if (actualStr === '') continue;
       const actual = Math.floor(Number(actualStr) || 0);
       const systemQty = Number(item.available_qty) || 0;
       const delta = actual - systemQty;
       if (delta === 0) continue;
+      sentKeys.add(key);
       try {
         await createStockMovement({
           product_id: item.product_id,
@@ -229,6 +235,7 @@ export function KirimFormScreen() {
         if (e?.response?.status === 403) permissionError = true;
       }
     }
+    submittingAdjustRef.current = false;
     setSubmittingAdjust(false);
     if (permissionError) {
       Alert.alert(t('error'), t('inventoryAdjustNoPermission'));
@@ -238,7 +245,7 @@ export function KirimFormScreen() {
       setActualQtyByKey({});
       getLocationContents(inventoryLocation!.code).then(setLocationContents).catch(() => {});
     }
-  }, [locationContents, actualQtyByKey, submittingAdjust, inventoryLocation, t]);
+  }, [locationContents, actualQtyByKey, inventoryLocation, t]);
 
   const addLine = useCallback(() => {
     const location = flow === 'inventory' ? inventoryLocation : selectedLocation;
