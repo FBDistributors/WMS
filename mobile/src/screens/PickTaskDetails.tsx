@@ -92,7 +92,12 @@ export function PickTaskDetails() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : t('loadError');
       setError(msg);
-      if (msg === UNAUTHORIZED_MSG) navigation.replace('Login');
+      if (msg === UNAUTHORIZED_MSG) {
+        Alert.alert(t('error'), t('authErrorPleaseLogin'), [
+          { text: 'OK', onPress: () => navigation.replace('Login') },
+        ]);
+        return;
+      }
     } finally {
       setLoading(false);
     }

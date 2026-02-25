@@ -19,7 +19,8 @@ router = APIRouter()
 
 ADMIN_ROLE = "warehouse_admin"
 MAX_ADMIN_SESSIONS = 3
-MAX_OTHER_SESSIONS = 1
+# Picker/controller: 2 sessiya (mobil + bitta boshqa), shunda buyurtmaga kirganda avtomat chiqmasin
+MAX_OTHER_SESSIONS = 2
 
 
 class LoginRequest(BaseModel):
@@ -64,14 +65,9 @@ async def login(payload: LoginRequest, request: Request, db: Session = Depends(g
     )
     max_sessions = MAX_ADMIN_SESSIONS if user.role == ADMIN_ROLE else MAX_OTHER_SESSIONS
 
-    if user.role == ADMIN_ROLE:
-        # Admin: keep up to 3; remove oldest if at limit
-        while len(existing) >= max_sessions and existing:
-            db.delete(existing.pop(0))
-    else:
-        # Non-admin: single device — remove all previous sessions
-        for s in existing:
-            db.delete(s)
+    # Keep up to max_sessions; remove oldest when at limit (admin 3, others 2)
+    while len(existing) >= max_sessions and existing:
+        db.delete(existing.pop(0))
 
     db.add(UserSession(user_id=user.id, token=token, device_info=user_agent))
     db.commit()

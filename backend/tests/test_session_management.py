@@ -1,5 +1,5 @@
 """
-Tests for session management: admin up to 3 devices, others 1 device.
+Tests for session management: admin up to 3 devices, others 2 (mobil + boshqa).
 """
 import pytest
 from fastapi.testclient import TestClient
@@ -30,11 +30,10 @@ def test_login_creates_session(client: TestClient, db_session: Session, test_use
     assert session is not None
 
 
-def test_non_admin_second_login_invalidates_first(
+def test_non_admin_two_sessions_then_third_invalidates_oldest(
     client: TestClient, db_session: Session, test_user: User
 ):
-    """Non-admin: second login invalidates first session (single device)."""
-    # Use a picker (non-admin) user
+    """Non-admin: can have 2 sessions (e.g. mobil + boshqa); 3rd login removes oldest."""
     picker = User(
         username="picker1",
         password_hash=get_password_hash("testpass123"),
@@ -60,12 +59,24 @@ def test_non_admin_second_login_invalidates_first(
     token2 = r2.json()["access_token"]
     assert token1 != token2
 
-    # First token invalid
-    resp = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token1}"})
-    assert resp.status_code == 401
-    # Second token valid
-    resp = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token2}"})
-    assert resp.status_code == 200
+    # Both tokens valid (2 sessions allowed)
+    resp1 = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token1}"})
+    assert resp1.status_code == 200
+    resp2 = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token2}"})
+    assert resp2.status_code == 200
+
+    # 3rd login: oldest (token1) invalidated
+    r3 = client.post(
+        "/api/v1/auth/login",
+        json={"username": picker.username, "password": "testpass123"},
+        headers={"User-Agent": "Third Device"},
+    )
+    assert r3.status_code == 200
+    token3 = r3.json()["access_token"]
+    resp_old = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token1}"})
+    assert resp_old.status_code == 401
+    resp_new = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token3}"})
+    assert resp_new.status_code == 200
 
 
 def test_admin_can_have_three_sessions(

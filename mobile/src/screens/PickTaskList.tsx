@@ -111,7 +111,9 @@ export function PickTaskList() {
       const msg = e instanceof Error ? e.message : t('listLoadError');
       setError(msg);
       if (msg === UNAUTHORIZED_MSG) {
-        navigation.replace('Login');
+        Alert.alert(t('error'), t('authErrorPleaseLogin'), [
+          { text: 'OK', onPress: () => navigation.replace('Login') },
+        ]);
         return;
       }
       if (isOnline) Alert.alert(t('error'), msg);
