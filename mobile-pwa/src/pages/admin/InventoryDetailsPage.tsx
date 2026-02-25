@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { DateInput } from '../../components/DateInput'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
@@ -137,11 +138,11 @@ export function InventoryDetailsPage() {
           </label>
           <label className="text-sm text-slate-600 dark:text-slate-300">
             {t('inventory:filters.expiry_before')}
-            <input
-              type="date"
-              className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+            <DateInput
               value={expiryBefore}
-              onChange={(event) => setExpiryBefore(event.target.value)}
+              onChange={setExpiryBefore}
+              className="mt-1 w-full"
+              aria-label={t('inventory:filters.expiry_before')}
             />
           </label>
           <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">

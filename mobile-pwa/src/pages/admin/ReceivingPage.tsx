@@ -8,6 +8,7 @@ import { ProductSearchCombobox, formatProductLabel } from '../../components/Prod
 import { LocationSearchCombobox, formatLocationLabel } from '../../components/LocationSearchCombobox'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
+import { DateInput } from '../../components/DateInput'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { getProducts, type Product } from '../../services/productsApi'
@@ -380,13 +381,11 @@ export function ReceivingPage() {
               </label>
               <label className="text-sm text-slate-600 dark:text-slate-300">
                 {t('receiving:fields.expiry_date')}
-                <input
-                  type="date"
-                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                <DateInput
                   value={line.expiry_date ?? ''}
-                  onChange={(event) =>
-                    updateLine(line.id, { expiry_date: event.target.value || null })
-                  }
+                  onChange={(val) => updateLine(line.id, { expiry_date: val || null })}
+                  className="mt-1 w-full"
+                  aria-label={t('receiving:fields.expiry_date')}
                 />
               </label>
             </div>
@@ -525,20 +524,20 @@ export function ReceivingPage() {
                       <div className="grid grid-cols-2 gap-2">
                         <label className="block text-sm text-slate-600 dark:text-slate-400">
                           {t('receiving:date_from')}
-                          <input
-                            type="date"
+                          <DateInput
                             value={dateFrom}
-                            onChange={(e) => setDateFrom(e.target.value)}
-                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                            onChange={setDateFrom}
+                            className="mt-1 w-full"
+                            aria-label={t('receiving:date_from')}
                           />
                         </label>
                         <label className="block text-sm text-slate-600 dark:text-slate-400">
                           {t('receiving:date_to')}
-                          <input
-                            type="date"
+                          <DateInput
                             value={dateTo}
-                            onChange={(e) => setDateTo(e.target.value)}
-                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                            onChange={setDateTo}
+                            className="mt-1 w-full"
+                            aria-label={t('receiving:date_to')}
                           />
                         </label>
                       </div>

@@ -5,6 +5,7 @@ import { FileText, MinusCircle } from 'lucide-react'
 
 import { useAuth } from '../../rbac/AuthProvider'
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { DateInput } from '../../components/DateInput'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
@@ -189,20 +190,20 @@ export function KamomatlarPage() {
           </label>
           <label className="text-sm text-slate-600 dark:text-slate-300">
             {t('kamomat:filters.date_from')}
-            <input
-              type="date"
-              className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+            <DateInput
               value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
+              onChange={setDateFrom}
+              className="mt-1 w-full"
+              aria-label={t('kamomat:filters.date_from')}
             />
           </label>
           <label className="text-sm text-slate-600 dark:text-slate-300">
             {t('kamomat:filters.date_to')}
-            <input
-              type="date"
-              className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+            <DateInput
               value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
+              onChange={setDateTo}
+              className="mt-1 w-full"
+              aria-label={t('kamomat:filters.date_to')}
             />
           </label>
           <div className="flex items-end">

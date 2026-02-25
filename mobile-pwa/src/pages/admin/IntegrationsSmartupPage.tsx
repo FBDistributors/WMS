@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { DateInput } from '../../components/DateInput'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { fetchJSON, type ApiError } from '../../services/apiClient'
@@ -69,20 +70,20 @@ export function IntegrationsSmartupPage() {
         <div className="grid gap-3 md:grid-cols-3">
           <label className="text-sm text-slate-600 dark:text-slate-300">
             {t('admin:integrations.smartup.begin_deal_date')}
-            <input
-              type="date"
-              className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+            <DateInput
               value={beginDealDate}
-              onChange={(event) => setBeginDealDate(event.target.value)}
+              onChange={setBeginDealDate}
+              className="mt-1 w-full"
+              aria-label={t('admin:integrations.smartup.begin_deal_date')}
             />
           </label>
           <label className="text-sm text-slate-600 dark:text-slate-300">
             {t('admin:integrations.smartup.end_deal_date')}
-            <input
-              type="date"
-              className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+            <DateInput
               value={endDealDate}
-              onChange={(event) => setEndDealDate(event.target.value)}
+              onChange={setEndDealDate}
+              className="mt-1 w-full"
+              aria-label={t('admin:integrations.smartup.end_deal_date')}
             />
           </label>
           <label className="text-sm text-slate-600 dark:text-slate-300">
