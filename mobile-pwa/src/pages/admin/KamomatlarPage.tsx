@@ -12,11 +12,10 @@ import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { listAuditLogs } from '../../services/auditApi'
 import type { AuditLogRecord } from '../../services/auditApi'
-import { listDocuments } from '../../services/api/documents'
-import type { DocumentListItem } from '../../services/api/types'
 
 const PAGE_SIZE = 50
 
+/** Inventarizatsiya tarixi: faqat stock_movement (mahsulot qo'shish/yo'q qilish va mobil inventar o'zgarishlari). */
 export function KamomatlarPage() {
   const { t } = useTranslation(['kamomat', 'common'])
   const { has } = useAuth()
@@ -26,34 +25,16 @@ export function KamomatlarPage() {
   const [offset, setOffset] = useState(0)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
-  const [entityId, setEntityId] = useState('')
-  const [docMap, setDocMap] = useState<Record<string, string>>({})
-  const [documents, setDocuments] = useState<DocumentListItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [detailRow, setDetailRow] = useState<AuditLogRecord | null>(null)
-
-  const loadDocuments = useCallback(async () => {
-    try {
-      const list = await listDocuments({ limit: 200, offset: 0 })
-      setDocuments(list)
-      const map: Record<string, string> = {}
-      list.forEach((d) => {
-        map[d.id] = d.reference_number ?? d.id
-      })
-      setDocMap(map)
-    } catch {
-      setDocMap({})
-    }
-  }, [])
 
   const load = useCallback(async () => {
     setIsLoading(true)
     setError(null)
     try {
       const data = await listAuditLogs({
-        entity_type: 'document',
-        entity_id: entityId || undefined,
+        entity_type: 'stock_movement',
         date_from: dateFrom || undefined,
         date_to: dateTo || undefined,
         limit: PAGE_SIZE,
@@ -66,11 +47,7 @@ export function KamomatlarPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [entityId, dateFrom, dateTo, offset, t])
-
-  useEffect(() => {
-    void loadDocuments()
-  }, [loadDocuments])
+  }, [dateFrom, dateTo, offset, t])
 
   useEffect(() => {
     void load()
@@ -90,7 +67,8 @@ export function KamomatlarPage() {
     }
   }
 
-  const docNo = (entityId: string) => docMap[entityId] ?? entityId
+  /** Harakat ID (stock_movement) qisqacha ko'rsatish */
+  const movementLabel = (entityId: string) => entityId.slice(0, 8)
 
   const content = () => {
     if (isLoading) {
@@ -118,7 +96,7 @@ export function KamomatlarPage() {
               <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('kamomat:columns.date')}</th>
               <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('kamomat:columns.user')}</th>
               <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('kamomat:columns.action')}</th>
-              <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('kamomat:columns.document')}</th>
+              <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('kamomat:columns.movement')}</th>
             </tr>
           </thead>
           <tbody>
@@ -148,7 +126,7 @@ export function KamomatlarPage() {
                   </span>
                 </td>
                 <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-800 dark:text-slate-200 sm:px-4">
-                  {docNo(row.entity_id)}
+                  {movementLabel(row.entity_id)}
                 </td>
               </tr>
             ))}
@@ -172,22 +150,7 @@ export function KamomatlarPage() {
         </div>
       )}
       <Card className="mb-4 space-y-3">
-        <div className="grid gap-3 md:grid-cols-4">
-          <label className="text-sm text-slate-600 dark:text-slate-300">
-            {t('kamomat:filters.document')}
-            <select
-              className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-              value={entityId}
-              onChange={(e) => setEntityId(e.target.value)}
-            >
-              <option value="">{t('kamomat:filters.all_documents')}</option>
-              {documents.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.reference_number} ({d.doc_type})
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="grid gap-3 md:grid-cols-3">
           <label className="text-sm text-slate-600 dark:text-slate-300">
             {t('kamomat:filters.date_from')}
             <DateInput
@@ -242,7 +205,7 @@ export function KamomatlarPage() {
           />
           <div className="relative max-h-[90vh] w-full max-w-2xl overflow-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
             <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
-              {detailRow.action} • {docNo(detailRow.entity_id)}
+              {detailRow.action} • {movementLabel(detailRow.entity_id)}
             </h3>
             <p className="mb-2 text-xs text-slate-500">
               {new Date(detailRow.created_at).toLocaleString()} • {detailRow.username ?? '—'}

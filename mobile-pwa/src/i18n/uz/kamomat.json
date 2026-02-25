@@ -2,18 +2,16 @@
   "title": "Inventarizatsiya (Hujjatlar tarixi)",
   "write_off_button": "Mahsulotni yo'q qilish",
   "load_error": "Tarix yuklanmadi.",
-  "empty": "Hujjatlar tarixi boʻsh",
-  "empty_desc": "Hujjatlar yaratilganda yoki oʻzgartirilganda bu yerda koʻrinadi.",
+  "empty": "Inventarizatsiya tarixi boʻsh",
+  "empty_desc": "Mahsulot qoʻshilganda, yoʻq qilinganda yoki mobil ilovada inventar oʻzgartirilganda bu yerda koʻrinadi.",
   "total": "Jami {{count}} ta",
   "columns": {
     "date": "Sana",
     "user": "Foydalanuvchi",
     "action": "Amal",
-    "document": "Hujjat"
+    "movement": "Harakat"
   },
   "filters": {
-    "document": "Hujjat",
-    "all_documents": "Barcha hujjatlar",
     "date_from": "Boshlanish",
     "date_to": "Tugash",
     "apply": "Qoʻllash"

@@ -2,18 +2,16 @@
   "title": "Inventory count",
   "write_off_button": "Write off product",
   "load_error": "Failed to load history.",
-  "empty": "No document history",
-  "empty_desc": "History will appear when documents are created or updated.",
+  "empty": "No inventory change history",
+  "empty_desc": "History will show when products are added or removed (write-off, mobile inventory).",
   "total": "{{count}} total",
   "columns": {
     "date": "Date",
     "user": "User",
     "action": "Action",
-    "document": "Document"
+    "movement": "Movement"
   },
   "filters": {
-    "document": "Document",
-    "all_documents": "All documents",
     "date_from": "From date",
     "date_to": "To date",
     "apply": "Apply"
