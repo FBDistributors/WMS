@@ -655,8 +655,9 @@ async def complete_picking_document(
         if document.controlled_by_user_id != user.id:
             raise HTTPException(status_code=403, detail="Document not assigned to you")
         if document.status == "completed":
+            response = _to_picking_document_with_lines(document, lines)
             db.commit()
-            return _to_picking_document_with_lines(document, lines)
+            return response
         if document.status != "picked":
             raise HTTPException(status_code=409, detail="Document must be in picked status")
         document.status = "completed"
@@ -673,6 +674,7 @@ async def complete_picking_document(
             )
             if order and order.status in {"picking", "allocated"}:
                 order.status = "picked"
+    # Javobni commit dan oldin yig‘ib olamiz (commit dan keyin session expired bo‘ladi)
+    response = _to_picking_document_with_lines(document, lines)
     db.commit()
-
-    return _to_picking_document_with_lines(document, lines)
+    return response

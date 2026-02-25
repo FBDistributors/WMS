@@ -81,7 +81,7 @@ export function PickTaskDetails() {
     setError(null);
     try {
       if (isOnline) {
-        const data = await getTaskById(taskId);
+        const data = await getTaskById(String(taskId));
         const normalized = normalizeDocument(data);
         setDoc(normalized);
         if (normalized) await saveCachedPickTaskDetail(taskId, normalized);
@@ -254,7 +254,7 @@ export function PickTaskDetails() {
       try {
         const profileType = isController ? 'controller' : 'picker';
         if (isOnline) {
-          await completePickDocument(taskId, incompleteReason ? { incomplete_reason: incompleteReason } : undefined);
+          await completePickDocument(String(taskId), incompleteReason ? { incomplete_reason: incompleteReason } : undefined);
           navigation.replace('PickTaskList', { profileType });
           Alert.alert(t('success'), t('pickingComplete'));
         } else {
@@ -329,7 +329,7 @@ export function PickTaskDetails() {
         <TouchableOpacity onPress={goBack} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <Icon name="arrow-left" size={24} color="#1976d2" />
         </TouchableOpacity>
-        <Text style={styles.title}>{doc.reference_number}</Text>
+        <Text style={styles.title}>{doc.reference_number ?? '—'}</Text>
         <View style={styles.badge}>
           <Text style={styles.badgeText}>
             {isController && doc.status === 'picked'
@@ -357,11 +357,11 @@ export function PickTaskDetails() {
         keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.sectionTitle}>{t('positions')}</Text>
-        {(doc.lines ?? []).map((line) => (
+        {(doc.lines ?? []).filter(Boolean).map((line, index) => (
           <LineCard
-            key={line.id}
-            line={line}
-            onPress={isController ? undefined : () => openLineScan(line)}
+            key={line?.id ?? `line-${index}`}
+            line={line as PickingLine}
+            onPress={isController ? undefined : () => openLineScan(line as PickingLine)}
             t={t}
             readOnly={isController}
             isController={isController}
