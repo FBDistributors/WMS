@@ -20,6 +20,8 @@ const PAGE_SIZE = 50
 
 type DetailResolved = {
   productName: string
+  productCode: string
+  barcode: string
   locationCode: string
   lotBatch: string
   qtyChange: number
@@ -84,15 +86,20 @@ export function KamomatlarPage() {
     setDetailResolveLoading(true)
     setDetailResolved(null)
     Promise.all([
-      getProduct(productId).then((p) => p.name ?? p.sku ?? productId).catch(() => productId),
+      getProduct(productId).catch(() => null),
       getLocation(locationId).then((l) => l.code ?? locationId).catch(() => locationId),
       listStockLots(productId)
         .then((lots) => lots.find((l) => l.id === lotId)?.batch ?? (lotId ? lotId.slice(0, 8) : '—'))
         .catch(() => lotId ? lotId.slice(0, 8) : '—'),
     ])
-      .then(([productName, locationCode, lotBatch]) => {
+      .then(([product, locationCode, lotBatch]) => {
+        const productName = product?.name ?? product?.sku ?? productId
+        const productCode = product?.sku ?? '—'
+        const barcode = product?.barcode ?? product?.barcodes?.[0] ?? '—'
         setDetailResolved({
           productName: String(productName),
+          productCode: String(productCode),
+          barcode: String(barcode),
           locationCode: String(locationCode),
           lotBatch: String(lotBatch),
           qtyChange,
@@ -286,6 +293,14 @@ export function KamomatlarPage() {
                   <div>
                     <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.product')}: </span>
                     <span className="text-slate-800 dark:text-slate-200">{detailResolved.productName}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.product_code')}: </span>
+                    <span className="font-mono text-slate-800 dark:text-slate-200">{detailResolved.productCode}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.barcode')}: </span>
+                    <span className="font-mono text-slate-800 dark:text-slate-200">{detailResolved.barcode}</span>
                   </div>
                   <div>
                     <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.batch')}: </span>
