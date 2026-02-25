@@ -87,9 +87,19 @@ class ProductHistoryPick(BaseModel):
     qty: float
 
 
+class ProductHistoryAdjustment(BaseModel):
+    """Inventarizatsiya: adjust harakati (mobil yoki admin yo'q qilish/qo'shish)."""
+    date: str  # ISO
+    adjusted_by: Optional[str] = None
+    location_code: Optional[str] = None
+    qty_change: float  # + or -
+    reason_code: Optional[str] = None
+
+
 class ProductHistoryResponse(BaseModel):
     receiving: List[ProductHistoryReceiving] = []
     picks: List[ProductHistoryPick] = []
+    adjustments: List[ProductHistoryAdjustment] = []
     on_hand_total: Optional[float] = None
     reserved_total: Optional[float] = None
     available_total: Optional[float] = None
@@ -421,11 +431,47 @@ async def get_product_history(
             )
         )
 
+    adjustments: List[ProductHistoryAdjustment] = []
+    adjust_movements = (
+        db.query(StockMovementModel)
+        .filter(
+            StockMovementModel.product_id == product_id,
+            StockMovementModel.movement_type == "adjust",
+        )
+        .order_by(StockMovementModel.created_at.desc())
+        .all()
+    )
+    adjust_user_ids = {m.created_by_user_id for m in adjust_movements if m.created_by_user_id}
+    adjust_users: Dict[UUID, UserModel] = {}
+    if adjust_user_ids:
+        for u in db.query(UserModel).filter(UserModel.id.in_(adjust_user_ids)).all():
+            adjust_users[u.id] = u
+    location_ids = {m.location_id for m in adjust_movements}
+    locations_by_id: Dict[UUID, LocationModel] = {}
+    if location_ids:
+        for loc in db.query(LocationModel).filter(LocationModel.id.in_(location_ids)).all():
+            locations_by_id[loc.id] = loc
+    for mov in adjust_movements:
+        creator = adjust_users.get(mov.created_by_user_id) if mov.created_by_user_id else None
+        adjusted_by = (creator.full_name or creator.username) if creator else None
+        loc = locations_by_id.get(mov.location_id) if mov.location_id else None
+        location_code = loc.code if loc else None
+        adjustments.append(
+            ProductHistoryAdjustment(
+                date=mov.created_at.isoformat() if mov.created_at else "",
+                adjusted_by=adjusted_by,
+                location_code=location_code,
+                qty_change=float(mov.qty_change),
+                reason_code=mov.reason_code,
+            )
+        )
+
     summary = _fetch_inventory_summary(db, [product_id])
     s = summary.get(product_id) or {}
     return ProductHistoryResponse(
         receiving=receiving,
         picks=picks,
+        adjustments=adjustments,
         on_hand_total=s.get("on_hand_total"),
         reserved_total=s.get("reserved_total"),
         available_total=s.get("available_total"),

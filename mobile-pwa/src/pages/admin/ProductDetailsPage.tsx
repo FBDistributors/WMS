@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Info, Package, ShoppingCart, Truck, Warehouse } from 'lucide-react'
+import { ArrowLeft, ClipboardList, Info, Package, ShoppingCart, Truck, Warehouse } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -28,7 +28,7 @@ function formatDate(iso: string): string {
   }
 }
 
-type TabId = 'basic' | 'receiving' | 'picks' | 'stock'
+type TabId = 'basic' | 'receiving' | 'picks' | 'adjustments' | 'stock'
 
 export function ProductDetailsPage() {
   const { id } = useParams()
@@ -125,6 +125,7 @@ export function ProductDetailsPage() {
     { id: 'basic', labelKey: 'products:history.tab_basic', icon: <Info size={16} /> },
     { id: 'receiving', labelKey: 'products:history.receiving_history', icon: <Truck size={16} /> },
     { id: 'picks', labelKey: 'products:history.pick_history', icon: <ShoppingCart size={16} /> },
+    { id: 'adjustments', labelKey: 'products:history.adjustment_history', icon: <ClipboardList size={16} /> },
     { id: 'stock', labelKey: 'products:history.tab_stock', icon: <Warehouse size={16} /> },
   ]
 
@@ -370,6 +371,67 @@ export function ProductDetailsPage() {
                             </td>
                             <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">
                               {row.qty}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {activeTab === 'adjustments' && (
+              <section>
+                <h3 className="mb-4 text-base font-semibold text-slate-900 dark:text-slate-100">
+                  {t('products:history.adjustment_history')}
+                </h3>
+                {historyLoading ? (
+                  <div className="h-24 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
+                ) : !history || !history.adjustments?.length ? (
+                  <p className="text-sm text-slate-500">{t('products:history.no_adjustments')}</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200 dark:border-slate-700">
+                          <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">
+                            {t('products:history.date')}
+                          </th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">
+                            {t('products:history.adjusted_by')}
+                          </th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">
+                            {t('products:history.location_code')}
+                          </th>
+                          <th className="px-3 py-2 text-right font-medium text-slate-600 dark:text-slate-400">
+                            {t('products:history.qty_change')}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {history.adjustments.map((row, idx) => (
+                          <tr
+                            key={idx}
+                            className="border-b border-slate-100 dark:border-slate-800"
+                          >
+                            <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
+                              {formatDate(row.date)}
+                            </td>
+                            <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
+                              {row.adjusted_by ?? '—'}
+                            </td>
+                            <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300">
+                              {row.location_code ?? '—'}
+                            </td>
+                            <td
+                              className={`px-3 py-2 text-right font-medium ${
+                                row.qty_change < 0
+                                  ? 'text-amber-600 dark:text-amber-400'
+                                  : 'text-slate-700 dark:text-slate-300'
+                              }`}
+                            >
+                              {row.qty_change > 0 ? '+' : ''}{row.qty_change}
                             </td>
                           </tr>
                         ))}

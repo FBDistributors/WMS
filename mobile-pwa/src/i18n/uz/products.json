@@ -111,6 +111,7 @@
     "location_code": "Joy kodi",
     "receiving_history": "Kirim tarixi",
     "pick_history": "Terish tarixi",
+    "adjustment_history": "Inventarizatsiya",
     "on_hand": "Mavjud",
     "reserved": "Rezerv",
     "available": "Erkin",
@@ -118,12 +119,15 @@
     "received_by": "Kim qabul qilgan",
     "order_number": "Buyurtma",
     "picked_by": "Kim yig'gan",
+    "adjusted_by": "Kim o'zgartirgan",
     "qty": "Miqdor",
+    "qty_change": "O'zgarish",
     "doc_no": "Hujjat raqami",
     "batch": "Partiya",
     "location": "Joy",
     "no_receiving": "Kirim yozuvlari yo'q.",
     "no_picks": "Terish yozuvlari yo'q.",
+    "no_adjustments": "Inventarizatsiya yozuvlari yo'q.",
     "no_stock_by_location": "Lokatsiyalar bo'yicha qoldiq yo'q."
   }
 }

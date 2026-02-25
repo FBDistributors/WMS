@@ -79,9 +79,18 @@ export type ProductHistoryPick = {
   qty: number
 }
 
+export type ProductHistoryAdjustment = {
+  date: string
+  adjusted_by: string | null
+  location_code: string | null
+  qty_change: number
+  reason_code: string | null
+}
+
 export type ProductHistoryResponse = {
   receiving: ProductHistoryReceiving[]
   picks: ProductHistoryPick[]
+  adjustments: ProductHistoryAdjustment[]
   on_hand_total: number | null
   reserved_total: number | null
   available_total: number | null

@@ -111,6 +111,7 @@
     "location_code": "Локация",
     "receiving_history": "История поступлений",
     "pick_history": "История отборов",
+    "adjustment_history": "Инвентаризация",
     "on_hand": "В наличии",
     "reserved": "Резерв",
     "available": "Доступно",
@@ -118,12 +119,15 @@
     "received_by": "Кто принял",
     "order_number": "Заказ",
     "picked_by": "Кто собрал",
+    "adjusted_by": "Кто изменил",
     "qty": "Кол-во",
+    "qty_change": "Изменение",
     "doc_no": "Док. №",
     "batch": "Партия",
     "location": "Место",
     "no_receiving": "Нет записей о поступлении.",
     "no_picks": "Нет записей об отборе.",
+    "no_adjustments": "Нет записей инвентаризации.",
     "no_stock_by_location": "Нет остатков по локациям."
   }
 }

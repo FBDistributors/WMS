@@ -111,6 +111,7 @@
     "location_code": "Location",
     "receiving_history": "Receiving history",
     "pick_history": "Pick history",
+    "adjustment_history": "Inventory adjustments",
     "on_hand": "On hand",
     "reserved": "Reserved",
     "available": "Available",
@@ -118,12 +119,15 @@
     "received_by": "Received by",
     "order_number": "Order",
     "picked_by": "Picked by",
+    "adjusted_by": "Adjusted by",
     "qty": "Qty",
+    "qty_change": "Qty change",
     "doc_no": "Doc no",
     "batch": "Batch",
     "location": "Location",
     "no_receiving": "No receiving records.",
     "no_picks": "No pick records.",
+    "no_adjustments": "No inventory adjustments.",
     "no_stock_by_location": "No stock by location."
   }
 }
