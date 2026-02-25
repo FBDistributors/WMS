@@ -1,3 +1,4 @@
+import { useRef, useCallback } from 'react'
 import { Calendar } from 'lucide-react'
 
 const PLACEHOLDER = 'dd/mm/yyyy'
@@ -29,11 +30,31 @@ export function DateInput({
   'aria-label': ariaLabel,
   disabled = false,
 }: DateInputProps) {
+  const inputRef = useRef<HTMLInputElement>(null)
   const displayValue = formatForDisplay(value)
+
+  const openCalendar = useCallback(() => {
+    if (disabled) return
+    const el = inputRef.current
+    if (!el) return
+    el.focus()
+    if (typeof (el as HTMLInputElement & { showPicker?: () => void }).showPicker === 'function') {
+      ;(el as HTMLInputElement & { showPicker: () => void }).showPicker()
+    }
+  }, [disabled])
 
   return (
     <div
-      className={`relative flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition-colors hover:border-slate-300 focus-within:ring-2 focus-within:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600 ${
+      role="button"
+      tabIndex={disabled ? undefined : 0}
+      onClick={openCalendar}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          openCalendar()
+        }
+      }}
+      className={`relative flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition-colors hover:border-slate-300 focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600 ${
         disabled ? 'cursor-not-allowed opacity-60' : ''
       } ${className}`}
     >
@@ -48,14 +69,16 @@ export function DateInput({
         aria-hidden
       />
       <input
+        ref={inputRef}
         type="date"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
         id={id}
         aria-label={ariaLabel}
+        aria-hidden
+        tabIndex={-1}
         className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-        tabIndex={0}
       />
     </div>
   )
