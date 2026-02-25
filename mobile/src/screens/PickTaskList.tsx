@@ -88,6 +88,8 @@ export function PickTaskList() {
   const { t } = useLocale();
   const { isOnline } = useNetwork();
   const profileType = route.params?.profileType ?? 'picker';
+  const completedMessage = route.params?.completedMessage;
+  const [showCompletedBanner, setShowCompletedBanner] = useState(!!completedMessage);
   const [list, setList] = useState<PickingListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -125,6 +127,13 @@ export function PickTaskList() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!completedMessage) return;
+    setShowCompletedBanner(true);
+    const t = setTimeout(() => setShowCompletedBanner(false), 2500);
+    return () => clearTimeout(t);
+  }, [completedMessage]);
 
   const openControllerModal = useCallback(
     async (doc: PickingListItem) => {
@@ -186,6 +195,12 @@ export function PickTaskList() {
 
   return (
     <View style={styles.container}>
+      {showCompletedBanner && completedMessage ? (
+        <View style={styles.completedBanner}>
+          <Icon name="check-circle" size={20} color="#fff" />
+          <Text style={styles.completedBannerText}>{completedMessage}</Text>
+        </View>
+      ) : null}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -274,6 +289,16 @@ export function PickTaskList() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
+  completedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: '#2e7d32',
+  },
+  completedBannerText: { color: '#fff', fontSize: 14, fontWeight: '600' },
   centered: {
     flex: 1,
     justifyContent: 'center',

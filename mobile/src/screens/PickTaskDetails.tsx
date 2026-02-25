@@ -255,12 +255,10 @@ export function PickTaskDetails() {
         const profileType = isController ? 'controller' : 'picker';
         if (isOnline) {
           await completePickDocument(String(taskId), incompleteReason ? { incomplete_reason: incompleteReason } : undefined);
-          navigation.replace('PickTaskList', { profileType });
-          Alert.alert(t('success'), t('pickingComplete'));
+          navigation.replace('PickTaskList', { profileType, completedMessage: t('pickingComplete') });
         } else {
           await addToQueue('PICK_CLOSE_TASK', { taskId, ts: Date.now(), incomplete_reason: incompleteReason });
-          navigation.replace('PickTaskList', { profileType });
-          Alert.alert(t('success'), t('pickingComplete'));
+          navigation.replace('PickTaskList', { profileType, completedMessage: t('pickingComplete') });
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : t('completeError');
