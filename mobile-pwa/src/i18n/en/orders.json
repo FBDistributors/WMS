@@ -74,6 +74,11 @@
     "cancelled": "Cancelled"
   },
   "incomplete_badge": "Incomplete",
+  "status_simple": {
+    "yigishda": "In picking",
+    "tekshiruvda": "Under verification",
+    "yakunlash": "Completed"
+  },
   "columns": {
     "select": "",
     "order_number": "Order",

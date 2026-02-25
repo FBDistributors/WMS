@@ -72,6 +72,11 @@
     "cancelled": "Отменено"
   },
   "incomplete_badge": "Не полностью",
+  "status_simple": {
+    "yigishda": "В подборе",
+    "tekshiruvda": "На проверке",
+    "yakunlash": "Завершён"
+  },
   "columns": {
     "order_number": "Заказ",
     "external_id": "Внешний ID",

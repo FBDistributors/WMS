@@ -74,6 +74,11 @@
     "cancelled": "Bekor qilingan"
   },
   "incomplete_badge": "To'liq emas",
+  "status_simple": {
+    "yigishda": "Yig'ishda",
+    "tekshiruvda": "Tekshiruvda",
+    "yakunlash": "Yakunlash"
+  },
   "columns": {
     "select": "",
     "order_number": "Buyurtma",

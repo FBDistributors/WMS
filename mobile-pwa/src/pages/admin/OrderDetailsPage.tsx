@@ -24,25 +24,25 @@ export function OrderDetailsPage() {
 
   const canEditStatus = has('documents:edit_status')
 
-  const ORDER_STATUS_OPTIONS = [
-    'imported',
-    'B#S',
-    'allocated',
-    'ready_for_picking',
-    'picking',
-    'picked',
-    'completed',
-    'packed',
-    'shipped',
-    'cancelled',
+  // 3 ta soddalashtirilgan status: backend statusni shu uchiga map qilamiz
+  const SIMPLIFIED_STATUSES = [
+    { value: 'picking', labelKey: 'orders:status_simple.yigishda' },
+    { value: 'picked', labelKey: 'orders:status_simple.tekshiruvda' },
+    { value: 'completed', labelKey: 'orders:status_simple.yakunlash' },
   ] as const
 
-  const handleStatusChange = async (newStatus: string) => {
-    if (!order || newStatus === order.status) return
+  const backendToSimple = (status: string): string => {
+    if (['imported', 'B#S', 'allocated', 'ready_for_picking', 'picking'].includes(status)) return 'picking'
+    if (status === 'picked') return 'picked'
+    return 'completed' // completed, packed, shipped, cancelled
+  }
+
+  const handleStatusChange = async (newBackendStatus: string) => {
+    if (!order || newBackendStatus === order.status) return
     setIsUpdating(true)
     setActionError(null)
     try {
-      const data = await updateOrderStatus(order.id, newStatus)
+      const data = await updateOrderStatus(order.id, newBackendStatus)
       setOrder(data)
     } catch (err) {
       setActionError(err instanceof Error ? err.message : t('orders:status_update_failed'))
@@ -163,20 +163,20 @@ export function OrderDetailsPage() {
             <div className="text-xs text-slate-500">{t('orders:columns.status')}</div>
             {canEditStatus ? (
               <select
-                value={order.status}
+                value={backendToSimple(order.status)}
                 onChange={(e) => handleStatusChange(e.target.value)}
                 disabled={isUpdating}
                 className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               >
-                {ORDER_STATUS_OPTIONS.map((s) => (
-                  <option key={s} value={s}>
-                    {t(`orders:status.${s === 'B#S' ? 'b#s' : s}`, s)}
+                {SIMPLIFIED_STATUSES.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {t(s.labelKey)}
                   </option>
                 ))}
               </select>
             ) : (
               <div className="text-sm text-slate-700 dark:text-slate-200">
-                {t(`orders:status.${order.status === 'B#S' ? 'b#s' : order.status}`, order.status)}
+                {t(SIMPLIFIED_STATUSES.find((x) => x.value === backendToSimple(order.status))?.labelKey ?? 'orders:status_simple.yakunlash')}
               </div>
             )}
           </div>
