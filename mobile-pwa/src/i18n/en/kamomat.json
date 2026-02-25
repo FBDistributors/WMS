@@ -17,6 +17,16 @@
     "apply": "Apply"
   },
   "detail": {
+    "who": "Who",
+    "when": "When",
+    "loading": "Loading details…",
+    "summary": "What was changed",
+    "product": "Product",
+    "batch": "Batch",
+    "location": "Location",
+    "qty_change": "Quantity change",
+    "action_type": "Action type",
+    "raw_data": "Raw data (JSON)",
     "old_data": "Old data",
     "new_data": "New data"
   },

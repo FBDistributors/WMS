@@ -17,6 +17,16 @@
     "apply": "Qoʻllash"
   },
   "detail": {
+    "who": "Kim",
+    "when": "Qachon",
+    "loading": "Tafsilotlar yuklanmoqda…",
+    "summary": "Nima o'zgartirildi",
+    "product": "Mahsulot",
+    "batch": "Partiya",
+    "location": "Lokatsiya",
+    "qty_change": "Miqdor o'zgarishi",
+    "action_type": "Amal turi",
+    "raw_data": "Batafsil (JSON)",
     "old_data": "Eski maʼlumot",
     "new_data": "Yangi maʼlumot"
   },

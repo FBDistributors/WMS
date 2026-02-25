@@ -205,6 +205,20 @@ export async function getInventoryMovements(query: InventoryMovementsQuery = {})
   })
 }
 
+export type StockLot = {
+  id: string
+  product_id: string
+  batch: string
+  expiry_date?: string | null
+  created_at?: string
+}
+
+export async function listStockLots(productId?: string) {
+  return fetchJSON<StockLot[]>('/api/v1/inventory/lots', {
+    query: productId ? { product_id: productId } : undefined,
+  })
+}
+
 export type CreateMovementPayload = {
   product_id: string
   lot_id: string

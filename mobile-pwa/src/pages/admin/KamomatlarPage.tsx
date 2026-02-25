@@ -12,8 +12,19 @@ import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { listAuditLogs } from '../../services/auditApi'
 import type { AuditLogRecord } from '../../services/auditApi'
+import { getProduct } from '../../services/productsApi'
+import { getLocation } from '../../services/locationsApi'
+import { listStockLots } from '../../services/inventoryApi'
 
 const PAGE_SIZE = 50
+
+type DetailResolved = {
+  productName: string
+  locationCode: string
+  lotBatch: string
+  qtyChange: number
+  movementType: string
+}
 
 /** Inventarizatsiya tarixi: faqat stock_movement (mahsulot qo'shish/yo'q qilish va mobil inventar o'zgarishlari). */
 export function KamomatlarPage() {
@@ -28,6 +39,8 @@ export function KamomatlarPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [detailRow, setDetailRow] = useState<AuditLogRecord | null>(null)
+  const [detailResolved, setDetailResolved] = useState<DetailResolved | null>(null)
+  const [detailResolveLoading, setDetailResolveLoading] = useState(false)
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -52,6 +65,42 @@ export function KamomatlarPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (!detailRow || detailRow.entity_type !== 'stock_movement') {
+      setDetailResolved(null)
+      return
+    }
+    const data = detailRow.new_data ?? detailRow.old_data
+    const productId = data?.product_id as string | undefined
+    const lotId = data?.lot_id as string | undefined
+    const locationId = data?.location_id as string | undefined
+    const qtyChange = data?.qty_change != null ? Number(data.qty_change) : 0
+    const movementType = (data?.movement_type as string) ?? '—'
+    if (!productId || !locationId) {
+      setDetailResolved(null)
+      return
+    }
+    setDetailResolveLoading(true)
+    setDetailResolved(null)
+    Promise.all([
+      getProduct(productId).then((p) => p.name ?? p.sku ?? productId).catch(() => productId),
+      getLocation(locationId).then((l) => l.code ?? locationId).catch(() => locationId),
+      listStockLots(productId)
+        .then((lots) => lots.find((l) => l.id === lotId)?.batch ?? (lotId ? lotId.slice(0, 8) : '—'))
+        .catch(() => lotId ? lotId.slice(0, 8) : '—'),
+    ])
+      .then(([productName, locationCode, lotBatch]) => {
+        setDetailResolved({
+          productName: String(productName),
+          locationCode: String(locationCode),
+          lotBatch: String(lotBatch),
+          qtyChange,
+          movementType,
+        })
+      })
+      .finally(() => setDetailResolveLoading(false))
+  }, [detailRow])
 
   const handleApply = () => {
     setOffset(0)
@@ -207,28 +256,87 @@ export function KamomatlarPage() {
             <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
               {detailRow.action} • {movementLabel(detailRow.entity_id)}
             </h3>
-            <p className="mb-2 text-xs text-slate-500">
-              {new Date(detailRow.created_at).toLocaleString()} • {detailRow.username ?? '—'}
-              {detailRow.ip_address ? ` • ${detailRow.ip_address}` : ''}
-            </p>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <h4 className="mb-1 text-sm font-medium text-slate-600 dark:text-slate-400">
-                  {t('kamomat:detail.old_data')}
-                </h4>
-                <pre className="max-h-64 overflow-auto rounded-xl bg-slate-100 p-3 font-mono text-xs text-slate-800 dark:bg-slate-900 dark:text-slate-200">
-                  {formatJson(detailRow.old_data)}
-                </pre>
+            <dl className="mb-4 space-y-2 text-sm">
+              <div className="flex flex-wrap gap-x-2">
+                <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.who')}:</span>
+                <span className="text-slate-800 dark:text-slate-200">{detailRow.username ?? '—'}</span>
               </div>
-              <div>
-                <h4 className="mb-1 text-sm font-medium text-slate-600 dark:text-slate-400">
-                  {t('kamomat:detail.new_data')}
-                </h4>
-                <pre className="max-h-64 overflow-auto rounded-xl bg-slate-100 p-3 font-mono text-xs text-slate-800 dark:bg-slate-900 dark:text-slate-200">
-                  {formatJson(detailRow.new_data)}
-                </pre>
+              <div className="flex flex-wrap gap-x-2">
+                <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.when')}:</span>
+                <span className="text-slate-800 dark:text-slate-200">
+                  {new Date(detailRow.created_at).toLocaleString()}
+                </span>
               </div>
-            </div>
+              {detailRow.ip_address && (
+                <div className="flex flex-wrap gap-x-2">
+                  <span className="font-medium text-slate-500 dark:text-slate-400">IP:</span>
+                  <span className="font-mono text-slate-700 dark:text-slate-300">{detailRow.ip_address}</span>
+                </div>
+              )}
+            </dl>
+            {detailResolveLoading && (
+              <p className="mb-4 text-sm text-slate-500">{t('kamomat:detail.loading')}</p>
+            )}
+            {detailResolved && !detailResolveLoading && (
+              <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/50">
+                <h4 className="mb-3 text-sm font-medium text-slate-600 dark:text-slate-400">
+                  {t('kamomat:detail.summary')}
+                </h4>
+                <dl className="space-y-2 text-sm">
+                  <div>
+                    <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.product')}: </span>
+                    <span className="text-slate-800 dark:text-slate-200">{detailResolved.productName}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.batch')}: </span>
+                    <span className="text-slate-800 dark:text-slate-200">{detailResolved.lotBatch}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.location')}: </span>
+                    <span className="text-slate-800 dark:text-slate-200">{detailResolved.locationCode}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.qty_change')}: </span>
+                    <span
+                      className={
+                        detailResolved.qtyChange < 0
+                          ? 'font-medium text-amber-600 dark:text-amber-400'
+                          : 'text-slate-800 dark:text-slate-200'
+                      }
+                    >
+                      {detailResolved.qtyChange > 0 ? '+' : ''}{detailResolved.qtyChange}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.action_type')}: </span>
+                    <span className="text-slate-800 dark:text-slate-200">{detailResolved.movementType}</span>
+                  </div>
+                </dl>
+              </div>
+            )}
+            <details className="mb-4">
+              <summary className="cursor-pointer text-sm font-medium text-slate-600 dark:text-slate-400">
+                {t('kamomat:detail.raw_data')}
+              </summary>
+              <div className="mt-2 grid gap-4 md:grid-cols-2">
+                <div>
+                  <h4 className="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                    {t('kamomat:detail.old_data')}
+                  </h4>
+                  <pre className="max-h-48 overflow-auto rounded-xl bg-slate-100 p-3 font-mono text-xs text-slate-800 dark:bg-slate-900 dark:text-slate-200">
+                    {formatJson(detailRow.old_data)}
+                  </pre>
+                </div>
+                <div>
+                  <h4 className="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                    {t('kamomat:detail.new_data')}
+                  </h4>
+                  <pre className="max-h-48 overflow-auto rounded-xl bg-slate-100 p-3 font-mono text-xs text-slate-800 dark:bg-slate-900 dark:text-slate-200">
+                    {formatJson(detailRow.new_data)}
+                  </pre>
+                </div>
+              </div>
+            </details>
             <Button className="mt-4" variant="secondary" onClick={() => setDetailRow(null)}>
               {t('common:buttons.close')}
             </Button>
