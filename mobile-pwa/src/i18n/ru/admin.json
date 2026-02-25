@@ -37,7 +37,11 @@
     "no_expired_zone": "Нет ячейки в зоне EXPIRED",
     "no_damaged_zone": "Нет ячейки в зоне DAMAGED",
     "select_other": "Выберите другую ячейку",
-    "pcs": "шт."
+    "pcs": "шт.",
+    "reason_shortage": "Расход (из источника)",
+    "reason_overage": "Приход (в назначение)",
+    "detail_title": "Детали перемещения",
+    "detail_reason": "Действие"
   },
   "settings": {
     "title": "Настройки",

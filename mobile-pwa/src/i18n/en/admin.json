@@ -37,7 +37,11 @@
     "no_expired_zone": "No location in EXPIRED zone",
     "no_damaged_zone": "No location in DAMAGED zone",
     "select_other": "Select another location",
-    "pcs": "pcs"
+    "pcs": "pcs",
+    "reason_shortage": "Out (from source)",
+    "reason_overage": "In (to destination)",
+    "detail_title": "Transfer detail",
+    "detail_reason": "Action"
   },
   "settings": {
     "title": "Settings",

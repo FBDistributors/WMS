@@ -47,9 +47,12 @@ export type InventoryMovement = {
   product_code?: string | null
   product_name?: string | null
   lot_id: string
+  batch?: string | null
   location_id: string
+  location_code?: string | null
   qty_change: number
   movement_type: string
+  reason_code?: string | null
   source_document_type?: string | null
   source_document_id?: string | null
   created_at: string
@@ -193,6 +196,7 @@ export type InventoryMovementsQuery = {
   lot_id?: string
   location_id?: string
   movement_type?: string
+  reason_code?: string
   date_from?: string
   date_to?: string
   limit?: number

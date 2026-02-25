@@ -41,6 +41,7 @@ export function MovementPage() {
   const [qty, setQty] = useState('')
   const [submitLoading, setSubmitLoading] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [detailRow, setDetailRow] = useState<InventoryMovement | null>(null)
 
   const loadHistory = useCallback(async () => {
     setIsLoading(true)
@@ -48,6 +49,7 @@ export function MovementPage() {
     try {
       const data = await getInventoryMovements({
         movement_type: 'adjust',
+        reason_code: 'inventory_shortage,inventory_overage',
         limit: PAGE_SIZE,
         offset: 0,
       })
@@ -212,12 +214,20 @@ export function MovementPage() {
           </thead>
           <tbody>
             {items.map((row) => (
-              <tr key={row.id} className="border-b border-slate-100 dark:border-slate-800">
+              <tr
+                key={row.id}
+                className="cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                onClick={() => setDetailRow(row)}
+              >
                 <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
-                  {t(`inventory:movement_types.${row.movement_type}`, row.movement_type)}
+                  {row.reason_code === 'inventory_overage'
+                    ? t('admin:movement_page.reason_overage')
+                    : row.reason_code === 'inventory_shortage'
+                      ? t('admin:movement_page.reason_shortage')
+                      : t(`inventory:movement_types.${row.movement_type}`, row.movement_type)}
                 </td>
                 <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
-                  {Math.round(Number(row.qty_change))}
+                  {row.qty_change > 0 ? '+' : ''}{Math.round(Number(row.qty_change))}
                 </td>
                 <td className="max-w-[200px] px-4 py-3 text-slate-700 dark:text-slate-200">
                   {row.product_code != null || row.product_name != null ? (
@@ -228,8 +238,12 @@ export function MovementPage() {
                     row.product_id
                   )}
                 </td>
-                <td className="px-4 py-3 text-slate-500">{row.lot_id}</td>
-                <td className="px-4 py-3 text-slate-500">{row.location_id}</td>
+                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
+                  {row.batch ?? row.lot_id}
+                </td>
+                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
+                  {row.location_code ?? row.location_id}
+                </td>
                 <td className="px-4 py-3 text-slate-500">
                   {new Date(row.created_at).toLocaleString()}
                 </td>
@@ -424,6 +438,85 @@ export function MovementPage() {
                 {submitLoading ? '...' : t('admin:movement_page.submit')}
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {detailRow && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
+          <button
+            type="button"
+            className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm"
+            onClick={() => setDetailRow(null)}
+            aria-label={t('common:buttons.close')}
+          />
+          <div className="relative max-h-[90vh] w-full max-w-2xl overflow-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+            <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
+              {t('admin:movement_page.detail_title')}
+            </h3>
+            <dl className="space-y-3 text-sm">
+              <div>
+                <span className="font-medium text-slate-500 dark:text-slate-400">
+                  {t('inventory:columns.product')}:{' '}
+                </span>
+                <span className="text-slate-800 dark:text-slate-200">
+                  {[detailRow.product_code, detailRow.product_name].filter(Boolean).join(' — ') || detailRow.product_id}
+                </span>
+              </div>
+              <div>
+                <span className="font-medium text-slate-500 dark:text-slate-400">
+                  {t('inventory:columns.lot')}:{' '}
+                </span>
+                <span className="text-slate-800 dark:text-slate-200">
+                  {detailRow.batch ?? detailRow.lot_id}
+                </span>
+              </div>
+              <div>
+                <span className="font-medium text-slate-500 dark:text-slate-400">
+                  {t('inventory:columns.location')}:{' '}
+                </span>
+                <span className="text-slate-800 dark:text-slate-200">
+                  {detailRow.location_code ?? detailRow.location_id}
+                </span>
+              </div>
+              <div>
+                <span className="font-medium text-slate-500 dark:text-slate-400">
+                  {t('inventory:columns.qty')}:{' '}
+                </span>
+                <span
+                  className={
+                    Number(detailRow.qty_change) < 0
+                      ? 'font-medium text-amber-600 dark:text-amber-400'
+                      : 'text-slate-800 dark:text-slate-200'
+                  }
+                >
+                  {Number(detailRow.qty_change) > 0 ? '+' : ''}{Math.round(Number(detailRow.qty_change))}
+                </span>
+              </div>
+              <div>
+                <span className="font-medium text-slate-500 dark:text-slate-400">
+                  {t('admin:movement_page.detail_reason')}:{' '}
+                </span>
+                <span className="text-slate-800 dark:text-slate-200">
+                  {detailRow.reason_code === 'inventory_overage'
+                    ? t('admin:movement_page.reason_overage')
+                    : detailRow.reason_code === 'inventory_shortage'
+                      ? t('admin:movement_page.reason_shortage')
+                      : detailRow.reason_code ?? '—'}
+                </span>
+              </div>
+              <div>
+                <span className="font-medium text-slate-500 dark:text-slate-400">
+                  {t('inventory:columns.created_at')}:{' '}
+                </span>
+                <span className="text-slate-800 dark:text-slate-200">
+                  {new Date(detailRow.created_at).toLocaleString()}
+                </span>
+              </div>
+            </dl>
+            <Button className="mt-4" variant="secondary" onClick={() => setDetailRow(null)}>
+              {t('common:buttons.close')}
+            </Button>
           </div>
         </div>
       )}

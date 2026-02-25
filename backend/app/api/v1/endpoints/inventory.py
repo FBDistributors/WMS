@@ -67,9 +67,12 @@ class StockMovementOut(BaseModel):
     product_code: Optional[str] = None
     product_name: Optional[str] = None
     lot_id: UUID
+    batch: Optional[str] = None
     location_id: UUID
+    location_code: Optional[str] = None
     qty_change: Decimal
     movement_type: str
+    reason_code: Optional[str] = None
     source_document_type: Optional[str] = None
     source_document_id: Optional[UUID] = None
     created_at: datetime
@@ -266,15 +269,20 @@ def _to_lot(lot: StockLotModel) -> StockLotOut:
 
 def _to_movement(movement: StockMovementModel) -> StockMovementOut:
     product = getattr(movement, "product", None)
+    lot = getattr(movement, "lot", None)
+    location = getattr(movement, "location", None)
     return StockMovementOut(
         id=movement.id,
         product_id=movement.product_id,
         product_code=product.sku if product else None,
         product_name=product.name if product else None,
         lot_id=movement.lot_id,
+        batch=lot.batch if lot else None,
         location_id=movement.location_id,
+        location_code=location.code if location else None,
         qty_change=movement.qty_change,
         movement_type=movement.movement_type,
+        reason_code=movement.reason_code,
         source_document_type=movement.source_document_type,
         source_document_id=movement.source_document_id,
         created_at=movement.created_at,
@@ -442,6 +450,7 @@ async def list_stock_movements(
     lot_id: Optional[UUID] = None,
     location_id: Optional[UUID] = None,
     movement_type: Optional[str] = None,
+    reason_code: Optional[str] = None,
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
     source_document_type: Optional[str] = None,
@@ -461,6 +470,9 @@ async def list_stock_movements(
     if movement_type:
         tokens = [token.strip() for token in movement_type.split(",") if token.strip()]
         query = query.filter(StockMovementModel.movement_type.in_(tokens))
+    if reason_code:
+        tokens = [token.strip() for token in reason_code.split(",") if token.strip()]
+        query = query.filter(StockMovementModel.reason_code.in_(tokens))
     if date_from:
         query = query.filter(func.date(StockMovementModel.created_at) >= date_from)
     if date_to:
@@ -471,7 +483,11 @@ async def list_stock_movements(
         query = query.filter(StockMovementModel.source_document_id == source_document_id)
 
     movements = (
-        query.options(selectinload(StockMovementModel.product))
+        query.options(
+            selectinload(StockMovementModel.product),
+            selectinload(StockMovementModel.lot),
+            selectinload(StockMovementModel.location),
+        )
         .order_by(StockMovementModel.created_at.desc())
         .offset(offset)
         .limit(limit)

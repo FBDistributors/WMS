@@ -37,7 +37,11 @@
     "no_expired_zone": "EXPIRED zonadagi joy topilmadi",
     "no_damaged_zone": "DAMAGED zonadagi joy topilmadi",
     "select_other": "Boshqa joy tanlang",
-    "pcs": "dono"
+    "pcs": "dono",
+    "reason_shortage": "Chiqim (manbadan)",
+    "reason_overage": "Kirim (manbaga)",
+    "detail_title": "Ko'chirish tafsiloti",
+    "detail_reason": "Harakat"
   },
   "settings": {
     "title": "Sozlamalar",
