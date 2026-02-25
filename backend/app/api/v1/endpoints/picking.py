@@ -146,12 +146,25 @@ def _to_picking_line(line: DocumentLineModel) -> PickingLine:
 
 
 def _to_picking_document(doc: DocumentModel) -> PickingDocument:
+    lines = getattr(doc, "lines", None) or []
     return PickingDocument(
         id=doc.id,
         reference_number=doc.doc_no,
         status=doc.status,
-        lines=[_to_picking_line(line) for line in doc.lines],
-        progress=_calculate_progress(doc.lines),
+        lines=[_to_picking_line(line) for line in lines],
+        progress=_calculate_progress(lines),
+        incomplete_reason=getattr(doc, "incomplete_reason", None),
+    )
+
+
+def _to_picking_document_with_lines(doc: DocumentModel, lines: List[DocumentLineModel]) -> PickingDocument:
+    """Commit dan keyin javob qaytarish uchun — doc.lines expired bo‘lishi mumkin."""
+    return PickingDocument(
+        id=doc.id,
+        reference_number=doc.doc_no,
+        status=doc.status,
+        lines=[_to_picking_line(line) for line in lines],
+        progress=_calculate_progress(lines),
         incomplete_reason=getattr(doc, "incomplete_reason", None),
     )
 
@@ -631,8 +644,7 @@ async def complete_picking_document(
             raise HTTPException(status_code=403, detail="Document not assigned to you")
         if document.status == "completed":
             db.commit()
-            document.lines = lines
-            return _to_picking_document(document)
+            return _to_picking_document_with_lines(document, lines)
         if document.status != "picked":
             raise HTTPException(status_code=409, detail="Document must be in picked status")
         document.status = "completed"
@@ -651,5 +663,4 @@ async def complete_picking_document(
                 order.status = "picked"
     db.commit()
 
-    document.lines = lines
-    return _to_picking_document(document)
+    return _to_picking_document_with_lines(document, lines)

@@ -199,6 +199,15 @@ export function PickTaskDetails() {
       }
       void playSuccessBeep();
       closeLineScan();
+      setDoc((prev) => {
+        if (!prev) return prev;
+        const updatedLines = (prev.lines ?? []).map((l) =>
+          l.id === selectedLine.id ? { ...l, qty_picked: selectedLine.qty_required } : l
+        );
+        const picked = updatedLines.reduce((s, l) => s + (l.qty_picked ?? 0), 0);
+        const required = updatedLines.reduce((s, l) => s + (l.qty_required ?? 0), 0);
+        return { ...prev, lines: updatedLines, progress: { picked, required } };
+      });
       Alert.alert(t('success'), `${selectedLine.product_name}: ${qty} / ${selectedLine.qty_required}`);
       return;
     }
@@ -355,6 +364,7 @@ export function PickTaskDetails() {
             onPress={isController ? undefined : () => openLineScan(line)}
             t={t}
             readOnly={isController}
+            isController={isController}
           />
         ))}
       </ScrollView>
@@ -527,15 +537,22 @@ function LineCard({
   onPress,
   t,
   readOnly,
+  isController,
 }: {
   line: PickingLine;
   onPress?: () => void;
   t: (key: string, params?: Record<string, string | number>) => string;
   readOnly?: boolean;
+  isController?: boolean;
 }) {
   const qtyPicked = Number(line.qty_picked) || 0;
   const qtyRequired = Number(line.qty_required) || 0;
   const isDone = qtyPicked >= qtyRequired;
+  const cardStyle = [
+    styles.lineCard,
+    isDone && styles.lineCardDone,
+    isController && !isDone && styles.lineCardIncomplete,
+  ];
   const content = (
     <>
       <Text style={styles.lineName}>{line.product_name ?? '—'}</Text>
@@ -552,14 +569,10 @@ function LineCard({
     </>
   );
   if (readOnly) {
-    return <View style={[styles.lineCard, isDone && styles.lineCardDone]}>{content}</View>;
+    return <View style={cardStyle}>{content}</View>;
   }
   return (
-    <TouchableOpacity
-      style={[styles.lineCard, isDone && styles.lineCardDone]}
-      onPress={onPress}
-      activeOpacity={0.8}
-    >
+    <TouchableOpacity style={cardStyle} onPress={onPress} activeOpacity={0.8}>
       {content}
     </TouchableOpacity>
   );
@@ -617,6 +630,7 @@ const styles = StyleSheet.create({
     borderColor: '#e0e0e0',
   },
   lineCardDone: { backgroundColor: '#e8f5e9', borderColor: '#c8e6c9' },
+  lineCardIncomplete: { backgroundColor: '#ffebee', borderColor: '#ffcdd2' },
   lineName: { fontSize: 16, fontWeight: '600', color: '#111' },
   lineMeta: { fontSize: 14, color: '#666', marginTop: 4 },
   lineQty: { fontSize: 14, fontWeight: '600', marginTop: 6 },
