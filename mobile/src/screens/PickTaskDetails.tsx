@@ -70,6 +70,7 @@ export function PickTaskDetails() {
   const [qtyInput, setQtyInput] = useState('');
   const [incompleteReasonModalVisible, setIncompleteReasonModalVisible] = useState(false);
   const [selectedIncompleteReason, setSelectedIncompleteReason] = useState<string | null>(null);
+  const [controllerVerifiedLineIds, setControllerVerifiedLineIds] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     if (!taskId || typeof taskId !== 'string') {
@@ -199,16 +200,7 @@ export function PickTaskDetails() {
       }
       void playSuccessBeep();
       closeLineScan();
-      setDoc((prev) => {
-        if (!prev) return prev;
-        const updatedLines = (prev.lines ?? []).map((l) =>
-          l.id === selectedLine.id ? { ...l, qty_picked: selectedLine.qty_required } : l
-        );
-        const picked = updatedLines.reduce((s, l) => s + (l.qty_picked ?? 0), 0);
-        const required = updatedLines.reduce((s, l) => s + (l.qty_required ?? 0), 0);
-        return { ...prev, lines: updatedLines, progress: { picked, required } };
-      });
-      Alert.alert(t('success'), `${selectedLine.product_name}: ${qty} / ${selectedLine.qty_required}`);
+      setControllerVerifiedLineIds((prev) => new Set(prev).add(selectedLine.id));
       return;
     }
     const remaining = selectedLine.qty_required - selectedLine.qty_picked;
@@ -280,9 +272,18 @@ export function PickTaskDetails() {
         setIncompleteReasonModalVisible(true);
         return;
       }
+    } else {
+      const lines = doc?.lines ?? [];
+      const pickedLines = lines.filter((l) => Number(l.qty_picked) >= Number(l.qty_required));
+      const allVerified =
+        pickedLines.length === 0 || pickedLines.every((l) => controllerVerifiedLineIds.has(l.id));
+      if (!allVerified) {
+        Alert.alert(t('error'), t('verifyAllPickedLines'));
+        return;
+      }
     }
     await doComplete(undefined);
-  }, [taskId, doc, isController, doComplete]);
+  }, [taskId, doc, isController, doComplete, controllerVerifiedLineIds, t]);
 
   const handleConfirmIncompleteReason = useCallback(() => {
     if (!selectedIncompleteReason) return;
@@ -359,10 +360,17 @@ export function PickTaskDetails() {
           <LineCard
             key={line?.id ?? `line-${index}`}
             line={line as PickingLine}
-            onPress={isController ? undefined : () => openLineScan(line as PickingLine)}
+            onPress={
+              isController
+                ? (Number((line as PickingLine).qty_picked) >= Number((line as PickingLine).qty_required)
+                    ? () => openLineScan(line as PickingLine)
+                    : undefined)
+                : () => openLineScan(line as PickingLine)
+            }
             t={t}
-            readOnly={isController}
+            readOnly={isController && Number((line as PickingLine).qty_picked) < Number((line as PickingLine).qty_required)}
             isController={isController}
+            controllerVerified={isController && controllerVerifiedLineIds.has((line as PickingLine).id)}
           />
         ))}
       </ScrollView>
@@ -536,21 +544,34 @@ function LineCard({
   t,
   readOnly,
   isController,
+  controllerVerified,
 }: {
   line: PickingLine;
   onPress?: () => void;
   t: (key: string, params?: Record<string, string | number>) => string;
   readOnly?: boolean;
   isController?: boolean;
+  controllerVerified?: boolean;
 }) {
   const qtyPicked = Number(line.qty_picked) || 0;
   const qtyRequired = Number(line.qty_required) || 0;
   const isDone = qtyPicked >= qtyRequired;
+  const isIncomplete = !isDone;
+
   const cardStyle = [
     styles.lineCard,
-    isDone && styles.lineCardDone,
-    isController && !isDone && styles.lineCardIncomplete,
-  ];
+    isController
+      ? (isIncomplete
+          ? styles.lineCardIncomplete
+          : controllerVerified
+            ? styles.lineCardDone
+            : undefined)
+      : (isDone ? styles.lineCardDone : isIncomplete ? styles.lineCardIncomplete : undefined),
+  ].filter(Boolean);
+
+  const showDoneBadge = !isController && isDone;
+  const showVerifiedBadge = isController && controllerVerified;
+
   const content = (
     <>
       <Text style={styles.lineName}>{line.product_name ?? '—'}</Text>
@@ -559,9 +580,14 @@ function LineCard({
       <Text style={styles.lineQty}>
         {qtyPicked} / {qtyRequired}
       </Text>
-      {isDone && (
+      {showDoneBadge && (
         <View style={styles.doneBadge}>
           <Text style={styles.doneBadgeText}>{t('doneBadge')}</Text>
+        </View>
+      )}
+      {showVerifiedBadge && (
+        <View style={styles.doneBadge}>
+          <Text style={styles.doneBadgeText}>{t('verifiedBadge')}</Text>
         </View>
       )}
     </>

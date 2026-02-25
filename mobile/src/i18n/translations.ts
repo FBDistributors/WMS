@@ -141,6 +141,8 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     confirmButton: 'Tasdiqlash',
     qtyMismatch: 'Miqdor mos emas. Terilgan:',
     doneBadge: 'Tugallandi',
+    verifiedBadge: 'Tekshirildi',
+    verifyAllPickedLines: "Barcha terilgan pozitsiyalarni skaner orqali tekshiring.",
     submittingProgress: 'Jarayonda…',
     barcodeSkuShort: 'Shtrix / SKU',
 
@@ -339,6 +341,8 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     confirmButton: 'Подтвердить',
     qtyMismatch: 'Количество не совпадает. Собрано:',
     doneBadge: 'Готово',
+    verifiedBadge: 'Проверено',
+    verifyAllPickedLines: 'Отсканируйте и проверьте все собранные позиции.',
     submittingProgress: 'Отправка…',
     barcodeSkuShort: 'Штрихкод / SKU',
 
@@ -537,6 +541,8 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     confirmButton: 'Confirm',
     qtyMismatch: 'Quantity mismatch. Picked:',
     doneBadge: 'Done',
+    verifiedBadge: 'Verified',
+    verifyAllPickedLines: 'Please scan and verify all picked positions.',
     submittingProgress: 'Submitting…',
     barcodeSkuShort: 'Barcode / SKU',
 
