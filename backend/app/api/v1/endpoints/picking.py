@@ -126,22 +126,30 @@ class MyPickerStatsResponse(BaseModel):
 
 
 def _calculate_progress(lines: List[DocumentLineModel]) -> PickingProgress:
-    required = sum(line.required_qty for line in lines)
-    picked = sum(line.picked_qty for line in lines)
+    required = sum(float(line.required_qty) if line.required_qty is not None else 0 for line in lines)
+    picked = sum(float(line.picked_qty) if line.picked_qty is not None else 0 for line in lines)
     return PickingProgress(picked=picked, required=required)
+
+
+def _safe_expiry_date(expiry_date) -> Optional[str]:
+    if expiry_date is None:
+        return None
+    if hasattr(expiry_date, "isoformat"):
+        return expiry_date.isoformat()
+    return str(expiry_date) if expiry_date else None
 
 
 def _to_picking_line(line: DocumentLineModel) -> PickingLine:
     return PickingLine(
         id=line.id,
-        product_name=line.product_name,
+        product_name=line.product_name or "",
         sku=line.sku,
         barcode=line.barcode,
-        location_code=line.location_code,
+        location_code=line.location_code or "",
         batch=line.batch,
-        expiry_date=line.expiry_date.isoformat() if line.expiry_date else None,
-        qty_required=line.required_qty,
-        qty_picked=line.picked_qty,
+        expiry_date=_safe_expiry_date(getattr(line, "expiry_date", None)),
+        qty_required=float(line.required_qty) if line.required_qty is not None else 0,
+        qty_picked=float(line.picked_qty) if line.picked_qty is not None else 0,
     )
 
 
@@ -643,7 +651,8 @@ async def complete_picking_document(
     )
     incomplete = [line.id for line in lines if line.picked_qty < line.required_qty]
     incomplete_reason = (body or CompletePickingRequest()).incomplete_reason if body else None
-    if incomplete:
+    # Faqat yig'uvchi to'liq yig'maganda sabab talab qilinadi; controller allaqachon sabab bilan yuborilgan hujjatni yakunlaydi
+    if incomplete and user.role != "inventory_controller":
         if not incomplete_reason or incomplete_reason not in INCOMPLETE_REASON_CODES:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
