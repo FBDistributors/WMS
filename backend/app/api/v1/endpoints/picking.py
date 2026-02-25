@@ -7,7 +7,7 @@ import logging
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -219,7 +219,19 @@ async def list_picking_documents(
     db: Session = Depends(get_db),
     user=Depends(require_permission("picking:read")),
 ):
-    query = db.query(DocumentModel).options(selectinload(DocumentModel.lines))
+    # Admin buyurtmani packed/shipped/cancelled qilsa — yig'uvchi va controller ro'yxatida ko'rinmasin
+    ORDER_HIDDEN_STATUSES = ("packed", "shipped", "cancelled")
+    query = (
+        db.query(DocumentModel)
+        .options(selectinload(DocumentModel.lines))
+        .outerjoin(OrderModel, DocumentModel.order_id == OrderModel.id)
+        .filter(
+            or_(
+                OrderModel.id.is_(None),
+                OrderModel.status.notin_(ORDER_HIDDEN_STATUSES),
+            )
+        )
+    )
     if user.role == "picker":
         query = query.filter(DocumentModel.assigned_to_user_id == user.id)
     elif user.role == "inventory_controller":
