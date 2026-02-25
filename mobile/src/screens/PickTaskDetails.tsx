@@ -264,6 +264,15 @@ export function PickTaskDetails() {
     }
   }, [taskId, doc, navigation, t, isOnline, isController]);
 
+  const goBack = useCallback(() => {
+    const pType = isController ? 'controller' : 'picker';
+    if (doc?.status === 'completed') {
+      navigation.replace('PickTaskList', { profileType: pType });
+    } else {
+      navigation.goBack();
+    }
+  }, [doc?.status, isController, navigation]);
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -286,15 +295,6 @@ export function PickTaskDetails() {
       </View>
     );
   }
-
-  const goBack = useCallback(() => {
-    const profileType = isController ? 'controller' : 'picker';
-    if (doc?.status === 'completed') {
-      navigation.replace('PickTaskList', { profileType });
-    } else {
-      navigation.goBack();
-    }
-  }, [doc?.status, isController, navigation]);
 
   return (
     <View style={styles.container}>
