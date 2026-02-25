@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { FileText, MinusCircle } from 'lucide-react'
+import { FileText, MinusCircle, Package } from 'lucide-react'
 
 import { useAuth } from '../../rbac/AuthProvider'
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -195,13 +195,20 @@ export function KamomatlarPage() {
   return (
     <AdminLayout title={t('kamomat:title')}>
       {canWriteOff && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-4 flex flex-wrap items-center gap-3">
           <Link
             to="/admin/kamomat/yoq-qilish"
             className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200 dark:hover:bg-amber-900/50"
           >
             <MinusCircle size={18} />
             {t('kamomat:write_off_button')}
+          </Link>
+          <Link
+            to="/admin/kamomat/opening-balance"
+            className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-800 transition-colors hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-200 dark:hover:bg-blue-900/50"
+          >
+            <Package size={18} />
+            {t('kamomat:opening_balance_button')}
           </Link>
         </div>
       )}

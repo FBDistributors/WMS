@@ -234,3 +234,22 @@ export async function createMovement(payload: CreateMovementPayload) {
     body: payload,
   })
 }
+
+export type BulkOpeningBalancePayload = {
+  location_id: string
+  qty: number
+  product_ids?: string[]
+}
+
+export type BulkOpeningBalanceResponse = {
+  created_count: number
+  skipped_count: number
+  errors: string[]
+}
+
+export async function bulkOpeningBalance(payload: BulkOpeningBalancePayload) {
+  return fetchJSON<BulkOpeningBalanceResponse>('/api/v1/inventory/bulk-opening-balance', {
+    method: 'POST',
+    body: payload,
+  })
+}

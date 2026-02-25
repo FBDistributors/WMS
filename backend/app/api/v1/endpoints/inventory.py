@@ -46,6 +46,21 @@ class StockLotCreate(BaseModel):
     expiry_date: Optional[date] = None
 
 
+BULK_OPENING_BATCH = "OPENING"
+
+
+class BulkOpeningBalanceRequest(BaseModel):
+    location_id: UUID
+    qty: Decimal = Field(..., gt=0, description="Quantity per product")
+    product_ids: Optional[List[UUID]] = Field(default=None, description="If empty, all active products")
+
+
+class BulkOpeningBalanceResponse(BaseModel):
+    created_count: int
+    skipped_count: int
+    errors: List[str] = []
+
+
 class StockMovementOut(BaseModel):
     id: UUID
     product_id: UUID
@@ -313,6 +328,111 @@ async def create_stock_lot(
     db.commit()
     db.refresh(lot)
     return _to_lot(lot)
+
+
+@router.post(
+    "/bulk-opening-balance",
+    response_model=BulkOpeningBalanceResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Set opening balance for many products at once",
+)
+@router.post(
+    "/bulk-opening-balance/",
+    response_model=BulkOpeningBalanceResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Set opening balance for many products at once",
+)
+async def bulk_opening_balance(
+    request: Request,
+    payload: BulkOpeningBalanceRequest,
+    db: Session = Depends(get_db),
+    user: UserModel = Depends(get_current_user),
+    _guard=Depends(require_permission("inventory:adjust")),
+):
+    """Barcha (yoki tanlangan) mahsulotlar uchun bitta joyda opening_balance harakati yozadi. Har bir mahsulot uchun OPENING partiya bo'yicha bitta yozuv."""
+    location = (
+        db.query(LocationModel.id).filter(LocationModel.id == payload.location_id).one_or_none()
+    )
+    if not location:
+        raise HTTPException(status_code=400, detail="Location not found")
+
+    if payload.product_ids:
+        product_ids = list(payload.product_ids)
+    else:
+        product_ids = [
+            row[0]
+            for row in db.query(ProductModel.id)
+            .filter(ProductModel.is_active.is_(True))
+            .all()
+        ]
+    if not product_ids:
+        return BulkOpeningBalanceResponse(created_count=0, skipped_count=0, errors=[])
+
+    created_count = 0
+    skipped_count = 0
+    errors: List[str] = []
+
+    for product_id in product_ids:
+        try:
+            lot = (
+                db.query(StockLotModel)
+                .filter(
+                    StockLotModel.product_id == product_id,
+                    StockLotModel.batch == BULK_OPENING_BATCH,
+                    StockLotModel.expiry_date.is_(None),
+                )
+                .first()
+            )
+            if not lot:
+                lot = StockLotModel(
+                    product_id=product_id,
+                    batch=BULK_OPENING_BATCH,
+                    expiry_date=None,
+                )
+                db.add(lot)
+                db.flush()
+            movement = StockMovementModel(
+                product_id=product_id,
+                lot_id=lot.id,
+                location_id=payload.location_id,
+                qty_change=payload.qty,
+                movement_type="opening_balance",
+                source_document_type=None,
+                source_document_id=None,
+                created_by_user_id=user.id,
+                reason_code=None,
+            )
+            db.add(movement)
+            log_action(
+                db,
+                user_id=user.id,
+                action=ACTION_CREATE,
+                entity_type="stock_movement",
+                entity_id=str(movement.id),
+                new_data={
+                    "product_id": str(product_id),
+                    "lot_id": str(lot.id),
+                    "location_id": str(payload.location_id),
+                    "qty_change": str(payload.qty),
+                    "movement_type": "opening_balance",
+                },
+                ip_address=get_client_ip(request),
+            )
+            db.commit()
+            created_count += 1
+        except Exception as e:
+            db.rollback()
+            skipped_count += 1
+            errors.append(f"{product_id}: {str(e)}")
+            if len(errors) >= 20:
+                errors.append("…")
+                break
+
+    return BulkOpeningBalanceResponse(
+        created_count=created_count,
+        skipped_count=skipped_count,
+        errors=errors[:20],
+    )
 
 
 @router.get("/movements", response_model=List[StockMovementOut], summary="List stock movements")
