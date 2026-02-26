@@ -93,7 +93,9 @@ export function KirimFormScreen() {
   const [expiryCalendarOpenScanned, setExpiryCalendarOpenScanned] = useState(false);
   const [inventoryLocation, setInventoryLocation] = useState<PickerLocationOption | null>(null);
   const [inventoryLocationSearch, setInventoryLocationSearch] = useState('');
-  const [inventoryStep, setInventoryStep] = useState<1 | 2 | 3>(1);
+  const [inventoryStep, setInventoryStep] = useState<0 | 1 | 2 | 3>(0);
+  const [inventorySubMode, setInventorySubMode] = useState<'byLocation' | 'byScan' | null>(null);
+  const [selectedScannedLocation, setSelectedScannedLocation] = useState<PickerProductLocation | null>(null);
   const [locationContents, setLocationContents] = useState<{ location_id: string; location_code: string; items: LocationContentsItem[] } | null>(null);
   const [loadingContents, setLoadingContents] = useState(false);
   const [contentsError, setContentsError] = useState<string | null>(null);
@@ -137,18 +139,22 @@ export function KirimFormScreen() {
       const pid = params?.scannedProductId;
       const invLocId = params?.inventoryLocationId;
       const invLocCode = params?.inventoryLocationCode;
-      if (flow === 'inventory' && (invLocId && invLocCode)) {
-        setInventoryLocation({
-          id: invLocId,
-          code: invLocCode,
-          name: invLocCode,
-        });
-        setInventoryLocationSearch(invLocCode);
-        if (pid) {
+      if (flow === 'inventory' && pid) {
+        if (invLocId && invLocCode) {
+          setInventorySubMode((m) => m ?? 'byLocation');
+          setInventoryLocation({
+            id: invLocId,
+            code: invLocCode,
+            name: invLocCode,
+          });
+          setInventoryLocationSearch(invLocCode);
           setInventoryStep(3);
           loadProductById(pid);
         } else {
-          setInventoryStep((params?.inventoryStep as 1 | 2 | 3) ?? 2);
+          setInventorySubMode('byScan');
+          setInventoryStep(2);
+          loadProductById(pid);
+          setSelectedScannedLocation(null);
         }
         navigation.setParams({
           ...route.params,
@@ -160,7 +166,24 @@ export function KirimFormScreen() {
         } as any);
         return;
       }
-      if (pid) {
+      if (flow === 'inventory' && invLocId && invLocCode && !pid) {
+        setInventorySubMode((m) => m ?? 'byLocation');
+        setInventoryLocation({
+          id: invLocId,
+          code: invLocCode,
+          name: invLocCode,
+        });
+        setInventoryLocationSearch(invLocCode);
+        setInventoryStep((params?.inventoryStep as 1 | 2) ?? 2);
+        navigation.setParams({
+          ...route.params,
+          inventoryStep: undefined,
+          inventoryLocationId: undefined,
+          inventoryLocationCode: undefined,
+        } as any);
+        return;
+      }
+      if (pid && flow !== 'inventory') {
         loadProductById(pid);
         navigation.setParams({
           flow: route.params?.flow ?? 'return',
@@ -178,7 +201,7 @@ export function KirimFormScreen() {
   }, [isOnline]);
 
   useEffect(() => {
-    if (flow !== 'inventory' || inventoryStep !== 2 || !inventoryLocation?.code) return;
+    if (flow !== 'inventory' || inventorySubMode !== 'byLocation' || inventoryStep !== 2 || !inventoryLocation?.code) return;
     setLoadingContents(true);
     setContentsError(null);
     setLocationContents(null);
@@ -191,10 +214,10 @@ export function KirimFormScreen() {
         setContentsError(e instanceof Error ? e.message : t('invLoadError'));
       })
       .finally(() => setLoadingContents(false));
-  }, [flow, inventoryStep, inventoryLocation?.code, t]);
+  }, [flow, inventorySubMode, inventoryStep, inventoryLocation?.code, t]);
 
   useEffect(() => {
-    if (flow !== 'inventory' || inventoryStep !== 3 || !currentProduct?.product_id || !inventoryLocation?.code) {
+    if (flow !== 'inventory' || inventorySubMode !== 'byLocation' || inventoryStep !== 3 || !currentProduct?.product_id || !inventoryLocation?.code) {
       setInventoryScannedLots([]);
       return;
     }
@@ -213,7 +236,7 @@ export function KirimFormScreen() {
       })
       .catch(() => setInventoryScannedLots([]))
       .finally(() => setLoadingScannedLots(false));
-  }, [flow, inventoryStep, currentProduct?.product_id, inventoryLocation?.code]);
+  }, [flow, inventorySubMode, inventoryStep, currentProduct?.product_id, inventoryLocation?.code]);
 
   useEffect(() => {
     if (currentProduct) {
@@ -233,13 +256,13 @@ export function KirimFormScreen() {
       returnToKirimForm: true,
       flow,
     };
-    if (flow === 'inventory' && inventoryLocation) {
+    if (flow === 'inventory' && inventorySubMode === 'byLocation' && inventoryLocation) {
       scanParams.inventoryStep = inventoryStep;
       scanParams.inventoryLocationId = inventoryLocation.id;
       scanParams.inventoryLocationCode = inventoryLocation.code;
     }
     navigation.navigate('Scanner', scanParams);
-  }, [navigation, flow, inventoryStep, inventoryLocation]);
+  }, [navigation, flow, inventoryStep, inventorySubMode, inventoryLocation]);
 
   const handleSubmitAdjust = useCallback(async () => {
     if (!locationContents?.items?.length) return;
@@ -320,6 +343,41 @@ export function KirimFormScreen() {
       setSubmittingScannedAdjust(false);
     }
   }, [inventoryScannedLots, inventoryLocation, inventoryScannedActualQty, t]);
+
+  const handleSubmitScannedAdjustByScan = useCallback(async (loc: PickerProductLocation) => {
+    if (!currentProduct) return;
+    const actual = Math.floor(Number(inventoryScannedActualQty.trim()) || 0);
+    const systemQty = Math.round(Number(loc.available_qty) || 0);
+    const delta = actual - systemQty;
+    if (delta === 0) {
+      Alert.alert(t('error'), t('inventoryScannedNoChange'));
+      return;
+    }
+    setSubmittingScannedAdjust(true);
+    try {
+      await createStockMovement({
+        product_id: currentProduct.product_id,
+        lot_id: loc.lot_id,
+        location_id: loc.location_id,
+        qty_change: delta,
+        movement_type: 'adjust',
+        reason_code: delta < 0 ? 'inventory_shortage' : 'inventory_overage',
+      });
+      Alert.alert(t('success'), t('inventoryScannedAdjustDone'));
+      setSelectedScannedLocation(null);
+      setInventoryScannedActualQty('');
+      setInventoryScannedExpiry('');
+      setInventoryStep(2);
+    } catch (e: any) {
+      if (e?.response?.status === 403) {
+        Alert.alert(t('error'), t('inventoryAdjustNoPermission'));
+      } else {
+        Alert.alert(t('error'), e instanceof Error ? e.message : t('kirimSubmitError'));
+      }
+    } finally {
+      setSubmittingScannedAdjust(false);
+    }
+  }, [currentProduct, inventoryScannedActualQty, t]);
 
   const addLine = useCallback(() => {
     const location = flow === 'inventory' ? inventoryLocation : selectedLocation;
@@ -452,7 +510,10 @@ export function KirimFormScreen() {
         showBack={true}
         onBack={() => {
           if (flow === 'inventory') {
-            navigation.navigate('Kirim');
+            if (inventoryStep === 0) navigation.navigate('Kirim');
+            else if (inventoryStep === 1) setInventoryStep(0);
+            else if (inventoryStep === 2) setInventoryStep(1);
+            else if (inventoryStep === 3) setInventoryStep(2);
           } else {
             navigation.goBack();
           }
@@ -460,8 +521,42 @@ export function KirimFormScreen() {
       />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        {/* Inventarizatsiya: 1-qadam — faqat lokatsiya tanlash */}
-        {flow === 'inventory' && inventoryStep === 1 && (
+        {/* Inventarizatsiya: 0-qadam — 2 bo'lim tanlovi */}
+        {flow === 'inventory' && inventoryStep === 0 && (
+          <>
+            <TouchableOpacity
+              style={styles.inventoryChoiceCard}
+              onPress={() => { setInventorySubMode('byLocation'); setInventoryStep(1); }}
+              activeOpacity={0.7}
+            >
+              <View style={styles.inventoryChoiceCardIconWrap}>
+                <Icon name="map-marker" size={32} color="#1a237e" />
+              </View>
+              <View style={styles.inventoryChoiceCardBody}>
+                <Text style={styles.inventoryChoiceCardTitle}>{t('inventoryByLocation')}</Text>
+                <Text style={styles.inventoryChoiceCardDesc}>{t('inventoryByLocationDesc')}</Text>
+              </View>
+              <Icon name="chevron-right" size={24} color="#777" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.inventoryChoiceCard}
+              onPress={() => { setInventorySubMode('byScan'); setInventoryStep(1); setCurrentProduct(null); setSelectedScannedLocation(null); }}
+              activeOpacity={0.7}
+            >
+              <View style={styles.inventoryChoiceCardIconWrap}>
+                <Icon name="barcode-scan" size={32} color="#1a237e" />
+              </View>
+              <View style={styles.inventoryChoiceCardBody}>
+                <Text style={styles.inventoryChoiceCardTitle}>{t('inventoryByScan')}</Text>
+                <Text style={styles.inventoryChoiceCardDesc}>{t('inventoryByScanDesc')}</Text>
+              </View>
+              <Icon name="chevron-right" size={24} color="#777" />
+            </TouchableOpacity>
+          </>
+        )}
+
+        {/* Bo'lim 1: Lokatsiya orqali — step 1: lokatsiya kiritish */}
+        {flow === 'inventory' && inventorySubMode === 'byLocation' && inventoryStep === 1 && (
           <>
             <View style={styles.inventoryLocationBlock}>
               <Text style={styles.inventoryLocationLabel}>{t('inventorySelectLocationFirst')}</Text>
@@ -518,25 +613,17 @@ export function KirimFormScreen() {
             </View>
             <TouchableOpacity
               style={[styles.scanBtnTop, !inventoryLocation && styles.buttonDisabled]}
-              onPress={() => inventoryLocation && handleScan()}
+              onPress={() => inventoryLocation && setInventoryStep(2)}
               activeOpacity={0.8}
               disabled={!inventoryLocation}
             >
-              <Icon name="barcode-scan" size={26} color="#fff" />
-              <Text style={styles.scanBtnText}>{t('inventoryScanProduct')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.inventoryViewContentsLink}
-              onPress={() => inventoryLocation && setInventoryStep(2)}
-              disabled={!inventoryLocation}
-            >
-              <Text style={styles.inventoryViewContentsLinkText}>{t('inventoryViewLocationContents')}</Text>
+              <Text style={styles.scanBtnText}>{t('inventoryViewLocationContents')}</Text>
             </TouchableOpacity>
           </>
         )}
 
-        {/* Inventarizatsiya 2-qadam: lokatsiya tarkibi ro'yxati + haqiqiy miqdor + tuzatish yuborish */}
-        {flow === 'inventory' && inventoryStep === 2 && inventoryLocation && (
+        {/* Bo'lim 1: Lokatsiya orqali — step 2: lokatsiya tarkibi + tuzatish */}
+        {flow === 'inventory' && inventorySubMode === 'byLocation' && inventoryStep === 2 && inventoryLocation && (
           <>
             <View style={styles.inventoryLocationChosenBar}>
               <Text style={styles.inventoryLocationChosenText}>
@@ -602,18 +689,141 @@ export function KirimFormScreen() {
                     )}
                   </TouchableOpacity>
                 )}
-                <TouchableOpacity style={styles.changeProductBtn} onPress={() => setInventoryStep(3)}>
-                  <Text style={styles.changeProductBtnText}>{t('inventoryAddProductScan')}</Text>
-                </TouchableOpacity>
-              </>
+                </>
             )}
           </>
         )}
 
-        {/* Inventarizatsiya 3-qadam: tanlangan joy + skaner + qatorlar; boshqa flow: barcode/skaner */}
-        {((flow === 'inventory' && inventoryStep === 3) || flow !== 'inventory') && (
+        {/* Bo'lim 2: Scan qilib — step 1: faqat Skaner */}
+        {flow === 'inventory' && inventorySubMode === 'byScan' && inventoryStep === 1 && (
+          <TouchableOpacity style={styles.scanBtnTop} onPress={handleScan} activeOpacity={0.8}>
+            <Icon name="barcode-scan" size={28} color="#fff" />
+            <Text style={styles.scanBtnText}>{t('scanButton')}</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Bo'lim 2: Scan qilib — step 2: mahsulot + lokatsiyalar ro'yxati */}
+        {flow === 'inventory' && inventorySubMode === 'byScan' && inventoryStep === 2 && currentProduct && !loadingProduct && (
           <>
-            {flow === 'inventory' && inventoryStep === 3 && inventoryLocation && (
+            <View style={styles.card}>
+              <Text style={styles.productName} numberOfLines={2}>{currentProduct.name}</Text>
+              {currentProduct.main_barcode ? (
+                <Text style={styles.contentsRowMeta}>{t('invShtrixKod')}: {currentProduct.main_barcode}</Text>
+              ) : null}
+            </View>
+            <Text style={styles.sectionLabel}>{t('inventorySelectLocationToAdjust')}</Text>
+            {currentProduct.locations.length === 0 ? (
+              <Text style={styles.muted}>{t('inventoryNoProductsAtLocation')}</Text>
+            ) : (
+              <View style={styles.contentsList}>
+                {currentProduct.locations.map((loc) => (
+                  <TouchableOpacity
+                    key={`${loc.location_id}-${loc.lot_id}`}
+                    style={styles.contentsRow}
+                    onPress={() => {
+                      setSelectedScannedLocation(loc);
+                      setInventoryScannedActualQty(String(Math.round(Number(loc.available_qty))));
+                      setInventoryScannedExpiry(loc.expiry_date ?? '');
+                      setInventoryStep(3);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.contentsRowInfo}>
+                      <Text style={styles.contentsRowName}>{loc.location_code}</Text>
+                      <Text style={styles.contentsRowMeta}>
+                        {loc.batch_no}{loc.expiry_date ? ` • ${loc.expiry_date}` : ''} • {t('invQoldiq')}: {Math.round(Number(loc.available_qty))}
+                      </Text>
+                    </View>
+                    <Icon name="chevron-right" size={22} color="#666" />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            <TouchableOpacity style={styles.inventoryScanAnotherBtn} onPress={() => { setCurrentProduct(null); setInventoryStep(1); }}>
+              <Text style={styles.inventoryScanAnotherBtnText}>{t('inventoryScanAnother')}</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {/* Bo'lim 2: Scan qilib — step 3: tanlangan lokatsiya uchun tuzatish */}
+        {flow === 'inventory' && inventorySubMode === 'byScan' && inventoryStep === 3 && currentProduct && selectedScannedLocation && (
+          <>
+            <View style={styles.inventoryLocationChosenBar}>
+              <Text style={styles.inventoryLocationChosenText}>
+                {selectedScannedLocation.location_code}
+              </Text>
+              <TouchableOpacity onPress={() => { setInventoryStep(2); setSelectedScannedLocation(null); }} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                <Text style={styles.inventoryLocationChangeLink}>{t('inventoryChangeLocation')}</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.card}>
+              <Text style={styles.productName} numberOfLines={2}>{currentProduct.name}</Text>
+              <Text style={styles.contentsRowMeta}>
+                {selectedScannedLocation.batch_no}
+                {selectedScannedLocation.expiry_date ? ` • ${selectedScannedLocation.expiry_date}` : ''}
+              </Text>
+              <View style={styles.inventoryLocationReadOnly}>
+                <Text style={styles.label}>{t('inventorySystemQty')}</Text>
+                <Text style={styles.inventoryLocationCode}>{Math.round(Number(selectedScannedLocation.available_qty))}</Text>
+              </View>
+              <Text style={styles.label}>{t('inventoryActualQty')}</Text>
+              <TextInput
+                style={styles.input}
+                value={inventoryScannedActualQty}
+                onChangeText={setInventoryScannedActualQty}
+                placeholder={t('inventoryActualQty')}
+                placeholderTextColor="#999"
+                keyboardType="number-pad"
+              />
+              <Text style={styles.label}>{t('inventoryExpiryDate')}</Text>
+              <View style={styles.expiryRow}>
+                <TouchableOpacity
+                  style={styles.expiryInputTouchable}
+                  onPress={() => setExpiryCalendarOpenScanned(true)}
+                >
+                  <Text style={[styles.expiryInputText, !inventoryScannedExpiry && styles.expiryInputPlaceholder]}>
+                    {inventoryScannedExpiry || t('kirimExpiryPlaceholder')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.expiryCalendarBtn}
+                  onPress={() => setExpiryCalendarOpenScanned(true)}
+                >
+                  <Icon name="calendar" size={24} color="#1a237e" />
+                </TouchableOpacity>
+              </View>
+              <ExpiryDatePicker
+                visible={expiryCalendarOpenScanned}
+                onClose={() => setExpiryCalendarOpenScanned(false)}
+                value={inventoryScannedExpiry || null}
+                onChange={(iso) => {
+                  setInventoryScannedExpiry(iso || '');
+                  setExpiryCalendarOpenScanned(false);
+                }}
+                minDate={todayISO()}
+                locale={locale}
+                darkMode={false}
+              />
+              <TouchableOpacity
+                style={[styles.scanBtnTop, submittingScannedAdjust && styles.buttonDisabled]}
+                onPress={() => handleSubmitScannedAdjustByScan(selectedScannedLocation)}
+                disabled={submittingScannedAdjust}
+                activeOpacity={0.8}
+              >
+                {submittingScannedAdjust ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.scanBtnText}>{t('inventoryAdjustSubmit')}</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+
+        {/* Inventarizatsiya byLocation step 3 (skaner orqali mahsulot qo'shish) va boshqa flow: barcode/skaner */}
+        {((flow === 'inventory' && inventorySubMode === 'byLocation' && inventoryStep === 3) || flow !== 'inventory') && (
+          <>
+            {flow === 'inventory' && inventorySubMode === 'byLocation' && inventoryStep === 3 && inventoryLocation && (
               <View style={styles.inventoryLocationChosenBar}>
                 <Text style={styles.inventoryLocationChosenText}>
                   {t('inventorySelectedLocation')}: {inventoryLocation.code}
@@ -644,20 +854,20 @@ export function KirimFormScreen() {
           </>
         )}
 
-        {!(flow === 'inventory' && (inventoryStep === 1 || inventoryStep === 2)) && loadingProduct && (
+        {!(flow === 'inventory' && (inventoryStep === 0 || (inventorySubMode === 'byLocation' && (inventoryStep === 1 || inventoryStep === 2)) || (inventorySubMode === 'byScan' && inventoryStep === 2))) && loadingProduct && (
           <View style={styles.loadingRow}>
             <ActivityIndicator size="small" color="#1a237e" />
             <Text style={styles.loadingText}>{t('loading')}</Text>
           </View>
         )}
 
-        {!(flow === 'inventory' && (inventoryStep === 1 || inventoryStep === 2)) && productError && (
+        {!(flow === 'inventory' && (inventoryStep === 0 || (inventorySubMode === 'byLocation' && (inventoryStep === 1 || inventoryStep === 2)) || (inventorySubMode === 'byScan' && inventoryStep === 2))) && productError && (
           <View style={styles.errorRow}>
             <Text style={styles.errorText}>{productError}</Text>
           </View>
         )}
 
-        {flow === 'inventory' && inventoryStep === 3 && inventoryLocation && currentProduct && !loadingProduct && (
+        {flow === 'inventory' && inventorySubMode === 'byLocation' && inventoryStep === 3 && inventoryLocation && currentProduct && !loadingProduct && (
           <>
             {loadingScannedLots ? (
               <View style={styles.loadingRow}>
@@ -738,7 +948,7 @@ export function KirimFormScreen() {
           </>
         )}
 
-        {!(flow === 'inventory' && (inventoryStep === 1 || inventoryStep === 2)) && (flow === 'inventory' ? inventoryLocation && currentProduct : currentProduct) && !loadingProduct && !(flow === 'inventory' && inventoryStep === 3 && inventoryScannedLots.length > 0) && (
+        {!(flow === 'inventory' && (inventoryStep === 0 || (inventorySubMode === 'byLocation' && (inventoryStep === 1 || inventoryStep === 2)) || (inventorySubMode === 'byScan' && (inventoryStep === 2 || inventoryStep === 3)))) && (flow === 'inventory' ? inventorySubMode === 'byLocation' && inventoryLocation && currentProduct : currentProduct) && !loadingProduct && !(flow === 'inventory' && inventorySubMode === 'byLocation' && inventoryStep === 3 && inventoryScannedLots.length > 0) && (
           <View style={styles.card}>
             <Text style={styles.productName} numberOfLines={2}>{currentProduct.name}</Text>
             <Text style={styles.label}>{t('quantity')}</Text>
@@ -1010,6 +1220,20 @@ const styles = StyleSheet.create({
   inventoryLocationChosenText: { fontSize: 14, color: '#1565c0', fontWeight: '600' },
   inventoryLocationChangeLink: { fontSize: 14, color: '#1976d2', textDecorationLine: 'underline' },
   buttonDisabled: { opacity: 0.6 },
+  inventoryChoiceCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 14,
+    padding: 18,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#e8e8e8',
+  },
+  inventoryChoiceCardIconWrap: { marginRight: 14 },
+  inventoryChoiceCardBody: { flex: 1, minWidth: 0 },
+  inventoryChoiceCardTitle: { fontSize: 17, fontWeight: '600', color: '#333', marginBottom: 4 },
+  inventoryChoiceCardDesc: { fontSize: 13, color: '#666' },
   inventoryViewContentsLink: { alignItems: 'center', paddingVertical: 12, marginBottom: 16 },
   inventoryViewContentsLinkText: { fontSize: 15, color: '#1976d2', textDecorationLine: 'underline' },
   changeProductBtn: { alignItems: 'center', paddingVertical: 12, marginTop: 8, marginBottom: 16 },

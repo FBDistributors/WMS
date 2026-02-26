@@ -32,7 +32,8 @@ export type RootStackParamList = {
         flow: 'new' | 'return' | 'inventory';
         scannedProductId?: string;
         scannedBarcode?: string;
-        inventoryStep?: 1 | 2 | 3;
+        inventoryStep?: 0 | 1 | 2 | 3;
+        inventorySubMode?: 'byLocation' | 'byScan';
         inventoryLocationId?: string;
         inventoryLocationCode?: string;
       }
