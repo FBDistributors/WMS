@@ -199,6 +199,10 @@ class SmartupClient:
                     last_detail = (
                         f"{response_text} (Loyiha ko'rinmayapti. Render env da SMARTUP_ORIKZOR_PROJECT_CODE ni 'mkw' yoki 'anor' qilib, SmartUP hisobiga loyiha ruxsatini tekshiring.)"
                     )
+                elif exc.code == 401:
+                    last_detail = (
+                        f"{response_text} (SmartUP kirish rad etildi. O'rikzor uchun Render env da SMARTUP_ORIKZOR_BASIC_USER va SMARTUP_ORIKZOR_BASIC_PASS ni movement$export API ga kirish beradigan login/parol bilan to'ldiring.)"
+                    )
             except Exception as exc:  # noqa: BLE001
                 last_error = exc
                 logger.error("Smartup export failed: %s", exc)

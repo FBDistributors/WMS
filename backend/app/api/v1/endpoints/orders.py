@@ -504,10 +504,17 @@ async def sync_orders_from_smartup(
             if is_orikzor else None
         )
         if is_orikzor:
-            # movement$export (anor/mxsx/mkw): 481 "Проект невидим" bo'lsa SMARTUP_ORIKZOR_PROJECT_CODE ni "mkw" yoki "anor" qilib sinab ko'ring
+            # movement$export: 401 bo'lsa SMARTUP_ORIKZOR_BASIC_USER / SMARTUP_ORIKZOR_BASIC_PASS ni o'rnating (alohida login)
             project_code = (os.getenv("SMARTUP_ORIKZOR_PROJECT_CODE") or "mkw").strip()
             filial_id = (os.getenv("SMARTUP_ORIKZOR_FILIAL_ID") or "").strip()
-            client = SmartupClient(project_code=project_code, filial_id=filial_id)
+            orikzor_user = (os.getenv("SMARTUP_ORIKZOR_BASIC_USER") or "").strip() or None
+            orikzor_pass = (os.getenv("SMARTUP_ORIKZOR_BASIC_PASS") or "").strip() or None
+            client = SmartupClient(
+                project_code=project_code,
+                filial_id=filial_id,
+                username=orikzor_user,
+                password=orikzor_pass,
+            )
         else:
             client = SmartupClient()
         response = client.export_orders(
