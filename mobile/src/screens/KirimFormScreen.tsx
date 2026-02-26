@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Alert,
   BackHandler,
+  FlatList,
   Modal,
   ScrollView,
   StyleSheet,
@@ -57,6 +58,11 @@ function sortLocations(locs: PickerProductLocation[]): PickerProductLocation[] {
 function todayISO(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Lokatsiya qidiruvda: chiziqchasiz solishtirish (S-9-3-1 va S931 bir xil). */
+function normalizeLocationForSearch(s: string): string {
+  return (s || '').replace(/[\s\-_]/g, '').toLowerCase();
 }
 
 export function KirimFormScreen() {
@@ -521,23 +527,25 @@ export function KirimFormScreen() {
   }, [flow, selectedPickerId, lines, t]);
 
   const searchTrim = locationSearch.trim();
+  const searchNorm = normalizeLocationForSearch(searchTrim);
   const filteredLocations = searchTrim
     ? allLocations.filter(
         (l) =>
-          (l.code && l.code.toLowerCase().includes(searchTrim.toLowerCase())) ||
-          (l.name != null && String(l.name).toLowerCase().includes(searchTrim.toLowerCase()))
-      ).slice(0, 30)
+          (l.code && normalizeLocationForSearch(l.code).includes(searchNorm)) ||
+          (l.name != null && normalizeLocationForSearch(String(l.name)).includes(searchNorm))
+      ).slice(0, 50)
     : [];
   const showLocationDropdown =
     searchTrim.length > 0 &&
     (!selectedLocation || selectedLocation.code !== searchTrim);
   const inventorySearchTrim = inventoryLocationSearch.trim();
+  const inventorySearchNorm = normalizeLocationForSearch(inventorySearchTrim);
   const filteredInventoryLocations = inventorySearchTrim
     ? allLocations.filter(
         (l) =>
-          (l.code && l.code.toLowerCase().includes(inventorySearchTrim.toLowerCase())) ||
-          (l.name != null && String(l.name).toLowerCase().includes(inventorySearchTrim.toLowerCase()))
-      ).slice(0, 30)
+          (l.code && normalizeLocationForSearch(l.code).includes(inventorySearchNorm)) ||
+          (l.name != null && normalizeLocationForSearch(String(l.name)).includes(inventorySearchNorm))
+      ).slice(0, 50)
     : [];
   const showInventoryLocationDropdown =
     flow === 'inventory' &&
@@ -612,21 +620,23 @@ export function KirimFormScreen() {
                 />
                 {showInventoryLocationDropdown && (
                   <View style={styles.locationDropdownInline}>
-                    <ScrollView
-                      style={styles.locationDropdownScroll}
-                      contentContainerStyle={styles.locationDropdownScrollContent}
-                      keyboardShouldPersistTaps="handled"
-                      nestedScrollEnabled
-                      showsVerticalScrollIndicator
-                    >
-                      {filteredInventoryLocations.length === 0 ? (
-                        <View style={styles.locationDropdownEmpty}>
-                          <Text style={styles.locationDropdownEmptyText}>{t('kirimLocationNoResults')}</Text>
-                        </View>
-                      ) : (
-                        filteredInventoryLocations.map((loc) => (
+                    {filteredInventoryLocations.length === 0 ? (
+                      <View style={styles.locationDropdownEmpty}>
+                        <Text style={styles.locationDropdownEmptyText}>{t('kirimLocationNoResults')}</Text>
+                      </View>
+                    ) : (
+                      <FlatList
+                        data={filteredInventoryLocations}
+                        keyExtractor={(loc) => loc.id}
+                        keyboardShouldPersistTaps="handled"
+                        nestedScrollEnabled
+                        showsVerticalScrollIndicator
+                        style={styles.locationDropdownFlatList}
+                        maxToRenderPerBatch={14}
+                        windowSize={8}
+                        initialNumToRender={14}
+                        renderItem={({ item: loc }) => (
                           <TouchableOpacity
-                            key={loc.id}
                             style={[
                               styles.locationDropdownItem,
                               inventoryLocation?.id === loc.id && styles.locationDropdownItemSelected,
@@ -641,9 +651,9 @@ export function KirimFormScreen() {
                               <Text style={styles.locationDropdownItemName} numberOfLines={1}>{loc.name}</Text>
                             ) : null}
                           </TouchableOpacity>
-                        ))
-                      )}
-                    </ScrollView>
+                        )}
+                      />
+                    )}
                   </View>
                 )}
               </View>
@@ -1323,6 +1333,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
   },
   locationDropdownScroll: { flex: 1 },
+  locationDropdownFlatList: { flex: 1 },
   locationDropdownScrollContent: { paddingBottom: 8 },
   locationDropdownEmpty: { padding: 20, alignItems: 'center' },
   locationDropdownEmptyText: { fontSize: 14, color: '#666' },
