@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from datetime import date
 from typing import List, Optional
@@ -496,12 +497,18 @@ async def sync_orders_from_smartup(
         raise HTTPException(status_code=400, detail="begin_deal_date must be <= end_deal_date")
 
     try:
-        # O'rikzor: alohida export URL (movement$export), env orqali yoki default
+        # O'rikzor: alohida export URL (movement$export) va header'lar (project_code anor bo'lishi mumkin)
+        is_orikzor = payload.order_source == "orikzor"
         orikzor_export_url = (
-            os.getenv("SMARTUP_ORIKZOR_EXPORT_URL") or "https://smartup.online/b/anor/mxsx/mkw/movement$export"
-        ).strip() if payload.order_source == "orikzor" else None
-
-        client = SmartupClient()
+            (os.getenv("SMARTUP_ORIKZOR_EXPORT_URL") or "https://smartup.online/b/anor/mxsx/mkw/movement$export").strip()
+            if is_orikzor else None
+        )
+        if is_orikzor:
+            project_code = (os.getenv("SMARTUP_ORIKZOR_PROJECT_CODE") or "anor").strip()
+            filial_id = (os.getenv("SMARTUP_ORIKZOR_FILIAL_ID") or "").strip()
+            client = SmartupClient(project_code=project_code, filial_id=filial_id)
+        else:
+            client = SmartupClient()
         response = client.export_orders(
             begin_deal_date=begin_date.strftime("%d.%m.%Y"),
             end_deal_date=end_date.strftime("%d.%m.%Y"),
@@ -511,6 +518,12 @@ async def sync_orders_from_smartup(
         created, updated, skipped, _errors = import_orders(
             db, response.items, order_source=payload.order_source
         )
+        if is_orikzor:
+            logger = logging.getLogger(__name__)
+            logger.info(
+                "O'rikzor sync: created=%s updated=%s skipped=%s items_from_api=%s",
+                created, updated, skipped, len(response.items),
+            )
         return SmartupSyncResponse(created=created, updated=updated, skipped=skipped)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"Smartup export failed: {exc}") from exc

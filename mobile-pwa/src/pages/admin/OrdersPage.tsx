@@ -117,6 +117,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set())
   const [sendDialogOrderIds, setSendDialogOrderIds] = useState<string[] | null>(null)
+  const [syncResult, setSyncResult] = useState<{ created: number; updated: number; skipped: number } | null>(null)
 
   const ELIGIBLE_PICKING_STATUSES = new Set(['imported', 'B#S', 'ready_for_picking', 'allocated'])
   const canBeSentToPicking = (order: OrderListItem) =>
@@ -186,8 +187,10 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const handleSync = async () => {
     setIsSyncing(true)
     setError(null)
+    setSyncResult(null)
     try {
-      await syncSmartupOrders(orderSource ? { order_source: orderSource } : {})
+      const result = await syncSmartupOrders(orderSource ? { order_source: orderSource } : {})
+      setSyncResult(result)
       await load()
     } catch (err) {
       const message = err instanceof Error ? err.message : t('orders:sync_failed')
@@ -496,6 +499,11 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
               {isRefreshing ? (
                 <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
                   {t('orders:refreshing')}
+                </span>
+              ) : null}
+              {syncResult ? (
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
+                  {t('orders:sync_result', { created: syncResult.created, updated: syncResult.updated, skipped: syncResult.skipped })}
                 </span>
               ) : null}
             </div>

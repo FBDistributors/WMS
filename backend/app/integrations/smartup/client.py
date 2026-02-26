@@ -174,6 +174,10 @@ class SmartupClient:
                             ORIKZOR_TO_WAREHOUSE_CODE or "(all)",
                             len(parsed.items),
                         )
+                    else:
+                        logger.warning(
+                            "Smartup movement$export: API dan 0 ta movement qaytdi. URL va sana oralig'ini tekshiring."
+                        )
                 else:
                     parsed = SmartupOrderExportResponse.parse_raw(body)
                 if parsed.items:

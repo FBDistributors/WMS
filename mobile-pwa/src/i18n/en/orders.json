@@ -6,6 +6,7 @@
   "syncing": "Syncing...",
   "refreshing": "Refreshing...",
   "sync_failed": "Smartup sync failed.",
+  "sync_result": "Synced: {{created}} created, {{updated}} updated, {{skipped}} skipped",
   "pack": "Pack",
   "packing": "Packing...",
   "ship": "Ship",

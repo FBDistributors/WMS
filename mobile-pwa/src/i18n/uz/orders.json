@@ -6,6 +6,7 @@
   "syncing": "Sinxronlanmoqda...",
   "refreshing": "Yangilanmoqda...",
   "sync_failed": "Smartup sinxronlash muvaffaqiyatsiz.",
+  "sync_result": "Yuklandi: {{created}} qo'shildi, {{updated}} yangilandi, {{skipped}} o'tkazib yuborildi",
   "pack": "Qadoqlash",
   "packing": "Qadoqlanmoqda...",
   "ship": "Jo'natish",
