@@ -11,7 +11,7 @@ import { useOrdersTableConfig } from '../../admin/hooks/useOrdersTableConfig'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { getOrders, syncSmartupOrders, type OrderListItem } from '../../services/ordersApi'
+import { getOrders, syncSmartupOrders, updateOrderStatus, type OrderListItem } from '../../services/ordersApi'
 import { useAuth } from '../../rbac/AuthProvider'
 
 const PAGE_SIZE = 50
@@ -34,6 +34,11 @@ const COLUMN_OPTIONS = [
 
 const COLUMN_OPTIONS_DEFAULT = COLUMN_OPTIONS.filter((c) => c.id !== 'status')
 
+// Backend da ruxsat etilgan buyurtma statuslari (admin o'zgartirishi mumkin)
+const ALLOWED_ORDER_STATUSES = [
+  'imported', 'B#S', 'allocated', 'ready_for_picking', 'picking', 'picked', 'completed', 'packed', 'shipped', 'cancelled',
+] as const
+
 // Buyurtma statuslari sahifasi: faqat ma'lumot, yig'ishga yuborish yo'q; yig'uvchi va kontrolyor ustunlari
 const COLUMN_OPTIONS_STATUSES = [
   { id: 'order_number', labelKey: 'orders:columns.order_number' },
@@ -43,6 +48,7 @@ const COLUMN_OPTIONS_STATUSES = [
   { id: 'agent', labelKey: 'orders:columns.agent' },
   { id: 'total_amount', labelKey: 'orders:columns.total_amount' },
   { id: 'status', labelKey: 'orders:columns.status' },
+  { id: 'change_status', labelKey: 'orders:columns.change_status' },
   { id: 'lines', labelKey: 'orders:columns.lines' },
   { id: 'created', labelKey: 'orders:columns.created' },
   { id: 'view_details', labelKey: 'orders:columns.view_details' },
@@ -82,6 +88,8 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
   const { has } = useAuth()
   const canSync = has('orders:write')
   const canSend = has('orders:write')
+  const canEditStatus = has('documents:edit_status')
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null)
 
   const { config, updateConfig, resetConfig } = useOrdersTableConfig()
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -305,6 +313,41 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
               </span>
             </td>
           )
+        case 'change_status':
+          if (!canEditStatus)
+            return (
+              <td className="px-4 py-3 text-slate-400 dark:text-slate-600">—</td>
+            )
+          {
+            const isUpdating = updatingOrderId === order.id
+            return (
+              <td className="px-4 py-3">
+                <select
+                  value={order.status}
+                  disabled={isUpdating}
+                  onChange={async (e) => {
+                    const newStatus = e.target.value
+                    if (newStatus === order.status) return
+                    setUpdatingOrderId(order.id)
+                    try {
+                      await updateOrderStatus(order.id, newStatus)
+                      await load()
+                    } finally {
+                      setUpdatingOrderId(null)
+                    }
+                  }}
+                  className="min-w-[140px] rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 disabled:opacity-60"
+                  aria-label={t('orders:columns.change_status')}
+                >
+                  {ALLOWED_ORDER_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {t(`orders:status.${s === 'B#S' ? 'b#s' : s}`, s)}
+                    </option>
+                  ))}
+                </select>
+              </td>
+            )
+          }
         case 'picker':
           return (
             <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
@@ -412,7 +455,7 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
         </table>
       </TableScrollArea>
     )
-  }, [canSend, config.columnOrder, config.visibleColumns, eligibleItems, error, isLoading, items, load, mode, navigate, selectedOrderIds, t])
+  }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, eligibleItems, error, isLoading, items, load, mode, navigate, selectedOrderIds, t, updatingOrderId])
 
   return (
     <AdminLayout title={pageTitle} backTo={mode === 'statuses' ? '/admin' : undefined}>

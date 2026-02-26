@@ -89,6 +89,7 @@
     "agent_id": "Agent ID",
     "total_amount": "Summa",
     "status": "Holat",
+    "change_status": "Holatni o'zgartirish",
     "lines": "Qatorlar",
     "created": "Yaratilgan",
     "view_details": "",

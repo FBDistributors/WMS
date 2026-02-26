@@ -89,6 +89,7 @@
     "agent_id": "Agent ID",
     "total_amount": "Total",
     "status": "Status",
+    "change_status": "Change status",
     "lines": "Lines",
     "created": "Created",
     "view_details": "",
