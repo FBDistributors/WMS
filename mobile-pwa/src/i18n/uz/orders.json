@@ -97,6 +97,21 @@
     "picker": "Yig'uvchi",
     "controller": "Kontrolyor"
   },
+  "columns_orikzor": {
+    "order_number": "Harakat raqami",
+    "external_id": "Movement ID",
+    "customer": "Mijoz",
+    "customer_id": "Mijoz ID",
+    "agent": "Agent",
+    "total_amount": "Summa",
+    "status": "Holat",
+    "change_status": "Holatni o'zgartirish",
+    "lines": "Tovarlar soni",
+    "created": "Harakat sanasi",
+    "view_details": "",
+    "picker": "Yig'uvchi",
+    "controller": "Kontrolyor"
+  },
   "lines": {
     "sku": "SKU",
     "barcode": "Barcode",

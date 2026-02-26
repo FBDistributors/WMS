@@ -97,6 +97,21 @@
     "picker": "Picker",
     "controller": "Controller"
   },
+  "columns_orikzor": {
+    "order_number": "Movement number",
+    "external_id": "Movement ID",
+    "customer": "Customer",
+    "customer_id": "Customer ID",
+    "agent": "Agent",
+    "total_amount": "Total",
+    "status": "Status",
+    "change_status": "Change status",
+    "lines": "Movement items",
+    "created": "Movement date",
+    "view_details": "",
+    "picker": "Picker",
+    "controller": "Controller"
+  },
   "lines": {
     "sku": "SKU",
     "barcode": "Barcode",

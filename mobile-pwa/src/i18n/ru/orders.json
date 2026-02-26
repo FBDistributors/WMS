@@ -94,6 +94,21 @@
     "picker": "Сборщик",
     "controller": "Контролёр"
   },
+  "columns_orikzor": {
+    "order_number": "Номер движения",
+    "external_id": "Movement ID",
+    "customer": "Клиент",
+    "customer_id": "ID клиента",
+    "agent": "Агент",
+    "total_amount": "Сумма",
+    "status": "Статус",
+    "change_status": "Изменить статус",
+    "lines": "Товары в движении",
+    "created": "Дата движения",
+    "view_details": "",
+    "picker": "Сборщик",
+    "controller": "Контролёр"
+  },
   "lines": {
     "sku": "SKU",
     "barcode": "Штрих-код",

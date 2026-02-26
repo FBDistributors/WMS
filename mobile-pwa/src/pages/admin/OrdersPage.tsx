@@ -248,7 +248,12 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       return ''
     }
     const columnLabels = new Map(
-      columnOptionsForMode.map((column) => [column.id, t(column.labelKey)])
+      columnOptionsForMode.map((column) => [
+        column.id,
+        orderSource === 'orikzor'
+          ? t(`orders:columns_orikzor.${column.id}`, t(column.labelKey))
+          : t(column.labelKey),
+      ])
     )
     const renderCell = (columnId: string, order: OrderListItem) => {
       switch (columnId) {
@@ -471,7 +476,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         </table>
       </TableScrollArea>
     )
-  }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, eligibleItems, error, isLoading, items, load, mode, navigate, selectedOrderIds, t, updatingOrderId])
+  }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, eligibleItems, error, isLoading, items, load, mode, navigate, orderSource, selectedOrderIds, t, updatingOrderId])
 
   return (
     <AdminLayout title={pageTitle} backTo={mode === 'statuses' ? '/admin' : undefined}>
