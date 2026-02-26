@@ -246,6 +246,12 @@ export function KirimFormScreen() {
   }, [currentProduct?.product_id]);
 
   useEffect(() => {
+    if (flow === 'inventory' && inventorySubMode === 'byScan' && inventoryStep === 1 && currentProduct && !loadingProduct) {
+      setInventoryStep(2);
+    }
+  }, [flow, inventorySubMode, inventoryStep, currentProduct, loadingProduct]);
+
+  useEffect(() => {
     if (pickerModalVisible && isOnline && flow === 'return') {
       getPickers().then(setPickers).catch(() => setPickers([]));
     }
@@ -694,12 +700,28 @@ export function KirimFormScreen() {
           </>
         )}
 
-        {/* Bo'lim 2: Scan qilib — step 1: faqat Skaner */}
+        {/* Bo'lim 2: Scan qilib — step 1: qo'lda kiritish + Skaner (yangi mahsulotlar bo'limidagi kabi) */}
         {flow === 'inventory' && inventorySubMode === 'byScan' && inventoryStep === 1 && (
-          <TouchableOpacity style={styles.scanBtnTop} onPress={handleScan} activeOpacity={0.8}>
-            <Icon name="barcode-scan" size={28} color="#fff" />
-            <Text style={styles.scanBtnText}>{t('scanButton')}</Text>
-          </TouchableOpacity>
+          <>
+            <View style={styles.barcodeBlockTop}>
+              <Text style={styles.manualEntryLabel}>{t('kirimManualEntry')}</Text>
+              <BarcodeSearchInput
+                value={manualBarcode}
+                onChangeText={setManualBarcode}
+                onSelectProduct={handleSelectProductFromBarcode}
+                placeholder={t('kirimBarcodePlaceholder')}
+                emptyLabel={t('barcodeSearchNoResults')}
+                loading={loadingProduct}
+                error={productError}
+                onClearError={() => setProductError(null)}
+                dropdownMaxHeight={200}
+              />
+            </View>
+            <TouchableOpacity style={styles.scanBtnTop} onPress={handleScan} activeOpacity={0.8}>
+              <Icon name="barcode-scan" size={28} color="#fff" />
+              <Text style={styles.scanBtnText}>{t('scanButton')}</Text>
+            </TouchableOpacity>
+          </>
         )}
 
         {/* Bo'lim 2: Scan qilib — step 2: mahsulot + lokatsiyalar ro'yxati */}
