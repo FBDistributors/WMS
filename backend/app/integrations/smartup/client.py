@@ -9,10 +9,65 @@ import urllib.error
 import urllib.request
 from urllib.parse import urljoin
 
-from app.integrations.smartup.schemas import SmartupOrderExportResponse
+from app.integrations.smartup.schemas import SmartupOrder, SmartupOrderExportResponse
 
 
 logger = logging.getLogger(__name__)
+
+# O'rikzor movement$export: faqat shu ombor kodidagi harakatlar yuklanadi (env orqali o'zgartirish mumkin)
+ORIKZOR_TO_WAREHOUSE_CODE = (os.getenv("SMARTUP_ORIKZOR_TO_WAREHOUSE_CODE") or "777").strip()
+
+
+def _parse_movement_export_to_orders(body: str) -> SmartupOrderExportResponse:
+    """movement$export javobini parse qiladi, to_warehouse_code bo'yicha filtrlaydi va SmartupOrder list qaytaradi."""
+    data = json.loads(body)
+    movements = data.get("movement") or []
+    if not isinstance(movements, list):
+        movements = [movements] if movements else []
+    filtered = [
+        m for m in movements
+        if isinstance(m, dict) and (m.get("to_warehouse_code") or "").strip() == ORIKZOR_TO_WAREHOUSE_CODE
+    ]
+    orders: list[SmartupOrder] = []
+    for m in filtered:
+        movement_id = (m.get("movement_id") or "").strip() or (m.get("movement_number") or "").strip()
+        movement_number = (m.get("movement_number") or m.get("movement_id") or "").strip()
+        if not movement_id and not movement_number:
+            continue
+        movement_id = movement_id or movement_number
+        items = m.get("movement_items") or []
+        if not isinstance(items, list):
+            items = [items] if items else []
+        lines = []
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            try:
+                qty = float(it.get("quantity") or 0)
+            except (TypeError, ValueError):
+                qty = 0
+            lines.append({
+                "product_code": it.get("product_code"),
+                "sku": it.get("product_code"),
+                "quantity": qty,
+                "name": it.get("product_article_code") or it.get("product_code") or "",
+            })
+        order_dict = {
+            "external_id": movement_id,
+            "deal_id": movement_id,
+            "order_no": movement_number,
+            "status": "B#S",
+            "filial_id": m.get("filial_code"),
+            "filial_code": m.get("filial_code"),
+            "lines": lines,
+        }
+        try:
+            validate = getattr(SmartupOrder, "model_validate", getattr(SmartupOrder, "parse_obj", None))
+            if validate:
+                orders.append(validate(order_dict))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Movement to order parse skip movement_id=%s: %s", movement_id, exc)
+    return SmartupOrderExportResponse(items=orders)
 
 
 class SmartupClient:
@@ -87,7 +142,17 @@ class SmartupClient:
             try:
                 with urllib.request.urlopen(request, timeout=30) as response:
                     body = response.read().decode("utf-8")
-                parsed = SmartupOrderExportResponse.parse_raw(body)
+                # O'rikzor movement$export: "movement" array, to_warehouse_code=777 filtri
+                if export_url and "movement$export" in (export_url or ""):
+                    parsed = _parse_movement_export_to_orders(body)
+                    if parsed.items:
+                        logger.info(
+                            "Smartup movement$export: to_warehouse_code=%s, movements=%s",
+                            ORIKZOR_TO_WAREHOUSE_CODE,
+                            len(parsed.items),
+                        )
+                else:
+                    parsed = SmartupOrderExportResponse.parse_raw(body)
                 if parsed.items:
                     sample = parsed.items[0]
                     logger.info(
