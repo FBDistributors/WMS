@@ -14,8 +14,8 @@ from app.integrations.smartup.schemas import SmartupOrder, SmartupOrderExportRes
 
 logger = logging.getLogger(__name__)
 
-# O'rikzor movement$export: faqat shu ombor kodidagi harakatlar yuklanadi (env orqali o'zgartirish mumkin)
-ORIKZOR_TO_WAREHOUSE_CODE = (os.getenv("SMARTUP_ORIKZOR_TO_WAREHOUSE_CODE") or "777").strip()
+# O'rikzor movement$export: to_warehouse_code bo'yicha filtrlash. "" = barcha, "777" = faqat 777
+ORIKZOR_TO_WAREHOUSE_CODE = (os.getenv("SMARTUP_ORIKZOR_TO_WAREHOUSE_CODE") or "").strip()
 
 
 def _parse_movement_export_to_orders(body: str) -> SmartupOrderExportResponse:
@@ -24,10 +24,14 @@ def _parse_movement_export_to_orders(body: str) -> SmartupOrderExportResponse:
     movements = data.get("movement") or []
     if not isinstance(movements, list):
         movements = [movements] if movements else []
-    filtered = [
-        m for m in movements
-        if isinstance(m, dict) and (m.get("to_warehouse_code") or "").strip() == ORIKZOR_TO_WAREHOUSE_CODE
-    ]
+    # to_warehouse_code: filterni bo'sh qoldirsak barcha movement'lar, aks holda faqat shu kod
+    if ORIKZOR_TO_WAREHOUSE_CODE:
+        filtered = [
+            m for m in movements
+            if isinstance(m, dict) and (m.get("to_warehouse_code") or "").strip() == ORIKZOR_TO_WAREHOUSE_CODE
+        ]
+    else:
+        filtered = [m for m in movements if isinstance(m, dict)]
     orders: list[SmartupOrder] = []
     for m in filtered:
         movement_id = (m.get("movement_id") or "").strip() or (m.get("movement_number") or "").strip()
@@ -109,20 +113,39 @@ class SmartupClient:
         # Pass filial_code only when explicitly provided. SmartUp may return 400 "org not found"
         # if we pass 3788131 in payload - so we import all, then filter by filial in our API.
         normalized_filial_code = (filial_code or "").strip()
-        payload = {
-            "filial_codes": [{"filial_code": normalized_filial_code}] if normalized_filial_code else [{"filial_code": ""}],
-            "filial_code": normalized_filial_code or "",
-            "external_id": "",
-            "deal_id": "",
-            "status": "B#S",
-            "begin_deal_date": begin_deal_date,
-            "end_deal_date": end_deal_date,
-            "delivery_date": "",
-            "begin_created_on": "",
-            "end_created_on": "",
-            "begin_modified_on": "",
-            "end_modified_on": "",
-        }
+        is_movement_export = export_url and "movement$export" in (export_url or "")
+
+        if is_movement_export:
+            # movement$export API formati (Internal movement / Export)
+            payload = {
+                "filial_codes": [{"filial_code": normalized_filial_code}] if normalized_filial_code else [{"filial_code": ""}],
+                "filial_code": normalized_filial_code or "",
+                "external_id": "",
+                "movement_id": "",
+                "begin_from_movement_date": begin_deal_date,
+                "end_from_movement_date": end_deal_date,
+                "begin_to_movement_date": "",
+                "end_to_movement_date": "",
+                "begin_created_on": "",
+                "end_created_on": "",
+                "begin_modified_on": "",
+                "end_modified_on": "",
+            }
+        else:
+            payload = {
+                "filial_codes": [{"filial_code": normalized_filial_code}] if normalized_filial_code else [{"filial_code": ""}],
+                "filial_code": normalized_filial_code or "",
+                "external_id": "",
+                "deal_id": "",
+                "status": "B#S",
+                "begin_deal_date": begin_deal_date,
+                "end_deal_date": end_deal_date,
+                "delivery_date": "",
+                "begin_created_on": "",
+                "end_created_on": "",
+                "begin_modified_on": "",
+                "end_modified_on": "",
+            }
         data = json.dumps(payload).encode("utf-8")
         credentials = f"{self.username}:{self.password}"
         basic_token = base64.b64encode(credentials.encode("utf-8")).decode("utf-8")
@@ -148,7 +171,7 @@ class SmartupClient:
                     if parsed.items:
                         logger.info(
                             "Smartup movement$export: to_warehouse_code=%s, movements=%s",
-                            ORIKZOR_TO_WAREHOUSE_CODE,
+                            ORIKZOR_TO_WAREHOUSE_CODE or "(all)",
                             len(parsed.items),
                         )
                 else:
