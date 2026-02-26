@@ -341,6 +341,7 @@ function LocationDialog({ mode, target, onClose, onSaved, onCreated }: DialogPro
   const [locationType, setLocationType] = useState<LocationTypeEnum>(
     (target?.location_type as LocationTypeEnum) ?? 'RACK'
   )
+  const [zoneType, setZoneType] = useState<string>(target?.zone_type ?? 'NORMAL')
   const [sector, setSector] = useState(target?.sector ?? '')
   const [levelNo, setLevelNo] = useState<number | ''>(target?.level_no ?? '')
   const [rowNo, setRowNo] = useState<number | ''>(target?.row_no ?? '')
@@ -412,6 +413,7 @@ function LocationDialog({ mode, target, onClose, onSaved, onCreated }: DialogPro
             : { pallet_no: Number(palletNo), level_no: undefined, row_no: undefined }),
           is_active: target.is_active,
           pick_sequence: pickSequence === '' ? null : Number(pickSequence),
+          zone_type: zoneType,
         })
       }
       onSaved()
@@ -460,6 +462,21 @@ function LocationDialog({ mode, target, onClose, onSaved, onCreated }: DialogPro
               <option value="FLOOR">{t('locations:types_enum.FLOOR')}</option>
             </select>
           </label>
+
+          {mode === 'edit' && (
+            <label className="text-sm text-slate-600 dark:text-slate-300">
+              {t('locations:zone_type')}
+              <select
+                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                value={zoneType}
+                onChange={(e) => setZoneType(e.target.value)}
+              >
+                <option value="NORMAL">{t('locations:zone_enum.NORMAL')}</option>
+                <option value="EXPIRED">{t('locations:zone_enum.EXPIRED')}</option>
+                <option value="DAMAGED">{t('locations:zone_enum.DAMAGED')}</option>
+              </select>
+            </label>
+          )}
 
           <label className="text-sm text-slate-600 dark:text-slate-300">
             {t('locations:sector')} *

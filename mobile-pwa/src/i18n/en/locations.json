@@ -80,5 +80,10 @@
   "types_enum": {
     "RACK": "Rack (S-sector-level-row)",
     "FLOOR": "Floor (P-sector-pallet)"
+  },
+  "zone_enum": {
+    "NORMAL": "Normal",
+    "EXPIRED": "Expired",
+    "DAMAGED": "Damaged"
   }
 }

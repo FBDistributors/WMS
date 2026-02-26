@@ -79,5 +79,10 @@
   "types_enum": {
     "RACK": "Stellaj (S-sektor-bosqich-qator)",
     "FLOOR": "Pol (P-sektor-pallet)"
+  },
+  "zone_enum": {
+    "NORMAL": "Normal",
+    "EXPIRED": "Muddati o'tkan",
+    "DAMAGED": "Yaroqsiz"
   }
 }

@@ -44,6 +44,7 @@ export type LocationUpdateInput = {
   pallet_no?: number
   is_active?: boolean
   pick_sequence?: number | null
+  zone_type?: ZoneType | string
 }
 
 export async function getLocations(includeInactive = false) {

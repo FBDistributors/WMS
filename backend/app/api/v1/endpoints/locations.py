@@ -68,6 +68,7 @@ class LocationUpdate(BaseModel):
     pallet_no: Optional[int] = Field(default=None, ge=0, le=99)
     is_active: Optional[bool] = None
     pick_sequence: Optional[int] = Field(default=None, ge=0, description="Terish ketma-ketligi (yo'nalish)")
+    zone_type: Optional[str] = Field(default=None, description="NORMAL, EXPIRED, DAMAGED, QUARANTINE")
 
 
 def _to_location(location: LocationModel) -> LocationOut:
@@ -186,9 +187,16 @@ async def update_location(
     location = db.query(LocationModel).filter(LocationModel.id == location_id).one_or_none()
     if not location:
         raise HTTPException(status_code=404, detail="Location not found")
+    ZONE_TYPES = ("NORMAL", "EXPIRED", "DAMAGED", "QUARANTINE")
     old_data = {"code": location.code, "is_active": location.is_active}
+    if payload.zone_type is not None:
+        old_data["zone_type"] = location.zone_type
     if payload.is_active is not None:
         location.is_active = payload.is_active
+    if payload.zone_type is not None:
+        if payload.zone_type not in ZONE_TYPES:
+            raise HTTPException(status_code=400, detail=f"zone_type must be one of {ZONE_TYPES}")
+        location.zone_type = payload.zone_type
     if "pick_sequence" in payload.model_dump(exclude_unset=True):
         location.pick_sequence = payload.pick_sequence
     if location.location_type in LOCATION_TYPE_ENUM and (
@@ -220,6 +228,8 @@ async def update_location(
             location.row_no = row_no
             location.pallet_no = pallet_no
     new_data = {"code": location.code, "is_active": location.is_active}
+    if payload.zone_type is not None:
+        new_data["zone_type"] = location.zone_type
     log_action(
         db,
         user_id=user.id,
