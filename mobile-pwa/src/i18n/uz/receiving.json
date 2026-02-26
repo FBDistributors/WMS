@@ -44,6 +44,8 @@
   "filter_panel_title": "Filterlar",
   "filter_doc_placeholder": "Hujjat raqami",
   "filter_by_product": "Mahsulot bo'yicha",
+  "filter_by_brand": "Brend bo'yicha",
+  "filter_all_brands": "Barcha brendlar",
   "filter_clear": "Tozalash",
   "filter_apply": "Qo'llash",
   "filter_receiver": "Qabul qiluvchi",

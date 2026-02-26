@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -31,8 +31,10 @@ function formatReceiptDate(iso: string): string {
 
 export function ReceivingDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const location = useLocation()
   const navigate = useNavigate()
   const { t } = useTranslation(['receiving', 'common'])
+  const listQuery = (location.state as { listQuery?: string } | null)?.listQuery ?? ''
   const [receipt, setReceipt] = useState<Receipt | null>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [locations, setLocations] = useState<Location[]>([])
@@ -118,7 +120,7 @@ export function ReceivingDetailPage() {
   return (
     <AdminLayout
       title={t('receiving:detail_title')}
-      backTo="/admin/receiving"
+      backTo={`/admin/receiving${listQuery ? `?${listQuery}` : ''}`}
     >
       <Card className="space-y-4">
         <div className="grid gap-3 text-sm sm:grid-cols-2 md:grid-cols-4">
@@ -241,7 +243,7 @@ export function ReceivingDetailPage() {
         <div className="flex justify-start pt-2">
           <Button
             variant="secondary"
-            onClick={() => navigate('/admin/receiving')}
+            onClick={() => navigate(`/admin/receiving${listQuery ? `?${listQuery}` : ''}`)}
             className="gap-2"
           >
             <ArrowLeft size={18} />

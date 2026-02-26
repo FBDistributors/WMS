@@ -43,6 +43,7 @@ export type Receiver = {
 export type ListReceiptsParams = {
   created_by?: string
   product_id?: string
+  brand_id?: string
   date_from?: string
   date_to?: string
   limit?: number
@@ -67,6 +68,7 @@ export async function listReceipts(
   const query: Record<string, string | number | undefined> = {
     created_by: params.created_by,
     product_id: params.product_id,
+    brand_id: params.brand_id,
     date_from: params.date_from,
     date_to: params.date_to,
     limit: params.limit,

@@ -44,6 +44,8 @@
   "filter_panel_title": "Фильтры",
   "filter_doc_placeholder": "Номер документа",
   "filter_by_product": "По товару",
+  "filter_by_brand": "По бренду",
+  "filter_all_brands": "Все бренды",
   "filter_clear": "Сбросить",
   "filter_apply": "Применить",
   "filter_receiver": "Получатель",

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Filter, Plus, Search, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -13,6 +13,7 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { getProducts, type Product } from '../../services/productsApi'
 import { getLocations, type Location } from '../../services/locationsApi'
+import { getBrands, type Brand } from '../../services/brandsApi'
 import {
   createReceipt,
   listReceipts,
@@ -56,6 +57,8 @@ function formatReceiptDate(iso: string): string {
 export function ReceivingPage() {
   const { t } = useTranslation(['receiving', 'common'])
   const navigate = useNavigate()
+  const location = useLocation()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { has } = useAuth()
   const canWrite = has('receiving:write')
 
@@ -64,15 +67,23 @@ export function ReceivingPage() {
   const [locations, setLocations] = useState<Location[]>([])
   const [receipts, setReceipts] = useState<Receipt[]>([])
   const [totalReceipts, setTotalReceipts] = useState(0)
-  const [offset, setOffset] = useState(0)
-  const [searchQuery, setSearchQuery] = useState('')
   const [receivers, setReceivers] = useState<Receiver[]>([])
-  const [receiverFilter, setReceiverFilter] = useState<string>('')
-  const [productFilter, setProductFilter] = useState<string>('')
-  const [filterProduct, setFilterProduct] = useState<Product | null>(null)
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+  const [brands, setBrands] = useState<Brand[]>([])
   const [filterPanelOpen, setFilterPanelOpen] = useState(false)
+
+  const searchQuery = searchParams.get('q') ?? ''
+  const productFilter = searchParams.get('product_id') ?? ''
+  const brandFilter = searchParams.get('brand_id') ?? ''
+  const receiverFilter = searchParams.get('created_by') ?? ''
+  const dateFrom = searchParams.get('date_from') ?? ''
+  const dateTo = searchParams.get('date_to') ?? ''
+  const offset = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10))
+
+  const [filterProduct, setFilterProduct] = useState<Product | null>(null)
+  const [filterBrandId, setFilterBrandId] = useState<string>('')
+  const [filterReceiver, setFilterReceiver] = useState<string>('')
+  const [filterDateFrom, setFilterDateFrom] = useState('')
+  const [filterDateTo, setFilterDateTo] = useState('')
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [docNo, setDocNo] = useState('')
@@ -90,6 +101,7 @@ export function ReceivingPage() {
         listReceipts({
           created_by: receiverFilter.trim() || undefined,
           product_id: productFilter.trim() || undefined,
+          brand_id: brandFilter.trim() || undefined,
           date_from: dateFrom.trim() || undefined,
           date_to: dateTo.trim() || undefined,
           limit: PAGE_SIZE,
@@ -121,7 +133,7 @@ export function ReceivingPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [t, receiverFilter, productFilter, dateFrom, dateTo, offset])
+  }, [t, receiverFilter, productFilter, brandFilter, dateFrom, dateTo, offset])
 
   const loadReceivers = useCallback(async () => {
     try {
@@ -132,9 +144,21 @@ export function ReceivingPage() {
     }
   }, [])
 
+  const loadBrands = useCallback(async () => {
+    try {
+      const list = await getBrands(undefined, true)
+      setBrands(list)
+    } catch {
+      setBrands([])
+    }
+  }, [])
+
   useEffect(() => {
     void loadReceivers()
   }, [loadReceivers])
+  useEffect(() => {
+    void loadBrands()
+  }, [loadBrands])
 
   useEffect(() => {
     void load()
@@ -173,6 +197,16 @@ export function ReceivingPage() {
     const map = new Map(locations.map((location) => [location.id, location]))
     return map
   }, [locations])
+
+  useEffect(() => {
+    if (filterPanelOpen) {
+      setFilterBrandId(brandFilter)
+      setFilterReceiver(receiverFilter)
+      setFilterDateFrom(dateFrom)
+      setFilterDateTo(dateTo)
+      setFilterProduct(productFilter ? productLookup.get(productFilter) ?? null : null)
+    }
+  }, [filterPanelOpen, brandFilter, productFilter, receiverFilter, dateFrom, dateTo, productLookup])
 
   const addLine = () => {
     setLines((prev) => [
@@ -446,7 +480,16 @@ export function ReceivingPage() {
                 type="search"
                 placeholder={t('receiving:search_placeholder')}
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev)
+                    if (v) next.set('q', v)
+                    else next.delete('q')
+                    next.delete('offset')
+                    return next
+                  })
+                }}
                 className="w-full rounded-2xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
                 aria-label={t('receiving:search_placeholder')}
               />
@@ -489,7 +532,15 @@ export function ReceivingPage() {
                         <input
                           type="text"
                           value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
+                          onChange={(e) => {
+                            setSearchParams((prev) => {
+                              const next = new URLSearchParams(prev)
+                              if (e.target.value) next.set('q', e.target.value)
+                              else next.delete('q')
+                              next.delete('offset')
+                              return next
+                            })
+                          }}
                           placeholder={t('receiving:filter_doc_placeholder')}
                           className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                         />
@@ -507,10 +558,25 @@ export function ReceivingPage() {
                         />
                       </label>
                       <label className="block text-sm text-slate-600 dark:text-slate-400">
+                        {t('receiving:filter_by_brand')}
+                        <select
+                          value={filterBrandId}
+                          onChange={(e) => setFilterBrandId(e.target.value)}
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                        >
+                          <option value="">{t('receiving:filter_all_brands')}</option>
+                          {brands.map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {b.display_name || b.name || b.code}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="block text-sm text-slate-600 dark:text-slate-400">
                         {t('receiving:filter_receiver')}
                         <select
-                          value={receiverFilter}
-                          onChange={(e) => setReceiverFilter(e.target.value)}
+                          value={filterReceiver}
+                          onChange={(e) => setFilterReceiver(e.target.value)}
                           className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                         >
                           <option value="">{t('receiving:filter_all_receivers')}</option>
@@ -525,8 +591,8 @@ export function ReceivingPage() {
                         <label className="block text-sm text-slate-600 dark:text-slate-400">
                           {t('receiving:date_from')}
                           <DateInput
-                            value={dateFrom}
-                            onChange={setDateFrom}
+                            value={filterDateFrom}
+                            onChange={setFilterDateFrom}
                             className="mt-1 w-full"
                             aria-label={t('receiving:date_from')}
                           />
@@ -534,8 +600,8 @@ export function ReceivingPage() {
                         <label className="block text-sm text-slate-600 dark:text-slate-400">
                           {t('receiving:date_to')}
                           <DateInput
-                            value={dateTo}
-                            onChange={setDateTo}
+                            value={filterDateTo}
+                            onChange={setFilterDateTo}
                             className="mt-1 w-full"
                             aria-label={t('receiving:date_to')}
                           />
@@ -546,22 +612,34 @@ export function ReceivingPage() {
                       <Button
                         variant="secondary"
                         onClick={() => {
-                          setSearchQuery('')
-                          setFilterProduct(null)
-                          setProductFilter('')
-                          setReceiverFilter('')
-                          setDateFrom('')
-                          setDateTo('')
-                          setOffset(0)
+                          setSearchParams({})
                           setFilterPanelOpen(false)
                         }}
                       >
                         {t('receiving:filter_clear')}
                       </Button>
                       <Button
-                        onClick={() => {
-                          setProductFilter(filterProduct?.id ?? '')
-                          setOffset(0)
+                          onClick={() => {
+                          setSearchParams((prev) => {
+                            const next = new URLSearchParams(prev)
+                            const pid = filterProduct?.id ?? ''
+                            const bid = filterBrandId.trim()
+                            const rid = filterReceiver.trim()
+                            const df = filterDateFrom.trim()
+                            const dt = filterDateTo.trim()
+                            if (pid) next.set('product_id', pid)
+                            else next.delete('product_id')
+                            if (bid) next.set('brand_id', bid)
+                            else next.delete('brand_id')
+                            if (rid) next.set('created_by', rid)
+                            else next.delete('created_by')
+                            if (df) next.set('date_from', df)
+                            else next.delete('date_from')
+                            if (dt) next.set('date_to', dt)
+                            else next.delete('date_to')
+                            next.delete('offset')
+                            return next
+                          })
                           setFilterPanelOpen(false)
                         }}
                       >
@@ -614,11 +692,17 @@ export function ReceivingPage() {
                     key={receipt.id}
                     role="button"
                     tabIndex={0}
-                    onClick={() => navigate(`/admin/receiving/${receipt.id}`)}
+                    onClick={() =>
+                      navigate(`/admin/receiving/${receipt.id}`, {
+                        state: { listQuery: location.search },
+                      })
+                    }
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault()
-                        navigate(`/admin/receiving/${receipt.id}`)
+                        navigate(`/admin/receiving/${receipt.id}`, {
+                          state: { listQuery: location.search },
+                        })
                       }
                     }}
                     className="cursor-pointer border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50"
@@ -672,7 +756,14 @@ export function ReceivingPage() {
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
-                onClick={() => setOffset((prev) => Math.max(0, prev - PAGE_SIZE))}
+                onClick={() => {
+                  const newOffset = Math.max(0, offset - PAGE_SIZE)
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev)
+                    next.set('offset', String(newOffset))
+                    return next
+                  })
+                }}
                 disabled={offset === 0}
                 className="gap-1"
               >
@@ -681,7 +772,13 @@ export function ReceivingPage() {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => setOffset((prev) => prev + PAGE_SIZE)}
+                onClick={() => {
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev)
+                    next.set('offset', String(offset + PAGE_SIZE))
+                    return next
+                  })
+                }}
                 disabled={offset + PAGE_SIZE >= totalReceipts}
                 className="gap-1"
               >
