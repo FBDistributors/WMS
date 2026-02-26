@@ -34,10 +34,18 @@ const COLUMN_OPTIONS = [
 
 const COLUMN_OPTIONS_DEFAULT = COLUMN_OPTIONS.filter((c) => c.id !== 'status')
 
-// Backend da ruxsat etilgan buyurtma statuslari (admin o'zgartirishi mumkin)
-const ALLOWED_ORDER_STATUSES = [
-  'imported', 'B#S', 'allocated', 'ready_for_picking', 'picking', 'picked', 'completed', 'packed', 'shipped', 'cancelled',
+// Dropdown da faqat 3 ta status: Yig'ishda, Tekshiruvda, Yakunlangan (backend ga picking / picked / completed yuboriladi)
+const SIMPLE_STATUS_OPTIONS = [
+  { value: 'picking', labelKey: 'orders:status_simple.yigishda' },
+  { value: 'picked', labelKey: 'orders:status_simple.tekshiruvda' },
+  { value: 'completed', labelKey: 'orders:status_simple.yakunlash' },
 ] as const
+
+function backendStatusToSimple(status: string): string {
+  if (['imported', 'B#S', 'allocated', 'ready_for_picking', 'picking'].includes(status)) return 'picking'
+  if (status === 'picked') return 'picked'
+  return 'completed' // completed, packed, shipped, cancelled
+}
 
 // Buyurtma statuslari sahifasi: faqat ma'lumot, yig'ishga yuborish yo'q; yig'uvchi va kontrolyor ustunlari
 const COLUMN_OPTIONS_STATUSES = [
@@ -320,17 +328,19 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
             )
           {
             const isUpdating = updatingOrderId === order.id
+            const simpleValue = backendStatusToSimple(order.status)
             return (
               <td className="px-4 py-3">
                 <select
-                  value={order.status}
+                  value={simpleValue}
                   disabled={isUpdating}
                   onChange={async (e) => {
-                    const newStatus = e.target.value
-                    if (newStatus === order.status) return
+                    const newSimple = e.target.value as 'picking' | 'picked' | 'completed'
+                    const backendStatus = newSimple // picking / picked / completed backend da qabul qilinadi
+                    if (backendStatus === order.status) return
                     setUpdatingOrderId(order.id)
                     try {
-                      await updateOrderStatus(order.id, newStatus)
+                      await updateOrderStatus(order.id, backendStatus)
                       await load()
                     } finally {
                       setUpdatingOrderId(null)
@@ -339,9 +349,9 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
                   className="min-w-[140px] rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 disabled:opacity-60"
                   aria-label={t('orders:columns.change_status')}
                 >
-                  {ALLOWED_ORDER_STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {t(`orders:status.${s === 'B#S' ? 'b#s' : s}`, s)}
+                  {SIMPLE_STATUS_OPTIONS.map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {t(s.labelKey)}
                     </option>
                   ))}
                 </select>
