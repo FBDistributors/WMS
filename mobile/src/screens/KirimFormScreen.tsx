@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   Modal,
   ScrollView,
   StyleSheet,
@@ -256,6 +257,45 @@ export function KirimFormScreen() {
       getPickers().then(setPickers).catch(() => setPickers([]));
     }
   }, [pickerModalVisible, isOnline, flow]);
+
+  const handleInventoryBack = useCallback(() => {
+    if (flow !== 'inventory') {
+      navigation.goBack();
+      return;
+    }
+    if (inventoryStep === 0) {
+      navigation.navigate('Kirim');
+      return;
+    }
+    if (inventoryStep === 1) {
+      setInventoryStep(0);
+      return;
+    }
+    if (inventoryStep === 2) {
+      setInventoryStep(1);
+      if (inventorySubMode === 'byScan') {
+        setCurrentProduct(null);
+        setSelectedScannedLocation(null);
+        setProductError(null);
+        setManualBarcode('');
+      }
+      return;
+    }
+    if (inventoryStep === 3) {
+      setInventoryStep(2);
+      if (inventorySubMode === 'byScan') setSelectedScannedLocation(null);
+      return;
+    }
+  }, [flow, inventoryStep, inventorySubMode, navigation]);
+
+  useEffect(() => {
+    if (flow !== 'inventory') return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleInventoryBack();
+      return true;
+    });
+    return () => sub.remove();
+  }, [flow, handleInventoryBack]);
 
   const handleScan = useCallback(() => {
     const scanParams: { returnToKirimForm: true; flow: typeof flow; inventoryStep?: 1 | 2 | 3; inventoryLocationId?: string; inventoryLocationCode?: string } = {
@@ -514,16 +554,7 @@ export function KirimFormScreen() {
         title={title}
         showLogo={false}
         showBack={true}
-        onBack={() => {
-          if (flow === 'inventory') {
-            if (inventoryStep === 0) navigation.navigate('Kirim');
-            else if (inventoryStep === 1) setInventoryStep(0);
-            else if (inventoryStep === 2) setInventoryStep(1);
-            else if (inventoryStep === 3) setInventoryStep(2);
-          } else {
-            navigation.goBack();
-          }
-        }}
+        onBack={handleInventoryBack}
       />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
