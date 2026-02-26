@@ -1,6 +1,7 @@
 {
   "title": "Buyurtmalar",
   "subtitle": "Smartupdan import qilingan buyurtmalar.",
+  "subtitle_orikzor": "Ichki harakatlar (Internal movement), alohida API orqali.",
   "load_failed": "Buyurtmalar yuklanmadi.",
   "sync": "Smartupni sinxronlash",
   "syncing": "Sinxronlanmoqda...",

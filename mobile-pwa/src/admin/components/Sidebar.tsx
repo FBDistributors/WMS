@@ -31,7 +31,7 @@ const MENU_ITEMS: Array<MenuItem & { key: string }> = [
   { key: 'brands', label: 'Brands', path: '/admin/brands', icon: Tag, required: 'brands:manage' },
   { key: 'orders', label: 'Orders', path: '/admin/orders', icon: ClipboardList, required: 'orders:read' },
   { key: 'orders_diller', label: 'Diller buyurtmalar', path: '/admin/orders-diller', icon: ClipboardList, required: 'orders:read' },
-  { key: 'orders_orikzor', label: "O'rikzor buyurtmalar", path: '/admin/orders-orikzor', icon: ClipboardList, required: 'orders:read' },
+  { key: 'orders_orikzor', label: "O'rikzor harakatlari", path: '/admin/orders-orikzor', icon: ArrowLeftRight, required: 'orders:read' },
   { key: 'locations', label: 'Locations', path: '/admin/locations', icon: MapPin, required: 'locations:manage' },
   { key: 'inventory', label: 'Qoldiq', path: '/admin/inventory', icon: Boxes, required: 'inventory:read' },
   { key: 'movement', label: 'Movement', path: '/admin/movement', icon: ArrowLeftRight, required: 'inventory:adjust' },
@@ -101,8 +101,15 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
       <TooltipProvider>
         <nav className="space-y-1">
           {items.map(({ label, path, icon: Icon, key }) => {
+            // /admin/orders faqat o'sha sahifa yoki order-statuses yoki orders/:id da aktiv; orders-diller/orikzor alohida
             const isActive =
-              location.pathname === path || (path !== '/admin' && location.pathname.startsWith(path))
+              path === '/admin/orders'
+                ? (location.pathname === '/admin/orders' ||
+                    location.pathname === '/admin/order-statuses' ||
+                    (location.pathname.startsWith('/admin/orders/') &&
+                      !location.pathname.startsWith('/admin/orders-diller') &&
+                      !location.pathname.startsWith('/admin/orders-orikzor')))
+                : (location.pathname === path || (path !== '/admin' && location.pathname.startsWith(path)))
             const content = (
               <Link
                 key={path}

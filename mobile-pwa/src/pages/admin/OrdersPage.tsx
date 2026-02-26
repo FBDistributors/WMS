@@ -88,7 +88,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const [searchParams] = useSearchParams()
   const group = searchParams.get('group') ?? 'all'
   const pageTitle = orderSource
-    ? t(`admin:menu.orders_${orderSource}`, orderSource === 'diller' ? 'Diller buyurtmalar' : "O'rikzor buyurtmalar")
+    ? t(`admin:menu.orders_${orderSource}`, orderSource === 'diller' ? 'Diller buyurtmalar' : "O'rikzor harakatlari")
     : mode === 'statuses'
       ? t('admin:dashboard.order_statuses_title')
       : t('orders:title')
@@ -490,7 +490,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
               {pageTitle}
             </div>
             <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-              <span>{t('orders:subtitle')}</span>
+              <span>{orderSource === 'orikzor' ? t('orders:subtitle_orikzor') : t('orders:subtitle')}</span>
               {group && group !== 'all' ? (
                 <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/50 dark:text-blue-200">
                   {t(`admin:dashboard.status_${group}`)}

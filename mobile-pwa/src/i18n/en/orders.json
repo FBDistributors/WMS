@@ -1,6 +1,7 @@
 {
   "title": "Orders",
   "subtitle": "Smartup orders imported into WMS.",
+  "subtitle_orikzor": "Internal movements via separate API.",
   "load_failed": "Failed to load orders.",
   "sync": "Sync Smartup",
   "syncing": "Syncing...",
