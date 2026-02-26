@@ -16,7 +16,11 @@ class ImportError:
     reason: str
 
 
-def import_orders(db: Session, orders: Iterable[SmartupOrder]) -> Tuple[int, int, int, List[ImportError]]:
+def import_orders(
+    db: Session,
+    orders: Iterable[SmartupOrder],
+    order_source: str | None = None,
+) -> Tuple[int, int, int, List[ImportError]]:
     created = 0
     updated = 0
     skipped = 0
@@ -46,8 +50,10 @@ def import_orders(db: Session, orders: Iterable[SmartupOrder]) -> Tuple[int, int
             continue
 
         payload = map_order_to_wms_order(order)
+        source = order_source if order_source else payload.source
         try:
             if existing:
+                existing.source = source
                 existing.order_number = payload.order_number
                 existing.filial_id = payload.filial_id
                 existing.customer_id = payload.customer_id
@@ -64,7 +70,7 @@ def import_orders(db: Session, orders: Iterable[SmartupOrder]) -> Tuple[int, int
                 continue
 
             record = Order(
-                source=payload.source,
+                source=source,
                 source_external_id=payload.source_external_id,
                 order_number=payload.order_number,
                 filial_id=payload.filial_id,

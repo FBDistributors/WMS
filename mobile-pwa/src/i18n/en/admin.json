@@ -4,6 +4,8 @@
     "products": "Products",
     "brands": "Brands",
     "orders": "Orders",
+    "orders_diller": "Diller orders",
+    "orders_orikzor": "O'rikzor orders",
     "locations": "Locations",
     "inventory": "Balance",
     "movement": "Movement",

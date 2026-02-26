@@ -4,6 +4,8 @@
     "products": "Mahsulotlar",
     "brands": "Brendlar",
     "orders": "Buyurtmalar",
+    "orders_diller": "Diller buyurtmalar",
+    "orders_orikzor": "O'rikzor buyurtmalar",
     "locations": "Joylashuvlar",
     "inventory": "Qoldiq",
     "movement": "Ko'chirish",

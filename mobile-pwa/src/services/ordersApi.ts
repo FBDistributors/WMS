@@ -55,6 +55,7 @@ export type OrdersQuery = {
   date_from?: string
   date_to?: string
   filial_id?: string
+  order_source?: string
   search_fields?: string
   limit?: number
   offset?: number
@@ -72,6 +73,7 @@ export type SmartupSyncInput = {
   begin_deal_date?: string
   end_deal_date?: string
   filial_code?: string | null
+  order_source?: string | null
 }
 
 export type SmartupSyncResult = {

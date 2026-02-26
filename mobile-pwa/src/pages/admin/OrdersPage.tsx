@@ -80,17 +80,22 @@ const GROUP_TO_STATUS: Record<string, string | undefined> = {
   all: undefined,
 }
 
-type OrdersPageProps = { mode?: 'default' | 'statuses' }
+type OrdersPageProps = { mode?: 'default' | 'statuses'; orderSource?: 'diller' | 'orikzor' }
 
-export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
+export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const { t } = useTranslation(['orders', 'common', 'admin'])
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const group = searchParams.get('group') ?? 'all'
-  const pageTitle = mode === 'statuses' ? t('admin:dashboard.order_statuses_title') : t('orders:title')
-  // Asosiy Buyurtmalar sahifasida faqat B#S (Smartupdan import; yig'ishga yuborilgach ko'rinmaydi)
-  const statusParam =
-    mode === 'default' && (group === 'all' || !searchParams.get('group'))
+  const pageTitle = orderSource
+    ? t(`admin:menu.orders_${orderSource}`, orderSource === 'diller' ? 'Diller buyurtmalar' : "O'rikzor buyurtmalar")
+    : mode === 'statuses'
+      ? t('admin:dashboard.order_statuses_title')
+      : t('orders:title')
+  // Asosiy Buyurtmalar sahifasida faqat B#S; Diller/O'rikzor va statuses rejimida group bo'yicha
+  const statusParam = orderSource
+    ? (GROUP_TO_STATUS[group] ?? undefined)
+    : mode === 'default' && (group === 'all' || !searchParams.get('group'))
       ? 'B#S'
       : (GROUP_TO_STATUS[group] ?? GROUP_TO_STATUS.all)
   const { has } = useAuth()
@@ -135,6 +140,7 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
         search_fields: config.searchFields.length > 0 ? config.searchFields.join(',') : undefined,
         limit: PAGE_SIZE,
         offset,
+        ...(orderSource ? { order_source: orderSource } : {}),
       })
       setItems(data.items)
       setTotal(data.total)
@@ -147,7 +153,7 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
       if (!background) setIsLoading(false)
       else setIsRefreshing(false)
     }
-  }, [config.searchFields, offset, search, statusParam, t])
+  }, [config.searchFields, offset, orderSource, search, statusParam, t])
 
   useEffect(() => {
     void load()
@@ -181,7 +187,7 @@ export function OrdersPage({ mode = 'default' }: OrdersPageProps) {
     setIsSyncing(true)
     setError(null)
     try {
-      await syncSmartupOrders()
+      await syncSmartupOrders(orderSource ? { order_source: orderSource } : {})
       await load()
     } catch (err) {
       const message = err instanceof Error ? err.message : t('orders:sync_failed')

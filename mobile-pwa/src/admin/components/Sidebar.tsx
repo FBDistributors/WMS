@@ -30,6 +30,8 @@ const MENU_ITEMS: Array<MenuItem & { key: string }> = [
   { key: 'products', label: 'Products', path: '/admin/products', icon: Package, required: 'products:read' },
   { key: 'brands', label: 'Brands', path: '/admin/brands', icon: Tag, required: 'brands:manage' },
   { key: 'orders', label: 'Orders', path: '/admin/orders', icon: ClipboardList, required: 'orders:read' },
+  { key: 'orders_diller', label: 'Diller buyurtmalar', path: '/admin/orders-diller', icon: ClipboardList, required: 'orders:read' },
+  { key: 'orders_orikzor', label: "O'rikzor buyurtmalar", path: '/admin/orders-orikzor', icon: ClipboardList, required: 'orders:read' },
   { key: 'locations', label: 'Locations', path: '/admin/locations', icon: MapPin, required: 'locations:manage' },
   { key: 'inventory', label: 'Qoldiq', path: '/admin/inventory', icon: Boxes, required: 'inventory:read' },
   { key: 'movement', label: 'Movement', path: '/admin/movement', icon: ArrowLeftRight, required: 'inventory:adjust' },

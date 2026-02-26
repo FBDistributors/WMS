@@ -282,6 +282,26 @@ export function App() {
           }
         />
         <Route
+          path="/admin/orders-diller"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="orders:read">
+                <OrdersPage orderSource="diller" />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/orders-orikzor"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="orders:read">
+                <OrdersPage orderSource="orikzor" />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
           path="/admin/orders/:id"
           element={
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">

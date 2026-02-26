@@ -98,6 +98,7 @@ class SmartupSyncRequest(BaseModel):
     begin_deal_date: Optional[date] = Field(None, description="YYYY-MM-DD")
     end_deal_date: Optional[date] = Field(None, description="YYYY-MM-DD")
     filial_code: Optional[str] = None
+    order_source: Optional[str] = Field(None, description="diller, orikzor yoki boshqa manba; saqlanadi Order.source da")
 
 
 class SmartupSyncResponse(BaseModel):
@@ -297,6 +298,7 @@ async def list_orders(
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
     filial_id: Optional[str] = None,
+    order_source: Optional[str] = Query(None, description="diller, orikzor va h.k. — Order.source bo'yicha filtrlash"),
     search_fields: Optional[str] = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
@@ -304,6 +306,9 @@ async def list_orders(
     _user=Depends(require_permission("orders:read")),
 ):
     query = db.query(OrderModel).options(selectinload(OrderModel.lines))
+
+    if order_source and order_source.strip():
+        query = query.filter(OrderModel.source == order_source.strip())
 
     if status:
         statuses = [s.strip() for s in status.split(",") if s.strip()]
@@ -338,15 +343,16 @@ async def list_orders(
         term = f"%{q.strip()}%"
         query = query.filter(or_(*[field.ilike(term) for field in fields]))
 
-    # Default to filial 3788131 - only show this branch's orders (use filial_id=all to see all)
-    if filial_id and filial_id.strip().lower() == "all":
-        pass  # no filial filter
-    elif filial_id and filial_id.strip():
-        query = query.filter(OrderModel.filial_id == filial_id.strip())
-    else:
-        default_filial = os.getenv("WMS_DEFAULT_FILIAL_ID", "3788131").strip()
-        if default_filial:
-            query = query.filter(OrderModel.filial_id == default_filial)
+    # Filial filter: order_source berilganda filial default qo‘llanmaydi (manba bo‘yicha filtr yetarli)
+    if not (order_source and order_source.strip()):
+        if filial_id and filial_id.strip().lower() == "all":
+            pass  # no filial filter
+        elif filial_id and filial_id.strip():
+            query = query.filter(OrderModel.filial_id == filial_id.strip())
+        else:
+            default_filial = os.getenv("WMS_DEFAULT_FILIAL_ID", "3788131").strip()
+            if default_filial:
+                query = query.filter(OrderModel.filial_id == default_filial)
 
     if date_from:
         query = query.filter(func.date(OrderModel.created_at) >= date_from)
@@ -496,7 +502,9 @@ async def sync_orders_from_smartup(
             end_deal_date=end_date.strftime("%d.%m.%Y"),
             filial_code=payload.filial_code,
         )
-        created, updated, skipped, _errors = import_orders(db, response.items)
+        created, updated, skipped, _errors = import_orders(
+            db, response.items, order_source=payload.order_source
+        )
         return SmartupSyncResponse(created=created, updated=updated, skipped=skipped)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"Smartup export failed: {exc}") from exc

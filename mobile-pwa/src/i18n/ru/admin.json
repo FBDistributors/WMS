@@ -4,6 +4,8 @@
     "products": "Товары",
     "brands": "Бренды",
     "orders": "Заказы",
+    "orders_diller": "Заказы Diller",
+    "orders_orikzor": "Заказы O'rikzor",
     "locations": "Локации",
     "inventory": "Остаток",
     "movement": "Перемещение",
