@@ -195,6 +195,10 @@ class SmartupClient:
                 response_text = exc.read().decode("utf-8")
                 last_detail = response_text
                 logger.error("Smartup export failed (HTTP %s): %s", exc.code, response_text)
+                if exc.code == 481 and "невидим" in response_text.lower():
+                    last_detail = (
+                        f"{response_text} (Loyiha ko'rinmayapti. Render env da SMARTUP_ORIKZOR_PROJECT_CODE ni 'mkw' yoki 'anor' qilib, SmartUP hisobiga loyiha ruxsatini tekshiring.)"
+                    )
             except Exception as exc:  # noqa: BLE001
                 last_error = exc
                 logger.error("Smartup export failed: %s", exc)
