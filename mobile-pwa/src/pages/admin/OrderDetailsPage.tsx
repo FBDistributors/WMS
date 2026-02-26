@@ -39,7 +39,6 @@ export function OrderDetailsPage() {
     }
     setIsLoading(true)
     setLoadError(null)
-    setActionError(null)
     try {
       const data = await getOrder(id)
       setOrder(data)
