@@ -499,8 +499,9 @@ async def sync_orders_from_smartup(
     try:
         # O'rikzor: alohida export URL (movement$export) va header'lar (project_code anor bo'lishi mumkin)
         is_orikzor = payload.order_source == "orikzor"
+        # Render'da SMARTUP_ORIKZOR_URL yoki SMARTUP_ORIKZOR_EXPORT_URL ishlatiladi
         orikzor_export_url = (
-            (os.getenv("SMARTUP_ORIKZOR_EXPORT_URL") or "https://smartup.online/b/anor/mxsx/mkw/movement$export").strip()
+            (os.getenv("SMARTUP_ORIKZOR_URL") or os.getenv("SMARTUP_ORIKZOR_EXPORT_URL") or "https://smartup.online/b/anor/mxsx/mkw/movement$export").strip()
             if is_orikzor else None
         )
         if is_orikzor:
