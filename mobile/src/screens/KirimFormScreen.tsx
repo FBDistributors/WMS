@@ -90,6 +90,7 @@ export function KirimFormScreen() {
   const [selectedPickerId, setSelectedPickerId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [expiryCalendarOpen, setExpiryCalendarOpen] = useState(false);
+  const [expiryCalendarOpenScanned, setExpiryCalendarOpenScanned] = useState(false);
   const [inventoryLocation, setInventoryLocation] = useState<PickerLocationOption | null>(null);
   const [inventoryLocationSearch, setInventoryLocationSearch] = useState('');
   const [inventoryStep, setInventoryStep] = useState<1 | 2 | 3>(1);
@@ -99,6 +100,11 @@ export function KirimFormScreen() {
   const [actualQtyByKey, setActualQtyByKey] = useState<Record<string, string>>({});
   const [submittingAdjust, setSubmittingAdjust] = useState(false);
   const submittingAdjustRef = useRef(false);
+  const [inventoryScannedLots, setInventoryScannedLots] = useState<LocationContentsItem[]>([]);
+  const [loadingScannedLots, setLoadingScannedLots] = useState(false);
+  const [inventoryScannedActualQty, setInventoryScannedActualQty] = useState('');
+  const [inventoryScannedExpiry, setInventoryScannedExpiry] = useState('');
+  const [submittingScannedAdjust, setSubmittingScannedAdjust] = useState(false);
 
   const title = flow === 'new' ? t('kirimNewProducts') : flow === 'inventory' ? t('kirimInventory') : t('kirimCustomerReturns');
 
@@ -129,6 +135,31 @@ export function KirimFormScreen() {
   useFocusEffect(
     useCallback(() => {
       const pid = params?.scannedProductId;
+      const invLocId = params?.inventoryLocationId;
+      const invLocCode = params?.inventoryLocationCode;
+      if (flow === 'inventory' && (invLocId && invLocCode)) {
+        setInventoryLocation({
+          id: invLocId,
+          code: invLocCode,
+          name: invLocCode,
+        });
+        setInventoryLocationSearch(invLocCode);
+        if (pid) {
+          setInventoryStep(3);
+          loadProductById(pid);
+        } else {
+          setInventoryStep((params?.inventoryStep as 1 | 2 | 3) ?? 2);
+        }
+        navigation.setParams({
+          ...route.params,
+          scannedProductId: undefined,
+          scannedBarcode: undefined,
+          inventoryStep: undefined,
+          inventoryLocationId: undefined,
+          inventoryLocationCode: undefined,
+        } as any);
+        return;
+      }
       if (pid) {
         loadProductById(pid);
         navigation.setParams({
@@ -137,22 +168,7 @@ export function KirimFormScreen() {
           scannedBarcode: undefined,
         } as any);
       }
-      if (flow === 'inventory' && params?.inventoryLocationId && params?.inventoryLocationCode) {
-        setInventoryStep((params?.inventoryStep as 1 | 2 | 3) ?? 2);
-        setInventoryLocation({
-          id: params.inventoryLocationId,
-          code: params.inventoryLocationCode,
-          name: params.inventoryLocationCode,
-        });
-        setInventoryLocationSearch(params.inventoryLocationCode);
-        navigation.setParams({
-          ...route.params,
-          inventoryStep: undefined,
-          inventoryLocationId: undefined,
-          inventoryLocationCode: undefined,
-        } as any);
-      }
-    }, [flow, params?.scannedProductId, params?.inventoryLocationId, params?.inventoryLocationCode, loadProductById, navigation, route.params])
+    }, [flow, params?.scannedProductId, params?.inventoryLocationId, params?.inventoryLocationCode, params?.inventoryStep, loadProductById, navigation, route.params])
   );
 
   useEffect(() => {
@@ -178,6 +194,28 @@ export function KirimFormScreen() {
   }, [flow, inventoryStep, inventoryLocation?.code, t]);
 
   useEffect(() => {
+    if (flow !== 'inventory' || inventoryStep !== 3 || !currentProduct?.product_id || !inventoryLocation?.code) {
+      setInventoryScannedLots([]);
+      return;
+    }
+    setLoadingScannedLots(true);
+    setInventoryScannedLots([]);
+    setInventoryScannedActualQty('');
+    setInventoryScannedExpiry('');
+    getLocationContents(inventoryLocation.code)
+      .then((res) => {
+        const forProduct = res.items.filter((i) => i.product_id === currentProduct.product_id);
+        setInventoryScannedLots(forProduct);
+        if (forProduct.length === 1) {
+          setInventoryScannedActualQty(String(Math.round(Number(forProduct[0].available_qty))));
+          setInventoryScannedExpiry(forProduct[0].expiry_date ?? '');
+        }
+      })
+      .catch(() => setInventoryScannedLots([]))
+      .finally(() => setLoadingScannedLots(false));
+  }, [flow, inventoryStep, currentProduct?.product_id, inventoryLocation?.code]);
+
+  useEffect(() => {
     if (currentProduct) {
       setSelectedLocation(null);
       setLocationSearch('');
@@ -195,7 +233,7 @@ export function KirimFormScreen() {
       returnToKirimForm: true,
       flow,
     };
-    if (flow === 'inventory' && (inventoryStep === 2 || inventoryStep === 3) && inventoryLocation) {
+    if (flow === 'inventory' && inventoryLocation) {
       scanParams.inventoryStep = inventoryStep;
       scanParams.inventoryLocationId = inventoryLocation.id;
       scanParams.inventoryLocationCode = inventoryLocation.code;
@@ -246,6 +284,42 @@ export function KirimFormScreen() {
       getLocationContents(inventoryLocation!.code).then(setLocationContents).catch(() => {});
     }
   }, [locationContents, actualQtyByKey, inventoryLocation, t]);
+
+  const handleSubmitScannedAdjust = useCallback(async () => {
+    if (inventoryScannedLots.length === 0 || !inventoryLocation) return;
+    const item = inventoryScannedLots[0];
+    const actual = Math.floor(Number(inventoryScannedActualQty.trim()) || 0);
+    const systemQty = Math.round(Number(item.available_qty) || 0);
+    const delta = actual - systemQty;
+    if (delta === 0) {
+      Alert.alert(t('error'), t('inventoryScannedNoChange'));
+      return;
+    }
+    setSubmittingScannedAdjust(true);
+    try {
+      await createStockMovement({
+        product_id: item.product_id,
+        lot_id: item.lot_id,
+        location_id: item.location_id,
+        qty_change: delta,
+        movement_type: 'adjust',
+        reason_code: delta < 0 ? 'inventory_shortage' : 'inventory_overage',
+      });
+      Alert.alert(t('success'), t('inventoryScannedAdjustDone'));
+      setCurrentProduct(null);
+      setInventoryScannedLots([]);
+      setInventoryScannedActualQty('');
+      setInventoryScannedExpiry('');
+    } catch (e: any) {
+      if (e?.response?.status === 403) {
+        Alert.alert(t('error'), t('inventoryAdjustNoPermission'));
+      } else {
+        Alert.alert(t('error'), e instanceof Error ? e.message : t('kirimSubmitError'));
+      }
+    } finally {
+      setSubmittingScannedAdjust(false);
+    }
+  }, [inventoryScannedLots, inventoryLocation, inventoryScannedActualQty, t]);
 
   const addLine = useCallback(() => {
     const location = flow === 'inventory' ? inventoryLocation : selectedLocation;
@@ -444,11 +518,19 @@ export function KirimFormScreen() {
             </View>
             <TouchableOpacity
               style={[styles.scanBtnTop, !inventoryLocation && styles.buttonDisabled]}
-              onPress={() => inventoryLocation && setInventoryStep(2)}
+              onPress={() => inventoryLocation && handleScan()}
               activeOpacity={0.8}
               disabled={!inventoryLocation}
             >
-              <Text style={styles.scanBtnText}>{t('inventoryContinueToScan')}</Text>
+              <Icon name="barcode-scan" size={26} color="#fff" />
+              <Text style={styles.scanBtnText}>{t('inventoryScanProduct')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.inventoryViewContentsLink}
+              onPress={() => inventoryLocation && setInventoryStep(2)}
+              disabled={!inventoryLocation}
+            >
+              <Text style={styles.inventoryViewContentsLinkText}>{t('inventoryViewLocationContents')}</Text>
             </TouchableOpacity>
           </>
         )}
@@ -575,7 +657,88 @@ export function KirimFormScreen() {
           </View>
         )}
 
-        {!(flow === 'inventory' && (inventoryStep === 1 || inventoryStep === 2)) && (flow === 'inventory' ? inventoryLocation && currentProduct : currentProduct) && !loadingProduct && (
+        {flow === 'inventory' && inventoryStep === 3 && inventoryLocation && currentProduct && !loadingProduct && (
+          <>
+            {loadingScannedLots ? (
+              <View style={styles.loadingRow}>
+                <ActivityIndicator size="small" color="#1a237e" />
+                <Text style={styles.loadingText}>{t('loading')}</Text>
+              </View>
+            ) : inventoryScannedLots.length === 0 ? (
+              <View style={styles.card}>
+                <Text style={styles.productName} numberOfLines={2}>{currentProduct.name}</Text>
+                <Text style={styles.muted}>{t('inventoryProductNotAtLocation')}</Text>
+                <TouchableOpacity style={styles.inventoryScanAnotherBtn} onPress={() => { setCurrentProduct(null); setInventoryScannedLots([]); }}>
+                  <Text style={styles.inventoryScanAnotherBtnText}>{t('inventoryScanAnother')}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.card}>
+                <Text style={styles.productName} numberOfLines={2}>{currentProduct.name}</Text>
+                <Text style={styles.contentsRowMeta}>
+                  {inventoryScannedLots[0].batch_no}
+                  {inventoryScannedLots[0].expiry_date ? ` • ${inventoryScannedLots[0].expiry_date}` : ''}
+                </Text>
+                <View style={styles.inventoryLocationReadOnly}>
+                  <Text style={styles.label}>{t('inventorySystemQty')}</Text>
+                  <Text style={styles.inventoryLocationCode}>{Math.round(Number(inventoryScannedLots[0].available_qty))}</Text>
+                </View>
+                <Text style={styles.label}>{t('inventoryActualQty')}</Text>
+                <TextInput
+                  style={styles.input}
+                  value={inventoryScannedActualQty}
+                  onChangeText={setInventoryScannedActualQty}
+                  placeholder={t('inventoryActualQty')}
+                  placeholderTextColor="#999"
+                  keyboardType="number-pad"
+                />
+                <Text style={styles.label}>{t('inventoryExpiryDate')}</Text>
+                <View style={styles.expiryRow}>
+                  <TouchableOpacity
+                    style={styles.expiryInputTouchable}
+                    onPress={() => setExpiryCalendarOpenScanned(true)}
+                  >
+                    <Text style={[styles.expiryInputText, !inventoryScannedExpiry && styles.expiryInputPlaceholder]}>
+                      {inventoryScannedExpiry || t('kirimExpiryPlaceholder')}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.expiryCalendarBtn}
+                    onPress={() => setExpiryCalendarOpenScanned(true)}
+                  >
+                    <Icon name="calendar" size={24} color="#1a237e" />
+                  </TouchableOpacity>
+                </View>
+                <ExpiryDatePicker
+                  visible={expiryCalendarOpenScanned}
+                  onClose={() => setExpiryCalendarOpenScanned(false)}
+                  value={inventoryScannedExpiry || null}
+                  onChange={(iso) => {
+                    setInventoryScannedExpiry(iso || '');
+                    setExpiryCalendarOpenScanned(false);
+                  }}
+                  minDate={todayISO()}
+                  locale={locale}
+                  darkMode={false}
+                />
+                <TouchableOpacity
+                  style={[styles.scanBtnTop, submittingScannedAdjust && styles.buttonDisabled]}
+                  onPress={handleSubmitScannedAdjust}
+                  disabled={submittingScannedAdjust}
+                  activeOpacity={0.8}
+                >
+                  {submittingScannedAdjust ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.scanBtnText}>{t('inventoryAdjustSubmit')}</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
+        )}
+
+        {!(flow === 'inventory' && (inventoryStep === 1 || inventoryStep === 2)) && (flow === 'inventory' ? inventoryLocation && currentProduct : currentProduct) && !loadingProduct && !(flow === 'inventory' && inventoryStep === 3 && inventoryScannedLots.length > 0) && (
           <View style={styles.card}>
             <Text style={styles.productName} numberOfLines={2}>{currentProduct.name}</Text>
             <Text style={styles.label}>{t('quantity')}</Text>
@@ -847,6 +1010,12 @@ const styles = StyleSheet.create({
   inventoryLocationChosenText: { fontSize: 14, color: '#1565c0', fontWeight: '600' },
   inventoryLocationChangeLink: { fontSize: 14, color: '#1976d2', textDecorationLine: 'underline' },
   buttonDisabled: { opacity: 0.6 },
+  inventoryViewContentsLink: { alignItems: 'center', paddingVertical: 12, marginBottom: 16 },
+  inventoryViewContentsLinkText: { fontSize: 15, color: '#1976d2', textDecorationLine: 'underline' },
+  changeProductBtn: { alignItems: 'center', paddingVertical: 12, marginTop: 8, marginBottom: 16 },
+  changeProductBtnText: { fontSize: 15, color: '#1976d2', textDecorationLine: 'underline' },
+  inventoryScanAnotherBtn: { alignItems: 'center', paddingVertical: 12, marginTop: 8 },
+  inventoryScanAnotherBtnText: { fontSize: 15, color: '#1976d2', textDecorationLine: 'underline' },
   locationWrap: { marginBottom: 12 },
   locationInputFull: {
     borderWidth: 1,
