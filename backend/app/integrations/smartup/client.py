@@ -35,17 +35,22 @@ class SmartupClient:
         begin_deal_date: str,
         end_deal_date: str,
         filial_code: str | None,
+        export_url: str | None = None,
     ) -> SmartupOrderExportResponse:
-        if not self.base_url:
+        if export_url and export_url.strip():
+            url = export_url.strip()
+        elif not self.base_url:
             raise RuntimeError("SMARTUP_BASE_URL is not configured")
+        else:
+            if not self.username or not self.password:
+                raise RuntimeError("SMARTUP_BASIC_USER or SMARTUP_BASIC_PASS is not configured")
+            raw_base = self.base_url.rstrip("/")
+            if "order$export" in raw_base or "movement$export" in raw_base:
+                url = raw_base
+            else:
+                url = urljoin(f"{raw_base}/", "b/trade/txs/tdeal/order$export")
         if not self.username or not self.password:
             raise RuntimeError("SMARTUP_BASIC_USER or SMARTUP_BASIC_PASS is not configured")
-
-        raw_base = self.base_url.rstrip("/")
-        if "order$export" in raw_base:
-            url = raw_base
-        else:
-            url = urljoin(f"{raw_base}/", "b/trade/txs/tdeal/order$export")
         # Pass filial_code only when explicitly provided. SmartUp may return 400 "org not found"
         # if we pass 3788131 in payload - so we import all, then filter by filial in our API.
         normalized_filial_code = (filial_code or "").strip()

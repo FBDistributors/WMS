@@ -496,11 +496,17 @@ async def sync_orders_from_smartup(
         raise HTTPException(status_code=400, detail="begin_deal_date must be <= end_deal_date")
 
     try:
+        # O'rikzor: alohida export URL (movement$export), env orqali yoki default
+        orikzor_export_url = (
+            os.getenv("SMARTUP_ORIKZOR_EXPORT_URL") or "https://smartup.online/b/anor/mxsx/mkw/movement$export"
+        ).strip() if payload.order_source == "orikzor" else None
+
         client = SmartupClient()
         response = client.export_orders(
             begin_deal_date=begin_date.strftime("%d.%m.%Y"),
             end_deal_date=end_date.strftime("%d.%m.%Y"),
             filial_code=payload.filial_code,
+            export_url=orikzor_export_url,
         )
         created, updated, skipped, _errors = import_orders(
             db, response.items, order_source=payload.order_source
