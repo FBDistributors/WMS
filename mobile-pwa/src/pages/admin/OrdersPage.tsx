@@ -91,7 +91,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const [searchParams, setSearchParams] = useSearchParams()
   const group = searchParams.get('group') ?? 'all'
   const searchQuery = searchParams.get('q') ?? ''
-  const brandFilter = searchParams.get('brand_id') ?? ''
+  const brandFilterIds = searchParams.getAll('brand_id')
   const dateFrom = searchParams.get('date_from') ?? ''
   const dateTo = searchParams.get('date_to') ?? ''
   const offset = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10))
@@ -117,7 +117,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const [filterPanelOpen, setFilterPanelOpen] = useState(false)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const [brands, setBrands] = useState<Brand[]>([])
-  const [filterBrandId, setFilterBrandId] = useState('')
+  const [filterBrandIds, setFilterBrandIds] = useState<string[]>([])
   const [filterDateFrom, setFilterDateFrom] = useState('')
   const [filterDateTo, setFilterDateTo] = useState('')
 
@@ -150,7 +150,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       const data = await getOrders({
         status: statusParam,
         q: searchQuery.trim() || undefined,
-        brand_id: brandFilter.trim() || undefined,
+        brand_ids: brandFilterIds.length > 0 ? brandFilterIds.join(',') : undefined,
         date_from: dateFrom.trim() || undefined,
         date_to: dateTo.trim() || undefined,
         search_fields: config.searchFields.length > 0 ? config.searchFields.join(',') : undefined,
@@ -169,7 +169,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       if (!background) setIsLoading(false)
       else setIsRefreshing(false)
     }
-  }, [config.searchFields, offset, orderSource, searchQuery, brandFilter, dateFrom, dateTo, statusParam, t])
+  }, [config.searchFields, offset, orderSource, searchQuery, brandFilterIds, dateFrom, dateTo, statusParam, t])
 
   const loadBrands = useCallback(async () => {
     try {
@@ -202,11 +202,17 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
 
   useEffect(() => {
     if (filterPanelOpen) {
-      setFilterBrandId(brandFilter)
+      setFilterBrandIds(brandFilterIds)
       setFilterDateFrom(dateFrom)
       setFilterDateTo(dateTo)
     }
-  }, [filterPanelOpen, brandFilter, dateFrom, dateTo])
+  }, [filterPanelOpen, brandFilterIds, dateFrom, dateTo])
+
+  const toggleFilterBrand = (brandId: string) => {
+    setFilterBrandIds((prev) =>
+      prev.includes(brandId) ? prev.filter((id) => id !== brandId) : [...prev, brandId]
+    )
+  }
 
   // Avtoyangilash: orqada yangilash — jadval o‘chirilmasdan, chaqnashsiz
   useEffect(() => {
@@ -625,21 +631,32 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                     </button>
                   </div>
                   <div className="space-y-3">
-                    <label className="block text-sm text-slate-600 dark:text-slate-400">
+                    <span className="block text-sm font-medium text-slate-600 dark:text-slate-400">
                       {t('orders:filters.filter_by_brand')}
-                      <select
-                        value={filterBrandId}
-                        onChange={(e) => setFilterBrandId(e.target.value)}
-                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                      >
-                        <option value="">{t('orders:filters.filter_all_brands')}</option>
-                        {brands.map((b) => (
-                          <option key={b.id} value={b.id}>
-                            {b.display_name || b.name || b.code}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    </span>
+                    <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/50 p-2 dark:border-slate-700 dark:bg-slate-800/30">
+                      {brands.length === 0 ? (
+                        <p className="py-2 text-sm text-slate-500 dark:text-slate-400">—</p>
+                      ) : (
+                        <ul className="space-y-1">
+                          {brands.map((b) => (
+                            <li key={b.id}>
+                              <label className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800">
+                                <input
+                                  type="checkbox"
+                                  checked={filterBrandIds.includes(b.id)}
+                                  onChange={() => toggleFilterBrand(b.id)}
+                                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                />
+                                <span className="text-sm text-slate-800 dark:text-slate-200">
+                                  {b.display_name || b.name || b.code}
+                                </span>
+                              </label>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                     <div className="grid grid-cols-2 gap-2">
                       <label className="block text-sm text-slate-600 dark:text-slate-400">
                         {t('orders:filters.date_from')}
@@ -682,8 +699,8 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                       onClick={() => {
                         setSearchParams((prev) => {
                           const next = new URLSearchParams(prev)
-                          if (filterBrandId) next.set('brand_id', filterBrandId)
-                          else next.delete('brand_id')
+                          next.delete('brand_id')
+                          filterBrandIds.forEach((id) => next.append('brand_id', id))
                           if (filterDateFrom) next.set('date_from', filterDateFrom)
                           else next.delete('date_from')
                           if (filterDateTo) next.set('date_to', filterDateTo)

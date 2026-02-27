@@ -299,7 +299,7 @@ async def list_orders(
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
     filial_id: Optional[str] = None,
-    brand_id: Optional[UUID] = Query(None, description="Filter by brand (orders that contain products of this brand)"),
+    brand_ids: Optional[str] = Query(None, description="Filter by brands: comma-separated UUIDs (orders that contain products of any of these brands)"),
     order_source: Optional[str] = Query(None, description="diller, orikzor va h.k. — Order.source bo'yicha filtrlash"),
     search_fields: Optional[str] = Query(None),
     limit: int = Query(50, ge=1, le=200),
@@ -361,15 +361,28 @@ async def list_orders(
     if date_to:
         query = query.filter(func.date(OrderModel.created_at) <= date_to)
 
-    if brand_id:
-        query = (
-            query.join(OrderLineModel, OrderModel.id == OrderLineModel.order_id)
-            .join(ProductModel, OrderLineModel.sku == ProductModel.sku)
-            .filter(ProductModel.brand_id == brand_id)
-            .distinct()
-        )
-        total = query.with_entities(OrderModel.id).count()
-        orders = query.order_by(OrderModel.created_at.desc()).offset(offset).limit(limit).all()
+    if brand_ids and brand_ids.strip():
+        try:
+            brand_id_list = [UUID(b.strip()) for b in brand_ids.split(",") if b.strip()]
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid brand_ids")
+        if brand_id_list:
+            query = (
+                query.join(OrderLineModel, OrderModel.id == OrderLineModel.order_id)
+                .join(ProductModel, OrderLineModel.sku == ProductModel.sku)
+                .filter(ProductModel.brand_id.in_(brand_id_list))
+                .distinct()
+            )
+            total = query.with_entities(OrderModel.id).count()
+            orders = query.order_by(OrderModel.created_at.desc()).offset(offset).limit(limit).all()
+        else:
+            total = (
+                query.with_entities(func.count(OrderModel.id))
+                .order_by(None)
+                .scalar()
+                or 0
+            )
+            orders = query.order_by(OrderModel.created_at.desc()).offset(offset).limit(limit).all()
     else:
         total = (
             query.with_entities(func.count(OrderModel.id))
