@@ -169,7 +169,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       if (!background) setIsLoading(false)
       else setIsRefreshing(false)
     }
-  }, [config.searchFields, offset, orderSource, searchQuery, brandFilterIds, dateFrom, dateTo, statusParam, t])
+  }, [config.searchFields, offset, orderSource, searchQuery, brandFilterIds.join(','), dateFrom, dateTo, statusParam, t])
 
   const loadBrands = useCallback(async () => {
     try {
