@@ -45,7 +45,13 @@
     "search_placeholder": "Buyurtma raqami yoki ID",
     "filial": "Filial",
     "date_from": "Boshlanish sanasi",
-    "date_to": "Tugash sanasi"
+    "date_to": "Tugash sanasi",
+    "filter_btn": "Filter",
+    "filter_panel_title": "Filterlar",
+    "filter_by_brand": "Brend bo'yicha",
+    "filter_all_brands": "Barcha brendlar",
+    "filter_clear": "Tozalash",
+    "filter_apply": "Qo'llash"
   },
   "table": {
     "settings_title": "Jadval sozlamalari",

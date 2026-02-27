@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -12,8 +12,12 @@ import { getOrder, type OrderDetails } from '../../services/ordersApi'
 
 export function OrderDetailsPage() {
   const { id } = useParams()
+  const location = useLocation()
   const navigate = useNavigate()
   const { t } = useTranslation(['orders', 'common'])
+  const listPath = (location.state as { listPath?: string; listQuery?: string } | null)?.listPath
+  const listQuery = (location.state as { listQuery?: string } | null)?.listQuery ?? ''
+  const backUrl = listPath ? `${listPath}${listQuery ? `?${listQuery}` : ''}` : '/admin/orders'
   const [order, setOrder] = useState<OrderDetails | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -77,7 +81,7 @@ export function OrderDetailsPage() {
     <AdminLayout title={t('orders:details_title')}>
       <Card className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Button variant="ghost" onClick={() => navigate(-1)}>
+          <Button variant="ghost" onClick={() => navigate(backUrl)}>
             <ArrowLeft size={16} />
             {t('common:buttons.back')}
           </Button>

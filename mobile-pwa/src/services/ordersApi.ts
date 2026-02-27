@@ -55,6 +55,7 @@ export type OrdersQuery = {
   date_from?: string
   date_to?: string
   filial_id?: string
+  brand_id?: string
   order_source?: string
   search_fields?: string
   limit?: number

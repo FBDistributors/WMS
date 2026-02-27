@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Settings, FileText } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { Filter, Settings, FileText, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -10,8 +10,10 @@ import { OrdersTableSettings } from '../../admin/components/orders/OrdersTableSe
 import { useOrdersTableConfig } from '../../admin/hooks/useOrdersTableConfig'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
+import { DateInput } from '../../components/DateInput'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { getOrders, syncSmartupOrders, updateOrderStatus, type OrderListItem } from '../../services/ordersApi'
+import { getBrands, type Brand } from '../../services/brandsApi'
 import { useAuth } from '../../rbac/AuthProvider'
 
 const PAGE_SIZE = 50
@@ -85,8 +87,14 @@ type OrdersPageProps = { mode?: 'default' | 'statuses'; orderSource?: 'diller' |
 export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const { t } = useTranslation(['orders', 'common', 'admin'])
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const location = useLocation()
+  const [searchParams, setSearchParams] = useSearchParams()
   const group = searchParams.get('group') ?? 'all'
+  const searchQuery = searchParams.get('q') ?? ''
+  const brandFilter = searchParams.get('brand_id') ?? ''
+  const dateFrom = searchParams.get('date_from') ?? ''
+  const dateTo = searchParams.get('date_to') ?? ''
+  const offset = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10))
   const pageTitle = orderSource
     ? t(`admin:menu.orders_${orderSource}`, orderSource === 'diller' ? 'Diller buyurtmalar' : "O'rikzor harakatlari")
     : mode === 'statuses'
@@ -106,11 +114,15 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
 
   const { config, updateConfig, resetConfig } = useOrdersTableConfig()
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
+  const [brands, setBrands] = useState<Brand[]>([])
+  const [filterBrandId, setFilterBrandId] = useState('')
+  const [filterDateFrom, setFilterDateFrom] = useState('')
+  const [filterDateTo, setFilterDateTo] = useState('')
 
   const [items, setItems] = useState<OrderListItem[]>([])
-  const [offset, setOffset] = useState(0)
   const [total, setTotal] = useState(0)
-  const [search, setSearch] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isSyncing, setIsSyncing] = useState(false)
@@ -137,7 +149,10 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     try {
       const data = await getOrders({
         status: statusParam,
-        q: search || undefined,
+        q: searchQuery.trim() || undefined,
+        brand_id: brandFilter.trim() || undefined,
+        date_from: dateFrom.trim() || undefined,
+        date_to: dateTo.trim() || undefined,
         search_fields: config.searchFields.length > 0 ? config.searchFields.join(',') : undefined,
         limit: PAGE_SIZE,
         offset,
@@ -154,15 +169,44 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       if (!background) setIsLoading(false)
       else setIsRefreshing(false)
     }
-  }, [config.searchFields, offset, orderSource, search, statusParam, t])
+  }, [config.searchFields, offset, orderSource, searchQuery, brandFilter, dateFrom, dateTo, statusParam, t])
+
+  const loadBrands = useCallback(async () => {
+    try {
+      const list = await getBrands(undefined, true)
+      setBrands(list)
+    } catch {
+      setBrands([])
+    }
+  }, [])
 
   useEffect(() => {
     void load()
   }, [load])
 
   useEffect(() => {
-    setOffset(0)
-  }, [group])
+    void loadBrands()
+  }, [loadBrands])
+
+  const prevGroupRef = useRef(group)
+  useEffect(() => {
+    if (prevGroupRef.current !== group) {
+      prevGroupRef.current = group
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('offset')
+        return next
+      })
+    }
+  }, [group, setSearchParams])
+
+  useEffect(() => {
+    if (filterPanelOpen) {
+      setFilterBrandId(brandFilter)
+      setFilterDateFrom(dateFrom)
+      setFilterDateTo(dateTo)
+    }
+  }, [filterPanelOpen, brandFilter, dateFrom, dateTo])
 
   // Avtoyangilash: orqada yangilash — jadval o‘chirilmasdan, chaqnashsiz
   useEffect(() => {
@@ -180,9 +224,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     }
   }, [load])
 
-  useEffect(() => {
-    setOffset(0)
-  }, [search])
 
   const handleSync = async () => {
     setIsSyncing(true)
@@ -401,7 +442,11 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             <td className="px-4 py-3">
               <button
                 className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-                onClick={() => navigate(`/admin/orders/${order.id}`)}
+                onClick={() =>
+                  navigate(`/admin/orders/${order.id}`, {
+                    state: { listQuery: location.search, listPath: location.pathname },
+                  })
+                }
                 aria-label={t('orders:view_details')}
               >
                 <FileText size={18} />
@@ -479,7 +524,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         </table>
       </TableScrollArea>
     )
-  }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, eligibleItems, error, isLoading, items, load, mode, navigate, orderSource, selectedOrderIds, t, updatingOrderId])
+  }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, eligibleItems, error, isLoading, items, load, location.pathname, location.search, mode, navigate, orderSource, selectedOrderIds, t, updatingOrderId])
 
   return (
     <AdminLayout title={pageTitle} backTo={mode === 'statuses' ? '/admin' : undefined}>
@@ -527,16 +572,135 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
           </div>
         </div>
 
-        <div className="grid gap-3">
-          <label className="text-sm text-slate-600 dark:text-slate-300">
-            {t('orders:filters.search')}
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex-1 min-w-[180px] max-w-md text-sm text-slate-600 dark:text-slate-300">
+            <span className="sr-only">{t('orders:filters.search')}</span>
             <input
-              className="mt-1 w-full max-w-md rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              type="search"
+              className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+              value={searchQuery}
+              onChange={(e) => {
+                const v = e.target.value
+                setSearchParams((prev) => {
+                  const next = new URLSearchParams(prev)
+                  if (v) next.set('q', v)
+                  else next.delete('q')
+                  next.delete('offset')
+                  return next
+                })
+              }}
               placeholder={t('orders:filters.search_placeholder')}
             />
           </label>
+          <div className="relative" ref={filterPanelRef}>
+            <Button
+              variant="outline"
+              onClick={() => setFilterPanelOpen((o) => !o)}
+              className="gap-2"
+              aria-label={t('orders:filters.filter_btn')}
+              aria-expanded={filterPanelOpen}
+            >
+              <Filter size={18} />
+              {t('orders:filters.filter_btn')}
+            </Button>
+            {filterPanelOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  aria-hidden
+                  onClick={() => setFilterPanelOpen(false)}
+                />
+                <div className="absolute right-0 top-full z-50 mt-2 w-full min-w-[260px] max-w-sm rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="font-semibold text-slate-900 dark:text-slate-100">
+                      {t('orders:filters.filter_panel_title')}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setFilterPanelOpen(false)}
+                      className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 dark:hover:text-slate-400 dark:hover:bg-slate-800"
+                      aria-label={t('common:close')}
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    <label className="block text-sm text-slate-600 dark:text-slate-400">
+                      {t('orders:filters.filter_by_brand')}
+                      <select
+                        value={filterBrandId}
+                        onChange={(e) => setFilterBrandId(e.target.value)}
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                      >
+                        <option value="">{t('orders:filters.filter_all_brands')}</option>
+                        {brands.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.display_name || b.name || b.code}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="block text-sm text-slate-600 dark:text-slate-400">
+                        {t('orders:filters.date_from')}
+                        <DateInput
+                          value={filterDateFrom}
+                          onChange={setFilterDateFrom}
+                          className="mt-1 w-full"
+                          aria-label={t('orders:filters.date_from')}
+                        />
+                      </label>
+                      <label className="block text-sm text-slate-600 dark:text-slate-400">
+                        {t('orders:filters.date_to')}
+                        <DateInput
+                          value={filterDateTo}
+                          onChange={setFilterDateTo}
+                          className="mt-1 w-full"
+                          aria-label={t('orders:filters.date_to')}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setSearchParams((prev) => {
+                          const next = new URLSearchParams(prev)
+                          next.delete('brand_id')
+                          next.delete('date_from')
+                          next.delete('date_to')
+                          next.delete('offset')
+                          return next
+                        })
+                        setFilterPanelOpen(false)
+                      }}
+                    >
+                      {t('orders:filters.filter_clear')}
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setSearchParams((prev) => {
+                          const next = new URLSearchParams(prev)
+                          if (filterBrandId) next.set('brand_id', filterBrandId)
+                          else next.delete('brand_id')
+                          if (filterDateFrom) next.set('date_from', filterDateFrom)
+                          else next.delete('date_from')
+                          if (filterDateTo) next.set('date_to', filterDateTo)
+                          else next.delete('date_to')
+                          next.delete('offset')
+                          return next
+                        })
+                        setFilterPanelOpen(false)
+                      }}
+                    >
+                      {t('orders:filters.filter_apply')}
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {mode !== 'statuses' && canSend && selectedOrderIds.size > 0 ? (
@@ -568,14 +732,27 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
           <Button
             variant="secondary"
             disabled={offset === 0}
-            onClick={() => setOffset((prev) => Math.max(prev - PAGE_SIZE, 0))}
+            onClick={() => {
+              const newOffset = Math.max(0, offset - PAGE_SIZE)
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev)
+                next.set('offset', String(newOffset))
+                return next
+              })
+            }}
           >
             {t('common:buttons.back')}
           </Button>
           <Button
             variant="secondary"
             disabled={offset + PAGE_SIZE >= total}
-            onClick={() => setOffset((prev) => prev + PAGE_SIZE)}
+            onClick={() => {
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev)
+                next.set('offset', String(offset + PAGE_SIZE))
+                return next
+              })
+            }}
           >
             {t('common:buttons.next')}
           </Button>

@@ -45,7 +45,13 @@
     "search_placeholder": "Order number or external ID",
     "filial": "Filial",
     "date_from": "Date from",
-    "date_to": "Date to"
+    "date_to": "Date to",
+    "filter_btn": "Filter",
+    "filter_panel_title": "Filters",
+    "filter_by_brand": "By brand",
+    "filter_all_brands": "All brands",
+    "filter_clear": "Clear",
+    "filter_apply": "Apply"
   },
   "table": {
     "settings_title": "Table settings",
