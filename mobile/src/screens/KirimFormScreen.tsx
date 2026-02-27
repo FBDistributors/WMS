@@ -658,14 +658,25 @@ export function KirimFormScreen() {
                 )}
               </View>
             </View>
-            <TouchableOpacity
-              style={[styles.scanBtnTop, !inventoryLocation && styles.buttonDisabled]}
-              onPress={() => inventoryLocation && setInventoryStep(2)}
-              activeOpacity={0.8}
-              disabled={!inventoryLocation}
-            >
-              <Text style={styles.scanBtnText}>{t('inventoryViewLocationContents')}</Text>
-            </TouchableOpacity>
+            <View style={styles.inventoryStep1Buttons}>
+              <TouchableOpacity
+                style={[styles.scanBtnTop, !inventoryLocation && styles.buttonDisabled]}
+                onPress={() => inventoryLocation && setInventoryStep(2)}
+                activeOpacity={0.8}
+                disabled={!inventoryLocation}
+              >
+                <Text style={styles.scanBtnText}>{t('inventoryViewLocationContents')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.scanBtnTop, styles.scanBtnSecondary, !inventoryLocation && styles.buttonDisabled]}
+                onPress={() => inventoryLocation && setInventoryStep(3)}
+                activeOpacity={0.8}
+                disabled={!inventoryLocation}
+              >
+                <Icon name="barcode-scan" size={22} color="#1a237e" />
+                <Text style={styles.scanBtnTextSecondary}>{t('inventoryAddProductScan')}</Text>
+              </TouchableOpacity>
+            </View>
           </>
         )}
 
@@ -736,6 +747,14 @@ export function KirimFormScreen() {
                     )}
                   </TouchableOpacity>
                 )}
+                <TouchableOpacity
+                  style={[styles.scanBtnTop, styles.scanBtnSecondary]}
+                  onPress={() => setInventoryStep(3)}
+                  activeOpacity={0.8}
+                >
+                  <Icon name="barcode-scan" size={22} color="#1a237e" />
+                  <Text style={styles.scanBtnTextSecondary}>{t('inventoryAddProductScan')}</Text>
+                </TouchableOpacity>
                 </>
             )}
           </>
@@ -1265,6 +1284,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   scanBtnText: { color: '#fff', fontSize: 18, fontWeight: '600' },
+  scanBtnSecondary: { backgroundColor: '#fff', borderWidth: 2, borderColor: '#1a237e' },
+  scanBtnTextSecondary: { color: '#1a237e', fontSize: 16, fontWeight: '600' },
+  inventoryStep1Buttons: { gap: 12, marginBottom: 20 },
   manualEntryLabel: { fontSize: 13, color: '#666', marginBottom: 6 },
   inventoryLocationBlock: { marginBottom: 16 },
   inventoryLocationLabel: { fontSize: 13, color: '#666', marginBottom: 6 },
