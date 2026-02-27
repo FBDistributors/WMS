@@ -25,12 +25,15 @@ def get_database_url() -> str:
 def create_engine_from_env() -> Engine:
     url = get_database_url()
     # Limit pool: Render free Postgres ~20 connections. Web + Worker share DB.
+    # connect_timeout: tez muvaffaqiyatsizlik (ulanish bo'lmasa). pool_timeout: pooldan connection kutish.
     return create_engine(
         url,
         pool_pre_ping=True,
         pool_size=3,
         max_overflow=2,
         pool_recycle=300,
+        pool_timeout=15,
+        connect_args={"connect_timeout": 10},
     )
 
 

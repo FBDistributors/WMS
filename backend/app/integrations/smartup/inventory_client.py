@@ -50,10 +50,10 @@ class SmartupInventoryExportClient:
 
         last_error: Exception | None = None
         last_detail: str | None = None
-        for attempt in range(1, 4):
+        for attempt in range(1, 3):
             request = urllib.request.Request(self.url, data=data, headers=headers, method="POST")
             try:
-                with urllib.request.urlopen(request, timeout=30) as response:
+                with urllib.request.urlopen(request, timeout=15) as response:
                     body = response.read().decode("utf-8")
                 return json.loads(body)
             except urllib.error.HTTPError as exc:
