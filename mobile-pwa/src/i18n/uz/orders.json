@@ -51,7 +51,11 @@
     "filter_by_brand": "Brend bo'yicha",
     "filter_all_brands": "Barcha brendlar",
     "filter_clear": "Tozalash",
-    "filter_apply": "Qo'llash"
+    "filter_apply": "Qo'llash",
+    "organization": "Organizatsiya",
+    "all_dealers": "Barcha dillerlar",
+    "brand_search_placeholder": "Brend nomi yoki kodini yozing",
+    "brand_search_no_results": "Brend topilmadi"
   },
   "table": {
     "settings_title": "Jadval sozlamalari",

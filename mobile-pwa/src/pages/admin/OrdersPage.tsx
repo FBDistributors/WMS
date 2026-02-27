@@ -82,6 +82,24 @@ const GROUP_TO_STATUS: Record<string, string | undefined> = {
   all: undefined,
 }
 
+/** Diller organizatsiyalari (filial_id) — Diller buyurtmalar filteri uchun */
+const DEALER_ORGANIZATIONS: { id: string; label: string }[] = [
+  { id: '3964966', label: 'Ипподром (Иззат)' },
+  { id: '8109098', label: 'Таш.область (Илхом)' },
+  { id: '12879867', label: 'Урикзор (Улугбек)' },
+  { id: '3535348', label: 'Янгиюль (Нодыра)' },
+  { id: '3541382', label: 'Фергана (Тавакал)' },
+  { id: '14409588', label: 'Андижан (Акмалжон)' },
+  { id: '3721967', label: 'Наманган (Шухрат)' },
+  { id: '18622054', label: 'Таш обл (Мейрлан) Проф' },
+  { id: '8783824', label: 'Коканд (Камолов Сардор)' },
+  { id: '8165921', label: 'Жиззах (Шердил)' },
+  { id: '3050589', label: 'Самарканд (Абдужалил)' },
+  { id: '12398877', label: 'Бухара (Жамшид)' },
+  { id: '14057761', label: 'Карши (Улугбек)' },
+  { id: '3654064', label: 'Термез (Гайрат)' },
+]
+
 type OrdersPageProps = { mode?: 'default' | 'statuses'; orderSource?: 'diller' | 'orikzor' }
 
 export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
@@ -94,6 +112,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const brandFilterIds = searchParams.getAll('brand_id')
   const dateFrom = searchParams.get('date_from') ?? ''
   const dateTo = searchParams.get('date_to') ?? ''
+  const filialId = searchParams.get('filial_id') ?? ''
   const offset = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10))
   const pageTitle = orderSource
     ? t(`admin:menu.orders_${orderSource}`, orderSource === 'diller' ? 'Diller buyurtmalar' : "O'rikzor harakatlari")
@@ -118,6 +137,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const [brands, setBrands] = useState<Brand[]>([])
   const [filterBrandIds, setFilterBrandIds] = useState<string[]>([])
+  const [brandSearch, setBrandSearch] = useState('')
   const [filterDateFrom, setFilterDateFrom] = useState('')
   const [filterDateTo, setFilterDateTo] = useState('')
 
@@ -157,6 +177,9 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         limit: PAGE_SIZE,
         offset,
         ...(orderSource ? { order_source: orderSource } : {}),
+        ...(orderSource === 'diller' && filialId.trim() && filialId.trim().toLowerCase() !== 'all'
+          ? { filial_id: filialId.trim() }
+          : {}),
       })
       setItems(data.items)
       setTotal(data.total)
@@ -169,7 +192,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       if (!background) setIsLoading(false)
       else setIsRefreshing(false)
     }
-  }, [config.searchFields, offset, orderSource, searchQuery, brandFilterIds.join(','), dateFrom, dateTo, statusParam, t])
+  }, [config.searchFields, offset, orderSource, searchQuery, brandFilterIds.join(','), dateFrom, dateTo, filialId, statusParam, t])
 
   const loadBrands = useCallback(async () => {
     try {
@@ -205,8 +228,21 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       setFilterBrandIds(brandFilterIds)
       setFilterDateFrom(dateFrom)
       setFilterDateTo(dateTo)
+    } else {
+      setBrandSearch('')
     }
   }, [filterPanelOpen, brandFilterIds, dateFrom, dateTo])
+
+  const filteredBrandsForPanel = useMemo(() => {
+    const q = brandSearch.trim().toLowerCase()
+    if (!q) return brands
+    return brands.filter(
+      (b) =>
+        (b.name && b.name.toLowerCase().includes(q)) ||
+        (b.display_name && b.display_name.toLowerCase().includes(q)) ||
+        (b.code && b.code.toLowerCase().includes(q))
+    )
+  }, [brands, brandSearch])
 
   const toggleFilterBrand = (brandId: string) => {
     setFilterBrandIds((prev) =>
@@ -578,6 +614,36 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
           </div>
         </div>
 
+        {orderSource === 'diller' && (
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="min-w-[200px] max-w-xs text-sm text-slate-600 dark:text-slate-300">
+              {t('orders:filters.organization')}
+              <select
+                value={filialId}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev)
+                    if (v) next.set('filial_id', v)
+                    else next.delete('filial_id')
+                    next.delete('offset')
+                    return next
+                  })
+                }}
+                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                aria-label={t('orders:filters.organization')}
+              >
+                <option value="">{t('orders:filters.all_dealers')}</option>
+                {DEALER_ORGANIZATIONS.map((org) => (
+                  <option key={org.id} value={org.id}>
+                    {org.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center gap-2">
           <label className="flex-1 min-w-[180px] max-w-md text-sm text-slate-600 dark:text-slate-300">
             <span className="sr-only">{t('orders:filters.search')}</span>
@@ -634,12 +700,22 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                     <span className="block text-sm font-medium text-slate-600 dark:text-slate-400">
                       {t('orders:filters.filter_by_brand')}
                     </span>
+                    <input
+                      type="search"
+                      value={brandSearch}
+                      onChange={(e) => setBrandSearch(e.target.value)}
+                      placeholder={t('orders:filters.brand_search_placeholder')}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+                      aria-label={t('orders:filters.brand_search_placeholder')}
+                    />
                     <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/50 p-2 dark:border-slate-700 dark:bg-slate-800/30">
                       {brands.length === 0 ? (
                         <p className="py-2 text-sm text-slate-500 dark:text-slate-400">—</p>
+                      ) : filteredBrandsForPanel.length === 0 ? (
+                        <p className="py-2 text-sm text-slate-500 dark:text-slate-400">{t('orders:filters.brand_search_no_results')}</p>
                       ) : (
                         <ul className="space-y-1">
-                          {brands.map((b) => (
+                          {filteredBrandsForPanel.map((b) => (
                             <li key={b.id}>
                               <label className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800">
                                 <input

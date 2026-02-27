@@ -51,7 +51,11 @@
     "filter_by_brand": "By brand",
     "filter_all_brands": "All brands",
     "filter_clear": "Clear",
-    "filter_apply": "Apply"
+    "filter_apply": "Apply",
+    "organization": "Organization",
+    "all_dealers": "All dealers",
+    "brand_search_placeholder": "Type brand name or code",
+    "brand_search_no_results": "No brand found"
   },
   "table": {
     "settings_title": "Table settings",

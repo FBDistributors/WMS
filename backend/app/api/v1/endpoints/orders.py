@@ -346,15 +346,12 @@ async def list_orders(
         query = query.filter(or_(*[field.ilike(term) for field in fields]))
 
     # Filial filter: order_source berilganda filial default qo‘llanmaydi (manba bo‘yicha filtr yetarli)
-    if not (order_source and order_source.strip()):
-        if filial_id and filial_id.strip().lower() == "all":
-            pass  # no filial filter
-        elif filial_id and filial_id.strip():
-            query = query.filter(OrderModel.filial_id == filial_id.strip())
-        else:
-            default_filial = os.getenv("WMS_DEFAULT_FILIAL_ID", "3788131").strip()
-            if default_filial:
-                query = query.filter(OrderModel.filial_id == default_filial)
+    if filial_id and filial_id.strip() and filial_id.strip().lower() != "all":
+        query = query.filter(OrderModel.filial_id == filial_id.strip())
+    elif not (order_source and order_source.strip()):
+        default_filial = os.getenv("WMS_DEFAULT_FILIAL_ID", "3788131").strip()
+        if default_filial:
+            query = query.filter(OrderModel.filial_id == default_filial)
 
     if date_from:
         query = query.filter(func.date(OrderModel.created_at) >= date_from)

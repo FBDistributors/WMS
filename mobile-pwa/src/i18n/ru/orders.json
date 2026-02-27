@@ -49,7 +49,11 @@
     "filter_by_brand": "По бренду",
     "filter_all_brands": "Все бренды",
     "filter_clear": "Сбросить",
-    "filter_apply": "Применить"
+    "filter_apply": "Применить",
+    "organization": "Организация",
+    "all_dealers": "Все дилеры",
+    "brand_search_placeholder": "Введите название или код бренда",
+    "brand_search_no_results": "Бренд не найден"
   },
   "table": {
     "settings_title": "Настройки таблицы",
