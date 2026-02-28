@@ -157,6 +157,12 @@ class SmartupClient:
             "filial_id": self.filial_id,
         }
 
+        if is_movement_export:
+            logger.info(
+                "Smartup movement$export: url=%s project_code=%s (filial_id in headers)",
+                url.split("?")[0],
+                self.project_code,
+            )
         # TODO: Confirm Smartup timeout and retry policies with ERP vendor.
         last_error: Exception | None = None
         last_detail: str | None = None
@@ -195,13 +201,17 @@ class SmartupClient:
                 response_text = exc.read().decode("utf-8")
                 last_detail = response_text
                 logger.error("Smartup export failed (HTTP %s): %s", exc.code, response_text)
-                if exc.code == 481 and "невидим" in response_text.lower():
-                    last_detail = (
-                        f"{response_text} (Loyiha ko'rinmayapti. Render env da SMARTUP_ORIKZOR_PROJECT_CODE ni 'mkw' yoki 'anor' qilib, SmartUP hisobiga loyiha ruxsatini tekshiring.)"
+                if exc.code == 481 or (exc.code == 401 and "авторизация" in response_text.lower()):
+                    # 481 = loyiha ko'rinmayapti; 401 = kirish rad etildi (movement$export boshqa loyiha bo'lishi mumkin)
+                    hint = (
+                        "Render env: SMARTUP_ORIKZOR_BASIC_USER, SMARTUP_ORIKZOR_BASIC_PASS (yoki SMARTUP_BASIC_*). "
+                        "Agar to'g'ri bo'lsa ham 401/481 bo'lsa: SMARTUP_ORIKZOR_PROJECT_CODE ni 'anor' qilib sinab ko'ring; "
+                        "Smartup hisobida movement$export (anor/mkw) loyihasiga ruxsat bering."
                     )
+                    last_detail = f"{response_text} ({hint})"
                 elif exc.code == 401:
                     last_detail = (
-                        f"{response_text} (SmartUP kirish rad etildi. Render env da SMARTUP_ORIKZOR_BASIC_USER va SMARTUP_ORIKZOR_BASIC_PASS yoki ular bo'sh bo'lsa SMARTUP_BASIC_USER va SMARTUP_BASIC_PASS ni movement$export API ga kirish beradigan login/parol bilan to'ldiring.)"
+                        f"{response_text} (SmartUP kirish rad etildi. Render env da SMARTUP_ORIKZOR_BASIC_USER va SMARTUP_ORIKZOR_BASIC_PASS yoki ular bo'sh bo'lsa SMARTUP_BASIC_USER va SMARTUP_BASIC_PASS ni movement$export API ga kirish beradigan login/parol bilan to'ldiring. Agar to'g'ri bo'lsa ham 401 bo'lsa, SMARTUP_ORIKZOR_PROJECT_CODE=anor sinab ko'ring yoki Smartup da anor/mkw loyihasiga ruxsatni tekshiring.)"
                     )
             except Exception as exc:  # noqa: BLE001
                 last_error = exc

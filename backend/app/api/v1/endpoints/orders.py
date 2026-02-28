@@ -522,13 +522,15 @@ async def sync_orders_from_smartup(
         # O'rikzor: alohida export URL (movement$export) va header'lar (project_code anor bo'lishi mumkin)
         is_orikzor = payload.order_source == "orikzor"
         # Render'da SMARTUP_ORIKZOR_URL yoki SMARTUP_ORIKZOR_EXPORT_URL ishlatiladi
-        orikzor_export_url = (
-            (os.getenv("SMARTUP_ORIKZOR_URL") or os.getenv("SMARTUP_ORIKZOR_EXPORT_URL") or "https://smartup.online/b/anor/mxsx/mkw/movement$export").strip()
-            if is_orikzor else None
-        )
+        orikzor_export_url = None
+        if is_orikzor:
+            orikzor_export_url = (
+                os.getenv("SMARTUP_ORIKZOR_URL") or os.getenv("SMARTUP_ORIKZOR_EXPORT_URL") or "https://smartup.online/b/anor/mxsx/mkw/movement$export"
+            ).strip()
+            # URL da anor bo'lsa project_code ham anor bo'lishi kerak (401/481 kamroq)
+            project_code = (os.getenv("SMARTUP_ORIKZOR_PROJECT_CODE") or ("anor" if "anor" in orikzor_export_url else "mkw")).strip()
         if is_orikzor:
             # O'rikzor: alohida login bo'lsa SMARTUP_ORIKZOR_*; bo'lmasa order API bilan bir xil SMARTUP_BASIC_*
-            project_code = (os.getenv("SMARTUP_ORIKZOR_PROJECT_CODE") or "mkw").strip()
             filial_id = (os.getenv("SMARTUP_ORIKZOR_FILIAL_ID") or "").strip()
             orikzor_user = (os.getenv("SMARTUP_ORIKZOR_BASIC_USER") or os.getenv("SMARTUP_BASIC_USER") or "").strip() or None
             orikzor_pass = (os.getenv("SMARTUP_ORIKZOR_BASIC_PASS") or os.getenv("SMARTUP_BASIC_PASS") or "").strip() or None
