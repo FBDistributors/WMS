@@ -532,6 +532,14 @@ async def sync_orders_from_smartup(
             filial_id = (os.getenv("SMARTUP_ORIKZOR_FILIAL_ID") or "").strip()
             orikzor_user = (os.getenv("SMARTUP_ORIKZOR_BASIC_USER") or os.getenv("SMARTUP_BASIC_USER") or "").strip() or None
             orikzor_pass = (os.getenv("SMARTUP_ORIKZOR_BASIC_PASS") or os.getenv("SMARTUP_BASIC_PASS") or "").strip() or None
+            if not orikzor_user or not orikzor_pass:
+                raise HTTPException(
+                    status_code=500,
+                    detail=(
+                        "O'rikzor sync uchun login/parol topilmadi. Render env da SMARTUP_BASIC_USER va SMARTUP_BASIC_PASS "
+                        "(yoki SMARTUP_ORIKZOR_BASIC_USER va SMARTUP_ORIKZOR_BASIC_PASS) ni to'ldiring."
+                    ),
+                )
             client = SmartupClient(
                 project_code=project_code,
                 filial_id=filial_id,

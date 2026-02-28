@@ -201,7 +201,7 @@ class SmartupClient:
                     )
                 elif exc.code == 401:
                     last_detail = (
-                        f"{response_text} (SmartUP kirish rad etildi. O'rikzor uchun Render env da SMARTUP_ORIKZOR_BASIC_USER va SMARTUP_ORIKZOR_BASIC_PASS ni movement$export API ga kirish beradigan login/parol bilan to'ldiring.)"
+                        f"{response_text} (SmartUP kirish rad etildi. Render env da SMARTUP_ORIKZOR_BASIC_USER va SMARTUP_ORIKZOR_BASIC_PASS yoki ular bo'sh bo'lsa SMARTUP_BASIC_USER va SMARTUP_BASIC_PASS ni movement$export API ga kirish beradigan login/parol bilan to'ldiring.)"
                     )
             except Exception as exc:  # noqa: BLE001
                 last_error = exc
