@@ -21,8 +21,30 @@ import { ScanInput } from '../components/ScanInput';
 import { useLocale } from '../i18n/LocaleContext';
 import { playSuccessBeep } from '../utils/playBeep';
 import { useNetwork } from '../network';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCachedPickTaskDetail, saveCachedPickTaskDetail } from '../offline/offlineDb';
 import { addToQueue } from '../offline/offlineQueue';
+
+const CONTROLLER_VERIFIED_KEY = (taskId: string) => `wms_controller_verified_${taskId}`;
+
+async function loadControllerVerifiedLineIds(taskId: string): Promise<Set<string>> {
+  try {
+    const raw = await AsyncStorage.getItem(CONTROLLER_VERIFIED_KEY(taskId));
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw) as string[];
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set();
+  }
+}
+
+async function saveControllerVerifiedLineIds(taskId: string, ids: Set<string>): Promise<void> {
+  try {
+    await AsyncStorage.setItem(CONTROLLER_VERIFIED_KEY(taskId), JSON.stringify([...ids]));
+  } catch {
+    // ignore
+  }
+}
 
 function barcodeMatchesLine(value: string, line: PickingLine): boolean {
   const v = value.trim().toLowerCase();
@@ -86,11 +108,19 @@ export function PickTaskDetails() {
         const normalized = normalizeDocument(data);
         setDoc(normalized);
         if (normalized) await saveCachedPickTaskDetail(taskId, normalized);
+        if (isController && normalized) {
+          const saved = await loadControllerVerifiedLineIds(String(taskId));
+          setControllerVerifiedLineIds(saved);
+        }
       } else {
         const cached = await getCachedPickTaskDetail(taskId);
         const normalized = normalizeDocument(cached as PickingDocument | null);
         setDoc(normalized);
         if (!normalized) setError(t('notFound'));
+        if (isController && normalized) {
+          const saved = await loadControllerVerifiedLineIds(String(taskId));
+          setControllerVerifiedLineIds(saved);
+        }
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : t('loadError');
@@ -104,7 +134,7 @@ export function PickTaskDetails() {
     } finally {
       setLoading(false);
     }
-  }, [taskId, navigation, t, isOnline]);
+  }, [taskId, navigation, t, isOnline, isController]);
 
   useEffect(() => {
     load();
@@ -200,7 +230,12 @@ export function PickTaskDetails() {
       }
       void playSuccessBeep();
       closeLineScan();
-      setControllerVerifiedLineIds((prev) => new Set(prev).add(selectedLine.id));
+      const lineIdStr = String(selectedLine.id);
+      setControllerVerifiedLineIds((prev) => {
+        const next = new Set(prev).add(lineIdStr);
+        saveControllerVerifiedLineIds(String(taskId), next);
+        return next;
+      });
       return;
     }
     const remaining = selectedLine.qty_required - selectedLine.qty_picked;
@@ -247,9 +282,11 @@ export function PickTaskDetails() {
         const profileType = isController ? 'controller' : 'picker';
         if (isOnline) {
           await completePickDocument(String(taskId), incompleteReason ? { incomplete_reason: incompleteReason } : undefined);
+          if (isController) AsyncStorage.removeItem(CONTROLLER_VERIFIED_KEY(String(taskId)));
           navigation.replace('PickTaskList', { profileType, completedMessage: t('pickingComplete') });
         } else {
           await addToQueue('PICK_CLOSE_TASK', { taskId, ts: Date.now(), incomplete_reason: incompleteReason });
+          if (isController) AsyncStorage.removeItem(CONTROLLER_VERIFIED_KEY(String(taskId)));
           navigation.replace('PickTaskList', { profileType, completedMessage: t('pickingComplete') });
         }
       } catch (e) {
@@ -276,7 +313,7 @@ export function PickTaskDetails() {
       const lines = doc?.lines ?? [];
       const pickedLines = lines.filter((l) => Number(l.qty_picked) >= Number(l.qty_required));
       const allVerified =
-        pickedLines.length === 0 || pickedLines.every((l) => controllerVerifiedLineIds.has(l.id));
+        pickedLines.length === 0 || pickedLines.every((l) => controllerVerifiedLineIds.has(String(l.id)));
       if (!allVerified) {
         Alert.alert(t('error'), t('verifyAllPickedLines'));
         return;
@@ -370,7 +407,7 @@ export function PickTaskDetails() {
             t={t}
             readOnly={isController && Number((line as PickingLine).qty_picked) < Number((line as PickingLine).qty_required)}
             isController={isController}
-            controllerVerified={isController && controllerVerifiedLineIds.has((line as PickingLine).id)}
+            controllerVerified={isController && controllerVerifiedLineIds.has(String((line as PickingLine).id))}
           />
         ))}
       </ScrollView>
