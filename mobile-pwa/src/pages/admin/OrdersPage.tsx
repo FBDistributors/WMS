@@ -136,7 +136,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const [filterPanelOpen, setFilterPanelOpen] = useState(false)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const filterPanelContentRef = useRef<HTMLDivElement>(null)
-  const filterOverlayRef = useRef<HTMLDivElement>(null)
   const [brands, setBrands] = useState<Brand[]>([])
   const [filterBrandIds, setFilterBrandIds] = useState<string[]>([])
   const [brandSearch, setBrandSearch] = useState('')
@@ -234,6 +233,22 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       setBrandSearch('')
     }
   }, [filterPanelOpen, brandFilterIds, dateFrom, dateTo])
+
+  // Tashqariga bosganda panelni yopish — overlay pointer-events: none, document listener
+  useEffect(() => {
+    if (!filterPanelOpen) return
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node
+      if (filterPanelContentRef.current?.contains(target)) return
+      if (filterPanelRef.current?.contains(target)) return
+      // Sana tanlash paytida (native picker ochiq) panelni yopma
+      const active = document.activeElement as HTMLElement | null
+      if (active?.getAttribute?.('type') === 'date') return
+      setFilterPanelOpen(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [filterPanelOpen])
 
   const filteredBrandsForPanel = useMemo(() => {
     const q = brandSearch.trim().toLowerCase()
@@ -681,13 +696,8 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             {filterPanelOpen && (
               <>
                 <div
-                  ref={filterOverlayRef}
-                  className="fixed inset-0 z-40"
+                  className="fixed inset-0 z-40 bg-black/20 pointer-events-none"
                   aria-hidden="true"
-                  onMouseDown={(e) => {
-                    if (e.target !== filterOverlayRef.current) return
-                    setFilterPanelOpen(false)
-                  }}
                 />
                 <div
                   ref={filterPanelContentRef}
