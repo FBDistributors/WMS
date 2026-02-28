@@ -73,6 +73,7 @@ export function DateInput({
         type="date"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onInput={(e) => onChange((e.target as HTMLInputElement).value)}
         disabled={disabled}
         id={id}
         aria-label={ariaLabel}

@@ -136,6 +136,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const [filterPanelOpen, setFilterPanelOpen] = useState(false)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const filterPanelContentRef = useRef<HTMLDivElement>(null)
+  const filterOverlayRef = useRef<HTMLDivElement>(null)
   const [brands, setBrands] = useState<Brand[]>([])
   const [filterBrandIds, setFilterBrandIds] = useState<string[]>([])
   const [brandSearch, setBrandSearch] = useState('')
@@ -680,10 +681,11 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             {filterPanelOpen && (
               <>
                 <div
+                  ref={filterOverlayRef}
                   className="fixed inset-0 z-40"
                   aria-hidden="true"
-                  onClick={(e) => {
-                    if (filterPanelContentRef.current?.contains(e.target as Node)) return
+                  onMouseDown={(e) => {
+                    if (e.target !== filterOverlayRef.current) return
                     setFilterPanelOpen(false)
                   }}
                 />
@@ -730,7 +732,10 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                               <li key={brandIdStr}>
                                 <label
                                   className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800"
-                                  onClick={(e) => e.stopPropagation()}
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    toggleFilterBrand(b.id)
+                                  }}
                                 >
                                   <input
                                     type="checkbox"
