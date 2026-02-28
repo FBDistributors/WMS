@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { CheckCircle2, PackageSearch } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -26,6 +26,7 @@ export function PickDetailsPage() {
   const [error, setError] = useState<string | null>(null)
   const [isCompleting, setIsCompleting] = useState(false)
   const [scanModalLine, setScanModalLine] = useState<PickLine | null>(null)
+  const loadIdRef = useRef(0)
 
   const load = useCallback(async () => {
     if (!documentId) {
@@ -33,15 +34,18 @@ export function PickDetailsPage() {
       setIsLoading(false)
       return
     }
+    const id = (loadIdRef.current += 1)
     setIsLoading(true)
     setError(null)
     try {
       const details = await getPickListDetailsForPicker(documentId)
+      if (id !== loadIdRef.current) return
       setData(details)
     } catch (err) {
+      if (id !== loadIdRef.current) return
       setError(t('load_failed'))
     } finally {
-      setIsLoading(false)
+      if (id === loadIdRef.current) setIsLoading(false)
     }
   }, [documentId, t])
 

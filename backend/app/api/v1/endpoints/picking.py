@@ -205,7 +205,6 @@ async def get_picking_document(
 ):
     document = (
         db.query(DocumentModel)
-        .options(selectinload(DocumentModel.lines))
         .filter(DocumentModel.id == document_id)
         .one_or_none()
     )
@@ -215,7 +214,15 @@ async def get_picking_document(
         raise HTTPException(status_code=404, detail="Document not found")
     if user.role == "inventory_controller" and document.controlled_by_user_id != user.id:
         raise HTTPException(status_code=404, detail="Document not found")
-    return _to_picking_document(document)
+    # Joylashuv bo‘yicha terish tartibi (admin panel Locations — pick_sequence)
+    lines = (
+        db.query(DocumentLineModel)
+        .outerjoin(LocationModel, DocumentLineModel.location_id == LocationModel.id)
+        .filter(DocumentLineModel.document_id == document_id)
+        .order_by(LocationModel.pick_sequence.asc().nulls_last(), DocumentLineModel.id)
+        .all()
+    )
+    return _to_picking_document_with_lines(document, lines)
 
 
 @router.get("/documents", response_model=List[PickingListItem], summary="Picking documents")
