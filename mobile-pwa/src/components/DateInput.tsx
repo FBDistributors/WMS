@@ -76,7 +76,6 @@ export function DateInput({
         disabled={disabled}
         id={id}
         aria-label={ariaLabel}
-        aria-hidden
         tabIndex={-1}
         className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
       />

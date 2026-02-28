@@ -135,6 +135,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [filterPanelOpen, setFilterPanelOpen] = useState(false)
   const filterPanelRef = useRef<HTMLDivElement>(null)
+  const filterPanelContentRef = useRef<HTMLDivElement>(null)
   const [brands, setBrands] = useState<Brand[]>([])
   const [filterBrandIds, setFilterBrandIds] = useState<string[]>([])
   const [brandSearch, setBrandSearch] = useState('')
@@ -680,11 +681,15 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
               <>
                 <div
                   className="fixed inset-0 z-40"
-                  aria-hidden
-                  onClick={() => setFilterPanelOpen(false)}
+                  aria-hidden="true"
+                  onClick={(e) => {
+                    if (filterPanelContentRef.current?.contains(e.target as Node)) return
+                    setFilterPanelOpen(false)
+                  }}
                 />
                 <div
-                  className="absolute right-0 top-full z-50 mt-2 w-full min-w-[260px] max-w-sm rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900"
+                  ref={filterPanelContentRef}
+                  className="absolute right-0 top-full z-[100] mt-2 w-full min-w-[260px] max-w-sm rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="mb-3 flex items-center justify-between">
