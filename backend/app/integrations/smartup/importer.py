@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from typing import Iterable, List, Tuple
 
@@ -41,31 +40,9 @@ def import_orders(
             .one_or_none()
         )
 
-        status_norm = (order.status or "").strip().upper()
-        # Diller sync: Smartup ba'zan status yubormaydi; bo'sh bo'lsa B#S deb import qilamiz.
-        if not status_norm and override:
-            status_norm = "B#S"
-        if status_norm != "B#S":
-            # Status changed in SmartUp: update our record so it no longer shows in B#S view
-            if existing and existing.status in ("imported", "B#S", "ready_for_picking"):
-                try:
-                    existing.status = order.status or "cancelled"
-                    db.commit()
-                    updated += 1
-                except Exception as exc:
-                    db.rollback()
-                    errors.append(ImportError(external_id=external_id, reason=str(exc)))
-            else:
-                skipped += 1
-                if skipped <= 3:
-                    logging.getLogger(__name__).info(
-                        "import_orders skip (status != B#S): deal_id=%s status=%r",
-                        getattr(order, "deal_id", None),
-                        order.status,
-                    )
-            continue
-
         payload = map_order_to_wms_order(order)
+        # Barcha statuslarni import qilamiz; Smartup dagi status saqlanadi.
+        payload.status = (order.status or "").strip() or "imported"
         if override and not (payload.filial_id or "").strip():
             payload.filial_id = override
         if override and external_id != payload.source_external_id:
@@ -81,8 +58,7 @@ def import_orders(
                 existing.agent_id = payload.agent_id
                 existing.agent_name = payload.agent_name
                 existing.total_amount = payload.total_amount
-                if existing.status in ("imported", "ready_for_picking", "B#S"):
-                    existing.status = payload.status
+                existing.status = payload.status
                 if payload.lines:
                     _upsert_lines(existing, payload.lines)
                 db.commit()
