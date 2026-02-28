@@ -244,9 +244,10 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     )
   }, [brands, brandSearch])
 
-  const toggleFilterBrand = (brandId: string) => {
+  const toggleFilterBrand = (brandId: string | number) => {
+    const id = String(brandId)
     setFilterBrandIds((prev) =>
-      prev.includes(brandId) ? prev.filter((id) => id !== brandId) : [...prev, brandId]
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     )
   }
 
@@ -682,7 +683,10 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                   aria-hidden
                   onClick={() => setFilterPanelOpen(false)}
                 />
-                <div className="absolute right-0 top-full z-50 mt-2 w-full min-w-[260px] max-w-sm rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                <div
+                  className="absolute right-0 top-full z-50 mt-2 w-full min-w-[260px] max-w-sm rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <div className="mb-3 flex items-center justify-between">
                     <span className="font-semibold text-slate-900 dark:text-slate-100">
                       {t('orders:filters.filter_panel_title')}
@@ -715,21 +719,27 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                         <p className="py-2 text-sm text-slate-500 dark:text-slate-400">{t('orders:filters.brand_search_no_results')}</p>
                       ) : (
                         <ul className="space-y-1">
-                          {filteredBrandsForPanel.map((b) => (
-                            <li key={b.id}>
-                              <label className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800">
-                                <input
-                                  type="checkbox"
-                                  checked={filterBrandIds.includes(b.id)}
-                                  onChange={() => toggleFilterBrand(b.id)}
-                                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                />
-                                <span className="text-sm text-slate-800 dark:text-slate-200">
-                                  {b.display_name || b.name || b.code}
-                                </span>
-                              </label>
-                            </li>
-                          ))}
+                          {filteredBrandsForPanel.map((b) => {
+                            const brandIdStr = String(b.id)
+                            return (
+                              <li key={brandIdStr}>
+                                <label
+                                  className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={filterBrandIds.includes(brandIdStr)}
+                                    onChange={() => toggleFilterBrand(b.id)}
+                                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                  />
+                                  <span className="text-sm text-slate-800 dark:text-slate-200">
+                                    {b.display_name || b.name || b.code}
+                                  </span>
+                                </label>
+                              </li>
+                            )
+                          })}
                         </ul>
                       )}
                     </div>
