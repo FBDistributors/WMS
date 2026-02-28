@@ -234,22 +234,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     }
   }, [filterPanelOpen, brandFilterIds, dateFrom, dateTo])
 
-  // Tashqariga bosganda panelni yopish — overlay pointer-events: none, document listener
-  useEffect(() => {
-    if (!filterPanelOpen) return
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node
-      if (filterPanelContentRef.current?.contains(target)) return
-      if (filterPanelRef.current?.contains(target)) return
-      // Sana tanlash paytida (native picker ochiq) panelni yopma
-      const active = document.activeElement as HTMLElement | null
-      if (active?.getAttribute?.('type') === 'date') return
-      setFilterPanelOpen(false)
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [filterPanelOpen])
-
   const filteredBrandsForPanel = useMemo(() => {
     const q = brandSearch.trim().toLowerCase()
     if (!q) return brands
@@ -696,13 +680,13 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             {filterPanelOpen && (
               <>
                 <div
-                  className="fixed inset-0 z-40 bg-black/20 pointer-events-none"
+                  className="fixed inset-0 z-40"
                   aria-hidden="true"
+                  onClick={() => setFilterPanelOpen(false)}
                 />
                 <div
                   ref={filterPanelContentRef}
-                  className="absolute right-0 top-full z-[100] mt-2 w-full min-w-[260px] max-w-sm rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900"
-                  onClick={(e) => e.stopPropagation()}
+                  className="absolute right-0 top-full z-50 mt-2 w-full min-w-[260px] max-w-sm rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900"
                 >
                   <div className="mb-3 flex items-center justify-between">
                     <span className="font-semibold text-slate-900 dark:text-slate-100">
