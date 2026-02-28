@@ -266,7 +266,12 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       setSyncResult(result)
       await load()
     } catch (err) {
-      const message = err instanceof Error ? err.message : t('orders:sync_failed')
+      const message =
+        (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string')
+          ? (err as { message: string }).message
+          : err instanceof Error
+            ? err.message
+            : t('orders:sync_failed')
       setError(message)
     } finally {
       setIsSyncing(false)

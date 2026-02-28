@@ -574,6 +574,8 @@ async def sync_orders_from_smartup(
         msg = str(exc)
         if "400" in msg or "не найдена" in msg or "organization" in msg.lower():
             raise HTTPException(status_code=400, detail=msg) from exc
+        # 401 qaytarmaymiz: frontend barcha 401 ni session tugadi deb hisoblab chiqadi.
+        # Smartup kirish xatosi 500 + detail orqali tushunarli xabar qaytaramiz.
         raise HTTPException(status_code=500, detail=msg) from exc
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"Smartup export failed: {exc}") from exc
