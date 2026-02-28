@@ -555,8 +555,13 @@ async def sync_orders_from_smartup(
             filial_code=export_filial,
             export_url=orikzor_export_url,
         )
+        filial_override = (
+            (payload.filial_id or "").strip()
+            if payload.order_source == "diller" and (payload.filial_id or "").strip()
+            else None
+        )
         created, updated, skipped, _errors = import_orders(
-            db, response.items, order_source=payload.order_source
+            db, response.items, order_source=payload.order_source, filial_id_override=filial_override
         )
         if is_orikzor:
             logger = logging.getLogger(__name__)

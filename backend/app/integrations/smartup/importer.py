@@ -20,14 +20,19 @@ def import_orders(
     db: Session,
     orders: Iterable[SmartupOrder],
     order_source: str | None = None,
+    filial_id_override: str | None = None,
 ) -> Tuple[int, int, int, List[ImportError]]:
     created = 0
     updated = 0
     skipped = 0
     errors: List[ImportError] = []
+    override = (filial_id_override or "").strip() or None
 
     for order in orders:
         external_id = _resolve_external_id(order)
+        if override and not (order.filial_id or order.filial_code):
+            if order.deal_id:
+                external_id = f"{order.deal_id}:{override}"
         existing = (
             db.query(Order)
             .options(selectinload(Order.lines))
@@ -35,7 +40,8 @@ def import_orders(
             .one_or_none()
         )
 
-        if order.status != "B#S":
+        status_norm = (order.status or "").strip().upper()
+        if status_norm != "B#S":
             # Status changed in SmartUp: update our record so it no longer shows in B#S view
             if existing and existing.status in ("imported", "B#S", "ready_for_picking"):
                 try:
@@ -50,6 +56,10 @@ def import_orders(
             continue
 
         payload = map_order_to_wms_order(order)
+        if override and not (payload.filial_id or "").strip():
+            payload.filial_id = override
+        if override and external_id != payload.source_external_id:
+            payload.source_external_id = external_id
         source = order_source if order_source else payload.source
         try:
             if existing:
