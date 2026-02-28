@@ -74,6 +74,7 @@ export type SmartupSyncInput = {
   begin_deal_date?: string
   end_deal_date?: string
   filial_code?: string | null
+  filial_id?: string | null
   order_source?: string | null
 }
 

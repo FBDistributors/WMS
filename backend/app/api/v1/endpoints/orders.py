@@ -99,6 +99,7 @@ class SmartupSyncRequest(BaseModel):
     begin_deal_date: Optional[date] = Field(None, description="YYYY-MM-DD")
     end_deal_date: Optional[date] = Field(None, description="YYYY-MM-DD")
     filial_code: Optional[str] = None
+    filial_id: Optional[str] = None
     order_source: Optional[str] = Field(None, description="diller, orikzor yoki boshqa manba; saqlanadi Order.source da")
 
 
@@ -538,11 +539,18 @@ async def sync_orders_from_smartup(
                 password=orikzor_pass,
             )
         else:
-            client = SmartupClient()
+            # Diller: tanlangan filial bo'lsa Smartup ga shu filial yuboriladi
+            diller_filial = (payload.filial_id or "").strip() if payload.order_source == "diller" else ""
+            client = SmartupClient(filial_id=diller_filial) if diller_filial else SmartupClient()
+        export_filial = (
+            (payload.filial_id or "").strip()
+            if payload.order_source == "diller" and (payload.filial_id or "").strip()
+            else payload.filial_code
+        )
         response = client.export_orders(
             begin_deal_date=begin_date.strftime("%d.%m.%Y"),
             end_deal_date=end_date.strftime("%d.%m.%Y"),
-            filial_code=payload.filial_code,
+            filial_code=export_filial,
             export_url=orikzor_export_url,
         )
         created, updated, skipped, _errors = import_orders(

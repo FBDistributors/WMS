@@ -252,7 +252,17 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     setError(null)
     setSyncResult(null)
     try {
-      const result = await syncSmartupOrders(orderSource ? { order_source: orderSource } : {})
+      const payload = orderSource
+        ? {
+            order_source: orderSource,
+            ...(orderSource === 'diller' &&
+            filialId.trim() &&
+            filialId.trim().toLowerCase() !== 'all'
+              ? { filial_id: filialId.trim() }
+              : {}),
+          }
+        : {}
+      const result = await syncSmartupOrders(payload)
       setSyncResult(result)
       await load()
     } catch (err) {
