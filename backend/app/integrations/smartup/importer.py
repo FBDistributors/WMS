@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Iterable, List, Tuple
 
@@ -41,6 +42,9 @@ def import_orders(
         )
 
         status_norm = (order.status or "").strip().upper()
+        # Diller sync: Smartup ba'zan status yubormaydi; bo'sh bo'lsa B#S deb import qilamiz.
+        if not status_norm and override:
+            status_norm = "B#S"
         if status_norm != "B#S":
             # Status changed in SmartUp: update our record so it no longer shows in B#S view
             if existing and existing.status in ("imported", "B#S", "ready_for_picking"):
@@ -53,6 +57,12 @@ def import_orders(
                     errors.append(ImportError(external_id=external_id, reason=str(exc)))
             else:
                 skipped += 1
+                if skipped <= 3:
+                    logging.getLogger(__name__).info(
+                        "import_orders skip (status != B#S): deal_id=%s status=%r",
+                        getattr(order, "deal_id", None),
+                        order.status,
+                    )
             continue
 
         payload = map_order_to_wms_order(order)
