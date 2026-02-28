@@ -539,11 +539,13 @@ async def sync_orders_from_smartup(
                 password=orikzor_pass,
             )
         else:
-            # Diller: tanlangan filial bo'lsa Smartup ga shu filial yuboriladi
+            # Diller: tanlangan filial bo'lsa Smartup ga faqat header'da filial_id yuboriladi.
+            # Body'da filial_code yuborilsa Smartup 400 "Данная организация не найдена" qaytarishi mumkin.
             diller_filial = (payload.filial_id or "").strip() if payload.order_source == "diller" else ""
             client = SmartupClient(filial_id=diller_filial) if diller_filial else SmartupClient()
+        # Diller uchun body'da filial_code yuborilmaydi — Smartup header'dagi filial_id dan foydalanadi.
         export_filial = (
-            (payload.filial_id or "").strip()
+            None
             if payload.order_source == "diller" and (payload.filial_id or "").strip()
             else payload.filial_code
         )
@@ -563,6 +565,11 @@ async def sync_orders_from_smartup(
                 created, updated, skipped, len(response.items),
             )
         return SmartupSyncResponse(created=created, updated=updated, skipped=skipped)
+    except RuntimeError as exc:
+        msg = str(exc)
+        if "400" in msg or "не найдена" in msg or "organization" in msg.lower():
+            raise HTTPException(status_code=400, detail=msg) from exc
+        raise HTTPException(status_code=500, detail=msg) from exc
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"Smartup export failed: {exc}") from exc
 
