@@ -30,7 +30,16 @@ def _parse_movement_export_to_orders(body: str) -> SmartupOrderExportResponse:
             or data.get("result")
         )
         if raw is not None:
-            movements = raw if isinstance(raw, list) else [raw] if raw else []
+            if isinstance(raw, list):
+                movements = raw
+            elif isinstance(raw, str):
+                try:
+                    parsed_raw = json.loads(raw)
+                    movements = parsed_raw if isinstance(parsed_raw, list) else [parsed_raw] if parsed_raw else []
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    movements = []
+            else:
+                movements = [raw] if raw else []
         elif data.get("movement_id") is not None or data.get("movement_number") is not None:
             # Javob to'g'ridan-to'g'ri bitta movement ob'ekti
             movements = [data]
