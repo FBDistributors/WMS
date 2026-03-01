@@ -59,7 +59,22 @@ def _parse_movement_export_to_orders(body: str) -> SmartupOrderExportResponse:
                     normalized.append(parsed)
             except (TypeError, ValueError, json.JSONDecodeError):
                 pass
-    movements = normalized
+    # Ro'yxatda wrapper bo'lsa [{"movement": [...]}] — ichidagi movement ro'yxatini chiqaramiz
+    expanded: list = []
+    for x in movements:
+        if isinstance(x, dict) and (x.get("movement_id") is not None or x.get("movement_number") is not None):
+            expanded.append(x)
+        elif isinstance(x, dict):
+            inner = x.get("movement") or x.get("movements")
+            if isinstance(inner, list):
+                expanded.extend(inner)
+            elif isinstance(inner, dict):
+                expanded.append(inner)
+            else:
+                expanded.append(x)
+        else:
+            expanded.append(x)
+    movements = expanded
     filtered = [m for m in movements if isinstance(m, dict)]
     logger.info(
         "Smartup movement$export parse: raw_count=%s dict_count=%s",
