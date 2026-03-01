@@ -571,7 +571,7 @@ async def sync_orders_from_smartup(
             if payload.order_source == "diller" and (payload.filial_id or "").strip()
             else None
         )
-        created, updated, skipped, _errors = import_orders(
+        created, updated, skipped, import_errors = import_orders(
             db, response.items, order_source=payload.order_source, filial_id_override=filial_override
         )
         if is_orikzor:
@@ -580,6 +580,10 @@ async def sync_orders_from_smartup(
                 "O'rikzor sync: created=%s updated=%s skipped=%s items_from_api=%s",
                 created, updated, skipped, len(response.items),
             )
+            for err in import_errors[:5]:
+                logger.error("O'rikzor import xato: external_id=%s sabab=%s", err.external_id, err.reason)
+            if len(import_errors) > 5:
+                logger.error("O'rikzor import: qolgan %s ta xato", len(import_errors) - 5)
         return SmartupSyncResponse(created=created, updated=updated, skipped=skipped)
     except RuntimeError as exc:
         msg = str(exc)

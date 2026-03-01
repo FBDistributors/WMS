@@ -38,7 +38,7 @@ def map_order_to_wms_order(order: SmartupOrder) -> OrderPayload:
         OrderLinePayload(
             sku=line.sku,
             barcode=line.barcode,
-            name=line.name or "Unknown item",
+            name=(line.name or "").strip() or "Unknown item",
             qty=line.qty or 0,
             uom=line.uom,
             raw_json=line.model_dump(by_alias=True),
