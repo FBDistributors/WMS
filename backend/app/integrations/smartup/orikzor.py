@@ -26,6 +26,8 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
     elif isinstance(data, dict):
         if data.get("movement_id") is not None or data.get("movement_number") is not None:
             movements = [data]
+        elif isinstance(data.get("movement"), list):
+            movements = data["movement"]
         else:
             raw = (
                 data.get("movement")
@@ -37,6 +39,13 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
             if raw is not None:
                 if isinstance(raw, list):
                     movements = raw
+                elif isinstance(raw, dict):
+                    # Bitta movement ob'ekti yoki {"movement": [...]} wrapper
+                    if raw.get("movement_id") is not None or raw.get("movement_number") is not None:
+                        movements = [raw]
+                    else:
+                        inner = raw.get("movement") or raw.get("movements")
+                        movements = inner if isinstance(inner, list) else [inner] if inner else []
                 elif isinstance(raw, str):
                     try:
                         parsed = json.loads(raw)
@@ -62,7 +71,7 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
                 pass
     movements = normalized
 
-    # Wrapper [{"movement": [...]}] — ichidagi ro'yxatni chiqarish
+    # Wrapper [{"movement": [...]}] yoki har bir element {"movement": {...}} — ichidagi ro'yxatni chiqarish
     expanded: list = []
     for x in movements:
         if isinstance(x, dict) and (
@@ -79,7 +88,20 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
                 expanded.append(x)
         else:
             expanded.append(x)
-    movements = [m for m in expanded if isinstance(m, dict)]
+    # Yana bir qatorda wrapper bo'lsa (har bir element {"movement": {...}})
+    flattened: list = []
+    for m in expanded:
+        if not isinstance(m, dict):
+            continue
+        if m.get("movement_id") is not None or m.get("movement_number") is not None:
+            flattened.append(m)
+        else:
+            inner = m.get("movement") or m.get("movements")
+            if isinstance(inner, list):
+                flattened.extend(inner)
+            elif isinstance(inner, dict):
+                flattened.append(inner)
+    movements = [m for m in flattened if isinstance(m, dict)]
 
     logger.info(
         "Smartup movement$export parse: raw_count=%s dict_count=%s",
@@ -89,8 +111,10 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
 
     orders: list[SmartupOrder] = []
     for m in movements:
-        movement_id = (m.get("movement_id") or "").strip() or (m.get("movement_number") or "").strip()
-        movement_number = (m.get("movement_number") or m.get("movement_id") or "").strip()
+        raw_id = m.get("movement_id")
+        raw_num = m.get("movement_number")
+        movement_id = (str(raw_id) if raw_id is not None else "").strip() or (str(raw_num) if raw_num is not None else "").strip()
+        movement_number = (str(raw_num) if raw_num is not None else str(raw_id) if raw_id is not None else "").strip()
         if not movement_id and not movement_number:
             continue
         movement_id = movement_id or movement_number
@@ -137,7 +161,12 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
             if validate:
                 orders.append(validate(order_dict))
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Movement to order skip movement_id=%s: %s", movement_id, exc)
+            logger.warning(
+                "O'rikzor movement to order skip movement_id=%s reason=%s",
+                movement_id,
+                exc,
+                exc_info=False,
+            )
 
     return SmartupOrderExportResponse(items=orders)
 
