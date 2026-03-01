@@ -45,8 +45,27 @@ def _parse_movement_export_to_orders(body: str) -> SmartupOrderExportResponse:
             movements = [data]
     if not isinstance(movements, list):
         movements = [movements] if movements else []
-    # Barcha movement'lar yuklanadi (to_warehouse_code filtri olib tashlandi)
+    # Ro'yxat ichida string bo'lsa (API "[{...}]" qaytarsa) parse qilamiz
+    normalized: list = []
+    for x in movements:
+        if isinstance(x, dict):
+            normalized.append(x)
+        elif isinstance(x, str):
+            try:
+                parsed = json.loads(x)
+                if isinstance(parsed, list):
+                    normalized.extend(parsed)
+                elif isinstance(parsed, dict):
+                    normalized.append(parsed)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                pass
+    movements = normalized
     filtered = [m for m in movements if isinstance(m, dict)]
+    logger.info(
+        "Smartup movement$export parse: raw_count=%s dict_count=%s",
+        len(movements),
+        len(filtered),
+    )
     orders: list[SmartupOrder] = []
     for m in filtered:
         movement_id = (m.get("movement_id") or "").strip() or (m.get("movement_number") or "").strip()
@@ -54,12 +73,21 @@ def _parse_movement_export_to_orders(body: str) -> SmartupOrderExportResponse:
         if not movement_id and not movement_number:
             continue
         movement_id = movement_id or movement_number
-        # API ba'zan "movement_itens" (e bilan) qaytaradi
+        # API ba'zan "movement_itens" (e bilan) qaytaradi; elementlar string bo'lishi mumkin
         items = m.get("movement_items") or m.get("movement_itens") or []
         if not isinstance(items, list):
             items = [items] if items else []
-        lines = []
+        item_dicts: list = []
         for it in items:
+            if isinstance(it, dict):
+                item_dicts.append(it)
+            elif isinstance(it, str):
+                try:
+                    item_dicts.append(json.loads(it))
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    pass
+        lines = []
+        for it in item_dicts:
             if not isinstance(it, dict):
                 continue
             try:
@@ -207,7 +235,7 @@ class SmartupClient:
                             keys = list(raw.keys()) if isinstance(raw, dict) else []
                             preview = (body[:600] + "...") if len(body) > 600 else body
                             logger.warning(
-                                "Smartup movement$export: API dan 0 ta movement qaytdi. Javob kalitlari=%s preview=%s",
+                                "Smartup movement$export: 0 ta order qaytdi. Yuqoridagi 'parse: raw_count= dict_count=' va 'parse skip' loglarini tekshiring. Kalitlar=%s preview=%s",
                                 keys,
                                 preview,
                             )
