@@ -107,6 +107,7 @@ class SmartupSyncResponse(BaseModel):
     created: int
     updated: int
     skipped: int
+    detail: Optional[str] = None  # birinchi import xatosi (0 qo'shilganda ko'rsatish uchun)
 
 
 class SendToPickingRequest(BaseModel):
@@ -584,7 +585,10 @@ async def sync_orders_from_smartup(
                 logger.error("O'rikzor import xato: external_id=%s sabab=%s", err.external_id, err.reason)
             if len(import_errors) > 5:
                 logger.error("O'rikzor import: qolgan %s ta xato", len(import_errors) - 5)
-        return SmartupSyncResponse(created=created, updated=updated, skipped=skipped)
+        detail = None
+        if import_errors and (created + updated) == 0 and len(response.items) > 0:
+            detail = import_errors[0].reason
+        return SmartupSyncResponse(created=created, updated=updated, skipped=skipped, detail=detail)
     except RuntimeError as exc:
         msg = str(exc)
         if "400" in msg or "не найдена" in msg or "organization" in msg.lower():

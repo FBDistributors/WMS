@@ -148,7 +148,12 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set())
   const [sendDialogOrderIds, setSendDialogOrderIds] = useState<string[] | null>(null)
-  const [syncResult, setSyncResult] = useState<{ created: number; updated: number; skipped: number } | null>(null)
+  const [syncResult, setSyncResult] = useState<{
+    created: number
+    updated: number
+    skipped: number
+    detail?: string | null
+  } | null>(null)
 
   const ELIGIBLE_PICKING_STATUSES = new Set(['imported', 'B#S', 'ready_for_picking', 'allocated'])
   const canBeSentToPicking = (order: OrderListItem) =>
@@ -584,8 +589,15 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                 </span>
               ) : null}
               {syncResult ? (
-                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
-                  {t('orders:sync_result', { created: syncResult.created, updated: syncResult.updated, skipped: syncResult.skipped })}
+                <span className="flex flex-col gap-0.5">
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
+                    {t('orders:sync_result', { created: syncResult.created, updated: syncResult.updated, skipped: syncResult.skipped })}
+                  </span>
+                  {syncResult.detail ? (
+                    <span className="max-w-md truncate text-xs text-amber-700 dark:text-amber-300" title={syncResult.detail}>
+                      {syncResult.detail}
+                    </span>
+                  ) : null}
                 </span>
               ) : null}
             </div>

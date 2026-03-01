@@ -34,11 +34,15 @@ class OrderPayload:
 
 def map_order_to_wms_order(order: SmartupOrder) -> OrderPayload:
     external_id = _resolve_external_id(order)
+    def _name(s: str | None) -> str:
+        out = (s or "").strip() or "Unknown item"
+        return out[:255] if len(out) > 255 else out  # OrderLine.name max 255
+
     lines = [
         OrderLinePayload(
             sku=line.sku,
             barcode=line.barcode,
-            name=(line.name or "").strip() or "Unknown item",
+            name=_name(line.name),
             qty=line.qty or 0,
             uom=line.uom,
             raw_json=line.model_dump(by_alias=True),
