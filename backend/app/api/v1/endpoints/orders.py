@@ -18,6 +18,7 @@ from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_
 from app.services.push_notifications import send_push_to_user
 from app.integrations.smartup.client import SmartupClient
 from app.integrations.smartup.importer import import_orders
+from app.integrations.smartup.orikzor import export_movements_from_smartup
 from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
 from app.models.order import Order as OrderModel
@@ -109,6 +110,11 @@ class SmartupSyncResponse(BaseModel):
     skipped: int
     detail: Optional[str] = None  # birinchi import xatosi
     errors_count: Optional[int] = None  # import xatolari soni
+
+
+class SyncOrikzorRequest(BaseModel):
+    begin_deal_date: Optional[date] = Field(None, description="YYYY-MM-DD")
+    end_deal_date: Optional[date] = Field(None, description="YYYY-MM-DD")
 
 
 class SendToPickingRequest(BaseModel):
@@ -508,55 +514,27 @@ async def update_order_status(
     return _to_order_details(order)
 
 
-@router.post("/sync-smartup", response_model=SmartupSyncResponse, summary="Sync orders from Smartup")
+@router.post("/sync-smartup", response_model=SmartupSyncResponse, summary="Sync orders from Smartup (Diller)")
 async def sync_orders_from_smartup(
     payload: SmartupSyncRequest,
     db: Session = Depends(get_db),
     _user=Depends(require_permission("orders:sync")),
 ):
+    if payload.order_source == "orikzor":
+        raise HTTPException(
+            status_code=400,
+            detail="O'rikzor uchun POST /api/v1/orders/sync-orikzor endpointidan foydalaning.",
+        )
     today = date.today()
-    # O'rikzor: sana yuborilmasa oxirgi 30 kun (yoki 1 kun emas) — API 0 ta movement qaytarmasin
-    is_orikzor = payload.order_source == "orikzor"
-    if is_orikzor and payload.begin_deal_date is None and payload.end_deal_date is None:
-        end_date = today
-        begin_date = today - timedelta(days=30)
-    else:
-        begin_date = payload.begin_deal_date or today
-        end_date = payload.end_deal_date or today
+    begin_date = payload.begin_deal_date or today
+    end_date = payload.end_deal_date or today
     if begin_date > end_date:
         raise HTTPException(status_code=400, detail="begin_deal_date must be <= end_deal_date")
-    if is_orikzor:
-        logger = logging.getLogger(__name__)
-        logger.info("O'rikzor sync sana oralig'i: %s — %s", begin_date, end_date)
 
     try:
-        # O'rikzor: movement$export URL (SMARTUP_ORIKZOR_EXPORT_URL), order API bilan bir xil SMARTUP_BASIC_* va SMARTUP_PROJECT_CODE
-        orikzor_export_url = None
-        if is_orikzor:
-            orikzor_export_url = (
-                os.getenv("SMARTUP_ORIKZOR_EXPORT_URL") or "https://smartup.online/b/anor/mxsx/mkw/movement$export"
-            ).strip()
-            project_code = (os.getenv("SMARTUP_PROJECT_CODE") or "trade").strip()
-            filial_id = (os.getenv("SMARTUP_FILIAL_ID") or "3788131").strip()
-            orikzor_user = (os.getenv("SMARTUP_BASIC_USER") or "").strip() or None
-            orikzor_pass = (os.getenv("SMARTUP_BASIC_PASS") or "").strip() or None
-            if not orikzor_user or not orikzor_pass:
-                raise HTTPException(
-                    status_code=500,
-                    detail="O'rikzor sync uchun Render env da SMARTUP_BASIC_USER va SMARTUP_BASIC_PASS ni to'ldiring.",
-                )
-            client = SmartupClient(
-                project_code=project_code,
-                filial_id=filial_id,
-                username=orikzor_user,
-                password=orikzor_pass,
-            )
-        else:
-            # Diller: tanlangan filial bo'lsa Smartup ga faqat header'da filial_id yuboriladi.
-            # Body'da filial_code yuborilsa Smartup 400 "Данная организация не найдена" qaytarishi mumkin.
-            diller_filial = (payload.filial_id or "").strip() if payload.order_source == "diller" else ""
-            client = SmartupClient(filial_id=diller_filial) if diller_filial else SmartupClient()
-        # Diller uchun body'da filial_code yuborilmaydi — Smartup header'dagi filial_id dan foydalanadi.
+        # Diller: tanlangan filial bo'lsa Smartup ga faqat header'da filial_id yuboriladi.
+        diller_filial = (payload.filial_id or "").strip() if payload.order_source == "diller" else ""
+        client = SmartupClient(filial_id=diller_filial) if diller_filial else SmartupClient()
         export_filial = (
             None
             if payload.order_source == "diller" and (payload.filial_id or "").strip()
@@ -566,7 +544,6 @@ async def sync_orders_from_smartup(
             begin_deal_date=begin_date.strftime("%d.%m.%Y"),
             end_deal_date=end_date.strftime("%d.%m.%Y"),
             filial_code=export_filial,
-            export_url=orikzor_export_url,
         )
         filial_override = (
             (payload.filial_id or "").strip()
@@ -576,19 +553,53 @@ async def sync_orders_from_smartup(
         created, updated, skipped, import_errors = import_orders(
             db, response.items, order_source=payload.order_source, filial_id_override=filial_override
         )
-        if is_orikzor:
-            logger = logging.getLogger(__name__)
-            logger.info(
-                "O'rikzor sync: created=%s updated=%s skipped=%s items_from_api=%s",
-                created, updated, skipped, len(response.items),
-            )
-            for err in import_errors[:5]:
-                logger.error("O'rikzor import xato: external_id=%s sabab=%s", err.external_id, err.reason)
-            if len(import_errors) > 5:
-                logger.error("O'rikzor import: qolgan %s ta xato", len(import_errors) - 5)
         detail = import_errors[0].reason if import_errors else None
         errors_count = len(import_errors) if import_errors else None
-        if is_orikzor and not detail and (created + updated) == 0 and len(response.items) == 0:
+        return SmartupSyncResponse(
+            created=created, updated=updated, skipped=skipped, detail=detail, errors_count=errors_count
+        )
+    except RuntimeError as exc:
+        msg = str(exc)
+        if "400" in msg or "не найдена" in msg or "organization" in msg.lower():
+            raise HTTPException(status_code=400, detail=msg) from exc
+        raise HTTPException(status_code=500, detail=msg) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"Smartup export failed: {exc}") from exc
+
+
+@router.post("/sync-orikzor", response_model=SmartupSyncResponse, summary="Sync O'rikzor harakatlari from Smartup")
+async def sync_orikzor(
+    payload: SyncOrikzorRequest,
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("orders:sync")),
+):
+    today = date.today()
+    if payload.begin_deal_date is not None and payload.end_deal_date is not None:
+        begin_date = payload.begin_deal_date
+        end_date = payload.end_deal_date
+    else:
+        end_date = today
+        begin_date = today - timedelta(days=30)
+    if begin_date > end_date:
+        raise HTTPException(status_code=400, detail="begin_deal_date must be <= end_deal_date")
+
+    try:
+        response = export_movements_from_smartup(begin_date, end_date)
+        created, updated, skipped, import_errors = import_orders(
+            db, response.items, order_source="orikzor", filial_id_override=None
+        )
+        logger = logging.getLogger(__name__)
+        logger.info(
+            "O'rikzor sync: created=%s updated=%s skipped=%s items_from_api=%s",
+            created, updated, skipped, len(response.items),
+        )
+        for err in import_errors[:5]:
+            logger.error("O'rikzor import xato: external_id=%s sabab=%s", err.external_id, err.reason)
+        if len(import_errors) > 5:
+            logger.error("O'rikzor import: qolgan %s ta xato", len(import_errors) - 5)
+        detail = import_errors[0].reason if import_errors else None
+        errors_count = len(import_errors) if import_errors else None
+        if not detail and (created + updated) == 0 and len(response.items) == 0:
             detail = (
                 "API dan hech qanday movement qaytmadi. "
                 "Sana oralig'ini yoki Render loglaridagi 'parse: raw_count= dict_count=' qatorini tekshiring."
@@ -600,11 +611,9 @@ async def sync_orders_from_smartup(
         msg = str(exc)
         if "400" in msg or "не найдена" in msg or "organization" in msg.lower():
             raise HTTPException(status_code=400, detail=msg) from exc
-        # 401 qaytarmaymiz: frontend barcha 401 ni session tugadi deb hisoblab chiqadi.
-        # Smartup kirish xatosi 500 + detail orqali tushunarli xabar qaytaramiz.
         raise HTTPException(status_code=500, detail=msg) from exc
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail=f"Smartup export failed: {exc}") from exc
+        raise HTTPException(status_code=500, detail=f"O'rikzor sync failed: {exc}") from exc
 
 
 @router.post("/{order_id}/send-to-picking", response_model=SendToPickingResponse, summary="Send order to picking")

@@ -12,6 +12,7 @@ import { ProductDetailsPage } from '../pages/admin/ProductDetailsPage'
 import { ProductsPage } from '../pages/admin/ProductsPage'
 import { BrandsPage } from '../pages/admin/BrandsPage'
 import { OrdersPage } from '../pages/admin/OrdersPage'
+import { OrikzorHarakatlariPage } from '../pages/admin/OrikzorHarakatlariPage'
 import { OrderDetailsPage } from '../pages/admin/OrderDetailsPage'
 import { LocationsPage } from '../pages/admin/LocationsPage'
 import { LocationDetailPage } from '../pages/admin/LocationDetailPage'
@@ -296,7 +297,7 @@ export function App() {
           element={
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">
               <RequirePermission permission="orders:read">
-                <OrdersPage orderSource="orikzor" />
+                <OrikzorHarakatlariPage />
               </RequirePermission>
             </RequirePermission>
           }

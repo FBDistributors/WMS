@@ -93,6 +93,18 @@ export async function syncSmartupOrders(payload: SmartupSyncInput = {}) {
   })
 }
 
+export type SyncOrikzorInput = {
+  begin_deal_date?: string
+  end_deal_date?: string
+}
+
+export async function syncOrikzorOrders(payload: SyncOrikzorInput = {}) {
+  return fetchJSON<SmartupSyncResult>('/api/v1/orders/sync-orikzor', {
+    method: 'POST',
+    body: payload,
+  })
+}
+
 export type PickerUser = {
   id: string
   name: string

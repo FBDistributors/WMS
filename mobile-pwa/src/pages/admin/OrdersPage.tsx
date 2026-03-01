@@ -100,7 +100,7 @@ const DEALER_ORGANIZATIONS: { id: string; label: string }[] = [
   { id: '3654064', label: 'Термез (Гайрат)' },
 ]
 
-type OrdersPageProps = { mode?: 'default' | 'statuses'; orderSource?: 'diller' | 'orikzor' }
+type OrdersPageProps = { mode?: 'default' | 'statuses'; orderSource?: 'diller' }
 
 export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const { t } = useTranslation(['orders', 'common', 'admin'])
@@ -115,7 +115,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const filialId = searchParams.get('filial_id') ?? ''
   const offset = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10))
   const pageTitle = orderSource
-    ? t(`admin:menu.orders_${orderSource}`, orderSource === 'diller' ? 'Diller buyurtmalar' : "O'rikzor harakatlari")
+    ? t('admin:menu.orders_diller', 'Diller buyurtmalar')
     : mode === 'statuses'
       ? t('admin:dashboard.order_statuses_title')
       : t('orders:title')
@@ -337,9 +337,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     const columnLabels = new Map(
       columnOptionsForMode.map((column) => [
         column.id,
-        orderSource === 'orikzor'
-          ? t(`orders:columns_orikzor.${column.id}`, t(column.labelKey))
-          : t(column.labelKey),
+        t(column.labelKey),
       ])
     )
     const renderCell = (columnId: string, order: OrderListItem) => {
@@ -578,7 +576,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
               {pageTitle}
             </div>
             <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-              <span>{orderSource === 'orikzor' ? t('orders:subtitle_orikzor') : t('orders:subtitle')}</span>
+              <span>{t('orders:subtitle')}</span>
               {group && group !== 'all' ? (
                 <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/50 dark:text-blue-200">
                   {t(`admin:dashboard.status_${group}`)}

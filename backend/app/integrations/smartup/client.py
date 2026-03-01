@@ -9,128 +9,10 @@ import urllib.error
 import urllib.request
 from urllib.parse import urljoin
 
-from app.integrations.smartup.schemas import SmartupOrder, SmartupOrderExportResponse
+from app.integrations.smartup.schemas import SmartupOrderExportResponse
 
 
 logger = logging.getLogger(__name__)
-
-def _parse_movement_export_to_orders(body: str) -> SmartupOrderExportResponse:
-    """movement$export javobini parse qiladi; barcha movement'lar yuklanadi (to_warehouse_code filtri yo'q)."""
-    data = json.loads(body)
-    # API turli struktura qaytarishi mumkin: {"movement": [...]}, {"movements": [...]}, to'g'ridan-to'g'ri list, yoki bitta ob'ekt
-    movements: list = []
-    if isinstance(data, list):
-        movements = data
-    elif isinstance(data, dict):
-        raw = (
-            data.get("movement")
-            or data.get("movements")
-            or data.get("data")
-            or data.get("items")
-            or data.get("result")
-        )
-        if raw is not None:
-            if isinstance(raw, list):
-                movements = raw
-            elif isinstance(raw, str):
-                try:
-                    parsed_raw = json.loads(raw)
-                    movements = parsed_raw if isinstance(parsed_raw, list) else [parsed_raw] if parsed_raw else []
-                except (TypeError, ValueError, json.JSONDecodeError):
-                    movements = []
-            else:
-                movements = [raw] if raw else []
-        elif data.get("movement_id") is not None or data.get("movement_number") is not None:
-            # Javob to'g'ridan-to'g'ri bitta movement ob'ekti
-            movements = [data]
-    if not isinstance(movements, list):
-        movements = [movements] if movements else []
-    # Ro'yxat ichida string bo'lsa (API "[{...}]" qaytarsa) parse qilamiz
-    normalized: list = []
-    for x in movements:
-        if isinstance(x, dict):
-            normalized.append(x)
-        elif isinstance(x, str):
-            try:
-                parsed = json.loads(x)
-                if isinstance(parsed, list):
-                    normalized.extend(parsed)
-                elif isinstance(parsed, dict):
-                    normalized.append(parsed)
-            except (TypeError, ValueError, json.JSONDecodeError):
-                pass
-    # Ro'yxatda wrapper bo'lsa [{"movement": [...]}] — ichidagi movement ro'yxatini chiqaramiz
-    expanded: list = []
-    for x in movements:
-        if isinstance(x, dict) and (x.get("movement_id") is not None or x.get("movement_number") is not None):
-            expanded.append(x)
-        elif isinstance(x, dict):
-            inner = x.get("movement") or x.get("movements")
-            if isinstance(inner, list):
-                expanded.extend(inner)
-            elif isinstance(inner, dict):
-                expanded.append(inner)
-            else:
-                expanded.append(x)
-        else:
-            expanded.append(x)
-    movements = expanded
-    filtered = [m for m in movements if isinstance(m, dict)]
-    logger.info(
-        "Smartup movement$export parse: raw_count=%s dict_count=%s",
-        len(movements),
-        len(filtered),
-    )
-    orders: list[SmartupOrder] = []
-    for m in filtered:
-        movement_id = (m.get("movement_id") or "").strip() or (m.get("movement_number") or "").strip()
-        movement_number = (m.get("movement_number") or m.get("movement_id") or "").strip()
-        if not movement_id and not movement_number:
-            continue
-        movement_id = movement_id or movement_number
-        # API ba'zan "movement_itens" (e bilan) qaytaradi; elementlar string bo'lishi mumkin
-        items = m.get("movement_items") or m.get("movement_itens") or []
-        if not isinstance(items, list):
-            items = [items] if items else []
-        item_dicts: list = []
-        for it in items:
-            if isinstance(it, dict):
-                item_dicts.append(it)
-            elif isinstance(it, str):
-                try:
-                    item_dicts.append(json.loads(it))
-                except (TypeError, ValueError, json.JSONDecodeError):
-                    pass
-        lines = []
-        for it in item_dicts:
-            if not isinstance(it, dict):
-                continue
-            try:
-                qty = float(it.get("quantity") or 0)
-            except (TypeError, ValueError):
-                qty = 0
-            lines.append({
-                "product_code": it.get("product_code"),
-                "sku": it.get("product_code"),
-                "quantity": qty,
-                "name": it.get("product_article_code") or it.get("product_code") or "",
-            })
-        order_dict = {
-            "external_id": movement_id,
-            "deal_id": movement_id,
-            "order_no": movement_number,
-            "status": "B#S",
-            "filial_id": m.get("filial_code"),
-            "filial_code": m.get("filial_code"),
-            "lines": lines,
-        }
-        try:
-            validate = getattr(SmartupOrder, "model_validate", getattr(SmartupOrder, "parse_obj", None))
-            if validate:
-                orders.append(validate(order_dict))
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Movement to order parse skip movement_id=%s: %s", movement_id, exc)
-    return SmartupOrderExportResponse(items=orders)
 
 
 class SmartupClient:
@@ -153,58 +35,31 @@ class SmartupClient:
         begin_deal_date: str,
         end_deal_date: str,
         filial_code: str | None,
-        export_url: str | None = None,
     ) -> SmartupOrderExportResponse:
-        if export_url and export_url.strip():
-            url = export_url.strip()
-        elif not self.base_url:
+        if not self.base_url:
             raise RuntimeError("SMARTUP_BASE_URL is not configured")
-        else:
-            if not self.username or not self.password:
-                raise RuntimeError("SMARTUP_BASIC_USER or SMARTUP_BASIC_PASS is not configured")
-            raw_base = self.base_url.rstrip("/")
-            if "order$export" in raw_base or "movement$export" in raw_base:
-                url = raw_base
-            else:
-                url = urljoin(f"{raw_base}/", "b/trade/txs/tdeal/order$export")
         if not self.username or not self.password:
             raise RuntimeError("SMARTUP_BASIC_USER or SMARTUP_BASIC_PASS is not configured")
-        # Pass filial_code only when explicitly provided. SmartUp may return 400 "org not found"
-        # if we pass 3788131 in payload - so we import all, then filter by filial in our API.
-        normalized_filial_code = (filial_code or "").strip()
-        is_movement_export = export_url and "movement$export" in (export_url or "")
-
-        if is_movement_export:
-            # O'rikzor body: siz ko'rsatgan strukturaning o'zi. Sana oralig'i to'ldiriladi (bo'sh yuborilmasa 0 qaytadi).
-            payload = {
-                "filial_codes": [{"filial_code": normalized_filial_code}] if normalized_filial_code else [{"filial_code": ""}],
-                "filial_code": normalized_filial_code or "",
-                "external_id": "",
-                "movement_id": "",
-                "begin_from_movement_date": begin_deal_date,
-                "end_from_movement_date": end_deal_date,
-                "begin_to_movement_date": "",
-                "end_to_movement_date": "",
-                "begin_created_on": "",
-                "end_created_on": "",
-                "begin_modified_on": "",
-                "end_modified_on": "",
-            }
+        raw_base = self.base_url.rstrip("/")
+        if "order$export" in raw_base:
+            url = raw_base
         else:
-            payload = {
-                "filial_codes": [{"filial_code": normalized_filial_code}] if normalized_filial_code else [{"filial_code": ""}],
-                "filial_code": normalized_filial_code or "",
-                "external_id": "",
-                "deal_id": "",
-                "status": "B#S",
-                "begin_deal_date": begin_deal_date,
-                "end_deal_date": end_deal_date,
-                "delivery_date": "",
-                "begin_created_on": "",
-                "end_created_on": "",
-                "begin_modified_on": "",
-                "end_modified_on": "",
-            }
+            url = urljoin(f"{raw_base}/", "b/trade/txs/tdeal/order$export")
+        normalized_filial_code = (filial_code or "").strip()
+        payload = {
+            "filial_codes": [{"filial_code": normalized_filial_code}] if normalized_filial_code else [{"filial_code": ""}],
+            "filial_code": normalized_filial_code or "",
+            "external_id": "",
+            "deal_id": "",
+            "status": "B#S",
+            "begin_deal_date": begin_deal_date,
+            "end_deal_date": end_deal_date,
+            "delivery_date": "",
+            "begin_created_on": "",
+            "end_created_on": "",
+            "begin_modified_on": "",
+            "end_modified_on": "",
+        }
         data = json.dumps(payload).encode("utf-8")
         credentials = f"{self.username}:{self.password}"
         basic_token = base64.b64encode(credentials.encode("utf-8")).decode("utf-8")
@@ -215,51 +70,14 @@ class SmartupClient:
             "project_code": self.project_code,
             "filial_id": self.filial_id,
         }
-
-        if is_movement_export:
-            logger.info(
-                "Smartup movement$export: url=%s project_code=%s filial_id=%s sana=%s..%s filial_code=%s",
-                url.split("?")[0],
-                self.project_code,
-                self.filial_id or "(bo'sh)",
-                begin_deal_date,
-                end_deal_date,
-                normalized_filial_code or "(barcha)",
-            )
-        # movement$export katta javob qaytarishi mumkin; timeout uzaytiriladi
-        timeout_seconds = 90 if is_movement_export else 30
         last_error: Exception | None = None
         last_detail: str | None = None
         for attempt in range(1, 4):
             request = urllib.request.Request(url, data=data, headers=headers, method="POST")
             try:
-                with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+                with urllib.request.urlopen(request, timeout=30) as response:
                     body = response.read().decode("utf-8")
-                # O'rikzor movement$export: barcha movement'lar yuklanadi
-                if export_url and "movement$export" in (export_url or ""):
-                    parsed = _parse_movement_export_to_orders(body)
-                    if parsed.items:
-                        logger.info(
-                            "Smartup movement$export: movements=%s",
-                            len(parsed.items),
-                        )
-                    else:
-                        # Debug: javob strukturasini ko'rsatish (Postman bilan solishtirish uchun)
-                        try:
-                            raw = json.loads(body)
-                            keys = list(raw.keys()) if isinstance(raw, dict) else []
-                            preview = (body[:600] + "...") if len(body) > 600 else body
-                            logger.warning(
-                                "Smartup movement$export: 0 ta order qaytdi. Yuqoridagi 'parse: raw_count= dict_count=' va 'parse skip' loglarini tekshiring. Kalitlar=%s preview=%s",
-                                keys,
-                                preview,
-                            )
-                        except Exception:  # noqa: S110
-                            logger.warning(
-                                "Smartup movement$export: API dan 0 ta movement qaytdi. URL va sana oralig'ini tekshiring."
-                            )
-                else:
-                    parsed = SmartupOrderExportResponse.parse_raw(body)
+                parsed = SmartupOrderExportResponse.parse_raw(body)
                 if parsed.items:
                     sample = parsed.items[0]
                     logger.info(
