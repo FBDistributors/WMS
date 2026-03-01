@@ -1,8 +1,8 @@
 {
   "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
+    { "source": "/manifest.webmanifest", "destination": "/manifest.webmanifest" },
+    { "source": "/sw.js", "destination": "/sw.js" },
+    { "source": "/workbox-:path*.js", "destination": "/workbox-:path*.js" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
