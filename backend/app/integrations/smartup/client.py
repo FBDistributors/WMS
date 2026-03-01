@@ -21,7 +21,8 @@ ORIKZOR_TO_WAREHOUSE_CODE = (os.getenv("SMARTUP_ORIKZOR_TO_WAREHOUSE_CODE") or "
 def _parse_movement_export_to_orders(body: str) -> SmartupOrderExportResponse:
     """movement$export javobini parse qiladi, to_warehouse_code bo'yicha filtrlaydi va SmartupOrder list qaytaradi."""
     data = json.loads(body)
-    movements = data.get("movement") or []
+    # API "movement" yoki "movements" qaytarishi mumkin
+    movements = data.get("movement") or data.get("movements") or []
     if not isinstance(movements, list):
         movements = [movements] if movements else []
     # to_warehouse_code: filterni bo'sh qoldirsak barcha movement'lar, aks holda faqat shu kod
@@ -159,10 +160,13 @@ class SmartupClient:
 
         if is_movement_export:
             logger.info(
-                "Smartup movement$export: url=%s project_code=%s filial_id=%s",
+                "Smartup movement$export: url=%s project_code=%s filial_id=%s sana=%s..%s filial_code=%s",
                 url.split("?")[0],
                 self.project_code,
                 self.filial_id or "(bo'sh)",
+                begin_deal_date,
+                end_deal_date,
+                normalized_filial_code or "(barcha)",
             )
         # movement$export katta javob qaytarishi mumkin; timeout uzaytiriladi
         timeout_seconds = 90 if is_movement_export else 30
@@ -183,9 +187,20 @@ class SmartupClient:
                             len(parsed.items),
                         )
                     else:
-                        logger.warning(
-                            "Smartup movement$export: API dan 0 ta movement qaytdi. URL va sana oralig'ini tekshiring."
-                        )
+                        # Debug: javob strukturasini ko'rsatish (Postman bilan solishtirish uchun)
+                        try:
+                            raw = json.loads(body)
+                            keys = list(raw.keys()) if isinstance(raw, dict) else []
+                            preview = (body[:600] + "...") if len(body) > 600 else body
+                            logger.warning(
+                                "Smartup movement$export: API dan 0 ta movement qaytdi. Javob kalitlari=%s preview=%s",
+                                keys,
+                                preview,
+                            )
+                        except Exception:  # noqa: S110
+                            logger.warning(
+                                "Smartup movement$export: API dan 0 ta movement qaytdi. URL va sana oralig'ini tekshiring."
+                            )
                 else:
                     parsed = SmartupOrderExportResponse.parse_raw(body)
                 if parsed.items:
