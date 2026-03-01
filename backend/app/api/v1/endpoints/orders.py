@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import date
+from datetime import date, timedelta
 from typing import List, Optional
 from uuid import UUID
 
@@ -513,14 +513,22 @@ async def sync_orders_from_smartup(
     _user=Depends(require_permission("orders:sync")),
 ):
     today = date.today()
-    begin_date = payload.begin_deal_date or today
-    end_date = payload.end_deal_date or today
+    # O'rikzor: sana yuborilmasa oxirgi 30 kun (yoki 1 kun emas) — API 0 ta movement qaytarmasin
+    is_orikzor = payload.order_source == "orikzor"
+    if is_orikzor and payload.begin_deal_date is None and payload.end_deal_date is None:
+        end_date = today
+        begin_date = today - timedelta(days=30)
+    else:
+        begin_date = payload.begin_deal_date or today
+        end_date = payload.end_deal_date or today
     if begin_date > end_date:
         raise HTTPException(status_code=400, detail="begin_deal_date must be <= end_deal_date")
+    if is_orikzor:
+        logger = logging.getLogger(__name__)
+        logger.info("O'rikzor sync sana oralig'i: %s — %s", begin_date, end_date)
 
     try:
         # O'rikzor: movement$export URL (SMARTUP_ORIKZOR_EXPORT_URL), order API bilan bir xil SMARTUP_BASIC_* va SMARTUP_PROJECT_CODE
-        is_orikzor = payload.order_source == "orikzor"
         orikzor_export_url = None
         if is_orikzor:
             orikzor_export_url = (
