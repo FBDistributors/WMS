@@ -203,15 +203,15 @@ class SmartupClient:
                 last_detail = response_text
                 logger.error("Smartup export failed (HTTP %s): %s", exc.code, response_text)
                 if exc.code == 481 or (exc.code == 401 and ("авторизация" in response_text.lower() or "невидим" in response_text.lower())):
-                    # 481 / 401 "Проект невидим" = loyiha ko'rinmayapti. Postman da project_code=trade ishlaydi.
                     hint = (
-                        "Render env: SMARTUP_ORIKZOR_BASIC_USER, SMARTUP_ORIKZOR_BASIC_PASS (yoki SMARTUP_BASIC_*). "
-                        "Agar 'Проект невидим' bo'lsa: SMARTUP_ORIKZOR_PROJECT_CODE ni o'chiring yoki 'trade' qiling (Postman da trade ishlaydi)."
+                        "Render env: SMARTUP_BASIC_USER, SMARTUP_BASIC_PASS, SMARTUP_PROJECT_CODE=trade. "
+                        "Agar 'Проект невидим' bo'lsa: SMARTUP_PROJECT_CODE=trade qiling."
                     )
                     last_detail = f"{response_text} ({hint})"
                 elif exc.code == 401:
                     last_detail = (
-                        f"{response_text} (SmartUP kirish rad etildi. Login/parolni tekshiring. Agar 'Проект невидим' bo'lsa: Render da SMARTUP_ORIKZOR_PROJECT_CODE ni o'chiring yoki 'trade' qiling.)"
+                        f"{response_text} (SmartUP kirish rad etildi. SMARTUP_BASIC_USER va SMARTUP_BASIC_PASS ni tekshiring. "
+                        "Agar 'Проект невидим' bo'lsa: SMARTUP_PROJECT_CODE=trade qiling.)"
                     )
             except Exception as exc:  # noqa: BLE001
                 last_error = exc

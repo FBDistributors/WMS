@@ -519,29 +519,21 @@ async def sync_orders_from_smartup(
         raise HTTPException(status_code=400, detail="begin_deal_date must be <= end_deal_date")
 
     try:
-        # O'rikzor: alohida export URL (movement$export) va header'lar (project_code anor bo'lishi mumkin)
+        # O'rikzor: movement$export URL (SMARTUP_ORIKZOR_EXPORT_URL), order API bilan bir xil SMARTUP_BASIC_* va SMARTUP_PROJECT_CODE
         is_orikzor = payload.order_source == "orikzor"
-        # Render'da SMARTUP_ORIKZOR_URL yoki SMARTUP_ORIKZOR_EXPORT_URL ishlatiladi
         orikzor_export_url = None
         if is_orikzor:
             orikzor_export_url = (
-                os.getenv("SMARTUP_ORIKZOR_URL") or os.getenv("SMARTUP_ORIKZOR_EXPORT_URL") or "https://smartup.online/b/anor/mxsx/mkw/movement$export"
+                os.getenv("SMARTUP_ORIKZOR_EXPORT_URL") or "https://smartup.online/b/anor/mxsx/mkw/movement$export"
             ).strip()
-            # Postman da ishlaydigan header: project_code=trade, filial_id=3788131. "anor" bo'lsa "Проект невидим" chiqadi.
-            _pc = (os.getenv("SMARTUP_ORIKZOR_PROJECT_CODE") or "").strip().lower()
-            project_code = _pc if _pc and _pc != "anor" else "trade"
-        if is_orikzor:
-            # O'rikzor: alohida login bo'lsa SMARTUP_ORIKZOR_*; bo'lmasa order API bilan bir xil SMARTUP_BASIC_*
-            filial_id = (os.getenv("SMARTUP_ORIKZOR_FILIAL_ID") or "").strip()
-            orikzor_user = (os.getenv("SMARTUP_ORIKZOR_BASIC_USER") or os.getenv("SMARTUP_BASIC_USER") or "").strip() or None
-            orikzor_pass = (os.getenv("SMARTUP_ORIKZOR_BASIC_PASS") or os.getenv("SMARTUP_BASIC_PASS") or "").strip() or None
+            project_code = (os.getenv("SMARTUP_PROJECT_CODE") or "trade").strip()
+            filial_id = (os.getenv("SMARTUP_FILIAL_ID") or "3788131").strip()
+            orikzor_user = (os.getenv("SMARTUP_BASIC_USER") or "").strip() or None
+            orikzor_pass = (os.getenv("SMARTUP_BASIC_PASS") or "").strip() or None
             if not orikzor_user or not orikzor_pass:
                 raise HTTPException(
                     status_code=500,
-                    detail=(
-                        "O'rikzor sync uchun login/parol topilmadi. Render env da SMARTUP_BASIC_USER va SMARTUP_BASIC_PASS "
-                        "(yoki SMARTUP_ORIKZOR_BASIC_USER va SMARTUP_ORIKZOR_BASIC_PASS) ni to'ldiring."
-                    ),
+                    detail="O'rikzor sync uchun Render env da SMARTUP_BASIC_USER va SMARTUP_BASIC_PASS ni to'ldiring.",
                 )
             client = SmartupClient(
                 project_code=project_code,
