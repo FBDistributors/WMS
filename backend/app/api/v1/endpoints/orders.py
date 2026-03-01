@@ -588,6 +588,11 @@ async def sync_orders_from_smartup(
                 logger.error("O'rikzor import: qolgan %s ta xato", len(import_errors) - 5)
         detail = import_errors[0].reason if import_errors else None
         errors_count = len(import_errors) if import_errors else None
+        if is_orikzor and not detail and (created + updated) == 0 and len(response.items) == 0:
+            detail = (
+                "API dan hech qanday movement qaytmadi. "
+                "Sana oralig'ini yoki Render loglaridagi 'parse: raw_count= dict_count=' qatorini tekshiring."
+            )
         return SmartupSyncResponse(
             created=created, updated=updated, skipped=skipped, detail=detail, errors_count=errors_count
         )
