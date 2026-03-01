@@ -527,8 +527,9 @@ async def sync_orders_from_smartup(
             orikzor_export_url = (
                 os.getenv("SMARTUP_ORIKZOR_URL") or os.getenv("SMARTUP_ORIKZOR_EXPORT_URL") or "https://smartup.online/b/anor/mxsx/mkw/movement$export"
             ).strip()
-            # Postman da ishlaydigan header: project_code=trade, filial_id=3788131
-            project_code = (os.getenv("SMARTUP_ORIKZOR_PROJECT_CODE") or "trade").strip()
+            # Postman da ishlaydigan header: project_code=trade, filial_id=3788131. "anor" bo'lsa "Проект невидим" chiqadi.
+            _pc = (os.getenv("SMARTUP_ORIKZOR_PROJECT_CODE") or "").strip().lower()
+            project_code = _pc if _pc and _pc != "anor" else "trade"
         if is_orikzor:
             # O'rikzor: alohida login bo'lsa SMARTUP_ORIKZOR_*; bo'lmasa order API bilan bir xil SMARTUP_BASIC_*
             filial_id = (os.getenv("SMARTUP_ORIKZOR_FILIAL_ID") or "").strip()
