@@ -21,8 +21,23 @@ ORIKZOR_TO_WAREHOUSE_CODE = (os.getenv("SMARTUP_ORIKZOR_TO_WAREHOUSE_CODE") or "
 def _parse_movement_export_to_orders(body: str) -> SmartupOrderExportResponse:
     """movement$export javobini parse qiladi, to_warehouse_code bo'yicha filtrlaydi va SmartupOrder list qaytaradi."""
     data = json.loads(body)
-    # API "movement" yoki "movements" qaytarishi mumkin
-    movements = data.get("movement") or data.get("movements") or []
+    # API turli struktura qaytarishi mumkin: {"movement": [...]}, {"movements": [...]}, to'g'ridan-to'g'ri list, yoki bitta ob'ekt
+    movements: list = []
+    if isinstance(data, list):
+        movements = data
+    elif isinstance(data, dict):
+        raw = (
+            data.get("movement")
+            or data.get("movements")
+            or data.get("data")
+            or data.get("items")
+            or data.get("result")
+        )
+        if raw is not None:
+            movements = raw if isinstance(raw, list) else [raw] if raw else []
+        elif data.get("movement_id") is not None or data.get("movement_number") is not None:
+            # Javob to'g'ridan-to'g'ri bitta movement ob'ekti
+            movements = [data]
     if not isinstance(movements, list):
         movements = [movements] if movements else []
     # to_warehouse_code: filterni bo'sh qoldirsak barcha movement'lar, aks holda faqat shu kod
