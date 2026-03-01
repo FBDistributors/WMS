@@ -14,12 +14,8 @@ from app.integrations.smartup.schemas import SmartupOrder, SmartupOrderExportRes
 
 logger = logging.getLogger(__name__)
 
-# O'rikzor movement$export: to_warehouse_code bo'yicha filtrlash. "" = barcha, "777" = faqat 777
-ORIKZOR_TO_WAREHOUSE_CODE = (os.getenv("SMARTUP_ORIKZOR_TO_WAREHOUSE_CODE") or "").strip()
-
-
 def _parse_movement_export_to_orders(body: str) -> SmartupOrderExportResponse:
-    """movement$export javobini parse qiladi, to_warehouse_code bo'yicha filtrlaydi va SmartupOrder list qaytaradi."""
+    """movement$export javobini parse qiladi; barcha movement'lar yuklanadi (to_warehouse_code filtri yo'q)."""
     data = json.loads(body)
     # API turli struktura qaytarishi mumkin: {"movement": [...]}, {"movements": [...]}, to'g'ridan-to'g'ri list, yoki bitta ob'ekt
     movements: list = []
@@ -40,14 +36,8 @@ def _parse_movement_export_to_orders(body: str) -> SmartupOrderExportResponse:
             movements = [data]
     if not isinstance(movements, list):
         movements = [movements] if movements else []
-    # to_warehouse_code: filterni bo'sh qoldirsak barcha; aks holda shu kod yoki API null qaytarsa ham qo'shamiz (ma'lumot yo'qolmasin)
-    if ORIKZOR_TO_WAREHOUSE_CODE:
-        def _matches_warehouse(m: dict) -> bool:
-            code = (m.get("to_warehouse_code") or "").strip()
-            return not code or code == ORIKZOR_TO_WAREHOUSE_CODE
-        filtered = [m for m in movements if isinstance(m, dict) and _matches_warehouse(m)]
-    else:
-        filtered = [m for m in movements if isinstance(m, dict)]
+    # Barcha movement'lar yuklanadi (to_warehouse_code filtri olib tashlandi)
+    filtered = [m for m in movements if isinstance(m, dict)]
     orders: list[SmartupOrder] = []
     for m in filtered:
         movement_id = (m.get("movement_id") or "").strip() or (m.get("movement_number") or "").strip()
@@ -193,13 +183,12 @@ class SmartupClient:
             try:
                 with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
                     body = response.read().decode("utf-8")
-                # O'rikzor movement$export: "movement" array, to_warehouse_code=777 filtri
+                # O'rikzor movement$export: barcha movement'lar yuklanadi
                 if export_url and "movement$export" in (export_url or ""):
                     parsed = _parse_movement_export_to_orders(body)
                     if parsed.items:
                         logger.info(
-                            "Smartup movement$export: to_warehouse_code=%s, movements=%s",
-                            ORIKZOR_TO_WAREHOUSE_CODE or "(all)",
+                            "Smartup movement$export: movements=%s",
                             len(parsed.items),
                         )
                     else:
