@@ -31,7 +31,7 @@ export function OrikzorHarakatlariPage() {
   const searchQuery = searchParams.get('q') ?? ''
   const offset = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10))
   const { has } = useAuth()
-  const canSync = has('orders:sync')
+  const canSync = has('orders:write')
 
   const [items, setItems] = useState<OrderListItem[]>([])
   const [total, setTotal] = useState(0)
@@ -248,7 +248,7 @@ export function OrikzorHarakatlariPage() {
     columnLabels,
   ])
 
-  const pageTitle = t('admin:menu.orders_orikzor', "O'rikzor harakatlari")
+  const pageTitle = t('admin:menu.orders_orikzor', 'O\'rikzor harakatlari')
 
   return (
     <AdminLayout title={pageTitle}>
@@ -328,7 +328,7 @@ export function OrikzorHarakatlariPage() {
             <div className="flex gap-1">
               <Button
                 variant="outline"
-                size="sm"
+                className="px-3 py-1.5 text-xs"
                 disabled={offset <= 0}
                 onClick={() =>
                   setSearchParams((prev) => {
@@ -342,7 +342,7 @@ export function OrikzorHarakatlariPage() {
               </Button>
               <Button
                 variant="outline"
-                size="sm"
+                className="px-3 py-1.5 text-xs"
                 disabled={offset + PAGE_SIZE >= total}
                 onClick={() =>
                   setSearchParams((prev) => {
@@ -361,7 +361,3 @@ export function OrikzorHarakatlariPage() {
     </AdminLayout>
   )
 }
-</think>
-Jadvalda xato bor: `<key>` o'rniga `Fragment` yoki to'g'ri element ishlatamiz.
-<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>
-StrReplace
