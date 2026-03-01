@@ -21,6 +21,8 @@ export const ORDERS_TABLE_COLUMN_IDS = [
   'created',
   'view_details',
   'send_to_picking',
+  'picker',
+  'controller',
 ]
 
 export const DEFAULT_VISIBLE_COLUMNS = [
@@ -36,6 +38,8 @@ export const DEFAULT_VISIBLE_COLUMNS = [
   'created',
   'view_details',
   'send_to_picking',
+  'picker',
+  'controller',
 ]
 
 export const ORDERS_TABLE_SEARCH_FIELDS = [

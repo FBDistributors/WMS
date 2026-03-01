@@ -40,7 +40,8 @@ def _parse_movement_export_to_orders(body: str) -> SmartupOrderExportResponse:
         if not movement_id and not movement_number:
             continue
         movement_id = movement_id or movement_number
-        items = m.get("movement_items") or []
+        # API ba'zan "movement_itens" (e bilan) qaytaradi
+        items = m.get("movement_items") or m.get("movement_itens") or []
         if not isinstance(items, list):
             items = [items] if items else []
         lines = []
@@ -117,7 +118,7 @@ class SmartupClient:
         is_movement_export = export_url and "movement$export" in (export_url or "")
 
         if is_movement_export:
-            # movement$export API formati (Internal movement / Export)
+            # O'rikzor body: siz ko'rsatgan strukturaning o'zi. Sana oralig'i to'ldiriladi (bo'sh yuborilmasa 0 qaytadi).
             payload = {
                 "filial_codes": [{"filial_code": normalized_filial_code}] if normalized_filial_code else [{"filial_code": ""}],
                 "filial_code": normalized_filial_code or "",
