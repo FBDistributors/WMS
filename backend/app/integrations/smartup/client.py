@@ -164,13 +164,14 @@ class SmartupClient:
                 self.project_code,
                 self.filial_id or "(bo'sh)",
             )
-        # TODO: Confirm Smartup timeout and retry policies with ERP vendor.
+        # movement$export katta javob qaytarishi mumkin; timeout uzaytiriladi
+        timeout_seconds = 90 if is_movement_export else 30
         last_error: Exception | None = None
         last_detail: str | None = None
         for attempt in range(1, 4):
             request = urllib.request.Request(url, data=data, headers=headers, method="POST")
             try:
-                with urllib.request.urlopen(request, timeout=30) as response:
+                with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
                     body = response.read().decode("utf-8")
                 # O'rikzor movement$export: "movement" array, to_warehouse_code=777 filtri
                 if export_url and "movement$export" in (export_url or ""):
@@ -215,7 +216,13 @@ class SmartupClient:
                     )
             except Exception as exc:  # noqa: BLE001
                 last_error = exc
+                last_detail = str(exc)
                 logger.error("Smartup export failed: %s", exc)
             time.sleep(0.5 * attempt)
         detail = f": {last_detail}" if last_detail else ""
+        if last_error and "timed out" in (last_detail or "").lower():
+            detail = (
+                ": Smartup javob bermadi (timeout). Sana oralig'ini qisqartiring yoki keyinroq urinib ko'ring."
+                + (f" ({last_detail})" if last_detail else "")
+            )
         raise RuntimeError(f"Smartup export failed{detail}") from last_error
