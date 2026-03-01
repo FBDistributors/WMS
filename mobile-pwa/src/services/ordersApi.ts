@@ -83,6 +83,7 @@ export type SmartupSyncResult = {
   updated: number
   skipped: number
   detail?: string | null
+  errors_count?: number | null
 }
 
 export async function syncSmartupOrders(payload: SmartupSyncInput = {}) {
