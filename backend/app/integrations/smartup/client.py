@@ -40,12 +40,12 @@ def _parse_movement_export_to_orders(body: str) -> SmartupOrderExportResponse:
             movements = [data]
     if not isinstance(movements, list):
         movements = [movements] if movements else []
-    # to_warehouse_code: filterni bo'sh qoldirsak barcha movement'lar, aks holda faqat shu kod
+    # to_warehouse_code: filterni bo'sh qoldirsak barcha; aks holda shu kod yoki API null qaytarsa ham qo'shamiz (ma'lumot yo'qolmasin)
     if ORIKZOR_TO_WAREHOUSE_CODE:
-        filtered = [
-            m for m in movements
-            if isinstance(m, dict) and (m.get("to_warehouse_code") or "").strip() == ORIKZOR_TO_WAREHOUSE_CODE
-        ]
+        def _matches_warehouse(m: dict) -> bool:
+            code = (m.get("to_warehouse_code") or "").strip()
+            return not code or code == ORIKZOR_TO_WAREHOUSE_CODE
+        filtered = [m for m in movements if isinstance(m, dict) and _matches_warehouse(m)]
     else:
         filtered = [m for m in movements if isinstance(m, dict)]
     orders: list[SmartupOrder] = []
