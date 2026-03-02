@@ -1,0 +1,1 @@
+"""Smartup ERP integration package."""

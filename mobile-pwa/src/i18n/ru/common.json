@@ -1,0 +1,84 @@
+{
+  "buttons": {
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "back": "Назад",
+    "refresh": "Обновить",
+    "next": "Дальше",
+    "retry": "Повторить",
+    "create": "Создать",
+    "edit": "Редактировать",
+    "disable": "Отключить",
+    "login": "Войти",
+    "logout": "Выйти",
+    "home": "Главная",
+    "close": "Закрыть",
+    "clear": "Очистить"
+  },
+  "actions": {
+    "sign_out": "Выйти"
+  },
+  "theme": {
+    "label": "Тема",
+    "light": "Светлая",
+    "dark": "Тёмная",
+    "system": "Системная"
+  },
+  "sidebar": {
+    "collapse": "Свернуть меню",
+    "expand": "Развернуть меню"
+  },
+  "status": {
+    "active": "Активен",
+    "inactive": "Неактивен",
+    "new": "Новый",
+    "in_progress": "В процессе",
+    "done": "Готово",
+    "error": "Ошибка",
+    "exception": "Исключение"
+  },
+  "expiry": {
+    "expiry_date": "Срок годности",
+    "batch": "Партия",
+    "expired": "Просрочено",
+    "expiring_soon": "Скоро истекает",
+    "warning": "Предупреждение",
+    "days_left": "дней осталось",
+    "no_expiry": "Без срока"
+  },
+  "labels": {
+    "search": "Поиск",
+    "username": "Имя пользователя",
+    "password": "Пароль",
+    "confirm_password": "Подтвердите пароль",
+    "language": "Язык",
+    "menu": "Меню",
+    "qty": "Кол-во",
+    "offline_queue": "Оффлайн очередь"
+  },
+  "user_menu": "Меню пользователя",
+  "logout": "Выйти",
+  "logout_confirm_title": "Подтвердите выход",
+  "logout_confirm_message": "Вы уверены, что хотите выйти?",
+  "scroll_horizontal": "Прокрутить в сторону",
+  "scroll_left": "Влево",
+  "scroll_right": "Вправо",
+  "roles": {
+    "picker": "Комплектовщик",
+    "receiver": "Приёмщик",
+    "inventory_controller": "Контролёр",
+    "supervisor": "Супервайзер",
+    "warehouse_admin": "Администратор склада"
+  },
+  "messages": {
+    "not_authorized_title": "Нет доступа",
+    "not_authorized_desc": "У вас нет прав для просмотра этой страницы.",
+    "no_activity": "Пока нет активности.",
+    "loading": "Загрузка..."
+  },
+  "errors": {
+    "unknown": "Произошла ошибка.",
+    "network": "Ошибка сети.",
+    "unauthorized": "Нет доступа."
+  }
+}

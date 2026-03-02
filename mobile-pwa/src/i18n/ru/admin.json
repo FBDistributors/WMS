@@ -1,0 +1,174 @@
+{
+  "menu": {
+    "dashboard": "Дашборд",
+    "products": "Товары",
+    "brands": "Бренды",
+    "orders": "Заказы",
+    "orders_diller": "Заказы Diller",
+    "orders_orikzor": "Движения O'rikzor",
+    "locations": "Локации",
+    "inventory": "Остаток",
+    "movement": "Перемещение",
+    "picking": "Подбор",
+    "receiving": "Приёмка",
+    "users": "Пользователи и доступ",
+    "audit": "Журнал аудита",
+    "kamomat": "Инвентаризация",
+    "integrations": "Интеграции",
+    "smartup_orders": "Заказы Smartup",
+    "profile": "Профиль"
+  },
+  "movement_page": {
+    "do_button": "Выполнить перемещение",
+    "history": "История",
+    "type_expired": "Просроченный",
+    "type_damaged": "Повреждённый",
+    "type_simple": "Простое перемещение по локациям",
+    "from": "Откуда",
+    "to": "Куда",
+    "qty": "Кол-во",
+    "product_search": "Поиск товара",
+    "select_product": "Выберите товар",
+    "select_from": "Выберите откуда (локация + партия)",
+    "select_to": "Выберите куда",
+    "submit": "Подтвердить",
+    "success": "Перемещение выполнено",
+    "error": "Ошибка",
+    "cancel": "Отмена",
+    "kind_label": "Тип перемещения",
+    "no_expired_zone": "Нет ячейки в зоне EXPIRED",
+    "no_damaged_zone": "Нет ячейки в зоне DAMAGED",
+    "select_other": "Выберите другую ячейку",
+    "pcs": "шт.",
+    "reason_shortage": "Расход (из источника)",
+    "reason_overage": "Приход (в назначение)",
+    "detail_title": "Детали перемещения",
+    "detail_reason": "Действие"
+  },
+  "settings": {
+    "title": "Настройки",
+    "tabs": {
+      "profile": "Профиль",
+      "notifications": "Уведомления",
+      "integrations": "Интеграции",
+      "security": "Безопасность"
+    },
+    "coming_soon": "Скоро"
+  },
+  "dashboard": {
+    "title": "Дашборд",
+    "total_orders": "Всего заказов",
+    "completed_today": "Завершено сегодня",
+    "in_picking": "В подборе",
+    "active_pickers": "Работают сотрудников",
+    "exceptions": "Исключения",
+    "low_stock": "Низкий остаток",
+    "active_picks": "Активный подбор",
+    "today_overview": "Сводка за день",
+    "orders_by_status": "Заказы по статусу",
+    "status_column": "Статус",
+    "count_column": "Кол-во",
+    "status_xom": "Новые заказы",
+    "status_yigishda": "В подборе",
+    "status_tekshiruvda": "На проверке",
+    "status_yakunlangan": "Завершённые",
+    "status_barcha": "Все заказы",
+    "order_statuses_title": "Статусы заказов",
+    "load_error": "Не удалось загрузить дашборд. Попробуйте снова.",
+    "pickers_orders_title": "Собранные заказы по сотрудникам",
+    "worker_column": "Сотрудник",
+    "orders_picked_column": "Собрано заказов",
+    "pickers_empty": "Пока нет данных."
+  },
+  "active_picks": {
+    "empty": "Нет активного подбора.",
+    "open": "Открыть",
+    "picked": "{{picked}}/{{total}} подобрано",
+    "picker": "Сборщик",
+    "controller": "Контролёр",
+    "status_new": "Новый",
+    "status_in_progress": "В процессе",
+    "status_partial": "Частично",
+    "status_picked": "Собрано",
+    "status_completed": "Завершён"
+  },
+  "exceptions": {
+    "empty": "Сегодня исключений нет.",
+    "view": "Просмотр",
+    "status": {
+      "open": "Открыто",
+      "resolved": "Решено"
+    }
+  },
+  "header": {
+    "menu": "Меню"
+  },
+  "sidebar_title": "WMS Admin",
+  "roles": {
+    "warehouse_admin": "Администратор склада",
+    "supervisor": "Супервайзер",
+    "picker": "Сборщик",
+    "receiver": "Приёмщик",
+    "inventory_controller": "Контролёр запасов"
+  },
+  "integrations": {
+    "smartup": {
+      "title": "Smartup импорт",
+      "subtitle": "Загрузка заказов из Smartup в WMS.",
+      "begin_deal_date": "Дата начала",
+      "end_deal_date": "Дата окончания",
+      "filial_code": "Код филиала",
+      "filial_placeholder": "Необязательно",
+      "run": "Запустить импорт",
+      "running": "Импорт...",
+      "view_orders": "Посмотреть заказы",
+      "summary": "Создано {{created}}, обновлено {{updated}}, пропущено {{skipped}}.",
+      "row_error": "Заказ {{external_id}}: {{reason}}",
+      "error": "Импорт не удался. Попробуйте снова."
+    },
+    "smartup_orders": {
+      "title": "Заказы Smartup",
+      "subtitle": "Заказы, импортированные из Smartup.",
+      "empty": "Заказов Smartup пока нет.",
+      "empty_desc": "Запустите импорт, чтобы загрузить заказы.",
+      "error": "Не удалось загрузить заказы Smartup.",
+      "columns": {
+        "doc_no": "Документ",
+        "external_id": "Внешний ID",
+        "status": "Статус",
+        "lines": "Строки",
+        "created": "Создано"
+      },
+      "status": {
+        "all": "Все",
+        "smartup_created": "Создано Smartup",
+        "confirmed": "Подтверждено",
+        "in_progress": "В процессе",
+        "completed": "Завершено"
+      }
+    }
+  },
+  "profile": {
+    "menu": "Меню профиля",
+    "title": "Настройки",
+    "my_profile": "Мой профиль",
+    "avatar_alt": "Фото профиля",
+    "update_picture": "Обновить фото",
+    "remove_photo": "Удалить фото",
+    "fields": {
+      "full_name": "Полное имя",
+      "email": "Email",
+      "role": "Роль",
+      "department": "Отдел"
+    },
+    "placeholders": {
+      "email": "admin@company.com",
+      "department": "—"
+    },
+    "password_title": "Пароль",
+    "change_password": "Сменить пароль",
+    "password_soon": "Смена пароля скоро будет доступна.",
+    "security_title": "Безопасность",
+    "enable_2fa": "Включить двухфакторную аутентификацию"
+  }
+}

@@ -1,0 +1,174 @@
+{
+  "menu": {
+    "dashboard": "Dashboard",
+    "products": "Mahsulotlar",
+    "brands": "Brendlar",
+    "orders": "Buyurtmalar",
+    "orders_diller": "Diller buyurtmalar",
+    "orders_orikzor": "O'rikzor harakatlari",
+    "locations": "Joylashuvlar",
+    "inventory": "Qoldiq",
+    "movement": "Ko'chirish",
+    "picking": "Picking",
+    "receiving": "Qabul",
+    "users": "Users & Access",
+    "audit": "Audit log",
+    "kamomat": "Inventarizatsiya",
+    "integrations": "Integratsiyalar",
+    "smartup_orders": "Smartup buyurtmalar",
+    "profile": "Profil"
+  },
+  "movement_page": {
+    "do_button": "Ko'chirish qilish",
+    "history": "Tarix",
+    "type_expired": "Muddati o'tkan",
+    "type_damaged": "Yaroqsiz",
+    "type_simple": "Oddiy lokatsiya ko'chirish",
+    "from": "Qayerdan",
+    "to": "Qayerga",
+    "qty": "Miqdor",
+    "product_search": "Mahsulot qidirish",
+    "select_product": "Mahsulotni tanlang",
+    "select_from": "Qayerdan (joy + partiya) tanlang",
+    "select_to": "Qayerga tanlang",
+    "submit": "Tasdiqlash",
+    "success": "Ko'chirish bajarildi",
+    "error": "Xato",
+    "cancel": "Bekor qilish",
+    "kind_label": "Ko'chirish turi",
+    "no_expired_zone": "EXPIRED zonadagi joy topilmadi",
+    "no_damaged_zone": "DAMAGED zonadagi joy topilmadi",
+    "select_other": "Boshqa joy tanlang",
+    "pcs": "dono",
+    "reason_shortage": "Chiqim (manbadan)",
+    "reason_overage": "Kirim (manbaga)",
+    "detail_title": "Ko'chirish tafsiloti",
+    "detail_reason": "Harakat"
+  },
+  "settings": {
+    "title": "Sozlamalar",
+    "tabs": {
+      "profile": "Profil",
+      "notifications": "Bildirishnomalar",
+      "integrations": "Integratsiyalar",
+      "security": "Xavfsizlik"
+    },
+    "coming_soon": "Tez orada"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "total_orders": "Buyurtmalar soni",
+    "completed_today": "Yakunlangan buyurtmalar",
+    "in_picking": "Yig'ishda",
+    "active_pickers": "Ishlayotgan xodimlar",
+    "exceptions": "Istisnolar",
+    "low_stock": "Past qoldiq",
+    "active_picks": "Faol pickinglar",
+    "today_overview": "Bugungi ko‘rinish",
+    "orders_by_status": "Buyurtmalar holati",
+    "status_column": "Holat",
+    "count_column": "Soni",
+    "status_xom": "Yangi buyurtmalar",
+    "status_yigishda": "Yig'ishda",
+    "status_tekshiruvda": "Tekshiruvda",
+    "status_yakunlangan": "Yakunlangan",
+    "status_barcha": "Barcha buyurtmalar",
+    "order_statuses_title": "Buyurtma statuslari",
+    "load_error": "Dashboard yuklanmadi. Qayta urinib ko‘ring.",
+    "pickers_orders_title": "Ishchilar bo‘yicha yig‘ilgan buyurtmalar",
+    "worker_column": "Ishchi",
+    "orders_picked_column": "Yig‘ilgan buyurtmalar",
+    "pickers_empty": "Hozircha ma'lumot yo'q."
+  },
+  "active_picks": {
+    "empty": "Hozircha faol picking yo‘q.",
+    "open": "Ochish",
+    "picked": "{{picked}}/{{total}} terildi",
+    "picker": "Yig‘uvchi",
+    "controller": "Kontrolyor",
+    "status_new": "Yangi",
+    "status_in_progress": "Jarayonda",
+    "status_partial": "Qisman",
+    "status_picked": "Yig‘ildi",
+    "status_completed": "Tugallangan"
+  },
+  "exceptions": {
+    "empty": "Bugun istisnolar yo‘q.",
+    "view": "Ko‘rish",
+    "status": {
+      "open": "Ochiq",
+      "resolved": "Yechilgan"
+    }
+  },
+  "header": {
+    "menu": "Menyu"
+  },
+  "sidebar_title": "WMS Admin",
+  "roles": {
+    "warehouse_admin": "Ombor administratori",
+    "supervisor": "Supervayzer",
+    "picker": "Yig'uvchi",
+    "receiver": "Qabulchi",
+    "inventory_controller": "Inventar nazoratchisi"
+  },
+  "integrations": {
+    "smartup": {
+      "title": "Smartup import",
+      "subtitle": "Smartupdan savdo buyurtmalarini WMSga yuklash.",
+      "begin_deal_date": "Boshlanish sanasi",
+      "end_deal_date": "Tugash sanasi",
+      "filial_code": "Filial kodi",
+      "filial_placeholder": "Ixtiyoriy",
+      "run": "Importni ishga tushirish",
+      "running": "Import qilinmoqda...",
+      "view_orders": "Buyurtmalarni ko‘rish",
+      "summary": "{{created}} ta yaratildi, {{updated}} ta yangilandi, {{skipped}} ta o‘tkazib yuborildi.",
+      "row_error": "Buyurtma {{external_id}}: {{reason}}",
+      "error": "Import muvaffaqiyatsiz. Qayta urinib ko‘ring."
+    },
+    "smartup_orders": {
+      "title": "Smartup buyurtmalar",
+      "subtitle": "Smartupdan import qilingan buyurtmalar.",
+      "empty": "Hozircha Smartup buyurtmalar yo‘q.",
+      "empty_desc": "Importni ishga tushirib buyurtmalarni yuklang.",
+      "error": "Smartup buyurtmalari yuklanmadi.",
+      "columns": {
+        "doc_no": "Hujjat",
+        "external_id": "Tashqi ID",
+        "status": "Holat",
+        "lines": "Qatorlar",
+        "created": "Yaratilgan"
+      },
+      "status": {
+        "all": "Barchasi",
+        "smartup_created": "Smartupdan kelgan",
+        "confirmed": "Tasdiqlangan",
+        "in_progress": "Jarayonda",
+        "completed": "Yakunlangan"
+      }
+    }
+  },
+  "profile": {
+    "menu": "Profil menyusi",
+    "title": "Sozlamalar",
+    "my_profile": "Mening profilim",
+    "avatar_alt": "Profil rasmi",
+    "update_picture": "Rasmni yangilash",
+    "remove_photo": "Rasmni olib tashlash",
+    "fields": {
+      "full_name": "To‘liq ism",
+      "email": "Email",
+      "role": "Rol",
+      "department": "Bo‘lim"
+    },
+    "placeholders": {
+      "email": "admin@company.com",
+      "department": "—"
+    },
+    "password_title": "Parol",
+    "change_password": "Parolimni o‘zgartirish",
+    "password_soon": "Parolni o‘zgartirish tez orada.",
+    "security_title": "Xavfsizlik",
+    "enable_2fa": "Ikki bosqichli autentifikatsiyani yoqish"
+  }
+}

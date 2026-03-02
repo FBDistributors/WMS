@@ -1,0 +1,84 @@
+{
+  "buttons": {
+    "save": "Saqlash",
+    "cancel": "Bekor qilish",
+    "back": "Orqaga",
+    "refresh": "Yangilash",
+    "next": "Keyingi",
+    "retry": "Qayta urinib ko‘rish",
+    "create": "Yaratish",
+    "edit": "Tahrirlash",
+    "disable": "O‘chirish",
+    "login": "Kirish",
+    "logout": "Chiqish",
+    "home": "Bosh sahifa",
+    "close": "Yopish",
+    "clear": "Tozalash"
+  },
+  "actions": {
+    "sign_out": "Chiqish"
+  },
+  "theme": {
+    "label": "Mavzu",
+    "light": "Yorug‘",
+    "dark": "Qorong‘i",
+    "system": "Tizim"
+  },
+  "sidebar": {
+    "collapse": "Sidebarni yig‘ish",
+    "expand": "Sidebarni kengaytirish"
+  },
+  "status": {
+    "active": "Faol",
+    "inactive": "Faol emas",
+    "new": "Yangi",
+    "in_progress": "Jarayonda",
+    "done": "Bajarildi",
+    "error": "Xato",
+    "exception": "Istisno"
+  },
+  "expiry": {
+    "expiry_date": "Yaroqlilik muddati",
+    "batch": "Partiya",
+    "expired": "Muddati o'tgan",
+    "expiring_soon": "Tez orada tugaydi",
+    "warning": "Ogohlantirish",
+    "days_left": "kun qoldi",
+    "no_expiry": "Muddat yo'q"
+  },
+  "labels": {
+    "search": "Qidirish",
+    "username": "Username",
+    "password": "Parol",
+    "confirm_password": "Parolni tasdiqlash",
+    "language": "Til",
+    "menu": "Menyu",
+    "qty": "Miqdor",
+    "offline_queue": "Offline navbat"
+  },
+  "user_menu": "Foydalanuvchi menyusi",
+  "logout": "Chiqish",
+  "logout_confirm_title": "Chiqishni tasdiqlash",
+  "logout_confirm_message": "Hisobdan chiqmoqchimisiz?",
+  "scroll_horizontal": "Jadvalni yonga suring",
+  "scroll_left": "Chapga",
+  "scroll_right": "O'ngga",
+  "roles": {
+    "picker": "Yig'uvchi",
+    "receiver": "Qabul qiluvchi",
+    "inventory_controller": "Inventar nazoratchi",
+    "supervisor": "Nazoratchi",
+    "warehouse_admin": "Ombor admin"
+  },
+  "messages": {
+    "not_authorized_title": "Ruxsat yo‘q",
+    "not_authorized_desc": "Bu sahifani ko‘rish uchun ruxsatingiz yetarli emas.",
+    "no_activity": "Hozircha faoliyat yo‘q.",
+    "loading": "Yuklanmoqda..."
+  },
+  "errors": {
+    "unknown": "Noma'lum xatolik yuz berdi.",
+    "network": "Tarmoq xatosi.",
+    "unauthorized": "Ruxsat yo‘q."
+  }
+}

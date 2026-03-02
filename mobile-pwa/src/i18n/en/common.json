@@ -1,0 +1,84 @@
+{
+  "buttons": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "back": "Back",
+    "refresh": "Refresh",
+    "next": "Next",
+    "retry": "Try again",
+    "create": "Create",
+    "edit": "Edit",
+    "disable": "Disable",
+    "login": "Login",
+    "logout": "Logout",
+    "home": "Home",
+    "close": "Close",
+    "clear": "Clear"
+  },
+  "actions": {
+    "sign_out": "Sign out"
+  },
+  "theme": {
+    "label": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "sidebar": {
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar"
+  },
+  "status": {
+    "active": "Active",
+    "inactive": "Inactive",
+    "new": "New",
+    "in_progress": "In progress",
+    "done": "Done",
+    "error": "Error",
+    "exception": "Exception"
+  },
+  "expiry": {
+    "expiry_date": "Expiry Date",
+    "batch": "Batch",
+    "expired": "Expired",
+    "expiring_soon": "Expiring Soon",
+    "warning": "Warning",
+    "days_left": "days left",
+    "no_expiry": "No Expiry"
+  },
+  "labels": {
+    "search": "Search",
+    "username": "Username",
+    "password": "Password",
+    "confirm_password": "Confirm password",
+    "language": "Language",
+    "menu": "Menu",
+    "qty": "Qty",
+    "offline_queue": "Offline queue"
+  },
+  "user_menu": "User menu",
+  "logout": "Logout",
+  "logout_confirm_title": "Confirm sign out",
+  "logout_confirm_message": "Are you sure you want to sign out?",
+  "scroll_horizontal": "Scroll horizontally",
+  "scroll_left": "Scroll left",
+  "scroll_right": "Scroll right",
+  "roles": {
+    "picker": "Order picker",
+    "receiver": "Receiver",
+    "inventory_controller": "Inventory Controller",
+    "supervisor": "Supervisor",
+    "warehouse_admin": "Warehouse Admin"
+  },
+  "messages": {
+    "not_authorized_title": "Not authorized",
+    "not_authorized_desc": "You do not have permission to view this page.",
+    "no_activity": "No activity yet.",
+    "loading": "Loading..."
+  },
+  "errors": {
+    "unknown": "Something went wrong.",
+    "network": "Network error.",
+    "unauthorized": "Unauthorized."
+  }
+}

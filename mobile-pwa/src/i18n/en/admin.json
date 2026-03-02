@@ -1,0 +1,174 @@
+{
+  "menu": {
+    "dashboard": "Dashboard",
+    "products": "Products",
+    "brands": "Brands",
+    "orders": "Orders",
+    "orders_diller": "Diller orders",
+    "orders_orikzor": "O'rikzor movements",
+    "locations": "Locations",
+    "inventory": "Balance",
+    "movement": "Movement",
+    "picking": "Picking",
+    "receiving": "Receiving",
+    "users": "Users & Access",
+    "audit": "Audit Logs",
+    "kamomat": "Inventory count",
+    "integrations": "Integrations",
+    "smartup_orders": "Smartup Orders",
+    "profile": "Profile"
+  },
+  "movement_page": {
+    "do_button": "Do movement",
+    "history": "History",
+    "type_expired": "Expired",
+    "type_damaged": "Damaged",
+    "type_simple": "Simple location transfer",
+    "from": "From",
+    "to": "To",
+    "qty": "Qty",
+    "product_search": "Search product",
+    "select_product": "Select product",
+    "select_from": "Select from (location + lot)",
+    "select_to": "Select to",
+    "submit": "Confirm",
+    "success": "Movement completed",
+    "error": "Error",
+    "cancel": "Cancel",
+    "kind_label": "Movement type",
+    "no_expired_zone": "No location in EXPIRED zone",
+    "no_damaged_zone": "No location in DAMAGED zone",
+    "select_other": "Select another location",
+    "pcs": "pcs",
+    "reason_shortage": "Out (from source)",
+    "reason_overage": "In (to destination)",
+    "detail_title": "Transfer detail",
+    "detail_reason": "Action"
+  },
+  "settings": {
+    "title": "Settings",
+    "tabs": {
+      "profile": "Profile",
+      "notifications": "Notifications",
+      "integrations": "Integrations",
+      "security": "Security"
+    },
+    "coming_soon": "Coming soon"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "total_orders": "Total orders",
+    "completed_today": "Completed today",
+    "in_picking": "In picking",
+    "active_pickers": "Active workers",
+    "exceptions": "Exceptions",
+    "low_stock": "Low stock",
+    "active_picks": "Active picks",
+    "today_overview": "Today overview",
+    "orders_by_status": "Orders by status",
+    "status_column": "Status",
+    "count_column": "Count",
+    "status_xom": "New orders",
+    "status_yigishda": "In picking",
+    "status_tekshiruvda": "In verification",
+    "status_yakunlangan": "Completed",
+    "status_barcha": "All orders",
+    "order_statuses_title": "Order statuses",
+    "load_error": "Failed to load dashboard. Please try again.",
+    "pickers_orders_title": "Orders picked by worker",
+    "worker_column": "Worker",
+    "orders_picked_column": "Orders picked",
+    "pickers_empty": "No data yet."
+  },
+  "active_picks": {
+    "empty": "No active picks right now.",
+    "open": "Open",
+    "picked": "{{picked}}/{{total}} picked",
+    "picker": "Picker",
+    "controller": "Controller",
+    "status_new": "New",
+    "status_in_progress": "In progress",
+    "status_partial": "Partial",
+    "status_picked": "Picked",
+    "status_completed": "Completed"
+  },
+  "exceptions": {
+    "empty": "No exceptions reported today.",
+    "view": "View",
+    "status": {
+      "open": "Open",
+      "resolved": "Resolved"
+    }
+  },
+  "header": {
+    "menu": "Menu"
+  },
+  "sidebar_title": "WMS Admin",
+  "roles": {
+    "warehouse_admin": "Warehouse Admin",
+    "supervisor": "Supervisor",
+    "picker": "Order picker",
+    "receiver": "Receiver",
+    "inventory_controller": "Inventory Controller"
+  },
+  "integrations": {
+    "smartup": {
+      "title": "Smartup Import",
+      "subtitle": "Pull sales orders from Smartup into WMS.",
+      "begin_deal_date": "Begin deal date",
+      "end_deal_date": "End deal date",
+      "filial_code": "Filial code",
+      "filial_placeholder": "Optional",
+      "run": "Run import",
+      "running": "Importing...",
+      "view_orders": "View orders",
+      "summary": "Created {{created}}, updated {{updated}}, skipped {{skipped}}.",
+      "row_error": "Order {{external_id}}: {{reason}}",
+      "error": "Import failed. Please try again."
+    },
+    "smartup_orders": {
+      "title": "Smartup Orders",
+      "subtitle": "Orders imported from Smartup.",
+      "empty": "No Smartup orders yet.",
+      "empty_desc": "Run import to load Smartup orders.",
+      "error": "Failed to load Smartup orders.",
+      "columns": {
+        "doc_no": "Document",
+        "external_id": "External ID",
+        "status": "Status",
+        "lines": "Lines",
+        "created": "Created"
+      },
+      "status": {
+        "all": "All",
+        "smartup_created": "Smartup created",
+        "confirmed": "Confirmed",
+        "in_progress": "In progress",
+        "completed": "Completed"
+      }
+    }
+  },
+  "profile": {
+    "menu": "Profile menu",
+    "title": "Settings",
+    "my_profile": "My Profile",
+    "avatar_alt": "Profile photo",
+    "update_picture": "Update picture",
+    "remove_photo": "Remove photo",
+    "fields": {
+      "full_name": "Full name",
+      "email": "Email",
+      "role": "Role",
+      "department": "Department"
+    },
+    "placeholders": {
+      "email": "admin@company.com",
+      "department": "—"
+    },
+    "password_title": "Password",
+    "change_password": "Change my password",
+    "password_soon": "Password change is coming soon.",
+    "security_title": "Security",
+    "enable_2fa": "Enable Two-Factor Authentication"
+  }
+}

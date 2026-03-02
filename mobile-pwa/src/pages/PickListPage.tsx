@@ -1,0 +1,138 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
+import { Search, Boxes, Package } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+
+import { AppHeader } from '../components/layout/AppHeader'
+import { PickListCard } from '../components/picking/PickListCard'
+import { EmptyState } from '../components/ui/EmptyState'
+import { useAuth } from '../rbac/AuthProvider'
+import { listPickLists, cancelPickList, type PickList } from '../services/pickingApi'
+
+export function PickListPage() {
+  const navigate = useNavigate()
+  const { t } = useTranslation('picking')
+  const { has } = useAuth()
+  const canCancelDocuments = has('documents:edit_status')
+  const [items, setItems] = useState<PickList[]>([])
+  const [query, setQuery] = useState('')
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [cancellingId, setCancellingId] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const data = await listPickLists()
+      setItems(data)
+    } catch (err) {
+      setError(t('load_error'))
+    } finally {
+      setIsLoading(false)
+    }
+  }, [t])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return items
+    const term = query.toLowerCase()
+    return items.filter((item) => item.document_no.toLowerCase().includes(term))
+  }, [items, query])
+
+  const handleCancel = useCallback(
+    async (item: PickList) => {
+      if (!confirm(t('cancel_confirm', { doc: item.document_no }))) return
+      setCancellingId(item.id)
+      try {
+        await cancelPickList(item.id)
+        await load()
+      } catch {
+        setError(t('cancel_error'))
+      } finally {
+        setCancellingId(null)
+      }
+    },
+    [load, t]
+  )
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 px-4">
+        <AppHeader title={t('list_title')} onRefresh={load} hideUserMenu />
+        <div className="space-y-4">
+          <div className="h-12 w-full animate-pulse rounded-2xl bg-slate-200" />
+          <div className="h-24 w-full animate-pulse rounded-2xl bg-slate-200" />
+          <div className="h-24 w-full animate-pulse rounded-2xl bg-slate-200" />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 px-4 pb-6">
+      <AppHeader
+        title={t('list_title')}
+        onRefresh={load}
+        hideUserMenu
+        actionSlot={
+          <Link
+            to="/picker/inventory"
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-sm text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+          >
+            <Package size={18} />
+            <span className="hidden sm:inline">{t('inventory_link')}</span>
+          </Link>
+        }
+      />
+      <div className="mb-4 flex items-center gap-2 rounded-2xl bg-white px-3 py-2 shadow-sm">
+        <Search size={18} className="text-slate-400" />
+        <input
+          className="w-full bg-transparent text-sm text-slate-900 outline-none"
+          placeholder={t('search_placeholder')}
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      </div>
+
+      {error ? (
+        <EmptyState
+          icon={<Boxes size={32} />}
+          title={error}
+          actionLabel={t('refresh')}
+          onAction={load}
+        />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          icon={<Boxes size={32} />}
+          title={t('empty_title')}
+          description={t('empty_desc')}
+          actionLabel={t('refresh')}
+          onAction={load}
+        />
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((item) => (
+            <PickListCard
+              key={item.id}
+              item={item}
+              onClick={() => navigate(`/picking/mobile-pwa/${item.id}`)}
+              onCancel={
+                canCancelDocuments
+                  ? (e) => {
+                      e.stopPropagation()
+                      void handleCancel(item)
+                    }
+                  : undefined
+              }
+              isCancelling={cancellingId === item.id}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
