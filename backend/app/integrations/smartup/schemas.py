@@ -190,6 +190,7 @@ class SmartupOrderExportResponse(BaseModel):
     debug_preview: Optional[list] = None
     debug_discrepancy: Optional[bool] = None
     debug_pre_filter_count: Optional[int] = None
+    debug_after_date_filter_count: Optional[int] = None
     debug_loop_count: Optional[int] = None
     debug_skipped_out_of_range: Optional[int] = None
 

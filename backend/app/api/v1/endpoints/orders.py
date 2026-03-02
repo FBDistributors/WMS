@@ -601,27 +601,33 @@ async def sync_orikzor(
     try:
         response = export_movements_from_smartup(begin_date, end_date)
         n_items = len(response.items)
-        raw_count = response.debug_raw_count if response.debug_raw_count is not None else "?"
-        dict_count = response.debug_dict_count if response.debug_dict_count is not None else "?"
-        logger.info(
-            "O'rikzor sync debug: raw_count=%s dict_count=%s filtered_count=%s (parse logda 3 ta movement preview)",
-            raw_count,
-            dict_count,
-            n_items,
-        )
+        parse_skipped = getattr(response, "debug_skipped_by_reason", None) or {}
         created, updated, skipped, import_errors, skipped_by_reason = import_orders(
             db, response.items, order_source="orikzor", filial_id_override=None
         )
+        raw_count = response.debug_dict_count if response.debug_dict_count is not None else response.debug_raw_count
+        if raw_count is None:
+            raw_count = 0
+        after_date_filter_val = getattr(response, "debug_after_date_filter_count", None)
+        loop_count_val = getattr(response, "debug_loop_count", None)
+        all_reason_keys = set(parse_skipped) | set(skipped_by_reason)
+        merged_skipped = {k: parse_skipped.get(k, 0) + skipped_by_reason.get(k, 0) for k in all_reason_keys}
+        skipped_total = sum(merged_skipped.values())
+        processed = created + updated + skipped_total
         logger.info(
-            "O'rikzor sync: inserted_count=%s updated_count=%s skipped_count=%s parsed_count=%s",
+            "O'rikzor sync counts: raw_count=%s after_date_filter_count=%s loop_count=%s inserted_count=%s updated_count=%s skipped_total=%s processed=%s reasons=%s",
+            raw_count,
+            after_date_filter_val,
+            loop_count_val,
             created,
             updated,
-            skipped,
-            n_items,
+            skipped_total,
+            processed,
+            merged_skipped,
         )
         logger.info(
             "O'rikzor sync skipped_by_reason: %s",
-            skipped_by_reason,
+            merged_skipped,
         )
         for err in import_errors[:5]:
             logger.error("O'rikzor import xato: external_id=%s sabab=%s", err.external_id, err.reason)
@@ -629,13 +635,6 @@ async def sync_orikzor(
             logger.error("O'rikzor import: qolgan %s ta xato", len(import_errors) - 5)
         errors_count = len(import_errors) if import_errors else None
         first_error_reason = import_errors[0].reason if import_errors else None
-        dict_count_val = response.debug_dict_count if response.debug_dict_count is not None else 0
-        raw_count = dict_count_val
-        parse_skipped = getattr(response, "debug_skipped_by_reason", None) or {}
-        all_reason_keys = set(parse_skipped) | set(skipped_by_reason)
-        merged_skipped = {k: parse_skipped.get(k, 0) + skipped_by_reason.get(k, 0) for k in all_reason_keys}
-        skipped_total = sum(merged_skipped.values())
-        processed = created + updated + skipped_total
         discrepancy = None
         if raw_count is not None and processed != raw_count:
             logger.error(
@@ -657,6 +656,7 @@ async def sync_orikzor(
             "discrepancy": discrepancy or getattr(response, "debug_discrepancy", None),
             "preview": (getattr(response, "debug_preview", None) or [])[:2],
             "pre_filter_count": getattr(response, "debug_pre_filter_count", None),
+            "after_date_filter_count": getattr(response, "debug_after_date_filter_count", None),
             "loop_count": getattr(response, "debug_loop_count", None),
             "skipped_out_of_range": getattr(response, "debug_skipped_out_of_range", None),
         }
@@ -665,10 +665,10 @@ async def sync_orikzor(
                 f"Data keldi ({n_items} ta), import qilinmadi. skipped_by_reason: {skipped_by_reason}. "
                 + (f"Birinchi xato: {first_error_reason}" if first_error_reason else "")
             )
-        elif (created + updated) == 0 and n_items == 0 and dict_count_val > 0:
+        elif (created + updated) == 0 and n_items == 0 and (raw_count or 0) > 0:
             extra = getattr(response, "parse_warning", None) or first_error_reason or ""
             detail = (
-                f"Data keldi ({dict_count_val} ta), lekin parse natijasi 0. skipped_by_reason: {parse_skipped}."
+                f"Data keldi ({raw_count} ta), lekin parse natijasi 0. skipped_by_reason: {parse_skipped}."
                 + (f" {extra}" if extra else "")
             )
         elif (created + updated) == 0 and n_items == 0:

@@ -47,7 +47,7 @@ ALLOWED_MOVEMENT_STATUSES: set[str] = {"N", "C", "B#S", "D", "P"}  # N ni qo'shd
 
 
 def _parse_movement_date(value: str | None) -> datetime | None:
-    """Smartup from_movement_date format: '31.01.2026 15:01:52' (DD.MM.YYYY HH:MM:SS)."""
+    """Smartup from_movement_date format: '31.01.2026 15:01:52' (DD.MM.YYYY HH:MM:SS). Fallback: %d.%m.%Y."""
     if not value or not isinstance(value, str):
         return None
     raw = value.strip()
@@ -62,7 +62,11 @@ def _parse_movement_date(value: str | None) -> datetime | None:
             return None
 
 
-def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
+def _parse_movement_response(
+    body: str,
+    begin_date: date | None = None,
+    end_date: date | None = None,
+) -> SmartupOrderExportResponse:
     """movement$export javobini parse qiladi; bitta joyda movement/movements/list va movement_items/itens."""
     raw_count = len(body)
     data = json.loads(body)
@@ -207,11 +211,15 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
             elif isinstance(inner, dict):
                 flattened.append(inner)
     movements = [m for m in flattened if isinstance(m, dict)]
+    # Hech qanday limit/pagination yo'q — barcha movementlar ishlatiladi
     pre_filter_count = len(movements)
-    dict_count = pre_filter_count
-    raw_count = dict_count  # invariant: raw_count = len(movements)
+    raw_count = pre_filter_count  # invariant: raw_count = len(movements)
 
-    status_filter_off = os.getenv("SMARTUP_ORIKZOR_STATUS_FILTER_OFF", "").strip().lower() in ("1", "true", "yes")
+    logger.info(
+        "O'rikzor parse: Smartup from_movement_date format DD.MM.YYYY HH:MM:SS (fallback DD.MM.YYYY). "
+        "UI date DD/MM/YYYY yoki MM/DD/YYYY. raw_count=%s",
+        raw_count,
+    )
 
     skipped_by_reason: dict[str, int] = {
         "missing_id": 0,
@@ -219,15 +227,72 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
         "product_not_found": 0,
         "warehouse_null_or_not_found": 0,
         "date_parse_error": 0,
+        "out_of_range": 0,
         "db_error": 0,
         "validation_error": 0,
         "exception": 0,
     }
+
+    # Sana bo'yicha filtrlash (begin_date, end_date berilgan bo'lsa)
+    start_dt = datetime.combine(begin_date, datetime.min.time()) if begin_date else None
+    end_dt = datetime.combine(end_date, datetime.max.time()) if end_date else None
+    movements_in_range: list = []
+    out_of_range_samples: list = []  # 3 ta sample debug uchun
+
+    if begin_date is not None and end_date is not None:
+        for m in movements:
+            from_raw = m.get("from_movement_date")
+            from_str = str(from_raw).strip() if from_raw is not None else ""
+            parsed_from_dt = _parse_movement_date(from_raw) if from_raw else None
+            if parsed_from_dt is None:
+                # Sana parse bo'lmasa — oralikda deb hisoblaymiz (o'tkazamiz)
+                movements_in_range.append(m)
+                continue
+            mov_date = parsed_from_dt.date()
+            if mov_date < begin_date or mov_date > end_date:
+                skipped_by_reason["out_of_range"] += 1
+                reason = (
+                    f"mov_date={mov_date!s} < start={begin_date!s}" if mov_date < begin_date
+                    else f"mov_date={mov_date!s} > end={end_date!s}"
+                )
+                if len(out_of_range_samples) < 3:
+                    out_of_range_samples.append({
+                        "movement_id": m.get("movement_id") or m.get("movement_number"),
+                        "status": m.get("status"),
+                        "from_movement_date": from_str or None,
+                        "parsed_from_dt": parsed_from_dt.isoformat() if parsed_from_dt else None,
+                        "start_dt": begin_date.isoformat(),
+                        "end_dt": end_date.isoformat(),
+                        "out_of_range_reason": reason,
+                    })
+                continue
+            movements_in_range.append(m)
+    else:
+        movements_in_range = list(movements)
+
+    after_date_filter_count = len(movements_in_range)
+    dict_count = raw_count  # parse invariant: raw_count = len(movements) (date filter oldin)
+
+    for i, sample in enumerate(out_of_range_samples[:3]):
+        logger.info(
+            "O'rikzor out_of_range sample [%s]: movement_id=%s status=%s from_movement_date=%s parsed_from_dt=%s start_dt=%s end_dt=%s reason=%s",
+            i + 1,
+            sample.get("movement_id"),
+            sample.get("status"),
+            sample.get("from_movement_date"),
+            sample.get("parsed_from_dt"),
+            sample.get("start_dt"),
+            sample.get("end_dt"),
+            sample.get("out_of_range_reason"),
+        )
+
+    status_filter_off = os.getenv("SMARTUP_ORIKZOR_STATUS_FILTER_OFF", "").strip().lower() in ("1", "true", "yes")
+
     orders: list[SmartupOrder] = []
     first_validation_error: str | None = None
     loop_count = 0
-    skipped_out_of_range = 0  # sana bo'yicha tashlab yuborilgan (kelajakda date filter bo'lsa)
-    for m in movements:
+    skipped_out_of_range = skipped_by_reason.get("out_of_range", 0)
+    for m in movements_in_range:
         loop_count += 1
         raw_id = m.get("movement_id")
         raw_num = m.get("movement_number")
@@ -357,20 +422,20 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
     parse_skipped_total = sum(skipped_by_reason.values())
     parse_processed = filtered_count + parse_skipped_total
     discrepancy: bool | None = None
-    if dict_count != parse_processed:
+    if raw_count != parse_processed:
         discrepancy = True
         logger.error(
-            "DISCREPANCY raw=%s processed=%s filtered=%s skipped_total=%s reasons=%s",
-            dict_count,
+            "DISCREPANCY raw_count=%s processed=%s filtered=%s skipped_total=%s reasons=%s",
+            raw_count,
             parse_processed,
             filtered_count,
             parse_skipped_total,
             skipped_by_reason,
         )
     logger.info(
-        "O'rikzor parse debug: pre_filter_count=%s post_filter_count=%s loop_count=%s filtered_count=%s skipped_total=%s skipped_out_of_range=%s reasons=%s",
-        pre_filter_count,
-        dict_count,
+        "O'rikzor parse debug: raw_count=%s after_date_filter_count=%s loop_count=%s filtered_count=%s skipped_total=%s skipped_out_of_range=%s reasons=%s",
+        raw_count,
+        after_date_filter_count,
         loop_count,
         filtered_count,
         parse_skipped_total,
@@ -398,6 +463,7 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
         debug_preview=previews,
         debug_discrepancy=discrepancy,
         debug_pre_filter_count=pre_filter_count,
+        debug_after_date_filter_count=after_date_filter_count,
         debug_loop_count=loop_count,
         debug_skipped_out_of_range=skipped_out_of_range,
     )
@@ -468,7 +534,7 @@ def export_movements_from_smartup(begin_date: date, end_date: date) -> SmartupOr
         logger.error("Smartup movement$export: %s", exc)
         raise RuntimeError(f"Smartup movement$export failed: {exc}") from exc
 
-    parsed = _parse_movement_response(body)
+    parsed = _parse_movement_response(body, begin_date=begin_date, end_date=end_date)
     if parsed.items:
         logger.info("Smartup movement$export: %s ta movement", len(parsed.items))
     else:
