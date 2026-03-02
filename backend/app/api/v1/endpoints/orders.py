@@ -610,15 +610,16 @@ async def sync_orikzor(
         if len(import_errors) > 5:
             logger.error("O'rikzor import: qolgan %s ta xato", len(import_errors) - 5)
         errors_count = len(import_errors) if import_errors else None
-        if (created + updated) == 0 and len(response.items) == 0:
+        n_items = len(response.items)
+        if (created + updated) == 0 and n_items > 0:
+            detail = (
+                f"API dan {n_items} ta movement keldi, lekin import qilinmadi. "
+                + (f"Birinchi xato: {import_errors[0].reason}" if import_errors else "Render logda 'O'rikzor import xato' qatorini tekshiring.")
+            )
+        elif (created + updated) == 0 and n_items == 0:
             detail = (
                 "API dan hech qanday movement qaytmadi. "
                 "Sana oralig'ini yoki Render loglaridagi 'parse: raw_count= dict_count=' qatorini tekshiring."
-            )
-        elif (created + updated) == 0 and len(response.items) > 0 and import_errors:
-            detail = (
-                f"API dan {len(response.items)} ta movement keldi, lekin import qilinmadi. "
-                f"Birinchi xato: {import_errors[0].reason}"
             )
         else:
             detail = import_errors[0].reason if import_errors else None
