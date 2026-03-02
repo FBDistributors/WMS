@@ -1,0 +1,20 @@
+---
+description: Mobile — barcha terminal ishlari (Metro + run-android) agent tomonidan
+globs: mobile/**/*
+alwaysApply: false
+---
+
+# Mobile: barcha terminal ishlari
+
+Foydalanuvchi natijani faqat telefonda/emulyatorda ko‘radi. **Barcha** terminalda ishlatiladigan buyruqlarni **men** bajaraman.
+
+1. **Metro**
+   - Metro ishlayotganini tekshir; ishlayotgan bo‘lsa to‘xtatib, `--reset-cache` bilan qayta ishga tushir.
+   - Buyruq: `cd C:\Users\hp\Desktop\WMS\mobile; npx react-native start --reset-cache` (background).
+2. **Ilovani ishga tushirish**
+   - Metro tayyor bo‘lgach: `cd C:\Users\hp\Desktop\WMS\mobile; npx react-native run-android` (yoki run-ios).
+3. **Boshqa kerak bo‘ladigan ishlar**
+   - Android clean: `cd android; .\gradlew.bat clean`
+   - npm install, pod install va hokazo — hammani men bajaraman.
+
+Esda tutish: mobile loyihasida foydalanuvchi hech qanday terminal buyruqini o‘zi ishga tushirmaydi — hammasini agent qiladi.

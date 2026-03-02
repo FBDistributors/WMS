@@ -1,0 +1,55 @@
+# WMS Render Blueprint: DB + Web Service + Background Worker
+# Ulanish: Web va Worker ikkalasi ham wms-db PostgreSQL ga ulanadi (DATABASE_URL).
+# Repo root WMS/ bo'lsa: Dashboard da Blueprint path = backend/render.yaml yoki Root Directory = backend.
+---
+databases:
+  - name: wms-db
+    databaseName: wms
+    plan: free  # yoki starter / basic-1gb
+
+services:
+  # FastAPI Web Service (API)
+  - type: web
+    name: wms-api
+    runtime: python
+    plan: free  # yoki starter
+    buildCommand: pip install -r requirements.txt
+    preDeployCommand: alembic upgrade head
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: wms-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: "*"
+
+  # Background Worker (SmartUp sync)
+  - type: worker
+    name: wms-smartup-sync
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: python worker.py
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: wms-db
+          property: connectionString
+      - key: SMARTUP_BASE_URL
+        sync: false
+      - key: SMARTUP_BASIC_USER
+        sync: false
+      - key: SMARTUP_BASIC_PASS
+        sync: false
+      - key: SMARTUP_PROJECT_CODE
+        value: trade
+      - key: SMARTUP_FILIAL_ID
+        sync: false
+      - key: SYNC_INTERVAL_SECONDS
+        value: "600"
+      - key: SYNC_ORDERS_DAYS_BACK
+        value: "7"
