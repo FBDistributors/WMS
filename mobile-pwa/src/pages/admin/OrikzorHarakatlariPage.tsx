@@ -9,7 +9,7 @@ import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { DateInput } from '../../components/DateInput'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { getOrders, syncOrikzorOrders, type OrderListItem } from '../../services/ordersApi'
+import { getOrders, syncOrikzorOrders, type OrderListItem, type SmartupSyncResult } from '../../services/ordersApi'
 import { useAuth } from '../../rbac/AuthProvider'
 
 function todayISO() {
@@ -49,13 +49,7 @@ export function OrikzorHarakatlariPage() {
   const [error, setError] = useState<string | null>(null)
   const [isSyncing, setIsSyncing] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const [syncResult, setSyncResult] = useState<{
-    created: number
-    updated: number
-    skipped: number
-    detail?: string | null
-    errors_count?: number | null
-  } | null>(null)
+  const [syncResult, setSyncResult] = useState<SmartupSyncResult | null>(null)
   const [syncDateFrom, setSyncDateFrom] = useState(daysAgoISO(60))
   const [syncDateTo, setSyncDateTo] = useState(todayISO())
 
