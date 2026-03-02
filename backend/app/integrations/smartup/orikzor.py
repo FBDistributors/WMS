@@ -16,6 +16,19 @@ from app.integrations.smartup.schemas import SmartupOrder, SmartupOrderExportRes
 logger = logging.getLogger(__name__)
 
 
+def _structure_summary(obj, depth: int = 0, max_depth: int = 4):
+    """JSON ob'ektining strukturasi (kalitlar, turi, ro'yxat uzunligi) — log uchun."""
+    if depth >= max_depth:
+        return "..."
+    if isinstance(obj, dict):
+        return {k: _structure_summary(v, depth + 1, max_depth) for k, v in obj.items()}
+    if isinstance(obj, list):
+        if not obj:
+            return "[]"
+        return [f"list[{len(obj)}]", _structure_summary(obj[0], depth + 1, max_depth)]
+    return type(obj).__name__
+
+
 def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
     """movement$export javobini parse qiladi; bitta joyda movement/movements/list va movement_items/itens."""
     data = json.loads(body)
@@ -32,12 +45,15 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
             raw = (
                 data.get("movement")
                 or data.get("movements")
+                or data.get("Movement")
+                or data.get("MovementList")
                 or data.get("data")
                 or data.get("items")
                 or data.get("result")
                 or data.get("response")
                 or data.get("export")
-                or data.get("Movement")
+                or data.get("list")
+                or data.get("rows")
             )
             if raw is None and isinstance(data, dict):
                 for v in data.values():
@@ -49,6 +65,34 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
                     if isinstance(v, list) and v and isinstance(v[0], dict):
                         raw = v
                         break
+            if raw is None and isinstance(data, dict):
+                for k, v in data.items():
+                    if isinstance(v, list) and v and isinstance(v[0], dict):
+                        first = v[0]
+                        if first.get("movement_id") is not None or first.get("movement_number") is not None:
+                            raw = v
+                            logger.info("Smartup movement$export: ro'yxat '%s' kalitida topildi (len=%s)", k, len(v))
+                            break
+            if raw is None and isinstance(data, dict):
+                for wrap in ("response", "data", "result", "export"):
+                    inner = data.get(wrap)
+                    if isinstance(inner, dict):
+                        inner_list = inner.get("movement") or inner.get("movements") or inner.get("items")
+                        if isinstance(inner_list, list) and inner_list and isinstance(inner_list[0], dict):
+                            first = inner_list[0]
+                            if first.get("movement_id") is not None or first.get("movement_number") is not None:
+                                raw = inner_list
+                                logger.info("Smartup movement$export: ro'yxat '%s.%s' ichida topildi (len=%s)", wrap, "movement|movements|items", len(raw))
+                                break
+                    if raw is not None:
+                        break
+            if raw is None and isinstance(data, dict) and len(data) == 1:
+                single_val = next(iter(data.values()), None)
+                if isinstance(single_val, list) and single_val and isinstance(single_val[0], dict):
+                    first = single_val[0]
+                    if first.get("movement_id") is not None or first.get("movement_number") is not None:
+                        raw = single_val
+                        logger.info("Smartup movement$export: bitta kalit ostidagi ro'yxat ishlatildi (len=%s)", len(raw))
             if raw is not None:
                 if isinstance(raw, list):
                     movements = raw
@@ -92,7 +136,7 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
         ):
             expanded.append(x)
         elif isinstance(x, dict):
-            inner = x.get("movement") or x.get("movements")
+            inner = x.get("movement") or x.get("movements") or x.get("Movement")
             if isinstance(inner, list):
                 expanded.extend(inner)
             elif isinstance(inner, dict):
@@ -109,7 +153,7 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
         if m.get("movement_id") is not None or m.get("movement_number") is not None:
             flattened.append(m)
         else:
-            inner = m.get("movement") or m.get("movements")
+            inner = m.get("movement") or m.get("movements") or m.get("Movement")
             if isinstance(inner, list):
                 flattened.extend(inner)
             elif isinstance(inner, dict):
@@ -261,11 +305,16 @@ def export_movements_from_smartup(begin_date: date, end_date: date) -> SmartupOr
         try:
             raw = json.loads(body)
             keys = list(raw.keys()) if isinstance(raw, dict) else []
+            structure = _structure_summary(raw)
             logger.warning(
-                "Smartup movement$export: 0 ta order (body_len=%s). Kalitlar=%s preview=%s",
+                "Smartup movement$export: 0 ta order (body_len=%s). Kalitlar=%s struktura=%s",
                 len(body),
                 keys,
-                (body[:500] + "...") if len(body) > 500 else body,
+                structure,
+            )
+            logger.warning(
+                "Smartup movement$export: body preview (birinchi 2000 belgi): %s",
+                (body[:2000] + "...") if len(body) > 2000 else body,
             )
         except Exception:  # noqa: S110
             logger.warning(
