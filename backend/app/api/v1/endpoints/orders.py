@@ -625,6 +625,8 @@ async def sync_orikzor(
             )
         else:
             detail = import_errors[0].reason if import_errors else None
+        if (created + updated) == 0 and detail:
+            logger.info("O'rikzor sync javob (detail): %s", detail[:200] + ("..." if len(detail or "") > 200 else ""))
         return SmartupSyncResponse(
             created=created, updated=updated, skipped=skipped, detail=detail, errors_count=errors_count
         )
