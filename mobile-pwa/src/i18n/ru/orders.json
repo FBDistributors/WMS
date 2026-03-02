@@ -45,6 +45,7 @@
     "date_from": "Дата с",
     "date_to": "Дата по",
     "sync_date_range": "Диапазон дат синхронизации",
+    "sync_date_hint": "from_movement_date в Smartup должен попадать в этот диапазон.",
     "filter_btn": "Фильтр",
     "filter_panel_title": "Фильтры",
     "filter_by_brand": "По бренду",

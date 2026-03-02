@@ -47,6 +47,7 @@
     "date_from": "Boshlanish sanasi",
     "date_to": "Tugash sanasi",
     "sync_date_range": "Sinxronlash sana oralig'i",
+    "sync_date_hint": "Smartup'dagi from_movement_date shu oraliqda bo'lishi kerak.",
     "filter_btn": "Filter",
     "filter_panel_title": "Filterlar",
     "filter_by_brand": "Brend bo'yicha",

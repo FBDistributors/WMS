@@ -56,7 +56,7 @@ export function OrikzorHarakatlariPage() {
     detail?: string | null
     errors_count?: number | null
   } | null>(null)
-  const [syncDateFrom, setSyncDateFrom] = useState(daysAgoISO(30))
+  const [syncDateFrom, setSyncDateFrom] = useState(daysAgoISO(60))
   const [syncDateTo, setSyncDateTo] = useState(todayISO())
 
   const load = useCallback(
@@ -329,6 +329,9 @@ export function OrikzorHarakatlariPage() {
                 aria-label={t('orders:filters.date_to')}
               />
             </label>
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              {t('orders:sync_date_hint', "Smartup'dagi from_movement_date shu oraliqda bo'lishi kerak.")}
+            </span>
           </div>
         ) : null}
 
