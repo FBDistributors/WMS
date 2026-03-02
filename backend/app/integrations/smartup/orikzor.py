@@ -35,7 +35,20 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
                 or data.get("data")
                 or data.get("items")
                 or data.get("result")
+                or data.get("response")
+                or data.get("export")
+                or data.get("Movement")
             )
+            if raw is None and isinstance(data, dict):
+                for v in data.values():
+                    if isinstance(v, dict) and (
+                        v.get("movement_id") is not None or v.get("movement_number") is not None
+                    ):
+                        raw = v
+                        break
+                    if isinstance(v, list) and v and isinstance(v[0], dict):
+                        raw = v
+                        break
             if raw is not None:
                 if isinstance(raw, list):
                     movements = raw
@@ -119,7 +132,12 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
             continue
         movement_id = movement_id or movement_number
 
-        items = m.get("movement_items") or m.get("movement_itens") or []
+        items = (
+            m.get("movement_items")
+            or m.get("movement_itens")
+            or m.get("movementItems")
+            or []
+        )
         if not isinstance(items, list):
             items = [items] if items else []
         item_dicts: list = []
@@ -137,14 +155,14 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
             if not isinstance(it, dict):
                 continue
             try:
-                qty = float(it.get("quantity") or 0)
+                qty = float(it.get("quantity") or it.get("qty") or 0)
             except (TypeError, ValueError):
                 qty = 0
             lines.append({
-                "product_code": it.get("product_code"),
-                "sku": it.get("product_code"),
+                "product_code": it.get("product_code") or it.get("productCode"),
+                "sku": it.get("product_code") or it.get("productCode"),
                 "quantity": qty,
-                "name": it.get("product_article_code") or it.get("product_code") or "",
+                "name": it.get("product_article_code") or it.get("productArticleCode") or it.get("product_code") or it.get("productCode") or "",
             })
 
         order_dict = {

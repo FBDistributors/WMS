@@ -46,6 +46,7 @@
     "filial": "Filial",
     "date_from": "Date from",
     "date_to": "Date to",
+    "sync_date_range": "Sync date range",
     "filter_btn": "Filter",
     "filter_panel_title": "Filters",
     "filter_by_brand": "By brand",

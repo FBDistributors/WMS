@@ -7,9 +7,19 @@ import { AdminLayout } from '../../admin/components/AdminLayout'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
+import { DateInput } from '../../components/DateInput'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { getOrders, syncOrikzorOrders, type OrderListItem } from '../../services/ordersApi'
 import { useAuth } from '../../rbac/AuthProvider'
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10)
+}
+function daysAgoISO(days: number) {
+  const d = new Date()
+  d.setDate(d.getDate() - days)
+  return d.toISOString().slice(0, 10)
+}
 
 const PAGE_SIZE = 50
 const COLUMNS = [
@@ -46,6 +56,8 @@ export function OrikzorHarakatlariPage() {
     detail?: string | null
     errors_count?: number | null
   } | null>(null)
+  const [syncDateFrom, setSyncDateFrom] = useState(daysAgoISO(30))
+  const [syncDateTo, setSyncDateTo] = useState(todayISO())
 
   const load = useCallback(
     async (background = false) => {
@@ -83,7 +95,10 @@ export function OrikzorHarakatlariPage() {
     setError(null)
     setSyncResult(null)
     try {
-      const result = await syncOrikzorOrders()
+      const result = await syncOrikzorOrders({
+        begin_deal_date: syncDateFrom.trim() || undefined,
+        end_deal_date: syncDateTo.trim() || undefined,
+      })
       setSyncResult(result)
       await load()
     } catch (err) {
@@ -292,6 +307,30 @@ export function OrikzorHarakatlariPage() {
             ) : null}
           </div>
         </div>
+
+        {canSync ? (
+          <div className="flex flex-wrap items-center gap-4 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/30">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              {t('orders:filters.sync_date_range', 'Sinxronlash sana oralig\'i')}
+            </span>
+            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+              {t('orders:filters.date_from', 'Dan')}
+              <DateInput
+                value={syncDateFrom}
+                onChange={setSyncDateFrom}
+                aria-label={t('orders:filters.date_from')}
+              />
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+              {t('orders:filters.date_to', 'Gacha')}
+              <DateInput
+                value={syncDateTo}
+                onChange={setSyncDateTo}
+                aria-label={t('orders:filters.date_to')}
+              />
+            </label>
+          </div>
+        ) : null}
 
         <div className="flex flex-wrap items-center gap-2">
           <label className="flex-1 min-w-[180px] max-w-md text-sm text-slate-600 dark:text-slate-300">

@@ -46,6 +46,7 @@
     "filial": "Filial",
     "date_from": "Boshlanish sanasi",
     "date_to": "Tugash sanasi",
+    "sync_date_range": "Sinxronlash sana oralig'i",
     "filter_btn": "Filter",
     "filter_panel_title": "Filterlar",
     "filter_by_brand": "Brend bo'yicha",
