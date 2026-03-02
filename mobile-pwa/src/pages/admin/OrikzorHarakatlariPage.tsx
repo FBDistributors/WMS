@@ -294,10 +294,10 @@ export function OrikzorHarakatlariPage() {
                       skipped: syncResult.skipped,
                     })}
                   </span>
-                  {syncResult.detail || syncResult.errors_count ? (
+                  {syncResult.detail || syncResult.errors_count || syncResult.error ? (
                     <span className="max-w-xl rounded bg-amber-100 px-2 py-1 text-xs text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 break-words">
                       {syncResult.errors_count ? `${syncResult.errors_count} ta xato. ` : ''}
-                      {syncResult.detail ?? ''}
+                      {syncResult.error ?? syncResult.detail ?? ''}
                     </span>
                   ) : null}
                 </span>

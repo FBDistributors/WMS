@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Iterable, List, Tuple
 
@@ -8,6 +9,8 @@ from sqlalchemy.orm import Session, selectinload
 from app.integrations.smartup.mapper import _resolve_external_id, map_order_to_wms_order
 from app.integrations.smartup.schemas import SmartupOrder
 from app.models.order import Order, OrderLine
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -93,6 +96,11 @@ def import_orders(
             created += 1
         except Exception as exc:  # noqa: BLE001
             db.rollback()
+            logger.exception(
+                "O'rikzor import xato: external_id=%s sabab=%s",
+                payload.source_external_id,
+                exc,
+            )
             errors.append(ImportError(external_id=payload.source_external_id, reason=str(exc)))
             continue
 

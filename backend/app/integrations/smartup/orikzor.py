@@ -40,8 +40,13 @@ def _structure_summary(obj, depth: int = 0, max_depth: int = 4):
     return type(obj).__name__
 
 
+# Smartup movement statuslari: barchasini import qilamiz. "N" = yangi, "C" = tasdiqlangan va h.k.
+ALLOWED_MOVEMENT_STATUSES: set[str] = {"N", "C", "B#S", "D", "P"}  # N ni qo'shdik; kerak bo'lsa env orqali sozlash mumkin
+
+
 def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
     """movement$export javobini parse qiladi; bitta joyda movement/movements/list va movement_items/itens."""
+    raw_count = len(body)
     data = json.loads(body)
     movements: list = []
 
@@ -184,13 +189,13 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
             elif isinstance(inner, dict):
                 flattened.append(inner)
     movements = [m for m in flattened if isinstance(m, dict)]
+    dict_count = len(movements)
 
-    logger.info(
-        "Smartup movement$export parse: raw_count=%s dict_count=%s",
-        len(expanded),
-        len(movements),
-    )
-
+    skipped_by_reason: dict[str, int] = {
+        "missing_id": 0,
+        "status_not_allowed": 0,
+        "validation_error": 0,
+    }
     orders: list[SmartupOrder] = []
     first_validation_error: str | None = None
     for m in movements:
@@ -199,8 +204,13 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
         movement_id = (str(raw_id) if raw_id is not None else "").strip() or (str(raw_num) if raw_num is not None else "").strip()
         movement_number = (str(raw_num) if raw_num is not None else str(raw_id) if raw_id is not None else "").strip()
         if not movement_id and not movement_number:
+            skipped_by_reason["missing_id"] += 1
             continue
         movement_id = movement_id or movement_number
+        raw_status = (m.get("status") or "").strip()
+        if raw_status and ALLOWED_MOVEMENT_STATUSES and raw_status not in ALLOWED_MOVEMENT_STATUSES:
+            skipped_by_reason["status_not_allowed"] += 1
+            continue
 
         items = (
             m.get("movement_items")
@@ -235,8 +245,9 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
                 "name": it.get("product_article_code") or it.get("productArticleCode") or it.get("product_code") or it.get("productCode") or "",
             })
 
+        external_key = (m.get("external_id") or "").strip() or f"movement:{movement_id}"
         order_dict = {
-            "external_id": movement_id,
+            "external_id": external_key,
             "deal_id": movement_id,
             "order_no": movement_number,
             "status": "B#S",
@@ -249,6 +260,7 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
             if validate:
                 orders.append(validate(order_dict))
         except Exception as exc:  # noqa: BLE001
+            skipped_by_reason["validation_error"] += 1
             if first_validation_error is None:
                 first_validation_error = f"movement_id={movement_id!r} {type(exc).__name__}: {exc}"
             logger.warning(
@@ -257,6 +269,24 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
                 exc,
                 exc_info=False,
             )
+
+    filtered_count = len(orders)
+    previews = [
+        {
+            "movement_id": (m.get("movement_id") or m.get("movement_number") or ""),
+            "status": m.get("status"),
+            "external_id": m.get("external_id"),
+        }
+        for m in movements[:3]
+    ]
+    logger.info(
+        "O'rikzor parse debug: raw_count=%s dict_count=%s filtered_count=%s skipped_by_reason=%s previews=%s",
+        raw_count,
+        dict_count,
+        filtered_count,
+        skipped_by_reason,
+        previews,
+    )
 
     if movements and not orders and first_validation_error:
         logger.info(

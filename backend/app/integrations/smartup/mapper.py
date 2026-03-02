@@ -65,11 +65,13 @@ def map_order_to_wms_order(order: SmartupOrder) -> OrderPayload:
 
 
 def _resolve_external_id(order: SmartupOrder) -> str:
-    if order.external_id:
-        return order.external_id
-    if order.deal_id and order.filial_id:
-        return f"{order.deal_id}:{order.filial_id}"
-    if order.deal_id:
-        return order.deal_id
-    # TODO: Decide fallback behavior when both external_id and deal_id are empty.
-    return f"smartup:{order.order_no or 'unknown'}"
+    """Idempotency uchun: external_id yoki deal_id bo'lmasa movement:order_no ishlatiladi."""
+    if order.external_id and str(order.external_id).strip():
+        return str(order.external_id).strip()
+    if order.deal_id and str(order.deal_id).strip():
+        if order.filial_id and str(order.filial_id).strip():
+            return f"{order.deal_id}:{order.filial_id}"
+        return str(order.deal_id).strip()
+    if order.order_no and str(order.order_no).strip():
+        return f"movement:{order.order_no}"
+    return "smartup:unknown"

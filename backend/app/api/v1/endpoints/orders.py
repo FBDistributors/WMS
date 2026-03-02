@@ -110,6 +110,7 @@ class SmartupSyncResponse(BaseModel):
     skipped: int
     detail: Optional[str] = None  # birinchi import xatosi
     errors_count: Optional[int] = None  # import xatolari soni
+    error: Optional[str] = None  # UI sariq qutida ko'rsatiladigan xato (import exception va h.k.)
 
 
 class SyncOrikzorRequest(BaseModel):
@@ -598,23 +599,28 @@ async def sync_orikzor(
 
     try:
         response = export_movements_from_smartup(begin_date, end_date)
+        n_items = len(response.items)
+        logger.info(
+            "O'rikzor sync debug: raw response items=%s (parse logda raw_count/dict_count/filtered_count)",
+            n_items,
+        )
         created, updated, skipped, import_errors = import_orders(
             db, response.items, order_source="orikzor", filial_id_override=None
         )
         logger.info(
             "O'rikzor sync: created=%s updated=%s skipped=%s items_from_api=%s",
-            created, updated, skipped, len(response.items),
+            created, updated, skipped, n_items,
         )
         for err in import_errors[:5]:
             logger.error("O'rikzor import xato: external_id=%s sabab=%s", err.external_id, err.reason)
         if len(import_errors) > 5:
             logger.error("O'rikzor import: qolgan %s ta xato", len(import_errors) - 5)
         errors_count = len(import_errors) if import_errors else None
-        n_items = len(response.items)
+        first_error_reason = import_errors[0].reason if import_errors else None
         if (created + updated) == 0 and n_items > 0:
             detail = (
                 f"API dan {n_items} ta movement keldi, lekin import qilinmadi. "
-                + (f"Birinchi xato: {import_errors[0].reason}" if import_errors else "Render logda 'O'rikzor import xato' qatorini tekshiring.")
+                + (f"Birinchi xato: {first_error_reason}" if first_error_reason else "Render logda 'O'rikzor import xato' qatorini tekshiring.")
             )
         elif (created + updated) == 0 and n_items == 0:
             parse_warning = getattr(response, "parse_warning", None) or ""
@@ -624,11 +630,16 @@ async def sync_orikzor(
                 + "Sana oralig'ini yoki Render loglaridagi 'parse: raw_count= dict_count=' qatorini tekshiring."
             )
         else:
-            detail = import_errors[0].reason if import_errors else None
+            detail = first_error_reason if import_errors else None
         if (created + updated) == 0 and detail:
             logger.info("O'rikzor sync javob (detail): %s", detail[:200] + ("..." if len(detail or "") > 200 else ""))
         return SmartupSyncResponse(
-            created=created, updated=updated, skipped=skipped, detail=detail, errors_count=errors_count
+            created=created,
+            updated=updated,
+            skipped=skipped,
+            detail=detail,
+            errors_count=errors_count,
+            error=first_error_reason if (created + updated) == 0 and first_error_reason else None,
         )
     except RuntimeError as exc:
         msg = str(exc)
@@ -636,6 +647,7 @@ async def sync_orikzor(
             raise HTTPException(status_code=400, detail=msg) from exc
         raise HTTPException(status_code=500, detail=msg) from exc
     except Exception as exc:  # noqa: BLE001
+        logger.exception("O'rikzor sync failed: %s", exc)
         raise HTTPException(status_code=500, detail=f"O'rikzor sync failed: {exc}") from exc
 
 
