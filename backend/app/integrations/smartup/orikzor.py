@@ -16,6 +16,17 @@ from app.integrations.smartup.schemas import SmartupOrder, SmartupOrderExportRes
 logger = logging.getLogger(__name__)
 
 
+def _flatten_movement_list(lst: list) -> list:
+    """Ro'yxat ichida ro'yxat bo'lsa (list of lists) bitta ro'yxatga yoyadi."""
+    out: list = []
+    for x in lst:
+        if isinstance(x, list):
+            out.extend(x)
+        else:
+            out.append(x)
+    return out
+
+
 def _structure_summary(obj, depth: int = 0, max_depth: int = 4):
     """JSON ob'ektining strukturasi (kalitlar, turi, ro'yxat uzunligi) — log uchun."""
     if depth >= max_depth:
@@ -40,7 +51,7 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
         if data.get("movement_id") is not None or data.get("movement_number") is not None:
             movements = [data]
         elif isinstance(data.get("movement"), list):
-            movements = data["movement"]
+            movements = _flatten_movement_list(data["movement"])
         else:
             raw = (
                 data.get("movement")
@@ -55,44 +66,55 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
                 or data.get("list")
                 or data.get("rows")
             )
+            def _is_movement_dict(d):
+                return isinstance(d, dict) and (
+                    d.get("movement_id") is not None or d.get("movement_number") is not None
+                )
+
+            def _take_raw_from_list(lst):
+                if not isinstance(lst, list) or not lst:
+                    return None
+                first = lst[0]
+                if isinstance(first, dict) and _is_movement_dict(first):
+                    return lst
+                if isinstance(first, list) and first and isinstance(first[0], dict):
+                    return _flatten_movement_list(lst)
+                return None
+
             if raw is None and isinstance(data, dict):
                 for v in data.values():
-                    if isinstance(v, dict) and (
-                        v.get("movement_id") is not None or v.get("movement_number") is not None
-                    ):
+                    if isinstance(v, dict) and _is_movement_dict(v):
                         raw = v
                         break
-                    if isinstance(v, list) and v and isinstance(v[0], dict):
-                        raw = v
+                    candidate = _take_raw_from_list(v)
+                    if candidate is not None:
+                        raw = candidate
                         break
             if raw is None and isinstance(data, dict):
                 for k, v in data.items():
-                    if isinstance(v, list) and v and isinstance(v[0], dict):
-                        first = v[0]
-                        if first.get("movement_id") is not None or first.get("movement_number") is not None:
-                            raw = v
-                            logger.info("Smartup movement$export: ro'yxat '%s' kalitida topildi (len=%s)", k, len(v))
-                            break
+                    candidate = _take_raw_from_list(v)
+                    if candidate is not None:
+                        raw = candidate
+                        logger.info("Smartup movement$export: ro'yxat '%s' kalitida topildi (len=%s)", k, len(raw))
+                        break
             if raw is None and isinstance(data, dict):
                 for wrap in ("response", "data", "result", "export"):
                     inner = data.get(wrap)
                     if isinstance(inner, dict):
                         inner_list = inner.get("movement") or inner.get("movements") or inner.get("items")
-                        if isinstance(inner_list, list) and inner_list and isinstance(inner_list[0], dict):
-                            first = inner_list[0]
-                            if first.get("movement_id") is not None or first.get("movement_number") is not None:
-                                raw = inner_list
-                                logger.info("Smartup movement$export: ro'yxat '%s.%s' ichida topildi (len=%s)", wrap, "movement|movements|items", len(raw))
-                                break
+                        candidate = _take_raw_from_list(inner_list) if isinstance(inner_list, list) else None
+                        if candidate is not None:
+                            raw = candidate
+                            logger.info("Smartup movement$export: ro'yxat '%s.%s' ichida topildi (len=%s)", wrap, "movement|movements|items", len(raw))
+                            break
                     if raw is not None:
                         break
             if raw is None and isinstance(data, dict) and len(data) == 1:
                 single_val = next(iter(data.values()), None)
-                if isinstance(single_val, list) and single_val and isinstance(single_val[0], dict):
-                    first = single_val[0]
-                    if first.get("movement_id") is not None or first.get("movement_number") is not None:
-                        raw = single_val
-                        logger.info("Smartup movement$export: bitta kalit ostidagi ro'yxat ishlatildi (len=%s)", len(raw))
+                candidate = _take_raw_from_list(single_val) if single_val is not None else None
+                if candidate is not None:
+                    raw = candidate
+                    logger.info("Smartup movement$export: bitta kalit ostidagi ro'yxat ishlatildi (len=%s)", len(raw))
             if raw is not None:
                 if isinstance(raw, list):
                     movements = raw
@@ -120,6 +142,8 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
     for x in movements:
         if isinstance(x, dict):
             normalized.append(x)
+        elif isinstance(x, list):
+            normalized.extend(_flatten_movement_list(x))
         elif isinstance(x, str):
             try:
                 p = json.loads(x)
