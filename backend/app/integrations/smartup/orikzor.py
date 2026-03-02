@@ -8,7 +8,9 @@ import logging
 import os
 import urllib.error
 import urllib.request
-from datetime import date
+from datetime import date, datetime
+
+from pydantic import ValidationError as PydanticValidationError
 
 from app.integrations.smartup.schemas import SmartupOrder, SmartupOrderExportResponse
 
@@ -42,6 +44,22 @@ def _structure_summary(obj, depth: int = 0, max_depth: int = 4):
 
 # Smartup movement statuslari: barchasini import qilamiz. "N" = yangi, "C" = tasdiqlangan va h.k.
 ALLOWED_MOVEMENT_STATUSES: set[str] = {"N", "C", "B#S", "D", "P"}  # N ni qo'shdik; kerak bo'lsa env orqali sozlash mumkin
+
+
+def _parse_movement_date(value: str | None) -> datetime | None:
+    """Smartup from_movement_date format: '31.01.2026 15:01:52' (DD.MM.YYYY HH:MM:SS)."""
+    if not value or not isinstance(value, str):
+        return None
+    raw = value.strip()
+    if not raw:
+        return None
+    try:
+        return datetime.strptime(raw, "%d.%m.%Y %H:%M:%S")
+    except (ValueError, TypeError):
+        try:
+            return datetime.strptime(raw, "%d.%m.%Y")
+        except (ValueError, TypeError):
+            return None
 
 
 def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
@@ -190,11 +208,19 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
                 flattened.append(inner)
     movements = [m for m in flattened if isinstance(m, dict)]
     dict_count = len(movements)
+    raw_count = dict_count  # invariant: raw_count = len(movements)
+
+    status_filter_off = os.getenv("SMARTUP_ORIKZOR_STATUS_FILTER_OFF", "").strip().lower() in ("1", "true", "yes")
 
     skipped_by_reason: dict[str, int] = {
         "missing_id": 0,
         "status_not_allowed": 0,
+        "product_not_found": 0,
+        "warehouse_null_or_not_found": 0,
+        "date_parse_error": 0,
+        "db_error": 0,
         "validation_error": 0,
+        "exception": 0,
     }
     orders: list[SmartupOrder] = []
     first_validation_error: str | None = None
@@ -208,9 +234,19 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
             continue
         movement_id = movement_id or movement_number
         raw_status = (m.get("status") or "").strip()
-        if raw_status and ALLOWED_MOVEMENT_STATUSES and raw_status not in ALLOWED_MOVEMENT_STATUSES:
+        if not status_filter_off and raw_status and ALLOWED_MOVEMENT_STATUSES and raw_status not in ALLOWED_MOVEMENT_STATUSES:
             skipped_by_reason["status_not_allowed"] += 1
             continue
+
+        if not (m.get("filial_code") or m.get("from_warehouse_code") or m.get("to_warehouse_code")):
+            skipped_by_reason["warehouse_null_or_not_found"] += 1
+            continue
+
+        from_movement_date_raw = m.get("from_movement_date")
+        if from_movement_date_raw is not None and str(from_movement_date_raw).strip():
+            if _parse_movement_date(str(from_movement_date_raw)) is None:
+                skipped_by_reason["date_parse_error"] += 1
+                continue
 
         items = (
             m.get("movement_items")
@@ -261,7 +297,7 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
             validate = getattr(SmartupOrder, "model_validate", getattr(SmartupOrder, "parse_obj", None))
             if validate:
                 orders.append(validate(order_dict))
-        except Exception as exc:  # noqa: BLE001
+        except PydanticValidationError as exc:
             skipped_by_reason["validation_error"] += 1
             if first_validation_error is None:
                 first_validation_error = f"movement_id={movement_id!r} {type(exc).__name__}: {exc}"
@@ -270,6 +306,15 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
                 movement_id,
                 exc,
                 exc_info=False,
+            )
+        except Exception as exc:  # noqa: BLE001
+            skipped_by_reason["exception"] += 1
+            if first_validation_error is None:
+                first_validation_error = f"movement_id={movement_id!r} {type(exc).__name__}: {exc}"
+            logger.exception(
+                "O'rikzor movement import failed: movement_id=%s %s",
+                movement_id,
+                exc,
             )
 
     filtered_count = len(orders)
@@ -296,15 +341,26 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
             "first_item": _first_item_preview(m),
         })
 
-    skipped_by_reason["missing_key"] = skipped_by_reason.get("missing_id", 0)
-    skipped_by_reason.setdefault("missing_warehouse_codes", 0)
+    parse_skipped_total = sum(skipped_by_reason.values())
+    parse_processed = filtered_count + parse_skipped_total
+    discrepancy: bool | None = None
+    if dict_count != parse_processed:
+        discrepancy = True
+        logger.error(
+            "DISCREPANCY raw=%s processed=%s filtered=%s skipped_total=%s reasons=%s",
+            dict_count,
+            parse_processed,
+            filtered_count,
+            parse_skipped_total,
+            skipped_by_reason,
+        )
     logger.info(
-        "O'rikzor parse debug: raw_count=%s dict_count=%s filtered_count=%s skipped_by_reason=%s previews=%s",
+        "O'rikzor parse debug: raw_count=%s dict_count=%s filtered_count=%s skipped_total=%s skipped_by_reason=%s",
         raw_count,
         dict_count,
         filtered_count,
+        parse_skipped_total,
         skipped_by_reason,
-        previews,
     )
 
     if movements and not orders and first_validation_error:
@@ -325,6 +381,7 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
         debug_dict_count=dict_count,
         debug_skipped_by_reason=skipped_by_reason,
         debug_preview=previews,
+        debug_discrepancy=discrepancy,
     )
 
 

@@ -630,16 +630,31 @@ async def sync_orikzor(
         errors_count = len(import_errors) if import_errors else None
         first_error_reason = import_errors[0].reason if import_errors else None
         dict_count_val = response.debug_dict_count if response.debug_dict_count is not None else 0
+        raw_count = dict_count_val
         parse_skipped = getattr(response, "debug_skipped_by_reason", None) or {}
-        merged_skipped = {**parse_skipped, **skipped_by_reason}
+        all_reason_keys = set(parse_skipped) | set(skipped_by_reason)
+        merged_skipped = {k: parse_skipped.get(k, 0) + skipped_by_reason.get(k, 0) for k in all_reason_keys}
+        skipped_total = sum(merged_skipped.values())
+        processed = created + updated + skipped_total
+        discrepancy = None
+        if raw_count is not None and processed != raw_count:
+            logger.error(
+                "DISCREPANCY raw=%s processed=%s inserted=%s updated=%s skipped=%s reasons=%s",
+                raw_count,
+                processed,
+                created,
+                updated,
+                skipped_total,
+                merged_skipped,
+            )
+            discrepancy = True
         debug = {
-            "raw_count": response.debug_raw_count,
-            "dict_count": response.debug_dict_count,
-            "filtered_count": n_items,
-            "inserted_count": created,
-            "updated_count": updated,
-            "skipped_count": skipped,
+            "raw_count": raw_count if raw_count is not None else 0,
+            "inserted": created,
+            "updated": updated,
+            "skipped_total": skipped_total,
             "skipped_by_reason": merged_skipped,
+            "discrepancy": discrepancy or getattr(response, "debug_discrepancy", None),
             "preview": (getattr(response, "debug_preview", None) or [])[:2],
         }
         if (created + updated) == 0 and n_items > 0:

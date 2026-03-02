@@ -49,10 +49,12 @@ def import_orders(
         "status_not_allowed": 0,
         "missing_key": 0,
         "product_not_found": 0,
+        "warehouse_null_or_not_found": 0,
         "warehouse_not_found": 0,
         "db_error": 0,
         "validation_error": 0,
         "duplicate_conflict": 0,
+        "exception": 0,
     }
     override = (filial_id_override or "").strip() or None
     orders_list = list(orders)
@@ -127,11 +129,14 @@ def import_orders(
         except Exception as exc:  # noqa: BLE001
             db.rollback()
             reason_key = _classify_import_error(exc)
+            if reason_key not in skipped_by_reason:
+                reason_key = "exception"
             skipped_by_reason[reason_key] = skipped_by_reason.get(reason_key, 0) + 1
             logger.exception(
-                "O'rikzor import xato: external_id=%s sabab=%s",
+                "O'rikzor import xato: external_id=%s sabab=%s reason_key=%s",
                 payload.source_external_id,
                 exc,
+                reason_key,
             )
             errors.append(ImportError(external_id=payload.source_external_id, reason=str(exc)))
             continue
