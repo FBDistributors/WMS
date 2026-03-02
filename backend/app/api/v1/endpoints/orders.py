@@ -656,6 +656,9 @@ async def sync_orikzor(
             "skipped_by_reason": merged_skipped,
             "discrepancy": discrepancy or getattr(response, "debug_discrepancy", None),
             "preview": (getattr(response, "debug_preview", None) or [])[:2],
+            "pre_filter_count": getattr(response, "debug_pre_filter_count", None),
+            "loop_count": getattr(response, "debug_loop_count", None),
+            "skipped_out_of_range": getattr(response, "debug_skipped_out_of_range", None),
         }
         if (created + updated) == 0 and n_items > 0:
             detail = (

@@ -15,7 +15,7 @@ type NetworkContextValue = {
 
 const NetworkContext = createContext<NetworkContextValue | null>(null);
 
-export function NetworkProvider({ children }: { children: React.ReactNode }) {
+export function NetworkProvider({ children }: { children?: React.ReactNode }) {
   const [isOnline, setIsOnline] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
   const wasOfflineRef = useRef(false);

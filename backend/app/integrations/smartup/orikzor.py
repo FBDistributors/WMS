@@ -207,7 +207,8 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
             elif isinstance(inner, dict):
                 flattened.append(inner)
     movements = [m for m in flattened if isinstance(m, dict)]
-    dict_count = len(movements)
+    pre_filter_count = len(movements)
+    dict_count = pre_filter_count
     raw_count = dict_count  # invariant: raw_count = len(movements)
 
     status_filter_off = os.getenv("SMARTUP_ORIKZOR_STATUS_FILTER_OFF", "").strip().lower() in ("1", "true", "yes")
@@ -224,7 +225,10 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
     }
     orders: list[SmartupOrder] = []
     first_validation_error: str | None = None
+    loop_count = 0
+    skipped_out_of_range = 0  # sana bo'yicha tashlab yuborilgan (kelajakda date filter bo'lsa)
     for m in movements:
+        loop_count += 1
         raw_id = m.get("movement_id")
         raw_num = m.get("movement_number")
         movement_id = (str(raw_id) if raw_id is not None else "").strip() or (str(raw_num) if raw_num is not None else "").strip()
@@ -236,9 +240,16 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
         raw_status = (m.get("status") or "").strip()
         if not status_filter_off and raw_status and ALLOWED_MOVEMENT_STATUSES and raw_status not in ALLOWED_MOVEMENT_STATUSES:
             skipped_by_reason["status_not_allowed"] += 1
+            if raw_status == "N":
+                logger.debug("O'rikzor: N status skipped (allowed_statuses=%s)", sorted(ALLOWED_MOVEMENT_STATUSES))
             continue
 
-        if not (m.get("filial_code") or m.get("from_warehouse_code") or m.get("to_warehouse_code")):
+        # from/to_warehouse_code null bo'lsa skip qilmaymiz — default warehouse (filial) ishlatamiz
+        default_warehouse_code = (os.getenv("DEFAULT_WAREHOUSE_CODE") or os.getenv("SMARTUP_DEFAULT_FILIAL") or "MAIN").strip()
+        filial = (
+            m.get("filial_code") or m.get("from_warehouse_code") or m.get("to_warehouse_code") or default_warehouse_code
+        )
+        if not (filial or "").strip():
             skipped_by_reason["warehouse_null_or_not_found"] += 1
             continue
 
@@ -282,8 +293,6 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
             })
 
         external_key = (m.get("external_id") or "").strip() or f"movement:{movement_id}"
-        default_filial = (os.getenv("SMARTUP_DEFAULT_FILIAL") or "MAIN").strip()
-        filial = m.get("filial_code") or m.get("from_warehouse_code") or m.get("to_warehouse_code") or default_filial
         order_dict = {
             "external_id": external_key,
             "deal_id": movement_id,
@@ -297,6 +306,10 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
             validate = getattr(SmartupOrder, "model_validate", getattr(SmartupOrder, "parse_obj", None))
             if validate:
                 orders.append(validate(order_dict))
+            else:
+                skipped_by_reason["validation_error"] += 1
+                if first_validation_error is None:
+                    first_validation_error = f"movement_id={movement_id!r} SmartupOrder.model_validate yo'q"
         except PydanticValidationError as exc:
             skipped_by_reason["validation_error"] += 1
             if first_validation_error is None:
@@ -355,11 +368,13 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
             skipped_by_reason,
         )
     logger.info(
-        "O'rikzor parse debug: raw_count=%s dict_count=%s filtered_count=%s skipped_total=%s skipped_by_reason=%s",
-        raw_count,
+        "O'rikzor parse debug: pre_filter_count=%s post_filter_count=%s loop_count=%s filtered_count=%s skipped_total=%s skipped_out_of_range=%s reasons=%s",
+        pre_filter_count,
         dict_count,
+        loop_count,
         filtered_count,
         parse_skipped_total,
+        skipped_out_of_range,
         skipped_by_reason,
     )
 
@@ -382,6 +397,9 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
         debug_skipped_by_reason=skipped_by_reason,
         debug_preview=previews,
         debug_discrepancy=discrepancy,
+        debug_pre_filter_count=pre_filter_count,
+        debug_loop_count=loop_count,
+        debug_skipped_out_of_range=skipped_out_of_range,
     )
 
 

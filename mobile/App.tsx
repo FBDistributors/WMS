@@ -49,6 +49,7 @@ export default function App() {
       <NetworkProvider>
       <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
+        id="root"
         initialRouteName="Login"
         screenOptions={{ headerShown: false }}
       >

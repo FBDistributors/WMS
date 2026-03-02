@@ -27,7 +27,7 @@ function replaceParams(text: string, params?: Record<string, string | number>): 
   return result;
 }
 
-export function LocaleProvider({ children }: { children: React.ReactNode }) {
+export function LocaleProvider({ children }: { children?: React.ReactNode }) {
   const [locale, setLocaleState] = useState<LocaleCode>(defaultLocale);
 
   useEffect(() => {

@@ -1,6 +1,15 @@
 {
   "extends": "@react-native/typescript-config/tsconfig.json",
   "compilerOptions": {
-    "jsx": "react-native"
-  }
+    "jsx": "react-native",
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "noEmit": true,
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true
+  },
+  "include": ["**/*.ts", "**/*.tsx", "App.tsx"],
+  "exclude": ["node_modules", "babel.config.js", "metro.config.js"]
 }
