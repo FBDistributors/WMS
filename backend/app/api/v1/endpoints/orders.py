@@ -577,18 +577,30 @@ async def sync_orikzor(
     if payload.begin_deal_date is not None and payload.end_deal_date is not None:
         begin_date = payload.begin_deal_date
         end_date = payload.end_deal_date
+    elif payload.begin_deal_date is not None:
+        begin_date = payload.begin_deal_date
+        end_date = today
+    elif payload.end_deal_date is not None:
+        end_date = payload.end_deal_date
+        begin_date = end_date - timedelta(days=30)
     else:
         end_date = today
         begin_date = today - timedelta(days=30)
     if begin_date > end_date:
         raise HTTPException(status_code=400, detail="begin_deal_date must be <= end_deal_date")
 
+    logger = logging.getLogger(__name__)
+    logger.info(
+        "O'rikzor sync: sana oralig'i %s .. %s",
+        begin_date.isoformat(),
+        end_date.isoformat(),
+    )
+
     try:
         response = export_movements_from_smartup(begin_date, end_date)
         created, updated, skipped, import_errors = import_orders(
             db, response.items, order_source="orikzor", filial_id_override=None
         )
-        logger = logging.getLogger(__name__)
         logger.info(
             "O'rikzor sync: created=%s updated=%s skipped=%s items_from_api=%s",
             created, updated, skipped, len(response.items),
@@ -597,13 +609,19 @@ async def sync_orikzor(
             logger.error("O'rikzor import xato: external_id=%s sabab=%s", err.external_id, err.reason)
         if len(import_errors) > 5:
             logger.error("O'rikzor import: qolgan %s ta xato", len(import_errors) - 5)
-        detail = import_errors[0].reason if import_errors else None
         errors_count = len(import_errors) if import_errors else None
-        if not detail and (created + updated) == 0 and len(response.items) == 0:
+        if (created + updated) == 0 and len(response.items) == 0:
             detail = (
                 "API dan hech qanday movement qaytmadi. "
                 "Sana oralig'ini yoki Render loglaridagi 'parse: raw_count= dict_count=' qatorini tekshiring."
             )
+        elif (created + updated) == 0 and len(response.items) > 0 and import_errors:
+            detail = (
+                f"API dan {len(response.items)} ta movement keldi, lekin import qilinmadi. "
+                f"Birinchi xato: {import_errors[0].reason}"
+            )
+        else:
+            detail = import_errors[0].reason if import_errors else None
         return SmartupSyncResponse(
             created=created, updated=updated, skipped=skipped, detail=detail, errors_count=errors_count
         )

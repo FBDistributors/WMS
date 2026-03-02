@@ -261,10 +261,14 @@ def export_movements_from_smartup(begin_date: date, end_date: date) -> SmartupOr
             raw = json.loads(body)
             keys = list(raw.keys()) if isinstance(raw, dict) else []
             logger.warning(
-                "Smartup movement$export: 0 ta order. Kalitlar=%s preview=%s",
+                "Smartup movement$export: 0 ta order (body_len=%s). Kalitlar=%s preview=%s",
+                len(body),
                 keys,
                 (body[:500] + "...") if len(body) > 500 else body,
             )
         except Exception:  # noqa: S110
-            logger.warning("Smartup movement$export: API dan 0 ta movement qaytdi.")
+            logger.warning(
+                "Smartup movement$export: API dan 0 ta movement qaytdi (body_len=%s).",
+                len(body),
+            )
     return parsed
