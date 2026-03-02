@@ -46,6 +46,8 @@
     "date_to": "Дата по",
     "sync_date_range": "Диапазон дат синхронизации",
     "sync_date_hint": "from_movement_date в Smartup должен попадать в этот диапазон.",
+    "sync_single_day_hint": "Выбран один день — в этот день должны быть движения в Smartup. Расширьте диапазон (напр. 01.02–28.02).",
+    "sync_format_hint": "Формат Smartup: день.месяц.год (03.02.2026 = 3 фев). Сравните 'body=' в логах Render с Postman.",
     "filter_btn": "Фильтр",
     "filter_panel_title": "Фильтры",
     "filter_by_brand": "По бренду",

@@ -332,6 +332,16 @@ export function OrikzorHarakatlariPage() {
             <span className="text-xs text-slate-500 dark:text-slate-400">
               {t('orders:sync_date_hint', "Smartup'dagi from_movement_date shu oraliqda bo'lishi kerak.")}
             </span>
+            {syncDateFrom && syncDateTo && syncDateFrom === syncDateTo ? (
+              <span className="text-xs text-amber-700 dark:text-amber-300">
+                {t('orders:sync_single_day_hint', "Bitta kun tanlangan — o'sha kunda Smartup'da harakat bo'lishi kerak. Oraliqni kengaytiring (masalan 01.02–28.02).")}
+              </span>
+            ) : null}
+            {syncResult && syncResult.created === 0 && syncResult.updated === 0 && syncResult.detail ? (
+              <span className="text-xs text-slate-600 dark:text-slate-400 block">
+                {t('orders:sync_format_hint', "Smartup formati: kun.oy.yil (03.02.2026 = 3-fevral). Render loglarida 'body=' ni Postman bilan solashtiring.")}
+              </span>
+            ) : null}
           </div>
         ) : null}
 

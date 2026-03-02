@@ -232,10 +232,11 @@ def export_movements_from_smartup(begin_date: date, end_date: date) -> SmartupOr
     }
 
     logger.info(
-        "Smartup movement$export: url=%s sana=%s..%s",
+        "Smartup movement$export: url=%s sana=%s..%s body=%s",
         url.split("?")[0],
         begin_str,
         end_str,
+        json.dumps(payload),
     )
 
     request = urllib.request.Request(url, data=data, headers=headers, method="POST")
