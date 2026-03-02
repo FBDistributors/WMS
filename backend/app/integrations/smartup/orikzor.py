@@ -52,6 +52,7 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
             movements = [data]
         elif isinstance(data.get("movement"), list):
             movements = _flatten_movement_list(data["movement"])
+            logger.info("Smartup movement$export: data['movement'] dan %s ta olindi", len(movements))
         else:
             raw = (
                 data.get("movement")
@@ -258,7 +259,7 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
             )
 
     if movements and not orders and first_validation_error:
-        logger.warning(
+        logger.info(
             "O'rikzor parse: %s ta movementdan 0 ta order — birinchi xato: %s",
             len(movements),
             first_validation_error,
