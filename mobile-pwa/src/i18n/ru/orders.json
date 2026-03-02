@@ -48,6 +48,7 @@
     "sync_date_hint": "from_movement_date в Smartup должен попадать в этот диапазон.",
     "sync_single_day_hint": "Выбран один день — в этот день должны быть движения в Smartup. Расширьте диапазон (напр. 01.02–28.02).",
     "sync_format_hint": "Формат Smartup: день.месяц.год (03.02.2026 = 3 фев). Сравните 'body=' в логах Render с Postman.",
+    "sync_log_hint": "Если в логе Render есть «N ta order», данные пришли, но импорт не прошёл — при следующей синхронизации причина будет в жёлтом блоке.",
     "filter_btn": "Фильтр",
     "filter_panel_title": "Фильтры",
     "filter_by_brand": "По бренду",

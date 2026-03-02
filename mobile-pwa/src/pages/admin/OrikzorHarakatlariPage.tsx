@@ -95,9 +95,14 @@ export function OrikzorHarakatlariPage() {
     setError(null)
     setSyncResult(null)
     try {
+      let begin = syncDateFrom.trim() || undefined
+      let end = syncDateTo.trim() || undefined
+      if (begin && end && begin > end) {
+        ;[begin, end] = [end, begin]
+      }
       const result = await syncOrikzorOrders({
-        begin_deal_date: syncDateFrom.trim() || undefined,
-        end_deal_date: syncDateTo.trim() || undefined,
+        begin_deal_date: begin,
+        end_deal_date: end,
       })
       setSyncResult(result)
       await load()
@@ -338,8 +343,11 @@ export function OrikzorHarakatlariPage() {
               </span>
             ) : null}
             {syncResult && syncResult.created === 0 && syncResult.updated === 0 && syncResult.detail ? (
-              <span className="text-xs text-slate-600 dark:text-slate-400 block">
-                {t('orders:sync_format_hint', "Smartup formati: kun.oy.yil (03.02.2026 = 3-fevral). Render loglarida 'body=' ni Postman bilan solashtiring.")}
+              <span className="text-xs text-slate-600 dark:text-slate-400 block space-y-0.5">
+                <span className="block">{t('orders:sync_format_hint', "Smartup formati: kun.oy.yil (03.02.2026 = 3-fevral). Render loglarida 'body=' ni Postman bilan solashtiring.")}</span>
+                {syncResult.detail.includes('hech qanday movement') || syncResult.detail.includes('qaytmadi') ? (
+                  <span className="block">{t('orders:sync_log_hint', "Agar Render logda 'N ta order' ko'rsa, ma'lumot keldi lekin import xatosi — keyingi sync da sariq qutida sabab chiqadi.")}</span>
+                ) : null}
               </span>
             ) : null}
           </div>
