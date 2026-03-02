@@ -191,6 +191,7 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
     )
 
     orders: list[SmartupOrder] = []
+    first_validation_error: str | None = None
     for m in movements:
         raw_id = m.get("movement_id")
         raw_num = m.get("movement_number")
@@ -247,12 +248,21 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
             if validate:
                 orders.append(validate(order_dict))
         except Exception as exc:  # noqa: BLE001
+            if first_validation_error is None:
+                first_validation_error = f"movement_id={movement_id!r} {type(exc).__name__}: {exc}"
             logger.warning(
                 "O'rikzor movement to order skip movement_id=%s reason=%s",
                 movement_id,
                 exc,
                 exc_info=False,
             )
+
+    if movements and not orders and first_validation_error:
+        logger.warning(
+            "O'rikzor parse: %s ta movementdan 0 ta order — birinchi xato: %s",
+            len(movements),
+            first_validation_error,
+        )
 
     return SmartupOrderExportResponse(items=orders)
 
