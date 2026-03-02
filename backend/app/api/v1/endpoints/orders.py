@@ -617,9 +617,11 @@ async def sync_orikzor(
                 + (f"Birinchi xato: {import_errors[0].reason}" if import_errors else "Render logda 'O'rikzor import xato' qatorini tekshiring.")
             )
         elif (created + updated) == 0 and n_items == 0:
+            parse_warning = getattr(response, "parse_warning", None) or ""
             detail = (
                 "API dan hech qanday movement qaytmadi. "
-                "Sana oralig'ini yoki Render loglaridagi 'parse: raw_count= dict_count=' qatorini tekshiring."
+                + (parse_warning + " " if parse_warning else "")
+                + "Sana oralig'ini yoki Render loglaridagi 'parse: raw_count= dict_count=' qatorini tekshiring."
             )
         else:
             detail = import_errors[0].reason if import_errors else None

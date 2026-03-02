@@ -265,7 +265,11 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
             first_validation_error,
         )
 
-    return SmartupOrderExportResponse(items=orders)
+    parse_warning: str | None = None
+    if movements and not orders and first_validation_error:
+        parse_warning = f"{len(movements)} ta movementdan 0 ta order. Birinchi xato: {first_validation_error}"
+
+    return SmartupOrderExportResponse(items=orders, parse_warning=parse_warning)
 
 
 def export_movements_from_smartup(begin_date: date, end_date: date) -> SmartupOrderExportResponse:
