@@ -271,14 +271,28 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
             )
 
     filtered_count = len(orders)
-    previews = [
-        {
+
+    def _first_item_preview(m: dict) -> dict:
+        items = m.get("movement_items") or m.get("movement_itens") or m.get("movementItems") or []
+        first = items[0] if isinstance(items, list) and items and isinstance(items[0], dict) else {}
+        return {
+            "product_code": first.get("product_code") or first.get("productCode"),
+            "product_article_code": first.get("product_article_code") or first.get("productArticleCode"),
+            "quantity": first.get("quantity") or first.get("qty"),
+        }
+
+    previews = []
+    for m in movements[:3]:
+        previews.append({
             "movement_id": (m.get("movement_id") or m.get("movement_number") or ""),
+            "movement_number": m.get("movement_number"),
             "status": m.get("status"),
             "external_id": m.get("external_id"),
-        }
-        for m in movements[:3]
-    ]
+            "from_movement_date": m.get("from_movement_date"),
+            "first_item": _first_item_preview(m),
+        })
+
+    skipped_by_reason["missing_key"] = skipped_by_reason.get("missing_id", 0)
     logger.info(
         "O'rikzor parse debug: raw_count=%s dict_count=%s filtered_count=%s skipped_by_reason=%s previews=%s",
         raw_count,
@@ -299,7 +313,12 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
     if movements and not orders and first_validation_error:
         parse_warning = f"{len(movements)} ta movementdan 0 ta order. Birinchi xato: {first_validation_error}"
 
-    return SmartupOrderExportResponse(items=orders, parse_warning=parse_warning)
+    return SmartupOrderExportResponse(
+        items=orders,
+        parse_warning=parse_warning,
+        debug_raw_count=raw_count,
+        debug_dict_count=dict_count,
+    )
 
 
 def export_movements_from_smartup(begin_date: date, end_date: date) -> SmartupOrderExportResponse:

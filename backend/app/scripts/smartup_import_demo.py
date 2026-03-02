@@ -21,7 +21,7 @@ def main() -> None:
 
     db = SessionLocal()
     try:
-        created, updated, skipped, errors = import_orders(db, response.items)
+        created, updated, skipped, errors, _ = import_orders(db, response.items)
     finally:
         db.close()
 

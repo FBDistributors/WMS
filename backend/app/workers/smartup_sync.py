@@ -86,7 +86,7 @@ def sync_orders(db: Session) -> Tuple[int, str | None, list]:
             filial_code=None,
         )
 
-        created, updated, skipped, errors = import_orders(db, response.items)
+        created, updated, skipped, errors, _ = import_orders(db, response.items)
         count = created + updated
 
         if errors:

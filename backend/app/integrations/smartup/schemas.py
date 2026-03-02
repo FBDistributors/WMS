@@ -184,6 +184,8 @@ class SmartupOrderExportResponse(BaseModel):
     items: List[SmartupOrder] = Field(default_factory=list, alias="order")
     total: Optional[int] = None
     parse_warning: Optional[str] = None
+    debug_raw_count: Optional[int] = None
+    debug_dict_count: Optional[int] = None
 
     @root_validator(pre=True)
     def _normalize_order_list(cls, values):  # noqa: N805

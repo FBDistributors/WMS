@@ -63,7 +63,7 @@ async def import_smartup_orders(
             end_deal_date=payload.end_deal_date.strftime("%d.%m.%Y"),
             filial_code=payload.filial_code,
         )
-        created, updated, skipped, errors = import_orders(db, response.items)
+        created, updated, skipped, errors, _ = import_orders(db, response.items)
     except Exception as exc:  # noqa: BLE001
         run.finished_at = datetime.utcnow()
         run.success_count = 0

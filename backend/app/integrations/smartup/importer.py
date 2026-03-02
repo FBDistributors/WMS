@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Iterable, List, Tuple
+from typing import Dict, Iterable, List, Tuple
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.integrations.smartup.mapper import _resolve_external_id, map_order_to_wms_order
@@ -19,20 +20,49 @@ class ImportError:
     reason: str
 
 
+def _classify_import_error(exc: BaseException) -> str:
+    """Xato sababini tasniflash: duplicate_conflict, db_error, validation_error."""
+    msg = (str(exc) or "").lower()
+    if isinstance(exc, IntegrityError):
+        if "unique" in msg or "duplicate" in msg or "already exists" in msg or "uq_" in msg:
+            return "duplicate_conflict"
+        return "db_error"
+    if "not null" in msg or "nullable" in msg or "required" in msg:
+        return "validation_error"
+    if "foreign key" in msg or "constraint" in msg or "integrity" in msg:
+        return "db_error"
+    return "db_error"
+
+
 def import_orders(
     db: Session,
     orders: Iterable[SmartupOrder],
     order_source: str | None = None,
     filial_id_override: str | None = None,
-) -> Tuple[int, int, int, List[ImportError]]:
+) -> Tuple[int, int, int, List[ImportError], Dict[str, int]]:
     created = 0
     updated = 0
     skipped = 0
     errors: List[ImportError] = []
+    # OrderLine da product_id yo'q — faqat sku/name/qty saqlanadi; product lookup qilinmaydi.
+    skipped_by_reason: Dict[str, int] = {
+        "status_not_allowed": 0,
+        "missing_key": 0,
+        "product_not_found": 0,
+        "warehouse_not_found": 0,
+        "db_error": 0,
+        "validation_error": 0,
+        "duplicate_conflict": 0,
+    }
     override = (filial_id_override or "").strip() or None
-
-    for order in orders:
+    orders_list = list(orders)
+    for order in orders_list:
         external_id = _resolve_external_id(order)
+        if not (external_id or "").strip():
+            skipped += 1
+            skipped_by_reason["missing_key"] += 1
+            errors.append(ImportError(external_id="", reason="external_id bo'sh, fallback ham yo'q"))
+            continue
         if override and not (order.filial_id or order.filial_code):
             if order.deal_id:
                 external_id = f"{order.deal_id}:{override}"
@@ -96,6 +126,8 @@ def import_orders(
             created += 1
         except Exception as exc:  # noqa: BLE001
             db.rollback()
+            reason_key = _classify_import_error(exc)
+            skipped_by_reason[reason_key] = skipped_by_reason.get(reason_key, 0) + 1
             logger.exception(
                 "O'rikzor import xato: external_id=%s sabab=%s",
                 payload.source_external_id,
@@ -104,7 +136,19 @@ def import_orders(
             errors.append(ImportError(external_id=payload.source_external_id, reason=str(exc)))
             continue
 
-    return created, updated, skipped, errors
+    if orders_list and (created + updated) > 0:
+        for i, order in enumerate(orders_list[:3]):
+            ext = _resolve_external_id(order)
+            logger.info(
+                "O'rikzor import preview [%s]: external_id=%s order_no=%s status=%s lines=%s",
+                i,
+                ext,
+                order.order_no,
+                order.status,
+                len(order.lines) if order.lines else 0,
+            )
+
+    return created, updated, skipped, errors, skipped_by_reason
 
 
 def _line_key(line: OrderLine) -> Tuple[str, str, str]:

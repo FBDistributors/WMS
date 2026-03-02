@@ -551,7 +551,7 @@ async def sync_orders_from_smartup(
             if payload.order_source == "diller" and (payload.filial_id or "").strip()
             else None
         )
-        created, updated, skipped, import_errors = import_orders(
+        created, updated, skipped, import_errors, _ = import_orders(
             db, response.items, order_source=payload.order_source, filial_id_override=filial_override
         )
         detail = import_errors[0].reason if import_errors else None
@@ -600,16 +600,27 @@ async def sync_orikzor(
     try:
         response = export_movements_from_smartup(begin_date, end_date)
         n_items = len(response.items)
+        raw_count = response.debug_raw_count if response.debug_raw_count is not None else "?"
+        dict_count = response.debug_dict_count if response.debug_dict_count is not None else "?"
         logger.info(
-            "O'rikzor sync debug: raw response items=%s (parse logda raw_count/dict_count/filtered_count)",
+            "O'rikzor sync debug: raw_count=%s dict_count=%s filtered_count=%s (parse logda 3 ta movement preview)",
+            raw_count,
+            dict_count,
             n_items,
         )
-        created, updated, skipped, import_errors = import_orders(
+        created, updated, skipped, import_errors, skipped_by_reason = import_orders(
             db, response.items, order_source="orikzor", filial_id_override=None
         )
         logger.info(
-            "O'rikzor sync: created=%s updated=%s skipped=%s items_from_api=%s",
-            created, updated, skipped, n_items,
+            "O'rikzor sync: inserted_count=%s updated_count=%s skipped_count=%s parsed_count=%s",
+            created,
+            updated,
+            skipped,
+            n_items,
+        )
+        logger.info(
+            "O'rikzor sync skipped_by_reason: %s",
+            skipped_by_reason,
         )
         for err in import_errors[:5]:
             logger.error("O'rikzor import xato: external_id=%s sabab=%s", err.external_id, err.reason)
