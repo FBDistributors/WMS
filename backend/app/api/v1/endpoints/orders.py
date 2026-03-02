@@ -111,6 +111,7 @@ class SmartupSyncResponse(BaseModel):
     detail: Optional[str] = None  # birinchi import xatosi
     errors_count: Optional[int] = None  # import xatolari soni
     error: Optional[str] = None  # UI sariq qutida ko'rsatiladigan xato (import exception va h.k.)
+    debug: Optional[dict] = None  # raw_count, dict_count, filtered_count, inserted_count, updated_count, skipped_count, skipped_by_reason, preview
 
 
 class SyncOrikzorRequest(BaseModel):
@@ -628,10 +629,29 @@ async def sync_orikzor(
             logger.error("O'rikzor import: qolgan %s ta xato", len(import_errors) - 5)
         errors_count = len(import_errors) if import_errors else None
         first_error_reason = import_errors[0].reason if import_errors else None
+        dict_count_val = response.debug_dict_count if response.debug_dict_count is not None else 0
+        parse_skipped = getattr(response, "debug_skipped_by_reason", None) or {}
+        merged_skipped = {**parse_skipped, **skipped_by_reason}
+        debug = {
+            "raw_count": response.debug_raw_count,
+            "dict_count": response.debug_dict_count,
+            "filtered_count": n_items,
+            "inserted_count": created,
+            "updated_count": updated,
+            "skipped_count": skipped,
+            "skipped_by_reason": merged_skipped,
+            "preview": (getattr(response, "debug_preview", None) or [])[:2],
+        }
         if (created + updated) == 0 and n_items > 0:
             detail = (
-                f"API dan {n_items} ta movement keldi, lekin import qilinmadi. "
-                + (f"Birinchi xato: {first_error_reason}" if first_error_reason else "Render logda 'O'rikzor import xato' qatorini tekshiring.")
+                f"Data keldi ({n_items} ta), import qilinmadi. skipped_by_reason: {skipped_by_reason}. "
+                + (f"Birinchi xato: {first_error_reason}" if first_error_reason else "")
+            )
+        elif (created + updated) == 0 and n_items == 0 and dict_count_val > 0:
+            extra = getattr(response, "parse_warning", None) or first_error_reason or ""
+            detail = (
+                f"Data keldi ({dict_count_val} ta), lekin parse natijasi 0. skipped_by_reason: {parse_skipped}."
+                + (f" {extra}" if extra else "")
             )
         elif (created + updated) == 0 and n_items == 0:
             parse_warning = getattr(response, "parse_warning", None) or ""
@@ -651,6 +671,7 @@ async def sync_orikzor(
             detail=detail,
             errors_count=errors_count,
             error=first_error_reason if (created + updated) == 0 and first_error_reason else None,
+            debug=debug,
         )
     except RuntimeError as exc:
         msg = str(exc)

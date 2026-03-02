@@ -85,6 +85,23 @@ export type SmartupSyncResult = {
   detail?: string | null
   errors_count?: number | null
   error?: string | null
+  debug?: {
+    raw_count?: number | null
+    dict_count?: number | null
+    filtered_count?: number
+    inserted_count?: number
+    updated_count?: number
+    skipped_count?: number
+    skipped_by_reason?: Record<string, number>
+    preview?: Array<{
+      movement_id?: string
+      status?: string
+      external_id?: string | null
+      from_warehouse_code?: string | null
+      to_warehouse_code?: string | null
+      first_item?: { product_code?: string; product_article_code?: string; quantity?: unknown }
+    }>
+  } | null
 }
 
 export async function syncSmartupOrders(payload: SmartupSyncInput = {}) {

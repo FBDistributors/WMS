@@ -246,13 +246,15 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
             })
 
         external_key = (m.get("external_id") or "").strip() or f"movement:{movement_id}"
+        default_filial = (os.getenv("SMARTUP_DEFAULT_FILIAL") or "MAIN").strip()
+        filial = m.get("filial_code") or m.get("from_warehouse_code") or m.get("to_warehouse_code") or default_filial
         order_dict = {
             "external_id": external_key,
             "deal_id": movement_id,
             "order_no": movement_number,
             "status": "B#S",
-            "filial_id": m.get("filial_code"),
-            "filial_code": m.get("filial_code"),
+            "filial_id": filial,
+            "filial_code": filial,
             "lines": lines,
         }
         try:
@@ -282,17 +284,20 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
         }
 
     previews = []
-    for m in movements[:3]:
+    for m in movements[:2]:
         previews.append({
             "movement_id": (m.get("movement_id") or m.get("movement_number") or ""),
             "movement_number": m.get("movement_number"),
             "status": m.get("status"),
             "external_id": m.get("external_id"),
+            "from_warehouse_code": m.get("from_warehouse_code"),
+            "to_warehouse_code": m.get("to_warehouse_code"),
             "from_movement_date": m.get("from_movement_date"),
             "first_item": _first_item_preview(m),
         })
 
     skipped_by_reason["missing_key"] = skipped_by_reason.get("missing_id", 0)
+    skipped_by_reason.setdefault("missing_warehouse_codes", 0)
     logger.info(
         "O'rikzor parse debug: raw_count=%s dict_count=%s filtered_count=%s skipped_by_reason=%s previews=%s",
         raw_count,
@@ -318,6 +323,8 @@ def _parse_movement_response(body: str) -> SmartupOrderExportResponse:
         parse_warning=parse_warning,
         debug_raw_count=raw_count,
         debug_dict_count=dict_count,
+        debug_skipped_by_reason=skipped_by_reason,
+        debug_preview=previews,
     )
 
 
