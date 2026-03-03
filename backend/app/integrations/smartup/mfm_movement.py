@@ -123,10 +123,61 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
                 logger.warning("mfm movement to order skip group_id=%s: %s", group_id, exc)
         logger.info("mfm movement$export: %s ta guruh -> %s ta order (flat)", len(groups), len(orders))
     else:
-        # Movement-level: same shape as orikzor (movement_id, movement_items)
-        from app.integrations.smartup.orikzor import _parse_movement_response
-        parsed = _parse_movement_response(body, begin_date=None, end_date=None)
-        orders = parsed.items
+        # Movement-level: movement_id, movement_items, from_warehouse_code, to_warehouse_code, note (sklad-sklad)
+        default_filial = (os.getenv("DEFAULT_WAREHOUSE_CODE") or os.getenv("SMARTUP_DEFAULT_FILIAL") or "MAIN").strip()
+        for m in rows:
+            if not isinstance(m, dict):
+                continue
+            movement_id = (m.get("movement_id") or m.get("movement_number") or "").strip()
+            if not movement_id:
+                continue
+            items = m.get("movement_items") or m.get("movement_itens") or m.get("movementItems") or []
+            if not isinstance(items, list):
+                items = [items] if items else []
+            lines = []
+            for it in items:
+                if not isinstance(it, dict):
+                    continue
+                try:
+                    qty = float(it.get("quantity") or it.get("qty") or 0)
+                except (TypeError, ValueError):
+                    qty = 0
+                pc = it.get("product_code") or it.get("productCode") or ""
+                lines.append({
+                    "product_code": pc,
+                    "sku": pc,
+                    "quantity": qty,
+                    "name": it.get("product_article_code") or it.get("productArticleCode") or pc or "",
+                })
+            from_wh = (m.get("from_warehouse_code") or "").strip() or None
+            to_wh = (m.get("to_warehouse_code") or "").strip() or None
+            note = (m.get("note") or "").strip() or None
+            filial = from_wh or to_wh or default_filial
+            amount = m.get("amount")
+            if amount is not None and amount != "":
+                try:
+                    amount = str(amount).replace(" ", "").replace(",", ".")
+                except Exception:
+                    amount = None
+            order_dict = {
+                "external_id": (m.get("external_id") or "").strip() or f"mfm:{movement_id}",
+                "deal_id": movement_id,
+                "order_no": (m.get("delivery_number") or m.get("movement_number") or movement_id) or movement_id,
+                "status": (m.get("status") or "B#S").strip() or "B#S",
+                "filial_id": filial,
+                "filial_code": filial,
+                "total_amount": amount,
+                "from_warehouse_code": from_wh,
+                "to_warehouse_code": to_wh,
+                "note": note,
+                "lines": lines,
+            }
+            try:
+                orders.append(SmartupOrder.model_validate(order_dict))
+            except PydanticValidationError as exc:
+                logger.warning("mfm movement skip movement_id=%s: %s", movement_id, exc)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("mfm movement skip movement_id=%s: %s", movement_id, exc)
         logger.info("mfm movement$export: %s ta order (movement-level)", len(orders))
 
     return SmartupOrderExportResponse(items=orders)

@@ -129,6 +129,18 @@
     "picker": "Yig'uvchi",
     "controller": "Kontrolyor"
   },
+  "columns_diller": {
+    "order_number": "Harakat ID",
+    "external_id": "Tashqi ID",
+    "from_warehouse_code": "Qayerdan (sklad)",
+    "to_warehouse_code": "Qayerga (sklad)",
+    "movement_note": "Izoh",
+    "total_amount": "Summa",
+    "status": "Holat",
+    "lines": "Qato",
+    "created": "Sana",
+    "view_details": ""
+  },
   "lines": {
     "sku": "SKU",
     "barcode": "Barcode",

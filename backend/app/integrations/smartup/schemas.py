@@ -68,6 +68,10 @@ class SmartupOrder(BaseModel):
     agent_name: Optional[str] = Field(default=None, alias="agent_name")
     total_amount: Optional[Decimal] = Field(default=None, alias="total_amount")
     lines: List[SmartupOrderLine] = Field(default_factory=list)
+    # Tashkiliy harakat (mfm): skladdan skladga
+    from_warehouse_code: Optional[str] = Field(default=None, alias="from_warehouse_code")
+    to_warehouse_code: Optional[str] = Field(default=None, alias="to_warehouse_code")
+    note: Optional[str] = Field(default=None, alias="note")
 
     @field_validator("deal_time", "delivery_date", "created_on", "modified_on", mode="before")
     @classmethod

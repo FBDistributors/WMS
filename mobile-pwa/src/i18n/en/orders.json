@@ -114,6 +114,18 @@
     "picker": "Picker",
     "controller": "Controller"
   },
+  "columns_diller": {
+    "order_number": "Movement ID",
+    "external_id": "External ID",
+    "from_warehouse_code": "From warehouse",
+    "to_warehouse_code": "To warehouse",
+    "movement_note": "Note",
+    "total_amount": "Amount",
+    "status": "Status",
+    "lines": "Lines",
+    "created": "Date",
+    "view_details": ""
+  },
   "columns_orikzor": {
     "order_number": "Movement number",
     "external_id": "Movement ID",

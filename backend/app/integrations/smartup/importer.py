@@ -94,6 +94,12 @@ def import_orders(
                 existing.agent_name = payload.agent_name
                 existing.total_amount = payload.total_amount
                 existing.status = payload.status
+                if getattr(payload, "from_warehouse_code", None) is not None:
+                    existing.from_warehouse_code = payload.from_warehouse_code
+                if getattr(payload, "to_warehouse_code", None) is not None:
+                    existing.to_warehouse_code = payload.to_warehouse_code
+                if getattr(payload, "movement_note", None) is not None:
+                    existing.movement_note = payload.movement_note
                 if payload.lines:
                     _upsert_lines(existing, payload.lines)
                 db.commit()
@@ -111,6 +117,9 @@ def import_orders(
                 agent_name=payload.agent_name,
                 total_amount=payload.total_amount,
                 status=payload.status,
+                from_warehouse_code=getattr(payload, "from_warehouse_code", None),
+                to_warehouse_code=getattr(payload, "to_warehouse_code", None),
+                movement_note=getattr(payload, "movement_note", None),
             )
             record.lines = [
                 OrderLine(

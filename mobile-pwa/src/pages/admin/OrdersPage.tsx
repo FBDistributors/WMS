@@ -66,6 +66,20 @@ const COLUMN_OPTIONS_STATUSES = [
   { id: 'controller', labelKey: 'orders:columns.controller' },
 ]
 
+// Tashkiliy harakatlar (diller): skladdan skladga — mijoz/agent yo'q
+const COLUMN_OPTIONS_DILLER = [
+  { id: 'order_number', labelKey: 'orders:columns_diller.order_number' },
+  { id: 'external_id', labelKey: 'orders:columns_diller.external_id' },
+  { id: 'from_warehouse_code', labelKey: 'orders:columns_diller.from_warehouse_code' },
+  { id: 'to_warehouse_code', labelKey: 'orders:columns_diller.to_warehouse_code' },
+  { id: 'movement_note', labelKey: 'orders:columns_diller.movement_note' },
+  { id: 'total_amount', labelKey: 'orders:columns_diller.total_amount' },
+  { id: 'status', labelKey: 'orders:columns_diller.status' },
+  { id: 'lines', labelKey: 'orders:columns_diller.lines' },
+  { id: 'created', labelKey: 'orders:columns_diller.created' },
+  { id: 'view_details', labelKey: 'orders:columns_diller.view_details' },
+]
+
 const SEARCH_FIELD_OPTIONS = [
   { id: 'order_number', labelKey: 'orders:search_fields.order_number' },
   { id: 'external_id', labelKey: 'orders:search_fields.external_id' },
@@ -159,7 +173,12 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         brand_ids: brandFilter.trim() ? brandFilter.trim() : undefined,
         date_from: dateFrom.trim() || undefined,
         date_to: dateTo.trim() || undefined,
-        search_fields: config.searchFields.length > 0 ? config.searchFields.join(',') : undefined,
+        search_fields:
+          orderSource === 'diller'
+            ? 'order_number,external_id'
+            : config.searchFields.length > 0
+              ? config.searchFields.join(',')
+              : undefined,
         limit: PAGE_SIZE,
         offset,
         ...(orderSource ? { order_source: orderSource } : {}),
@@ -273,25 +292,31 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       )
     }
     const columnOptionsForMode =
-      mode === 'statuses'
-        ? COLUMN_OPTIONS_STATUSES
-        : mode === 'default'
-          ? COLUMN_OPTIONS_DEFAULT
-          : COLUMN_OPTIONS
+      orderSource === 'diller'
+        ? COLUMN_OPTIONS_DILLER
+        : mode === 'statuses'
+          ? COLUMN_OPTIONS_STATUSES
+          : mode === 'default'
+            ? COLUMN_OPTIONS_DEFAULT
+            : COLUMN_OPTIONS
     const visibleColumns =
-      mode === 'statuses'
-        ? new Set(COLUMN_OPTIONS_STATUSES.map((c) => c.id))
-        : new Set(
-            mode === 'default'
-              ? config.visibleColumns.filter((id) => id !== 'status')
-              : config.visibleColumns
-          )
+      orderSource === 'diller'
+        ? new Set(COLUMN_OPTIONS_DILLER.map((c) => c.id))
+        : mode === 'statuses'
+          ? new Set(COLUMN_OPTIONS_STATUSES.map((c) => c.id))
+          : new Set(
+              mode === 'default'
+                ? config.visibleColumns.filter((id) => id !== 'status')
+                : config.visibleColumns
+            )
     const orderedColumns =
-      mode === 'statuses'
-        ? COLUMN_OPTIONS_STATUSES.map((c) => c.id)
-        : config.columnOrder.filter((id) =>
-            columnOptionsForMode.some((column) => column.id === id)
-          )
+      orderSource === 'diller'
+        ? COLUMN_OPTIONS_DILLER.map((c) => c.id)
+        : mode === 'statuses'
+          ? COLUMN_OPTIONS_STATUSES.map((c) => c.id)
+          : config.columnOrder.filter((id) =>
+              columnOptionsForMode.some((column) => column.id === id)
+            )
     const getStatusRowClass = (order: OrderListItem) => {
       if (mode !== 'statuses') return ''
       if (order.is_incomplete) return 'bg-red-50 dark:bg-red-950/30'
@@ -365,6 +390,24 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
           return (
             <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
               {order.agent_name ?? '—'}
+            </td>
+          )
+        case 'from_warehouse_code':
+          return (
+            <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+              {order.from_warehouse_code ?? '—'}
+            </td>
+          )
+        case 'to_warehouse_code':
+          return (
+            <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+              {order.to_warehouse_code ?? '—'}
+            </td>
+          )
+        case 'movement_note':
+          return (
+            <td className="px-4 py-3 max-w-[200px] truncate text-slate-600 dark:text-slate-300" title={order.movement_note ?? undefined}>
+              {order.movement_note ?? '—'}
             </td>
           )
         case 'total_amount':
@@ -572,7 +615,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {mode !== 'statuses' ? (
+            {mode !== 'statuses' && orderSource !== 'diller' ? (
               <Button
                 variant="ghost"
                 className="rounded-full px-3 py-3"

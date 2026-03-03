@@ -111,6 +111,18 @@
     "picker": "Сборщик",
     "controller": "Контролёр"
   },
+  "columns_diller": {
+    "order_number": "ID движения",
+    "external_id": "Внешний ID",
+    "from_warehouse_code": "Со склада",
+    "to_warehouse_code": "На склад",
+    "movement_note": "Примечание",
+    "total_amount": "Сумма",
+    "status": "Статус",
+    "lines": "Строк",
+    "created": "Дата",
+    "view_details": ""
+  },
   "columns_orikzor": {
     "order_number": "Номер движения",
     "external_id": "Movement ID",

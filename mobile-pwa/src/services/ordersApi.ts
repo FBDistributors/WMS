@@ -16,6 +16,9 @@ export type OrderListItem = {
   picker_name?: string | null
   controller_name?: string | null
   is_incomplete?: boolean
+  from_warehouse_code?: string | null
+  to_warehouse_code?: string | null
+  movement_note?: string | null
 }
 
 export type OrdersListResponse = {
@@ -47,6 +50,9 @@ export type OrderDetails = {
   total_amount?: number | null
   created_at: string
   lines: OrderLine[]
+  from_warehouse_code?: string | null
+  to_warehouse_code?: string | null
+  movement_note?: string | null
 }
 
 export type OrdersQuery = {

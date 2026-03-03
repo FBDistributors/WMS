@@ -64,6 +64,9 @@ class OrderListItem(BaseModel):
     picker_name: Optional[str] = None
     controller_name: Optional[str] = None
     is_incomplete: bool = False
+    from_warehouse_code: Optional[str] = None
+    to_warehouse_code: Optional[str] = None
+    movement_note: Optional[str] = None
 
 
 class OrderLineOut(BaseModel):
@@ -88,6 +91,9 @@ class OrderDetails(BaseModel):
     total_amount: Optional[Decimal] = None
     created_at: date
     lines: List[OrderLineOut]
+    from_warehouse_code: Optional[str] = None
+    to_warehouse_code: Optional[str] = None
+    movement_note: Optional[str] = None
 
 
 class OrdersListResponse(BaseModel):
@@ -221,6 +227,9 @@ def _to_order_details(order: OrderModel) -> OrderDetails:
             )
             for line in order.lines
         ],
+        from_warehouse_code=getattr(order, "from_warehouse_code", None),
+        to_warehouse_code=getattr(order, "to_warehouse_code", None),
+        movement_note=getattr(order, "movement_note", None),
     )
 
 
@@ -445,6 +454,9 @@ async def list_orders(
                 total_amount=order.total_amount,
                 created_at=order.created_at.date(),
                 lines_total=len(order.lines),
+                from_warehouse_code=getattr(order, "from_warehouse_code", None),
+                to_warehouse_code=getattr(order, "to_warehouse_code", None),
+                movement_note=getattr(order, "movement_note", None),
                 picker_name=_picker_name(doc),
                 controller_name=_controller_name(doc),
                 is_incomplete=is_incomplete,
