@@ -8,6 +8,7 @@ import logging
 import os
 import urllib.error
 import urllib.request
+from collections import Counter
 from datetime import date, datetime
 
 from pydantic import ValidationError as PydanticValidationError
@@ -273,6 +274,17 @@ def _parse_movement_response(
     after_date_filter_count = len(movements_in_range)
     dict_count = raw_count  # parse invariant: raw_count = len(movements) (date filter oldin)
 
+    # Status histogram: Smartup dan qaysi statuslar kelgani (case-sensitive va bo'sh)
+    status_histogram = Counter(
+        (m.get("status") or "").strip() or "(empty)" for m in movements_in_range
+    )
+    logger.info(
+        "O'rikzor status_histogram (candidate movements): raw_count=%s after_date_filter=%s histogram=%s",
+        raw_count,
+        after_date_filter_count,
+        dict(status_histogram),
+    )
+
     for i, sample in enumerate(out_of_range_samples[:3]):
         logger.info(
             "O'rikzor out_of_range sample [%s]: movement_id=%s status=%s from_movement_date=%s parsed_from_dt=%s start_dt=%s end_dt=%s reason=%s",
@@ -303,10 +315,17 @@ def _parse_movement_response(
             continue
         movement_id = movement_id or movement_number
         raw_status = (m.get("status") or "").strip()
-        if not status_filter_off and raw_status and ALLOWED_MOVEMENT_STATUSES and raw_status not in ALLOWED_MOVEMENT_STATUSES:
+        # Normalize to uppercase: Smartup "c"/"n" qaytarsa ham "C"/"N" sifatida qabul qilamiz
+        normalized_status = raw_status.upper() if raw_status else ""
+        if not status_filter_off and ALLOWED_MOVEMENT_STATUSES and normalized_status and normalized_status not in ALLOWED_MOVEMENT_STATUSES:
             skipped_by_reason["status_not_allowed"] += 1
-            if raw_status == "N":
-                logger.debug("O'rikzor: N status skipped (allowed_statuses=%s)", sorted(ALLOWED_MOVEMENT_STATUSES))
+            if raw_status != normalized_status:
+                logger.debug(
+                    "O'rikzor: status skipped (raw=%r normalized=%r allowed=%s)",
+                    raw_status,
+                    normalized_status,
+                    sorted(ALLOWED_MOVEMENT_STATUSES),
+                )
             continue
 
         # from/to_warehouse_code null bo'lsa skip qilmaymiz — default warehouse (filial) ishlatamiz
@@ -466,6 +485,7 @@ def _parse_movement_response(
         debug_after_date_filter_count=after_date_filter_count,
         debug_loop_count=loop_count,
         debug_skipped_out_of_range=skipped_out_of_range,
+        debug_status_histogram=dict(status_histogram),
     )
 
 

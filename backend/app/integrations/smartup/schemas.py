@@ -193,6 +193,7 @@ class SmartupOrderExportResponse(BaseModel):
     debug_after_date_filter_count: Optional[int] = None
     debug_loop_count: Optional[int] = None
     debug_skipped_out_of_range: Optional[int] = None
+    debug_status_histogram: Optional[dict] = None
 
     @root_validator(pre=True)
     def _normalize_order_list(cls, values):  # noqa: N805

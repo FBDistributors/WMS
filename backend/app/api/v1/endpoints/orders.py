@@ -659,6 +659,7 @@ async def sync_orikzor(
             "after_date_filter_count": getattr(response, "debug_after_date_filter_count", None),
             "loop_count": getattr(response, "debug_loop_count", None),
             "skipped_out_of_range": getattr(response, "debug_skipped_out_of_range", None),
+            "status_histogram": getattr(response, "debug_status_histogram", None),
         }
         if (created + updated) == 0 and n_items > 0:
             detail = (
