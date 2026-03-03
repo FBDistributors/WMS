@@ -141,6 +141,7 @@ ORDER_STATUSES_FOR_COUNTS = (
     "ready_for_picking",
     "picking",
     "picked",
+    "completed",  # controller yakunlagach
     "packed",
     "shipped",
     "cancelled",

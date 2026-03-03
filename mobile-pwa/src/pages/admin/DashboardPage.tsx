@@ -15,8 +15,8 @@ const STATUS_XOM = ['imported', 'B#S']
 const STATUS_YIGISHDA = ['allocated', 'ready_for_picking', 'picking']
 // Tekshiruvda = yig'uvchi controllerga yuborgan, controller yakunlamagan
 const STATUS_TEKSHIRUVDA = ['picked']
-// Yakunlangan = controller tekshirib yakunlagan
-const STATUS_YAKUNLANGAN = ['packed', 'shipped']
+// Yakunlangan = controller tekshirib yakunlagan (completed) yoki packed/shipped
+const STATUS_YAKUNLANGAN = ['completed', 'packed', 'shipped']
 
 function aggregateByFourGroups(
   rows: { status: string; count: number }[]
