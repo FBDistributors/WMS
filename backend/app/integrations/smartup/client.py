@@ -75,7 +75,7 @@ class SmartupClient:
         for attempt in range(1, 4):
             request = urllib.request.Request(url, data=data, headers=headers, method="POST")
             try:
-                with urllib.request.urlopen(request, timeout=30) as response:
+                with urllib.request.urlopen(request, timeout=60) as response:
                     body = response.read().decode("utf-8")
                 parsed = SmartupOrderExportResponse.parse_raw(body)
                 if parsed.items:
