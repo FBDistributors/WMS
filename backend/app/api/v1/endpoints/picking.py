@@ -249,6 +249,13 @@ async def list_picking_documents(
     )
     if user.role == "picker":
         query = query.filter(DocumentModel.assigned_to_user_id == user.id)
+        # Controllerga yuborilgan (picked + controlled_by) yig'uvchi ro'yxatida ko'rinmasin
+        query = query.filter(
+            or_(
+                DocumentModel.status != "picked",
+                DocumentModel.controlled_by_user_id.is_(None),
+            )
+        )
     elif user.role == "inventory_controller":
         query = query.filter(
             DocumentModel.controlled_by_user_id == user.id,
