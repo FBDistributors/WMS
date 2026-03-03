@@ -88,7 +88,7 @@ class DocumentLine(Base):
         UUID(as_uuid=True), ForeignKey("locations.id", ondelete="RESTRICT"), nullable=True
     )
     sku: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    product_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    product_name: Mapped[str] = mapped_column(String(512), nullable=False)
     barcode: Mapped[str | None] = mapped_column(String(64), nullable=True)
     location_code: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     batch: Mapped[str | None] = mapped_column(String(64), nullable=True)
