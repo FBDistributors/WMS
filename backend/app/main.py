@@ -52,6 +52,12 @@ app.add_middleware(
     max_age=600,
 )
 
+@app.get("/")
+async def root():
+    """Render va boshqa platformalar health check uchun HEAD/GET / ishlatadi — 404 oldini olish."""
+    return {"status": "ok"}
+
+
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}

@@ -53,7 +53,7 @@ class SmartupInventoryExportClient:
         for attempt in range(1, 3):
             request = urllib.request.Request(self.url, data=data, headers=headers, method="POST")
             try:
-                with urllib.request.urlopen(request, timeout=45) as response:
+                with urllib.request.urlopen(request, timeout=90) as response:
                     body = response.read().decode("utf-8")
                 return json.loads(body)
             except urllib.error.HTTPError as exc:
