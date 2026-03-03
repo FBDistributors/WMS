@@ -283,11 +283,11 @@ export function PickTaskDetails() {
         if (isOnline) {
           await completePickDocument(String(taskId), incompleteReason ? { incomplete_reason: incompleteReason } : undefined);
           if (isController) AsyncStorage.removeItem(CONTROLLER_VERIFIED_KEY(String(taskId)));
-          navigation.replace('PickTaskList', { profileType, completedMessage: t('pickingComplete') });
+          navigation.reset({ index: 0, routes: [{ name: 'PickerHome' }] });
         } else {
           await addToQueue('PICK_CLOSE_TASK', { taskId, ts: Date.now(), incomplete_reason: incompleteReason });
           if (isController) AsyncStorage.removeItem(CONTROLLER_VERIFIED_KEY(String(taskId)));
-          navigation.replace('PickTaskList', { profileType, completedMessage: t('pickingComplete') });
+          navigation.reset({ index: 0, routes: [{ name: 'PickerHome' }] });
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : t('completeError');
@@ -328,13 +328,12 @@ export function PickTaskDetails() {
   }, [selectedIncompleteReason, doComplete]);
 
   const goBack = useCallback(() => {
-    const pType = isController ? 'controller' : 'picker';
     if (doc?.status === 'completed') {
-      navigation.replace('PickTaskList', { profileType: pType });
+      navigation.reset({ index: 0, routes: [{ name: 'PickerHome' }] });
     } else {
       navigation.goBack();
     }
-  }, [doc?.status, isController, navigation]);
+  }, [doc?.status, navigation]);
 
   if (loading) {
     return (

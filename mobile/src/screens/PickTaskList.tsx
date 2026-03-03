@@ -186,7 +186,7 @@ export function PickTaskList() {
         <TouchableOpacity style={styles.retryBtn} onPress={load}>
           <Text style={styles.retryBtnText}>{t('retry')}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.reset({ index: 0, routes: [{ name: 'PickerHome' }] })} activeOpacity={0.7} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <Icon name="arrow-left" size={24} color="#1976d2" />
         </TouchableOpacity>
       </View>
@@ -204,7 +204,7 @@ export function PickTaskList() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => navigation.reset({ index: 0, routes: [{ name: 'PickerHome' }] })}
           activeOpacity={0.7}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
