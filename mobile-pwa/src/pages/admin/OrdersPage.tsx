@@ -82,24 +82,6 @@ const GROUP_TO_STATUS: Record<string, string | undefined> = {
   all: undefined,
 }
 
-/** Diller organizatsiyalari (filial_id) — Diller buyurtmalar filteri uchun */
-const DEALER_ORGANIZATIONS: { id: string; label: string }[] = [
-  { id: '3964966', label: 'Ипподром (Иззат)' },
-  { id: '8109098', label: 'Таш.область (Илхом)' },
-  { id: '12879867', label: 'Урикзор (Улугбек)' },
-  { id: '3535348', label: 'Янгиюль (Нодыра)' },
-  { id: '3541382', label: 'Фергана (Тавакал)' },
-  { id: '14409588', label: 'Андижан (Акмалжон)' },
-  { id: '3721967', label: 'Наманган (Шухрат)' },
-  { id: '18622054', label: 'Таш обл (Мейрлан) Проф' },
-  { id: '8783824', label: 'Коканд (Камолов Сардор)' },
-  { id: '8165921', label: 'Жиззах (Шердил)' },
-  { id: '3050589', label: 'Самарканд (Абдужалил)' },
-  { id: '12398877', label: 'Бухара (Жамшид)' },
-  { id: '14057761', label: 'Карши (Улугбек)' },
-  { id: '3654064', label: 'Термез (Гайрат)' },
-]
-
 type OrdersPageProps = { mode?: 'default' | 'statuses'; orderSource?: 'diller' }
 
 export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
@@ -112,7 +94,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const brandFilter = searchParams.get('brand_id') ?? ''
   const dateFrom = searchParams.get('date_from') ?? ''
   const dateTo = searchParams.get('date_to') ?? ''
-  const filialId = searchParams.get('filial_id') ?? ''
   const offset = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10))
   const pageTitle = orderSource
     ? t('admin:menu.orders_diller', 'Tashkiliy harakatlar')
@@ -182,9 +163,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         limit: PAGE_SIZE,
         offset,
         ...(orderSource ? { order_source: orderSource } : {}),
-        ...(orderSource === 'diller' && filialId.trim() && filialId.trim().toLowerCase() !== 'all'
-          ? { filial_id: filialId.trim() }
-          : {}),
       })
       setItems(data.items)
       setTotal(data.total)
@@ -197,7 +175,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       if (!background) setIsLoading(false)
       else setIsRefreshing(false)
     }
-  }, [config.searchFields, offset, orderSource, searchQuery, brandFilter, dateFrom, dateTo, filialId, statusParam, t])
+  }, [config.searchFields, offset, orderSource, searchQuery, brandFilter, dateFrom, dateTo, statusParam, t])
 
   const loadBrands = useCallback(async () => {
     try {
@@ -258,16 +236,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     setError(null)
     setSyncResult(null)
     try {
-      const payload = orderSource
-        ? {
-            order_source: orderSource,
-            ...(orderSource === 'diller' &&
-            filialId.trim() &&
-            filialId.trim().toLowerCase() !== 'all'
-              ? { filial_id: filialId.trim() }
-              : {}),
-          }
-        : {}
+      const payload = orderSource ? { order_source: orderSource } : {}
       const result = await syncSmartupOrders(payload)
       setSyncResult(result)
       await load()
@@ -620,36 +589,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             ) : null}
           </div>
         </div>
-
-        {orderSource === 'diller' && (
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="min-w-[200px] max-w-xs text-sm text-slate-600 dark:text-slate-300">
-              {t('orders:filters.organization')}
-              <select
-                value={filialId}
-                onChange={(e) => {
-                  const v = e.target.value
-                  setSearchParams((prev) => {
-                    const next = new URLSearchParams(prev)
-                    if (v) next.set('filial_id', v)
-                    else next.delete('filial_id')
-                    next.delete('offset')
-                    return next
-                  })
-                }}
-                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                aria-label={t('orders:filters.organization')}
-              >
-                <option value="">{t('orders:filters.all_dealers')}</option>
-                {DEALER_ORGANIZATIONS.map((org) => (
-                  <option key={org.id} value={org.id}>
-                    {org.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        )}
 
         <div className="flex flex-wrap items-center gap-2">
           <label className="flex-1 min-w-[180px] max-w-md text-sm text-slate-600 dark:text-slate-300">
