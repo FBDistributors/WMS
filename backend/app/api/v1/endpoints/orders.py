@@ -18,6 +18,7 @@ from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_
 from app.services.push_notifications import send_push_to_user
 from app.integrations.smartup.client import SmartupClient
 from app.integrations.smartup.importer import import_orders
+from app.integrations.smartup.mfm_movement import export_mfm_movements
 from app.integrations.smartup.orikzor import export_movements_from_smartup
 from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
@@ -516,7 +517,7 @@ async def update_order_status(
     return _to_order_details(order)
 
 
-@router.post("/sync-smartup", response_model=SmartupSyncResponse, summary="Sync orders from Smartup (Diller)")
+@router.post("/sync-smartup", response_model=SmartupSyncResponse, summary="Sync orders from Smartup (Cross-organizational movement)")
 async def sync_orders_from_smartup(
     payload: SmartupSyncRequest,
     db: Session = Depends(get_db),
@@ -534,24 +535,23 @@ async def sync_orders_from_smartup(
         raise HTTPException(status_code=400, detail="begin_deal_date must be <= end_deal_date")
 
     try:
-        # Diller: tanlangan filial bo'lsa Smartup ga faqat header'da filial_id yuboriladi.
-        diller_filial = (payload.filial_id or "").strip() if payload.order_source == "diller" else ""
-        client = SmartupClient(filial_id=diller_filial) if diller_filial else SmartupClient()
-        export_filial = (
-            None
-            if payload.order_source == "diller" and (payload.filial_id or "").strip()
-            else payload.filial_code
-        )
-        response = client.export_orders(
-            begin_deal_date=begin_date.strftime("%d.%m.%Y"),
-            end_deal_date=end_date.strftime("%d.%m.%Y"),
-            filial_code=export_filial,
-        )
-        filial_override = (
-            (payload.filial_id or "").strip()
-            if payload.order_source == "diller" and (payload.filial_id or "").strip()
-            else None
-        )
+        if payload.order_source == "diller":
+            # Cross-organizational movement: mfm movement$export
+            response = export_mfm_movements(
+                begin_date=begin_date,
+                end_date=end_date,
+                filial_id=(payload.filial_id or "").strip() or None,
+            )
+            filial_override = (payload.filial_id or "").strip() or None
+        else:
+            # Other sources: order$export (savdo buyurtmalari)
+            client = SmartupClient(filial_id=(payload.filial_id or "").strip() or None)
+            response = client.export_orders(
+                begin_deal_date=begin_date.strftime("%d.%m.%Y"),
+                end_deal_date=end_date.strftime("%d.%m.%Y"),
+                filial_code=payload.filial_code,
+            )
+            filial_override = (payload.filial_id or "").strip() or None
         created, updated, skipped, import_errors, _ = import_orders(
             db, response.items, order_source=payload.order_source, filial_id_override=filial_override
         )

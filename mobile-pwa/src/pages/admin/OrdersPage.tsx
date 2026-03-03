@@ -115,7 +115,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const filialId = searchParams.get('filial_id') ?? ''
   const offset = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10))
   const pageTitle = orderSource
-    ? t('admin:menu.orders_diller', 'Diller buyurtmalar')
+    ? t('admin:menu.orders_diller', 'Tashkiliy harakatlar')
     : mode === 'statuses'
       ? t('admin:dashboard.order_statuses_title')
       : t('orders:title')
