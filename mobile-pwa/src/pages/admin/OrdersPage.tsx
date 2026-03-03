@@ -66,7 +66,7 @@ const COLUMN_OPTIONS_STATUSES = [
   { id: 'controller', labelKey: 'orders:columns.controller' },
 ]
 
-// Tashkiliy harakatlar (diller): skladdan skladga — mijoz/agent yo'q
+// Tashkiliy harakat (cross-organizational movement): mfm movement$export — sklad-sklad, mijoz/agent yo'q
 const COLUMN_OPTIONS_DILLER = [
   { id: 'order_number', labelKey: 'orders:columns_diller.order_number' },
   { id: 'external_id', labelKey: 'orders:columns_diller.external_id' },

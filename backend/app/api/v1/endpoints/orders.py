@@ -548,7 +548,7 @@ async def sync_orders_from_smartup(
 
     try:
         if payload.order_source == "diller":
-            # Cross-organizational movement: mfm movement$export
+            # Tashkiliy harakat: cross-organizational movement (mfm movement$export), order'dan emas
             response = export_mfm_movements(
                 begin_date=begin_date,
                 end_date=end_date,
@@ -556,7 +556,7 @@ async def sync_orders_from_smartup(
             )
             filial_override = (payload.filial_id or "").strip() or None
         else:
-            # Other sources: order$export (savdo buyurtmalari)
+            # Oddiy buyurtmalar: order$export (savdo buyurtmalari)
             client = SmartupClient(filial_id=(payload.filial_id or "").strip() or None)
             response = client.export_orders(
                 begin_deal_date=begin_date.strftime("%d.%m.%Y"),
