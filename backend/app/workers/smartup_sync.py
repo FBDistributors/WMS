@@ -27,8 +27,8 @@ STATUS_PARTIAL = "PARTIAL"
 
 
 def _get_orders_date_range() -> Tuple[date, date]:
-    """Get date range for order sync (last N days). Default 3 — SmartUp timeout kamayishi uchun."""
-    days = int(os.getenv("SYNC_ORDERS_DAYS_BACK", "3"))
+    """Get date range for order sync (last N days). Default 1 — SmartUp timeout kamayishi uchun."""
+    days = int(os.getenv("SYNC_ORDERS_DAYS_BACK", "1"))
     days = max(1, min(days, 90))
     end_date = date.today()
     start_date = end_date - timedelta(days=days)
@@ -77,22 +77,28 @@ def sync_products() -> Tuple[int, str | None, list]:
 def sync_orders() -> Tuple[int, str | None, list]:
     """
     Fetch orders from SmartUp API and upsert into orders table.
-    HTTP chaqiruvi session ochiq bo'lmaganda bajariladi, keyin qisqa session bilan import (pool band qilmaslik).
-    Returns (count_synced, exception_message, list of error dicts).
+    Kunma-kun so'rov (har kuni alohida) — SmartUp tezroq javob beradi, timeout kam.
     """
     try:
         start_date, end_date = _get_orders_date_range()
         client = SmartupClient()
-        response = client.export_orders(
-            begin_deal_date=start_date.strftime("%d.%m.%Y"),
-            end_deal_date=end_date.strftime("%d.%m.%Y"),
-            filial_code=None,
-        )
-        items = response.items
+        all_items: list = []
+        today = end_date
+        current = start_date
+        while current <= today:
+            day_str = current.strftime("%d.%m.%Y")
+            response = client.export_orders(
+                begin_deal_date=day_str,
+                end_deal_date=day_str,
+                filial_code=None,
+            )
+            all_items.extend(response.items)
+            logger.info("Orders sync: %s -> %d buyurtma", day_str, len(response.items))
+            current += timedelta(days=1)
 
         db = SessionLocal()
         try:
-            created, updated, skipped, errors, _ = import_orders(db, items)
+            created, updated, skipped, errors, _ = import_orders(db, all_items)
             count = created + updated
             if errors:
                 logger.warning("Orders sync: %d errors (first: %s)", len(errors), errors[0].reason)
