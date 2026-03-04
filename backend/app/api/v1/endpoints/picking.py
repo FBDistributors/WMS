@@ -553,6 +553,7 @@ async def consolidated_pick(
         if first_picked_line_id is not None:
             db.add(PickRequest(request_id=payload.request_id, line_id=first_picked_line_id))
         db.commit()
+        return await get_consolidated(db=db, user=user)
     except HTTPException:
         raise
     except Exception as e:
@@ -562,8 +563,6 @@ async def consolidated_pick(
             status_code=400,
             detail=f"Terish saqlanmadi. Sabab: {str(e).strip() or type(e).__name__}",
         ) from e
-
-    return await get_consolidated(db=db, user=user)
 
 
 @router.get("/controllers", response_model=List[ControllerUser], summary="List controllers (inventory_controller)")

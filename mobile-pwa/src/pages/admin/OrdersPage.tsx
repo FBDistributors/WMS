@@ -835,8 +835,11 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
           orderIds={sendDialogOrderIds ?? []}
           onOpenChange={(open) => !open && setSendDialogOrderIds(null)}
           onSent={() => {
+            const sentIds = sendDialogOrderIds ?? []
             setSendDialogOrderIds(null)
             setSelectedOrderIds(new Set())
+            setItems((prev) => prev.filter((o) => !sentIds.includes(o.id)))
+            setTotal((prev) => Math.max(0, prev - sentIds.length))
             void load()
           }}
         />

@@ -10,11 +10,13 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
 
-# On-hand movement types only (no allocate/unallocate). Used for ledger and CHECK.
+# All movement types for CHECK constraint (DB migration 20260210_0016 includes allocate/unallocate).
 ON_HAND_MOVEMENT_TYPES = (
     "opening_balance",
     "receipt",
     "putaway",
+    "allocate",
+    "unallocate",
     "pick",
     "ship",
     "adjust",

@@ -264,6 +264,7 @@ export function ConsolidatedPickContent({
                         n: Math.round(selectedProduct.total_required - selectedProduct.total_picked),
                       })}
                     </Text>
+                    <Text style={styles.modalQtyLabel}>{t('quantity')}</Text>
                     <TextInput
                       style={styles.modalQtyInput}
                       value={productQtyInput}
@@ -390,6 +391,7 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 18, fontWeight: '700', color: '#111', flex: 1 },
   modalClose: { fontSize: 22, color: '#666', padding: 4 },
   modalHint: { fontSize: 14, color: '#666', marginBottom: 12 },
+  modalQtyLabel: { fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 6 },
   scanBtnModal: {
     flexDirection: 'row',
     alignItems: 'center',

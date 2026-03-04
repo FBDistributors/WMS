@@ -166,8 +166,8 @@ export function PickTaskList() {
       onMoveShouldSetPanResponderCapture: (_: unknown, { dx, dy }: { dx: number; dy: number }) =>
         Math.abs(dx) > SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy) * 1.2,
       onPanResponderRelease: (_: unknown, { dx }: { dx: number }) => {
-        if (dx > SWIPE_THRESHOLD) setShowConsolidated(true);
-        else if (dx < -SWIPE_THRESHOLD) setShowConsolidated(false);
+        if (dx > SWIPE_THRESHOLD) setShowConsolidated(false);
+        else if (dx < -SWIPE_THRESHOLD) setShowConsolidated(true);
       },
     })
   ).current;
