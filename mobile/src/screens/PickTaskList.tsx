@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Modal,
+  PanResponder,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -55,10 +56,16 @@ function TaskRow({
     profileType === 'picker' &&
     item.status === 'picked' &&
     !item.controlled_by_user_id;
+  const isFullyPicked =
+    item.lines_total > 0 && item.lines_done >= item.lines_total;
 
   return (
     <View style={styles.rowWrap}>
-      <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.7}>
+      <TouchableOpacity
+        style={[styles.row, isFullyPicked && styles.rowFullyPicked]}
+        onPress={onPress}
+        activeOpacity={0.7}
+      >
         <Text style={styles.rowRef}>{item.reference_number}</Text>
         <Text style={styles.rowMeta}>
           {t('linesCount', { done: item.lines_done, total: item.lines_total })}
@@ -151,6 +158,19 @@ export function PickTaskList() {
       }
     }, [route.params, navigation])
   );
+
+  const SWIPE_THRESHOLD = 50;
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponderCapture: (_: unknown, { dx, dy }: { dx: number; dy: number }) =>
+        Math.abs(dx) > SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy) * 1.2,
+      onPanResponderRelease: (_: unknown, { dx }: { dx: number }) => {
+        if (dx > SWIPE_THRESHOLD) setShowConsolidated(true);
+        else if (dx < -SWIPE_THRESHOLD) setShowConsolidated(false);
+      },
+    })
+  ).current;
 
   const openControllerModal = useCallback(
     async (doc: PickingListItem) => {
@@ -246,6 +266,7 @@ export function PickTaskList() {
           <Icon name="refresh" size={24} color={loading ? '#999' : '#1976d2'} />
         </TouchableOpacity>
       </View>
+      <View style={styles.toggleAndContent} {...(isPicker ? panResponder.panHandlers : {})}>
       {isPicker && (
         <View style={styles.toggleWrap}>
           <TouchableOpacity
@@ -302,6 +323,7 @@ export function PickTaskList() {
           contentContainerStyle={styles.listContent}
         />
       )}
+      </View>
 
       <Modal
         visible={!!controllerModalDoc}
@@ -411,6 +433,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '700', color: '#111' },
   count: { fontSize: 14, color: '#666', marginTop: 4 },
   refreshBtn: { padding: 4 },
+  toggleAndContent: { flex: 1 },
   toggleWrap: {
     flexDirection: 'row',
     alignSelf: 'center',
@@ -436,6 +459,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e0e0e0',
+  },
+  rowFullyPicked: {
+    backgroundColor: '#e8f5e9',
+    borderColor: '#c8e6c9',
   },
   sendBtn: {
     marginTop: 8,

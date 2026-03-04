@@ -304,6 +304,10 @@ function ProductRow({
     .map((l) => `${l.reference_number}: ${Math.round(l.qty_required)} ${t('countTa')}`)
     .join(', ');
   const isDone = product.total_picked >= product.total_required;
+  const barcodeOrSku = product.barcode || product.sku || null;
+  const locations = product.lines.length > 0
+    ? [...new Set(product.lines.map((l) => l.location_code).filter(Boolean))].join(', ')
+    : '';
   const cardStyle = [
     styles.productCard,
     isDone ? styles.productCardDone : styles.productCardIncomplete,
@@ -313,6 +317,16 @@ function ProductRow({
       <Text style={styles.productName} numberOfLines={2}>
         {product.product_name}
       </Text>
+      {barcodeOrSku ? (
+        <Text style={styles.productBarcodeLocation}>
+          {t('barcodeSkuShort')}: {barcodeOrSku}
+        </Text>
+      ) : null}
+      {locations ? (
+        <Text style={styles.productBarcodeLocation}>
+          {t('locationLabel')}: {locations}
+        </Text>
+      ) : null}
       <Text style={styles.productTotals}>
         {t('picked')}: {Math.round(product.total_picked)} / {Math.round(product.total_required)}
       </Text>
@@ -357,6 +371,7 @@ const styles = StyleSheet.create({
   productCardDone: { backgroundColor: '#e8f5e9', borderColor: '#c8e6c9' },
   productCardIncomplete: { backgroundColor: '#ffebee', borderColor: '#ffcdd2' },
   productName: { fontSize: 15, fontWeight: '600', color: '#111', marginBottom: 4 },
+  productBarcodeLocation: { fontSize: 13, color: '#555', marginBottom: 2 },
   productTotals: { fontSize: 14, color: '#333', marginBottom: 4 },
   productByOrder: { fontSize: 12, color: '#666' },
   modalOverlay: {
