@@ -114,12 +114,15 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     : mode === 'statuses'
       ? t('admin:dashboard.order_statuses_title')
       : t('orders:title')
-  // Asosiy Buyurtmalar sahifasida faqat B#S; Diller/O'rikzor va statuses rejimida group bo'yicha
+  // Asosiy Buyurtmalar sahifasida faqat yig'ishga yuborilmagan (B#S); yig'ishga yuborilganlar bu ro'yxatda ko'rinmasin
   const statusParam = orderSource
     ? (GROUP_TO_STATUS[group] ?? undefined)
     : mode === 'default' && (group === 'all' || !searchParams.get('group'))
       ? 'B#S'
       : (GROUP_TO_STATUS[group] ?? GROUP_TO_STATUS.all)
+
+  const onlyNotSentToPicking = mode === 'default' && !orderSource && (statusParam === 'B#S' || statusParam === 'imported,B#S')
+  const SENT_TO_PICKING_STATUSES = new Set(['allocated', 'ready_for_picking', 'picking'])
   const { has } = useAuth()
   const canSync = has('orders:write')
   const canSend = has('orders:write')
@@ -183,7 +186,10 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         offset,
         ...(orderSource ? { order_source: orderSource } : {}),
       })
-      setItems(data.items)
+      const list = onlyNotSentToPicking
+        ? data.items.filter((o) => !SENT_TO_PICKING_STATUSES.has(o.status))
+        : data.items
+      setItems(list)
       setTotal(data.total)
     } catch (err) {
       if (!background) {
@@ -194,7 +200,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       if (!background) setIsLoading(false)
       else setIsRefreshing(false)
     }
-  }, [config.searchFields, offset, orderSource, searchQuery, brandFilter, dateFrom, dateTo, statusParam, t])
+  }, [config.searchFields, offset, orderSource, searchQuery, brandFilter, dateFrom, dateTo, statusParam, onlyNotSentToPicking, t])
 
   const loadBrands = useCallback(async () => {
     try {
