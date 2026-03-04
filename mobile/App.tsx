@@ -15,6 +15,7 @@ import { LoginScreen } from './src/screens/LoginScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { PickerHome } from './src/screens/PickerHome';
 import { PickTaskList } from './src/screens/PickTaskList';
+import { ConsolidatedPickScreen } from './src/screens/ConsolidatedPickScreen';
 import { PickTaskDetails } from './src/screens/PickTaskDetails';
 import { PickerScreen } from './src/screens/PickerScreen';
 import { ScannerScreen } from './src/screens/ScannerScreen';
@@ -57,6 +58,7 @@ export default function App() {
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="PickerHome" component={PickerHome} />
         <Stack.Screen name="PickTaskList" component={PickTaskList} />
+        <Stack.Screen name="ConsolidatedPick" component={ConsolidatedPickScreen} />
         <Stack.Screen name="PickTaskDetails" component={PickTaskDetails} />
         <Stack.Screen name="Picker" component={PickerScreen} />
         <Stack.Screen name="Scanner" component={ScannerScreen} />

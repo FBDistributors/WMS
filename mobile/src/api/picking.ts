@@ -2,7 +2,12 @@
  * Picker flow API — backend /api/v1/picking ga mos.
  */
 import apiClient from './client';
-import type { PickingListItem, PickingDocument, PickLineResponse } from './picking.types';
+import type {
+  PickingListItem,
+  PickingDocument,
+  PickLineResponse,
+  ConsolidatedViewResponse,
+} from './picking.types';
 
 const PICKING = '/picking';
 
@@ -87,6 +92,26 @@ export async function completePickDocument(
     `${PICKING}/documents/${documentId}/complete`,
     options ?? {}
   );
+  return data;
+}
+
+/** Umumiy yig'ish: barcha tayinlangan hujjatlar mahsulot bo'yicha birlashtirilgan. */
+export async function getConsolidatedView(): Promise<ConsolidatedViewResponse> {
+  const { data } = await apiClient.get<ConsolidatedViewResponse>(`${PICKING}/consolidated`);
+  return data;
+}
+
+/** Umumiy yig'ish: barcode + miqdor — barcha tegishli qatorlar bo'yicha taqsimlanadi (idempotent: request_id). */
+export async function consolidatedPick(
+  barcode: string,
+  qty: number,
+  requestId: string
+): Promise<ConsolidatedViewResponse> {
+  const { data } = await apiClient.post<ConsolidatedViewResponse>(`${PICKING}/consolidated/pick`, {
+    barcode: barcode.trim(),
+    qty,
+    request_id: requestId,
+  });
   return data;
 }
 

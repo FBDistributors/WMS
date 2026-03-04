@@ -7,6 +7,7 @@ export type RootStackParamList = {
   Picker: { taskId?: string } | undefined;
   PickerHome: { profileType?: 'picker' | 'controller' } | undefined;
   PickTaskList: { profileType?: 'picker' | 'controller'; completedMessage?: string } | undefined;
+  ConsolidatedPick: undefined;
   PickTaskDetails: { taskId: string; scannedBarcode?: string; lineId?: string; profileType?: 'picker' | 'controller' };
   Scanner: {
     returnToPick?: boolean;

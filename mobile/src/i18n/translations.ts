@@ -102,6 +102,12 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     openTasks: "Ochiq topshiriqlar",
     openTasksEmpty: "Ochiq topshiriq yo'q",
     countTa: ' ta',
+    consolidatedPickTitle: "Umumiy yig'ish",
+    consolidatedMyTasks: "Mening vazifalarim",
+    consolidatedDocsCount: "{{count}} ta hujjat",
+    consolidatedProductByOrder: "Buyurtma bo'yicha",
+    consolidatedScanHint: "Shtrixkod + miqdor (ixtiyoriy)",
+    consolidatedQuantity: "Miqdor",
 
     // Mahsulotlar (picker inventory)
     invTitle: "Mahsulotlar",
@@ -315,6 +321,12 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     openTasks: 'Открытые задания',
     openTasksEmpty: 'Нет открытых заданий',
     countTa: ' шт',
+    consolidatedPickTitle: 'Сводный сбор',
+    consolidatedMyTasks: 'Мои задания',
+    consolidatedDocsCount: '{{count}} док.',
+    consolidatedProductByOrder: 'По заказам',
+    consolidatedScanHint: 'Штрихкод + кол-во (необяз.)',
+    consolidatedQuantity: 'Кол-во',
 
     invTitle: 'Товары',
     invSearchPlaceholder: 'SKU, название или штрихкод',
@@ -527,6 +539,12 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     openTasks: 'Open tasks',
     openTasksEmpty: 'No open tasks',
     countTa: '',
+    consolidatedPickTitle: 'Consolidated pick',
+    consolidatedMyTasks: 'My tasks',
+    consolidatedDocsCount: '{{count}} docs',
+    consolidatedProductByOrder: 'By order',
+    consolidatedScanHint: 'Barcode + qty (optional)',
+    consolidatedQuantity: 'Qty',
 
     invTitle: 'Products',
     invSearchPlaceholder: 'SKU, name or barcode',

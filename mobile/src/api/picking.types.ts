@@ -42,3 +42,38 @@ export interface PickLineResponse {
   progress: PickingProgress;
   document_status: string;
 }
+
+/** Per-document line inside a product group (bu mahsulot bu buyurtma). */
+export interface ConsolidatedLineItem {
+  document_id: string;
+  line_id: string;
+  reference_number: string;
+  qty_required: number;
+  qty_picked: number;
+  location_code: string;
+  pick_sequence?: number | null;
+  expiry_date?: string | null;
+}
+
+export interface ConsolidatedProduct {
+  barcode?: string | null;
+  sku?: string | null;
+  product_name: string;
+  total_required: number;
+  total_picked: number;
+  expiry_date?: string | null;
+  lines: ConsolidatedLineItem[];
+}
+
+export interface ConsolidatedDocumentSummary {
+  id: string;
+  reference_number: string;
+  status: string;
+  lines_total: number;
+  lines_done: number;
+}
+
+export interface ConsolidatedViewResponse {
+  documents: ConsolidatedDocumentSummary[];
+  products: ConsolidatedProduct[];
+}

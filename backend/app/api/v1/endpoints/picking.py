@@ -62,6 +62,48 @@ class PickingListItem(BaseModel):
     controlled_by_user_id: Optional[UUID] = None
 
 
+class ConsolidatedLineItem(BaseModel):
+    """Per-document line inside a product group (bu mahsulot bu buyurtma)."""
+    document_id: UUID
+    line_id: UUID
+    reference_number: str
+    qty_required: float
+    qty_picked: float
+    location_code: str
+    pick_sequence: Optional[int] = None
+    expiry_date: Optional[str] = None
+
+
+class ConsolidatedProduct(BaseModel):
+    """Product group: total required/picked + per-document lines."""
+    barcode: Optional[str] = None
+    sku: Optional[str] = None
+    product_name: str
+    total_required: float
+    total_picked: float
+    expiry_date: Optional[str] = None  # representative (e.g. first line's) for display
+    lines: List[ConsolidatedLineItem]
+
+
+class ConsolidatedDocumentSummary(BaseModel):
+    id: UUID
+    reference_number: str
+    status: str
+    lines_total: int
+    lines_done: int
+
+
+class ConsolidatedViewResponse(BaseModel):
+    documents: List[ConsolidatedDocumentSummary]
+    products: List[ConsolidatedProduct]
+
+
+class ConsolidatedPickRequest(BaseModel):
+    barcode: str
+    qty: float
+    request_id: str
+
+
 class PickLineRequest(BaseModel):
     delta: Literal[-1, 1]
     request_id: str
@@ -219,7 +261,12 @@ async def get_picking_document(
         db.query(DocumentLineModel)
         .outerjoin(LocationModel, DocumentLineModel.location_id == LocationModel.id)
         .filter(DocumentLineModel.document_id == document_id)
-        .order_by(LocationModel.pick_sequence.asc().nulls_last(), DocumentLineModel.id)
+        .order_by(
+            DocumentLineModel.expiry_date.asc().nulls_last(),
+            LocationModel.pick_sequence.asc().nulls_last(),
+            LocationModel.code.asc().nulls_last(),
+            DocumentLineModel.id,
+        )
         .all()
     )
     return _to_picking_document_with_lines(document, lines)
@@ -265,6 +312,258 @@ async def list_picking_documents(
         query = query.filter(DocumentModel.status != "cancelled")
     docs = query.order_by(DocumentModel.created_at.desc()).offset(offset).limit(limit).all()
     return [_to_picking_list_item(doc) for doc in docs]
+
+
+@router.get(
+    "/consolidated",
+    response_model=ConsolidatedViewResponse,
+    summary="Consolidated pick view (all assigned docs by product)",
+)
+async def get_consolidated(
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("picking:read")),
+):
+    if user.role != "picker":
+        raise HTTPException(status_code=403, detail="Only for picker")
+    ORDER_HIDDEN_STATUSES = ("completed", "packed", "shipped", "cancelled")
+    docs_query = (
+        db.query(DocumentModel)
+        .options(selectinload(DocumentModel.lines))
+        .outerjoin(OrderModel, DocumentModel.order_id == OrderModel.id)
+        .filter(
+            DocumentModel.assigned_to_user_id == user.id,
+            or_(
+                OrderModel.id.is_(None),
+                OrderModel.status.notin_(ORDER_HIDDEN_STATUSES),
+            ),
+            or_(
+                DocumentModel.status != "picked",
+                DocumentModel.controlled_by_user_id.is_(None),
+            ),
+            DocumentModel.status != "cancelled",
+        )
+    )
+    documents = docs_query.all()
+    doc_map = {d.id: d for d in documents}
+    if not documents:
+        return ConsolidatedViewResponse(documents=[], products=[])
+
+    doc_ids = [d.id for d in documents]
+    lines_with_loc = (
+        db.query(DocumentLineModel, LocationModel)
+        .outerjoin(LocationModel, DocumentLineModel.location_id == LocationModel.id)
+        .filter(DocumentLineModel.document_id.in_(doc_ids))
+        .order_by(
+            DocumentLineModel.expiry_date.asc().nulls_last(),
+            LocationModel.pick_sequence.asc().nulls_last(),
+            LocationModel.code.asc().nulls_last(),
+            DocumentLineModel.id,
+        )
+        .all()
+    )
+    # Group by product key (barcode or sku+product_name); preserve order of first occurrence
+    product_order: List[tuple] = []  # (barcode_or_key, product_name, sku, expiry_display)
+    groups: dict = {}
+    for line, loc in lines_with_loc:
+        key = (line.barcode or line.sku or str(line.product_id or ""), line.product_name or "", line.sku)
+        if key not in groups:
+            groups[key] = []
+            product_order.append((key, line.product_name or "", line.sku, _safe_expiry_date(line.expiry_date)))
+        doc = doc_map.get(line.document_id)
+        ref = doc.doc_no if doc else ""
+        pick_seq = loc.pick_sequence if loc else None
+        groups[key].append(
+            ConsolidatedLineItem(
+                document_id=line.document_id,
+                line_id=line.id,
+                reference_number=ref,
+                qty_required=float(line.required_qty or 0),
+                qty_picked=float(line.picked_qty or 0),
+                location_code=line.location_code or "",
+                pick_sequence=pick_seq,
+                expiry_date=_safe_expiry_date(line.expiry_date),
+            )
+        )
+    products = []
+    for (barcode_or_sku, product_name, sku), _name, _sku, expiry_display in product_order:
+        lines_list = groups[(barcode_or_sku, product_name, sku)]
+        total_required = sum(l.qty_required for l in lines_list)
+        total_picked = sum(l.qty_picked for l in lines_list)
+        products.append(
+            ConsolidatedProduct(
+                barcode=barcode_or_sku if (barcode_or_sku and barcode_or_sku != str(None)) else None,
+                sku=sku,
+                product_name=product_name,
+                total_required=total_required,
+                total_picked=total_picked,
+                expiry_date=expiry_display,
+                lines=lines_list,
+            )
+        )
+    doc_summaries = [
+        ConsolidatedDocumentSummary(
+            id=d.id,
+            reference_number=d.doc_no,
+            status=d.status,
+            lines_total=len(d.lines),
+            lines_done=sum(1 for line in d.lines if (line.picked_qty or 0) >= (line.required_qty or 0)),
+        )
+        for d in documents
+    ]
+    return ConsolidatedViewResponse(documents=doc_summaries, products=products)
+
+
+@router.post(
+    "/consolidated/pick",
+    response_model=ConsolidatedViewResponse,
+    summary="Consolidated pick by barcode + qty (idempotent by request_id)",
+)
+async def consolidated_pick(
+    payload: ConsolidatedPickRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("picking:pick")),
+):
+    if user.role != "picker":
+        raise HTTPException(status_code=403, detail="Only for picker")
+    barcode = (payload.barcode or "").strip()
+    if not barcode:
+        raise HTTPException(status_code=400, detail="barcode required")
+    qty = payload.qty
+    if qty is None or qty <= 0:
+        raise HTTPException(status_code=400, detail="qty must be positive")
+
+    # Idempotency: if we already processed this request_id, return current view
+    existing = db.query(PickRequest).filter(PickRequest.request_id == payload.request_id).one_or_none()
+    if existing:
+        return await get_consolidated(db=db, user=user)
+
+    ORDER_HIDDEN_STATUSES = ("completed", "packed", "shipped", "cancelled")
+    docs_query = (
+        db.query(DocumentModel.id)
+        .outerjoin(OrderModel, DocumentModel.order_id == OrderModel.id)
+        .filter(
+            DocumentModel.assigned_to_user_id == user.id,
+            or_(
+                OrderModel.id.is_(None),
+                OrderModel.status.notin_(ORDER_HIDDEN_STATUSES),
+            ),
+            or_(
+                DocumentModel.status != "picked",
+                DocumentModel.controlled_by_user_id.is_(None),
+            ),
+            DocumentModel.status != "cancelled",
+        )
+    )
+    doc_ids = [r[0] for r in docs_query.all()]
+    if not doc_ids:
+        raise HTTPException(status_code=404, detail="Mahsulot topilmadi yoki sizning vazifangizda yo'q")
+    # Lines matching barcode (or sku), same sort order as consolidated view
+    lines = (
+        db.query(DocumentLineModel)
+        .outerjoin(LocationModel, DocumentLineModel.location_id == LocationModel.id)
+        .filter(
+            DocumentLineModel.document_id.in_(doc_ids),
+            or_(
+                DocumentLineModel.barcode == barcode,
+                DocumentLineModel.sku == barcode,
+            ),
+        )
+        .order_by(
+            DocumentLineModel.expiry_date.asc().nulls_last(),
+            LocationModel.pick_sequence.asc().nulls_last(),
+            LocationModel.code.asc().nulls_last(),
+            DocumentLineModel.id,
+        )
+        .with_for_update()
+        .all()
+    )
+    if not lines:
+        raise HTTPException(status_code=404, detail="Mahsulot topilmadi yoki sizning vazifangizda yo'q")
+
+    remaining = Decimal(str(qty))
+    first_picked_line_id: Optional[UUID] = None
+    docs_to_refresh = set()
+    try:
+        for line in lines:
+            if remaining <= 0:
+                break
+            need = min(remaining, Decimal(str(line.required_qty or 0)) - Decimal(str(line.picked_qty or 0)))
+            if need <= 0:
+                continue
+            if not line.product_id or not line.lot_id or not line.location_id:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Pick line missing allocation details (product/lot/location). Allocate the order first.",
+                )
+            loc = db.query(LocationModel).filter(LocationModel.id == line.location_id).one_or_none()
+            if not loc or loc.zone_type != "NORMAL":
+                raise HTTPException(
+                    status_code=400,
+                    detail="Pick only from NORMAL zone. Line location is not NORMAL.",
+                )
+            line.picked_qty = float(Decimal(str(line.picked_qty or 0)) + need)
+            docs_to_refresh.add(line.document_id)
+            db.add(
+                StockMovementModel(
+                    product_id=line.product_id,
+                    lot_id=line.lot_id,
+                    location_id=line.location_id,
+                    qty_change=-need,
+                    movement_type="pick",
+                    source_document_type="document",
+                    source_document_id=line.document_id,
+                    created_by_user_id=user.id,
+                )
+            )
+            db.add(
+                StockMovementModel(
+                    product_id=line.product_id,
+                    lot_id=line.lot_id,
+                    location_id=line.location_id,
+                    qty_change=-need,
+                    movement_type="unallocate",
+                    source_document_type="document",
+                    source_document_id=line.document_id,
+                    created_by_user_id=user.id,
+                )
+            )
+            if first_picked_line_id is None:
+                first_picked_line_id = line.id
+            remaining -= need
+
+        for doc_id in docs_to_refresh:
+            document = (
+                db.query(DocumentModel)
+                .options(selectinload(DocumentModel.lines))
+                .filter(DocumentModel.id == doc_id)
+                .with_for_update()
+                .one_or_none()
+            )
+            if document:
+                _refresh_document_status(document, document.lines)
+                if document.order_id:
+                    order = (
+                        db.query(OrderModel)
+                        .filter(OrderModel.id == document.order_id)
+                        .with_for_update()
+                        .one_or_none()
+                    )
+                    if order and order.status in {"allocated", "ready_for_picking"}:
+                        order.status = "picking"
+        if first_picked_line_id is not None:
+            db.add(PickRequest(request_id=payload.request_id, line_id=first_picked_line_id))
+        db.commit()
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.exception("consolidated_pick error: %s", e)
+        raise HTTPException(
+            status_code=400,
+            detail=f"Terish saqlanmadi. Sabab: {str(e).strip() or type(e).__name__}",
+        ) from e
+
+    return await get_consolidated(db=db, user=user)
 
 
 @router.get("/controllers", response_model=List[ControllerUser], summary="List controllers (inventory_controller)")

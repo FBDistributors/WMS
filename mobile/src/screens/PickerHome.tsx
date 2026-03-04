@@ -225,6 +225,14 @@ export function PickerHome() {
             )}
           </View>
         )}
+        {profileType === 'picker' && (
+          <Card
+            iconName="format-list-group"
+            title={t('consolidatedPickTitle')}
+            subtitle={t('consolidatedMyTasks')}
+            onPress={() => navigation.navigate('ConsolidatedPick')}
+          />
+        )}
         <Card
           iconName="sync-off"
           title={queueCount > 0 ? `${t('offlineQueue')} (${queueCount})` : t('offlineQueue')}
