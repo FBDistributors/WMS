@@ -24,6 +24,12 @@ import { useLocale } from '../i18n/LocaleContext';
 const DEBOUNCE_MS = 1500;
 const SUPPORTED_CODE_TYPES = ['ean-13', 'ean-8', 'code-128', 'qr'] as const;
 
+/**
+ * Qoida: Kamera faqat foydalanuvchi "Scan" tugmasini bosganda ochiladi (bu ekranga
+ * faqat navigate('Scanner') orqali kelinadi). Skan qilib qaytishda CommonActions.reset
+ * bilan Scanner stack dan olib tashlanadi — orqaga bosilganda kameraga qaytish bo‘lmasin.
+ */
+
 type ScannerRoute = RouteProp<RootStackParamList, 'Scanner'>;
 
 export function ScannerScreen() {

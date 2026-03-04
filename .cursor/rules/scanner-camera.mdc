@@ -1,0 +1,19 @@
+---
+description: Scanner/kamera — faqat "Scan" tugmasi bosilganda ochiladi; orqaga qaytishda kameraga qaytmaslik
+globs: mobile/src/screens/ScannerScreen.tsx, mobile/src/components/ConsolidatedPickContent.tsx, mobile/src/screens/PickTaskList.tsx
+alwaysApply: false
+---
+
+# Scanner va kamera qoidalari
+
+## Kamera faqat Scan tugmasi orqali
+
+- **Kamera faqat foydalanuvchi "Scan" (Skaner) tugmasini bosganda ochiladi.** Boshqa paytda kamera ishga tushmasin.
+- Scanner ekraniga **faqat** foydalanuvchi aniq Scan/Skaner tugmasini bosganda `navigation.navigate('Scanner', ...)` orqali o‘tilsin.
+- Ekran fokusida, mountda yoki boshqa triggerlarda kamerani avtomatik ochish/ishga tushirish **qat’iyan man etiladi**.
+
+## Skan qilib orqaga qaytganda kameraga qaytmaslik
+
+- Skan qilinganidan keyin ro‘yxatga (masalan Umumiy yig‘ish / PickTaskList) qaytishda **stack dan Scanner olib tashlansin** — `CommonActions.reset` bilan `[PickerHome, PickTaskList]` (yoki tegishli marshrutlar) qilingan bo‘lsin, Scanner stack da qolmasin.
+- Shunda qaytishdan keyin orqaga (back) tugmasi bosilganda foydalanuvchi **kameraga emas**, balki PickerHome yoki oldingi ekranga qaytsin.
+- PickTaskList da header orqaga tugmasi PickerHome ga reset qilsin; qurilma (hardware) orqaga tugmasi ham stack bo‘yicha to‘g‘ri ishlashi kerak (Scanner stack da bo‘lmasa, kameraga qaytish bo‘lmaydi).

@@ -127,6 +127,13 @@ export function ConsolidatedPickContent({
     onProductSelect?.(null);
   }, [onProductSelect]);
 
+  /** Skanerga o'tishdan oldin modaldni yopish (orqa fonda qolmasin); selectedProductKey saqlanadi, qaytishda modal qayta ochiladi. */
+  const hideModalForScanner = useCallback(() => {
+    setSelectedProduct(null);
+    setScannedBarcodeForQty(null);
+    setProductQtyInput('1');
+  }, []);
+
   const handleProductBarcodeSubmit = useCallback(
     (barcode: string) => {
       const b = barcode.trim();
@@ -158,12 +165,13 @@ export function ConsolidatedPickContent({
 
   const goToScannerForProduct = useCallback(() => {
     if (!selectedProduct) return;
+    hideModalForScanner();
     const nav = navigation.getParent?.() || navigation;
     nav.navigate('Scanner', {
       returnToConsolidated: true,
       profileType: 'picker',
     } as any);
-  }, [selectedProduct, navigation]);
+  }, [selectedProduct, navigation, hideModalForScanner]);
 
   if (loading) {
     return (
