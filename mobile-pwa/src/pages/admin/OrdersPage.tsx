@@ -157,11 +157,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   } | null>(null)
   const [movementsData, setMovementsData] = useState<MovementsResponse | null>(null)
   const [movementPage, setMovementPage] = useState(0)
-  const [dillerApiInfo, setDillerApiInfo] = useState<{
-    url: string
-    filial_id: string
-    project_code: string
-  } | null>(null)
 
   const ELIGIBLE_PICKING_STATUSES = new Set(['imported', 'B#S', 'ready_for_picking', 'allocated'])
   const canBeSentToPicking = (order: OrderListItem) =>
@@ -171,7 +166,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     [items]
   )
 
-  const load = useCallback(async (background = false) => {
+  const load = useCallback(async (background = false, pageOverride?: number) => {
     if (!background) {
       setIsLoading(true)
       setError(null)
@@ -185,20 +180,18 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         begin.setDate(begin.getDate() - 30)
         const beginStr = begin.toISOString().slice(0, 10)
         const endStr = end.toISOString().slice(0, 10)
-        const query: Record<string, string> = {
+        const page = pageOverride ?? movementPage
+        const query: Record<string, string | number> = {
           begin_created_on: beginStr,
           end_created_on: endStr,
+          limit: MOVEMENT_PAGE_SIZE,
+          offset: page * MOVEMENT_PAGE_SIZE,
         }
         const filialId = (import.meta.env.VITE_DEFAULT_FILIAL_ID as string)?.trim()
         if (filialId) query.filial_id = filialId
         const data = await getMovements(query)
         setMovementsData(data)
-        setMovementPage(0)
-        setDillerApiInfo({
-          url: buildApiUrl('/api/v1/movements', query),
-          filial_id: filialId || '—',
-          project_code: (import.meta.env.VITE_PROJECT_CODE as string)?.trim() || '—',
-        })
+        if (pageOverride !== undefined) setMovementPage(pageOverride)
         setItems([])
         setTotal(0)
         return
@@ -230,7 +223,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       if (!background) setIsLoading(false)
       else setIsRefreshing(false)
     }
-  }, [config.searchFields, offset, orderSource, searchQuery, brandFilter, dateFrom, dateTo, statusParam, onlyNotSentToPicking, t])
+  }, [config.searchFields, movementPage, offset, orderSource, searchQuery, brandFilter, dateFrom, dateTo, statusParam, onlyNotSentToPicking, t])
 
   const loadBrands = useCallback(async () => {
     try {
@@ -324,9 +317,8 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       )
     }
     if (orderSource === 'diller') {
-      const movementListFull = movementsData?.movement ?? []
-      const movementStart = movementPage * MOVEMENT_PAGE_SIZE
-      const movementList = movementListFull.slice(movementStart, movementStart + MOVEMENT_PAGE_SIZE)
+      const movementList = movementsData?.movement ?? []
+      const movementTotal = movementsData?.total ?? 0
       const columnLabelsDiller = new Map(
         COLUMN_OPTIONS_DILLER.map((c) => [c.id, t(c.labelKey)])
       )
@@ -415,28 +407,9 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             return null
         }
       }
-      if (movementListFull.length === 0) {
+      if (movementList.length === 0 && movementTotal === 0) {
         return (
           <div className="space-y-3">
-            {dillerApiInfo && (
-              <div className="rounded-2xl border border-slate-200 bg-slate-100/80 p-4 text-sm dark:border-slate-700 dark:bg-slate-800/50">
-                <div className="mb-2 font-semibold text-slate-700 dark:text-slate-300">API</div>
-                <div className="space-y-1.5 break-all">
-                  <div>
-                    <span className="font-medium text-slate-600 dark:text-slate-400">URL:</span>{' '}
-                    <span className="text-slate-800 dark:text-slate-200">{dillerApiInfo.url}</span>
-                  </div>
-                  <div>
-                    <span className="font-medium text-slate-600 dark:text-slate-400">filial_id:</span>{' '}
-                    <span className="text-slate-800 dark:text-slate-200">{dillerApiInfo.filial_id}</span>
-                  </div>
-                  <div>
-                    <span className="font-medium text-slate-600 dark:text-slate-400">project_code:</span>{' '}
-                    <span className="text-slate-800 dark:text-slate-200">{dillerApiInfo.project_code}</span>
-                  </div>
-                </div>
-              </div>
-            )}
             <EmptyState
               title={t('orders:empty')}
               description={t('orders:empty_desc')}
@@ -448,25 +421,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       }
       return (
         <div className="space-y-3">
-          {dillerApiInfo && (
-            <div className="rounded-2xl border border-slate-200 bg-slate-100/80 p-4 text-sm dark:border-slate-700 dark:bg-slate-800/50">
-              <div className="mb-2 font-semibold text-slate-700 dark:text-slate-300">API</div>
-              <div className="space-y-1.5 break-all">
-                <div>
-                  <span className="font-medium text-slate-600 dark:text-slate-400">URL:</span>{' '}
-                  <span className="text-slate-800 dark:text-slate-200">{dillerApiInfo.url}</span>
-                </div>
-                <div>
-                  <span className="font-medium text-slate-600 dark:text-slate-400">filial_id:</span>{' '}
-                  <span className="text-slate-800 dark:text-slate-200">{dillerApiInfo.filial_id}</span>
-                </div>
-                <div>
-                  <span className="font-medium text-slate-600 dark:text-slate-400">project_code:</span>{' '}
-                  <span className="text-slate-800 dark:text-slate-200">{dillerApiInfo.project_code}</span>
-                </div>
-              </div>
-            </div>
-          )}
           <TableScrollArea inline>
             <table className="w-max min-w-[600px] text-sm">
               <thead className="text-xs uppercase text-slate-500">
@@ -799,7 +753,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         </table>
       </TableScrollArea>
     )
-  }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, dillerApiInfo, eligibleItems, error, isLoading, items, load, location.pathname, location.search, mode, movementPage, movementsData, navigate, orderSource, selectedOrderIds, t, updatingOrderId])
+  }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, eligibleItems, error, isLoading, items, load, location.pathname, location.search, mode, movementPage, movementsData, navigate, orderSource, selectedOrderIds, t, updatingOrderId])
 
   return (
     <AdminLayout title={pageTitle} backTo={mode === 'statuses' ? '/admin' : undefined}>
@@ -1022,24 +976,21 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
           {orderSource === 'diller' ? (
             <>
               <span className="text-sm text-slate-600 dark:text-slate-400">
-                {movementsData?.movement?.length
-                  ? `${movementPage * MOVEMENT_PAGE_SIZE + 1}–${Math.min((movementPage + 1) * MOVEMENT_PAGE_SIZE, movementsData.movement.length)} / ${movementsData.movement.length}`
+                {(movementsData?.total ?? 0) > 0
+                  ? `${movementPage * MOVEMENT_PAGE_SIZE + 1}–${Math.min((movementPage + 1) * MOVEMENT_PAGE_SIZE, movementsData?.total ?? 0)} / ${movementsData?.total ?? 0}`
                   : '0 / 0'}
               </span>
               <Button
                 variant="secondary"
                 disabled={movementPage === 0}
-                onClick={() => setMovementPage((p) => Math.max(0, p - 1))}
+                onClick={() => load(false, movementPage - 1)}
               >
                 {t('common:buttons.back')}
               </Button>
               <Button
                 variant="secondary"
-                disabled={
-                  !movementsData?.movement?.length ||
-                  (movementPage + 1) * MOVEMENT_PAGE_SIZE >= (movementsData.movement?.length ?? 0)
-                }
-                onClick={() => setMovementPage((p) => p + 1)}
+                disabled={(movementPage + 1) * MOVEMENT_PAGE_SIZE >= (movementsData?.total ?? 0)}
+                onClick={() => load(false, movementPage + 1)}
               >
                 {t('common:buttons.next')}
               </Button>

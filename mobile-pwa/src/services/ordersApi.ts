@@ -15,12 +15,15 @@ export type MovementItemLine = {
 
 export type MovementsResponse = {
   movement: MovementItem[]
+  total?: number
 }
 
 export type MovementsQuery = {
   begin_created_on?: string
   end_created_on?: string
   filial_id?: string
+  limit?: number
+  offset?: number
 }
 
 export async function getMovements(query: MovementsQuery = {}) {
