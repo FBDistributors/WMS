@@ -51,13 +51,12 @@ export function OrikzorHarakatlariPage() {
   const [movementPage, setMovementPage] = useState(0)
   const [dateFrom, setDateFrom] = useState(daysAgoISO(30))
   const [dateTo, setDateTo] = useState(todayISO())
+  const [warehouseCode, setWarehouseCode] = useState('777')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isSyncing, setIsSyncing] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [syncResult, setSyncResult] = useState<SmartupSyncResult | null>(null)
-  const [syncDateFrom, setSyncDateFrom] = useState(daysAgoISO(60))
-  const [syncDateTo, setSyncDateTo] = useState(todayISO())
 
   const load = useCallback(
     async (background = false, pageOverride?: number) => {
@@ -69,6 +68,7 @@ export function OrikzorHarakatlariPage() {
         const data = await getOrikzorMovements({
           begin_created_on: dateFrom.trim() || undefined,
           end_created_on: dateTo.trim() || undefined,
+          to_warehouse_code: warehouseCode.trim() || undefined,
           limit: PAGE_SIZE,
           offset: page * PAGE_SIZE,
         })
@@ -83,7 +83,7 @@ export function OrikzorHarakatlariPage() {
         else setIsRefreshing(false)
       }
     },
-    [dateFrom, dateTo, movementPage, t]
+    [dateFrom, dateTo, warehouseCode, movementPage, t]
   )
 
   useEffect(() => {
@@ -95,8 +95,8 @@ export function OrikzorHarakatlariPage() {
     setError(null)
     setSyncResult(null)
     try {
-      let begin = syncDateFrom.trim() || undefined
-      let end = syncDateTo.trim() || undefined
+      let begin = dateFrom.trim() || undefined
+      let end = dateTo.trim() || undefined
       if (begin && end && begin > end) {
         ;[begin, end] = [end, begin]
       }
@@ -288,37 +288,11 @@ export function OrikzorHarakatlariPage() {
               ) : null}
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {canSync ? (
-              <Button onClick={handleSync} disabled={isSyncing}>
-                {isSyncing ? t('orders:syncing') : t('orders:sync')}
-              </Button>
-            ) : null}
-          </div>
         </div>
-
-        {canSync ? (
-          <div className="flex flex-wrap items-center gap-4 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/30">
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              {t('orders:filters.sync_date_range', "Sinxronlash sana oralig'i")}
-            </span>
-            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-              {t('orders:filters.date_from', 'Dan')}
-              <DateInput value={syncDateFrom} onChange={setSyncDateFrom} aria-label={t('orders:filters.date_from')} />
-            </label>
-            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-              {t('orders:filters.date_to', 'Gacha')}
-              <DateInput value={syncDateTo} onChange={setSyncDateTo} aria-label={t('orders:filters.date_to')} />
-            </label>
-            <span className="text-xs text-slate-500 dark:text-slate-400">
-              {t('orders:sync_date_hint', "Smartup'dagi from_movement_date shu oraliqda bo'lishi kerak.")}
-            </span>
-          </div>
-        ) : null}
 
         <div className="flex flex-wrap items-center gap-4 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/30">
           <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-            {t('orders:filters.table_date_range', "Jadval sana oralig'i")}
+            {t('orders:filters.sync_date_range', "Sana oralig'i")}
           </span>
           <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
             {t('orders:filters.date_from', 'Boshlanish')}
@@ -328,9 +302,30 @@ export function OrikzorHarakatlariPage() {
             {t('orders:filters.date_to', 'Tugash')}
             <DateInput value={dateTo} onChange={setDateTo} aria-label={t('orders:filters.date_to')} />
           </label>
-          <Button variant="outline" onClick={() => load()} disabled={isRefreshing}>
-            {t('common:buttons.refresh')}
-          </Button>
+          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+            {t('orders:columns_diller.to_warehouse_code', 'Qayerga (sklad)')}
+            <input
+              type="text"
+              className="w-24 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              value={warehouseCode}
+              onChange={(e) => setWarehouseCode(e.target.value)}
+              placeholder="777"
+              aria-label={t('orders:columns_diller.to_warehouse_code')}
+            />
+          </label>
+          <span className="text-xs text-slate-500 dark:text-slate-400">
+            {t('orders:sync_date_hint', "Smartup'dagi from_movement_date shu oraliqda bo'lishi kerak.")}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => load()} disabled={isRefreshing}>
+              {t('common:buttons.refresh')}
+            </Button>
+            {canSync ? (
+              <Button onClick={handleSync} disabled={isSyncing}>
+                {isSyncing ? t('orders:syncing') : t('orders:sync')}
+              </Button>
+            ) : null}
+          </div>
         </div>
 
         {content}

@@ -22,6 +22,7 @@ export type MovementsQuery = {
   begin_created_on?: string
   end_created_on?: string
   filial_id?: string
+  to_warehouse_code?: string
   limit?: number
   offset?: number
 }

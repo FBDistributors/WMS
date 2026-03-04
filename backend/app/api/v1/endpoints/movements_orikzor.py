@@ -50,13 +50,14 @@ async def list_movements_orikzor(
     begin_created_on: str | None = Query(None, description="Start date (YYYY-MM-DD or DD.MM.YYYY)"),
     end_created_on: str | None = Query(None, description="End date (YYYY-MM-DD or DD.MM.YYYY)"),
     filial_id: str | None = Query(None, description="Smartup filial_id (optional)"),
+    to_warehouse_code: str | None = Query(None, description="Filter by to_warehouse_code (e.g. 777)"),
     limit: int = Query(50, ge=1, le=500, description="Max items per page"),
     offset: int = Query(0, ge=0, description="Skip N items"),
     _user=Depends(require_permission("orders:read")),
 ) -> dict[str, Any]:
     """
     Proxy to O'rikzor Smartup movement$export (alohida API URL).
-    Returns "movement" (sliced) and "total". Default date range: last 30 days.
+    Returns "movement" (sliced) and "total". Optional filter by to_warehouse_code.
     """
     today = date.today()
     begin = _parse_date(begin_created_on)
@@ -82,6 +83,10 @@ async def list_movements_orikzor(
         raise HTTPException(
             status_code=500, detail=f"O'rikzor movement export failed: {exc}"
         ) from exc
+
+    if to_warehouse_code is not None and to_warehouse_code.strip():
+        tw = to_warehouse_code.strip()
+        full_list = [m for m in full_list if isinstance(m, dict) and str(m.get("to_warehouse_code") or "").strip() == tw]
 
     total = len(full_list)
     chunk = full_list[offset : offset + limit]
