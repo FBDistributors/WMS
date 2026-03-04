@@ -44,8 +44,12 @@ def _structure_summary(obj, depth: int = 0, max_depth: int = 4):
     return type(obj).__name__
 
 
-# Smartup movement statuslari: barchasini import qilamiz. "N" = yangi, "C" = tasdiqlangan va h.k.
-ALLOWED_MOVEMENT_STATUSES: set[str] = {"N", "C", "B#S", "D", "P"}  # N ni qo'shdik; kerak bo'lsa env orqali sozlash mumkin
+# Smartup movement statuslari. Env bo'sh/berilmagan bo'lsa barcha statuslar qabul qilinadi (filtr o'chiq).
+# SMARTUP_ORIKZOR_ALLOWED_STATUSES=N,C,B#S,D,P,O,S (vergul bilan) — faqat shu statuslar import qilinadi.
+_env_statuses = (os.getenv("SMARTUP_ORIKZOR_ALLOWED_STATUSES") or "").strip()
+ALLOWED_MOVEMENT_STATUSES: set[str] = (
+    {s.strip().upper() for s in _env_statuses.split(",") if s.strip()} if _env_statuses else set()
+)
 
 
 def _parse_movement_date(value: str | None) -> datetime | None:
