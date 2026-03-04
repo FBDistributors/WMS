@@ -9,8 +9,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, Query, status
 from pydantic import BaseModel, Field
 from decimal import Decimal
-from sqlalchemy import func, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.sql import exists
 
 from app.auth.deps import get_current_user, require_any_permission, require_permission
 from app.db import get_db
@@ -343,6 +344,15 @@ async def list_orders(
             raise HTTPException(status_code=400, detail="Invalid status")
         if len(valid) == 1:
             query = query.filter(OrderModel.status == valid[0])
+            if valid[0] == "B#S":
+                # Yig'ishga yuborilgan buyurtmalar (terish documenti bor) asosiy ro'yxatda ko'rinmasin
+                has_picking_doc = exists().where(
+                    and_(
+                        DocumentModel.order_id == OrderModel.id,
+                        DocumentModel.doc_type == "SO",
+                    )
+                )
+                query = query.filter(~has_picking_doc)
         else:
             query = query.filter(OrderModel.status.in_(valid))
 
