@@ -147,6 +147,11 @@
     "barcode": "Barcode",
     "name": "Nomi",
     "qty": "Miqdor",
-    "uom": "O‘lchov"
-  }
+    "uom": "O‘lchov",
+    "price": "Narx",
+    "amount": "Summa"
+  },
+  "movement_details_title": "Tashkiliy harakat tafsilotlari",
+  "movement_not_found": "Harakat topilmadi. Ro'yxatdan oching.",
+  "movement_delivery_number": "Yetkazib berish raqami"
 }

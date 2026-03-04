@@ -13,6 +13,7 @@ import { ProductsPage } from '../pages/admin/ProductsPage'
 import { BrandsPage } from '../pages/admin/BrandsPage'
 import { OrdersPage } from '../pages/admin/OrdersPage'
 import { OrikzorHarakatlariPage } from '../pages/admin/OrikzorHarakatlariPage'
+import { MovementDetailsPage } from '../pages/admin/MovementDetailsPage'
 import { OrderDetailsPage } from '../pages/admin/OrderDetailsPage'
 import { LocationsPage } from '../pages/admin/LocationsPage'
 import { LocationDetailPage } from '../pages/admin/LocationDetailPage'
@@ -288,6 +289,16 @@ export function App() {
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">
               <RequirePermission permission="orders:read">
                 <OrdersPage orderSource="diller" />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/orders-diller/:movementId"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="orders:read">
+                <MovementDetailsPage />
               </RequirePermission>
             </RequirePermission>
           }

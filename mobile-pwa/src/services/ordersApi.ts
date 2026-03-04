@@ -3,6 +3,16 @@ import { fetchJSON } from './apiClient'
 /** Smartup movement$export raw item (movement_id, barcode, delivery_number, note, movement_items, ...). */
 export type MovementItem = Record<string, unknown>
 
+/** Movement item line (movement_items[]. */
+export type MovementItemLine = {
+  product_code?: string | null
+  quantity?: string | number | null
+  price?: string | number | null
+  amount?: string | number | null
+  movement_unit_id?: string | null
+  [key: string]: unknown
+}
+
 export type MovementsResponse = {
   movement: MovementItem[]
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Filter, Settings, FileText, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -13,7 +13,7 @@ import { Card } from '../../components/ui/card'
 import { DateInput } from '../../components/DateInput'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { buildApiUrl } from '../../services/apiClient'
-import { getMovements, getOrders, syncSmartupOrders, updateOrderStatus, type OrderListItem, type MovementsResponse } from '../../services/ordersApi'
+import { getMovements, getOrders, syncSmartupOrders, updateOrderStatus, type MovementItem, type OrderListItem, type MovementsResponse } from '../../services/ordersApi'
 import { getBrands, type Brand } from '../../services/brandsApi'
 import { useAuth } from '../../rbac/AuthProvider'
 
@@ -321,45 +321,175 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       )
     }
     if (orderSource === 'diller') {
-      const json = movementsData ?? { movement: [] }
+      const movementList = movementsData?.movement ?? []
+      const columnLabelsDiller = new Map(
+        COLUMN_OPTIONS_DILLER.map((c) => [c.id, t(c.labelKey)])
+      )
+      const renderMovementCell = (columnId: string, m: MovementItem) => {
+        const mid = (m.movement_id as string) ?? '—'
+        const deliveryNo = (m.delivery_number as string) ?? '—'
+        const barcode = (m.barcode as string) ?? '—'
+        const fromWh = (m.from_warehouse_code as string) ?? '—'
+        const toWh = (m.to_warehouse_code as string) ?? '—'
+        const note = (m.note as string) ?? '—'
+        const amount = m.amount != null ? String(m.amount) : '—'
+        const status = (m.status as string) ?? '—'
+        const items = (m.movement_items as unknown[]) ?? []
+        const fromTime = (m.from_time as string) ?? '—'
+        switch (columnId) {
+          case 'order_number':
+            return (
+              <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">
+                {mid}
+              </td>
+            )
+          case 'external_id':
+            return (
+              <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                {barcode}
+              </td>
+            )
+          case 'from_warehouse_code':
+            return (
+              <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                {fromWh}
+              </td>
+            )
+          case 'to_warehouse_code':
+            return (
+              <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                {toWh}
+              </td>
+            )
+          case 'movement_note':
+            return (
+              <td className="max-w-[200px] truncate px-4 py-3 text-slate-600 dark:text-slate-300" title={note}>
+                {note}
+              </td>
+            )
+          case 'total_amount':
+            return (
+              <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                {amount === '—' ? '—' : Number(amount).toLocaleString()}
+              </td>
+            )
+          case 'status':
+            return (
+              <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                {status}
+              </td>
+            )
+          case 'lines':
+            return (
+              <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                {items.length}
+              </td>
+            )
+          case 'delivery_date':
+            return (
+              <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                {fromTime}
+              </td>
+            )
+          case 'view_details':
+            return (
+              <td className="px-4 py-3">
+                <button
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                  onClick={() =>
+                    navigate(`/admin/orders-diller/${encodeURIComponent(mid)}`, {
+                      state: { movement: m, listPath: location.pathname, listQuery: location.search },
+                    })
+                  }
+                  aria-label={t('orders:view_details')}
+                >
+                  <FileText size={18} />
+                </button>
+              </td>
+            )
+          default:
+            return null
+        }
+      }
+      if (movementList.length === 0) {
+        return (
+          <div className="space-y-3">
+            {dillerApiInfo && (
+              <div className="rounded-2xl border border-slate-200 bg-slate-100/80 p-4 text-sm dark:border-slate-700 dark:bg-slate-800/50">
+                <div className="mb-2 font-semibold text-slate-700 dark:text-slate-300">API</div>
+                <div className="space-y-1.5 break-all">
+                  <div>
+                    <span className="font-medium text-slate-600 dark:text-slate-400">URL:</span>{' '}
+                    <span className="text-slate-800 dark:text-slate-200">{dillerApiInfo.url}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-slate-600 dark:text-slate-400">filial_id:</span>{' '}
+                    <span className="text-slate-800 dark:text-slate-200">{dillerApiInfo.filial_id}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-slate-600 dark:text-slate-400">project_code:</span>{' '}
+                    <span className="text-slate-800 dark:text-slate-200">{dillerApiInfo.project_code}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            <EmptyState
+              title={t('orders:empty')}
+              description={t('orders:empty_desc')}
+              actionLabel={t('common:buttons.refresh')}
+              onAction={load}
+            />
+          </div>
+        )
+      }
       return (
         <div className="space-y-3">
           {dillerApiInfo && (
             <div className="rounded-2xl border border-slate-200 bg-slate-100/80 p-4 text-sm dark:border-slate-700 dark:bg-slate-800/50">
-              <div className="mb-2 font-semibold text-slate-700 dark:text-slate-300">
-                API
-              </div>
+              <div className="mb-2 font-semibold text-slate-700 dark:text-slate-300">API</div>
               <div className="space-y-1.5 break-all">
                 <div>
-                  <span className="font-medium text-slate-600 dark:text-slate-400">
-                    URL:
-                  </span>{' '}
-                  <span className="text-slate-800 dark:text-slate-200">
-                    {dillerApiInfo.url}
-                  </span>
+                  <span className="font-medium text-slate-600 dark:text-slate-400">URL:</span>{' '}
+                  <span className="text-slate-800 dark:text-slate-200">{dillerApiInfo.url}</span>
                 </div>
                 <div>
-                  <span className="font-medium text-slate-600 dark:text-slate-400">
-                    filial_id:
-                  </span>{' '}
-                  <span className="text-slate-800 dark:text-slate-200">
-                    {dillerApiInfo.filial_id}
-                  </span>
+                  <span className="font-medium text-slate-600 dark:text-slate-400">filial_id:</span>{' '}
+                  <span className="text-slate-800 dark:text-slate-200">{dillerApiInfo.filial_id}</span>
                 </div>
                 <div>
-                  <span className="font-medium text-slate-600 dark:text-slate-400">
-                    project_code:
-                  </span>{' '}
-                  <span className="text-slate-800 dark:text-slate-200">
-                    {dillerApiInfo.project_code}
-                  </span>
+                  <span className="font-medium text-slate-600 dark:text-slate-400">project_code:</span>{' '}
+                  <span className="text-slate-800 dark:text-slate-200">{dillerApiInfo.project_code}</span>
                 </div>
               </div>
             </div>
           )}
-          <pre className="overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-            {JSON.stringify(json, null, 2)}
-          </pre>
+          <TableScrollArea inline>
+            <table className="w-max min-w-[600px] text-sm">
+              <thead className="text-xs uppercase text-slate-500">
+                <tr className="border-b border-slate-200 dark:border-slate-800">
+                  {COLUMN_OPTIONS_DILLER.map((col) => (
+                    <th key={col.id} className="px-4 py-3 text-left">
+                      {columnLabelsDiller.get(col.id)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {movementList.map((m) => (
+                  <tr
+                    key={(m.movement_id as string) ?? String(m.barcode ?? '')}
+                    className="border-b border-slate-100 dark:border-slate-800"
+                  >
+                    {COLUMN_OPTIONS_DILLER.map((col) => (
+                      <React.Fragment key={col.id}>
+                        {renderMovementCell(col.id, m)}
+                      </React.Fragment>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableScrollArea>
         </div>
       )
     }

@@ -147,6 +147,11 @@
     "barcode": "Barcode",
     "name": "Name",
     "qty": "Qty",
-    "uom": "UOM"
-  }
+    "uom": "UOM",
+    "price": "Price",
+    "amount": "Amount"
+  },
+  "movement_details_title": "Organizational movement details",
+  "movement_not_found": "Movement not found. Open from list.",
+  "movement_delivery_number": "Delivery number"
 }
