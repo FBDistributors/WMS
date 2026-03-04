@@ -278,7 +278,16 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     setError(null)
     setSyncResult(null)
     try {
-      const payload = orderSource ? { order_source: orderSource } : {}
+      const payload: { order_source?: string; begin_deal_date?: string; end_deal_date?: string } = orderSource
+        ? { order_source: orderSource }
+        : {}
+      if (orderSource === 'diller') {
+        const end = new Date()
+        const begin = new Date()
+        begin.setDate(begin.getDate() - 30)
+        payload.begin_deal_date = begin.toISOString().slice(0, 10)
+        payload.end_deal_date = end.toISOString().slice(0, 10)
+      }
       const result = await syncSmartupOrders(payload)
       setSyncResult(result)
       await load()

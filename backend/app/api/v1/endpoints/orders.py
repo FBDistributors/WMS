@@ -555,8 +555,12 @@ async def sync_orders_from_smartup(
             detail="O'rikzor uchun POST /api/v1/orders/sync-orikzor endpointidan foydalaning.",
         )
     today = date.today()
-    begin_date = payload.begin_deal_date or today
-    end_date = payload.end_deal_date or today
+    if payload.order_source == "diller" and payload.begin_deal_date is None and payload.end_deal_date is None:
+        begin_date = today - timedelta(days=30)
+        end_date = today
+    else:
+        begin_date = payload.begin_deal_date or today
+        end_date = payload.end_deal_date or today
     if begin_date > end_date:
         raise HTTPException(status_code=400, detail="begin_deal_date must be <= end_deal_date")
 
