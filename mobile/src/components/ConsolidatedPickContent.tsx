@@ -20,19 +20,8 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../types/navigation';
 import { useLocale } from '../i18n/LocaleContext';
 import { useNetwork } from '../network';
-import type {
-  ConsolidatedViewResponse,
-  ConsolidatedDocumentSummary,
-  ConsolidatedProduct,
-} from '../api/picking.types';
-import {
-  getConsolidatedView,
-  consolidatedPick,
-  getControllers,
-  sendToController,
-  completePickDocument,
-} from '../api/picking';
-import type { ControllerUser } from '../api/picking';
+import type { ConsolidatedViewResponse, ConsolidatedProduct } from '../api/picking.types';
+import { getConsolidatedView, consolidatedPick } from '../api/picking';
 import { ScanInput } from '../components/ScanInput';
 import { UNAUTHORIZED_MSG } from '../api/client';
 import { playSuccessBeep } from '../utils/playBeep';
@@ -71,10 +60,6 @@ export function ConsolidatedPickContent({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [qtyInput, setQtyInput] = useState('1');
-  const [controllerModalDoc, setControllerModalDoc] = useState<ConsolidatedDocumentSummary | null>(null);
-  const [controllers, setControllers] = useState<ControllerUser[]>([]);
-  const [sending, setSending] = useState(false);
   // Product tap modal (like PickTaskDetails line modal)
   const [selectedProduct, setSelectedProduct] = useState<ConsolidatedProduct | null>(null);
   const [scannedBarcodeForQty, setScannedBarcodeForQty] = useState<string | null>(null);
@@ -142,26 +127,6 @@ export function ConsolidatedPickContent({
     onProductSelect?.(null);
   }, [onProductSelect]);
 
-  const handleScanSubmit = useCallback(
-    async (barcode: string) => {
-      const b = barcode.trim();
-      if (!b || !data) return;
-      const qty = Math.max(1, Math.floor(Number(qtyInput) || 1));
-      setSubmitting(true);
-      try {
-        const requestId = `cons-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        const updated = await consolidatedPick(b, qty, requestId);
-        setData(updated);
-        playSuccessBeep();
-      } catch (e) {
-        Alert.alert(t('error'), e instanceof Error ? e.message : t('error'));
-      } finally {
-        setSubmitting(false);
-      }
-    },
-    [data, qtyInput, t]
-  );
-
   const handleProductBarcodeSubmit = useCallback(
     (barcode: string) => {
       const b = barcode.trim();
@@ -190,44 +155,6 @@ export function ConsolidatedPickContent({
       setSubmitting(false);
     }
   }, [selectedProduct, scannedBarcodeForQty, productQtyInput, t, closeProductModal]);
-
-  const openControllerModal = useCallback(
-    async (doc: ConsolidatedDocumentSummary) => {
-      setControllerModalDoc(doc);
-      if (isOnline) {
-        try {
-          const c = await getControllers();
-          setControllers(c);
-        } catch (e) {
-          Alert.alert(t('error'), e instanceof Error ? e.message : t('listLoadError'));
-          setControllerModalDoc(null);
-        }
-      } else {
-        setControllers([]);
-      }
-    },
-    [isOnline, t]
-  );
-
-  const sendToControllerConfirm = useCallback(
-    async (controllerId: string) => {
-      if (!controllerModalDoc || sending) return;
-      setSending(true);
-      try {
-        if (controllerModalDoc.status !== 'picked') {
-          await completePickDocument(controllerModalDoc.id);
-        }
-        await sendToController(controllerModalDoc.id, controllerId);
-        setControllerModalDoc(null);
-        await load();
-      } catch (e) {
-        Alert.alert(t('error'), e instanceof Error ? e.message : t('error'));
-      } finally {
-        setSending(false);
-      }
-    },
-    [controllerModalDoc, load, sending, t]
-  );
 
   const goToScannerForProduct = useCallback(() => {
     if (!selectedProduct) return;
@@ -263,7 +190,6 @@ export function ConsolidatedPickContent({
     );
   }
 
-  const documents = data?.documents ?? [];
   const products = data?.products ?? [];
 
   return (
@@ -273,34 +199,6 @@ export function ConsolidatedPickContent({
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.scanSection}>
-          <Text style={styles.sectionTitle}>{t('consolidatedScanHint')}</Text>
-          <View style={styles.scanRow}>
-            <View style={styles.scanInputWrap}>
-              <ScanInput
-                onSubmit={(v) => handleScanSubmit(v)}
-                placeholder={t('barcodeSkuShort') || 'Barcode / SKU'}
-                label={t('barcodeSkuLabel') || 'Shtrixkod'}
-                submitText={t('submit')}
-                disabled={submitting || !isOnline}
-              />
-            </View>
-            <View style={styles.qtyWrap}>
-              <Text style={styles.qtyLabel}>{t('consolidatedQuantity')}</Text>
-              <TextInput
-                style={styles.qtyInput}
-                value={qtyInput}
-                onChangeText={setQtyInput}
-                keyboardType="number-pad"
-                placeholder="1"
-                placeholderTextColor="#999"
-                maxLength={5}
-                editable={!submitting}
-              />
-            </View>
-          </View>
-        </View>
-
         <Text style={styles.sectionTitle}>{t('positions')}</Text>
         {products.length === 0 && <Text style={styles.emptyText}>{t('openTasksEmpty')}</Text>}
         {products.map((prod) => (
@@ -314,28 +212,6 @@ export function ConsolidatedPickContent({
             }}
           />
         ))}
-
-        <Text style={[styles.sectionTitle, styles.docSectionTitle]}>{t('consolidatedMyTasks')}</Text>
-        {documents.map((doc) => {
-          const isFullyPicked = doc.lines_done >= doc.lines_total && doc.lines_total > 0;
-          const canSend = isFullyPicked;
-          return (
-            <View key={doc.id} style={styles.docRow}>
-              <View style={styles.docInfo}>
-                <Text style={styles.docRef}>{doc.reference_number}</Text>
-                <Text style={styles.docMeta}>{t('linesCount', { done: doc.lines_done, total: doc.lines_total })}</Text>
-              </View>
-              <TouchableOpacity
-                style={[styles.sendBtn, !canSend && styles.sendBtnDisabled]}
-                onPress={() => canSend && openControllerModal(doc)}
-                disabled={!canSend}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.sendBtnText}>{t('sendToController')}</Text>
-              </TouchableOpacity>
-            </View>
-          );
-        })}
       </ScrollView>
 
       {/* Product tap modal — like PickTaskDetails line modal */}
@@ -403,38 +279,6 @@ export function ConsolidatedPickContent({
           </View>
         </TouchableOpacity>
       </Modal>
-
-      {/* Controller selection modal */}
-      <Modal
-        visible={!!controllerModalDoc}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setControllerModalDoc(null)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setControllerModalDoc(null)}
-        >
-          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
-            <Text style={styles.modalTitle}>{t('selectController')}</Text>
-            {controllers.length === 0 && <Text style={styles.modalEmpty}>{t('openTasksEmpty')}</Text>}
-            {controllers.map((c) => (
-              <TouchableOpacity
-                key={c.id}
-                style={styles.controllerRow}
-                onPress={() => sendToControllerConfirm(c.id)}
-                disabled={sending}
-              >
-                <Text style={styles.controllerName}>{c.full_name || c.username}</Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity style={styles.modalCancel} onPress={() => setControllerModalDoc(null)}>
-              <Text style={styles.modalCancelText}>{t('cancel')}</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
     </View>
   );
 }
@@ -451,8 +295,13 @@ function ProductRow({
   const byOrder = product.lines
     .map((l) => `${l.reference_number}: ${Math.round(l.qty_required)} ${t('countTa')}`)
     .join(', ');
+  const isDone = product.total_picked >= product.total_required;
+  const cardStyle = [
+    styles.productCard,
+    isDone ? styles.productCardDone : styles.productCardIncomplete,
+  ];
   return (
-    <TouchableOpacity style={styles.productCard} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity style={cardStyle} onPress={onPress} activeOpacity={0.7}>
       <Text style={styles.productName} numberOfLines={2}>
         {product.product_name}
       </Text>
@@ -490,59 +339,18 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 32 },
   sectionTitle: { fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 10 },
-  scanSection: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  scanRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 12 },
-  scanInputWrap: { flex: 1, minWidth: 0 },
-  qtyWrap: { width: 80 },
-  qtyLabel: { fontSize: 12, color: '#666', marginBottom: 4 },
-  qtyInput: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    fontSize: 16,
-    color: '#111',
-  },
   emptyText: { fontSize: 14, color: '#666', marginBottom: 12 },
   productCard: {
-    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 14,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
   },
+  productCardDone: { backgroundColor: '#e8f5e9', borderColor: '#c8e6c9' },
+  productCardIncomplete: { backgroundColor: '#ffebee', borderColor: '#ffcdd2' },
   productName: { fontSize: 15, fontWeight: '600', color: '#111', marginBottom: 4 },
   productTotals: { fontSize: 14, color: '#333', marginBottom: 4 },
   productByOrder: { fontSize: 12, color: '#666' },
-  docSectionTitle: { marginTop: 8 },
-  docRow: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  docInfo: { marginBottom: 8 },
-  docRef: { fontSize: 16, fontWeight: '600', color: '#111' },
-  docMeta: { fontSize: 14, color: '#666' },
-  sendBtn: {
-    backgroundColor: '#2e7d32',
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  sendBtnDisabled: { backgroundColor: '#9e9e9e', opacity: 0.8 },
-  sendBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -591,13 +399,4 @@ const styles = StyleSheet.create({
   },
   modalSubmitDisabled: { opacity: 0.7 },
   modalSubmitText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  modalEmpty: { fontSize: 14, color: '#666', marginBottom: 12 },
-  controllerRow: {
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e0e0e0',
-  },
-  controllerName: { fontSize: 16, color: '#111' },
-  modalCancel: { marginTop: 16, paddingVertical: 12, alignItems: 'center' },
-  modalCancelText: { fontSize: 16, color: '#1976d2', fontWeight: '600' },
 });

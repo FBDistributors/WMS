@@ -237,20 +237,6 @@ export function PickTaskList() {
             {showConsolidated ? t('consolidatedMyTasks') : `${list.length}${t('countTa')}`}
           </Text>
         </View>
-        {isPicker && (
-          <TouchableOpacity
-            onPress={() => setShowConsolidated((prev) => !prev)}
-            style={styles.refreshBtn}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            accessibilityLabel={showConsolidated ? t('openTasks') : t('consolidatedPickTitle')}
-          >
-            <Icon
-              name={showConsolidated ? 'format-list-bulleted' : 'format-list-group'}
-              size={24}
-              color="#1976d2"
-            />
-          </TouchableOpacity>
-        )}
         <TouchableOpacity
           onPress={() => load()}
           style={styles.refreshBtn}
@@ -260,6 +246,32 @@ export function PickTaskList() {
           <Icon name="refresh" size={24} color={loading ? '#999' : '#1976d2'} />
         </TouchableOpacity>
       </View>
+      {isPicker && (
+        <View style={styles.toggleWrap}>
+          <TouchableOpacity
+            style={[styles.toggleSegment, !showConsolidated && styles.toggleSegmentActive]}
+            onPress={() => setShowConsolidated(false)}
+            activeOpacity={0.8}
+          >
+            <Icon
+              name="format-list-bulleted"
+              size={24}
+              color={!showConsolidated ? '#111' : '#666'}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.toggleSegment, showConsolidated && styles.toggleSegmentActive]}
+            onPress={() => setShowConsolidated(true)}
+            activeOpacity={0.8}
+          >
+            <Icon
+              name="format-list-group"
+              size={24}
+              color={showConsolidated ? '#111' : '#666'}
+            />
+          </TouchableOpacity>
+        </View>
+      )}
       {showConsolidated && isPicker ? (
         <ConsolidatedPickContent
           embeddedInPickTaskList
@@ -399,6 +411,23 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '700', color: '#111' },
   count: { fontSize: 14, color: '#666', marginTop: 4 },
   refreshBtn: { padding: 4 },
+  toggleWrap: {
+    flexDirection: 'row',
+    alignSelf: 'center',
+    backgroundColor: '#e0e0e0',
+    borderRadius: 12,
+    padding: 4,
+    marginVertical: 10,
+    gap: 0,
+  },
+  toggleSegment: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+  },
+  toggleSegmentActive: {
+    backgroundColor: '#fff',
+  },
   listContent: { padding: 16, paddingBottom: 24 },
   rowWrap: { marginBottom: 12 },
   row: {

@@ -73,11 +73,22 @@ export function ScannerScreen() {
       }
       if (params.returnToConsolidated) {
         const profileType = params.profileType ?? 'picker';
-        navigation.navigate('PickTaskList', {
-          profileType,
-          scannedBarcode: value,
-          openConsolidated: true,
-        });
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 1,
+            routes: [
+              { name: 'PickerHome', params: { profileType } },
+              {
+                name: 'PickTaskList',
+                params: {
+                  profileType,
+                  scannedBarcode: value,
+                  openConsolidated: true,
+                },
+              },
+            ],
+          })
+        );
         return;
       }
       fetchByBarcode(value);
