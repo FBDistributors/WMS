@@ -18,6 +18,7 @@ import { getBrands, type Brand } from '../../services/brandsApi'
 import { useAuth } from '../../rbac/AuthProvider'
 
 const PAGE_SIZE = 50
+const MOVEMENT_PAGE_SIZE = 50
 const COLUMN_OPTIONS = [
   { id: 'select', labelKey: 'orders:columns.select' },
   { id: 'order_number', labelKey: 'orders:columns.order_number' },
@@ -155,6 +156,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     errors_count?: number | null
   } | null>(null)
   const [movementsData, setMovementsData] = useState<MovementsResponse | null>(null)
+  const [movementPage, setMovementPage] = useState(0)
   const [dillerApiInfo, setDillerApiInfo] = useState<{
     url: string
     filial_id: string
@@ -191,6 +193,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         if (filialId) query.filial_id = filialId
         const data = await getMovements(query)
         setMovementsData(data)
+        setMovementPage(0)
         setDillerApiInfo({
           url: buildApiUrl('/api/v1/movements', query),
           filial_id: filialId || '—',
@@ -321,7 +324,9 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       )
     }
     if (orderSource === 'diller') {
-      const movementList = movementsData?.movement ?? []
+      const movementListFull = movementsData?.movement ?? []
+      const movementStart = movementPage * MOVEMENT_PAGE_SIZE
+      const movementList = movementListFull.slice(movementStart, movementStart + MOVEMENT_PAGE_SIZE)
       const columnLabelsDiller = new Map(
         COLUMN_OPTIONS_DILLER.map((c) => [c.id, t(c.labelKey)])
       )
@@ -410,7 +415,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             return null
         }
       }
-      if (movementList.length === 0) {
+      if (movementListFull.length === 0) {
         return (
           <div className="space-y-3">
             {dillerApiInfo && (
@@ -794,7 +799,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         </table>
       </TableScrollArea>
     )
-  }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, dillerApiInfo, eligibleItems, error, isLoading, items, load, location.pathname, location.search, mode, movementsData, navigate, orderSource, selectedOrderIds, t, updatingOrderId])
+  }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, dillerApiInfo, eligibleItems, error, isLoading, items, load, location.pathname, location.search, mode, movementPage, movementsData, navigate, orderSource, selectedOrderIds, t, updatingOrderId])
 
   return (
     <AdminLayout title={pageTitle} backTo={mode === 'statuses' ? '/admin' : undefined}>
@@ -1014,33 +1019,62 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         </div>
 
         <div className="flex items-center justify-end gap-2">
-          <Button
-            variant="secondary"
-            disabled={offset === 0}
-            onClick={() => {
-              const newOffset = Math.max(0, offset - PAGE_SIZE)
-              setSearchParams((prev) => {
-                const next = new URLSearchParams(prev)
-                next.set('offset', String(newOffset))
-                return next
-              })
-            }}
-          >
-            {t('common:buttons.back')}
-          </Button>
-          <Button
-            variant="secondary"
-            disabled={offset + PAGE_SIZE >= total}
-            onClick={() => {
-              setSearchParams((prev) => {
-                const next = new URLSearchParams(prev)
-                next.set('offset', String(offset + PAGE_SIZE))
-                return next
-              })
-            }}
-          >
-            {t('common:buttons.next')}
-          </Button>
+          {orderSource === 'diller' ? (
+            <>
+              <span className="text-sm text-slate-600 dark:text-slate-400">
+                {movementsData?.movement?.length
+                  ? `${movementPage * MOVEMENT_PAGE_SIZE + 1}–${Math.min((movementPage + 1) * MOVEMENT_PAGE_SIZE, movementsData.movement.length)} / ${movementsData.movement.length}`
+                  : '0 / 0'}
+              </span>
+              <Button
+                variant="secondary"
+                disabled={movementPage === 0}
+                onClick={() => setMovementPage((p) => Math.max(0, p - 1))}
+              >
+                {t('common:buttons.back')}
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={
+                  !movementsData?.movement?.length ||
+                  (movementPage + 1) * MOVEMENT_PAGE_SIZE >= (movementsData.movement?.length ?? 0)
+                }
+                onClick={() => setMovementPage((p) => p + 1)}
+              >
+                {t('common:buttons.next')}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="secondary"
+                disabled={offset === 0}
+                onClick={() => {
+                  const newOffset = Math.max(0, offset - PAGE_SIZE)
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev)
+                    next.set('offset', String(newOffset))
+                    return next
+                  })
+                }}
+              >
+                {t('common:buttons.back')}
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={offset + PAGE_SIZE >= total}
+                onClick={() => {
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev)
+                    next.set('offset', String(offset + PAGE_SIZE))
+                    return next
+                  })
+                }}
+              >
+                {t('common:buttons.next')}
+              </Button>
+            </>
+          )}
         </div>
       </Card>
 
