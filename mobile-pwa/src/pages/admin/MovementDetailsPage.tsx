@@ -50,8 +50,7 @@ export function MovementDetailsPage() {
   const amount = movement.amount != null ? Number(movement.amount).toLocaleString() : '—'
   const status = (movement.status as string) ?? '—'
   const fromWh = (movement.from_warehouse_code as string) ?? '—'
-  const toWhRaw = (movement.to_warehouse_code as string) ?? '—'
-  const toWh = toWhRaw === '777' ? 'Урикзор склад - НОВЫЙ' : toWhRaw
+  const toWh = (movement.to_warehouse_code as string) ?? '—'
   const fromTime = (movement.from_time as string) ?? '—'
   const items = (movement.movement_items as Array<Record<string, unknown>>) ?? []
 
