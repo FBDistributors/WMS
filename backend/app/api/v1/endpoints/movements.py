@@ -14,8 +14,8 @@ from app.integrations.smartup.mfm_movement import fetch_mfm_movements_raw
 
 router = APIRouter()
 
-# Cache: key = (begin, end, filial_id), value = (full_list, expiry). TTL 15 min — keyingi sahifa va qayta ochish tez.
-_movements_cache: dict[tuple[date, date, str | None], tuple[list[Any], float]] = {}
+# Cache: key = (begin, end, filial_id, begin_mod?, end_mod?), value = (full_list, expiry). TTL 15 min.
+_movements_cache: dict[tuple, tuple[list[Any], float]] = {}
 _CACHE_TTL_SEC = 900
 
 
@@ -32,9 +32,21 @@ def _parse_date(value: str | None) -> date | None:
     return None
 
 
-def _fetch_movements_sync(begin: date, end: date, filial_id: str | None) -> list[Any]:
-    """Smartup dan to'liq ro'yxatni oladi (bloklovchi — thread da chaqiriladi)."""
-    raw = fetch_mfm_movements_raw(begin_date=begin, end_date=end, filial_id=filial_id)
+def _fetch_movements_sync(
+    begin: date,
+    end: date,
+    filial_id: str | None,
+    begin_modified_on: date | None = None,
+    end_modified_on: date | None = None,
+) -> list[Any]:
+    """Smartup dan to'liq ro'yxatni oladi (bloklovchi — thread da chaqiriladi). modified_on orqali delta."""
+    raw = fetch_mfm_movements_raw(
+        begin_date=begin,
+        end_date=end,
+        filial_id=filial_id,
+        begin_modified_on=begin_modified_on,
+        end_modified_on=end_modified_on,
+    )
     return raw.get("movement") if isinstance(raw.get("movement"), list) else []
 
 
@@ -57,6 +69,8 @@ def _get_cached_movements(begin: date, end: date, filial_id: str | None) -> list
 async def list_movements(
     begin_created_on: str | None = Query(None, description="Start date (YYYY-MM-DD or DD.MM.YYYY)"),
     end_created_on: str | None = Query(None, description="End date (YYYY-MM-DD or DD.MM.YYYY)"),
+    begin_modified_on: str | None = Query(None, description="Delta: faqat shu sanadan o'zgartirilganlar"),
+    end_modified_on: str | None = Query(None, description="Delta: faqat shu sanagacha o'zgartirilganlar"),
     filial_id: str | None = Query(None, description="Smartup filial_id (optional)"),
     limit: int = Query(50, ge=1, le=500, description="Max items per page"),
     offset: int = Query(0, ge=0, description="Skip N items"),
@@ -64,7 +78,7 @@ async def list_movements(
 ) -> dict[str, Any]:
     """
     Proxy to Smartup mfm movement$export. Returns "movement" (sliced) and "total".
-    Cache 15 min — keyingi sahifa va qayta yuklash tez. Birinchi so'rov Smartupni kutadi.
+    begin_modified_on/end_modified_on berilsa faqat o'zgarishlar yuklanadi (delta sync).
     """
     today = date.today()
     begin = _parse_date(begin_created_on)
@@ -79,8 +93,17 @@ async def list_movements(
     if begin > end:
         raise HTTPException(status_code=400, detail="begin_created_on must be <= end_created_on")
 
+    begin_mod = _parse_date(begin_modified_on)
+    end_mod = _parse_date(end_modified_on)
+    if begin_mod is None or end_mod is None:
+        # Default: oxirgi 1 oy o'zgarishlar (delta — tezroq)
+        end_mod = end_mod or today
+        begin_mod = begin_mod or (today - timedelta(days=30))
+    if begin_mod > end_mod:
+        begin_mod, end_mod = end_mod, begin_mod
+
     now = time.monotonic()
-    key = (begin, end, filial_id)
+    key = (begin, end, filial_id, begin_mod, end_mod)
     if key in _movements_cache:
         full_list, expiry = _movements_cache[key]
         if now < expiry:
@@ -90,7 +113,9 @@ async def list_movements(
         del _movements_cache[key]
 
     try:
-        full_list = await asyncio.to_thread(_fetch_movements_sync, begin, end, filial_id)
+        full_list = await asyncio.to_thread(
+            _fetch_movements_sync, begin, end, filial_id, begin_mod, end_mod
+        )
         _movements_cache[key] = (full_list, now + _CACHE_TTL_SEC)
     except RuntimeError as exc:
         msg = str(exc)

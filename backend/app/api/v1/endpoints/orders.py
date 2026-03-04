@@ -125,8 +125,10 @@ class SmartupSyncResponse(BaseModel):
 
 
 class SyncOrikzorRequest(BaseModel):
-    begin_deal_date: Optional[date] = Field(None, description="YYYY-MM-DD")
+    begin_deal_date: Optional[date] = Field(None, description="YYYY-MM-DD (from_movement_date oralig'i)")
     end_deal_date: Optional[date] = Field(None, description="YYYY-MM-DD")
+    begin_modified_on: Optional[date] = Field(None, description="Delta sync: faqat shu sanadan o'zgartirilganlar")
+    end_modified_on: Optional[date] = Field(None, description="Delta sync: faqat shu sanagacha o'zgartirilganlar")
 
 
 class SendToPickingRequest(BaseModel):
@@ -627,14 +629,29 @@ async def sync_orikzor(
         raise HTTPException(status_code=400, detail="begin_deal_date must be <= end_deal_date")
 
     logger = logging.getLogger(__name__)
+    begin_mod = getattr(payload, "begin_modified_on", None)
+    end_mod = getattr(payload, "end_modified_on", None)
+    if begin_mod is None or end_mod is None:
+        # Default: oxirgi 1 oy o'zgarishlar (delta sync tezroq)
+        end_mod = end_mod or today
+        begin_mod = begin_mod or (today - timedelta(days=30))
+    if begin_mod > end_mod:
+        begin_mod, end_mod = end_mod, begin_mod
+
     logger.info(
-        "O'rikzor sync: sana oralig'i %s .. %s",
+        "O'rikzor sync: sana oralig'i %s .. %s (delta: modified %s .. %s)",
         begin_date.isoformat(),
         end_date.isoformat(),
+        begin_mod.isoformat(),
+        end_mod.isoformat(),
     )
 
     try:
-        response = export_movements_from_smartup(begin_date, end_date)
+        response = export_movements_from_smartup(
+            begin_date, end_date,
+            begin_modified_on=begin_mod,
+            end_modified_on=end_mod,
+        )
         n_items = len(response.items)
         parse_skipped = getattr(response, "debug_skipped_by_reason", None) or {}
         created, updated, skipped, import_errors, skipped_by_reason = import_orders(

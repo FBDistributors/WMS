@@ -501,8 +501,12 @@ def _request_orikzor_export(
     begin_date: date,
     end_date: date,
     filial_id: str | None = None,
+    begin_modified_on: date | None = None,
+    end_modified_on: date | None = None,
 ) -> str:
-    """O'rikzor Smartup movement$export ga so'rov yuborib, javob body (JSON string) qaytaradi."""
+    """O'rikzor Smartup movement$export ga so'rov yuborib, javob body (JSON string) qaytaradi.
+    begin_modified_on/end_modified_on berilsa faqat o'sha vaqtda o'zgartirilgan yozuvlar so'raladi (delta sync).
+    """
     url = (os.getenv("SMARTUP_ORIKZOR_EXPORT_URL") or DEFAULT_ORIKZOR_EXPORT_URL).strip()
     project_code = (os.getenv("SMARTUP_PROJECT_CODE") or "trade").strip()
     header_filial = (filial_id or os.getenv("SMARTUP_FILIAL_ID") or "3788131").strip()
@@ -514,6 +518,8 @@ def _request_orikzor_export(
         )
     begin_str = begin_date.strftime("%d.%m.%Y")
     end_str = end_date.strftime("%d.%m.%Y")
+    mod_begin = begin_modified_on.strftime("%d.%m.%Y") if begin_modified_on else ""
+    mod_end = end_modified_on.strftime("%d.%m.%Y") if end_modified_on else ""
     payload = {
         "filial_codes": [{"filial_code": ""}],
         "filial_code": "",
@@ -525,8 +531,8 @@ def _request_orikzor_export(
         "end_to_movement_date": "",
         "begin_created_on": "",
         "end_created_on": "",
-        "begin_modified_on": "",
-        "end_modified_on": "",
+        "begin_modified_on": mod_begin,
+        "end_modified_on": mod_end,
     }
     data = json.dumps(payload).encode("utf-8")
     credentials = f"{username}:{password}"
@@ -574,9 +580,21 @@ def fetch_orikzor_movements_raw(
     return _extract_movements_list(data)
 
 
-def export_movements_from_smartup(begin_date: date, end_date: date) -> SmartupOrderExportResponse:
-    """Smartup movement$export ga so'rov yuborib, harakatlarni SmartupOrder ro'yxati sifatida qaytaradi."""
-    body = _request_orikzor_export(begin_date=begin_date, end_date=end_date)
+def export_movements_from_smartup(
+    begin_date: date,
+    end_date: date,
+    begin_modified_on: date | None = None,
+    end_modified_on: date | None = None,
+) -> SmartupOrderExportResponse:
+    """Smartup movement$export ga so'rov yuborib, harakatlarni SmartupOrder ro'yxati sifatida qaytaradi.
+    begin_modified_on/end_modified_on orqali delta sync (faqat o'zgarishlar) qilish mumkin.
+    """
+    body = _request_orikzor_export(
+        begin_date=begin_date,
+        end_date=end_date,
+        begin_modified_on=begin_modified_on,
+        end_modified_on=end_modified_on,
+    )
     parsed = _parse_movement_response(body, begin_date=begin_date, end_date=end_date)
     if parsed.items:
         logger.info("Smartup movement$export: %s ta movement", len(parsed.items))

@@ -21,6 +21,10 @@ export type MovementsResponse = {
 export type MovementsQuery = {
   begin_created_on?: string
   end_created_on?: string
+  /** Delta: faqat shu sanadan o'zgartirilganlar (YYYY-MM-DD) */
+  begin_modified_on?: string
+  /** Delta: faqat shu sanagacha o'zgartirilganlar (YYYY-MM-DD) */
+  end_modified_on?: string
   filial_id?: string
   to_warehouse_code?: string
   limit?: number
@@ -158,6 +162,10 @@ export async function syncSmartupOrders(payload: SmartupSyncInput = {}) {
 export type SyncOrikzorInput = {
   begin_deal_date?: string
   end_deal_date?: string
+  /** Delta sync: faqat shu sanadan o'zgartirilgan harakatlar (YYYY-MM-DD) */
+  begin_modified_on?: string
+  /** Delta sync: faqat shu sanagacha o'zgartirilgan harakatlar (YYYY-MM-DD) */
+  end_modified_on?: string
 }
 
 export async function syncOrikzorOrders(payload: SyncOrikzorInput = {}) {

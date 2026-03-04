@@ -187,9 +187,12 @@ def _request_mfm_export(
     begin_date: date,
     end_date: date,
     filial_id: str | None = None,
+    begin_modified_on: date | None = None,
+    end_modified_on: date | None = None,
 ) -> str:
     """
     Call SmartUp mfm movement$export, return raw response body (JSON string).
+    begin_modified_on/end_modified_on berilsa faqat o'sha vaqtda o'zgartirilgan yozuvlar so'raladi (delta sync).
     """
     url = (os.getenv("SMARTUP_MFM_MOVEMENT_EXPORT_URL") or DEFAULT_MFM_URL).strip()
     project_code = (os.getenv("SMARTUP_PROJECT_CODE") or "trade").strip()
@@ -203,6 +206,8 @@ def _request_mfm_export(
 
     begin_str = begin_date.strftime("%d.%m.%Y")
     end_str = end_date.strftime("%d.%m.%Y")
+    mod_begin = begin_modified_on.strftime("%d.%m.%Y") if begin_modified_on else begin_str
+    mod_end = end_modified_on.strftime("%d.%m.%Y") if end_modified_on else end_str
     payload = {
         "filial_codes": [{"filial_code": ""}],
         "filial_code": "",
@@ -210,8 +215,8 @@ def _request_mfm_export(
         "movement_id": "",
         "begin_created_on": begin_str,
         "end_created_on": end_str,
-        "begin_modified_on": begin_str,
-        "end_modified_on": end_str,
+        "begin_modified_on": mod_begin,
+        "end_modified_on": mod_end,
     }
     data = json.dumps(payload).encode("utf-8")
     credentials = f"{username}:{password}"
@@ -251,12 +256,20 @@ def fetch_mfm_movements_raw(
     begin_date: date,
     end_date: date,
     filial_id: str | None = None,
+    begin_modified_on: date | None = None,
+    end_modified_on: date | None = None,
 ) -> dict:
     """
     Call SmartUp mfm movement$export and return raw JSON as dict (e.g. {"movement": [...]}).
-    Does not parse into SmartupOrder; for use by GET /api/v1/movements.
+    begin_modified_on/end_modified_on orqali delta sync (faqat o'zgarishlar) qilish mumkin.
     """
-    body = _request_mfm_export(begin_date=begin_date, end_date=end_date, filial_id=filial_id)
+    body = _request_mfm_export(
+        begin_date=begin_date,
+        end_date=end_date,
+        filial_id=filial_id,
+        begin_modified_on=begin_modified_on,
+        end_modified_on=end_modified_on,
+    )
     return json.loads(body)
 
 
@@ -264,10 +277,17 @@ def export_mfm_movements(
     begin_date: date,
     end_date: date,
     filial_id: str | None = None,
+    begin_modified_on: date | None = None,
+    end_modified_on: date | None = None,
 ) -> SmartupOrderExportResponse:
     """
     Call SmartUp mfm movement$export (Cross-organizational movement), return SmartupOrder list.
-    Uses begin_created_on/end_created_on in payload.
     """
-    body = _request_mfm_export(begin_date=begin_date, end_date=end_date, filial_id=filial_id)
+    body = _request_mfm_export(
+        begin_date=begin_date,
+        end_date=end_date,
+        filial_id=filial_id,
+        begin_modified_on=begin_modified_on,
+        end_modified_on=end_modified_on,
+    )
     return _parse_mfm_response(body)
