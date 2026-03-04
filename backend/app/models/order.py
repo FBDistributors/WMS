@@ -39,6 +39,9 @@ class Order(Base):
     from_warehouse_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
     to_warehouse_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
     movement_note: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    delivery_date: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

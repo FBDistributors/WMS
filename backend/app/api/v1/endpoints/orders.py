@@ -67,6 +67,7 @@ class OrderListItem(BaseModel):
     from_warehouse_code: Optional[str] = None
     to_warehouse_code: Optional[str] = None
     movement_note: Optional[str] = None
+    delivery_date: Optional[date] = None
 
 
 class OrderLineOut(BaseModel):
@@ -94,6 +95,7 @@ class OrderDetails(BaseModel):
     from_warehouse_code: Optional[str] = None
     to_warehouse_code: Optional[str] = None
     movement_note: Optional[str] = None
+    delivery_date: Optional[date] = None
 
 
 class OrdersListResponse(BaseModel):
@@ -230,6 +232,7 @@ def _to_order_details(order: OrderModel) -> OrderDetails:
         from_warehouse_code=getattr(order, "from_warehouse_code", None),
         to_warehouse_code=getattr(order, "to_warehouse_code", None),
         movement_note=getattr(order, "movement_note", None),
+        delivery_date=order.delivery_date.date() if getattr(order, "delivery_date", None) else None,
     )
 
 
@@ -460,6 +463,7 @@ async def list_orders(
                 picker_name=_picker_name(doc),
                 controller_name=_controller_name(doc),
                 is_incomplete=is_incomplete,
+                delivery_date=order.delivery_date.date() if getattr(order, "delivery_date", None) else None,
             )
         )
 

@@ -19,6 +19,7 @@ export type OrderListItem = {
   from_warehouse_code?: string | null
   to_warehouse_code?: string | null
   movement_note?: string | null
+  delivery_date?: string | null
 }
 
 export type OrdersListResponse = {

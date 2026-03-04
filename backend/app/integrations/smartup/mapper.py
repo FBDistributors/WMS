@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
 
@@ -33,6 +34,7 @@ class OrderPayload:
     from_warehouse_code: Optional[str] = None
     to_warehouse_code: Optional[str] = None
     movement_note: Optional[str] = None
+    delivery_date: Optional[datetime] = None
 
 
 def map_order_to_wms_order(order: SmartupOrder) -> OrderPayload:
@@ -67,6 +69,7 @@ def map_order_to_wms_order(order: SmartupOrder) -> OrderPayload:
         from_warehouse_code=getattr(order, "from_warehouse_code", None) or None,
         to_warehouse_code=getattr(order, "to_warehouse_code", None) or None,
         movement_note=getattr(order, "note", None) or None,
+        delivery_date=order.delivery_date,
     )
 
 

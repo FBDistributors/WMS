@@ -100,6 +100,8 @@ def import_orders(
                     existing.to_warehouse_code = payload.to_warehouse_code
                 if getattr(payload, "movement_note", None) is not None:
                     existing.movement_note = payload.movement_note
+                if getattr(payload, "delivery_date", None) is not None:
+                    existing.delivery_date = payload.delivery_date
                 if payload.lines:
                     _upsert_lines(existing, payload.lines)
                 db.commit()
@@ -120,6 +122,7 @@ def import_orders(
                 from_warehouse_code=getattr(payload, "from_warehouse_code", None),
                 to_warehouse_code=getattr(payload, "to_warehouse_code", None),
                 movement_note=getattr(payload, "movement_note", None),
+                delivery_date=getattr(payload, "delivery_date", None),
             )
             record.lines = [
                 OrderLine(

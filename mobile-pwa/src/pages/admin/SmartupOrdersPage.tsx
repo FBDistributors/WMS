@@ -6,23 +6,14 @@ import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { fetchJSON } from '../../services/apiClient'
-
-type SmartupDocument = {
-  id: string
-  reference_number: string
-  status: string
-  lines_total: number
-  lines_done: number
-  source_external_id?: string | null
-  created_at: string
-}
+import { getOrders, type OrderListItem } from '../../services/ordersApi'
 
 const PAGE_SIZE = 50
 
 export function SmartupOrdersPage() {
   const { t } = useTranslation(['admin', 'common'])
-  const [items, setItems] = useState<SmartupDocument[]>([])
+  const [items, setItems] = useState<OrderListItem[]>([])
+  const [total, setTotal] = useState(0)
   const [status, setStatus] = useState('all')
   const [offset, setOffset] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
@@ -32,15 +23,14 @@ export function SmartupOrdersPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const data = await fetchJSON<SmartupDocument[]>('/api/v1/documents', {
-        query: {
-          source: 'smartup',
-          status: status === 'all' ? undefined : status,
-          limit: PAGE_SIZE,
-          offset,
-        },
+      const data = await getOrders({
+        order_source: 'smartup',
+        status: status === 'all' ? undefined : status,
+        limit: PAGE_SIZE,
+        offset,
       })
-      setItems(data)
+      setItems(data.items)
+      setTotal(data.total)
     } catch (err) {
       const message = err instanceof Error ? err.message : t('admin:integrations.smartup_orders.error')
       setError(message)
@@ -89,24 +79,28 @@ export function SmartupOrdersPage() {
               <th className="px-4 py-3 text-left">{t('admin:integrations.smartup_orders.columns.external_id')}</th>
               <th className="px-4 py-3 text-left">{t('admin:integrations.smartup_orders.columns.status')}</th>
               <th className="px-4 py-3 text-left">{t('admin:integrations.smartup_orders.columns.lines')}</th>
-              <th className="px-4 py-3 text-left">{t('admin:integrations.smartup_orders.columns.created')}</th>
+              <th className="px-4 py-3 text-left">{t('admin:integrations.smartup_orders.columns.delivery_date')}</th>
             </tr>
           </thead>
           <tbody>
             {items.map((item) => (
               <tr key={item.id} className="border-b border-slate-100 dark:border-slate-800">
                 <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">
-                  {item.reference_number}
+                  {item.order_number}
                 </td>
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                   {item.source_external_id ?? '—'}
                 </td>
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{item.status}</td>
+                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{item.lines_total}</td>
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                  {item.lines_done}/{item.lines_total}
-                </td>
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                  {new Date(item.created_at).toLocaleString()}
+                  {item.delivery_date
+                    ? new Date(item.delivery_date).toLocaleDateString(undefined, {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                      })
+                    : '—'}
                 </td>
               </tr>
             ))}
@@ -156,7 +150,7 @@ export function SmartupOrdersPage() {
           </Button>
           <Button
             variant="secondary"
-            disabled={items.length < PAGE_SIZE}
+            disabled={offset + items.length >= total}
             onClick={() => setOffset((prev) => prev + PAGE_SIZE)}
           >
             {t('common:buttons.next')}

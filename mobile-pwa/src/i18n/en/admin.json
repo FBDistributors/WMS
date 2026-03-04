@@ -137,7 +137,7 @@
         "external_id": "External ID",
         "status": "Status",
         "lines": "Lines",
-        "created": "Created"
+        "delivery_date": "Delivery date"
       },
       "status": {
         "all": "All",
