@@ -12,6 +12,7 @@ import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { DateInput } from '../../components/DateInput'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { buildApiUrl } from '../../services/apiClient'
 import { getOrders, syncSmartupOrders, updateOrderStatus, type OrderListItem, type OrdersListResponse } from '../../services/ordersApi'
 import { getBrands, type Brand } from '../../services/brandsApi'
 import { useAuth } from '../../rbac/AuthProvider'
@@ -154,6 +155,11 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     errors_count?: number | null
   } | null>(null)
   const [rawDillerResponse, setRawDillerResponse] = useState<OrdersListResponse | null>(null)
+  const [dillerApiInfo, setDillerApiInfo] = useState<{
+    url: string
+    filial_id: string
+    project_code: string
+  } | null>(null)
 
   const ELIGIBLE_PICKING_STATUSES = new Set(['imported', 'B#S', 'ready_for_picking', 'allocated'])
   const canBeSentToPicking = (order: OrderListItem) =>
@@ -171,7 +177,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       setIsRefreshing(true)
     }
     try {
-      const data = await getOrders({
+      const query: Record<string, string | number | undefined> = {
         status: statusParam,
         q: searchQuery.trim() || undefined,
         brand_ids: brandFilter.trim() ? brandFilter.trim() : undefined,
@@ -186,13 +192,22 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         limit: PAGE_SIZE,
         offset,
         ...(orderSource ? { order_source: orderSource } : {}),
-      })
+      }
+      const data = await getOrders(query)
       const list = onlyNotSentToPicking
         ? data.items.filter((o) => !SENT_TO_PICKING_STATUSES.has(o.status))
         : data.items
       setItems(list)
       setTotal(data.total)
-      if (orderSource === 'diller') setRawDillerResponse(data)
+      if (orderSource === 'diller') {
+        setRawDillerResponse(data)
+        const url = buildApiUrl('/api/v1/orders', query)
+        const filialId =
+          (import.meta.env.VITE_DEFAULT_FILIAL_ID as string)?.trim() || '—'
+        const projectCode =
+          (import.meta.env.VITE_PROJECT_CODE as string)?.trim() || '—'
+        setDillerApiInfo({ url, filial_id: filialId, project_code: projectCode })
+      }
     } catch (err) {
       if (!background) {
         const message = err instanceof Error ? err.message : t('orders:load_failed')
@@ -294,9 +309,44 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         rawDillerResponse ??
         { items: [], total: 0, limit: PAGE_SIZE, offset }
       return (
-        <pre className="overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-          {JSON.stringify(json, null, 2)}
-        </pre>
+        <div className="space-y-3">
+          {dillerApiInfo && (
+            <div className="rounded-2xl border border-slate-200 bg-slate-100/80 p-4 text-sm dark:border-slate-700 dark:bg-slate-800/50">
+              <div className="mb-2 font-semibold text-slate-700 dark:text-slate-300">
+                API
+              </div>
+              <div className="space-y-1.5 break-all">
+                <div>
+                  <span className="font-medium text-slate-600 dark:text-slate-400">
+                    URL:
+                  </span>{' '}
+                  <span className="text-slate-800 dark:text-slate-200">
+                    {dillerApiInfo.url}
+                  </span>
+                </div>
+                <div>
+                  <span className="font-medium text-slate-600 dark:text-slate-400">
+                    filial_id:
+                  </span>{' '}
+                  <span className="text-slate-800 dark:text-slate-200">
+                    {dillerApiInfo.filial_id}
+                  </span>
+                </div>
+                <div>
+                  <span className="font-medium text-slate-600 dark:text-slate-400">
+                    project_code:
+                  </span>{' '}
+                  <span className="text-slate-800 dark:text-slate-200">
+                    {dillerApiInfo.project_code}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+          <pre className="overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+            {JSON.stringify(json, null, 2)}
+          </pre>
+        </div>
       )
     }
     if (items.length === 0) {
@@ -601,7 +651,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         </table>
       </TableScrollArea>
     )
-  }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, eligibleItems, error, isLoading, items, load, location.pathname, location.search, mode, navigate, orderSource, rawDillerResponse, selectedOrderIds, t, updatingOrderId])
+  }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, dillerApiInfo, eligibleItems, error, isLoading, items, load, location.pathname, location.search, mode, navigate, orderSource, rawDillerResponse, selectedOrderIds, t, updatingOrderId])
 
   return (
     <AdminLayout title={pageTitle} backTo={mode === 'statuses' ? '/admin' : undefined}>
