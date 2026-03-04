@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState, Fragment } from 'react'
+import { useCallback, useEffect, useMemo, useState, Fragment } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { FileText } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -328,7 +328,7 @@ export function OrikzorHarakatlariPage() {
             {t('orders:filters.date_to', 'Tugash')}
             <DateInput value={dateTo} onChange={setDateTo} aria-label={t('orders:filters.date_to')} />
           </label>
-          <Button variant="outline" size="sm" onClick={() => load()} disabled={isRefreshing}>
+          <Button variant="outline" onClick={() => load()} disabled={isRefreshing}>
             {t('common:buttons.refresh')}
           </Button>
         </div>
