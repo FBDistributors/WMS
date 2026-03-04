@@ -314,6 +314,16 @@ export function App() {
           }
         />
         <Route
+          path="/admin/orders-orikzor/:movementId"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="orders:read">
+                <MovementDetailsPage />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
           path="/admin/orders/:id"
           element={
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">

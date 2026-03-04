@@ -48,6 +48,7 @@
     "date_from": "Date from",
     "date_to": "Date to",
     "sync_date_range": "Sync date range",
+    "table_date_range": "Table date range",
     "sync_date_hint": "from_movement_date in Smartup must fall within this range.",
     "sync_single_day_hint": "Single day selected — that day must have movements in Smartup. Widen the range (e.g. 01.02–28.02).",
     "sync_format_hint": "Smartup format: day.month.year (03.02.2026 = 3 Feb). Compare 'body=' in Render logs with Postman.",

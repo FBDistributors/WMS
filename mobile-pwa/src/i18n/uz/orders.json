@@ -48,6 +48,7 @@
     "date_from": "Boshlanish sanasi",
     "date_to": "Tugash sanasi",
     "sync_date_range": "Sinxronlash sana oralig'i",
+    "table_date_range": "Jadval sana oralig'i",
     "sync_date_hint": "Smartup'dagi from_movement_date shu oraliqda bo'lishi kerak.",
     "sync_single_day_hint": "Bitta kun tanlangan — o'sha kunda Smartup'da harakat bo'lishi kerak. Oraliqni kengaytiring (masalan 01.02–28.02).",
     "sync_format_hint": "Smartup formati: kun.oy.yil (03.02.2026 = 3-fevral). Render loglarida 'body=' ni Postman bilan solashtiring.",

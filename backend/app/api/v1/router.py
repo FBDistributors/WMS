@@ -11,6 +11,7 @@ from app.api.v1.endpoints import (
     inventory,
     locations,
     movements,
+    movements_orikzor,
     orders,
     picking,
     products,
@@ -28,6 +29,7 @@ router.include_router(brands.router, prefix="/brands", tags=["brands"])
 router.include_router(documents.router, prefix="/documents", tags=["documents"])
 router.include_router(download.router, prefix="/download", tags=["download"])
 router.include_router(movements.router, prefix="/movements", tags=["movements"])
+router.include_router(movements_orikzor.router, prefix="/movements-orikzor", tags=["movements-orikzor"])
 router.include_router(orders.router, prefix="/orders", tags=["orders"])
 router.include_router(locations.router, prefix="/locations", tags=["locations"])
 router.include_router(inventory.router, prefix="/inventory", tags=["inventory"])

@@ -30,6 +30,11 @@ export async function getMovements(query: MovementsQuery = {}) {
   return fetchJSON<MovementsResponse>('/api/v1/movements', { query })
 }
 
+/** O'rikzor harakatlari — alohida API (mkw/movement$export). */
+export async function getOrikzorMovements(query: MovementsQuery = {}) {
+  return fetchJSON<MovementsResponse>('/api/v1/movements-orikzor', { query })
+}
+
 export type OrderListItem = {
   id: string
   order_number: string

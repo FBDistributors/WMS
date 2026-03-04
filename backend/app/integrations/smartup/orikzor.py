@@ -10,6 +10,7 @@ import urllib.error
 import urllib.request
 from collections import Counter
 from datetime import date, datetime
+from typing import Any
 
 from pydantic import ValidationError as PydanticValidationError
 
@@ -63,14 +64,8 @@ def _parse_movement_date(value: str | None) -> datetime | None:
             return None
 
 
-def _parse_movement_response(
-    body: str,
-    begin_date: date | None = None,
-    end_date: date | None = None,
-) -> SmartupOrderExportResponse:
-    """movement$export javobini parse qiladi; bitta joyda movement/movements/list va movement_items/itens."""
-    raw_count = len(body)
-    data = json.loads(body)
+def _extract_movements_list(data: Any) -> list:
+    """Parse qilingan JSON dan movement ro'yxatini chiqaradi (raw list of dicts)."""
     movements: list = []
 
     if isinstance(data, list):
@@ -95,6 +90,7 @@ def _parse_movement_response(
                 or data.get("list")
                 or data.get("rows")
             )
+
             def _is_movement_dict(d):
                 return isinstance(d, dict) and (
                     d.get("movement_id") is not None or d.get("movement_number") is not None
@@ -134,7 +130,10 @@ def _parse_movement_response(
                         candidate = _take_raw_from_list(inner_list) if isinstance(inner_list, list) else None
                         if candidate is not None:
                             raw = candidate
-                            logger.info("Smartup movement$export: ro'yxat '%s.%s' ichida topildi (len=%s)", wrap, "movement|movements|items", len(raw))
+                            logger.info(
+                                "Smartup movement$export: ro'yxat '%s.%s' ichida topildi (len=%s)",
+                                wrap, "movement|movements|items", len(raw),
+                            )
                             break
                     if raw is not None:
                         break
@@ -148,7 +147,6 @@ def _parse_movement_response(
                 if isinstance(raw, list):
                     movements = raw
                 elif isinstance(raw, dict):
-                    # Bitta movement ob'ekti yoki {"movement": [...]} wrapper
                     if raw.get("movement_id") is not None or raw.get("movement_number") is not None:
                         movements = [raw]
                     else:
@@ -166,7 +164,6 @@ def _parse_movement_response(
     if not isinstance(movements, list):
         movements = [movements] if movements else []
 
-    # String elementlarni parse qilish
     normalized: list = []
     for x in movements:
         if isinstance(x, dict):
@@ -181,7 +178,6 @@ def _parse_movement_response(
                 pass
     movements = normalized
 
-    # Wrapper [{"movement": [...]}] yoki har bir element {"movement": {...}} — ichidagi ro'yxatni chiqarish
     expanded: list = []
     for x in movements:
         if isinstance(x, dict) and (
@@ -198,7 +194,6 @@ def _parse_movement_response(
                 expanded.append(x)
         else:
             expanded.append(x)
-    # Yana bir qatorda wrapper bo'lsa (har bir element {"movement": {...}})
     flattened: list = []
     for m in expanded:
         if not isinstance(m, dict):
@@ -211,10 +206,20 @@ def _parse_movement_response(
                 flattened.extend(inner)
             elif isinstance(inner, dict):
                 flattened.append(inner)
-    movements = [m for m in flattened if isinstance(m, dict)]
-    # Hech qanday limit/pagination yo'q — barcha movementlar ishlatiladi
+    return [m for m in flattened if isinstance(m, dict)]
+
+
+def _parse_movement_response(
+    body: str,
+    begin_date: date | None = None,
+    end_date: date | None = None,
+) -> SmartupOrderExportResponse:
+    """movement$export javobini parse qiladi; bitta joyda movement/movements/list va movement_items/itens."""
+    raw_count = len(body)
+    data = json.loads(body)
+    movements = _extract_movements_list(data)
     pre_filter_count = len(movements)
-    raw_count = pre_filter_count  # invariant: raw_count = len(movements)
+    raw_count = pre_filter_count
 
     logger.info(
         "O'rikzor parse: Smartup from_movement_date format DD.MM.YYYY HH:MM:SS (fallback DD.MM.YYYY). "
@@ -489,21 +494,24 @@ def _parse_movement_response(
     )
 
 
-def export_movements_from_smartup(begin_date: date, end_date: date) -> SmartupOrderExportResponse:
-    """Smartup movement$export ga so'rov yuborib, harakatlarni SmartupOrder ro'yxati sifatida qaytaradi."""
-    url = (
-        os.getenv("SMARTUP_ORIKZOR_EXPORT_URL")
-        or "https://smartup.online/b/anor/mxsx/mkw/movement$export"
-    ).strip()
+DEFAULT_ORIKZOR_EXPORT_URL = "https://smartup.online/b/anor/mxsx/mkw/movement$export"
+
+
+def _request_orikzor_export(
+    begin_date: date,
+    end_date: date,
+    filial_id: str | None = None,
+) -> str:
+    """O'rikzor Smartup movement$export ga so'rov yuborib, javob body (JSON string) qaytaradi."""
+    url = (os.getenv("SMARTUP_ORIKZOR_EXPORT_URL") or DEFAULT_ORIKZOR_EXPORT_URL).strip()
     project_code = (os.getenv("SMARTUP_PROJECT_CODE") or "trade").strip()
-    filial_id = (os.getenv("SMARTUP_FILIAL_ID") or "3788131").strip()
+    header_filial = (filial_id or os.getenv("SMARTUP_FILIAL_ID") or "3788131").strip()
     username = (os.getenv("SMARTUP_BASIC_USER") or "").strip() or None
     password = (os.getenv("SMARTUP_BASIC_PASS") or "").strip() or None
     if not username or not password:
         raise RuntimeError(
-            "O'rikzor sync uchun SMARTUP_BASIC_USER va SMARTUP_BASIC_PASS ni to'ldiring."
+            "O'rikzor uchun SMARTUP_BASIC_USER va SMARTUP_BASIC_PASS ni to'ldiring."
         )
-
     begin_str = begin_date.strftime("%d.%m.%Y")
     end_str = end_date.strftime("%d.%m.%Y")
     payload = {
@@ -528,21 +536,18 @@ def export_movements_from_smartup(begin_date: date, end_date: date) -> SmartupOr
         "Accept": "application/json",
         "Authorization": f"Basic {basic_token}",
         "project_code": project_code,
-        "filial_id": filial_id,
+        "filial_id": header_filial,
     }
-
     logger.info(
-        "Smartup movement$export: url=%s sana=%s..%s body=%s",
+        "Smartup movement$export: url=%s sana=%s..%s",
         url.split("?")[0],
         begin_str,
         end_str,
-        json.dumps(payload),
     )
-
     request = urllib.request.Request(url, data=data, headers=headers, method="POST")
     try:
         with urllib.request.urlopen(request, timeout=90) as response:
-            body = response.read().decode("utf-8")
+            return response.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
         response_text = exc.read().decode("utf-8")
         logger.error("Smartup movement$export HTTP %s: %s", exc.code, response_text)
@@ -554,6 +559,24 @@ def export_movements_from_smartup(begin_date: date, end_date: date) -> SmartupOr
         logger.error("Smartup movement$export: %s", exc)
         raise RuntimeError(f"Smartup movement$export failed: {exc}") from exc
 
+
+def fetch_orikzor_movements_raw(
+    begin_date: date,
+    end_date: date,
+    filial_id: str | None = None,
+) -> list[Any]:
+    """
+    O'rikzor Smartup movement$export dan raw movement ro'yxatini qaytaradi.
+    GET /api/v1/movements-orikzor uchun ishlatiladi.
+    """
+    body = _request_orikzor_export(begin_date=begin_date, end_date=end_date, filial_id=filial_id)
+    data = json.loads(body)
+    return _extract_movements_list(data)
+
+
+def export_movements_from_smartup(begin_date: date, end_date: date) -> SmartupOrderExportResponse:
+    """Smartup movement$export ga so'rov yuborib, harakatlarni SmartupOrder ro'yxati sifatida qaytaradi."""
+    body = _request_orikzor_export(begin_date=begin_date, end_date=end_date)
     parsed = _parse_movement_response(body, begin_date=begin_date, end_date=end_date)
     if parsed.items:
         logger.info("Smartup movement$export: %s ta movement", len(parsed.items))

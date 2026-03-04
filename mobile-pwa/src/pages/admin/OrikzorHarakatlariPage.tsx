@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, Fragment } from 'react'
+import React, { useCallback, useEffect, useMemo, useState, Fragment } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { FileText } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -9,7 +9,12 @@ import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { DateInput } from '../../components/DateInput'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { getOrders, syncOrikzorOrders, type OrderListItem, type SmartupSyncResult } from '../../services/ordersApi'
+import {
+  getOrikzorMovements,
+  syncOrikzorOrders,
+  type MovementItem,
+  type SmartupSyncResult,
+} from '../../services/ordersApi'
 import { useAuth } from '../../rbac/AuthProvider'
 
 function todayISO() {
@@ -22,29 +27,30 @@ function daysAgoISO(days: number) {
 }
 
 const PAGE_SIZE = 50
-const COLUMNS = [
-  { id: 'order_number', labelKey: 'orders:columns.order_number' },
-  { id: 'external_id', labelKey: 'orders:columns.external_id' },
-  { id: 'customer', labelKey: 'orders:columns.customer' },
-  { id: 'status', labelKey: 'orders:columns.status' },
-  { id: 'lines', labelKey: 'orders:columns.lines' },
-  { id: 'created', labelKey: 'orders:columns.created' },
-  { id: 'picker', labelKey: 'orders:columns.picker' },
-  { id: 'controller', labelKey: 'orders:columns.controller' },
-  { id: 'view_details', labelKey: 'orders:columns.view_details' },
+const COLUMNS_DILLER = [
+  { id: 'order_number', labelKey: 'orders:columns_diller.order_number' },
+  { id: 'external_id', labelKey: 'orders:columns_diller.external_id' },
+  { id: 'from_warehouse_code', labelKey: 'orders:columns_diller.from_warehouse_code' },
+  { id: 'to_warehouse_code', labelKey: 'orders:columns_diller.to_warehouse_code' },
+  { id: 'movement_note', labelKey: 'orders:columns_diller.movement_note' },
+  { id: 'total_amount', labelKey: 'orders:columns_diller.total_amount' },
+  { id: 'status', labelKey: 'orders:columns_diller.status' },
+  { id: 'lines', labelKey: 'orders:columns_diller.lines' },
+  { id: 'delivery_date', labelKey: 'orders:columns_diller.delivery_date' },
+  { id: 'view_details', labelKey: 'orders:columns_diller.view_details' },
 ] as const
 
 export function OrikzorHarakatlariPage() {
   const { t } = useTranslation(['orders', 'common', 'admin'])
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const searchQuery = searchParams.get('q') ?? ''
-  const offset = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10))
+  const [searchParams] = useSearchParams()
   const { has } = useAuth()
   const canSync = has('orders:write')
 
-  const [items, setItems] = useState<OrderListItem[]>([])
-  const [total, setTotal] = useState(0)
+  const [movementsData, setMovementsData] = useState<{ movement: MovementItem[]; total?: number } | null>(null)
+  const [movementPage, setMovementPage] = useState(0)
+  const [dateFrom, setDateFrom] = useState(daysAgoISO(30))
+  const [dateTo, setDateTo] = useState(todayISO())
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isSyncing, setIsSyncing] = useState(false)
@@ -54,20 +60,20 @@ export function OrikzorHarakatlariPage() {
   const [syncDateTo, setSyncDateTo] = useState(todayISO())
 
   const load = useCallback(
-    async (background = false) => {
+    async (background = false, pageOverride?: number) => {
       if (!background) setIsLoading(true)
       else setIsRefreshing(true)
       setError(null)
+      const page = pageOverride ?? movementPage
       try {
-        const data = await getOrders({
-          order_source: 'orikzor',
-          q: searchQuery.trim() || undefined,
-          search_fields: 'order_number,external_id,customer,customer_id,agent',
+        const data = await getOrikzorMovements({
+          begin_created_on: dateFrom.trim() || undefined,
+          end_created_on: dateTo.trim() || undefined,
           limit: PAGE_SIZE,
-          offset,
+          offset: page * PAGE_SIZE,
         })
-        setItems(data.items)
-        setTotal(data.total)
+        setMovementsData(data)
+        if (pageOverride !== undefined) setMovementPage(pageOverride)
       } catch (err) {
         if (!background) {
           setError(err instanceof Error ? err.message : t('orders:load_failed'))
@@ -77,7 +83,7 @@ export function OrikzorHarakatlariPage() {
         else setIsRefreshing(false)
       }
     },
-    [offset, searchQuery, t]
+    [dateFrom, dateTo, movementPage, t]
   )
 
   useEffect(() => {
@@ -99,7 +105,7 @@ export function OrikzorHarakatlariPage() {
         end_deal_date: end,
       })
       setSyncResult(result)
-      await load()
+      await load(true)
     } catch (err) {
       const message =
         err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string'
@@ -113,16 +119,85 @@ export function OrikzorHarakatlariPage() {
     }
   }
 
+  const movementList = movementsData?.movement ?? []
+  const movementTotal = movementsData?.total ?? 0
   const columnLabels = useMemo(
-    () =>
-      new Map(
-        COLUMNS.map((col) => [
-          col.id,
-          t(`orders:columns_orikzor.${col.id}`, t(col.labelKey)),
-        ])
-      ),
+    () => new Map(COLUMNS_DILLER.map((c) => [c.id, t(c.labelKey)])),
     [t]
   )
+
+  const renderCell = (columnId: string, m: MovementItem) => {
+    const mid = (m.movement_id as string) ?? '—'
+    const barcode = (m.barcode as string) ?? '—'
+    const fromWh = (m.from_warehouse_code as string) ?? '—'
+    const toWh = (m.to_warehouse_code as string) ?? '—'
+    const note = (m.note as string) ?? '—'
+    const amount = m.amount != null ? String(m.amount) : '—'
+    const status = (m.status as string) ?? '—'
+    const items = (m.movement_items as unknown[]) ?? []
+    const fromTime = (m.from_time as string) ?? (m.from_movement_date as string) ?? '—'
+    switch (columnId) {
+      case 'order_number':
+        return (
+          <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">{mid}</td>
+        )
+      case 'external_id':
+        return (
+          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{barcode}</td>
+        )
+      case 'from_warehouse_code':
+        return (
+          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{fromWh}</td>
+        )
+      case 'to_warehouse_code':
+        return (
+          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{toWh}</td>
+        )
+      case 'movement_note':
+        return (
+          <td className="max-w-[200px] truncate px-4 py-3 text-slate-600 dark:text-slate-300" title={note}>
+            {note}
+          </td>
+        )
+      case 'total_amount':
+        return (
+          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+            {amount === '—' ? '—' : Number(amount).toLocaleString()}
+          </td>
+        )
+      case 'status':
+        return (
+          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{status}</td>
+        )
+      case 'lines':
+        return (
+          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{items.length}</td>
+        )
+      case 'delivery_date':
+        return (
+          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{fromTime}</td>
+        )
+      case 'view_details':
+        return (
+          <td className="px-4 py-3">
+            <button
+              type="button"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+              onClick={() =>
+                navigate(`/admin/orders-orikzor/${encodeURIComponent(mid)}`, {
+                  state: { movement: m, listPath: '/admin/orders-orikzor', listQuery: searchParams.toString() },
+                })
+              }
+              aria-label={t('orders:view_details')}
+            >
+              <FileText size={18} />
+            </button>
+          </td>
+        )
+      default:
+        return null
+    }
+  }
 
   const content = useMemo(() => {
     if (isLoading) {
@@ -137,7 +212,7 @@ export function OrikzorHarakatlariPage() {
         />
       )
     }
-    if (items.length === 0) {
+    if (movementList.length === 0 && movementTotal === 0) {
       return (
         <EmptyState
           title={t('orders:empty')}
@@ -147,89 +222,12 @@ export function OrikzorHarakatlariPage() {
         />
       )
     }
-    const renderCell = (columnId: string, order: OrderListItem) => {
-      switch (columnId) {
-        case 'order_number':
-          return (
-            <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">
-              {order.order_number}
-            </td>
-          )
-        case 'external_id':
-          return (
-            <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-              {order.source_external_id}
-            </td>
-          )
-        case 'customer':
-          return (
-            <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-              {order.customer_name ?? '—'}
-            </td>
-          )
-        case 'status':
-          return (
-            <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-              {t(
-                `orders:status.${order.status === 'B#S' ? 'b#s' : order.status}`,
-                order.status
-              )}
-            </td>
-          )
-        case 'lines':
-          return (
-            <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-              {order.lines_total}
-            </td>
-          )
-        case 'created':
-          return (
-            <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-              {new Date(order.created_at).toLocaleDateString()}
-            </td>
-          )
-        case 'picker':
-          return (
-            <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-              {order.picker_name ?? '—'}
-            </td>
-          )
-        case 'controller':
-          return (
-            <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-              {order.controller_name ?? '—'}
-            </td>
-          )
-        case 'view_details':
-          return (
-            <td className="px-4 py-3">
-              <button
-                type="button"
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-                onClick={() =>
-                  navigate(`/admin/orders/${order.id}`, {
-                    state: {
-                      listQuery: searchParams.toString(),
-                      listPath: '/admin/orders-orikzor',
-                    },
-                  })
-                }
-                aria-label={t('orders:view_details')}
-              >
-                <FileText size={18} />
-              </button>
-            </td>
-          )
-        default:
-          return null
-      }
-    }
     return (
       <TableScrollArea inline>
         <table className="w-max min-w-[600px] text-sm">
           <thead className="text-xs uppercase text-slate-500">
             <tr className="border-b border-slate-200 dark:border-slate-800">
-              {COLUMNS.map((col) => (
+              {COLUMNS_DILLER.map((col) => (
                 <th key={col.id} className="px-4 py-3 text-left">
                   {columnLabels.get(col.id)}
                 </th>
@@ -237,13 +235,13 @@ export function OrikzorHarakatlariPage() {
             </tr>
           </thead>
           <tbody>
-            {items.map((order) => (
+            {movementList.map((m) => (
               <tr
-                key={order.id}
+                key={(m.movement_id as string) ?? String(m.barcode ?? '')}
                 className="border-b border-slate-100 dark:border-slate-800"
               >
-                {COLUMNS.map((col) => (
-                  <Fragment key={col.id}>{renderCell(col.id, order)}</Fragment>
+                {COLUMNS_DILLER.map((col) => (
+                  <Fragment key={col.id}>{renderCell(col.id, m)}</Fragment>
                 ))}
               </tr>
             ))}
@@ -251,27 +249,16 @@ export function OrikzorHarakatlariPage() {
         </table>
       </TableScrollArea>
     )
-  }, [
-    error,
-    isLoading,
-    items,
-    load,
-    navigate,
-    searchParams,
-    t,
-    columnLabels,
-  ])
+  }, [error, isLoading, movementList, movementTotal, load, columnLabels, navigate, searchParams, t])
 
-  const pageTitle = t('admin:menu.orders_orikzor', 'O\'rikzor harakatlari')
+  const pageTitle = t('admin:menu.orders_orikzor', "O'rikzor harakatlari")
 
   return (
     <AdminLayout title={pageTitle}>
       <Card className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              {pageTitle}
-            </div>
+            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{pageTitle}</div>
             <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
               <span>{t('orders:subtitle_orikzor')}</span>
               {isRefreshing ? (
@@ -279,21 +266,24 @@ export function OrikzorHarakatlariPage() {
                   {t('orders:refreshing')}
                 </span>
               ) : null}
+              {movementTotal > 0 ? (
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
+                  {t('orders:movements_loaded', { count: movementTotal })}
+                </span>
+              ) : null}
               {syncResult ? (
-                <span className="flex flex-col gap-1">
-                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
-                    {t('orders:sync_result', {
-                      created: syncResult.created,
-                      updated: syncResult.updated,
-                      skipped: syncResult.skipped,
-                    })}
-                  </span>
-                  {syncResult.detail || syncResult.errors_count || syncResult.error ? (
-                    <span className="max-w-xl rounded bg-amber-100 px-2 py-1 text-xs text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 break-words">
-                      {syncResult.errors_count ? `${syncResult.errors_count} ta xato. ` : ''}
-                      {syncResult.error ?? syncResult.detail ?? ''}
-                    </span>
-                  ) : null}
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
+                  {t('orders:sync_result', {
+                    created: syncResult.created,
+                    updated: syncResult.updated,
+                    skipped: syncResult.skipped,
+                  })}
+                </span>
+              ) : null}
+              {syncResult?.detail || syncResult?.errors_count || syncResult?.error ? (
+                <span className="max-w-xl rounded bg-amber-100 px-2 py-1 text-xs text-amber-800 dark:bg-amber-900/40 dark:bg-amber-200 break-words">
+                  {syncResult.errors_count ? `${syncResult.errors_count} ta xato. ` : ''}
+                  {syncResult.error ?? syncResult.detail ?? ''}
                 </span>
               ) : null}
             </div>
@@ -310,63 +300,37 @@ export function OrikzorHarakatlariPage() {
         {canSync ? (
           <div className="flex flex-wrap items-center gap-4 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/30">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              {t('orders:filters.sync_date_range', 'Sinxronlash sana oralig\'i')}
+              {t('orders:filters.sync_date_range', "Sinxronlash sana oralig'i")}
             </span>
             <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
               {t('orders:filters.date_from', 'Dan')}
-              <DateInput
-                value={syncDateFrom}
-                onChange={setSyncDateFrom}
-                aria-label={t('orders:filters.date_from')}
-              />
+              <DateInput value={syncDateFrom} onChange={setSyncDateFrom} aria-label={t('orders:filters.date_from')} />
             </label>
             <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
               {t('orders:filters.date_to', 'Gacha')}
-              <DateInput
-                value={syncDateTo}
-                onChange={setSyncDateTo}
-                aria-label={t('orders:filters.date_to')}
-              />
+              <DateInput value={syncDateTo} onChange={setSyncDateTo} aria-label={t('orders:filters.date_to')} />
             </label>
             <span className="text-xs text-slate-500 dark:text-slate-400">
               {t('orders:sync_date_hint', "Smartup'dagi from_movement_date shu oraliqda bo'lishi kerak.")}
             </span>
-            {syncDateFrom && syncDateTo && syncDateFrom === syncDateTo ? (
-              <span className="text-xs text-amber-700 dark:text-amber-300">
-                {t('orders:sync_single_day_hint', "Bitta kun tanlangan — o'sha kunda Smartup'da harakat bo'lishi kerak. Oraliqni kengaytiring (masalan 01.02–28.02).")}
-              </span>
-            ) : null}
-            {syncResult && syncResult.created === 0 && syncResult.updated === 0 && syncResult.detail ? (
-              <span className="text-xs text-slate-600 dark:text-slate-400 block space-y-0.5">
-                <span className="block">{t('orders:sync_format_hint', "Smartup formati: kun.oy.yil (03.02.2026 = 3-fevral). Render loglarida 'body=' ni Postman bilan solashtiring.")}</span>
-                {syncResult.detail.includes('hech qanday movement') || syncResult.detail.includes('qaytmadi') ? (
-                  <span className="block">{t('orders:sync_log_hint', "Agar Render logda 'N ta order' ko'rsa, ma'lumot keldi lekin import xatosi — keyingi sync da sariq qutida sabab chiqadi.")}</span>
-                ) : null}
-              </span>
-            ) : null}
           </div>
         ) : null}
 
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="flex-1 min-w-[180px] max-w-md text-sm text-slate-600 dark:text-slate-300">
-            <span className="sr-only">{t('orders:filters.search')}</span>
-            <input
-              type="search"
-              className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-              value={searchQuery}
-              onChange={(e) => {
-                const v = e.target.value
-                setSearchParams((prev) => {
-                  const next = new URLSearchParams(prev)
-                  if (v) next.set('q', v)
-                  else next.delete('q')
-                  next.delete('offset')
-                  return next
-                })
-              }}
-              placeholder={t('orders:filters.search_placeholder')}
-            />
+        <div className="flex flex-wrap items-center gap-4 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/30">
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            {t('orders:filters.table_date_range', "Jadval sana oralig'i")}
+          </span>
+          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+            {t('orders:filters.date_from', 'Boshlanish')}
+            <DateInput value={dateFrom} onChange={setDateFrom} aria-label={t('orders:filters.date_from')} />
           </label>
+          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+            {t('orders:filters.date_to', 'Tugash')}
+            <DateInput value={dateTo} onChange={setDateTo} aria-label={t('orders:filters.date_to')} />
+          </label>
+          <Button variant="outline" size="sm" onClick={() => load()} disabled={isRefreshing}>
+            {t('common:buttons.refresh')}
+          </Button>
         </div>
 
         {content}
@@ -377,38 +341,24 @@ export function OrikzorHarakatlariPage() {
           </Button>
           <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
             <span>
-              {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} / {total}
+              {movementTotal > 0
+                ? `${movementPage * PAGE_SIZE + 1}–${Math.min((movementPage + 1) * PAGE_SIZE, movementTotal)} / ${movementTotal}`
+                : '0 / 0'}
             </span>
-            <div className="flex gap-1">
-              <Button
-                variant="outline"
-                className="px-3 py-1.5 text-xs"
-                disabled={offset <= 0}
-                onClick={() =>
-                  setSearchParams((prev) => {
-                    const next = new URLSearchParams(prev)
-                    next.set('offset', String(Math.max(0, offset - PAGE_SIZE)))
-                    return next
-                  })
-                }
-              >
-                {t('orders:pagination.prev', 'Orqaga')}
-              </Button>
-              <Button
-                variant="outline"
-                className="px-3 py-1.5 text-xs"
-                disabled={offset + PAGE_SIZE >= total}
-                onClick={() =>
-                  setSearchParams((prev) => {
-                    const next = new URLSearchParams(prev)
-                    next.set('offset', String(offset + PAGE_SIZE))
-                    return next
-                  })
-                }
-              >
-                {t('orders:pagination.next', 'Keyingi')}
-              </Button>
-            </div>
+            <Button
+              variant="secondary"
+              disabled={movementPage === 0}
+              onClick={() => load(false, movementPage - 1)}
+            >
+              {t('common:buttons.back')}
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={(movementPage + 1) * PAGE_SIZE >= movementTotal}
+              onClick={() => load(false, movementPage + 1)}
+            >
+              {t('orders:pagination.next', 'Keyingi')}
+            </Button>
           </div>
         </div>
       </Card>
