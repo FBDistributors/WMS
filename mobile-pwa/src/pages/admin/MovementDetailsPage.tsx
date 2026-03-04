@@ -1,4 +1,4 @@
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -16,7 +16,6 @@ type MovementState = {
 }
 
 export function MovementDetailsPage() {
-  const { movementId } = useParams()
   const location = useLocation()
   const navigate = useNavigate()
   const { t } = useTranslation(['orders', 'common'])

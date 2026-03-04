@@ -327,7 +327,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       )
       const renderMovementCell = (columnId: string, m: MovementItem) => {
         const mid = (m.movement_id as string) ?? '—'
-        const deliveryNo = (m.delivery_number as string) ?? '—'
         const barcode = (m.barcode as string) ?? '—'
         const fromWh = (m.from_warehouse_code as string) ?? '—'
         const toWh = (m.to_warehouse_code as string) ?? '—'
