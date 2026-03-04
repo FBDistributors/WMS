@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 from datetime import date, datetime, timedelta
 from typing import Any
@@ -13,9 +14,9 @@ from app.integrations.smartup.mfm_movement import fetch_mfm_movements_raw
 
 router = APIRouter()
 
-# Qisqa cache: key = (begin, end, filial_id), value = (full_list, expiry_time). TTL 90 soniya.
+# Cache: key = (begin, end, filial_id), value = (full_list, expiry). TTL 15 min — keyingi sahifa va qayta ochish tez.
 _movements_cache: dict[tuple[date, date, str | None], tuple[list[Any], float]] = {}
-_CACHE_TTL_SEC = 90
+_CACHE_TTL_SEC = 900
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -31,8 +32,14 @@ def _parse_date(value: str | None) -> date | None:
     return None
 
 
+def _fetch_movements_sync(begin: date, end: date, filial_id: str | None) -> list[Any]:
+    """Smartup dan to'liq ro'yxatni oladi (bloklovchi — thread da chaqiriladi)."""
+    raw = fetch_mfm_movements_raw(begin_date=begin, end_date=end, filial_id=filial_id)
+    return raw.get("movement") if isinstance(raw.get("movement"), list) else []
+
+
 def _get_cached_movements(begin: date, end: date, filial_id: str | None) -> list[Any]:
-    """Cache or fetch full list; caller will slice."""
+    """Cache yoki Smartup; caller slice qiladi."""
     now = time.monotonic()
     key = (begin, end, filial_id)
     if key in _movements_cache:
@@ -40,8 +47,7 @@ def _get_cached_movements(begin: date, end: date, filial_id: str | None) -> list
         if now < expiry:
             return full_list
         del _movements_cache[key]
-    raw = fetch_mfm_movements_raw(begin_date=begin, end_date=end, filial_id=filial_id)
-    full_list = raw.get("movement") if isinstance(raw.get("movement"), list) else []
+    full_list = _fetch_movements_sync(begin, end, filial_id)
     _movements_cache[key] = (full_list, now + _CACHE_TTL_SEC)
     return full_list
 
@@ -58,7 +64,7 @@ async def list_movements(
 ) -> dict[str, Any]:
     """
     Proxy to Smartup mfm movement$export. Returns "movement" (sliced) and "total".
-    Default date range: last 30 days. Uses in-memory cache (90s TTL) for faster next pages.
+    Cache 15 min — keyingi sahifa va qayta yuklash tez. Birinchi so'rov Smartupni kutadi.
     """
     today = date.today()
     begin = _parse_date(begin_created_on)
@@ -73,8 +79,19 @@ async def list_movements(
     if begin > end:
         raise HTTPException(status_code=400, detail="begin_created_on must be <= end_created_on")
 
+    now = time.monotonic()
+    key = (begin, end, filial_id)
+    if key in _movements_cache:
+        full_list, expiry = _movements_cache[key]
+        if now < expiry:
+            total = len(full_list)
+            chunk = full_list[offset : offset + limit]
+            return {"movement": chunk, "total": total}
+        del _movements_cache[key]
+
     try:
-        full_list = _get_cached_movements(begin, end, filial_id)
+        full_list = await asyncio.to_thread(_fetch_movements_sync, begin, end, filial_id)
+        _movements_cache[key] = (full_list, now + _CACHE_TTL_SEC)
     except RuntimeError as exc:
         msg = str(exc)
         if "400" in msg or "не найдена" in msg or "organization" in msg.lower():

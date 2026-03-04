@@ -27,11 +27,11 @@ function daysAgoISO(days: number) {
 }
 
 const PAGE_SIZE = 50
+
 const COLUMNS_DILLER = [
   { id: 'order_number', labelKey: 'orders:columns_diller.order_number' },
   { id: 'external_id', labelKey: 'orders:columns_diller.external_id' },
   { id: 'from_warehouse_code', labelKey: 'orders:columns_diller.from_warehouse_code' },
-  { id: 'to_warehouse_code', labelKey: 'orders:columns_diller.to_warehouse_code' },
   { id: 'movement_note', labelKey: 'orders:columns_diller.movement_note' },
   { id: 'total_amount', labelKey: 'orders:columns_diller.total_amount' },
   { id: 'status', labelKey: 'orders:columns_diller.status' },
@@ -51,7 +51,6 @@ export function OrikzorHarakatlariPage() {
   const [movementPage, setMovementPage] = useState(0)
   const [dateFrom, setDateFrom] = useState(daysAgoISO(30))
   const [dateTo, setDateTo] = useState(todayISO())
-  const [warehouseCode, setWarehouseCode] = useState('777')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isSyncing, setIsSyncing] = useState(false)
@@ -68,7 +67,6 @@ export function OrikzorHarakatlariPage() {
         const data = await getOrikzorMovements({
           begin_created_on: dateFrom.trim() || undefined,
           end_created_on: dateTo.trim() || undefined,
-          to_warehouse_code: warehouseCode.trim() || undefined,
           limit: PAGE_SIZE,
           offset: page * PAGE_SIZE,
         })
@@ -83,7 +81,7 @@ export function OrikzorHarakatlariPage() {
         else setIsRefreshing(false)
       }
     },
-    [dateFrom, dateTo, warehouseCode, movementPage, t]
+    [dateFrom, dateTo, movementPage, t]
   )
 
   useEffect(() => {
@@ -130,7 +128,6 @@ export function OrikzorHarakatlariPage() {
     const mid = (m.movement_id as string) ?? '—'
     const barcode = (m.barcode as string) ?? '—'
     const fromWh = (m.from_warehouse_code as string) ?? '—'
-    const toWh = (m.to_warehouse_code as string) ?? '—'
     const note = (m.note as string) ?? '—'
     const amount = m.amount != null ? String(m.amount) : '—'
     const status = (m.status as string) ?? '—'
@@ -148,10 +145,6 @@ export function OrikzorHarakatlariPage() {
       case 'from_warehouse_code':
         return (
           <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{fromWh}</td>
-        )
-      case 'to_warehouse_code':
-        return (
-          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{toWh}</td>
         )
       case 'movement_note':
         return (
@@ -255,42 +248,18 @@ export function OrikzorHarakatlariPage() {
 
   return (
     <AdminLayout title={pageTitle}>
-      <Card className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{pageTitle}</div>
-            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-              <span>{t('orders:subtitle_orikzor')}</span>
-              {isRefreshing ? (
-                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
-                  {t('orders:refreshing')}
-                </span>
-              ) : null}
-              {movementTotal > 0 ? (
-                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
-                  {t('orders:movements_loaded', { count: movementTotal })}
-                </span>
-              ) : null}
-              {syncResult ? (
-                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
-                  {t('orders:sync_result', {
-                    created: syncResult.created,
-                    updated: syncResult.updated,
-                    skipped: syncResult.skipped,
-                  })}
-                </span>
-              ) : null}
-              {syncResult?.detail || syncResult?.errors_count || syncResult?.error ? (
-                <span className="max-w-xl rounded bg-amber-100 px-2 py-1 text-xs text-amber-800 dark:bg-amber-900/40 dark:bg-amber-200 break-words">
-                  {syncResult.errors_count ? `${syncResult.errors_count} ta xato. ` : ''}
-                  {syncResult.error ?? syncResult.detail ?? ''}
-                </span>
-              ) : null}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-4 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/30">
+      {syncResult ? (
+        <Card className="mb-4 border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700 dark:border-green-500/30 dark:bg-green-500/10">
+          {t('orders:sync_result', {
+            created: syncResult.created,
+            updated: syncResult.updated,
+            skipped: syncResult.skipped,
+          })}
+          {syncResult.detail || syncResult.error ? ` · ${syncResult.error ?? syncResult.detail ?? ''}` : ''}
+        </Card>
+      ) : null}
+      <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-1 flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
             {t('orders:filters.sync_date_range', "Sana oralig'i")}
           </span>
@@ -302,32 +271,35 @@ export function OrikzorHarakatlariPage() {
             {t('orders:filters.date_to', 'Tugash')}
             <DateInput value={dateTo} onChange={setDateTo} aria-label={t('orders:filters.date_to')} />
           </label>
-          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-            {t('orders:columns_diller.to_warehouse_code', 'Qayerga (sklad)')}
-            <input
-              type="text"
-              className="w-24 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-              value={warehouseCode}
-              onChange={(e) => setWarehouseCode(e.target.value)}
-              placeholder="777"
-              aria-label={t('orders:columns_diller.to_warehouse_code')}
-            />
-          </label>
           <span className="text-xs text-slate-500 dark:text-slate-400">
             {t('orders:sync_date_hint', "Smartup'dagi from_movement_date shu oraliqda bo'lishi kerak.")}
           </span>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => load()} disabled={isRefreshing}>
-              {t('common:buttons.refresh')}
-            </Button>
-            {canSync ? (
-              <Button onClick={handleSync} disabled={isSyncing}>
-                {isSyncing ? t('orders:syncing') : t('orders:sync')}
-              </Button>
-            ) : null}
-          </div>
+          <Button variant="secondary" onClick={() => load()} disabled={isRefreshing} className="shrink-0">
+            {t('common:buttons.refresh')}
+          </Button>
         </div>
-
+        <div className="flex shrink-0 items-center gap-2">
+          {canSync ? (
+            <Button onClick={handleSync} disabled={isSyncing} className="w-full md:w-auto">
+              {isSyncing ? t('orders:syncing') : t('orders:sync')}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+      <Card className="space-y-4">
+        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+          <span>{t('orders:subtitle_orikzor')}</span>
+          {isRefreshing ? (
+            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+              {t('orders:refreshing')}
+            </span>
+          ) : null}
+          {movementTotal > 0 ? (
+            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
+              {t('orders:movements_loaded', { count: movementTotal })}
+            </span>
+          ) : null}
+        </div>
         {content}
 
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-4 dark:border-slate-800">
