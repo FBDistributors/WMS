@@ -12,7 +12,7 @@ import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { DateInput } from '../../components/DateInput'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { getOrders, syncSmartupOrders, updateOrderStatus, type OrderListItem } from '../../services/ordersApi'
+import { getOrders, syncSmartupOrders, updateOrderStatus, type OrderListItem, type OrdersListResponse } from '../../services/ordersApi'
 import { getBrands, type Brand } from '../../services/brandsApi'
 import { useAuth } from '../../rbac/AuthProvider'
 
@@ -153,6 +153,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     detail?: string | null
     errors_count?: number | null
   } | null>(null)
+  const [rawDillerResponse, setRawDillerResponse] = useState<OrdersListResponse | null>(null)
 
   const ELIGIBLE_PICKING_STATUSES = new Set(['imported', 'B#S', 'ready_for_picking', 'allocated'])
   const canBeSentToPicking = (order: OrderListItem) =>
@@ -191,6 +192,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         : data.items
       setItems(list)
       setTotal(data.total)
+      if (orderSource === 'diller') setRawDillerResponse(data)
     } catch (err) {
       if (!background) {
         const message = err instanceof Error ? err.message : t('orders:load_failed')
@@ -285,6 +287,16 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     if (error) {
       return (
         <EmptyState title={error} actionLabel={t('common:buttons.retry')} onAction={load} />
+      )
+    }
+    if (orderSource === 'diller') {
+      const json =
+        rawDillerResponse ??
+        { items: [], total: 0, limit: PAGE_SIZE, offset }
+      return (
+        <pre className="overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+          {JSON.stringify(json, null, 2)}
+        </pre>
       )
     }
     if (items.length === 0) {
@@ -589,7 +601,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         </table>
       </TableScrollArea>
     )
-  }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, eligibleItems, error, isLoading, items, load, location.pathname, location.search, mode, navigate, orderSource, selectedOrderIds, t, updatingOrderId])
+  }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, eligibleItems, error, isLoading, items, load, location.pathname, location.search, mode, navigate, orderSource, rawDillerResponse, selectedOrderIds, t, updatingOrderId])
 
   return (
     <AdminLayout title={pageTitle} backTo={mode === 'statuses' ? '/admin' : undefined}>
