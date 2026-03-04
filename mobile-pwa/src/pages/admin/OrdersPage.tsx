@@ -13,7 +13,7 @@ import { Card } from '../../components/ui/card'
 import { DateInput } from '../../components/DateInput'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { buildApiUrl } from '../../services/apiClient'
-import { getMovements, getOrders, syncSmartupOrders, updateOrderStatus, type OrderListItem, type MovementsResponse, type OrdersListResponse } from '../../services/ordersApi'
+import { getMovements, getOrders, syncSmartupOrders, updateOrderStatus, type OrderListItem, type MovementsResponse } from '../../services/ordersApi'
 import { getBrands, type Brand } from '../../services/brandsApi'
 import { useAuth } from '../../rbac/AuthProvider'
 
