@@ -52,20 +52,38 @@ ALLOWED_MOVEMENT_STATUSES: set[str] = (
 )
 
 
-def _parse_movement_date(value: str | None) -> datetime | None:
-    """Smartup from_movement_date format: '31.01.2026 15:01:52' (DD.MM.YYYY HH:MM:SS). Fallback: %d.%m.%Y."""
-    if not value or not isinstance(value, str):
+def _parse_movement_date(value: str | int | float | None) -> datetime | None:
+    """Smartup from_movement_date: DD.MM.YYYY HH:MM:SS, DD.MM.YYYY, ISO, Unix timestamp (s/ms)."""
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        try:
+            if value > 1e12:
+                value = value / 1000.0
+            return datetime.fromtimestamp(value)
+        except (ValueError, OSError):
+            return None
+    if not isinstance(value, str):
         return None
     raw = value.strip()
-    if not raw:
+    if not raw or raw.lower() in ("none", "null"):
         return None
-    try:
-        return datetime.strptime(raw, "%d.%m.%Y %H:%M:%S")
-    except (ValueError, TypeError):
+    formats = [
+        "%d.%m.%Y %H:%M:%S",
+        "%d.%m.%Y",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%dT%H:%M:%S.%f",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d",
+        "%m/%d/%Y %H:%M:%S",
+        "%m/%d/%Y",
+    ]
+    for fmt in formats:
         try:
-            return datetime.strptime(raw, "%d.%m.%Y")
+            return datetime.strptime(raw, fmt)
         except (ValueError, TypeError):
-            return None
+            continue
+    return None
 
 
 def _extract_movements_list(data: Any) -> list:
@@ -339,18 +357,21 @@ def _parse_movement_response(
 
         # from/to_warehouse_code null bo'lsa skip qilmaymiz — default warehouse (filial) ishlatamiz
         default_warehouse_code = (os.getenv("DEFAULT_WAREHOUSE_CODE") or os.getenv("SMARTUP_DEFAULT_FILIAL") or "MAIN").strip()
-        filial = (
+        raw_filial = (
             m.get("filial_code") or m.get("from_warehouse_code") or m.get("to_warehouse_code") or default_warehouse_code
         )
-        if not (filial or "").strip():
+        filial = (str(raw_filial) if raw_filial is not None else "").strip()
+        if not filial or filial.lower() in ("none", "null"):
+            filial = default_warehouse_code
+        if not filial:
             skipped_by_reason["warehouse_null_or_not_found"] += 1
             continue
 
+        # Sana parse xatoligida movementni o'tkazib yubormaymiz — faqat sana oralig'i filtrlashda ishlatamiz
         from_movement_date_raw = m.get("from_movement_date")
         if from_movement_date_raw is not None and str(from_movement_date_raw).strip():
             if _parse_movement_date(str(from_movement_date_raw)) is None:
                 skipped_by_reason["date_parse_error"] += 1
-                continue
 
         items = (
             m.get("movement_items")
