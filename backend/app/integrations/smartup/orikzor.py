@@ -237,11 +237,33 @@ def _parse_movement_response(
     end_date: date | None = None,
 ) -> SmartupOrderExportResponse:
     """movement$export javobini parse qiladi; bitta joyda movement/movements/list va movement_items/itens."""
-    raw_count = len(body)
-    data = json.loads(body)
-    movements = _extract_movements_list(data)
-    pre_filter_count = len(movements)
-    raw_count = pre_filter_count
+    skipped_by_reason: dict[str, int] = {
+        "missing_id": 0,
+        "status_not_allowed": 0,
+        "product_not_found": 0,
+        "warehouse_null_or_not_found": 0,
+        "date_parse_error": 0,
+        "out_of_range": 0,
+        "db_error": 0,
+        "validation_error": 0,
+        "exception": 0,
+    }
+    try:
+        raw_count = len(body)
+        data = json.loads(body)
+        movements = _extract_movements_list(data)
+        pre_filter_count = len(movements)
+        raw_count = pre_filter_count
+    except Exception as e:  # noqa: BLE001
+        logger.exception("O'rikzor parse: JSON yoki _extract_movements_list xatosi: %s", e)
+        skipped_by_reason["exception"] = 1
+        return SmartupOrderExportResponse(
+            items=[],
+            parse_warning=f"Parse boshlashda xato: {e!s}",
+            debug_raw_count=0,
+            debug_dict_count=0,
+            debug_skipped_by_reason=skipped_by_reason,
+        )
 
     logger.info(
         "O'rikzor parse: Smartup from_movement_date format DD.MM.YYYY HH:MM:SS (fallback DD.MM.YYYY). "
@@ -249,7 +271,7 @@ def _parse_movement_response(
         raw_count,
     )
 
-    skipped_by_reason: dict[str, int] = {
+    skipped_by_reason = {
         "missing_id": 0,
         "status_not_allowed": 0,
         "product_not_found": 0,
@@ -500,7 +522,12 @@ def _parse_movement_response(
         )
 
     parse_warning: str | None = None
-    if movements and not orders and first_validation_error:
+    if after_date_filter_count == 0 and raw_count > 0:
+        parse_warning = (
+            f"Barcha {raw_count} ta yozuv sana oralig'idan tashqarida (out_of_range={skipped_by_reason.get('out_of_range', 0)}). "
+            "Sinxronlash sana oralig'ini kengaytiring."
+        )
+    elif movements and not orders and first_validation_error:
         parse_warning = f"{len(movements)} ta movementdan 0 ta order. Birinchi xato: {first_validation_error}"
 
     return SmartupOrderExportResponse(
