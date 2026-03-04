@@ -27,7 +27,7 @@ const COLUMN_OPTIONS = [
   { id: 'total_amount', labelKey: 'orders:columns.total_amount' },
   { id: 'status', labelKey: 'orders:columns.status' },
   { id: 'lines', labelKey: 'orders:columns.lines' },
-  { id: 'created', labelKey: 'orders:columns.created' },
+  { id: 'delivery_date', labelKey: 'orders:columns.delivery_date' },
   { id: 'view_details', labelKey: 'orders:columns.view_details' },
   { id: 'send_to_picking', labelKey: 'orders:columns.send_to_picking' },
   { id: 'picker', labelKey: 'orders:columns.picker' },
@@ -60,7 +60,7 @@ const COLUMN_OPTIONS_STATUSES = [
   { id: 'status', labelKey: 'orders:columns.status' },
   { id: 'change_status', labelKey: 'orders:columns.change_status' },
   { id: 'lines', labelKey: 'orders:columns.lines' },
-  { id: 'created', labelKey: 'orders:columns.created' },
+  { id: 'delivery_date', labelKey: 'orders:columns.delivery_date' },
   { id: 'view_details', labelKey: 'orders:columns.view_details' },
   { id: 'picker', labelKey: 'orders:columns.picker' },
   { id: 'controller', labelKey: 'orders:columns.controller' },
@@ -76,7 +76,7 @@ const COLUMN_OPTIONS_DILLER = [
   { id: 'total_amount', labelKey: 'orders:columns_diller.total_amount' },
   { id: 'status', labelKey: 'orders:columns_diller.status' },
   { id: 'lines', labelKey: 'orders:columns_diller.lines' },
-  { id: 'created', labelKey: 'orders:columns_diller.created' },
+  { id: 'delivery_date', labelKey: 'orders:columns_diller.delivery_date' },
   { id: 'view_details', labelKey: 'orders:columns_diller.view_details' },
 ]
 
@@ -484,10 +484,16 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
               {order.lines_total}
             </td>
           )
-        case 'created':
+        case 'delivery_date':
           return (
             <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-              {new Date(order.created_at).toLocaleDateString()}
+              {order.delivery_date
+                ? new Date(order.delivery_date).toLocaleDateString(undefined, {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                  })
+                : '—'}
             </td>
           )
         case 'view_details':

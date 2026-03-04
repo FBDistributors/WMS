@@ -105,7 +105,7 @@
     "status": "Статус",
     "change_status": "Изменить статус",
     "lines": "Строки",
-    "created": "Создано",
+    "delivery_date": "Дата доставки",
     "view_details": "",
     "send_to_picking": "В подбор",
     "picker": "Сборщик",
@@ -120,7 +120,7 @@
     "total_amount": "Сумма",
     "status": "Статус",
     "lines": "Строк",
-    "created": "Дата",
+    "delivery_date": "Дата доставки",
     "view_details": ""
   },
   "columns_orikzor": {
@@ -133,7 +133,7 @@
     "status": "Статус",
     "change_status": "Изменить статус",
     "lines": "Товары в движении",
-    "created": "Дата движения",
+    "delivery_date": "Дата доставки",
     "view_details": "",
     "picker": "Сборщик",
     "controller": "Контролёр"

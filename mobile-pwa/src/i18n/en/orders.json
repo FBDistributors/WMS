@@ -108,7 +108,7 @@
     "status": "Status",
     "change_status": "Change status",
     "lines": "Lines",
-    "created": "Created",
+    "delivery_date": "Delivery date",
     "view_details": "",
     "send_to_picking": "Send to Picking",
     "picker": "Picker",
@@ -123,7 +123,7 @@
     "total_amount": "Amount",
     "status": "Status",
     "lines": "Lines",
-    "created": "Date",
+    "delivery_date": "Delivery date",
     "view_details": ""
   },
   "columns_orikzor": {
@@ -136,7 +136,7 @@
     "status": "Status",
     "change_status": "Change status",
     "lines": "Movement items",
-    "created": "Movement date",
+    "delivery_date": "Delivery date",
     "view_details": "",
     "picker": "Picker",
     "controller": "Controller"

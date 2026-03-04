@@ -50,6 +50,7 @@ export type OrderDetails = {
   agent_name?: string | null
   total_amount?: number | null
   created_at: string
+  delivery_date?: string | null
   lines: OrderLine[]
   from_warehouse_code?: string | null
   to_warehouse_code?: string | null

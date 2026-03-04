@@ -134,9 +134,15 @@ export function OrderDetailsPage() {
             </div>
           </div>
           <div>
-            <div className="text-xs text-slate-500">{t('orders:columns.created')}</div>
+            <div className="text-xs text-slate-500">{t('orders:columns.delivery_date')}</div>
             <div className="text-sm text-slate-700 dark:text-slate-200">
-              {new Date(order.created_at).toLocaleString()}
+              {order.delivery_date
+                ? new Date(order.delivery_date).toLocaleString(undefined, {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                  })
+                : '—'}
             </div>
           </div>
           <div>

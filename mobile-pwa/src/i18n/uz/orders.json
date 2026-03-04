@@ -108,7 +108,7 @@
     "status": "Holat",
     "change_status": "Holatni o'zgartirish",
     "lines": "Qatorlar",
-    "created": "Yaratilgan",
+    "delivery_date": "Yetkazib berish sanasi",
     "view_details": "",
     "send_to_picking": "Yig'ishga yuborish",
     "picker": "Yig'uvchi",
@@ -124,7 +124,7 @@
     "status": "Holat",
     "change_status": "Holatni o'zgartirish",
     "lines": "Tovarlar soni",
-    "created": "Harakat sanasi",
+    "delivery_date": "Yetkazib berish sanasi",
     "view_details": "",
     "picker": "Yig'uvchi",
     "controller": "Kontrolyor"
@@ -138,7 +138,7 @@
     "total_amount": "Summa",
     "status": "Holat",
     "lines": "Qato",
-    "created": "Sana",
+    "delivery_date": "Yetkazib berish sanasi",
     "view_details": ""
   },
   "lines": {
