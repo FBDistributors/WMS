@@ -8,6 +8,7 @@
   "refreshing": "Обновление...",
   "sync_failed": "Синхронизация Smartup не удалась.",
   "sync_result": "Загружено: {{created}} создано, {{updated}} обновлено, {{skipped}} пропущено",
+  "movements_loaded": "Загружено из Smartup: {{count}} движений",
   "pack": "Упаковать",
   "packing": "Упаковка...",
   "ship": "Отгрузить",

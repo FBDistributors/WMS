@@ -13,7 +13,7 @@ import { Card } from '../../components/ui/card'
 import { DateInput } from '../../components/DateInput'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { buildApiUrl } from '../../services/apiClient'
-import { getOrders, syncSmartupOrders, updateOrderStatus, type OrderListItem, type OrdersListResponse } from '../../services/ordersApi'
+import { getMovements, getOrders, syncSmartupOrders, updateOrderStatus, type OrderListItem, type MovementsResponse, type OrdersListResponse } from '../../services/ordersApi'
 import { getBrands, type Brand } from '../../services/brandsApi'
 import { useAuth } from '../../rbac/AuthProvider'
 
@@ -155,6 +155,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     errors_count?: number | null
   } | null>(null)
   const [rawDillerResponse, setRawDillerResponse] = useState<OrdersListResponse | null>(null)
+  const [movementsData, setMovementsData] = useState<MovementsResponse | null>(null)
   const [dillerApiInfo, setDillerApiInfo] = useState<{
     url: string
     filial_id: string
@@ -177,6 +178,29 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       setIsRefreshing(true)
     }
     try {
+      if (orderSource === 'diller') {
+        const end = new Date()
+        const begin = new Date()
+        begin.setDate(begin.getDate() - 30)
+        const beginStr = begin.toISOString().slice(0, 10)
+        const endStr = end.toISOString().slice(0, 10)
+        const query: Record<string, string> = {
+          begin_created_on: beginStr,
+          end_created_on: endStr,
+        }
+        const filialId = (import.meta.env.VITE_DEFAULT_FILIAL_ID as string)?.trim()
+        if (filialId) query.filial_id = filialId
+        const data = await getMovements(query)
+        setMovementsData(data)
+        setDillerApiInfo({
+          url: buildApiUrl('/api/v1/movements', query),
+          filial_id: filialId || '—',
+          project_code: (import.meta.env.VITE_PROJECT_CODE as string)?.trim() || '—',
+        })
+        setItems([])
+        setTotal(0)
+        return
+      }
       const query: Record<string, string | number | undefined> = {
         status: statusParam,
         q: searchQuery.trim() || undefined,
@@ -184,11 +208,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         date_from: dateFrom.trim() || undefined,
         date_to: dateTo.trim() || undefined,
         search_fields:
-          orderSource === 'diller'
-            ? 'order_number,external_id'
-            : config.searchFields.length > 0
-              ? config.searchFields.join(',')
-              : undefined,
+          config.searchFields.length > 0 ? config.searchFields.join(',') : undefined,
         limit: PAGE_SIZE,
         offset,
         ...(orderSource ? { order_source: orderSource } : {}),
@@ -199,15 +219,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         : data.items
       setItems(list)
       setTotal(data.total)
-      if (orderSource === 'diller') {
-        setRawDillerResponse(data)
-        const url = buildApiUrl('/api/v1/orders', query)
-        const filialId =
-          (import.meta.env.VITE_DEFAULT_FILIAL_ID as string)?.trim() || '—'
-        const projectCode =
-          (import.meta.env.VITE_PROJECT_CODE as string)?.trim() || '—'
-        setDillerApiInfo({ url, filial_id: filialId, project_code: projectCode })
-      }
+      setRawDillerResponse(null)
     } catch (err) {
       if (!background) {
         const message = err instanceof Error ? err.message : t('orders:load_failed')
@@ -278,16 +290,13 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     setError(null)
     setSyncResult(null)
     try {
+      if (orderSource === 'diller') {
+        await load()
+        return
+      }
       const payload: { order_source?: string; begin_deal_date?: string; end_deal_date?: string } = orderSource
         ? { order_source: orderSource }
         : {}
-      if (orderSource === 'diller') {
-        const end = new Date()
-        const begin = new Date()
-        begin.setDate(begin.getDate() - 30)
-        payload.begin_deal_date = begin.toISOString().slice(0, 10)
-        payload.end_deal_date = end.toISOString().slice(0, 10)
-      }
       const result = await syncSmartupOrders(payload)
       setSyncResult(result)
       await load()
@@ -314,9 +323,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       )
     }
     if (orderSource === 'diller') {
-      const json =
-        rawDillerResponse ??
-        { items: [], total: 0, limit: PAGE_SIZE, offset }
+      const json = movementsData ?? { movement: [] }
       return (
         <div className="space-y-3">
           {dillerApiInfo && (
@@ -660,7 +667,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         </table>
       </TableScrollArea>
     )
-  }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, dillerApiInfo, eligibleItems, error, isLoading, items, load, location.pathname, location.search, mode, navigate, orderSource, rawDillerResponse, selectedOrderIds, t, updatingOrderId])
+  }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, dillerApiInfo, eligibleItems, error, isLoading, items, load, location.pathname, location.search, mode, movementsData, navigate, orderSource, selectedOrderIds, t, updatingOrderId])
 
   return (
     <AdminLayout title={pageTitle} backTo={mode === 'statuses' ? '/admin' : undefined}>
@@ -682,7 +689,11 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                   {t('orders:refreshing')}
                 </span>
               ) : null}
-              {syncResult ? (
+              {orderSource === 'diller' && movementsData != null ? (
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
+                  {t('orders:movements_loaded', { count: movementsData.movement?.length ?? 0 })}
+                </span>
+              ) : syncResult ? (
                 <span className="flex flex-col gap-1">
                   <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
                     {t('orders:sync_result', { created: syncResult.created, updated: syncResult.updated, skipped: syncResult.skipped })}

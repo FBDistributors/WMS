@@ -1,5 +1,22 @@
 import { fetchJSON } from './apiClient'
 
+/** Smartup movement$export raw item (movement_id, barcode, delivery_number, note, movement_items, ...). */
+export type MovementItem = Record<string, unknown>
+
+export type MovementsResponse = {
+  movement: MovementItem[]
+}
+
+export type MovementsQuery = {
+  begin_created_on?: string
+  end_created_on?: string
+  filial_id?: string
+}
+
+export async function getMovements(query: MovementsQuery = {}) {
+  return fetchJSON<MovementsResponse>('/api/v1/movements', { query })
+}
+
 export type OrderListItem = {
   id: string
   order_number: string

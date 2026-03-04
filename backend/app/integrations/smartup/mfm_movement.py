@@ -183,14 +183,13 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
     return SmartupOrderExportResponse(items=orders)
 
 
-def export_mfm_movements(
+def _request_mfm_export(
     begin_date: date,
     end_date: date,
     filial_id: str | None = None,
-) -> SmartupOrderExportResponse:
+) -> str:
     """
-    Call SmartUp mfm movement$export (Cross-organizational movement), return SmartupOrder list.
-    Uses begin_created_on/end_created_on in payload.
+    Call SmartUp mfm movement$export, return raw response body (JSON string).
     """
     url = (os.getenv("SMARTUP_MFM_MOVEMENT_EXPORT_URL") or DEFAULT_MFM_URL).strip()
     project_code = (os.getenv("SMARTUP_PROJECT_CODE") or "trade").strip()
@@ -235,7 +234,7 @@ def export_mfm_movements(
     request = urllib.request.Request(url, data=data, headers=headers, method="POST")
     try:
         with urllib.request.urlopen(request, timeout=90) as response:
-            body = response.read().decode("utf-8")
+            return response.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
         response_text = exc.read().decode("utf-8")
         logger.error("mfm movement$export HTTP %s: %s", exc.code, response_text)
@@ -247,4 +246,28 @@ def export_mfm_movements(
         logger.error("mfm movement$export: %s", exc)
         raise RuntimeError(f"Smartup mfm movement$export failed: {exc}") from exc
 
+
+def fetch_mfm_movements_raw(
+    begin_date: date,
+    end_date: date,
+    filial_id: str | None = None,
+) -> dict:
+    """
+    Call SmartUp mfm movement$export and return raw JSON as dict (e.g. {"movement": [...]}).
+    Does not parse into SmartupOrder; for use by GET /api/v1/movements.
+    """
+    body = _request_mfm_export(begin_date=begin_date, end_date=end_date, filial_id=filial_id)
+    return json.loads(body)
+
+
+def export_mfm_movements(
+    begin_date: date,
+    end_date: date,
+    filial_id: str | None = None,
+) -> SmartupOrderExportResponse:
+    """
+    Call SmartUp mfm movement$export (Cross-organizational movement), return SmartupOrder list.
+    Uses begin_created_on/end_created_on in payload.
+    """
+    body = _request_mfm_export(begin_date=begin_date, end_date=end_date, filial_id=filial_id)
     return _parse_mfm_response(body)

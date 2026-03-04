@@ -554,6 +554,11 @@ async def sync_orders_from_smartup(
             status_code=400,
             detail="O'rikzor uchun POST /api/v1/orders/sync-orikzor endpointidan foydalaning.",
         )
+    if payload.order_source == "diller":
+        raise HTTPException(
+            status_code=400,
+            detail="Tashkiliy harakatlar uchun GET /api/v1/movements dan foydalaning. Sync buyurtmalar jadvaliga yozilmaydi.",
+        )
     today = date.today()
     if payload.order_source == "diller" and payload.begin_deal_date is None and payload.end_deal_date is None:
         begin_date = today - timedelta(days=30)
