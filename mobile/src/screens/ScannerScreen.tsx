@@ -71,9 +71,18 @@ export function ScannerScreen() {
         );
         return;
       }
+      if (params.returnToConsolidated) {
+        const profileType = params.profileType ?? 'picker';
+        navigation.navigate('PickTaskList', {
+          profileType,
+          scannedBarcode: value,
+          openConsolidated: true,
+        });
+        return;
+      }
       fetchByBarcode(value);
     },
-    [fetchByBarcode, params.returnToPick, params.taskId, params.profileType, navigation]
+    [fetchByBarcode, params.returnToPick, params.returnToConsolidated, params.taskId, params.profileType, navigation]
   );
 
   const codeScanner = useCodeScanner({

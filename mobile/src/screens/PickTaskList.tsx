@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../types/navigation';
@@ -20,6 +20,7 @@ import { UNAUTHORIZED_MSG } from '../api/client';
 import { getOpenTasks, getControllers, sendToController, type ControllerUser } from '../api/picking';
 import { useNetwork } from '../network';
 import { getCachedPickTasks, saveCachedPickTasks } from '../offline/offlineDb';
+import { ConsolidatedPickContent } from '../components/ConsolidatedPickContent';
 
 type Nav = StackNavigationProp<RootStackParamList, 'PickTaskList'>;
 type PickTaskListRoute = RouteProp<RootStackParamList, 'PickTaskList'>;
@@ -96,6 +97,9 @@ export function PickTaskList() {
   const [controllerModalDoc, setControllerModalDoc] = useState<PickingListItem | null>(null);
   const [controllers, setControllers] = useState<ControllerUser[]>([]);
   const [sending, setSending] = useState(false);
+  const [showConsolidated, setShowConsolidated] = useState(false);
+  const [pendingScannedBarcode, setPendingScannedBarcode] = useState<string | null>(null);
+  const [selectedProductKey, setSelectedProductKey] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -134,6 +138,19 @@ export function PickTaskList() {
     const t = setTimeout(() => setShowCompletedBanner(false), 2500);
     return () => clearTimeout(t);
   }, [completedMessage]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const params = route.params ?? {};
+      if (params.openConsolidated) {
+        setShowConsolidated(true);
+      }
+      if (params.scannedBarcode) {
+        setPendingScannedBarcode(params.scannedBarcode);
+        navigation.setParams({ scannedBarcode: undefined });
+      }
+    }, [route.params, navigation])
+  );
 
   const openControllerModal = useCallback(
     async (doc: PickingListItem) => {
@@ -193,6 +210,8 @@ export function PickTaskList() {
     );
   }
 
+  const isPicker = profileType === 'picker';
+
   return (
     <View style={styles.container}>
       {showCompletedBanner && completedMessage ? (
@@ -211,9 +230,27 @@ export function PickTaskList() {
           <Icon name="arrow-left" size={24} color="#1976d2" />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.title}>{t('openTasks')}</Text>
-          <Text style={styles.count}>{list.length}{t('countTa')}</Text>
+          <Text style={styles.title}>
+            {showConsolidated ? t('consolidatedPickTitle') : t('openTasks')}
+          </Text>
+          <Text style={styles.count}>
+            {showConsolidated ? t('consolidatedMyTasks') : `${list.length}${t('countTa')}`}
+          </Text>
         </View>
+        {isPicker && (
+          <TouchableOpacity
+            onPress={() => setShowConsolidated((prev) => !prev)}
+            style={styles.refreshBtn}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            accessibilityLabel={showConsolidated ? t('openTasks') : t('consolidatedPickTitle')}
+          >
+            <Icon
+              name={showConsolidated ? 'format-list-bulleted' : 'format-list-group'}
+              size={24}
+              color="#1976d2"
+            />
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           onPress={() => load()}
           style={styles.refreshBtn}
@@ -223,7 +260,15 @@ export function PickTaskList() {
           <Icon name="refresh" size={24} color={loading ? '#999' : '#1976d2'} />
         </TouchableOpacity>
       </View>
-      {list.length === 0 ? (
+      {showConsolidated && isPicker ? (
+        <ConsolidatedPickContent
+          embeddedInPickTaskList
+          pendingScannedBarcode={pendingScannedBarcode}
+          onClearPendingBarcode={() => setPendingScannedBarcode(null)}
+          selectedProductKey={selectedProductKey}
+          onProductSelect={setSelectedProductKey}
+        />
+      ) : list.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyText}>{t('openTasksEmpty')}</Text>
         </View>
