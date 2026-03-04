@@ -154,7 +154,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     detail?: string | null
     errors_count?: number | null
   } | null>(null)
-  const [rawDillerResponse, setRawDillerResponse] = useState<OrdersListResponse | null>(null)
   const [movementsData, setMovementsData] = useState<MovementsResponse | null>(null)
   const [dillerApiInfo, setDillerApiInfo] = useState<{
     url: string
@@ -219,7 +218,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         : data.items
       setItems(list)
       setTotal(data.total)
-      setRawDillerResponse(null)
     } catch (err) {
       if (!background) {
         const message = err instanceof Error ? err.message : t('orders:load_failed')
