@@ -9,6 +9,7 @@ import {
   Modal,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -22,7 +23,7 @@ import type { RootStackParamList } from '../types/navigation';
 import { useLocale } from '../i18n/LocaleContext';
 import { localeLabels, type LocaleCode } from '../i18n/translations';
 import apiClient from '../api/client';
-import { logout } from '../api/auth';
+import { logout, changePassword, updateMe } from '../api/auth';
 
 const PROFILE_PHOTO_KEY = '@wms_profile_photo';
 const IMAGE_OPTIONS = {
@@ -50,11 +51,13 @@ function ProfileRow({
   label,
   value,
   onPress,
+  hideRight,
 }: {
   icon: string;
   label: string;
   value: string;
   onPress?: () => void;
+  hideRight?: boolean;
 }) {
   const content = (
     <>
@@ -64,14 +67,16 @@ function ProfileRow({
         </View>
         <Text style={styles.rowLabel}>{label}</Text>
       </View>
-      <View style={styles.rowRight}>
-        <Text style={styles.rowValue} numberOfLines={1}>
-          {value || '—'}
-        </Text>
-        {onPress ? (
-          <Icon name="chevron-right" size={20} color="#999" style={styles.rowChevron} />
-        ) : null}
-      </View>
+      {!hideRight && (
+        <View style={styles.rowRight}>
+          <Text style={styles.rowValue} numberOfLines={1}>
+            {value || '—'}
+          </Text>
+          {onPress ? (
+            <Icon name="chevron-right" size={20} color="#999" style={styles.rowChevron} />
+          ) : null}
+        </View>
+      )}
     </>
   );
   if (onPress) {
@@ -177,6 +182,81 @@ export function AccountScreen() {
     setLanguageModalVisible(false);
   };
 
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [usernameModalVisible, setUsernameModalVisible] = useState(false);
+  const [newUsername, setNewUsername] = useState(user?.username ?? '');
+  const [usernameLoading, setUsernameLoading] = useState(false);
+
+  useEffect(() => {
+    if (user) setNewUsername(user.username);
+  }, [user?.username]);
+
+  const openPasswordModal = () => {
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordModalVisible(true);
+  };
+  const openUsernameModal = () => {
+    setNewUsername(user?.username ?? '');
+    setUsernameModalVisible(true);
+  };
+
+  const handleChangePassword = async () => {
+    if (newPassword !== confirmPassword) {
+      Alert.alert(t('error'), t('passwordMismatch'));
+      return;
+    }
+    if (newPassword.length < 6) {
+      Alert.alert(t('error'), t('errorPasswordShort'));
+      return;
+    }
+    if (!currentPassword.trim()) {
+      Alert.alert(t('error'), t('errorInvalidCurrent'));
+      return;
+    }
+    setPasswordLoading(true);
+    try {
+      await changePassword(currentPassword, newPassword);
+      setPasswordModalVisible(false);
+      Alert.alert('', t('passwordUpdated'));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : t('errorInvalidCurrent');
+      Alert.alert(t('error'), msg);
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  const handleChangeUsername = async () => {
+    const trimmed = newUsername.trim();
+    if (trimmed.length < 3) {
+      Alert.alert(t('error'), t('errorUsernameShort'));
+      return;
+    }
+    if (trimmed === user?.username) {
+      setUsernameModalVisible(false);
+      return;
+    }
+    setUsernameLoading(true);
+    try {
+      const updated = await updateMe({ username: trimmed });
+      setUser(updated);
+      setUsernameModalVisible(false);
+      Alert.alert('', t('usernameUpdated'));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : t('error');
+      const isTaken = typeof msg === 'string' && (msg.includes('exists') || msg.includes('taken') || msg.includes('band'));
+      Alert.alert(t('error'), isTaken ? t('errorUsernameTaken') : msg);
+    } finally {
+      setUsernameLoading(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
@@ -232,6 +312,22 @@ export function AccountScreen() {
             />
             <View style={styles.separator} />
             <ProfileRow
+              icon="lock-outline"
+              label={t('profileChangePassword')}
+              value=""
+              onPress={openPasswordModal}
+              hideRight
+            />
+            <View style={styles.separator} />
+            <ProfileRow
+              icon="pencil-outline"
+              label={t('profileChangeUsername')}
+              value=""
+              onPress={openUsernameModal}
+              hideRight
+            />
+            <View style={styles.separator} />
+            <ProfileRow
               icon="translate"
               label={t('language')}
               value={localeLabels[locale]}
@@ -278,6 +374,108 @@ export function AccountScreen() {
                 <Text style={styles.languageModalOptionText}>{localeLabels[code]}</Text>
               </TouchableOpacity>
             ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      <Modal visible={passwordModalVisible} transparent animationType="fade">
+        <TouchableOpacity
+          style={styles.languageModalOverlay}
+          activeOpacity={1}
+          onPress={() => !passwordLoading && setPasswordModalVisible(false)}
+        >
+          <View style={styles.formModalContent} onStartShouldSetResponder={() => true}>
+            <View style={styles.languageModalHeader}>
+              <Text style={styles.languageModalTitle}>{t('profileChangePassword')}</Text>
+              <TouchableOpacity
+                onPress={() => !passwordLoading && setPasswordModalVisible(false)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                style={styles.languageModalCloseBtn}
+              >
+                <Icon name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={styles.formInput}
+              placeholder={t('currentPassword')}
+              placeholderTextColor="#666"
+              value={currentPassword}
+              onChangeText={setCurrentPassword}
+              secureTextEntry
+              autoCapitalize="none"
+              editable={!passwordLoading}
+            />
+            <TextInput
+              style={styles.formInput}
+              placeholder={t('newPassword')}
+              placeholderTextColor="#666"
+              value={newPassword}
+              onChangeText={setNewPassword}
+              secureTextEntry
+              autoCapitalize="none"
+              editable={!passwordLoading}
+            />
+            <TextInput
+              style={styles.formInput}
+              placeholder={t('confirmPassword')}
+              placeholderTextColor="#666"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+              autoCapitalize="none"
+              editable={!passwordLoading}
+            />
+            <TouchableOpacity
+              style={[styles.formSubmitBtn, passwordLoading && styles.formSubmitBtnDisabled]}
+              onPress={handleChangePassword}
+              disabled={passwordLoading}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.formSubmitText}>
+                {passwordLoading ? '…' : t('save')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      <Modal visible={usernameModalVisible} transparent animationType="fade">
+        <TouchableOpacity
+          style={styles.languageModalOverlay}
+          activeOpacity={1}
+          onPress={() => !usernameLoading && setUsernameModalVisible(false)}
+        >
+          <View style={styles.formModalContent} onStartShouldSetResponder={() => true}>
+            <View style={styles.languageModalHeader}>
+              <Text style={styles.languageModalTitle}>{t('profileChangeUsername')}</Text>
+              <TouchableOpacity
+                onPress={() => !usernameLoading && setUsernameModalVisible(false)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                style={styles.languageModalCloseBtn}
+              >
+                <Icon name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={styles.formInput}
+              placeholder={t('profileLogin')}
+              placeholderTextColor="#666"
+              value={newUsername}
+              onChangeText={setNewUsername}
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!usernameLoading}
+            />
+            <TouchableOpacity
+              style={[styles.formSubmitBtn, usernameLoading && styles.formSubmitBtnDisabled]}
+              onPress={handleChangeUsername}
+              disabled={usernameLoading}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.formSubmitText}>
+                {usernameLoading ? '…' : t('save')}
+              </Text>
+            </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Modal>
@@ -466,5 +664,39 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1976d2',
     fontWeight: '500',
+  },
+  formModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    paddingBottom: 20,
+    minWidth: 280,
+    maxWidth: 320,
+  },
+  formInput: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#111',
+    marginBottom: 12,
+    backgroundColor: '#fff',
+  },
+  formSubmitBtn: {
+    backgroundColor: '#1976d2',
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  formSubmitBtnDisabled: {
+    opacity: 0.6,
+  },
+  formSubmitText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
 });

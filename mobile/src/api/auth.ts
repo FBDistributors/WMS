@@ -29,6 +29,18 @@ export async function getMe(): Promise<MeResponse> {
   return data;
 }
 
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  await apiClient.post('/auth/change-password', {
+    current_password: currentPassword,
+    new_password: newPassword,
+  });
+}
+
+export async function updateMe(payload: { username?: string; full_name?: string | null }): Promise<MeResponse> {
+  const { data } = await apiClient.patch<MeResponse>('/auth/me', payload);
+  return data;
+}
+
 export async function logout(): Promise<void> {
   try {
     await apiClient.post('/auth/logout');
