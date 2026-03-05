@@ -413,7 +413,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             )
           case 'movement_note':
             return (
-              <td className="max-w-[200px] truncate px-4 py-3 text-slate-600 dark:text-slate-300" title={note}>
+              <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300" title={note}>
                 {note}
               </td>
             )
@@ -492,7 +492,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             </div>
           )}
           <TableScrollArea inline>
-            <table className="w-max min-w-[600px] text-sm">
+            <table className="w-max min-w-[600px] table-auto text-sm">
               <thead className="text-xs uppercase text-slate-500">
                 <tr className="border-b border-slate-200 dark:border-slate-800">
                   {dillerOrdered.map((colId) =>
