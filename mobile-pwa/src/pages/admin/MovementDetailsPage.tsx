@@ -30,11 +30,12 @@ export function MovementDetailsPage() {
   const movement = state?.movement
 
   useEffect(() => {
-    if (!movement?.movement_items?.length) {
+    const rawItems = movement?.movement_items
+    if (!Array.isArray(rawItems) || rawItems.length === 0) {
       setProductBySku(new Map())
       return
     }
-    const items = (movement.movement_items as Array<Record<string, unknown>>) ?? []
+    const items = rawItems as Array<Record<string, unknown>>
     const skus = [...new Set(items.map((line) => String(line.product_code ?? line.productCode ?? '').trim()).filter(Boolean))]
     if (skus.length === 0) {
       setProductBySku(new Map())
