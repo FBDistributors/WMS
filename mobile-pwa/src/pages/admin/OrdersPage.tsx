@@ -318,7 +318,19 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       )
     }
     if (orderSource === 'diller') {
-      const movementList = movementsData?.movement ?? []
+      const movementListRaw = movementsData?.movement ?? []
+      const q = searchQuery.trim().toLowerCase()
+      const movementList = q
+        ? movementListRaw.filter((m: MovementItem) => {
+            const mid = String((m.movement_id as string) ?? '').toLowerCase()
+            const barcode = String((m.barcode as string) ?? '').toLowerCase()
+            const fromWh = String((m.from_warehouse_code as string) ?? '').toLowerCase()
+            const toWh = String((m.to_warehouse_code as string) ?? '').toLowerCase()
+            const note = String((m.note as string) ?? '').toLowerCase()
+            const status = String((m.status as string) ?? '').toLowerCase()
+            return mid.includes(q) || barcode.includes(q) || fromWh.includes(q) || toWh.includes(q) || note.includes(q) || status.includes(q)
+          })
+        : movementListRaw
       const movementTotal = movementsData?.total ?? 0
       const columnLabelsDiller = new Map(
         COLUMN_OPTIONS_DILLER.map((c) => [c.id, t(c.labelKey)])
@@ -408,12 +420,13 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             return null
         }
       }
-      if (movementList.length === 0 && movementTotal === 0) {
+      if (movementList.length === 0) {
+        const isSearch = searchQuery.trim().length > 0
         return (
           <div className="space-y-3">
             <EmptyState
-              title={t('orders:empty')}
-              description={t('orders:empty_desc')}
+              title={isSearch ? t('orders:search_no_results', "Qidiruv bo'yicha natija topilmadi") : t('orders:empty')}
+              description={isSearch ? t('orders:search_no_results_hint', "Boshqa so'z yoki filterni sinab ko'ring.") : t('orders:empty_desc')}
               actionLabel={t('common:buttons.refresh')}
               onAction={load}
             />
@@ -754,7 +767,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         </table>
       </TableScrollArea>
     )
-  }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, eligibleItems, error, isLoading, items, load, location.pathname, location.search, mode, movementPage, movementsData, navigate, orderSource, selectedOrderIds, t, updatingOrderId])
+  }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, eligibleItems, error, isLoading, items, load, location.pathname, location.search, mode, movementPage, movementsData, navigate, orderSource, searchQuery, selectedOrderIds, t, updatingOrderId])
 
   return (
     <AdminLayout title={pageTitle} backTo={mode === 'statuses' ? '/admin' : undefined}>

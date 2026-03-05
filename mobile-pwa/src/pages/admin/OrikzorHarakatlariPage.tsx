@@ -97,7 +97,20 @@ export function OrikzorHarakatlariPage() {
     }
   }, [filterPanelOpen, dateFrom, dateTo])
 
-  const movementList = movementsData?.movement ?? []
+  const searchQuery = searchParams.get('q') ?? ''
+  const movementListRaw = movementsData?.movement ?? []
+  const movementList = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return movementListRaw
+    return movementListRaw.filter((m) => {
+      const mid = String((m.movement_id as string) ?? '').toLowerCase()
+      const barcode = String((m.barcode as string) ?? '').toLowerCase()
+      const fromWh = String((m.from_warehouse_code as string) ?? '').toLowerCase()
+      const note = String((m.note as string) ?? '').toLowerCase()
+      const status = String((m.status as string) ?? '').toLowerCase()
+      return mid.includes(q) || barcode.includes(q) || fromWh.includes(q) || note.includes(q) || status.includes(q)
+    })
+  }, [movementListRaw, searchQuery])
   const movementTotal = movementsData?.total ?? 0
   const columnLabels = useMemo(
     () => new Map(COLUMNS_DILLER.map((c) => [c.id, t(c.labelKey)])),
@@ -185,13 +198,13 @@ export function OrikzorHarakatlariPage() {
         />
       )
     }
-    if (movementList.length === 0 && movementTotal === 0) {
+    if (movementList.length === 0) {
       return (
         <EmptyState
-          title={t('orders:empty')}
-          description={t('orders:empty_desc')}
-          actionLabel={t('common:buttons.refresh')}
-          onAction={() => load()}
+          title={searchQuery.trim() ? t('orders:search_no_results', 'Qidiruv bo\'yicha natija topilmadi') : t('orders:empty')}
+          description={searchQuery.trim() ? t('orders:search_no_results_hint', 'Boshqa so\'z yoki filterni sinab ko\'ring.') : t('orders:empty_desc')}
+          actionLabel={searchQuery.trim() ? t('common:buttons.refresh') : t('common:buttons.refresh')}
+          onAction={() => (searchQuery.trim() ? setSearchParams((p) => { const n = new URLSearchParams(p); n.delete('q'); return n }) : load())}
         />
       )
     }
@@ -244,7 +257,26 @@ export function OrikzorHarakatlariPage() {
         </Button>
       }
     >
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <label className="flex-1 min-w-[200px] max-w-md text-sm text-slate-600 dark:text-slate-300">
+          <span className="sr-only">{t('orders:filters.search')}</span>
+          <input
+            type="search"
+            className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+            value={searchQuery}
+            onChange={(e) => {
+              const v = e.target.value
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev)
+                if (v) next.set('q', v)
+                else next.delete('q')
+                next.delete('offset')
+                return next
+              })
+            }}
+            placeholder={t('orders:filters.search_placeholder')}
+          />
+        </label>
         <div className="relative" ref={filterPanelRef}>
           <Button
             variant="outline"
