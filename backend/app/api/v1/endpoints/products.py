@@ -241,6 +241,7 @@ async def list_products(
     search: Optional[str] = Query(None, alias="search"),
     q: Optional[str] = None,
     product_ids: Optional[str] = Query(None, description="Comma-separated product UUIDs to filter"),
+    skus: Optional[str] = Query(None, description="Comma-separated SKUs to filter (exact match)"),
     include_inactive: bool = Query(False),
     include_summary: bool = Query(False, description="Include on_hand_total, available_total per product"),
     limit: int = Query(50, ge=1, le=200),
@@ -256,6 +257,11 @@ async def list_products(
         ids = [UUID(x.strip()) for x in ids_value.split(",") if x.strip()]
         if ids:
             query = query.filter(ProductModel.id.in_(ids))
+    skus_value = (skus or "").strip()
+    if skus_value:
+        sku_list = [x.strip() for x in skus_value.split(",") if x.strip()]
+        if sku_list:
+            query = query.filter(ProductModel.sku.in_(sku_list))
     term_value = (search or q or "").strip()
     if term_value:
         term = f"%{term_value}%"

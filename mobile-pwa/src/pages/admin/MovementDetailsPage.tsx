@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -10,6 +10,7 @@ import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { useAuth } from '../../rbac/AuthProvider'
+import { getProducts } from '../../services/productsApi'
 import type { MovementItem } from '../../services/ordersApi'
 
 type MovementState = {
@@ -24,8 +25,31 @@ export function MovementDetailsPage() {
   const { t } = useTranslation(['orders', 'common'])
   const { has } = useAuth()
   const [pickerDialogOpen, setPickerDialogOpen] = useState(false)
+  const [productBySku, setProductBySku] = useState<Map<string, { name: string; barcode: string | null }>>(new Map())
   const state = location.state as MovementState | null
   const movement = state?.movement
+
+  useEffect(() => {
+    if (!movement?.movement_items?.length) {
+      setProductBySku(new Map())
+      return
+    }
+    const items = (movement.movement_items as Array<Record<string, unknown>>) ?? []
+    const skus = [...new Set(items.map((line) => String(line.product_code ?? line.productCode ?? '').trim()).filter(Boolean))]
+    if (skus.length === 0) {
+      setProductBySku(new Map())
+      return
+    }
+    getProducts({ skus, limit: 500 })
+      .then((res) => {
+        const map = new Map<string, { name: string; barcode: string | null }>()
+        res.items.forEach((p) => {
+          map.set(p.sku, { name: p.name, barcode: p.barcode ?? (p.barcodes?.[0] ?? null) ?? null })
+        })
+        setProductBySku(map)
+      })
+      .catch(() => setProductBySku(new Map()))
+  }, [movement])
   const listPath = state?.listPath ?? '/admin/orders-diller'
   const listQuery = state?.listQuery ?? ''
   const backUrl = `${listPath}${listQuery ? `?${listQuery}` : ''}`
@@ -133,14 +157,23 @@ export function MovementDetailsPage() {
               </tr>
             </thead>
             <tbody>
-              {items.map((line, idx) => (
-                <tr key={idx} className="border-b border-slate-100 dark:border-slate-800">
-                  <td className="px-4 py-3">{String(line.product_code ?? line.productCode ?? '—')}</td>
-                  <td className="px-4 py-3">{String(line.name ?? line.product_name ?? '—')}</td>
-                  <td className="px-4 py-3">{String(line.barcode ?? line.product_barcode ?? '—')}</td>
-                  <td className="px-4 py-3">{line.quantity != null ? String(line.quantity) : '—'}</td>
-                </tr>
-              ))}
+              {items.map((line, idx) => {
+                const sku = String(line.product_code ?? line.productCode ?? '').trim()
+                const product = sku ? productBySku.get(sku) : undefined
+                const name = (product?.name ?? line.name ?? line.product_name) != null && String(product?.name ?? line.name ?? line.product_name).trim() !== ''
+                  ? String(product?.name ?? line.name ?? line.product_name)
+                  : '—'
+                const rawBarcode = product?.barcode ?? line.barcode ?? line.product_barcode
+                const barcode = rawBarcode != null && String(rawBarcode).trim() !== '' ? String(rawBarcode) : '—'
+                return (
+                  <tr key={idx} className="border-b border-slate-100 dark:border-slate-800">
+                    <td className="px-4 py-3">{sku || '—'}</td>
+                    <td className="px-4 py-3">{name}</td>
+                    <td className="px-4 py-3">{barcode}</td>
+                    <td className="px-4 py-3">{line.quantity != null ? String(line.quantity) : '—'}</td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </TableScrollArea>
