@@ -47,8 +47,10 @@ def _raw_to_display(m: dict[str, Any]) -> dict[str, Any]:
         if isinstance(it, dict)
     ]
     from_date = m.get("from_movement_date") or m.get("fromMovementDate") or ""
+    movement_number = (m.get("movement_number") or "").strip() or mid
     return {
         "movement_id": mid,
+        "movement_number": movement_number,
         "barcode": barcode,
         "from_warehouse_code": m.get("from_warehouse_code"),
         "to_warehouse_code": m.get("to_warehouse_code"),

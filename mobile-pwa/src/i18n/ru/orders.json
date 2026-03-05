@@ -43,6 +43,7 @@
     "all": "Все",
     "search": "Поиск",
     "search_placeholder": "Номер заказа или ID",
+    "search_placeholder_orikzor": "Номер движения или ID",
     "filial": "Филиал",
     "date_from": "Дата с",
     "date_to": "Дата по",
@@ -118,6 +119,7 @@
   },
   "columns_diller": {
     "order_number": "ID движения",
+    "movement_number": "Номер движения",
     "external_id": "Внешний ID",
     "from_warehouse_code": "Со склада",
     "to_warehouse_code": "На склад",

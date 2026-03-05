@@ -45,6 +45,7 @@
     "all": "All",
     "search": "Search",
     "search_placeholder": "Order number or external ID",
+    "search_placeholder_orikzor": "Movement number or ID",
     "filial": "Filial",
     "date_from": "Date from",
     "date_to": "Date to",
@@ -121,6 +122,7 @@
   },
   "columns_diller": {
     "order_number": "Movement ID",
+    "movement_number": "Movement number",
     "external_id": "External ID",
     "from_warehouse_code": "From warehouse",
     "to_warehouse_code": "To warehouse",

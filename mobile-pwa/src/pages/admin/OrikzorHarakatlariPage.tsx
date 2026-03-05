@@ -22,10 +22,8 @@ function daysAgoISO(days: number) {
 
 const PAGE_SIZE = 50
 
-const COLUMNS_DILLER = [
-  { id: 'order_number', labelKey: 'orders:columns_diller.order_number' },
-  { id: 'external_id', labelKey: 'orders:columns_diller.external_id' },
-  { id: 'from_warehouse_code', labelKey: 'orders:columns_diller.from_warehouse_code' },
+const COLUMNS_ORIKZOR = [
+  { id: 'movement_number', labelKey: 'orders:columns_diller.movement_number' },
   { id: 'movement_note', labelKey: 'orders:columns_diller.movement_note' },
   { id: 'total_amount', labelKey: 'orders:columns_diller.total_amount' },
   { id: 'status', labelKey: 'orders:columns_diller.status' },
@@ -103,41 +101,31 @@ export function OrikzorHarakatlariPage() {
     const q = searchQuery.trim().toLowerCase()
     if (!q) return movementListRaw
     return movementListRaw.filter((m) => {
+      const movementNum = String((m.movement_number as string) ?? (m.movement_id as string) ?? '').toLowerCase()
       const mid = String((m.movement_id as string) ?? '').toLowerCase()
-      const barcode = String((m.barcode as string) ?? '').toLowerCase()
-      const fromWh = String((m.from_warehouse_code as string) ?? '').toLowerCase()
       const note = String((m.note as string) ?? '').toLowerCase()
       const status = String((m.status as string) ?? '').toLowerCase()
-      return mid.includes(q) || barcode.includes(q) || fromWh.includes(q) || note.includes(q) || status.includes(q)
+      return movementNum.includes(q) || mid.includes(q) || note.includes(q) || status.includes(q)
     })
   }, [movementListRaw, searchQuery])
   const movementTotal = movementsData?.total ?? 0
   const columnLabels = useMemo(
-    () => new Map(COLUMNS_DILLER.map((c) => [c.id, t(c.labelKey)])),
+    () => new Map(COLUMNS_ORIKZOR.map((c) => [c.id, t(c.labelKey)])),
     [t]
   )
 
   const renderCell = (columnId: string, m: MovementItem) => {
     const mid = (m.movement_id as string) ?? '—'
-    const barcode = (m.barcode as string) ?? '—'
-    const fromWh = (m.from_warehouse_code as string) ?? '—'
+    const movementNum = (m.movement_number as string) ?? mid
     const note = (m.note as string) ?? '—'
     const amount = m.amount != null ? String(m.amount) : '—'
     const status = (m.status as string) ?? '—'
     const items = (m.movement_items as unknown[]) ?? []
     const fromTime = (m.from_time as string) ?? (m.from_movement_date as string) ?? '—'
     switch (columnId) {
-      case 'order_number':
+      case 'movement_number':
         return (
-          <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">{mid}</td>
-        )
-      case 'external_id':
-        return (
-          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{barcode}</td>
-        )
-      case 'from_warehouse_code':
-        return (
-          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{fromWh}</td>
+          <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">{movementNum}</td>
         )
       case 'movement_note':
         return (
@@ -213,7 +201,7 @@ export function OrikzorHarakatlariPage() {
         <table className="w-max min-w-[600px] text-sm">
           <thead className="text-xs uppercase text-slate-500">
             <tr className="border-b border-slate-200 dark:border-slate-800">
-              {COLUMNS_DILLER.map((col) => (
+              {COLUMNS_ORIKZOR.map((col) => (
                 <th key={col.id} className="px-4 py-3 text-left">
                   {columnLabels.get(col.id)}
                 </th>
@@ -226,7 +214,7 @@ export function OrikzorHarakatlariPage() {
                 key={(m.movement_id as string) ?? String(m.barcode ?? '')}
                 className="border-b border-slate-100 dark:border-slate-800"
               >
-                {COLUMNS_DILLER.map((col) => (
+                {COLUMNS_ORIKZOR.map((col) => (
                   <Fragment key={col.id}>{renderCell(col.id, m)}</Fragment>
                 ))}
               </tr>
@@ -274,7 +262,7 @@ export function OrikzorHarakatlariPage() {
                 return next
               })
             }}
-            placeholder={t('orders:filters.search_placeholder')}
+            placeholder={t('orders:filters.search_placeholder_orikzor')}
           />
         </label>
         <div className="relative" ref={filterPanelRef}>

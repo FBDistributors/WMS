@@ -45,6 +45,7 @@
     "all": "Barchasi",
     "search": "Qidiruv",
     "search_placeholder": "Buyurtma raqami yoki ID",
+    "search_placeholder_orikzor": "Harakat raqami yoki ID",
     "filial": "Filial",
     "date_from": "Boshlanish sanasi",
     "date_to": "Tugash sanasi",
@@ -136,6 +137,7 @@
   },
   "columns_diller": {
     "order_number": "Harakat ID",
+    "movement_number": "Harakat raqami",
     "external_id": "Tashqi ID",
     "from_warehouse_code": "Qayerdan (sklad)",
     "to_warehouse_code": "Qayerga (sklad)",
