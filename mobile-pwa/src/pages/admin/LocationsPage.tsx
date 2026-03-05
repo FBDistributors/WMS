@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Download, Pencil, Plus, Printer, QrCode, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import JsBarcode from 'jsbarcode'
@@ -58,6 +58,9 @@ export function LocationsPage() {
   const [locationForQr, setLocationForQr] = useState<Location | null>(null)
   const [includeInactive, setIncludeInactive] = useState(false)
   const [filterQuery, setFilterQuery] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const PAGE_SIZE = 50
+  const locationPage = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10) / PAGE_SIZE)
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -90,6 +93,11 @@ export function LocationsPage() {
       return false
     })
   }, [items, filterQuery])
+
+  const paginatedItems = useMemo(() => {
+    const start = locationPage * PAGE_SIZE
+    return filteredItems.slice(start, start + PAGE_SIZE)
+  }, [filteredItems, locationPage])
 
   const content = useMemo(() => {
     if (isLoading) {
@@ -148,14 +156,14 @@ export function LocationsPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredItems.length === 0 ? (
+            {paginatedItems.length === 0 ? (
               <tr>
                 <td colSpan={10} className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
                   {filterQuery.trim() ? t('locations:filter_no_results') : t('locations:empty')}
                 </td>
               </tr>
             ) : (
-              filteredItems.map((loc) => (
+              paginatedItems.map((loc) => (
               <tr
                 key={loc.id}
                 className="cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
@@ -244,29 +252,13 @@ export function LocationsPage() {
         </table>
       </TableScrollArea>
     )
-  }, [error, isLoading, items, filteredItems, load, navigate, t])
+  }, [error, isLoading, items, filteredItems, paginatedItems, load, navigate, t])
 
   return (
-    <AdminLayout
-      title={t('locations:title')}
-      actionSlot={
-        <Button onClick={() => setDialog({ open: true, mode: 'create' })} className="shrink-0">
-          <Plus size={16} />
-          <span className="hidden sm:inline">{t('locations:add')}</span>
-        </Button>
-      }
-    >
+    <AdminLayout title={t('locations:title')}>
       <Card className="min-w-0 space-y-4 overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-base font-semibold text-slate-900 dark:text-slate-100 sm:text-lg">
-              {t('locations:title')}
-            </div>
-            <div className="break-words text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
-              {t('locations:subtitle')}
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 min-w-0 flex-1">
             <div className="relative">
               <input
                 type="text"
@@ -295,8 +287,52 @@ export function LocationsPage() {
               {t('locations:show_inactive')}
             </label>
           </div>
+          <Button onClick={() => setDialog({ open: true, mode: 'create' })} className="shrink-0">
+            <Plus size={16} />
+            <span className="hidden sm:inline">{t('locations:add')}</span>
+          </Button>
         </div>
         {content}
+        {!isLoading && !error && filteredItems.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-4 dark:border-slate-800">
+            <Button variant="outline" onClick={() => void load()} disabled={isLoading}>
+              {t('common:buttons.refresh')}
+            </Button>
+            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+              <span>
+                {filteredItems.length > 0
+                  ? `${locationPage * PAGE_SIZE + 1}–${Math.min((locationPage + 1) * PAGE_SIZE, filteredItems.length)} / ${filteredItems.length}`
+                  : '0 / 0'}
+              </span>
+              <Button
+                variant="secondary"
+                disabled={locationPage === 0}
+                onClick={() => {
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev)
+                    next.set('offset', String((locationPage - 1) * PAGE_SIZE))
+                    return next
+                  })
+                }}
+              >
+                {t('common:buttons.back')}
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={(locationPage + 1) * PAGE_SIZE >= filteredItems.length}
+                onClick={() => {
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev)
+                    next.set('offset', String((locationPage + 1) * PAGE_SIZE))
+                    return next
+                  })
+                }}
+              >
+                {t('orders:pagination.next', 'Keyingi')}
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {dialog.open ? (
