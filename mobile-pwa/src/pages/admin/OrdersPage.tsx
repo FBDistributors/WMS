@@ -331,7 +331,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             return mid.includes(q) || barcode.includes(q) || fromWh.includes(q) || toWh.includes(q) || note.includes(q) || status.includes(q)
           })
         : movementListRaw
-      const movementTotal = movementsData?.total ?? 0
       const columnLabelsDiller = new Map(
         COLUMN_OPTIONS_DILLER.map((c) => [c.id, t(c.labelKey)])
       )
