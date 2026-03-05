@@ -8,7 +8,7 @@ import { ProductSearchCombobox, formatProductLabel } from '../../components/Prod
 import { LocationSearchCombobox, formatLocationLabel } from '../../components/LocationSearchCombobox'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
-import { DateInput } from '../../components/DateInput'
+import { MonthYearInput } from '../../components/MonthYearInput'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { getProducts, type Product } from '../../services/productsApi'
@@ -288,7 +288,13 @@ export function ReceivingPage() {
       await completeReceipt(receiptId)
       await load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('receiving:complete_failed'))
+      const msg =
+        err && typeof err === 'object' && 'message' in err
+          ? String((err as { message: string }).message)
+          : err instanceof Error
+            ? err.message
+            : t('receiving:complete_failed')
+      setError(msg)
     } finally {
       setIsSubmitting(false)
     }
@@ -314,6 +320,9 @@ export function ReceivingPage() {
           {error}
         </div>
       ) : null}
+      <p className="text-xs text-slate-500 dark:text-slate-400" role="note">
+        {t('receiving:rule_location_single_expiry')}
+      </p>
       <label className="text-sm text-slate-600 dark:text-slate-300">
         {t('receiving:fields.doc_no')}
         <input
@@ -415,7 +424,7 @@ export function ReceivingPage() {
               </label>
               <label className="text-sm text-slate-600 dark:text-slate-300">
                 {t('receiving:fields.expiry_date')}
-                <DateInput
+                <MonthYearInput
                   value={line.expiry_date ?? ''}
                   onChange={(val) => updateLine(line.id, { expiry_date: val || null })}
                   className="mt-1 w-full"

@@ -37,6 +37,7 @@
     "lines_required": "At least one line is required.",
     "line_invalid": "Fill product, location, batch and qty for each line."
   },
+  "rule_location_single_expiry": "One location may only hold one expiry date per product. Adding the same product with a different expiry to the same location is not allowed.",
   "no_results": "No results",
   "no_results_desc": "Try changing search or filter.",
   "search_placeholder": "Search by doc no or receiver",

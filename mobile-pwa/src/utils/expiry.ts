@@ -1,154 +1,107 @@
 /**
- * Expiry Date Utilities
- * 
- * Helper functions for working with expiry dates in the WMS system.
+ * Expiry Date Utilities — muddat oy bo'yicha (Yil keyin Oy).
+ * Display: "Mart 2026"; status/color oy bo'yicha.
  */
 
+function toDate(d: string | Date | null | undefined): Date | null {
+  if (d == null) return null
+  const date = typeof d === 'string' ? new Date(d) : d
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+/** Months until expiry (negative if expired). */
+function getMonthsUntilExpiry(expiryDate: string | Date | null | undefined): number | null {
+  const expiry = toDate(expiryDate)
+  if (!expiry) return null
+  const now = new Date()
+  const monthsUntil = (expiry.getFullYear() - now.getFullYear()) * 12 + (expiry.getMonth() - now.getMonth())
+  return monthsUntil
+}
+
 /**
- * Get color class for expiry date based on how soon it expires
- * 
- * @param expiryDate - ISO date string or Date object
- * @returns Tailwind CSS color class
+ * Get color class for expiry date (month-based).
  */
 export function getExpiryColorClass(expiryDate: string | Date | null | undefined): string {
   if (!expiryDate) {
-    return 'text-slate-400'; // No expiry date
+    return 'text-slate-400'
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  const expiry = typeof expiryDate === 'string' ? new Date(expiryDate) : expiryDate;
-  expiry.setHours(0, 0, 0, 0);
-  
-  const daysUntilExpiry = Math.floor((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  
-  if (daysUntilExpiry < 0) {
-    return 'text-red-600 font-semibold dark:text-red-400'; // Expired
-  }
-  if (daysUntilExpiry <= 30) {
-    return 'text-orange-600 font-semibold dark:text-orange-400'; // Expiring soon (critical)
-  }
-  if (daysUntilExpiry <= 90) {
-    return 'text-yellow-600 dark:text-yellow-400'; // Warning period
-  }
-  
-  return 'text-slate-600 dark:text-slate-300'; // Normal
+  const months = getMonthsUntilExpiry(expiryDate)
+  if (months === null) return 'text-slate-400'
+  if (months < 0) return 'text-red-600 font-semibold dark:text-red-400'
+  if (months <= 1) return 'text-orange-600 font-semibold dark:text-orange-400'
+  if (months <= 3) return 'text-yellow-600 dark:text-yellow-400'
+  return 'text-slate-600 dark:text-slate-300'
 }
 
 /**
- * Get expiry status label
- * 
- * @param expiryDate - ISO date string or Date object
- * @returns Status label (expired, expiring_soon, warning, ok)
+ * Get expiry status (month-based).
  */
 export function getExpiryStatus(expiryDate: string | Date | null | undefined): 'expired' | 'expiring_soon' | 'warning' | 'ok' | 'none' {
-  if (!expiryDate) {
-    return 'none';
-  }
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  const expiry = typeof expiryDate === 'string' ? new Date(expiryDate) : expiryDate;
-  expiry.setHours(0, 0, 0, 0);
-  
-  const daysUntilExpiry = Math.floor((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  
-  if (daysUntilExpiry < 0) return 'expired';
-  if (daysUntilExpiry <= 30) return 'expiring_soon';
-  if (daysUntilExpiry <= 90) return 'warning';
-  return 'ok';
+  if (!expiryDate) return 'none'
+  const months = getMonthsUntilExpiry(expiryDate)
+  if (months === null) return 'none'
+  if (months < 0) return 'expired'
+  if (months <= 1) return 'expiring_soon'
+  if (months <= 3) return 'warning'
+  return 'ok'
 }
 
 /**
- * Get days until expiry
- * 
- * @param expiryDate - ISO date string or Date object
- * @returns Number of days (negative if expired, null if no expiry)
+ * Get days until expiry (approximate from month; negative if expired).
  */
 export function getDaysUntilExpiry(expiryDate: string | Date | null | undefined): number | null {
-  if (!expiryDate) {
-    return null;
-  }
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  const expiry = typeof expiryDate === 'string' ? new Date(expiryDate) : expiryDate;
-  expiry.setHours(0, 0, 0, 0);
-  
-  return Math.floor((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const months = getMonthsUntilExpiry(expiryDate)
+  if (months === null) return null
+  const expiry = toDate(expiryDate)!
+  const now = new Date()
+  const firstOfExpiry = new Date(expiry.getFullYear(), expiry.getMonth(), 1)
+  const firstOfNow = new Date(now.getFullYear(), now.getMonth(), 1)
+  return Math.floor((firstOfExpiry.getTime() - firstOfNow.getTime()) / (1000 * 60 * 60 * 24))
 }
 
 /**
- * Format expiry date for display
- * 
- * @param expiryDate - ISO date string or Date object
- * @param locale - Locale for formatting (default: 'uz-UZ')
- * @returns Formatted date string
+ * Format expiry for display: "Mart 2026" (oy + yil).
  */
 export function formatExpiryDate(expiryDate: string | Date | null | undefined, locale: string = 'uz-UZ'): string {
-  if (!expiryDate) {
-    return '—';
-  }
-
-  const expiry = typeof expiryDate === 'string' ? new Date(expiryDate) : expiryDate;
-  return expiry.toLocaleDateString(locale);
+  if (!expiryDate) return '—'
+  const expiry = toDate(expiryDate)
+  if (!expiry) return '—'
+  return expiry.toLocaleDateString(locale, { month: 'long', year: 'numeric' })
 }
 
 /**
- * Get minimum allowed expiry date (today)
- * 
- * @returns ISO date string for today
+ * Minimum expiry = first day of current month (YYYY-MM-01).
  */
 export function getMinExpiryDate(): string {
-  return new Date().toISOString().split('T')[0];
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = d.getMonth() + 1
+  return `${y}-${String(m).padStart(2, '0')}-01`
 }
 
 /**
- * Validate expiry date
- * 
- * @param expiryDate - ISO date string or Date object
- * @returns Error message if invalid, null if valid
+ * Validate: past = expiry month before current month.
  */
 export function validateExpiryDate(expiryDate: string | Date | null | undefined): string | null {
-  if (!expiryDate) {
-    return null; // Optional field
-  }
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  const expiry = typeof expiryDate === 'string' ? new Date(expiryDate) : expiryDate;
-  expiry.setHours(0, 0, 0, 0);
-  
-  if (expiry < today) {
-    return 'Expiry date cannot be in the past';
-  }
-  
-  return null;
+  if (!expiryDate) return null
+  const months = getMonthsUntilExpiry(expiryDate)
+  if (months === null) return null
+  if (months < 0) return 'Expiry date cannot be in the past'
+  return null
 }
 
-/**
- * Get expiry warning icon
- * 
- * @param expiryDate - ISO date string or Date object
- * @returns Icon name (for lucide-react)
- */
 export function getExpiryIcon(expiryDate: string | Date | null | undefined): 'alert-circle' | 'alert-triangle' | 'check-circle' | 'minus' {
-  const status = getExpiryStatus(expiryDate);
-  
+  const status = getExpiryStatus(expiryDate)
   switch (status) {
     case 'expired':
-      return 'alert-circle';
+      return 'alert-circle'
     case 'expiring_soon':
-      return 'alert-triangle';
     case 'warning':
-      return 'alert-triangle';
+      return 'alert-triangle'
     case 'ok':
-      return 'check-circle';
+      return 'check-circle'
     default:
-      return 'minus';
+      return 'minus'
   }
 }

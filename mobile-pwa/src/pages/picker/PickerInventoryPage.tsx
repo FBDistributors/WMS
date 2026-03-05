@@ -16,17 +16,8 @@ import {
 } from '../../services/pickerInventoryApi'
 import { resolveBarcode } from '../../services/scannerApi'
 import { getPickerInventoryCache, setPickerInventoryCache } from '../../lib/pickerInventoryCache'
-import { getExpiryColorClass } from '../../utils/expiry'
+import { formatExpiryDate, getExpiryColorClass } from '../../utils/expiry'
 import type { ApiError } from '../../services/apiClient'
-
-function formatExpiry(d: string | null): string {
-  if (!d) return '—'
-  try {
-    return new Date(d).toLocaleDateString()
-  } catch {
-    return d
-  }
-}
 
 function formatError(err: unknown): string {
   if (err && typeof err === 'object' && 'details' in err) {
@@ -228,7 +219,7 @@ export function PickerInventoryPage() {
                     {t('inventory.available')}: {Math.round(Number(item.available_qty))}
                   </span>
                   <span className={getExpiryColorClass(item.nearest_expiry)}>
-                    {t('inventory.expiry')}: {formatExpiry(item.nearest_expiry)}
+                    {t('inventory.expiry')}: {formatExpiryDate(item.nearest_expiry)}
                   </span>
                 </div>
               </div>
@@ -242,7 +233,7 @@ export function PickerInventoryPage() {
                         className="flex justify-between text-sm text-slate-600 dark:text-slate-400"
                       >
                         <span>{lot.location_code} / {lot.batch_no}</span>
-                        <span>{Math.round(Number(lot.available_qty))} {formatExpiry(lot.expiry_date)}</span>
+                        <span>{Math.round(Number(lot.available_qty))} {formatExpiryDate(lot.expiry_date)}</span>
                       </div>
                     ))}
                   </div>

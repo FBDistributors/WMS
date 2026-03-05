@@ -212,6 +212,7 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     kirimExpiryPlaceholder: 'YYYY-MM-DD (ixtiyoriy)',
     kirimExpiryFormat: 'Muddat YYYY-MM-DD ko\'rinishida bo\'lishi kerak',
     kirimSubmitError: 'Yuborish xatosi',
+    kirimRuleLocationSingleExpiry: "Bitta joyda bir xil mahsulot faqat bitta muddat bilan bo'lishi mumkin. Boshqa muddat bilan kirg'azish taqiqlanadi.",
 
     movementTitle: "Ko'chirish",
     movementDesc: "Mahsulotni lokatsiyadan lokatsiyaga ko'chirish",
@@ -430,6 +431,7 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     kirimExpiryPlaceholder: 'ГГГГ-ММ-ДД (необязательно)',
     kirimExpiryFormat: 'Срок в формате ГГГГ-ММ-ДД',
     kirimSubmitError: 'Ошибка отправки',
+    kirimRuleLocationSingleExpiry: 'В одной локации один и тот же товар может храниться только с одним сроком годности. Добавление с другим сроком запрещено.',
 
     movementTitle: 'Перемещение',
     movementDesc: 'Перемещение товара между локациями',
@@ -648,6 +650,7 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     kirimExpiryPlaceholder: 'YYYY-MM-DD (optional)',
     kirimExpiryFormat: 'Expiry must be YYYY-MM-DD',
     kirimSubmitError: 'Submit error',
+    kirimRuleLocationSingleExpiry: 'One location may only hold one expiry date per product. Adding with a different expiry is not allowed.',
 
     movementTitle: 'Movement',
     movementDesc: 'Move product from one location to another',

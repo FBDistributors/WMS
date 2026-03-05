@@ -24,6 +24,7 @@ import { getPickerProductDetail, type PickerProductDetailResponse, type PickerPr
 import { getPickers, type PickerUser } from '../api/picking';
 import { AppHeader } from '../components/AppHeader';
 import { BarcodeSearchInput } from '../components/BarcodeSearchInput';
+import { formatExpiryDisplay } from '../components/ExpiryDatePicker';
 
 type Nav = StackNavigationProp<RootStackParamList, 'Returns'>;
 type ReturnsRoute = RouteProp<RootStackParamList, 'Returns'>;
@@ -51,7 +52,7 @@ function sortLocations(locs: PickerProductLocation[]): PickerProductLocation[] {
 export function ReturnsScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<ReturnsRoute>();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const { isOnline } = useNetwork();
   const params = route.params as { scannedProductId?: string; scannedBarcode?: string } | undefined;
 
@@ -242,7 +243,7 @@ export function ReturnsScreen() {
                       }}
                     >
                       <Text style={styles.dropdownItemText}>
-                        {loc.location_code} — {loc.batch_no} {loc.expiry_date ? `(${loc.expiry_date})` : ''} — {Math.round(Number(loc.available_qty))} {t('invAvailable')}
+                        {loc.location_code} — {loc.batch_no} {loc.expiry_date ? `(${formatExpiryDisplay(loc.expiry_date, locale)})` : ''} — {Math.round(Number(loc.available_qty))} {t('invAvailable')}
                       </Text>
                     </TouchableOpacity>
                   ))}

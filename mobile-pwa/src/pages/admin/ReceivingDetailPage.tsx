@@ -12,6 +12,7 @@ import { getReceipt, type Receipt } from '../../services/receivingApi'
 import { getProducts, type Product } from '../../services/productsApi'
 import { getLocations, type Location } from '../../services/locationsApi'
 import { getInventorySummary } from '../../services/inventoryApi'
+import { formatExpiryDate } from '../../utils/expiry'
 
 function formatReceiptDate(iso: string): string {
   try {
@@ -227,7 +228,7 @@ export function ReceivingDetailPage() {
                         {line.batch || '—'}
                       </td>
                       <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                        {line.expiry_date ?? '—'}
+                        {formatExpiryDate(line.expiry_date)}
                       </td>
                       <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300">
                         {location?.code ?? line.location_id}

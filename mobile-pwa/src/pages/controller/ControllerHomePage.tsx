@@ -4,6 +4,7 @@ import { ClipboardList, Package, WifiOff } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AppHeader } from '../../components/layout/AppHeader'
+import { formatExpiryDate } from '../../utils/expiry'
 
 type ScanResult = 'idle' | 'product' | 'location' | 'unknown' | 'loading'
 
@@ -52,15 +53,6 @@ export function ControllerHomePage() {
       navigate(location.pathname, { replace: true, state: {} })
     }
   }, [location.state, location.pathname, navigate, t])
-
-  const formatExpiry = (d: string | null) => {
-    if (!d) return '—'
-    try {
-      return new Date(d).toLocaleDateString()
-    } catch {
-      return d
-    }
-  }
 
   return (
     <div className="min-h-screen w-full min-w-0 overflow-x-hidden bg-slate-50 dark:bg-slate-950">
@@ -111,7 +103,7 @@ export function ControllerHomePage() {
                 </div>
                 <div className="mt-1">
                   {resultData.product.fefo_lots[0].batch_no} /{' '}
-                  {formatExpiry(resultData.product.fefo_lots[0].expiry_date)} →{' '}
+                  {formatExpiryDate(resultData.product.fefo_lots[0].expiry_date)} →{' '}
                   {Math.round(Number(resultData.product.fefo_lots[0].available_qty))}
                 </div>
               </div>

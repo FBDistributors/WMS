@@ -37,6 +37,7 @@
     "lines_required": "Kamida bitta qator kerak.",
     "line_invalid": "Har qator uchun mahsulot, joylashuv, partiya va miqdorni kiriting."
   },
+  "rule_location_single_expiry": "Bitta joylashuvda bir xil mahsulot faqat bitta muddat bilan bo'lishi mumkin. Boshqa muddat bilan kirg'azish taqiqlanadi.",
   "no_results": "Natija topilmadi",
   "no_results_desc": "Qidiruv yoki filterni o'zgartiring.",
   "search_placeholder": "Hujjat raqami yoki qabul qiluvchi bo'yicha qidirish",

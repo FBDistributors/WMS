@@ -1154,6 +1154,7 @@ export function KirimFormScreen() {
 
         {lines.length > 0 && (
           <View style={styles.card}>
+            <Text style={styles.ruleNote}>{t('kirimRuleLocationSingleExpiry')}</Text>
             <Text style={styles.sectionTitle}>{t('returnsLines')} ({lines.length})</Text>
             {lines.map((line) => (
               <View key={line.id} style={styles.lineRow}>
@@ -1446,6 +1447,7 @@ const styles = StyleSheet.create({
   addLineBtnDisabled: { backgroundColor: '#9e9e9e', opacity: 0.8 },
   addLineBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   sectionTitle: { fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 12 },
+  ruleNote: { fontSize: 12, color: '#666', marginBottom: 10 },
   sectionLabel: { fontSize: 15, fontWeight: '600', color: '#333', marginBottom: 8 },
   muted: { fontSize: 14, color: '#666', marginBottom: 12 },
   contentsList: { marginBottom: 16 },

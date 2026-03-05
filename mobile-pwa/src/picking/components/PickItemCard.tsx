@@ -2,6 +2,7 @@ import { Badge } from '../../components/ui/badge'
 import { useTranslation } from 'react-i18next'
 import { Card } from '../../components/ui/card'
 import type { PickLineStatus } from '../../services/pickingApi'
+import { formatExpiryDate } from '../../utils/expiry'
 
 type PickItemCardProps = {
   productName: string
@@ -47,7 +48,7 @@ export function PickItemCard({
         </div>
         <div>
           <div className="text-xs uppercase text-slate-500">{t('expiry_label')}</div>
-          <div className="font-semibold text-slate-900">{expiryDate || '—'}</div>
+          <div className="font-semibold text-slate-900">{formatExpiryDate(expiryDate)}</div>
         </div>
       </div>
       <div className="mt-4 flex items-center justify-between text-sm text-slate-600">

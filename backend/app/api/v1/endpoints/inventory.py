@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.auth.deps import get_current_user, require_permission
 from app.auth.guards import check_controller_adjust_reason
+from app.core.stock_rules import check_location_single_expiry
 from app.services.audit_service import ACTION_CREATE, get_client_ip, log_action
 
 from app.api.v1.endpoints import picker_inventory
@@ -382,6 +383,8 @@ async def bulk_opening_balance(
 
     for product_id in product_ids:
         try:
+            check_location_single_expiry(db, payload.location_id, product_id, None)
+
             lot = (
                 db.query(StockLotModel)
                 .filter(
@@ -528,6 +531,9 @@ async def create_stock_movement(
     )
     if not location:
         raise HTTPException(status_code=400, detail="Location not found")
+
+    if payload.qty_change > 0:
+        check_location_single_expiry(db, payload.location_id, payload.product_id, lot.expiry_date)
 
     if payload.movement_type == "adjust":
         check_controller_adjust_reason(user, payload.reason_code)

@@ -11,6 +11,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth.deps import get_current_user, require_any_permission, require_permission
+from app.core.expiry import first_day_of_current_month, normalize_expiry_to_first_of_month
+from app.core.stock_rules import check_location_single_expiry
 from app.db import get_db
 from app.models.location import Location as LocationModel
 from app.models.product import Product as ProductModel
@@ -225,14 +227,16 @@ async def create_receipt(
     if not payload.lines:
         raise HTTPException(status_code=400, detail="Receipt lines must not be empty")
     
-    # Validate expiry dates
-    today = date.today()
+    # Validate expiry dates (oy bo'yicha: muddati o'tgan = joriy oydan oldingi)
+    first_of_month = first_day_of_current_month()
     for line in payload.lines:
-        if line.expiry_date and line.expiry_date < today:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Expiry date {line.expiry_date} is in the past for product {line.product_id}"
-            )
+        if line.expiry_date:
+            norm_expiry = normalize_expiry_to_first_of_month(line.expiry_date)
+            if norm_expiry and norm_expiry < first_of_month:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Expiry date {line.expiry_date} is in the past for product {line.product_id}"
+                )
     
     doc_no = payload.doc_no.strip() if payload.doc_no else _generate_doc_no()
 
@@ -262,12 +266,14 @@ async def create_receipt(
         batch_val = (line.batch or "").strip()
         if not batch_val:
             batch_val = uuid4().hex[:12]
+        expiry_normalized = normalize_expiry_to_first_of_month(line.expiry_date)
+        check_location_single_expiry(db, line.location_id, line.product_id, expiry_normalized)
         receipt.lines.append(
             ReceiptLineModel(
                 product_id=line.product_id,
                 qty=line.qty,
                 batch=batch_val,
-                expiry_date=line.expiry_date,
+                expiry_date=expiry_normalized,
                 location_id=line.location_id,
             )
         )
@@ -318,6 +324,9 @@ async def complete_receipt(
         raise HTTPException(status_code=400, detail="Receipt has no lines")
 
     for line in receipt.lines:
+        expiry_normalized = normalize_expiry_to_first_of_month(line.expiry_date)
+        check_location_single_expiry(db, line.location_id, line.product_id, expiry_normalized)
+
         lot = (
             db.query(StockLotModel)
             .filter(

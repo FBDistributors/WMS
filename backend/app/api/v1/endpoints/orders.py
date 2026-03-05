@@ -7,6 +7,8 @@ from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Query, status
+
+from app.core.expiry import first_day_of_current_month
 from pydantic import BaseModel, Field
 from decimal import Decimal
 from sqlalchemy import and_, func, or_
@@ -207,7 +209,7 @@ def _fefo_available_lots(db: Session, product_id: UUID):
             StockLotModel.product_id == product_id,
             LocationModel.zone_type == "NORMAL",
             LocationModel.is_active.is_(True),
-            (StockLotModel.expiry_date.is_(None) | (StockLotModel.expiry_date >= date.today())),
+            (StockLotModel.expiry_date.is_(None) | (StockLotModel.expiry_date >= first_day_of_current_month())),
         )
         .group_by(
             StockMovementModel.lot_id,

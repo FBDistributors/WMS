@@ -19,28 +19,15 @@ import {
   getPickerProductDetail,
   type PickerProductDetailResponse,
 } from '../api/inventory';
+import { formatExpiryDisplay } from '../components/ExpiryDatePicker';
 
 type Nav = StackNavigationProp<RootStackParamList, 'InventoryDetail'>;
 type DetailRoute = RouteProp<RootStackParamList, 'InventoryDetail'>;
 
-/** Format: "31 Dec 2026" */
-function formatExpiry(d: string | null): string {
-  if (!d) return '—';
-  try {
-    const date = new Date(d);
-    const day = date.getDate();
-    const month = date.toLocaleDateString('en-GB', { month: 'short' });
-    const year = date.getFullYear();
-    return `${day} ${month} ${year}`;
-  } catch {
-    return d;
-  }
-}
-
 export function InventoryDetailScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<DetailRoute>();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const productId = route.params?.productId;
   const [data, setData] = useState<PickerProductDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -130,7 +117,7 @@ export function InventoryDetailScreen() {
           <View key={`${loc.location_id}-${loc.lot_id}`} style={styles.locCard}>
             <View style={styles.locRow}>
               <Text style={styles.locCode}>{loc.location_code}</Text>
-              <Text style={styles.locExpiry}>{formatExpiry(loc.expiry_date)}</Text>
+              <Text style={styles.locExpiry}>{formatExpiryDisplay(loc.expiry_date, locale)}</Text>
             </View>
             <Text style={styles.locMeta}>
               {t('invQoldiq')}: {Math.round(loc.available_qty)}

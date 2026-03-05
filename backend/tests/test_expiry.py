@@ -1,24 +1,26 @@
 """
-Tests for expiry date functionality in WMS.
+Tests for expiry date functionality in WMS (muddati oy bo'yicha — first of month).
 
 Tests cover:
-1. Creating lots with expiry dates
+1. Creating lots with expiry dates (stored as first of month)
 2. Unique constraint enforcement
-3. FEFO (First Expired, First Out) logic
-4. Receiving flow with expiry
-5. Expiry date validation
+3. FEFO (First Expired, First Out) logic — filter by first_day_of_current_month
+4. Receiving flow with expiry (normalized to first of month)
+5. Expiry date validation (past = before first of current month)
 """
 import pytest
 from datetime import date, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
+from app.core.expiry import first_day_of_current_month, normalize_expiry_to_first_of_month
+
 
 def test_create_lot_with_expiry(db_session, test_product):
-    """Test creating a stock lot with expiry date"""
+    """Test creating a stock lot with expiry date (first of month)"""
     from app.models.stock import StockLot
-    
-    expiry = date.today() + timedelta(days=90)
+
+    expiry = normalize_expiry_to_first_of_month(date.today() + timedelta(days=90))
     lot = StockLot(
         product_id=test_product.id,
         batch="BATCH-001",
@@ -167,9 +169,11 @@ def test_null_expiry_comes_last(db_session, test_product, test_location, test_us
 
 
 def test_receiving_creates_new_lot(client, db_session, test_product, test_location, admin_token):
-    """Test receiving creates new lot if not found"""
-    expiry = (date.today() + timedelta(days=90)).isoformat()
-    
+    """Test receiving creates new lot; expiry normalized to first of month"""
+    raw_expiry = date.today() + timedelta(days=90)
+    expiry_sent = raw_expiry.isoformat()
+    expected_expiry = normalize_expiry_to_first_of_month(raw_expiry)
+
     response = client.post(
         "/api/v1/receiving/receipts",
         json={
@@ -177,40 +181,39 @@ def test_receiving_creates_new_lot(client, db_session, test_product, test_locati
                 "product_id": str(test_product.id),
                 "qty": 50,
                 "batch": "NEW-BATCH-001",
-                "expiry_date": expiry,
+                "expiry_date": expiry_sent,
                 "location_id": str(test_location.id)
             }]
         },
         headers={"Authorization": f"Bearer {admin_token}"}
     )
-    
+
     assert response.status_code == 201
     data = response.json()
     assert data["lines"][0]["batch"] == "NEW-BATCH-001"
-    assert data["lines"][0]["expiry_date"] == expiry
-    
-    # Complete the receipt
+    assert data["lines"][0]["expiry_date"] == expected_expiry.isoformat()
+
     receipt_id = data["id"]
     response = client.post(
         f"/api/v1/receiving/receipts/{receipt_id}/complete",
         headers={"Authorization": f"Bearer {admin_token}"}
     )
-    
+
     assert response.status_code == 200
-    
-    # Verify lot was created
+
     from app.models.stock import StockLot
     lot = db_session.query(StockLot).filter(
         StockLot.product_id == test_product.id,
         StockLot.batch == "NEW-BATCH-001"
     ).one()
-    
-    assert lot.expiry_date.isoformat() == expiry
+
+    assert lot.expiry_date == expected_expiry
 
 
 def test_reject_past_expiry_date(client, test_product, test_location, admin_token):
-    """Test validation rejects past expiry dates"""
-    past_date = (date.today() - timedelta(days=1)).isoformat()
+    """Test validation rejects past expiry (before first of current month)"""
+    first = first_day_of_current_month()
+    past_date = (first - timedelta(days=32)).replace(day=1).isoformat()
     
     response = client.post(
         "/api/v1/receiving/receipts",
@@ -231,9 +234,9 @@ def test_reject_past_expiry_date(client, test_product, test_location, admin_toke
 
 
 def test_accept_today_as_expiry(client, test_product, test_location, admin_token):
-    """Test that today's date is accepted as expiry (edge case)"""
+    """Test that current month is accepted; stored as first of month"""
     today = date.today().isoformat()
-    
+
     response = client.post(
         "/api/v1/receiving/receipts",
         json={
@@ -247,8 +250,10 @@ def test_accept_today_as_expiry(client, test_product, test_location, admin_token
         },
         headers={"Authorization": f"Bearer {admin_token}"}
     )
-    
+
     assert response.status_code == 201
+    first_of_month = first_day_of_current_month().isoformat()
+    assert response.json()["lines"][0]["expiry_date"] == first_of_month
 
 
 def test_receiving_without_expiry_allowed(client, test_product, test_location, admin_token):

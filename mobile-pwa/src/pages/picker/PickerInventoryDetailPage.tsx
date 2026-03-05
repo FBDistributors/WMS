@@ -7,16 +7,7 @@ import { AppHeader } from '../../components/layout/AppHeader'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { getPickerProductDetail, type PickerProductDetailResponse } from '../../services/pickerInventoryApi'
-import { getExpiryColorClass } from '../../utils/expiry'
-
-function formatExpiry(d: string | null): string {
-  if (!d) return '—'
-  try {
-    return new Date(d).toLocaleDateString()
-  } catch {
-    return d
-  }
-}
+import { formatExpiryDate, getExpiryColorClass } from '../../utils/expiry'
 
 export function PickerInventoryDetailPage() {
   const { productId } = useParams<{ productId: string }>()
@@ -93,7 +84,7 @@ export function PickerInventoryDetailPage() {
             <div className="flex justify-between text-sm">
               <span className="font-medium">{loc.location_code}</span>
               <span className={getExpiryColorClass(loc.expiry_date)}>
-                {formatExpiry(loc.expiry_date)}
+                {formatExpiryDate(loc.expiry_date)}
               </span>
             </div>
             <div className="mt-1 text-xs text-slate-500">

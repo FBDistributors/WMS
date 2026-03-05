@@ -11,6 +11,7 @@ import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { getLocations, type Location } from '../../services/locationsApi'
 import { getInventoryDetails, type InventoryDetailRow } from '../../services/inventoryApi'
+import { formatExpiryDate } from '../../utils/expiry'
 
 export function InventoryDetailsPage() {
   const { productId } = useParams()
@@ -90,7 +91,7 @@ export function InventoryDetailsPage() {
                 </td>
                 <td className="px-4 py-3 text-slate-700 dark:text-slate-200">{row.batch}</td>
                 <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
-                  {row.expiry_date ?? '—'}
+                  {formatExpiryDate(row.expiry_date)}
                 </td>
                 <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
                   {Math.round(Number(row.on_hand))}

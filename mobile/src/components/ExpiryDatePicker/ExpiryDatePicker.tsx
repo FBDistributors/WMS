@@ -15,8 +15,8 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { ExpiryPickerLocale } from './localeLabels';
 import {
   expiryPickerLabels,
+  monthNamesLong,
   monthNamesShort,
-  weekdayLetters,
 } from './localeLabels';
 import type { ExpiryDatePickerTheme } from './theme';
 import { expiryPickerThemes } from './theme';
@@ -24,46 +24,13 @@ import { expiryPickerThemes } from './theme';
 const MIN_YEAR = 2020;
 const MAX_YEAR = 2050;
 
-function getDaysInMonth(year: number, month: number): number {
-  return new Date(year, month, 0).getDate();
-}
-
-type DayCell = {
-  type: 'prev' | 'current' | 'next';
-  year: number;
-  month: number;
-  day: number;
-};
-
-function buildCalendarDays(year: number, month: number): DayCell[] {
-  const firstDay = new Date(year, month - 1, 1).getDay();
-  const daysInMonth = getDaysInMonth(year, month);
-  const prevYear = month === 1 ? year - 1 : year;
-  const prevMonth = month === 1 ? 12 : month - 1;
-  const prevDaysCount = getDaysInMonth(prevYear, prevMonth);
-  const nextYear = month === 12 ? year + 1 : year;
-  const nextMonth = month === 12 ? 1 : month + 1;
-  const cells: DayCell[] = [];
-  for (let i = 0; i < firstDay; i++) {
-    cells.push({
-      type: 'prev',
-      year: prevYear,
-      month: prevMonth,
-      day: prevDaysCount - firstDay + 1 + i,
-    });
-  }
-  for (let d = 1; d <= daysInMonth; d++) {
-    cells.push({ type: 'current', year, month, day: d });
-  }
-  const rest = 42 - cells.length;
-  for (let d = 1; d <= rest; d++) {
-    cells.push({ type: 'next', year: nextYear, month: nextMonth, day: d });
-  }
-  return cells;
-}
-
 function toISODate(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function firstDayOfCurrentMonth(): string {
+  const d = new Date();
+  return toISODate(d.getFullYear(), d.getMonth() + 1, 1);
 }
 
 function isBefore(a: string, b: string): boolean {
@@ -81,7 +48,7 @@ export type ExpiryDatePickerProps = {
   darkMode?: boolean;
 };
 
-const TOTAL_STEPS = 3;
+const TOTAL_STEPS = 2;
 
 export function ExpiryDatePicker({
   visible,
@@ -99,17 +66,12 @@ export function ExpiryDatePicker({
   const months = monthNamesShort[locale];
   const weekLetters = weekdayLetters[locale];
 
-  const today = useCallback(() => {
-    const d = new Date();
-    return toISODate(d.getFullYear(), d.getMonth() + 1, d.getDate());
-  }, []);
-  const min = minDate ?? today();
+  const min = minDate ?? firstDayOfCurrentMonth();
   const max = maxDate ?? `${MAX_YEAR}-12-31`;
 
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2>(1);
   const [pickerYear, setPickerYear] = useState<number | null>(null);
   const [pickerMonth, setPickerMonth] = useState<number | null>(null);
-  const [pendingDay, setPendingDay] = useState<{ year: number; month: number; day: number } | null>(null);
 
   const allYears = useMemo(
     () => Array.from({ length: MAX_YEAR - MIN_YEAR + 1 }, (_, i) => MIN_YEAR + i),
@@ -137,40 +99,15 @@ export function ExpiryDatePicker({
       setStep(1);
       setPickerYear(null);
       setPickerMonth(null);
-    } else if (step === 3) {
-      setStep(2);
-      setPickerMonth(null);
     }
   }, [step]);
-
-  const handleSelectDay = useCallback(
-    (cell: DayCell) => {
-      const iso = toISODate(cell.year, cell.month, cell.day);
-      if (isBefore(iso, min)) return;
-      if (max && isBefore(max, iso)) return;
-      setPendingDay({ year: cell.year, month: cell.month, day: cell.day });
-      onChange(iso);
-      onClose();
-    },
-    [min, max, onChange, onClose]
-  );
-
-  const isDayDisabled = useCallback(
-    (cell: DayCell): boolean => {
-      const iso = toISODate(cell.year, cell.month, cell.day);
-      return isBefore(iso, min) || (!!max && isBefore(max, iso));
-    },
-    [min, max]
-  );
 
   const title =
     step === 1
       ? `${MIN_YEAR} – ${MAX_YEAR}`
       : step === 2 && pickerYear != null
         ? String(pickerYear)
-        : step === 3 && pickerYear != null && pickerMonth != null
-          ? `${pickerYear}-${String(pickerMonth).padStart(2, '0')}`
-          : labels.year;
+        : labels.year;
 
   const dynamicStyles = {
     modal: { backgroundColor: theme.modal, borderColor: theme.modalBorder },
@@ -285,100 +222,45 @@ export function ExpiryDatePicker({
             </ScrollView>
           )}
 
-          {/* Step 2: Month grid (centered) */}
+          {/* Step 2: Month grid (centered) — select month then done (YYYY-MM-01) */}
           {step === 2 && pickerYear != null && (
             <View style={styles.gridCentered}>
-              {months.map((name, i) => (
-                <TouchableOpacity
-                  key={name}
-                  style={[
-                    styles.cell,
-                    dynamicStyles.cell,
-                    pickerMonth === i + 1 && styles.cellSelected,
-                    pickerMonth === i + 1 && dynamicStyles.cellSelected,
-                  ]}
-                  onPress={() => {
-                    setPickerMonth(i + 1);
-                    setStep(3);
-                  }}
-                >
-                  <Text
+              {months.map((name, i) => {
+                const monthNum = i + 1;
+                const isoFirst = toISODate(pickerYear, monthNum, 1);
+                const disabled = isBefore(isoFirst, min) || (!!max && isBefore(max, isoFirst));
+                return (
+                  <TouchableOpacity
+                    key={name}
                     style={[
-                      styles.cellText,
-                      dynamicStyles.cellText,
-                      pickerMonth === i + 1 && dynamicStyles.cellSelectedText,
+                      styles.cell,
+                      dynamicStyles.cell,
+                      pickerMonth === monthNum && styles.cellSelected,
+                      pickerMonth === monthNum && dynamicStyles.cellSelected,
+                      disabled && dynamicStyles.cellDisabled,
                     ]}
+                    onPress={() => {
+                      if (disabled) return;
+                      onChange(isoFirst);
+                      onClose();
+                    }}
+                    disabled={disabled}
                   >
-                    {name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                    <Text
+                      style={[
+                        styles.cellText,
+                        dynamicStyles.cellText,
+                        pickerMonth === monthNum && dynamicStyles.cellSelectedText,
+                        disabled && dynamicStyles.cellDisabledText,
+                      ]}
+                    >
+                      {name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           )}
-
-          {/* Step 3: Day calendar */}
-          {step === 3 && pickerYear != null && pickerMonth != null && (() => {
-            const cells = buildCalendarDays(pickerYear, pickerMonth);
-            const sel = pendingDay ?? (value && /^\d{4}-\d{2}-\d{2}$/.test(value)
-              ? (() => {
-                  const [y, m, d] = value.split('-').map(Number);
-                  return { year: y, month: m, day: d };
-                })()
-              : null);
-            return (
-              <>
-                <View style={[styles.weekRow, dynamicStyles.header]}>
-                  {weekLetters.map((letter, idx) => (
-                    <Text
-                      key={idx}
-                      style={[styles.weekDay, dynamicStyles.weekDay]}
-                    >
-                      {letter}
-                    </Text>
-                  ))}
-                </View>
-                <View style={styles.dayGrid}>
-                  {cells.map((cell, idx) => {
-                    const iso = toISODate(cell.year, cell.month, cell.day);
-                    const selected =
-                      sel != null &&
-                      sel.year === cell.year &&
-                      sel.month === cell.month &&
-                      sel.day === cell.day;
-                    const disabled = isDayDisabled(cell);
-                    const otherMonth = cell.type !== 'current';
-                    return (
-                      <TouchableOpacity
-                        key={idx}
-                        style={[
-                          styles.dayCell,
-                          dynamicStyles.cell,
-                          otherMonth && styles.dayCellOther,
-                          selected && styles.cellSelected,
-                          selected && dynamicStyles.cellSelected,
-                          disabled && dynamicStyles.cellDisabled,
-                        ]}
-                        onPress={() => !disabled && handleSelectDay(cell)}
-                        disabled={disabled}
-                      >
-                        <Text
-                          style={[
-                            styles.dayCellText,
-                            dynamicStyles.cellText,
-                            otherMonth && { opacity: theme.otherMonthOpacity },
-                            selected && dynamicStyles.cellSelectedText,
-                            disabled && dynamicStyles.cellDisabledText,
-                          ]}
-                        >
-                          {cell.day}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </>
-            );
-          })()}
         </TouchableOpacity>
       </TouchableOpacity>
     </Modal>
@@ -485,9 +367,13 @@ const styles = StyleSheet.create({
   dayCellText: { fontSize: 15, fontWeight: '500' },
 });
 
-/** Format ISO date for display: "16.02.2026" */
-export function formatExpiryDisplay(isoDate: string | null, _locale?: ExpiryPickerLocale): string {
+/** Format expiry for display: "Mart 2026" (oy + yil) */
+export function formatExpiryDisplay(isoDate: string | null, locale: ExpiryPickerLocale = 'uz'): string {
   if (!isoDate || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return '';
-  const [y, m, d] = isoDate.split('-');
-  return `${d}.${m}.${y}`;
+  const [yStr, mStr] = isoDate.split('-');
+  const year = parseInt(yStr!, 10);
+  const month = parseInt(mStr!, 10);
+  if (month < 1 || month > 12) return isoDate;
+  const names = monthNamesLong[locale];
+  return `${names[month - 1]} ${year}`;
 }
