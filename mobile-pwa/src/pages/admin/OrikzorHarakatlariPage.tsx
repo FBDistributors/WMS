@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState, Fragment } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { FileText } from 'lucide-react'
+import { FileText, Filter, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -37,14 +37,18 @@ const COLUMNS_DILLER = [
 export function OrikzorHarakatlariPage() {
   const { t } = useTranslation(['orders', 'common', 'admin'])
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const dateFrom = searchParams.get('date_from') ?? daysAgoISO(30)
+  const dateTo = searchParams.get('date_to') ?? todayISO()
+  const movementPage = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10) / PAGE_SIZE)
   const [movementsData, setMovementsData] = useState<{ movement: MovementItem[]; total?: number } | null>(null)
-  const [movementPage, setMovementPage] = useState(0)
-  const [dateFrom, setDateFrom] = useState(daysAgoISO(30))
-  const [dateTo, setDateTo] = useState(todayISO())
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false)
+  const [filterDateFrom, setFilterDateFrom] = useState(dateFrom)
+  const [filterDateTo, setFilterDateTo] = useState(dateTo)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(
     async (background = false, pageOverride?: number, forceRefresh = false) => {
@@ -52,16 +56,24 @@ export function OrikzorHarakatlariPage() {
       else setIsRefreshing(true)
       setError(null)
       const page = pageOverride ?? movementPage
+      const from = dateFrom.trim() || daysAgoISO(30)
+      const to = dateTo.trim() || todayISO()
       try {
         const data = await getOrikzorMovements({
-          begin_created_on: dateFrom.trim() || undefined,
-          end_created_on: dateTo.trim() || undefined,
+          begin_created_on: from,
+          end_created_on: to,
           limit: PAGE_SIZE,
           offset: page * PAGE_SIZE,
           refresh: forceRefresh,
         })
         setMovementsData(data)
-        if (pageOverride !== undefined) setMovementPage(pageOverride)
+        if (pageOverride !== undefined) {
+          setSearchParams((prev) => {
+            const next = new URLSearchParams(prev)
+            next.set('offset', String(page * PAGE_SIZE))
+            return next
+          })
+        }
       } catch (err) {
         if (!background) {
           setError(err instanceof Error ? err.message : t('orders:load_failed'))
@@ -71,12 +83,19 @@ export function OrikzorHarakatlariPage() {
         else setIsRefreshing(false)
       }
     },
-    [dateFrom, dateTo, movementPage, t]
+    [dateFrom, dateTo, movementPage, setSearchParams, t]
   )
 
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (filterPanelOpen) {
+      setFilterDateFrom(dateFrom)
+      setFilterDateTo(dateTo)
+    }
+  }, [filterPanelOpen, dateFrom, dateTo])
 
   const movementList = movementsData?.movement ?? []
   const movementTotal = movementsData?.total ?? 0
@@ -207,33 +226,126 @@ export function OrikzorHarakatlariPage() {
 
   const pageTitle = t('admin:menu.orders_orikzor', "O'rikzor harakatlari")
 
+  const handleSmartupSync = useCallback(() => {
+    void load(true, 0, true)
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.delete('offset')
+      return next
+    })
+  }, [load, setSearchParams])
+
   return (
-    <AdminLayout title={pageTitle}>
-      <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div className="flex flex-1 flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-            {t('orders:filters.sync_date_range', "Sana oralig'i")}
-          </span>
-          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-            {t('orders:filters.date_from', 'Boshlanish')}
-            <DateInput value={dateFrom} onChange={setDateFrom} aria-label={t('orders:filters.date_from')} />
-          </label>
-          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-            {t('orders:filters.date_to', 'Tugash')}
-            <DateInput value={dateTo} onChange={setDateTo} aria-label={t('orders:filters.date_to')} />
-          </label>
-          <span className="text-xs text-slate-500 dark:text-slate-400">
-            {t('orders:sync_date_hint', "Smartup'dagi from_movement_date shu oraliqda bo'lishi kerak.")}
-          </span>
+    <AdminLayout
+      title={pageTitle}
+      actionSlot={
+        <Button onClick={handleSmartupSync} disabled={isRefreshing}>
+          {isRefreshing ? t('orders:syncing') : t('orders:sync')}
+        </Button>
+      }
+    >
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="relative" ref={filterPanelRef}>
           <Button
-            variant="secondary"
-            onClick={() => load(true, undefined, true)}
-            disabled={isRefreshing}
-            className="shrink-0"
+            variant="outline"
+            onClick={() => setFilterPanelOpen((o) => !o)}
+            className="gap-2"
+            aria-label={t('orders:filters.filter_btn')}
+            aria-expanded={filterPanelOpen}
           >
-            {t('common:buttons.refresh')}
+            <Filter size={18} />
+            {t('orders:filters.filter_btn')}
           </Button>
+          {filterPanelOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                aria-hidden
+                onClick={() => setFilterPanelOpen(false)}
+              />
+              <div className="absolute left-0 top-full z-50 mt-2 w-full min-w-[280px] max-w-sm rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">
+                    {t('orders:filters.filter_panel_title')}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setFilterPanelOpen(false)}
+                    className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 dark:hover:text-slate-400 dark:hover:bg-slate-800"
+                    aria-label={t('common:close')}
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="block text-sm text-slate-600 dark:text-slate-400">
+                      {t('orders:filters.date_from')}
+                      <DateInput
+                        value={filterDateFrom}
+                        onChange={setFilterDateFrom}
+                        className="mt-1 w-full"
+                        aria-label={t('orders:filters.date_from')}
+                      />
+                    </label>
+                    <label className="block text-sm text-slate-600 dark:text-slate-400">
+                      {t('orders:filters.date_to')}
+                      <DateInput
+                        value={filterDateTo}
+                        onChange={setFilterDateTo}
+                        className="mt-1 w-full"
+                        aria-label={t('orders:filters.date_to')}
+                      />
+                    </label>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {t('orders:sync_date_hint', "Smartup'dagi from_movement_date shu oraliqda bo'lishi kerak.")}
+                  </p>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setSearchParams((prev) => {
+                        const next = new URLSearchParams(prev)
+                        next.delete('date_from')
+                        next.delete('date_to')
+                        next.delete('offset')
+                        return next
+                      })
+                      setFilterPanelOpen(false)
+                    }}
+                  >
+                    {t('orders:filters.filter_clear')}
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setSearchParams((prev) => {
+                        const next = new URLSearchParams(prev)
+                        const df = filterDateFrom.trim()
+                        const dt = filterDateTo.trim()
+                        if (df) next.set('date_from', df)
+                        else next.delete('date_from')
+                        if (dt) next.set('date_to', dt)
+                        else next.delete('date_to')
+                        next.delete('offset')
+                        return next
+                      })
+                      setFilterPanelOpen(false)
+                    }}
+                  >
+                    {t('orders:filters.filter_apply')}
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
+        {(dateFrom || dateTo) && (
+          <span className="text-sm text-slate-500 dark:text-slate-400">
+            {dateFrom} – {dateTo}
+          </span>
+        )}
       </div>
       <Card className="space-y-4">
         <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
@@ -264,14 +376,26 @@ export function OrikzorHarakatlariPage() {
             <Button
               variant="secondary"
               disabled={movementPage === 0}
-              onClick={() => load(false, movementPage - 1)}
+              onClick={() => {
+                setSearchParams((prev) => {
+                  const next = new URLSearchParams(prev)
+                  next.set('offset', String((movementPage - 1) * PAGE_SIZE))
+                  return next
+                })
+              }}
             >
               {t('common:buttons.back')}
             </Button>
             <Button
               variant="secondary"
               disabled={(movementPage + 1) * PAGE_SIZE >= movementTotal}
-              onClick={() => load(false, movementPage + 1)}
+              onClick={() => {
+                setSearchParams((prev) => {
+                  const next = new URLSearchParams(prev)
+                  next.set('offset', String((movementPage + 1) * PAGE_SIZE))
+                  return next
+                })
+              }}
             >
               {t('orders:pagination.next', 'Keyingi')}
             </Button>

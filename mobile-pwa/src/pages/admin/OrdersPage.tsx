@@ -177,8 +177,10 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         const end = new Date()
         const begin = new Date()
         begin.setDate(begin.getDate() - 30)
-        const beginStr = begin.toISOString().slice(0, 10)
-        const endStr = end.toISOString().slice(0, 10)
+        const defaultBegin = begin.toISOString().slice(0, 10)
+        const defaultEnd = end.toISOString().slice(0, 10)
+        const beginStr = dateFrom.trim() || defaultBegin
+        const endStr = dateTo.trim() || defaultEnd
         const page = pageOverride ?? movementPage
         const query: Record<string, string | number> = {
           begin_created_on: beginStr,
