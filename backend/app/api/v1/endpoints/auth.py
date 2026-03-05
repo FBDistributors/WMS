@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.auth.deps import get_current_user, get_effective_permissions
 from app.auth.security import (
     create_access_token,
+    get_password_hash,
     verify_password,
 )
 from app.db import get_db
@@ -39,6 +40,21 @@ class MeResponse(BaseModel):
     full_name: Optional[str] = None
     role: str
     permissions: list[str]
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class UpdateMeRequest(BaseModel):
+    username: Optional[str] = None
+    full_name: Optional[str] = None
+
+
+def _validate_password(password: str) -> None:
+    if len(password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
 
 
 def _get_user_by_username(db: Session, username: str) -> Optional[User]:
@@ -98,6 +114,48 @@ async def logout(
 
 @router.get("/me", response_model=MeResponse, summary="Current user")
 async def me(current_user: User = Depends(get_current_user)):
+    return MeResponse(
+        id=current_user.id,
+        username=current_user.username,
+        full_name=current_user.full_name,
+        role=current_user.role,
+        permissions=list(get_effective_permissions(current_user)),
+    )
+
+
+@router.post("/change-password", summary="Change current user password")
+async def change_password(
+    payload: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not verify_password(payload.current_password, current_user.password_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid current password")
+    _validate_password(payload.new_password)
+    current_user.password_hash = get_password_hash(payload.new_password)
+    db.commit()
+    return {"status": "ok"}
+
+
+@router.patch("/me", response_model=MeResponse, summary="Update current user profile")
+async def update_me(
+    payload: UpdateMeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if payload.username is not None:
+        username = payload.username.strip()
+        if len(username) < 3:
+            raise HTTPException(status_code=400, detail="Username must be at least 3 characters")
+        if username != current_user.username:
+            existing = _get_user_by_username(db, username)
+            if existing:
+                raise HTTPException(status_code=409, detail="Username already exists")
+            current_user.username = username
+    if payload.full_name is not None:
+        current_user.full_name = payload.full_name.strip() or None
+    db.commit()
+    db.refresh(current_user)
     return MeResponse(
         id=current_user.id,
         username=current_user.username,

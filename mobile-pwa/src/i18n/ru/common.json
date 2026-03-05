@@ -46,6 +46,18 @@
     "days_left": "дней осталось",
     "no_expiry": "Без срока"
   },
+  "profile_account": {
+    "change_password": "Изменить пароль",
+    "change_username": "Изменить логин",
+    "current_password": "Текущий пароль",
+    "new_password": "Новый пароль",
+    "password_updated": "Пароль обновлён.",
+    "username_updated": "Логин обновлён.",
+    "error_invalid_current": "Неверный текущий пароль.",
+    "error_username_taken": "Этот логин уже занят.",
+    "error_username_short": "Логин должен быть не менее 3 символов.",
+    "error_password_short": "Пароль должен быть не менее 6 символов."
+  },
   "labels": {
     "search": "Поиск",
     "username": "Имя пользователя",

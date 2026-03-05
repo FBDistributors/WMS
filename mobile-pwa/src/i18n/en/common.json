@@ -46,6 +46,18 @@
     "days_left": "days left",
     "no_expiry": "No Expiry"
   },
+  "profile_account": {
+    "change_password": "Change password",
+    "change_username": "Change login (username)",
+    "current_password": "Current password",
+    "new_password": "New password",
+    "password_updated": "Password updated.",
+    "username_updated": "Login updated.",
+    "error_invalid_current": "Current password is incorrect.",
+    "error_username_taken": "This username is already in use.",
+    "error_username_short": "Username must be at least 3 characters.",
+    "error_password_short": "Password must be at least 6 characters."
+  },
   "labels": {
     "search": "Search",
     "username": "Username",

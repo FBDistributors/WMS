@@ -299,159 +299,163 @@ export function OrikzorHarakatlariPage() {
   }, [load, setSearchParams])
 
   return (
-    <AdminLayout
-      title={pageTitle}
-      actionSlot={
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            className="rounded-full px-3 py-3"
-            onClick={() => setIsSettingsOpen(true)}
-            aria-label={t('orders:table.settings_title')}
-          >
-            <Settings size={18} />
-          </Button>
-          <Button onClick={handleSmartupSync} disabled={isRefreshing}>
-            {isRefreshing ? t('orders:syncing') : t('orders:sync')}
-          </Button>
-        </div>
-      }
-    >
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <label className="flex-1 min-w-[200px] max-w-md text-sm text-slate-600 dark:text-slate-300">
-          <span className="sr-only">{t('orders:filters.search')}</span>
-          <input
-            type="search"
-            className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
-            value={searchQuery}
-            onChange={(e) => {
-              const v = e.target.value
-              setSearchParams((prev) => {
-                const next = new URLSearchParams(prev)
-                if (v) next.set('q', v)
-                else next.delete('q')
-                next.delete('offset')
-                return next
-              })
-            }}
-            placeholder={t('orders:filters.search_placeholder_orikzor')}
-          />
-        </label>
-        <div className="relative" ref={filterPanelRef}>
-          <Button
-            variant="outline"
-            onClick={() => setFilterPanelOpen((o) => !o)}
-            className="gap-2"
-            aria-label={t('orders:filters.filter_btn')}
-            aria-expanded={filterPanelOpen}
-          >
-            <Filter size={18} />
-            {t('orders:filters.filter_btn')}
-          </Button>
-          {filterPanelOpen && (
-            <>
-              <div
-                className="fixed inset-0 z-40"
-                aria-hidden
-                onClick={() => setFilterPanelOpen(false)}
-              />
-              <div className="absolute left-0 top-full z-50 mt-2 w-full min-w-[280px] max-w-sm rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900">
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="font-semibold text-slate-900 dark:text-slate-100">
-                    {t('orders:filters.filter_panel_title')}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setFilterPanelOpen(false)}
-                    className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 dark:hover:text-slate-400 dark:hover:bg-slate-800"
-                    aria-label={t('common:close')}
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-2">
-                    <label className="block text-sm text-slate-600 dark:text-slate-400">
-                      {t('orders:filters.date_from')}
-                      <DateInput
-                        value={filterDateFrom}
-                        onChange={setFilterDateFrom}
-                        className="mt-1 w-full"
-                        aria-label={t('orders:filters.date_from')}
-                      />
-                    </label>
-                    <label className="block text-sm text-slate-600 dark:text-slate-400">
-                      {t('orders:filters.date_to')}
-                      <DateInput
-                        value={filterDateTo}
-                        onChange={setFilterDateTo}
-                        className="mt-1 w-full"
-                        aria-label={t('orders:filters.date_to')}
-                      />
-                    </label>
-                  </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {t('orders:sync_date_hint', "Smartup'dagi from_movement_date shu oraliqda bo'lishi kerak.")}
-                  </p>
-                </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      setSearchParams((prev) => {
-                        const next = new URLSearchParams(prev)
-                        next.delete('date_from')
-                        next.delete('date_to')
-                        next.delete('offset')
-                        return next
-                      })
-                      setFilterPanelOpen(false)
-                    }}
-                  >
-                    {t('orders:filters.filter_clear')}
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setSearchParams((prev) => {
-                        const next = new URLSearchParams(prev)
-                        const df = filterDateFrom.trim()
-                        const dt = filterDateTo.trim()
-                        if (df) next.set('date_from', df)
-                        else next.delete('date_from')
-                        if (dt) next.set('date_to', dt)
-                        else next.delete('date_to')
-                        next.delete('offset')
-                        return next
-                      })
-                      setFilterPanelOpen(false)
-                    }}
-                  >
-                    {t('orders:filters.filter_apply')}
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-        {(dateFrom || dateTo) && (
-          <span className="text-sm text-slate-500 dark:text-slate-400">
-            {dateFrom} – {dateTo}
-          </span>
-        )}
-      </div>
+    <AdminLayout title={pageTitle}>
       <Card className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-          <span>{t('orders:subtitle_orikzor')}</span>
-          {isRefreshing ? (
-            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
-              {t('orders:refreshing')}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              {pageTitle}
+            </div>
+            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+              <span>{t('orders:subtitle_orikzor')}</span>
+              {isRefreshing ? (
+                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+                  {t('orders:refreshing')}
+                </span>
+              ) : null}
+              {movementTotal > 0 ? (
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
+                  {t('orders:movements_loaded', { count: movementTotal })}
+                </span>
+              ) : null}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              className="rounded-full px-3 py-3"
+              onClick={() => setIsSettingsOpen(true)}
+              aria-label={t('orders:table.settings_title')}
+            >
+              <Settings size={18} />
+            </Button>
+            <Button onClick={handleSmartupSync} disabled={isRefreshing}>
+              {isRefreshing ? t('orders:syncing') : t('orders:sync')}
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex-1 min-w-[180px] max-w-md text-sm text-slate-600 dark:text-slate-300">
+            <span className="sr-only">{t('orders:filters.search')}</span>
+            <input
+              type="search"
+              className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+              value={searchQuery}
+              onChange={(e) => {
+                const v = e.target.value
+                setSearchParams((prev) => {
+                  const next = new URLSearchParams(prev)
+                  if (v) next.set('q', v)
+                  else next.delete('q')
+                  next.delete('offset')
+                  return next
+                })
+              }}
+              placeholder={t('orders:filters.search_placeholder_orikzor')}
+            />
+          </label>
+          <div className="relative" ref={filterPanelRef}>
+            <Button
+              variant="outline"
+              onClick={() => setFilterPanelOpen((o) => !o)}
+              className="gap-2"
+              aria-label={t('orders:filters.filter_btn')}
+              aria-expanded={filterPanelOpen}
+            >
+              <Filter size={18} />
+              {t('orders:filters.filter_btn')}
+            </Button>
+            {filterPanelOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  aria-hidden
+                  onClick={() => setFilterPanelOpen(false)}
+                />
+                <div className="absolute right-0 top-full z-50 mt-2 w-full min-w-[280px] max-w-sm rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="font-semibold text-slate-900 dark:text-slate-100">
+                      {t('orders:filters.filter_panel_title')}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setFilterPanelOpen(false)}
+                      className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 dark:hover:text-slate-400 dark:hover:bg-slate-800"
+                      aria-label={t('common:close')}
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="block text-sm text-slate-600 dark:text-slate-400">
+                        {t('orders:filters.date_from')}
+                        <DateInput
+                          value={filterDateFrom}
+                          onChange={setFilterDateFrom}
+                          className="mt-1 w-full"
+                          aria-label={t('orders:filters.date_from')}
+                        />
+                      </label>
+                      <label className="block text-sm text-slate-600 dark:text-slate-400">
+                        {t('orders:filters.date_to')}
+                        <DateInput
+                          value={filterDateTo}
+                          onChange={setFilterDateTo}
+                          className="mt-1 w-full"
+                          aria-label={t('orders:filters.date_to')}
+                        />
+                      </label>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {t('orders:sync_date_hint', "Smartup'dagi from_movement_date shu oraliqda bo'lishi kerak.")}
+                    </p>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setSearchParams((prev) => {
+                          const next = new URLSearchParams(prev)
+                          next.delete('date_from')
+                          next.delete('date_to')
+                          next.delete('offset')
+                          return next
+                        })
+                        setFilterPanelOpen(false)
+                      }}
+                    >
+                      {t('orders:filters.filter_clear')}
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setSearchParams((prev) => {
+                          const next = new URLSearchParams(prev)
+                          const df = filterDateFrom.trim()
+                          const dt = filterDateTo.trim()
+                          if (df) next.set('date_from', df)
+                          else next.delete('date_from')
+                          if (dt) next.set('date_to', dt)
+                          else next.delete('date_to')
+                          next.delete('offset')
+                          return next
+                        })
+                        setFilterPanelOpen(false)
+                      }}
+                    >
+                      {t('orders:filters.filter_apply')}
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+          {(dateFrom || dateTo) && (
+            <span className="text-sm text-slate-500 dark:text-slate-400">
+              {dateFrom} – {dateTo}
             </span>
-          ) : null}
-          {movementTotal > 0 ? (
-            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
-              {t('orders:movements_loaded', { count: movementTotal })}
-            </span>
-          ) : null}
+          )}
         </div>
         {canSendToPicking && selectedMovementIds.size > 0 ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/50">

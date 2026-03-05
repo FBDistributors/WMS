@@ -35,6 +35,7 @@ type AuthContextValue = {
   signOut: () => void
   login: (username: string, password: string) => Promise<User>
   logout: () => void
+  refreshUser: () => Promise<void>
   setRole: (role: Role) => void
   has: (permission: PermissionKey) => boolean
   can: (permission: PermissionKey) => boolean
@@ -141,6 +142,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null)
   }
 
+  const refreshUser = async () => {
+    const me = await getMe()
+    setUser({
+      id: me.id,
+      name: me.full_name || me.username,
+      username: me.username,
+      full_name: me.full_name,
+      role: me.role as Role,
+      permissions: normalizePermissions(me.permissions),
+    })
+  }
+
   const value = useMemo(
     () => ({
       user,
@@ -155,6 +168,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signOut,
       login: signIn,
       logout: signOut,
+      refreshUser,
       setRole,
       has,
       can: has,

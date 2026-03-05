@@ -40,6 +40,22 @@ export async function getMe() {
   return fetchJSON<AuthUser>('/api/v1/auth/me')
 }
 
+export async function changePassword(currentPassword: string, newPassword: string) {
+  return fetchJSON<{ status: string }>('/api/v1/auth/change-password', {
+    method: 'POST',
+    body: { current_password: currentPassword, new_password: newPassword },
+  })
+}
+
+export type UpdateMePayload = { username?: string; full_name?: string }
+
+export async function updateMe(payload: UpdateMePayload) {
+  return fetchJSON<AuthUser>('/api/v1/auth/me', {
+    method: 'PATCH',
+    body: payload,
+  })
+}
+
 export async function logout() {
   try {
     await fetchJSON('/api/v1/auth/logout', { method: 'POST' })

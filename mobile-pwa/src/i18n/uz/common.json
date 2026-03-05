@@ -46,6 +46,18 @@
     "days_left": "kun qoldi",
     "no_expiry": "Muddat yo'q"
   },
+  "profile_account": {
+    "change_password": "Parolni o'zgartirish",
+    "change_username": "Loginni o'zgartirish",
+    "current_password": "Joriy parol",
+    "new_password": "Yangi parol",
+    "password_updated": "Parol yangilandi.",
+    "username_updated": "Login yangilandi.",
+    "error_invalid_current": "Joriy parol noto'g'ri.",
+    "error_username_taken": "Bunday login band.",
+    "error_username_short": "Login kamida 3 belgidan iborat bo'lishi kerak.",
+    "error_password_short": "Parol kamida 6 belgidan iborat bo'lishi kerak."
+  },
   "labels": {
     "search": "Qidirish",
     "username": "Username",
