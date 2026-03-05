@@ -43,6 +43,16 @@ def upgrade():
             text("UPDATE stock_movements SET lot_id = :keeper WHERE lot_id = ANY(:others)"),
             {"keeper": keeper_id, "others": others},
         )
+        # document_lines da lot_id ni keeper ga yo'naltirish (FK buzilmasligi uchun)
+        conn.execute(
+            text("UPDATE document_lines SET lot_id = :keeper WHERE lot_id = ANY(:others)"),
+            {"keeper": keeper_id, "others": others},
+        )
+        # wave_allocations da stock_lot_id ni keeper ga yo'naltirish
+        conn.execute(
+            text("UPDATE wave_allocations SET stock_lot_id = :keeper WHERE stock_lot_id = ANY(:others)"),
+            {"keeper": keeper_id, "others": others},
+        )
         # Takroriy lotlarni o'chirish
         conn.execute(
             text("DELETE FROM stock_lots WHERE id = ANY(:others)"),
