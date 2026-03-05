@@ -8,6 +8,7 @@ import { ProductSearchCombobox, formatProductLabel } from '../../components/Prod
 import { LocationSearchCombobox, formatLocationLabel } from '../../components/LocationSearchCombobox'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
+import { DateInput } from '../../components/DateInput'
 import { MonthYearInput } from '../../components/MonthYearInput'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { TableScrollArea } from '../../components/TableScrollArea'

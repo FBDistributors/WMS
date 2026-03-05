@@ -31,7 +31,6 @@ function parseValue(val: string): { year: number; month: number } | null {
 export function MonthYearInput({
   value,
   onChange,
-  placeholder = 'YYYY-MM',
   className = '',
   id,
   'aria-label': ariaLabel,
