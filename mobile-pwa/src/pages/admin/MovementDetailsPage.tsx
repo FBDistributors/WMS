@@ -127,22 +127,18 @@ export function MovementDetailsPage() {
             <thead className="text-xs uppercase text-slate-500">
               <tr className="border-b border-slate-200 dark:border-slate-800">
                 <th className="px-4 py-3 text-left">{t('orders:lines.sku')}</th>
+                <th className="px-4 py-3 text-left">{t('orders:lines.name')}</th>
+                <th className="px-4 py-3 text-left">{t('orders:lines.barcode')}</th>
                 <th className="px-4 py-3 text-left">{t('orders:lines.qty')}</th>
-                <th className="px-4 py-3 text-left">{t('orders:lines.price')}</th>
-                <th className="px-4 py-3 text-left">{t('orders:lines.amount')}</th>
               </tr>
             </thead>
             <tbody>
               {items.map((line, idx) => (
                 <tr key={idx} className="border-b border-slate-100 dark:border-slate-800">
-                  <td className="px-4 py-3">{String(line.product_code ?? '—')}</td>
+                  <td className="px-4 py-3">{String(line.product_code ?? line.productCode ?? '—')}</td>
+                  <td className="px-4 py-3">{String(line.name ?? line.product_name ?? '—')}</td>
+                  <td className="px-4 py-3">{String(line.barcode ?? line.product_barcode ?? '—')}</td>
                   <td className="px-4 py-3">{line.quantity != null ? String(line.quantity) : '—'}</td>
-                  <td className="px-4 py-3">
-                    {line.price != null ? Number(line.price).toLocaleString() : '—'}
-                  </td>
-                  <td className="px-4 py-3">
-                    {line.amount != null ? Number(line.amount).toLocaleString() : '—'}
-                  </td>
                 </tr>
               ))}
             </tbody>
