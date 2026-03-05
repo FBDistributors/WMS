@@ -48,6 +48,8 @@
     "filial": "Filial",
     "date_from": "Date from",
     "date_to": "Date to",
+    "delivery_date_from": "Delivery date (from)",
+    "delivery_date_to": "Delivery date (to)",
     "sync_date_range": "Sync date range",
     "table_date_range": "Table date range",
     "sync_date_hint": "from_movement_date in Smartup must fall within this range.",

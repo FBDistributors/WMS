@@ -403,10 +403,11 @@ async def list_orders(
         if default_filial:
             query = query.filter(OrderModel.filial_id == default_filial)
 
+    # Sana filtri — Yetkazib berish sanasi (delivery_date) bo'yicha
     if date_from:
-        query = query.filter(func.date(OrderModel.created_at) >= date_from)
+        query = query.filter(func.date(OrderModel.delivery_date) >= date_from)
     if date_to:
-        query = query.filter(func.date(OrderModel.created_at) <= date_to)
+        query = query.filter(func.date(OrderModel.delivery_date) <= date_to)
 
     if brand_ids and brand_ids.strip():
         try:

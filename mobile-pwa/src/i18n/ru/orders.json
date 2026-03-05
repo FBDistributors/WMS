@@ -46,6 +46,8 @@
     "filial": "Филиал",
     "date_from": "Дата с",
     "date_to": "Дата по",
+    "delivery_date_from": "Дата доставки (с)",
+    "delivery_date_to": "Дата доставки (по)",
     "sync_date_range": "Диапазон дат синхронизации",
     "table_date_range": "Диапазон дат в таблице",
     "sync_date_hint": "from_movement_date в Smartup должен попадать в этот диапазон.",

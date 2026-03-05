@@ -48,6 +48,8 @@
     "filial": "Filial",
     "date_from": "Boshlanish sanasi",
     "date_to": "Tugash sanasi",
+    "delivery_date_from": "Yetkazib berish sanasi (dan)",
+    "delivery_date_to": "Yetkazib berish sanasi (gacha)",
     "sync_date_range": "Sinxronlash sana oralig'i",
     "table_date_range": "Jadval sana oralig'i",
     "sync_date_hint": "Smartup'dagi from_movement_date shu oraliqda bo'lishi kerak.",

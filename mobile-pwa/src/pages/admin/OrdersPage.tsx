@@ -896,21 +896,21 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       <label className="block text-sm text-slate-600 dark:text-slate-400">
-                        {t('orders:filters.date_from')}
+                        {t('orders:filters.delivery_date_from')}
                         <DateInput
                           value={filterDateFrom}
                           onChange={setFilterDateFrom}
                           className="mt-1 w-full"
-                          aria-label={t('orders:filters.date_from')}
+                          aria-label={t('orders:filters.delivery_date_from')}
                         />
                       </label>
                       <label className="block text-sm text-slate-600 dark:text-slate-400">
-                        {t('orders:filters.date_to')}
+                        {t('orders:filters.delivery_date_to')}
                         <DateInput
                           value={filterDateTo}
                           onChange={setFilterDateTo}
                           className="mt-1 w-full"
-                          aria-label={t('orders:filters.date_to')}
+                          aria-label={t('orders:filters.delivery_date_to')}
                         />
                       </label>
                     </div>
