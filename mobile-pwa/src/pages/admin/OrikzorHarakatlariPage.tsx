@@ -28,7 +28,6 @@ const COLUMNS_ORIKZOR = [
   { id: 'select', labelKey: 'orders:columns.select' },
   { id: 'movement_number', labelKey: 'orders:columns_diller.movement_number' },
   { id: 'movement_note', labelKey: 'orders:columns_diller.movement_note' },
-  { id: 'total_amount', labelKey: 'orders:columns_diller.total_amount' },
   { id: 'status', labelKey: 'orders:columns_diller.status' },
   { id: 'lines', labelKey: 'orders:columns_diller.lines' },
   { id: 'delivery_date', labelKey: 'orders:columns_diller.delivery_date' },
@@ -125,7 +124,6 @@ export function OrikzorHarakatlariPage() {
     const mid = (m.movement_id as string) ?? '—'
     const movementNum = (m.movement_number as string) ?? mid
     const note = (m.note as string) ?? '—'
-    const amount = m.amount != null ? String(m.amount) : '—'
     const status = (m.status as string) ?? '—'
     const items = (m.movement_items as unknown[]) ?? []
     const fromTime = (m.from_time as string) ?? (m.from_movement_date as string) ?? '—'
@@ -159,14 +157,8 @@ export function OrikzorHarakatlariPage() {
         )
       case 'movement_note':
         return (
-          <td className="max-w-[200px] truncate px-4 py-3 text-slate-600 dark:text-slate-300" title={note}>
+          <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300" title={note}>
             {note}
-          </td>
-        )
-      case 'total_amount':
-        return (
-          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-            {amount === '—' ? '—' : Number(amount).toLocaleString()}
           </td>
         )
       case 'status':
@@ -228,7 +220,7 @@ export function OrikzorHarakatlariPage() {
     }
     return (
       <TableScrollArea inline>
-        <table className="w-max min-w-[600px] text-sm">
+        <table className="w-max min-w-[600px] table-auto text-sm">
           <thead className="text-xs uppercase text-slate-500">
             <tr className="border-b border-slate-200 dark:border-slate-800">
               {COLUMNS_ORIKZOR.map((col) => (
