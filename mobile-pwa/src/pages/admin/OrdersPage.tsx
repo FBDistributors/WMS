@@ -69,6 +69,7 @@ const COLUMN_OPTIONS_STATUSES = [
 
 // Tashkiliy harakat (cross-organizational movement): mfm movement$export — sklad-sklad, mijoz/agent yo'q
 const COLUMN_OPTIONS_DILLER = [
+  { id: 'select', labelKey: 'orders:columns.select' },
   { id: 'order_number', labelKey: 'orders:columns_diller.order_number' },
   { id: 'external_id', labelKey: 'orders:columns_diller.external_id' },
   { id: 'from_warehouse_code', labelKey: 'orders:columns_diller.from_warehouse_code' },
@@ -156,6 +157,8 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   } | null>(null)
   const [movementsData, setMovementsData] = useState<MovementsResponse | null>(null)
   const [movementPage, setMovementPage] = useState(0)
+  const [selectedMovementIds, setSelectedMovementIds] = useState<Set<string>>(new Set())
+  const [sendMovementDialogOpen, setSendMovementDialogOpen] = useState(false)
 
   const ELIGIBLE_PICKING_STATUSES = new Set(['imported', 'B#S', 'ready_for_picking', 'allocated'])
   const canBeSentToPicking = (order: OrderListItem) =>
@@ -345,6 +348,29 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         const items = (m.movement_items as unknown[]) ?? []
         const fromTime = (m.from_time as string) ?? '—'
         switch (columnId) {
+          case 'select':
+            if (!canSend) return null
+            {
+              const checked = selectedMovementIds.has(mid)
+              return (
+                <td className="px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => {
+                      setSelectedMovementIds((prev) => {
+                        const next = new Set(prev)
+                        if (next.has(mid)) next.delete(mid)
+                        else next.add(mid)
+                        return next
+                      })
+                    }}
+                    aria-label={t('orders:select_all')}
+                    className="h-4 w-4 rounded border-slate-300"
+                  />
+                </td>
+              )
+            }
           case 'order_number':
             return (
               <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">
@@ -434,13 +460,48 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       }
       return (
         <div className="space-y-3">
+          {canSend && selectedMovementIds.size > 0 && (
+            <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/50">
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                {t('orders:send_selected_to_picking', { count: selectedMovementIds.size })}
+              </span>
+              <Button variant="outline" size="sm" onClick={() => setSelectedMovementIds(new Set())}>
+                {t('common:buttons.cancel')}
+              </Button>
+              <Button size="sm" onClick={() => setSendMovementDialogOpen(true)}>
+                {t('orders:send_to_picking.button')}
+              </Button>
+            </div>
+          )}
           <TableScrollArea inline>
             <table className="w-max min-w-[600px] text-sm">
               <thead className="text-xs uppercase text-slate-500">
                 <tr className="border-b border-slate-200 dark:border-slate-800">
                   {COLUMN_OPTIONS_DILLER.map((col) => (
                     <th key={col.id} className="px-4 py-3 text-left">
-                      {columnLabelsDiller.get(col.id)}
+                      {col.id === 'select' && canSend ? (
+                        <input
+                          type="checkbox"
+                          checked={movementList.length > 0 && movementList.every((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))}
+                          ref={(el) => {
+                            if (el) {
+                              const some = movementList.some((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))
+                              el.indeterminate = some && !movementList.every((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))
+                            }
+                          }}
+                          onChange={() =>
+                            setSelectedMovementIds(
+                              movementList.every((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))
+                                ? new Set()
+                                : new Set(movementList.map((m) => (m.movement_id as string) ?? ''))
+                            )
+                          }
+                          aria-label={t('orders:select_all')}
+                          className="h-4 w-4 rounded border-slate-300"
+                        />
+                      ) : (
+                        columnLabelsDiller.get(col.id)
+                      )}
                     </th>
                   ))}
                 </tr>
@@ -766,7 +827,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         </table>
       </TableScrollArea>
     )
-  }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, eligibleItems, error, isLoading, items, load, location.pathname, location.search, mode, movementPage, movementsData, navigate, orderSource, searchQuery, selectedOrderIds, t, updatingOrderId])
+  }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, eligibleItems, error, isLoading, items, load, location.pathname, location.search, mode, movementPage, movementsData, navigate, orderSource, searchQuery, selectedMovementIds, selectedOrderIds, t, updatingOrderId])
 
   return (
     <AdminLayout title={pageTitle} backTo={mode === 'statuses' ? '/admin' : undefined}>
@@ -1057,6 +1118,23 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
           }}
         />
       ) : null}
+      {orderSource === 'diller' && (
+        <SendToPickingDialog
+          open={sendMovementDialogOpen}
+          orderIds={[]}
+          movementPayloads={sendMovementDialogOpen
+            ? (movementsData?.movement ?? [])
+                .filter((m: MovementItem) => selectedMovementIds.has((m.movement_id as string) ?? ''))
+                .map((m) => ({ source: 'diller' as const, movement_id: (m.movement_id as string) ?? '', movement: m }))
+            : null}
+          onOpenChange={(open) => !open && setSendMovementDialogOpen(false)}
+          onSent={() => {
+            setSendMovementDialogOpen(false)
+            setSelectedMovementIds(new Set())
+            void load(true)
+          }}
+        />
+      )}
       <OrdersTableSettings
         open={isSettingsOpen}
         onOpenChange={setIsSettingsOpen}

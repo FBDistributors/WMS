@@ -157,11 +157,9 @@ async def get_orders_by_status(
     db: Session = Depends(get_db),
     _user=Depends(require_any_permission(["reports:read", "audit:read", "admin:access"])),
 ):
-    def _order_base(q):
-        return q.filter(OrderModel.filial_id == DEFAULT_FILIAL_ID) if DEFAULT_FILIAL_ID else q
-
+    # Barcha buyurtmalar bo'yicha status hisobi (dashboard kartalarida ko'rsatish uchun)
     rows = (
-        _order_base(db.query(OrderModel.status, func.count(OrderModel.id)))
+        db.query(OrderModel.status, func.count(OrderModel.id))
         .filter(OrderModel.status.in_(ORDER_STATUSES_FOR_COUNTS))
         .group_by(OrderModel.status)
         .all()

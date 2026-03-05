@@ -4,12 +4,14 @@ import { FileText, Filter, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { SendToPickingDialog } from '../../admin/components/orders/SendToPickingDialog'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { DateInput } from '../../components/DateInput'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { getOrikzorMovements, type MovementItem } from '../../services/ordersApi'
+import { useAuth } from '../../rbac/AuthProvider'
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
@@ -23,6 +25,7 @@ function daysAgoISO(days: number) {
 const PAGE_SIZE = 50
 
 const COLUMNS_ORIKZOR = [
+  { id: 'select', labelKey: 'orders:columns.select' },
   { id: 'movement_number', labelKey: 'orders:columns_diller.movement_number' },
   { id: 'movement_note', labelKey: 'orders:columns_diller.movement_note' },
   { id: 'total_amount', labelKey: 'orders:columns_diller.total_amount' },
@@ -47,6 +50,10 @@ export function OrikzorHarakatlariPage() {
   const [filterDateFrom, setFilterDateFrom] = useState(dateFrom)
   const [filterDateTo, setFilterDateTo] = useState(dateTo)
   const filterPanelRef = useRef<HTMLDivElement>(null)
+  const { has: hasPermission } = useAuth()
+  const canSendToPicking = hasPermission('orders:send_to_picking')
+  const [selectedMovementIds, setSelectedMovementIds] = useState<Set<string>>(new Set())
+  const [sendDialogOpen, setSendDialogOpen] = useState(false)
 
   const load = useCallback(
     async (background = false, pageOverride?: number, forceRefresh = false) => {
@@ -123,6 +130,29 @@ export function OrikzorHarakatlariPage() {
     const items = (m.movement_items as unknown[]) ?? []
     const fromTime = (m.from_time as string) ?? (m.from_movement_date as string) ?? '—'
     switch (columnId) {
+      case 'select':
+        if (!canSendToPicking) return null
+        {
+          const checked = selectedMovementIds.has(mid)
+          return (
+            <td className="px-4 py-3">
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={() => {
+                  setSelectedMovementIds((prev) => {
+                    const next = new Set(prev)
+                    if (next.has(mid)) next.delete(mid)
+                    else next.add(mid)
+                    return next
+                  })
+                }}
+                aria-label={t('orders:select_all')}
+                className="h-4 w-4 rounded border-slate-300"
+              />
+            </td>
+          )
+        }
       case 'movement_number':
         return (
           <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">{movementNum}</td>
@@ -203,7 +233,29 @@ export function OrikzorHarakatlariPage() {
             <tr className="border-b border-slate-200 dark:border-slate-800">
               {COLUMNS_ORIKZOR.map((col) => (
                 <th key={col.id} className="px-4 py-3 text-left">
-                  {columnLabels.get(col.id)}
+                  {col.id === 'select' && canSendToPicking ? (
+                    <input
+                      type="checkbox"
+                      checked={movementList.length > 0 && movementList.every((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))}
+                      ref={(el) => {
+                        if (el) {
+                          const some = movementList.some((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))
+                          el.indeterminate = some && !movementList.every((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))
+                        }
+                      }}
+                      onChange={() =>
+                        setSelectedMovementIds(
+                          movementList.every((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))
+                            ? new Set()
+                            : new Set(movementList.map((m) => (m.movement_id as string) ?? ''))
+                        )
+                      }
+                      aria-label={t('orders:select_all')}
+                      className="h-4 w-4 rounded border-slate-300"
+                    />
+                  ) : (
+                    columnLabels.get(col.id)
+                  )}
                 </th>
               ))}
             </tr>
@@ -223,7 +275,7 @@ export function OrikzorHarakatlariPage() {
         </table>
       </TableScrollArea>
     )
-  }, [error, isLoading, movementList, movementTotal, load, columnLabels, navigate, searchParams, t])
+  }, [canSendToPicking, error, isLoading, movementList, movementTotal, load, columnLabels, navigate, searchParams, selectedMovementIds, setSelectedMovementIds, t])
 
   const pageTitle = t('admin:menu.orders_orikzor', "O'rikzor harakatlari")
 
@@ -381,7 +433,39 @@ export function OrikzorHarakatlariPage() {
             </span>
           ) : null}
         </div>
+        {canSendToPicking && selectedMovementIds.size > 0 ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/50">
+            <span className="text-sm text-slate-600 dark:text-slate-300">
+              {t('orders:send_selected_to_picking', { count: selectedMovementIds.size })}
+            </span>
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={() => setSelectedMovementIds(new Set())}>
+                {t('common:buttons.cancel')}
+              </Button>
+              <Button onClick={() => setSendDialogOpen(true)}>
+                {t('orders:send_to_picking.button')}
+              </Button>
+            </div>
+          </div>
+        ) : null}
         {content}
+
+        <SendToPickingDialog
+          open={sendDialogOpen}
+          orderIds={[]}
+          onOpenChange={setSendDialogOpen}
+          onSent={() => {
+            setSelectedMovementIds(new Set())
+            void load(true)
+          }}
+          movementPayloads={movementList
+            .filter((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))
+            .map((m) => ({
+              source: 'orikzor' as const,
+              movement_id: (m.movement_id as string) ?? '',
+              movement: m,
+            }))}
+        />
 
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-4 dark:border-slate-800">
           <Button variant="outline" onClick={() => load(true)} disabled={isRefreshing}>

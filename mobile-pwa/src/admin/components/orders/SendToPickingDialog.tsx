@@ -59,6 +59,8 @@ type SendToPickingDialogProps = {
   onSent: () => void
   /** Agar berilsa, orderIds o'rniga movement dan yuboriladi (sendMovementToPicking). */
   movementPayload?: MovementPayload | null
+  /** Bir nechta movement ni yuborish (har biri uchun sendMovementToPicking). */
+  movementPayloads?: MovementPayload[] | null
 }
 
 export function SendToPickingDialog({
@@ -67,6 +69,7 @@ export function SendToPickingDialog({
   onOpenChange,
   onSent,
   movementPayload,
+  movementPayloads,
 }: SendToPickingDialogProps) {
   const { t } = useTranslation(['orders', 'common'])
   const [pickers, setPickers] = useState<PickerUser[]>([])
@@ -92,7 +95,8 @@ export function SendToPickingDialog({
     })()
   }, [open, t])
 
-  const isMovementMode = Boolean(movementPayload)
+  const isMovementMode = Boolean(movementPayload) || Boolean(movementPayloads?.length)
+  const movementsCount = movementPayloads?.length ?? (movementPayload ? 1 : 0)
   if (!open) return null
   if (!isMovementMode && orderIds.length === 0) return null
 
@@ -109,7 +113,16 @@ export function SendToPickingDialog({
     setIsSubmitting(true)
     setError(null)
     try {
-      if (isMovementMode && movementPayload) {
+      if (movementPayloads?.length) {
+        for (const payload of movementPayloads) {
+          await sendMovementToPicking({
+            source: payload.source,
+            movement_id: payload.movement_id,
+            movement: payload.movement,
+            assigned_to_user_id: selectedStr,
+          })
+        }
+      } else if (isMovementMode && movementPayload) {
         await sendMovementToPicking({
           source: movementPayload.source,
           movement_id: movementPayload.movement_id,
@@ -154,11 +167,13 @@ export function SendToPickingDialog({
       <div className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
           <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            {isMovementMode
-              ? t('orders:send_to_picking.title')
-              : orderIds.length > 1
-                ? t('orders:send_selected_to_picking', { count: orderIds.length })
-                : t('orders:send_to_picking.title')}
+            {movementsCount > 1
+              ? t('orders:send_selected_to_picking', { count: movementsCount })
+              : isMovementMode
+                ? t('orders:send_to_picking.title')
+                : orderIds.length > 1
+                  ? t('orders:send_selected_to_picking', { count: orderIds.length })
+                  : t('orders:send_to_picking.title')}
           </div>
           <Button variant="ghost" className="rounded-full px-3 py-3" onClick={() => onOpenChange(false)}>
             <X size={18} />
