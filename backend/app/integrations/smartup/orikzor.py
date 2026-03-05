@@ -291,7 +291,13 @@ def _parse_movement_response(
 
     if begin_date is not None and end_date is not None:
         for m in movements:
-            from_raw = m.get("from_movement_date")
+            from_raw = (
+                m.get("from_movement_date")
+                or m.get("fromMovementDate")
+                or m.get("from_created_on")
+                or m.get("created_on")
+                or m.get("movement_date")
+            )
             from_str = str(from_raw).strip() if from_raw is not None else ""
             parsed_from_dt = _parse_movement_date(from_raw) if from_raw else None
             if parsed_from_dt is None:
@@ -322,6 +328,17 @@ def _parse_movement_response(
 
     after_date_filter_count = len(movements_in_range)
     dict_count = raw_count  # parse invariant: raw_count = len(movements) (date filter oldin)
+
+    # Agar barcha yozuvlar sana oralig'idan tashqarida bo'lsa, hisobni yo'qotmaslik
+    if after_date_filter_count == 0 and raw_count > 0 and skipped_by_reason.get("out_of_range", 0) == 0:
+        skipped_by_reason["out_of_range"] = raw_count
+        logger.warning(
+            "O'rikzor parse: barcha %s ta yozuv sana oralig'idan tashqarida (out_of_range=%s). begin_date=%s end_date=%s",
+            raw_count,
+            raw_count,
+            begin_date,
+            end_date,
+        )
 
     # Status histogram: Smartup dan qaysi statuslar kelgani (case-sensitive va bo'sh)
     status_histogram = Counter(
@@ -390,7 +407,12 @@ def _parse_movement_response(
             continue
 
         # Sana parse xatoligida movementni o'tkazib yubormaymiz — faqat sana oralig'i filtrlashda ishlatamiz
-        from_movement_date_raw = m.get("from_movement_date")
+        from_movement_date_raw = (
+            m.get("from_movement_date")
+            or m.get("fromMovementDate")
+            or m.get("from_created_on")
+            or m.get("created_on")
+        )
         if from_movement_date_raw is not None and str(from_movement_date_raw).strip():
             if _parse_movement_date(str(from_movement_date_raw)) is None:
                 skipped_by_reason["date_parse_error"] += 1

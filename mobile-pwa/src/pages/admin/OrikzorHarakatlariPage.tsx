@@ -255,7 +255,20 @@ export function OrikzorHarakatlariPage() {
             updated: syncResult.updated,
             skipped: syncResult.skipped,
           })}
-          {syncResult.detail || syncResult.error ? ` · ${syncResult.error ?? syncResult.detail ?? ''}` : ''}
+          {(syncResult.detail || syncResult.error) && (
+            <span className="mt-1 block">
+              {syncResult.error ?? syncResult.detail ?? ''}
+            </span>
+          )}
+          {syncResult.debug?.skipped_by_reason &&
+            Object.keys(syncResult.debug.skipped_by_reason).length > 0 && (
+              <span className="mt-1 block text-xs opacity-90">
+                {Object.entries(syncResult.debug.skipped_by_reason)
+                  .filter(([, v]) => Number(v) > 0)
+                  .map(([k, v]) => `${k}: ${v}`)
+                  .join(', ')}
+              </span>
+            )}
         </Card>
       ) : null}
       <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
