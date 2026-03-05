@@ -39,7 +39,8 @@ def _fetch_movements_sync(
     begin_modified_on: date | None = None,
     end_modified_on: date | None = None,
 ) -> list[Any]:
-    """Smartup dan to'liq ro'yxatni oladi (bloklovchi — thread da chaqiriladi). modified_on orqali delta."""
+    """Smartup dan to'liq ro'yxatni oladi (bloklovchi — thread da chaqiriladi). modified_on orqali delta.
+    Faqat status == 'N' (yangi) bo'lgan harakatlar qaytariladi."""
     raw = fetch_mfm_movements_raw(
         begin_date=begin,
         end_date=end,
@@ -47,7 +48,11 @@ def _fetch_movements_sync(
         begin_modified_on=begin_modified_on,
         end_modified_on=end_modified_on,
     )
-    return raw.get("movement") if isinstance(raw.get("movement"), list) else []
+    movement_list = raw.get("movement") if isinstance(raw.get("movement"), list) else []
+    return [
+        m for m in movement_list
+        if isinstance(m, dict) and (str(m.get("status") or "").strip().upper() == "N")
+    ]
 
 
 def _get_cached_movements(begin: date, end: date, filial_id: str | None) -> list[Any]:

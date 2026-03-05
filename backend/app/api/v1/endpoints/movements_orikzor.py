@@ -68,7 +68,8 @@ def _fetch_orikzor_sync(
     begin_modified_on: date | None = None,
     end_modified_on: date | None = None,
 ) -> list[dict[str, Any]]:
-    """Smartup dan O'rikzor harakatlari ro'yxatini oladi (bloklovchi — thread da chaqiriladi). modified_on orqali delta."""
+    """Smartup dan O'rikzor harakatlari ro'yxatini oladi (bloklovchi — thread da chaqiriladi). modified_on orqali delta.
+    Faqat to_warehouse_code == '777' bo'lgan harakatlar qaytariladi."""
     raw_list = fetch_orikzor_movements_raw(
         begin_date=begin,
         end_date=end,
@@ -76,7 +77,11 @@ def _fetch_orikzor_sync(
         begin_modified_on=begin_modified_on,
         end_modified_on=end_modified_on,
     )
-    return [_raw_to_display(m) for m in raw_list if isinstance(m, dict)]
+    filtered = [
+        m for m in raw_list
+        if isinstance(m, dict) and (m.get("to_warehouse_code") or "").strip() == "777"
+    ]
+    return [_raw_to_display(m) for m in filtered]
 
 
 @router.get("", summary="List O'rikzor movements from Smartup (movement$export proxy)")
