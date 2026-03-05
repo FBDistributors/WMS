@@ -15,7 +15,7 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../types/navigation';
 import type { PickingDocument, PickingLine } from '../api/picking.types';
 import apiClient, { UNAUTHORIZED_MSG } from '../api/client';
-import { completePickDocument, getTaskById, INCOMPLETE_REASON_KEYS, submitScan } from '../api/picking';
+import { completePickDocument, getTaskById, INCOMPLETE_REASON_KEYS, skipLine, submitScan } from '../api/picking';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { ScanInput } from '../components/ScanInput';
 import { useLocale } from '../i18n/LocaleContext';
@@ -93,6 +93,9 @@ export function PickTaskDetails() {
   const [incompleteReasonModalVisible, setIncompleteReasonModalVisible] = useState(false);
   const [selectedIncompleteReason, setSelectedIncompleteReason] = useState<string | null>(null);
   const [controllerVerifiedLineIds, setControllerVerifiedLineIds] = useState<Set<string>>(new Set());
+  const [lineForReasonModal, setLineForReasonModal] = useState<PickingLine | null>(null);
+  const [lineReasonModalVisible, setLineReasonModalVisible] = useState(false);
+  const [selectedLineReason, setSelectedLineReason] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!taskId || typeof taskId !== 'string') {
@@ -327,6 +330,59 @@ export function PickTaskDetails() {
     doComplete(selectedIncompleteReason);
   }, [selectedIncompleteReason, doComplete]);
 
+  const openLineReasonModal = useCallback((line: PickingLine) => {
+    setLineForReasonModal(line);
+    setSelectedLineReason(null);
+    setLineReasonModalVisible(true);
+  }, []);
+
+  const closeLineReasonModal = useCallback(() => {
+    setLineReasonModalVisible(false);
+    setLineForReasonModal(null);
+    setSelectedLineReason(null);
+  }, []);
+
+  const handleConfirmLineReason = useCallback(async () => {
+    if (!lineForReasonModal || !selectedLineReason || !taskId) return;
+    setSubmitting(true);
+    try {
+      if (!isOnline) {
+        Alert.alert(t('error'), t('reportReasonOffline') || 'Sabab bildirish faqat onlayn rejimda.');
+        return;
+      }
+      const res = await skipLine(lineForReasonModal.id, selectedLineReason);
+      setDoc((prev) =>
+        prev
+          ? {
+              ...prev,
+              lines: prev.lines.map((l) => (l.id === res.line.id ? res.line : l)),
+              progress: res.progress,
+              status: res.document_status,
+            }
+          : prev
+      );
+      if (doc) {
+        await saveCachedPickTaskDetail(taskId, {
+          ...doc,
+          lines: doc.lines.map((l) => (l.id === res.line.id ? res.line : l)),
+          progress: res.progress,
+          status: res.document_status,
+        } as PickingDocument);
+      }
+      closeLineReasonModal();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : t('error');
+      if (msg === UNAUTHORIZED_MSG) {
+        navigation.replace('Login');
+        closeLineReasonModal();
+        return;
+      }
+      Alert.alert(t('error'), msg);
+    } finally {
+      setSubmitting(false);
+    }
+  }, [lineForReasonModal, selectedLineReason, taskId, isOnline, doc, navigation, t, closeLineReasonModal]);
+
   const goBack = useCallback(() => {
     if (doc?.status === 'completed') {
       navigation.reset({ index: 0, routes: [{ name: 'PickerHome' }] });
@@ -403,6 +459,8 @@ export function PickTaskDetails() {
                     : undefined)
                 : () => openLineScan(line as PickingLine)
             }
+            onReportReason={!isController && isOnline ? openLineReasonModal : undefined}
+            isOnline={isOnline}
             t={t}
             readOnly={isController && Number((line as PickingLine).qty_picked) < Number((line as PickingLine).qty_required)}
             isController={isController}
@@ -543,6 +601,60 @@ export function PickTaskDetails() {
         </TouchableOpacity>
       </Modal>
 
+      <Modal
+        visible={lineReasonModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={closeLineReasonModal}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={closeLineReasonModal}
+        >
+          <View style={[styles.modalContent, styles.incompleteReasonModal]} onStartShouldSetResponder={() => true}>
+            <Text style={styles.incompleteReasonTitle}>{t('lineReasonModalTitle')}</Text>
+            {lineForReasonModal && (
+              <Text style={styles.modalHint} numberOfLines={2}>
+                {lineForReasonModal.product_name}
+              </Text>
+            )}
+            <Text style={styles.incompleteReasonHint}>{t('incompleteReasonSelect')}</Text>
+            <ScrollView style={styles.incompleteReasonList} nestedScrollEnabled>
+              {INCOMPLETE_REASON_KEYS.map((key) => (
+                <TouchableOpacity
+                  key={key}
+                  style={[styles.incompleteReasonRow, selectedLineReason === key && styles.incompleteReasonRowSelected]}
+                  onPress={() => setSelectedLineReason(key)}
+                  activeOpacity={0.7}
+                >
+                  <Icon
+                    name={selectedLineReason === key ? 'radiobox-marked' : 'radiobox-blank'}
+                    size={22}
+                    color={selectedLineReason === key ? '#1976d2' : '#666'}
+                  />
+                  <Text style={styles.incompleteReasonRowText}>{t(`reason_${key}`)}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <View style={styles.incompleteReasonActions}>
+              <TouchableOpacity
+                style={[styles.incompleteReasonConfirm, (!selectedLineReason || submitting) && styles.incompleteReasonConfirmDisabled]}
+                onPress={handleConfirmLineReason}
+                disabled={!selectedLineReason || submitting}
+              >
+                <Text style={styles.incompleteReasonConfirmText}>
+                  {submitting ? '…' : t('confirmButton')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.incompleteReasonCancel} onPress={closeLineReasonModal} disabled={submitting}>
+                <Text style={styles.incompleteReasonCancelText}>{t('cancel')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       <View style={styles.footer}>
         {isController && (
           <TouchableOpacity
@@ -577,6 +689,8 @@ export function PickTaskDetails() {
 function LineCard({
   line,
   onPress,
+  onReportReason,
+  isOnline,
   t,
   readOnly,
   isController,
@@ -584,6 +698,8 @@ function LineCard({
 }: {
   line: PickingLine;
   onPress?: () => void;
+  onReportReason?: (line: PickingLine) => void;
+  isOnline?: boolean;
   t: (key: string, params?: Record<string, string | number>) => string;
   readOnly?: boolean;
   isController?: boolean;
@@ -593,20 +709,25 @@ function LineCard({
   const qtyRequired = Number(line.qty_required) || 0;
   const isDone = qtyPicked >= qtyRequired;
   const isIncomplete = !isDone;
+  const isRejected = Boolean(line.skip_reason);
 
   const cardStyle = [
     styles.lineCard,
-    isController
-      ? (isIncomplete
-          ? styles.lineCardIncomplete
-          : controllerVerified
-            ? styles.lineCardDone
-            : undefined)
-      : (isDone ? styles.lineCardDone : isIncomplete ? styles.lineCardIncomplete : undefined),
+    isRejected
+      ? styles.lineCardRejected
+      : isController
+        ? (isIncomplete
+            ? styles.lineCardIncomplete
+            : controllerVerified
+              ? styles.lineCardDone
+              : undefined)
+        : (isDone ? styles.lineCardDone : isIncomplete ? styles.lineCardIncomplete : undefined),
   ].filter(Boolean);
 
-  const showDoneBadge = !isController && isDone;
+  const showDoneBadge = !isController && isDone && !isRejected;
   const showVerifiedBadge = isController && controllerVerified;
+  const showReportReasonBtn =
+    !isController && isDone && !isRejected && isOnline && onReportReason;
 
   const content = (
     <>
@@ -616,6 +737,11 @@ function LineCard({
       <Text style={styles.lineQty}>
         {qtyPicked} / {qtyRequired}
       </Text>
+      {isRejected && line.skip_reason && (
+        <Text style={styles.lineSkippedReasonText}>
+          {t('lineSkippedReason')}: {t(`reason_${line.skip_reason}` as 'reason_expired') || line.skip_reason}
+        </Text>
+      )}
       {showDoneBadge && (
         <View style={styles.doneBadge}>
           <Text style={styles.doneBadgeText}>{t('doneBadge')}</Text>
@@ -625,6 +751,16 @@ function LineCard({
         <View style={styles.doneBadge}>
           <Text style={styles.doneBadgeText}>{t('verifiedBadge')}</Text>
         </View>
+      )}
+      {showReportReasonBtn && (
+        <TouchableOpacity
+          style={styles.reportReasonBtn}
+          onPress={() => onReportReason?.(line)}
+          activeOpacity={0.8}
+        >
+          <Icon name="alert-circle-outline" size={18} color="#c62828" />
+          <Text style={styles.reportReasonBtnText}>{t('reportReasonBtn')}</Text>
+        </TouchableOpacity>
       )}
     </>
   );
@@ -691,7 +827,23 @@ const styles = StyleSheet.create({
   },
   lineCardDone: { backgroundColor: '#e8f5e9', borderColor: '#c8e6c9' },
   lineCardIncomplete: { backgroundColor: '#ffebee', borderColor: '#ffcdd2' },
+  lineCardRejected: { backgroundColor: '#ffebee', borderColor: '#c62828', borderWidth: 1.5 },
   lineName: { fontSize: 16, fontWeight: '600', color: '#111' },
+  lineSkippedReasonText: { fontSize: 13, color: '#c62828', marginTop: 6, fontStyle: 'italic' },
+  reportReasonBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignSelf: 'flex-start',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#c62828',
+    backgroundColor: '#fff',
+  },
+  reportReasonBtnText: { fontSize: 14, color: '#c62828', fontWeight: '600' },
   lineMeta: { fontSize: 14, color: '#666', marginTop: 4 },
   lineQty: { fontSize: 14, fontWeight: '600', marginTop: 6 },
   doneBadge: {

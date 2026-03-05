@@ -37,6 +37,7 @@ class PickingLine(BaseModel):
     expiry_date: Optional[str] = None
     qty_required: float
     qty_picked: float
+    skip_reason: Optional[str] = None
 
 
 class PickingProgress(BaseModel):
@@ -192,6 +193,7 @@ def _to_picking_line(line: DocumentLineModel) -> PickingLine:
         expiry_date=_safe_expiry_date(getattr(line, "expiry_date", None)),
         qty_required=float(line.required_qty) if line.required_qty is not None else 0,
         qty_picked=float(line.picked_qty) if line.picked_qty is not None else 0,
+        skip_reason=getattr(line, "skip_reason", None),
     )
 
 
@@ -931,6 +933,104 @@ def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
     return PickLineResponse(
         line=_to_picking_line(line),
         progress=_calculate_progress(lines),
+        document_status=document.status,
+    )
+
+
+class SkipLineRequest(BaseModel):
+    reason: str
+
+
+@router.post(
+    "/lines/{line_id}/skip",
+    response_model=PickLineResponse,
+    summary="Skip line with reason (picked_qty -> 0, reverse stock)",
+)
+async def skip_line(
+    line_id: UUID,
+    payload: SkipLineRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("picking:pick")),
+):
+    if not payload.reason or payload.reason.strip() not in INCOMPLETE_REASON_CODES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"reason must be one of: {list(INCOMPLETE_REASON_CODES)}",
+        )
+    reason = payload.reason.strip()
+
+    line = (
+        db.query(DocumentLineModel)
+        .options(selectinload(DocumentLineModel.document))
+        .filter(DocumentLineModel.id == line_id)
+        .with_for_update()
+        .one_or_none()
+    )
+    if not line:
+        raise HTTPException(status_code=404, detail="Line not found")
+    document = line.document
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if user.role == "picker" and document.assigned_to_user_id != user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if line.picked_qty <= 0:
+        raise HTTPException(status_code=400, detail="Line has no picked qty to skip")
+
+    if not line.product_id or not line.lot_id or not line.location_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Line missing product/lot/location",
+        )
+
+    qty_to_reverse = Decimal(str(line.picked_qty))
+
+    # Reverse stock: return picked qty to location (pick + unallocate with positive qty)
+    db.add(
+        StockMovementModel(
+            product_id=line.product_id,
+            lot_id=line.lot_id,
+            location_id=line.location_id,
+            qty_change=qty_to_reverse,
+            movement_type="pick",
+            source_document_type="document",
+            source_document_id=document.id,
+            created_by_user_id=user.id,
+        )
+    )
+    db.add(
+        StockMovementModel(
+            product_id=line.product_id,
+            lot_id=line.lot_id,
+            location_id=line.location_id,
+            qty_change=qty_to_reverse,
+            movement_type="unallocate",
+            source_document_type="document",
+            source_document_id=document.id,
+            created_by_user_id=user.id,
+        )
+    )
+
+    line.picked_qty = 0
+    line.skip_reason = reason
+
+    lines = (
+        db.query(DocumentLineModel)
+        .filter(DocumentLineModel.document_id == document.id)
+        .all()
+    )
+    _refresh_document_status(document, lines)
+    db.commit()
+    db.refresh(line)
+    lines_after = (
+        db.query(DocumentLineModel)
+        .filter(DocumentLineModel.document_id == document.id)
+        .all()
+    )
+    db.refresh(document)
+
+    return PickLineResponse(
+        line=_to_picking_line(line),
+        progress=_calculate_progress(lines_after),
         document_status=document.status,
     )
 

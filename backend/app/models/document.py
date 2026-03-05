@@ -95,6 +95,7 @@ class DocumentLine(Base):
     expiry_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     required_qty: Mapped[float] = mapped_column(Float, nullable=False)
     picked_qty: Mapped[float] = mapped_column(Float, nullable=False, server_default="0")
+    skip_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     document: Mapped[Document] = relationship("Document", back_populates="lines")
 

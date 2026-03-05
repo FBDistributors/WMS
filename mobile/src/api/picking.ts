@@ -128,6 +128,14 @@ export async function pickLine(
   return data;
 }
 
+/** Pozitsiyani sabab bilan bekor qilish (qizil holat: picked_qty=0, sabab saqlanadi). */
+export async function skipLine(lineId: string, reason: string): Promise<PickLineResponse> {
+  const { data } = await apiClient.post<PickLineResponse>(`${PICKING}/lines/${lineId}/skip`, {
+    reason: reason.trim(),
+  });
+  return data;
+}
+
 /**
  * Shtrixkod yoki SKU bo'yicha topib, bitta birlik terish (+1).
  * Agar qty berilsa, shuncha marta pickLine(+1) chaqiriladi.

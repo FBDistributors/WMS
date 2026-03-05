@@ -11,6 +11,7 @@ export interface PickingLine {
   expiry_date?: string | null;
   qty_required: number;
   qty_picked: number;
+  skip_reason?: string | null;
 }
 
 export interface PickingProgress {
