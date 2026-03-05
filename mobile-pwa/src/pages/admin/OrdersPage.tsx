@@ -117,11 +117,14 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       ? t('admin:dashboard.order_statuses_title')
       : t('orders:title')
   // Asosiy Buyurtmalar sahifasida faqat yig'ishga yuborilmagan (B#S); yig'ishga yuborilganlar bu ro'yxatda ko'rinmasin
+  // Buyurtma statuslari sahifasida group=all bo'lsa — yig'ishda + tekshiruvda + yakunlangan barcha statuslar
   const statusParam = orderSource
     ? (GROUP_TO_STATUS[group] ?? undefined)
     : mode === 'default' && (group === 'all' || !searchParams.get('group'))
       ? 'B#S'
-      : (GROUP_TO_STATUS[group] ?? GROUP_TO_STATUS.all)
+      : mode === 'statuses' && (group === 'all' || !searchParams.get('group'))
+        ? 'allocated,ready_for_picking,picking,picked,completed,packed,shipped'
+        : (GROUP_TO_STATUS[group] ?? GROUP_TO_STATUS.all)
 
   const onlyNotSentToPicking = mode === 'default' && !orderSource && (statusParam === 'B#S' || statusParam === 'imported,B#S')
   const SENT_TO_PICKING_STATUSES = new Set(['allocated', 'ready_for_picking', 'picking'])
@@ -211,6 +214,8 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         limit: PAGE_SIZE,
         offset,
         ...(orderSource ? { order_source: orderSource } : {}),
+        // Buyurtma statuslari sahifasida filial filtrini qo‘llamaymiz (dashboard bilan bir xil)
+        ...(mode === 'statuses' ? { filial_id: 'all' } : {}),
       }
       const data = await getOrders(query)
       const list = onlyNotSentToPicking
