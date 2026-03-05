@@ -307,7 +307,6 @@ export function OrikzorHarakatlariPage() {
               {pageTitle}
             </div>
             <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-              <span>{t('orders:subtitle_orikzor')}</span>
               {isRefreshing ? (
                 <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
                   {t('orders:refreshing')}
@@ -451,11 +450,6 @@ export function OrikzorHarakatlariPage() {
               </>
             )}
           </div>
-          {(dateFrom || dateTo) && (
-            <span className="text-sm text-slate-500 dark:text-slate-400">
-              {dateFrom} – {dateTo}
-            </span>
-          )}
         </div>
         {canSendToPicking && selectedMovementIds.size > 0 ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/50">
