@@ -42,6 +42,8 @@ const ORIKZOR_SEARCH_FIELD_OPTIONS = [
   { id: 'status', labelKey: 'orders:columns_diller.status' },
 ]
 
+type OrikzorColumnId = (typeof COLUMNS_ORIKZOR)[number]['id']
+
 export function OrikzorHarakatlariPage() {
   const { t } = useTranslation(['orders', 'common', 'admin'])
   const navigate = useNavigate()
@@ -130,7 +132,7 @@ export function OrikzorHarakatlariPage() {
     [t]
   )
 
-  const renderCell = (columnId: string, m: MovementItem) => {
+  const renderCell = (columnId: OrikzorColumnId, m: MovementItem) => {
     const mid = (m.movement_id as string) ?? '—'
     const movementNum = (m.movement_number as string) ?? mid
     const note = (m.note as string) ?? '—'
@@ -229,7 +231,7 @@ export function OrikzorHarakatlariPage() {
       )
     }
     const visibleCols = new Set(orikzorTableConfig.config.visibleColumns.filter((id) => COLUMNS_ORIKZOR.some((c) => c.id === id)))
-    const orderedCols = orikzorTableConfig.config.columnOrder.filter((id) => COLUMNS_ORIKZOR.some((c) => c.id === id))
+    const orderedCols = orikzorTableConfig.config.columnOrder.filter((id) => COLUMNS_ORIKZOR.some((c) => c.id === id)) as OrikzorColumnId[]
     return (
       <TableScrollArea inline>
         <table className="w-max min-w-[600px] table-auto text-sm">
@@ -274,7 +276,7 @@ export function OrikzorHarakatlariPage() {
               >
                 {orderedCols.map((colId) =>
                   visibleCols.has(colId) ? (
-                    <Fragment key={colId}>{renderCell(colId as (typeof COLUMNS_ORIKZOR)[number]['id'], m)}</Fragment>
+                    <Fragment key={colId}>{renderCell(colId, m)}</Fragment>
                   ) : null
                 )}
               </tr>
