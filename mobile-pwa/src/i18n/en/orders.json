@@ -36,6 +36,7 @@
   "no_pickers_hint": "No pickers. Create a user with 'Order picker' role via Admin > Users.",
     "invalid_selection": "Invalid selection. Please refresh the page and try again.",
     "insufficient_stock": "Insufficient stock in warehouse. Receive products first or check inventory.",
+    "picking_task_exists": "A picking task for this movement has already been created.",
     "network_error": "Could not connect to server. Check your internet and try again.",
     "request_timeout": "Request timed out. Server may be slow, please try again later."
   },

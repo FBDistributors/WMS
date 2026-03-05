@@ -180,6 +180,43 @@ export async function sendOrderToPicking(orderId: string, assignedToUserId: stri
   )
 }
 
+/** Movement (Tashkiliy/O'rikzor) dan yig'ishga yuborish — Order get-or-create, keyin send-to-picking. */
+export type SendMovementToPickingParams = {
+  source: 'diller' | 'orikzor'
+  movement_id: string
+  movement: MovementItem
+  assigned_to_user_id: string
+}
+
+export async function sendMovementToPicking(params: SendMovementToPickingParams) {
+  const { source, movement_id, movement, assigned_to_user_id } = params
+  const rawItems = (movement.movement_items as MovementItemLine[] | undefined) ?? []
+  const movement_items = rawItems.map((line) => ({
+    product_code: line.product_code ?? undefined,
+    quantity: typeof line.quantity === 'number' ? line.quantity : Number(line.quantity) || 0,
+    name: line.name ?? (line.product_code as string | undefined),
+  }))
+  return fetchJSON<{ pick_task_id: string; assigned_to: string }>(
+    '/api/v1/orders/from-movement/send-to-picking',
+    {
+      method: 'POST',
+      body: {
+        source,
+        movement_id,
+        movement: {
+          movement_id: movement.movement_id ?? movement_id,
+          barcode: movement.barcode ?? undefined,
+          from_warehouse_code: movement.from_warehouse_code ?? undefined,
+          to_warehouse_code: movement.to_warehouse_code ?? undefined,
+          note: movement.note ?? undefined,
+          movement_items,
+        },
+        assigned_to_user_id,
+      },
+    }
+  )
+}
+
 export async function packOrder(orderId: string) {
   return fetchJSON<OrderDetails>(`/api/v1/orders/${orderId}/pack`, {
     method: 'POST',

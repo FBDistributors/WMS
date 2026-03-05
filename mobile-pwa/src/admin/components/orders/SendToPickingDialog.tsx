@@ -3,7 +3,13 @@ import { X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '../../../components/ui/button'
-import { getPickerUsers, sendOrderToPicking, type PickerUser } from '../../../services/ordersApi'
+import {
+  getPickerUsers,
+  sendOrderToPicking,
+  sendMovementToPicking,
+  type PickerUser,
+  type MovementItem,
+} from '../../../services/ordersApi'
 import type { ApiError } from '../../../services/apiClient'
 
 const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
@@ -40,14 +46,28 @@ function formatApiError(err: unknown, t: (key: string) => string): string {
   return err instanceof Error ? err.message : 'Error'
 }
 
+export type MovementPayload = {
+  source: 'diller' | 'orikzor'
+  movement_id: string
+  movement: MovementItem
+}
+
 type SendToPickingDialogProps = {
   open: boolean
   orderIds: string[]
   onOpenChange: (open: boolean) => void
   onSent: () => void
+  /** Agar berilsa, orderIds o'rniga movement dan yuboriladi (sendMovementToPicking). */
+  movementPayload?: MovementPayload | null
 }
 
-export function SendToPickingDialog({ open, orderIds, onOpenChange, onSent }: SendToPickingDialogProps) {
+export function SendToPickingDialog({
+  open,
+  orderIds,
+  onOpenChange,
+  onSent,
+  movementPayload,
+}: SendToPickingDialogProps) {
   const { t } = useTranslation(['orders', 'common'])
   const [pickers, setPickers] = useState<PickerUser[]>([])
   const [selected, setSelected] = useState('')
@@ -72,7 +92,9 @@ export function SendToPickingDialog({ open, orderIds, onOpenChange, onSent }: Se
     })()
   }, [open, t])
 
-  if (!open || orderIds.length === 0) return null
+  const isMovementMode = Boolean(movementPayload)
+  if (!open) return null
+  if (!isMovementMode && orderIds.length === 0) return null
 
   const handleSubmit = async () => {
     if (!selected) {
@@ -84,16 +106,26 @@ export function SendToPickingDialog({ open, orderIds, onOpenChange, onSent }: Se
       setError(t('orders:send_to_picking.invalid_selection'))
       return
     }
-    const validIds = orderIds.filter((id) => isValidUuid(id))
-    if (validIds.length === 0) {
-      setError(t('orders:send_to_picking.invalid_selection'))
-      return
-    }
     setIsSubmitting(true)
     setError(null)
     try {
-      for (const orderIdStr of validIds) {
-        await sendOrderToPicking(orderIdStr, selectedStr)
+      if (isMovementMode && movementPayload) {
+        await sendMovementToPicking({
+          source: movementPayload.source,
+          movement_id: movementPayload.movement_id,
+          movement: movementPayload.movement,
+          assigned_to_user_id: selectedStr,
+        })
+      } else {
+        const validIds = orderIds.filter((id) => isValidUuid(id))
+        if (validIds.length === 0) {
+          setError(t('orders:send_to_picking.invalid_selection'))
+          setIsSubmitting(false)
+          return
+        }
+        for (const orderIdStr of validIds) {
+          await sendOrderToPicking(orderIdStr, selectedStr)
+        }
       }
       onSent()
       onOpenChange(false)
@@ -102,7 +134,9 @@ export function SendToPickingDialog({ open, orderIds, onOpenChange, onSent }: Se
       setError(
         msg.toLowerCase().includes('insufficient stock')
           ? t('orders:send_to_picking.insufficient_stock')
-          : msg
+          : msg.toLowerCase().includes('picking task already created')
+            ? t('orders:send_to_picking.picking_task_exists')
+            : msg
       )
     } finally {
       setIsSubmitting(false)
@@ -120,9 +154,11 @@ export function SendToPickingDialog({ open, orderIds, onOpenChange, onSent }: Se
       <div className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
           <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            {orderIds.length > 1
-              ? t('orders:send_selected_to_picking', { count: orderIds.length })
-              : t('orders:send_to_picking.title')}
+            {isMovementMode
+              ? t('orders:send_to_picking.title')
+              : orderIds.length > 1
+                ? t('orders:send_selected_to_picking', { count: orderIds.length })
+                : t('orders:send_to_picking.title')}
           </div>
           <Button variant="ghost" className="rounded-full px-3 py-3" onClick={() => onOpenChange(false)}>
             <X size={18} />

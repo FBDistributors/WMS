@@ -132,6 +132,28 @@ class SendToPickingResponse(BaseModel):
     assigned_to: UUID
 
 
+class MovementItemLine(BaseModel):
+    product_code: Optional[str] = None
+    quantity: float = Field(..., ge=0)
+    name: Optional[str] = None
+
+
+class MovementPayload(BaseModel):
+    movement_id: Optional[str] = None
+    barcode: Optional[str] = None
+    from_warehouse_code: Optional[str] = None
+    to_warehouse_code: Optional[str] = None
+    note: Optional[str] = None
+    movement_items: List[MovementItemLine] = Field(default_factory=list)
+
+
+class SendMovementToPickingRequest(BaseModel):
+    source: str = Field(..., description="diller yoki orikzor")
+    movement_id: str = Field(..., min_length=1)
+    movement: MovementPayload
+    assigned_to_user_id: UUID
+
+
 class OrderStatusUpdateRequest(BaseModel):
     status: str = Field(..., description="picked, packed, shipped yoki boshqa ruxsat etilgan status")
 
@@ -596,6 +618,134 @@ async def sync_orders_from_smartup(
         raise HTTPException(status_code=500, detail=msg) from exc
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"Smartup export failed: {exc}") from exc
+
+
+def _get_or_create_order_from_movement(
+    db: Session,
+    source: str,
+    movement_id: str,
+    movement: MovementPayload,
+) -> OrderModel:
+    """Movement dan Order topadi yoki yaratadi. source_external_id = movement:{movement_id} (max 128)."""
+    external_id = f"movement:{movement_id}"[:128]
+    order = (
+        db.query(OrderModel)
+        .options(selectinload(OrderModel.lines))
+        .filter(OrderModel.source_external_id == external_id)
+        .one_or_none()
+    )
+    if order:
+        return order
+    if not movement.movement_items:
+        raise HTTPException(status_code=400, detail="movement_items bo'sh bo'lmasligi kerak")
+    order = OrderModel(
+        source=source.strip(),
+        source_external_id=external_id,
+        order_number=movement_id[:64],
+        status="B#S",
+        from_warehouse_code=(movement.from_warehouse_code or "")[:64] or None,
+        to_warehouse_code=(movement.to_warehouse_code or "")[:64] or None,
+        movement_note=(movement.note or "")[:512] or None,
+    )
+    db.add(order)
+    db.flush()
+    for item in movement.movement_items:
+        sku = (item.product_code or "").strip() or None
+        name = (item.name or item.product_code or "").strip()[:255] or "—"
+        line = OrderLineModel(
+            order_id=order.id,
+            sku=sku,
+            name=name,
+            qty=float(item.quantity),
+        )
+        db.add(line)
+    db.flush()
+    order = (
+        db.query(OrderModel)
+        .options(selectinload(OrderModel.lines))
+        .filter(OrderModel.id == order.id)
+        .one()
+    )
+    return order
+
+
+@router.post("/from-movement/send-to-picking", response_model=SendToPickingResponse, summary="Send movement (Tashkiliy/O'rikzor) to picking")
+async def send_movement_to_picking(
+    request: Request,
+    payload: SendMovementToPickingRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("orders:send_to_picking")),
+):
+    if "picking:assign" not in get_permissions_for_role(user.role):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    if payload.source.strip().lower() not in ("diller", "orikzor"):
+        raise HTTPException(status_code=400, detail="source diller yoki orikzor bo'lishi kerak")
+    if not payload.movement.movement_items:
+        raise HTTPException(status_code=400, detail="movement_items bo'sh bo'lmasligi kerak")
+    assigned_user = db.query(User).filter(User.id == payload.assigned_to_user_id).one_or_none()
+    if not assigned_user or assigned_user.role != "picker":
+        raise HTTPException(status_code=400, detail="Invalid picker selection")
+
+    try:
+        order = _get_or_create_order_from_movement(
+            db, payload.source.strip(), payload.movement_id.strip(), payload.movement
+        )
+    except HTTPException:
+        raise
+    db.refresh(order)
+    if not order.lines:
+        raise HTTPException(status_code=409, detail="Order has no lines")
+
+    existing = db.query(DocumentModel).filter(DocumentModel.order_id == order.id).one_or_none()
+    if existing:
+        raise HTTPException(status_code=409, detail="Picking task already created")
+
+    if order.status not in {"imported", "B#S", "ready_for_picking", "allocated"}:
+        raise HTTPException(status_code=409, detail="Order cannot be sent to picking")
+
+    document_lines, shortages = _allocate_order(db, order, user.id)
+    if not document_lines:
+        raise HTTPException(status_code=409, detail="Insufficient stock to allocate")
+
+    document = DocumentModel(
+        doc_no=order.order_number,
+        doc_type="SO",
+        status="partial" if shortages else "new",
+        source="orders",
+        source_external_id=order.source_external_id,
+        order_id=order.id,
+        assigned_to_user_id=payload.assigned_to_user_id,
+    )
+    document.lines = document_lines
+
+    db.add(document)
+    old_status = order.status
+    order.status = "allocated"
+    log_action(
+        db,
+        user_id=user.id,
+        action=ACTION_UPDATE,
+        entity_type="order",
+        entity_id=str(order.id),
+        old_data={"status": old_status},
+        new_data={"status": "allocated", "document_id": str(document.id)},
+        ip_address=get_client_ip(request),
+    )
+    db.commit()
+    db.refresh(document)
+
+    try:
+        send_push_to_user(
+            db,
+            payload.assigned_to_user_id,
+            "Yangi buyurtma",
+            f"Terish buyurtmasi: {document.doc_no}. Ilovani oching.",
+            data={"taskId": str(document.id), "type": "new_pick_task"},
+        )
+    except Exception:
+        pass
+
+    return SendToPickingResponse(pick_task_id=document.id, assigned_to=payload.assigned_to_user_id)
 
 
 @router.post("/{order_id}/send-to-picking", response_model=SendToPickingResponse, summary="Send order to picking")

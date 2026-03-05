@@ -1,12 +1,15 @@
+import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { SendToPickingDialog } from '../../admin/components/orders/SendToPickingDialog'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { useAuth } from '../../rbac/AuthProvider'
 import type { MovementItem } from '../../services/ordersApi'
 
 type MovementState = {
@@ -19,11 +22,15 @@ export function MovementDetailsPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const { t } = useTranslation(['orders', 'common'])
+  const { has } = useAuth()
+  const [pickerDialogOpen, setPickerDialogOpen] = useState(false)
   const state = location.state as MovementState | null
   const movement = state?.movement
   const listPath = state?.listPath ?? '/admin/orders-diller'
   const listQuery = state?.listQuery ?? ''
   const backUrl = `${listPath}${listQuery ? `?${listQuery}` : ''}`
+  const source = listPath.includes('orikzor') ? ('orikzor' as const) : ('diller' as const)
+  const canSendToPicking = has('orders:send_to_picking')
 
   if (!movement) {
     return (
@@ -62,6 +69,11 @@ export function MovementDetailsPage() {
             <ArrowLeft size={16} />
             {t('common:buttons.back')}
           </Button>
+          {canSendToPicking && items.length > 0 && movement.movement_id != null && (
+            <Button onClick={() => setPickerDialogOpen(true)}>
+              {t('orders:send_to_picking.button')}
+            </Button>
+          )}
         </div>
         <div className="grid gap-3 md:grid-cols-3">
           <div>
@@ -136,6 +148,25 @@ export function MovementDetailsPage() {
             </tbody>
           </table>
         </TableScrollArea>
+
+        <SendToPickingDialog
+          open={pickerDialogOpen}
+          orderIds={[]}
+          onOpenChange={setPickerDialogOpen}
+          onSent={() => {
+            setPickerDialogOpen(false)
+            navigate(backUrl)
+          }}
+          movementPayload={
+            movement && movement.movement_id != null
+              ? {
+                  source,
+                  movement_id: String(movement.movement_id),
+                  movement,
+                }
+              : null
+          }
+        />
       </Card>
     </AdminLayout>
   )
