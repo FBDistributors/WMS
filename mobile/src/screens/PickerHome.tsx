@@ -17,6 +17,7 @@ import type { RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { RootStackParamList } from '../types/navigation';
 import { useLocale } from '../i18n/LocaleContext';
+import { useTheme } from '../theme/ThemeContext';
 import { useNetwork } from '../network';
 import { getOpenTasks, getMyPickerStats, type MyPickerStats } from '../api/picking';
 import { getCachedPickTasks } from '../offline/offlineDb';
@@ -44,18 +45,21 @@ function Card({
   subtitle,
   onPress,
   badge,
+  isDark,
 }: {
   iconName: string;
   title: string;
   subtitle: string;
   onPress: () => void;
   badge?: number;
+  isDark?: boolean;
 }) {
+  const iconColor = isDark ? '#e2e8f0' : TEXT_PRIMARY;
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity style={[styles.card, isDark && styles.cardDark]} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.cardIconWrap}>
-        <View style={styles.cardIcon}>
-          <Icon name={iconName as any} size={CARD_ICON_SIZE} color={TEXT_PRIMARY} />
+        <View style={[styles.cardIcon, isDark && styles.cardIconDark]}>
+          <Icon name={iconName as any} size={CARD_ICON_SIZE} color={iconColor} />
         </View>
         {badge != null && badge > 0 && (
           <View style={styles.badge}>
@@ -66,10 +70,10 @@ function Card({
         )}
       </View>
       <View style={styles.cardBody}>
-        <Text style={styles.cardTitle}>{title}</Text>
-        <Text style={styles.cardSubtitle}>{subtitle}</Text>
+        <Text style={[styles.cardTitle, isDark && styles.cardTitleDark]}>{title}</Text>
+        <Text style={[styles.cardSubtitle, isDark && styles.cardSubtitleDark]}>{subtitle}</Text>
       </View>
-      <Icon name="chevron-right" size={24} color={TEXT_SECONDARY} />
+      <Icon name="chevron-right" size={24} color={isDark ? '#94a3b8' : TEXT_SECONDARY} />
     </TouchableOpacity>
   );
 }
@@ -80,14 +84,18 @@ function BottomNavTab({
   active,
   onPress,
   badge,
+  activeColor = BOTTOM_ACTIVE,
+  inactiveColor = BOTTOM_INACTIVE,
 }: {
   iconName: string;
   label: string;
   active: boolean;
   onPress: () => void;
   badge?: number;
+  activeColor?: string;
+  inactiveColor?: string;
 }) {
-  const color = active ? BOTTOM_ACTIVE : BOTTOM_INACTIVE;
+  const color = active ? activeColor : inactiveColor;
   return (
     <TouchableOpacity style={styles.tab} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.tabIconWrap}>
@@ -116,6 +124,7 @@ export function PickerHome() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<PickerHomeRoute>();
   const { t } = useLocale();
+  const { theme } = useTheme();
   const { isOnline } = useNetwork();
   const [queueCount, setQueueCount] = useState(0);
   const [taskCount, setTaskCount] = useState(0);
@@ -123,6 +132,9 @@ export function PickerHome() {
   const [refreshing, setRefreshing] = useState(false);
   const profileType = route.params?.profileType ?? 'picker';
   const headerTitle = profileType === 'controller' ? t('controllerTitle') : t('pickerTitle');
+  const isDark = theme === 'dark';
+  const navActiveColor = isDark ? '#93c5fd' : BOTTOM_ACTIVE;
+  const navInactiveColor = isDark ? '#94a3b8' : BOTTOM_INACTIVE;
 
   const refreshCounts = useCallback(async () => {
     getPendingCount().then(setQueueCount);
@@ -152,13 +164,16 @@ export function PickerHome() {
   }, [refreshCounts]);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, isDark && styles.containerDark]} edges={['top']}>
       {/* Header */}
       <AppHeader
         title={headerTitle}
         showLogo={true}
         onRefresh={onHeaderRefresh}
         refreshing={refreshing}
+        headerStyle={isDark ? styles.headerDark : undefined}
+        titleStyle={isDark ? styles.headerTitleDark : undefined}
+        accentColor={isDark ? '#93c5fd' : undefined}
         leftTrailing={
           <TouchableOpacity
             onPress={() => navigation.navigate('Hisob')}
@@ -166,19 +181,19 @@ export function PickerHome() {
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             accessibilityLabel={t('tabAccount')}
           >
-            <Icon name="account-outline" size={24} color={HEADER_ACCENT} />
+            <Icon name="account-outline" size={24} color={isDark ? '#93c5fd' : HEADER_ACCENT} />
           </TouchableOpacity>
         }
         rightTrailing={!isOnline ? (
-          <View style={styles.onlineBadge}>
+          <View style={[styles.onlineBadge, isDark && styles.onlineBadgeDark]}>
             <Text style={styles.onlineBadgeText}>Offline</Text>
           </View>
         ) : undefined}
       />
 
       {!isOnline && (
-        <View style={styles.offlineBanner}>
-          <Text style={styles.offlineBannerText}>
+        <View style={[styles.offlineBanner, isDark && styles.offlineBannerDark]}>
+          <Text style={[styles.offlineBannerText, isDark && styles.offlineBannerTextDark]}>
             {t('offlineBanner', { count: queueCount })}
           </Text>
         </View>
@@ -191,20 +206,20 @@ export function PickerHome() {
         showsVerticalScrollIndicator={true}
       >
         {stats !== null && (
-          <View style={styles.statsSection}>
+          <View style={[styles.statsSection, isDark && styles.statsSectionDark]}>
             <View style={styles.statsRow}>
               <View style={styles.statBox}>
-                <Text style={styles.statValue}>{stats.total_completed}</Text>
-                <Text style={styles.statLabel}>{t('statsTotalCompleted')}</Text>
+                <Text style={[styles.statValue, isDark && styles.statValueDark]}>{stats.total_completed}</Text>
+                <Text style={[styles.statLabel, isDark && styles.statLabelDark]}>{t('statsTotalCompleted')}</Text>
               </View>
               <View style={styles.statBox}>
-                <Text style={styles.statValue}>{stats.completed_today}</Text>
-                <Text style={styles.statLabel}>{t('statsCompletedToday')}</Text>
+                <Text style={[styles.statValue, isDark && styles.statValueDark]}>{stats.completed_today}</Text>
+                <Text style={[styles.statLabel, isDark && styles.statLabelDark]}>{t('statsCompletedToday')}</Text>
               </View>
             </View>
             {stats.by_day.length > 0 && (
-              <View style={styles.chartWrap}>
-                <Text style={styles.chartTitle}>{t('statsChartTitle')}</Text>
+              <View style={[styles.chartWrap, isDark && styles.chartWrapDark]}>
+                <Text style={[styles.chartTitle, isDark && styles.chartTitleDark]}>{t('statsChartTitle')}</Text>
                 <View style={styles.chartBarRow}>
                   {stats.by_day.map((d) => {
                     const maxC = Math.max(1, ...stats.by_day.map((x) => x.count));
@@ -212,10 +227,10 @@ export function PickerHome() {
                     const label = d.date.slice(8, 10);
                     return (
                       <View key={d.date} style={styles.chartBarCol}>
-                        <View style={[styles.chartBar, { height: h }]} />
-                        <Text style={styles.chartBarLabel} numberOfLines={1}>{label}</Text>
+                        <View style={[styles.chartBar, isDark && styles.chartBarDark, { height: h }]} />
+                        <Text style={[styles.chartBarLabel, isDark && styles.chartBarLabelDark]} numberOfLines={1}>{label}</Text>
                         {d.count > 0 && (
-                          <Text style={styles.chartBarCount}>{d.count}</Text>
+                          <Text style={[styles.chartBarCount, isDark && styles.chartBarCountDark]}>{d.count}</Text>
                         )}
                       </View>
                     );
@@ -231,6 +246,7 @@ export function PickerHome() {
             title={t('consolidatedPickTitle')}
             subtitle={t('consolidatedMyTasks')}
             onPress={() => navigation.navigate('ConsolidatedPick')}
+            isDark={isDark}
           />
         )}
         <Card
@@ -238,16 +254,19 @@ export function PickerHome() {
           title={queueCount > 0 ? `${t('offlineQueue')} (${queueCount})` : t('offlineQueue')}
           subtitle={t('syncPending')}
           onPress={() => navigation.navigate('QueueScreen')}
+          isDark={isDark}
         />
       </ScrollView>
 
-      {/* Bottom nav */}
-      <View style={styles.bottomNav}>
+      {/* Bottom nav — yarim shaffof / dark da qorong'u bar */}
+      <View style={[styles.bottomNav, isDark && styles.bottomNavDark]}>
         <BottomNavTab
           iconName="home"
           label={t('tabMain')}
           active={true}
           onPress={() => {}}
+          activeColor={navActiveColor}
+          inactiveColor={navInactiveColor}
         />
         <BottomNavTab
           iconName="clipboard-list-outline"
@@ -255,6 +274,8 @@ export function PickerHome() {
           active={false}
           onPress={() => navigation.navigate('PickTaskList', { profileType })}
           badge={taskCount}
+          activeColor={navActiveColor}
+          inactiveColor={navInactiveColor}
         />
         <View style={styles.scanBtnWrap}>
           <TouchableOpacity
@@ -270,12 +291,16 @@ export function PickerHome() {
           label={t('tabInventory')}
           active={false}
           onPress={() => navigation.navigate('Inventory')}
+          activeColor={navActiveColor}
+          inactiveColor={navInactiveColor}
         />
         <BottomNavTab
           iconName="package-down"
           label={t('tabKirim')}
           active={false}
           onPress={() => navigation.navigate('Kirim')}
+          activeColor={navActiveColor}
+          inactiveColor={navInactiveColor}
         />
       </View>
     </SafeAreaView>
@@ -433,9 +458,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingTop: 12,
     paddingBottom: 24,
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.78)',
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: 'rgba(0,0,0,0.06)',
   },
   tab: {
     flex: 1,
@@ -492,5 +517,34 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 6,
     elevation: 8,
+  },
+  // Dark theme (Yig'uvchi)
+  containerDark: { backgroundColor: '#0f172a' },
+  headerDark: {
+    backgroundColor: '#1e293b',
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  headerTitleDark: { color: '#f1f5f9' },
+  onlineBadgeDark: { backgroundColor: '#b45309' },
+  offlineBannerDark: {
+    backgroundColor: 'rgba(251,191,36,0.2)',
+    borderBottomColor: 'rgba(251,191,36,0.3)',
+  },
+  offlineBannerTextDark: { color: '#fcd34d' },
+  statsSectionDark: { backgroundColor: '#1e293b' },
+  statValueDark: { color: '#93c5fd' },
+  statLabelDark: { color: '#94a3b8' },
+  chartWrapDark: { borderTopColor: 'rgba(255,255,255,0.08)' },
+  chartTitleDark: { color: '#94a3b8' },
+  chartBarDark: { backgroundColor: '#60a5fa' },
+  chartBarLabelDark: { color: '#94a3b8' },
+  chartBarCountDark: { color: '#e2e8f0' },
+  cardDark: { backgroundColor: '#1e293b' },
+  cardIconDark: { backgroundColor: '#334155' },
+  cardTitleDark: { color: '#f1f5f9' },
+  cardSubtitleDark: { color: '#94a3b8' },
+  bottomNavDark: {
+    backgroundColor: 'rgba(30,41,59,0.92)',
+    borderTopColor: 'rgba(255,255,255,0.08)',
   },
 });

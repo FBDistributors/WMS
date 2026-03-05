@@ -8,6 +8,7 @@ import React, { useEffect, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { LocaleProvider } from './src/i18n/LocaleContext';
+import { ThemeProvider } from './src/theme/ThemeContext';
 import { NetworkProvider } from './src/network';
 import type { RootStackParamList } from './src/types/navigation';
 import { initNotificationOpenedListener } from './src/notifications/pushNotifications';
@@ -47,6 +48,7 @@ export default function App() {
 
   return (
     <LocaleProvider>
+      <ThemeProvider>
       <NetworkProvider>
       <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
@@ -73,6 +75,7 @@ export default function App() {
       </Stack.Navigator>
     </NavigationContainer>
     </NetworkProvider>
+    </ThemeProvider>
     </LocaleProvider>
   );
 }

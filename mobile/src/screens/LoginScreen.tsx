@@ -16,6 +16,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { RootStackParamList } from '../types/navigation';
 import type { LocaleCode } from '../i18n/translations';
 import { useLocale } from '../i18n/LocaleContext';
+import { useTheme } from '../theme/ThemeContext';
 import { localeLabels } from '../i18n/translations';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getStoredToken } from '../api/client';
@@ -47,6 +48,8 @@ async function setLastUsername(username: string): Promise<void> {
 export function LoginScreen() {
   const navigation = useNavigation<Nav>();
   const { t, locale, setLocale } = useLocale();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -102,35 +105,36 @@ export function LoginScreen() {
 
   if (checkingSession) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#1976d2" />
-        <Text style={styles.loadingText}>{t('loading')}</Text>
+      <View style={[styles.container, isDark && styles.containerDark, styles.centered]}>
+        <ActivityIndicator size="large" color={isDark ? '#93c5fd' : '#1976d2'} />
+        <Text style={[styles.loadingText, isDark && styles.loadingTextDark]}>{t('loading')}</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isDark && styles.containerDark]}>
       {dropdownOpen && (
         <Pressable style={styles.dropdownBackdrop} onPress={() => setDropdownOpen(false)} />
       )}
       <View style={styles.langDropdownWrap}>
         <TouchableOpacity
-          style={styles.langTrigger}
+          style={[styles.langTrigger, isDark && styles.langTriggerDark]}
           onPress={() => setDropdownOpen((v) => !v)}
           activeOpacity={0.8}
         >
-          <Text style={styles.langTriggerText}>{localeLabels[locale]}</Text>
-          <Icon name={dropdownOpen ? 'chevron-up' : 'chevron-down'} size={20} color="#555" />
+          <Text style={[styles.langTriggerText, isDark && styles.langTriggerTextDark]}>{localeLabels[locale]}</Text>
+          <Icon name={dropdownOpen ? 'chevron-up' : 'chevron-down'} size={20} color={isDark ? '#94a3b8' : '#555'} />
         </TouchableOpacity>
         {dropdownOpen && (
-          <View style={styles.dropdown}>
+          <View style={[styles.dropdown, isDark && styles.dropdownDark]}>
             {LOCALES.map((code, index) => (
               <TouchableOpacity
                 key={code}
                 style={[
                   styles.dropdownItem,
-                  locale === code && styles.dropdownItemActive,
+                  isDark && styles.dropdownItemDark,
+                  locale === code && (isDark ? styles.dropdownItemActiveDark : styles.dropdownItemActive),
                   index === LOCALES.length - 1 && styles.dropdownItemLast,
                 ]}
                 onPress={() => {
@@ -138,10 +142,10 @@ export function LoginScreen() {
                   setDropdownOpen(false);
                 }}
               >
-                <Text style={[styles.dropdownItemText, locale === code && styles.dropdownItemTextActive]}>
+                <Text style={[styles.dropdownItemText, isDark && styles.dropdownItemTextDark, locale === code && (isDark ? styles.dropdownItemTextActiveDark : styles.dropdownItemTextActive)]}>
                   {localeLabels[code]}
                 </Text>
-                {locale === code && <Icon name="check" size={18} color="#1976d2" />}
+                {locale === code && <Icon name="check" size={18} color={isDark ? '#93c5fd' : '#1976d2'} />}
               </TouchableOpacity>
             ))}
           </View>
@@ -149,25 +153,25 @@ export function LoginScreen() {
       </View>
       <View style={styles.formWrap}>
       <Image source={require('../assets/logo.png')} style={[styles.logo, { width: BRAND.loginLogoSize, height: BRAND.loginLogoSize }]} resizeMode="contain" />
-      <Text style={styles.brand}>{BRAND.name}</Text>
-      <Text style={styles.subtitle}>{t('loginSubtitle')}</Text>
+      <Text style={[styles.brand, isDark && styles.brandDark]}>{BRAND.name}</Text>
+      <Text style={[styles.subtitle, isDark && styles.subtitleDark]}>{t('loginSubtitle')}</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, isDark && styles.inputDark]}
         value={username}
         onChangeText={setUsername}
         placeholder={t('loginPlaceholder')}
-        placeholderTextColor="#999"
+        placeholderTextColor={isDark ? '#94a3b8' : '#999'}
         autoCapitalize="none"
         autoCorrect={false}
         editable={!loading}
       />
-      <View style={styles.passwordWrap}>
+      <View style={[styles.passwordWrap, isDark && styles.passwordWrapDark]}>
         <TextInput
-          style={styles.passwordInput}
+          style={[styles.passwordInput, isDark && styles.passwordInputDark]}
           value={password}
           onChangeText={setPassword}
           placeholder={t('passwordPlaceholder')}
-          placeholderTextColor="#999"
+          placeholderTextColor={isDark ? '#94a3b8' : '#999'}
           secureTextEntry={!showPassword}
           editable={!loading}
         />
@@ -179,7 +183,7 @@ export function LoginScreen() {
           <Icon
             name={showPassword ? 'eye-off-outline' : 'eye-outline'}
             size={22}
-            color="#666"
+            color={isDark ? '#94a3b8' : '#666'}
           />
         </TouchableOpacity>
       </View>
@@ -343,4 +347,19 @@ const styles = StyleSheet.create({
   },
   btnDisabled: { opacity: 0.7 },
   btnText: { color: '#fff', fontSize: 18, fontWeight: '600' },
+  // Dark theme (Login)
+  containerDark: { backgroundColor: '#0f172a' },
+  loadingTextDark: { color: '#94a3b8' },
+  langTriggerDark: { backgroundColor: '#1e293b', borderColor: 'rgba(255,255,255,0.1)' },
+  langTriggerTextDark: { color: '#f1f5f9' },
+  dropdownDark: { backgroundColor: '#1e293b', borderColor: 'rgba(255,255,255,0.1)' },
+  dropdownItemDark: { borderBottomColor: 'rgba(255,255,255,0.08)' },
+  dropdownItemActiveDark: { backgroundColor: 'rgba(59,130,246,0.2)' },
+  dropdownItemTextDark: { color: '#e2e8f0' },
+  dropdownItemTextActiveDark: { fontWeight: '600', color: '#93c5fd' },
+  brandDark: { color: '#f1f5f9' },
+  subtitleDark: { color: '#94a3b8' },
+  inputDark: { backgroundColor: '#1e293b', borderColor: 'rgba(255,255,255,0.1)', color: '#f1f5f9' },
+  passwordWrapDark: { backgroundColor: '#1e293b', borderColor: 'rgba(255,255,255,0.1)' },
+  passwordInputDark: { color: '#f1f5f9' },
 });

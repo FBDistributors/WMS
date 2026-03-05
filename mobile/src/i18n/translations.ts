@@ -70,6 +70,9 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     langUz: 'O‘zbek',
     langRu: 'Русский',
     langEn: 'English',
+    theme_label: 'Mavzu',
+    theme_light: "Yorug'",
+    theme_dark: "Qorong'i",
 
     // PickTaskList
     loading: 'Yuklanmoqda…',
@@ -309,6 +312,9 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     langUz: "O'zbek",
     langRu: 'Русский',
     langEn: 'English',
+    theme_label: 'Тема',
+    theme_light: 'Светлая',
+    theme_dark: 'Тёмная',
 
     loading: 'Загрузка…',
     listLoadError: 'Не удалось загрузить список',
@@ -545,6 +551,9 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     langUz: "O'zbek",
     langRu: 'Русский',
     langEn: 'English',
+    theme_label: 'Theme',
+    theme_light: 'Light',
+    theme_dark: 'Dark',
 
     loading: 'Loading…',
     listLoadError: 'Failed to load list',

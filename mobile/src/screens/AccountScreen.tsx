@@ -22,6 +22,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { RootStackParamList } from '../types/navigation';
 import { useLocale } from '../i18n/LocaleContext';
 import { localeLabels, type LocaleCode } from '../i18n/translations';
+import { useTheme, type ThemeType } from '../theme/ThemeContext';
 import apiClient from '../api/client';
 import { logout, changePassword, updateMe } from '../api/auth';
 
@@ -52,28 +53,33 @@ function ProfileRow({
   value,
   onPress,
   hideRight,
+  isDark,
 }: {
   icon: string;
   label: string;
   value: string;
   onPress?: () => void;
   hideRight?: boolean;
+  isDark?: boolean;
 }) {
+  const iconWrapStyle = isDark ? [styles.rowIconWrap, styles.rowIconWrapDark] : styles.rowIconWrap;
+  const labelStyle = isDark ? [styles.rowLabel, styles.rowLabelDark] : styles.rowLabel;
+  const valueStyle = isDark ? [styles.rowValue, styles.rowValueDark] : styles.rowValue;
   const content = (
     <>
       <View style={styles.rowLeft}>
-        <View style={styles.rowIconWrap}>
-          <Icon name={icon as any} size={20} color="#1976d2" />
+        <View style={iconWrapStyle}>
+          <Icon name={icon as any} size={20} color={isDark ? '#93c5fd' : '#1976d2'} />
         </View>
-        <Text style={styles.rowLabel}>{label}</Text>
+        <Text style={labelStyle}>{label}</Text>
       </View>
       {!hideRight && (
         <View style={styles.rowRight}>
-          <Text style={styles.rowValue} numberOfLines={1}>
+          <Text style={valueStyle} numberOfLines={1}>
             {value || '—'}
           </Text>
           {onPress ? (
-            <Icon name="chevron-right" size={20} color="#999" style={styles.rowChevron} />
+            <Icon name="chevron-right" size={20} color={isDark ? '#94a3b8' : '#999'} style={styles.rowChevron} />
           ) : null}
         </View>
       )}
@@ -92,6 +98,7 @@ function ProfileRow({
 export function AccountScreen() {
   const navigation = useNavigation<Nav>();
   const { locale, setLocale, t } = useLocale();
+  const { theme, setTheme } = useTheme();
   const [user, setUser] = useState<MeResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -181,6 +188,14 @@ export function AccountScreen() {
     setLocale(code);
     setLanguageModalVisible(false);
   };
+  const [themeModalVisible, setThemeModalVisible] = useState(false);
+  const handleThemePress = () => setThemeModalVisible(true);
+  const handleCloseThemeModal = () => setThemeModalVisible(false);
+  const handleSelectTheme = (value: ThemeType) => {
+    setTheme(value);
+    setThemeModalVisible(false);
+  };
+  const themeLabel = theme === 'dark' ? t('theme_dark') : t('theme_light');
 
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -257,27 +272,28 @@ export function AccountScreen() {
     }
   };
 
+  const isDark = theme === 'dark';
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, isDark && styles.containerDark]} edges={['top']}>
+      <View style={[styles.header, isDark && styles.headerDark]}>
         <TouchableOpacity
-          style={styles.backButton}
+          style={[styles.backButton, isDark && styles.backButtonDark]}
           onPress={() => navigation.goBack()}
           activeOpacity={0.7}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
-          <Icon name="arrow-left" size={24} color="#1976d2" />
+          <Icon name="arrow-left" size={24} color={isDark ? '#93c5fd' : '#1976d2'} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('account')}</Text>
+        <Text style={[styles.headerTitle, isDark && styles.headerTitleDark]}>{t('account')}</Text>
       </View>
 
       {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#1976d2" />
+        <View style={[styles.centered, isDark && styles.centeredDark]}>
+          <ActivityIndicator size="large" color={isDark ? '#93c5fd' : '#1976d2'} />
         </View>
       ) : error ? (
-        <View style={styles.centered}>
-          <Text style={styles.errorText}>{t(error)}</Text>
+        <View style={[styles.centered, isDark && styles.centeredDark]}>
+          <Text style={[styles.errorText, isDark && styles.errorTextDark]}>{t(error)}</Text>
         </View>
       ) : user ? (
         <View style={styles.content}>
@@ -286,7 +302,7 @@ export function AccountScreen() {
             onPress={handleAvatarPress}
             activeOpacity={0.8}
           >
-            <View style={styles.avatarCircle}>
+            <View style={[styles.avatarCircle, isDark && styles.avatarCircleDark]}>
               {profilePhoto ? (
                 <Image
                   source={{ uri: profilePhoto }}
@@ -294,49 +310,62 @@ export function AccountScreen() {
                   resizeMode="cover"
                 />
               ) : (
-                <Icon name="camera-plus-outline" size={40} color="#999" />
+                <Icon name="camera-plus-outline" size={40} color={isDark ? '#94a3b8' : '#999'} />
               )}
             </View>
           </TouchableOpacity>
-          <View style={styles.card}>
+          <View style={[styles.card, isDark && styles.cardDark]}>
             <ProfileRow
               icon="account-outline"
               label={t('profileName')}
               value={user.full_name ?? ''}
+              isDark={isDark}
             />
-            <View style={styles.separator} />
+            <View style={[styles.separator, isDark && styles.separatorDark]} />
             <ProfileRow
               icon="account-circle-outline"
               label={t('profileLogin')}
               value={user.username}
+              isDark={isDark}
             />
-            <View style={styles.separator} />
+            <View style={[styles.separator, isDark && styles.separatorDark]} />
             <ProfileRow
               icon="lock-outline"
               label={t('profileChangePassword')}
               value=""
               onPress={openPasswordModal}
               hideRight
+              isDark={isDark}
             />
-            <View style={styles.separator} />
+            <View style={[styles.separator, isDark && styles.separatorDark]} />
             <ProfileRow
               icon="pencil-outline"
               label={t('profileChangeUsername')}
               value=""
               onPress={openUsernameModal}
               hideRight
+              isDark={isDark}
             />
-            <View style={styles.separator} />
+            <View style={[styles.separator, isDark && styles.separatorDark]} />
             <ProfileRow
               icon="translate"
               label={t('language')}
               value={localeLabels[locale]}
               onPress={handleLanguagePress}
+              isDark={isDark}
+            />
+            <View style={[styles.separator, isDark && styles.separatorDark]} />
+            <ProfileRow
+              icon="theme-light-dark"
+              label={t('theme_label')}
+              value={themeLabel}
+              onPress={handleThemePress}
+              isDark={isDark}
             />
           </View>
 
-          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
-            <Icon name="logout" size={22} color="#c62828" />
+          <TouchableOpacity style={[styles.logoutBtn, isDark && styles.logoutBtnDark]} onPress={handleLogout} activeOpacity={0.8}>
+            <Icon name="logout" size={22} color="#f87171" />
             <Text style={styles.logoutText}>{t('logoutButton')}</Text>
           </TouchableOpacity>
         </View>
@@ -372,6 +401,44 @@ export function AccountScreen() {
                 activeOpacity={0.7}
               >
                 <Text style={styles.languageModalOptionText}>{localeLabels[code]}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      <Modal
+        visible={themeModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCloseThemeModal}
+      >
+        <TouchableOpacity
+          style={styles.languageModalOverlay}
+          activeOpacity={1}
+          onPress={handleCloseThemeModal}
+        >
+          <View style={[styles.languageModalContent, theme === 'dark' && styles.themeModalContentDark]} onStartShouldSetResponder={() => true}>
+            <View style={[styles.languageModalHeader, theme === 'dark' && styles.themeModalHeaderDark]}>
+              <Text style={[styles.languageModalTitle, theme === 'dark' && styles.themeModalTextDark]}>{t('theme_label')}</Text>
+              <TouchableOpacity
+                onPress={handleCloseThemeModal}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                style={styles.languageModalCloseBtn}
+              >
+                <Icon name="close" size={24} color={theme === 'dark' ? '#f1f5f9' : '#333'} />
+              </TouchableOpacity>
+            </View>
+            {(['light', 'dark'] as const).map((value) => (
+              <TouchableOpacity
+                key={value}
+                style={[styles.languageModalOption, theme === 'dark' && styles.themeModalOptionDark]}
+                onPress={() => handleSelectTheme(value)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.languageModalOptionText, theme === 'dark' && styles.themeModalTextDark]}>
+                  {value === 'light' ? t('theme_light') : t('theme_dark')}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -664,6 +731,62 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1976d2',
     fontWeight: '500',
+  },
+  // Dark theme (AccountScreen)
+  containerDark: {
+    backgroundColor: '#0f172a',
+  },
+  headerDark: {
+    backgroundColor: '#1e293b',
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  headerTitleDark: {
+    color: '#f1f5f9',
+  },
+  backButtonDark: {
+    backgroundColor: 'rgba(148,163,184,0.2)',
+  },
+  centeredDark: {
+    backgroundColor: '#0f172a',
+  },
+  errorTextDark: {
+    color: '#94a3b8',
+  },
+  avatarCircleDark: {
+    backgroundColor: '#334155',
+    borderColor: '#1e293b',
+  },
+  cardDark: {
+    backgroundColor: '#1e293b',
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  separatorDark: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  rowIconWrapDark: {
+    backgroundColor: 'rgba(59,130,246,0.2)',
+  },
+  rowLabelDark: {
+    color: '#94a3b8',
+  },
+  rowValueDark: {
+    color: '#f1f5f9',
+  },
+  logoutBtnDark: {
+    backgroundColor: '#1e293b',
+    borderColor: 'rgba(248,113,113,0.4)',
+  },
+  themeModalContentDark: {
+    backgroundColor: '#1e293b',
+  },
+  themeModalHeaderDark: {
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  themeModalOptionDark: {
+    backgroundColor: 'transparent',
+  },
+  themeModalTextDark: {
+    color: '#f1f5f9',
   },
   formModalContent: {
     backgroundColor: '#fff',

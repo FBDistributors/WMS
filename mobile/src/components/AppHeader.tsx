@@ -20,6 +20,10 @@ export type AppHeaderProps = {
   leftTrailing?: React.ReactNode;
   /** O'ng tomonda refresh dan oldin (masalan offline badge) */
   rightTrailing?: React.ReactNode;
+  /** Dark mavzu: header va matn stillari */
+  headerStyle?: object;
+  titleStyle?: object;
+  accentColor?: string;
 };
 
 export function AppHeader({
@@ -31,9 +35,13 @@ export function AppHeader({
   refreshing = false,
   leftTrailing,
   rightTrailing,
+  headerStyle,
+  titleStyle,
+  accentColor = HEADER_ACCENT,
 }: AppHeaderProps) {
+  const accent = accentColor ?? HEADER_ACCENT;
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, headerStyle]}>
       {leftTrailing}
       {showBack && (
         <TouchableOpacity
@@ -42,7 +50,7 @@ export function AppHeader({
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           accessibilityLabel="Orqaga"
         >
-          <Icon name="arrow-left" size={24} color={HEADER_ACCENT} />
+          <Icon name="arrow-left" size={24} color={accent} />
         </TouchableOpacity>
       )}
       {showLogo && (
@@ -52,7 +60,7 @@ export function AppHeader({
           resizeMode="contain"
         />
       )}
-      <Text style={styles.headerTitle} numberOfLines={1}>
+      <Text style={[styles.headerTitle, titleStyle]} numberOfLines={1}>
         {title}
       </Text>
       {rightTrailing}
@@ -67,7 +75,7 @@ export function AppHeader({
           <Icon
             name="refresh"
             size={24}
-            color={refreshing ? '#999' : HEADER_ACCENT}
+            color={refreshing ? '#94a3b8' : accent}
           />
         </TouchableOpacity>
       )}
