@@ -465,10 +465,10 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
               <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
                 {t('orders:send_selected_to_picking', { count: selectedMovementIds.size })}
               </span>
-              <Button variant="outline" size="sm" onClick={() => setSelectedMovementIds(new Set())}>
+              <Button variant="outline" onClick={() => setSelectedMovementIds(new Set())}>
                 {t('common:buttons.cancel')}
               </Button>
-              <Button size="sm" onClick={() => setSendMovementDialogOpen(true)}>
+              <Button onClick={() => setSendMovementDialogOpen(true)}>
                 {t('orders:send_to_picking.button')}
               </Button>
             </div>
