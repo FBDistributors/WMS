@@ -9,13 +9,7 @@ import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { DateInput } from '../../components/DateInput'
 import { EmptyState } from '../../components/ui/EmptyState'
-import {
-  getOrikzorMovements,
-  syncOrikzorOrders,
-  type MovementItem,
-  type SmartupSyncResult,
-} from '../../services/ordersApi'
-import { useAuth } from '../../rbac/AuthProvider'
+import { getOrikzorMovements, type MovementItem } from '../../services/ordersApi'
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
@@ -44,21 +38,16 @@ export function OrikzorHarakatlariPage() {
   const { t } = useTranslation(['orders', 'common', 'admin'])
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { has } = useAuth()
-  const canSync = has('orders:write')
-
   const [movementsData, setMovementsData] = useState<{ movement: MovementItem[]; total?: number } | null>(null)
   const [movementPage, setMovementPage] = useState(0)
   const [dateFrom, setDateFrom] = useState(daysAgoISO(30))
   const [dateTo, setDateTo] = useState(todayISO())
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [isSyncing, setIsSyncing] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const [syncResult, setSyncResult] = useState<SmartupSyncResult | null>(null)
 
   const load = useCallback(
-    async (background = false, pageOverride?: number) => {
+    async (background = false, pageOverride?: number, forceRefresh = false) => {
       if (!background) setIsLoading(true)
       else setIsRefreshing(true)
       setError(null)
@@ -69,6 +58,7 @@ export function OrikzorHarakatlariPage() {
           end_created_on: dateTo.trim() || undefined,
           limit: PAGE_SIZE,
           offset: page * PAGE_SIZE,
+          refresh: forceRefresh,
         })
         setMovementsData(data)
         if (pageOverride !== undefined) setMovementPage(pageOverride)
@@ -87,35 +77,6 @@ export function OrikzorHarakatlariPage() {
   useEffect(() => {
     void load()
   }, [load])
-
-  const handleSync = async () => {
-    setIsSyncing(true)
-    setError(null)
-    setSyncResult(null)
-    try {
-      let begin = dateFrom.trim() || undefined
-      let end = dateTo.trim() || undefined
-      if (begin && end && begin > end) {
-        ;[begin, end] = [end, begin]
-      }
-      const result = await syncOrikzorOrders({
-        begin_deal_date: begin,
-        end_deal_date: end,
-      })
-      setSyncResult(result)
-      await load(true)
-    } catch (err) {
-      const message =
-        err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string'
-          ? (err as { message: string }).message
-          : err instanceof Error
-            ? err.message
-            : t('orders:sync_failed')
-      setError(message)
-    } finally {
-      setIsSyncing(false)
-    }
-  }
 
   const movementList = movementsData?.movement ?? []
   const movementTotal = movementsData?.total ?? 0
@@ -248,29 +209,6 @@ export function OrikzorHarakatlariPage() {
 
   return (
     <AdminLayout title={pageTitle}>
-      {syncResult ? (
-        <Card className="mb-4 border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700 dark:border-green-500/30 dark:bg-green-500/10">
-          {t('orders:sync_result', {
-            created: syncResult.created,
-            updated: syncResult.updated,
-            skipped: syncResult.skipped,
-          })}
-          {(syncResult.detail || syncResult.error) && (
-            <span className="mt-1 block">
-              {syncResult.error ?? syncResult.detail ?? ''}
-            </span>
-          )}
-          {syncResult.debug?.skipped_by_reason &&
-            Object.keys(syncResult.debug.skipped_by_reason).length > 0 && (
-              <span className="mt-1 block text-xs opacity-90">
-                {Object.entries(syncResult.debug.skipped_by_reason)
-                  .filter(([, v]) => Number(v) > 0)
-                  .map(([k, v]) => `${k}: ${v}`)
-                  .join(', ')}
-              </span>
-            )}
-        </Card>
-      ) : null}
       <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="flex flex-1 flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -287,16 +225,14 @@ export function OrikzorHarakatlariPage() {
           <span className="text-xs text-slate-500 dark:text-slate-400">
             {t('orders:sync_date_hint', "Smartup'dagi from_movement_date shu oraliqda bo'lishi kerak.")}
           </span>
-          <Button variant="secondary" onClick={() => load()} disabled={isRefreshing} className="shrink-0">
+          <Button
+            variant="secondary"
+            onClick={() => load(true, undefined, true)}
+            disabled={isRefreshing}
+            className="shrink-0"
+          >
             {t('common:buttons.refresh')}
           </Button>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {canSync ? (
-            <Button onClick={handleSync} disabled={isSyncing} className="w-full md:w-auto">
-              {isSyncing ? t('orders:syncing') : t('orders:sync')}
-            </Button>
-          ) : null}
         </div>
       </div>
       <Card className="space-y-4">

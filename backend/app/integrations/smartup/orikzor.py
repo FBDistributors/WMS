@@ -644,12 +644,21 @@ def fetch_orikzor_movements_raw(
     begin_date: date,
     end_date: date,
     filial_id: str | None = None,
+    begin_modified_on: date | None = None,
+    end_modified_on: date | None = None,
 ) -> list[Any]:
     """
     O'rikzor Smartup movement$export dan raw movement ro'yxatini qaytaradi.
     GET /api/v1/movements-orikzor uchun ishlatiladi.
+    begin_modified_on/end_modified_on orqali faqat o'zgarishlar (delta) so'raladi.
     """
-    body = _request_orikzor_export(begin_date=begin_date, end_date=end_date, filial_id=filial_id)
+    body = _request_orikzor_export(
+        begin_date=begin_date,
+        end_date=end_date,
+        filial_id=filial_id,
+        begin_modified_on=begin_modified_on,
+        end_modified_on=end_modified_on,
+    )
     data = json.loads(body)
     return _extract_movements_list(data)
 

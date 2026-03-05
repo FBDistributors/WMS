@@ -35,8 +35,10 @@ export async function getMovements(query: MovementsQuery = {}) {
   return fetchJSON<MovementsResponse>('/api/v1/movements', { query })
 }
 
-/** O'rikzor harakatlari — alohida API (mkw/movement$export). */
-export async function getOrikzorMovements(query: MovementsQuery = {}) {
+/** O'rikzor harakatlari — alohida API (Smartup proxy, Order bilan aloqasi yo'q). */
+export async function getOrikzorMovements(
+  query: MovementsQuery & { refresh?: boolean } = {}
+) {
   return fetchJSON<MovementsResponse>('/api/v1/movements-orikzor', { query })
 }
 
@@ -154,22 +156,6 @@ export type SmartupSyncResult = {
 
 export async function syncSmartupOrders(payload: SmartupSyncInput = {}) {
   return fetchJSON<SmartupSyncResult>('/api/v1/orders/sync-smartup', {
-    method: 'POST',
-    body: payload,
-  })
-}
-
-export type SyncOrikzorInput = {
-  begin_deal_date?: string
-  end_deal_date?: string
-  /** Delta sync: faqat shu sanadan o'zgartirilgan harakatlar (YYYY-MM-DD) */
-  begin_modified_on?: string
-  /** Delta sync: faqat shu sanagacha o'zgartirilgan harakatlar (YYYY-MM-DD) */
-  end_modified_on?: string
-}
-
-export async function syncOrikzorOrders(payload: SyncOrikzorInput = {}) {
-  return fetchJSON<SmartupSyncResult>('/api/v1/orders/sync-orikzor', {
     method: 'POST',
     body: payload,
   })

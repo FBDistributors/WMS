@@ -20,7 +20,6 @@ from app.services.push_notifications import send_push_to_user
 from app.integrations.smartup.client import SmartupClient
 from app.integrations.smartup.importer import import_orders
 from app.integrations.smartup.mfm_movement import export_mfm_movements
-from app.integrations.smartup.orikzor import export_movements_from_smartup
 from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
 from app.models.order import Order as OrderModel
@@ -122,13 +121,6 @@ class SmartupSyncResponse(BaseModel):
     errors_count: Optional[int] = None  # import xatolari soni
     error: Optional[str] = None  # UI sariq qutida ko'rsatiladigan xato (import exception va h.k.)
     debug: Optional[dict] = None  # raw_count, dict_count, filtered_count, inserted_count, updated_count, skipped_count, skipped_by_reason, preview
-
-
-class SyncOrikzorRequest(BaseModel):
-    begin_deal_date: Optional[date] = Field(None, description="YYYY-MM-DD (from_movement_date oralig'i)")
-    end_deal_date: Optional[date] = Field(None, description="YYYY-MM-DD")
-    begin_modified_on: Optional[date] = Field(None, description="Delta sync: faqat shu sanadan o'zgartirilganlar")
-    end_modified_on: Optional[date] = Field(None, description="Delta sync: faqat shu sanagacha o'zgartirilganlar")
 
 
 class SendToPickingRequest(BaseModel):
@@ -554,7 +546,7 @@ async def sync_orders_from_smartup(
     if payload.order_source == "orikzor":
         raise HTTPException(
             status_code=400,
-            detail="O'rikzor uchun POST /api/v1/orders/sync-orikzor endpointidan foydalaning.",
+            detail="O'rikzor harakatlari alohida API. GET /api/v1/movements-orikzor dan foydalaning. Sync buyurtmalar jadvaliga yozilmaydi.",
         )
     if payload.order_source == "diller":
         raise HTTPException(
@@ -604,154 +596,6 @@ async def sync_orders_from_smartup(
         raise HTTPException(status_code=500, detail=msg) from exc
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"Smartup export failed: {exc}") from exc
-
-
-@router.post("/sync-orikzor", response_model=SmartupSyncResponse, summary="Sync O'rikzor harakatlari from Smartup")
-async def sync_orikzor(
-    payload: SyncOrikzorRequest,
-    db: Session = Depends(get_db),
-    _user=Depends(require_permission("orders:sync")),
-):
-    today = date.today()
-    if payload.begin_deal_date is not None and payload.end_deal_date is not None:
-        begin_date = payload.begin_deal_date
-        end_date = payload.end_deal_date
-    elif payload.begin_deal_date is not None:
-        begin_date = payload.begin_deal_date
-        end_date = today
-    elif payload.end_deal_date is not None:
-        end_date = payload.end_deal_date
-        begin_date = end_date - timedelta(days=30)
-    else:
-        end_date = today
-        begin_date = today - timedelta(days=30)
-    if begin_date > end_date:
-        raise HTTPException(status_code=400, detail="begin_deal_date must be <= end_deal_date")
-
-    logger = logging.getLogger(__name__)
-    begin_mod = getattr(payload, "begin_modified_on", None)
-    end_mod = getattr(payload, "end_modified_on", None)
-    if begin_mod is None or end_mod is None:
-        # Default: oxirgi 1 oy o'zgarishlar (delta sync tezroq)
-        end_mod = end_mod or today
-        begin_mod = begin_mod or (today - timedelta(days=30))
-    if begin_mod > end_mod:
-        begin_mod, end_mod = end_mod, begin_mod
-
-    logger.info(
-        "O'rikzor sync: sana oralig'i %s .. %s (delta: modified %s .. %s)",
-        begin_date.isoformat(),
-        end_date.isoformat(),
-        begin_mod.isoformat(),
-        end_mod.isoformat(),
-    )
-
-    try:
-        response = export_movements_from_smartup(
-            begin_date, end_date,
-            begin_modified_on=begin_mod,
-            end_modified_on=end_mod,
-        )
-        n_items = len(response.items)
-        parse_skipped = getattr(response, "debug_skipped_by_reason", None) or {}
-        created, updated, skipped, import_errors, skipped_by_reason = import_orders(
-            db, response.items, order_source="orikzor", filial_id_override=None
-        )
-        raw_count = response.debug_dict_count if response.debug_dict_count is not None else response.debug_raw_count
-        if raw_count is None:
-            raw_count = 0
-        after_date_filter_val = getattr(response, "debug_after_date_filter_count", None)
-        loop_count_val = getattr(response, "debug_loop_count", None)
-        all_reason_keys = set(parse_skipped) | set(skipped_by_reason)
-        merged_skipped = {k: parse_skipped.get(k, 0) + skipped_by_reason.get(k, 0) for k in all_reason_keys}
-        skipped_total = sum(merged_skipped.values())
-        processed = created + updated + skipped_total
-        logger.info(
-            "O'rikzor sync counts: raw_count=%s after_date_filter_count=%s loop_count=%s inserted_count=%s updated_count=%s skipped_total=%s processed=%s reasons=%s",
-            raw_count,
-            after_date_filter_val,
-            loop_count_val,
-            created,
-            updated,
-            skipped_total,
-            processed,
-            merged_skipped,
-        )
-        logger.info(
-            "O'rikzor sync skipped_by_reason: %s",
-            merged_skipped,
-        )
-        for err in import_errors[:5]:
-            logger.error("O'rikzor import xato: external_id=%s sabab=%s", err.external_id, err.reason)
-        if len(import_errors) > 5:
-            logger.error("O'rikzor import: qolgan %s ta xato", len(import_errors) - 5)
-        errors_count = len(import_errors) if import_errors else None
-        first_error_reason = import_errors[0].reason if import_errors else None
-        discrepancy = None
-        if raw_count is not None and processed != raw_count:
-            logger.error(
-                "DISCREPANCY raw=%s processed=%s inserted=%s updated=%s skipped=%s reasons=%s",
-                raw_count,
-                processed,
-                created,
-                updated,
-                skipped_total,
-                merged_skipped,
-            )
-            discrepancy = True
-        debug = {
-            "raw_count": raw_count if raw_count is not None else 0,
-            "inserted": created,
-            "updated": updated,
-            "skipped_total": skipped_total,
-            "skipped_by_reason": merged_skipped,
-            "discrepancy": discrepancy or getattr(response, "debug_discrepancy", None),
-            "preview": (getattr(response, "debug_preview", None) or [])[:2],
-            "pre_filter_count": getattr(response, "debug_pre_filter_count", None),
-            "after_date_filter_count": getattr(response, "debug_after_date_filter_count", None),
-            "loop_count": getattr(response, "debug_loop_count", None),
-            "skipped_out_of_range": getattr(response, "debug_skipped_out_of_range", None),
-            "status_histogram": getattr(response, "debug_status_histogram", None),
-        }
-        if (created + updated) == 0 and n_items > 0:
-            detail = (
-                f"Data keldi ({n_items} ta), import qilinmadi. skipped_by_reason: {skipped_by_reason}. "
-                + (f"Birinchi xato: {first_error_reason}" if first_error_reason else "")
-            )
-        elif (created + updated) == 0 and n_items == 0 and (raw_count or 0) > 0:
-            extra = getattr(response, "parse_warning", None) or first_error_reason or ""
-            detail = (
-                f"Data keldi ({raw_count} ta), lekin parse natijasi 0. skipped_by_reason: {parse_skipped}."
-                + (f" {extra}" if extra else "")
-            )
-        elif (created + updated) == 0 and n_items == 0:
-            parse_warning = getattr(response, "parse_warning", None) or ""
-            detail = (
-                "API dan hech qanday movement qaytmadi. "
-                + (parse_warning + " " if parse_warning else "")
-                + "Sana oralig'ini yoki Render loglaridagi 'parse: raw_count= dict_count=' qatorini tekshiring."
-            )
-        else:
-            detail = first_error_reason if import_errors else None
-        if (created + updated) == 0 and detail:
-            logger.info("O'rikzor sync javob (detail): %s", detail[:200] + ("..." if len(detail or "") > 200 else ""))
-        return SmartupSyncResponse(
-            created=created,
-            updated=updated,
-            skipped=skipped,
-            detail=detail,
-            errors_count=errors_count,
-            error=first_error_reason if (created + updated) == 0 and first_error_reason else None,
-            debug=debug,
-        )
-    except RuntimeError as exc:
-        msg = str(exc)
-        if "400" in msg or "не найдена" in msg or "organization" in msg.lower():
-            raise HTTPException(status_code=400, detail=msg) from exc
-        raise HTTPException(status_code=500, detail=msg) from exc
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("O'rikzor sync failed: %s", exc)
-        raise HTTPException(status_code=500, detail=f"O'rikzor sync failed: {exc}") from exc
 
 
 @router.post("/{order_id}/send-to-picking", response_model=SendToPickingResponse, summary="Send order to picking")
