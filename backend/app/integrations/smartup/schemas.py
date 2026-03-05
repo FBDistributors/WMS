@@ -114,10 +114,18 @@ class SmartupOrder(BaseModel):
 
     @root_validator(pre=True)
     def _normalize_lines(cls, values):  # noqa: N805
+        base: List[dict] = []
         for key in ("lines", "order_lines", "items", "goods", "positions", "details", "order_products"):
             if key in values and isinstance(values[key], list):
-                values["lines"] = values[key]
+                base = list(values[key])
                 break
+        # Aksiya mahsulotlari: order_gifts va order_actions ni ham qatorlar ro'yxatiga qo'shamiz
+        for key in ("order_gifts", "order_actions"):
+            if key in values and isinstance(values[key], list):
+                for item in values[key]:
+                    if isinstance(item, dict):
+                        base.append(item)
+        values["lines"] = base
         if "customer_id" not in values:
             for key in (
                 "customer_id",
