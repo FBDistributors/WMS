@@ -274,7 +274,7 @@ export function OrikzorHarakatlariPage() {
               >
                 {orderedCols.map((colId) =>
                   visibleCols.has(colId) ? (
-                    <Fragment key={colId}>{renderCell(colId, m)}</Fragment>
+                    <Fragment key={colId}>{renderCell(colId as (typeof COLUMNS_ORIKZOR)[number]['id'], m)}</Fragment>
                   ) : null
                 )}
               </tr>

@@ -3,7 +3,6 @@ import { GripVertical, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '../../../components/ui/button'
-import type { OrdersTableConfig } from '../../hooks/useOrdersTableConfig'
 
 type Option = {
   id: string
