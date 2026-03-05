@@ -10,13 +10,20 @@ type Option = {
   label: string
 }
 
+/** Buyurtmalar, Tashkiliy harakatlar va O'rikzor jadvallari uchun umumiy sozlamalar */
+export type TableConfigShape = {
+  visibleColumns: string[]
+  columnOrder: string[]
+  searchFields: string[]
+}
+
 type OrdersTableSettingsProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  config: OrdersTableConfig
+  config: TableConfigShape
   columns: Option[]
   searchFields: Option[]
-  onSave: (config: OrdersTableConfig) => void
+  onSave: (config: TableConfigShape) => void
   onReset: () => void
 }
 

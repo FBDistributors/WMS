@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { FileText, Filter, X } from 'lucide-react'
+import { FileText, Filter, Settings, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { OrdersTableSettings } from '../../admin/components/orders/OrdersTableSettings'
 import { SendToPickingDialog } from '../../admin/components/orders/SendToPickingDialog'
+import { useOrikzorTableConfig } from '../../admin/hooks/useMovementsTableConfig'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
@@ -34,6 +36,12 @@ const COLUMNS_ORIKZOR = [
   { id: 'view_details', labelKey: 'orders:columns_diller.view_details' },
 ] as const
 
+const ORIKZOR_SEARCH_FIELD_OPTIONS = [
+  { id: 'movement_number', labelKey: 'orders:columns_diller.movement_number' },
+  { id: 'movement_note', labelKey: 'orders:columns_diller.movement_note' },
+  { id: 'status', labelKey: 'orders:columns_diller.status' },
+]
+
 export function OrikzorHarakatlariPage() {
   const { t } = useTranslation(['orders', 'common', 'admin'])
   const navigate = useNavigate()
@@ -53,6 +61,8 @@ export function OrikzorHarakatlariPage() {
   const canSendToPicking = hasPermission('orders:send_to_picking')
   const [selectedMovementIds, setSelectedMovementIds] = useState<Set<string>>(new Set())
   const [sendDialogOpen, setSendDialogOpen] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const orikzorTableConfig = useOrikzorTableConfig()
 
   const load = useCallback(
     async (background = false, pageOverride?: number, forceRefresh = false) => {
@@ -218,38 +228,42 @@ export function OrikzorHarakatlariPage() {
         />
       )
     }
+    const visibleCols = new Set(orikzorTableConfig.config.visibleColumns.filter((id) => COLUMNS_ORIKZOR.some((c) => c.id === id)))
+    const orderedCols = orikzorTableConfig.config.columnOrder.filter((id) => COLUMNS_ORIKZOR.some((c) => c.id === id))
     return (
       <TableScrollArea inline>
         <table className="w-max min-w-[600px] table-auto text-sm">
           <thead className="text-xs uppercase text-slate-500">
             <tr className="border-b border-slate-200 dark:border-slate-800">
-              {COLUMNS_ORIKZOR.map((col) => (
-                <th key={col.id} className="px-4 py-3 text-left">
-                  {col.id === 'select' && canSendToPicking ? (
-                    <input
-                      type="checkbox"
-                      checked={movementList.length > 0 && movementList.every((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))}
-                      ref={(el) => {
-                        if (el) {
-                          const some = movementList.some((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))
-                          el.indeterminate = some && !movementList.every((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))
+              {orderedCols.map((colId) =>
+                visibleCols.has(colId) ? (
+                  <th key={colId} className="px-4 py-3 text-left">
+                    {colId === 'select' && canSendToPicking ? (
+                      <input
+                        type="checkbox"
+                        checked={movementList.length > 0 && movementList.every((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))}
+                        ref={(el) => {
+                          if (el) {
+                            const some = movementList.some((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))
+                            el.indeterminate = some && !movementList.every((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))
+                          }
+                        }}
+                        onChange={() =>
+                          setSelectedMovementIds(
+                            movementList.every((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))
+                              ? new Set()
+                              : new Set(movementList.map((m) => (m.movement_id as string) ?? ''))
+                          )
                         }
-                      }}
-                      onChange={() =>
-                        setSelectedMovementIds(
-                          movementList.every((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))
-                            ? new Set()
-                            : new Set(movementList.map((m) => (m.movement_id as string) ?? ''))
-                        )
-                      }
-                      aria-label={t('orders:select_all')}
-                      className="h-4 w-4 rounded border-slate-300"
-                    />
-                  ) : (
-                    columnLabels.get(col.id)
-                  )}
-                </th>
-              ))}
+                        aria-label={t('orders:select_all')}
+                        className="h-4 w-4 rounded border-slate-300"
+                      />
+                    ) : (
+                      columnLabels.get(colId)
+                    )}
+                  </th>
+                ) : null
+              )}
             </tr>
           </thead>
           <tbody>
@@ -258,16 +272,18 @@ export function OrikzorHarakatlariPage() {
                 key={(m.movement_id as string) ?? String(m.barcode ?? '')}
                 className="border-b border-slate-100 dark:border-slate-800"
               >
-                {COLUMNS_ORIKZOR.map((col) => (
-                  <Fragment key={col.id}>{renderCell(col.id, m)}</Fragment>
-                ))}
+                {orderedCols.map((colId) =>
+                  visibleCols.has(colId) ? (
+                    <Fragment key={colId}>{renderCell(colId, m)}</Fragment>
+                  ) : null
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       </TableScrollArea>
     )
-  }, [canSendToPicking, error, isLoading, movementList, movementTotal, load, columnLabels, navigate, searchParams, selectedMovementIds, setSelectedMovementIds, t])
+  }, [canSendToPicking, error, isLoading, movementList, movementTotal, load, columnLabels, navigate, orikzorTableConfig.config, searchParams, selectedMovementIds, setSelectedMovementIds, t])
 
   const pageTitle = t('admin:menu.orders_orikzor', "O'rikzor harakatlari")
 
@@ -284,9 +300,19 @@ export function OrikzorHarakatlariPage() {
     <AdminLayout
       title={pageTitle}
       actionSlot={
-        <Button onClick={handleSmartupSync} disabled={isRefreshing}>
-          {isRefreshing ? t('orders:syncing') : t('orders:sync')}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            className="rounded-full px-3 py-3"
+            onClick={() => setIsSettingsOpen(true)}
+            aria-label={t('orders:table.settings_title')}
+          >
+            <Settings size={18} />
+          </Button>
+          <Button onClick={handleSmartupSync} disabled={isRefreshing}>
+            {isRefreshing ? t('orders:syncing') : t('orders:sync')}
+          </Button>
+        </div>
       }
     >
       <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -498,6 +524,21 @@ export function OrikzorHarakatlariPage() {
           </div>
         </div>
       </Card>
+      <OrdersTableSettings
+        open={isSettingsOpen}
+        onOpenChange={setIsSettingsOpen}
+        config={orikzorTableConfig.config}
+        columns={COLUMNS_ORIKZOR.map((column) => ({
+          id: column.id,
+          label: t(column.labelKey),
+        }))}
+        searchFields={ORIKZOR_SEARCH_FIELD_OPTIONS.map((field) => ({
+          id: field.id,
+          label: t(field.labelKey),
+        }))}
+        onSave={orikzorTableConfig.updateConfig}
+        onReset={orikzorTableConfig.resetConfig}
+      />
     </AdminLayout>
   )
 }

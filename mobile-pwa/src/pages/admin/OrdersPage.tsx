@@ -7,6 +7,7 @@ import { AdminLayout } from '../../admin/components/AdminLayout'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { SendToPickingDialog } from '../../admin/components/orders/SendToPickingDialog'
 import { OrdersTableSettings } from '../../admin/components/orders/OrdersTableSettings'
+import { useDillerTableConfig } from '../../admin/hooks/useMovementsTableConfig'
 import { useOrdersTableConfig } from '../../admin/hooks/useOrdersTableConfig'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
@@ -82,6 +83,15 @@ const COLUMN_OPTIONS_DILLER = [
   { id: 'view_details', labelKey: 'orders:columns_diller.view_details' },
 ]
 
+const DILLER_SEARCH_FIELD_OPTIONS = [
+  { id: 'order_number', labelKey: 'orders:columns_diller.order_number' },
+  { id: 'external_id', labelKey: 'orders:columns_diller.external_id' },
+  { id: 'from_warehouse_code', labelKey: 'orders:columns_diller.from_warehouse_code' },
+  { id: 'to_warehouse_code', labelKey: 'orders:columns_diller.to_warehouse_code' },
+  { id: 'movement_note', labelKey: 'orders:columns_diller.movement_note' },
+  { id: 'status', labelKey: 'orders:columns_diller.status' },
+]
+
 const SEARCH_FIELD_OPTIONS = [
   { id: 'order_number', labelKey: 'orders:search_fields.order_number' },
   { id: 'external_id', labelKey: 'orders:search_fields.external_id' },
@@ -135,6 +145,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null)
 
   const { config, updateConfig, resetConfig } = useOrdersTableConfig()
+  const dillerTableConfig = useDillerTableConfig()
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [filterPanelOpen, setFilterPanelOpen] = useState(false)
   const filterPanelRef = useRef<HTMLDivElement>(null)
@@ -463,6 +474,8 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
           </div>
         )
       }
+      const dillerVisible = new Set(dillerTableConfig.config.visibleColumns.filter((id) => COLUMN_OPTIONS_DILLER.some((c) => c.id === id)))
+      const dillerOrdered = dillerTableConfig.config.columnOrder.filter((id) => COLUMN_OPTIONS_DILLER.some((c) => c.id === id))
       return (
         <div className="space-y-3">
           {canSend && selectedMovementIds.size > 0 && (
@@ -482,33 +495,35 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             <table className="w-max min-w-[600px] text-sm">
               <thead className="text-xs uppercase text-slate-500">
                 <tr className="border-b border-slate-200 dark:border-slate-800">
-                  {COLUMN_OPTIONS_DILLER.map((col) => (
-                    <th key={col.id} className="px-4 py-3 text-left">
-                      {col.id === 'select' && canSend ? (
-                        <input
-                          type="checkbox"
-                          checked={movementList.length > 0 && movementList.every((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))}
-                          ref={(el) => {
-                            if (el) {
-                              const some = movementList.some((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))
-                              el.indeterminate = some && !movementList.every((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))
+                  {dillerOrdered.map((colId) =>
+                    dillerVisible.has(colId) ? (
+                      <th key={colId} className="px-4 py-3 text-left">
+                        {colId === 'select' && canSend ? (
+                          <input
+                            type="checkbox"
+                            checked={movementList.length > 0 && movementList.every((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))}
+                            ref={(el) => {
+                              if (el) {
+                                const some = movementList.some((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))
+                                el.indeterminate = some && !movementList.every((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))
+                              }
+                            }}
+                            onChange={() =>
+                              setSelectedMovementIds(
+                                movementList.every((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))
+                                  ? new Set()
+                                  : new Set(movementList.map((m) => (m.movement_id as string) ?? ''))
+                              )
                             }
-                          }}
-                          onChange={() =>
-                            setSelectedMovementIds(
-                              movementList.every((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))
-                                ? new Set()
-                                : new Set(movementList.map((m) => (m.movement_id as string) ?? ''))
-                            )
-                          }
-                          aria-label={t('orders:select_all')}
-                          className="h-4 w-4 rounded border-slate-300"
-                        />
-                      ) : (
-                        columnLabelsDiller.get(col.id)
-                      )}
-                    </th>
-                  ))}
+                            aria-label={t('orders:select_all')}
+                            className="h-4 w-4 rounded border-slate-300"
+                          />
+                        ) : (
+                          columnLabelsDiller.get(colId)
+                        )}
+                      </th>
+                    ) : null
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -517,11 +532,13 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                     key={(m.movement_id as string) ?? String(m.barcode ?? '')}
                     className="border-b border-slate-100 dark:border-slate-800"
                   >
-                    {COLUMN_OPTIONS_DILLER.map((col) => (
-                      <React.Fragment key={col.id}>
-                        {renderMovementCell(col.id, m)}
-                      </React.Fragment>
-                    ))}
+                    {dillerOrdered.map((colId) =>
+                      dillerVisible.has(colId) ? (
+                        <React.Fragment key={colId}>
+                          {renderMovementCell(colId, m)}
+                        </React.Fragment>
+                      ) : null
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -550,7 +567,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             : COLUMN_OPTIONS
     const visibleColumns =
       orderSource === 'diller'
-        ? new Set(COLUMN_OPTIONS_DILLER.map((c) => c.id))
+        ? new Set(dillerTableConfig.config.visibleColumns.filter((id) => COLUMN_OPTIONS_DILLER.some((c) => c.id === id)))
         : mode === 'statuses'
           ? new Set(COLUMN_OPTIONS_STATUSES.map((c) => c.id))
           : new Set(
@@ -560,7 +577,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             )
     const orderedColumns =
       orderSource === 'diller'
-        ? COLUMN_OPTIONS_DILLER.map((c) => c.id)
+        ? dillerTableConfig.config.columnOrder.filter((id) => COLUMN_OPTIONS_DILLER.some((c) => c.id === id))
         : mode === 'statuses'
           ? COLUMN_OPTIONS_STATUSES.map((c) => c.id)
           : config.columnOrder.filter((id) =>
@@ -832,7 +849,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         </table>
       </TableScrollArea>
     )
-  }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, eligibleItems, error, isLoading, items, load, location.pathname, location.search, mode, movementPage, movementsData, navigate, orderSource, searchQuery, selectedMovementIds, selectedOrderIds, t, updatingOrderId])
+  }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, dillerTableConfig.config, eligibleItems, error, isLoading, items, load, location.pathname, location.search, mode, movementPage, movementsData, navigate, orderSource, searchQuery, selectedMovementIds, selectedOrderIds, t, updatingOrderId])
 
   return (
     <AdminLayout title={pageTitle} backTo={mode === 'statuses' ? '/admin' : undefined}>
@@ -874,7 +891,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {mode !== 'statuses' && orderSource !== 'diller' ? (
+            {mode !== 'statuses' ? (
               <Button
                 variant="ghost"
                 className="rounded-full px-3 py-3"
@@ -1143,17 +1160,17 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       <OrdersTableSettings
         open={isSettingsOpen}
         onOpenChange={setIsSettingsOpen}
-        config={config}
-        columns={(mode === 'statuses' ? COLUMN_OPTIONS_STATUSES : mode === 'default' ? COLUMN_OPTIONS_DEFAULT : COLUMN_OPTIONS).map((column) => ({
+        config={orderSource === 'diller' ? dillerTableConfig.config : config}
+        columns={(orderSource === 'diller' ? COLUMN_OPTIONS_DILLER : mode === 'statuses' ? COLUMN_OPTIONS_STATUSES : mode === 'default' ? COLUMN_OPTIONS_DEFAULT : COLUMN_OPTIONS).map((column) => ({
           id: column.id,
           label: t(column.labelKey),
         }))}
-        searchFields={SEARCH_FIELD_OPTIONS.map((field) => ({
+        searchFields={(orderSource === 'diller' ? DILLER_SEARCH_FIELD_OPTIONS : SEARCH_FIELD_OPTIONS).map((field) => ({
           id: field.id,
           label: t(field.labelKey),
         }))}
-        onSave={updateConfig}
-        onReset={resetConfig}
+        onSave={orderSource === 'diller' ? dillerTableConfig.updateConfig : updateConfig}
+        onReset={orderSource === 'diller' ? dillerTableConfig.resetConfig : resetConfig}
       />
     </AdminLayout>
   )
