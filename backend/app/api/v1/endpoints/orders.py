@@ -398,7 +398,9 @@ async def list_orders(
         query = query.filter(or_(*[field.ilike(term) for field in fields]))
 
     # Filial filter: order_source berilganda filial default qo‘llanmaydi (manba bo‘yicha filtr yetarli)
-    if filial_id and filial_id.strip() and filial_id.strip().lower() != "all":
+    if filial_id and filial_id.strip() and filial_id.strip().lower() == "all":
+        pass  # Barcha filiallar (Buyurtma statuslari sahifasi)
+    elif filial_id and filial_id.strip():
         query = query.filter(OrderModel.filial_id == filial_id.strip())
     elif not (order_source and order_source.strip()):
         default_filial = os.getenv("WMS_DEFAULT_FILIAL_ID", "3788131").strip()
