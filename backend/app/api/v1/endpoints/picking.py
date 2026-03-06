@@ -364,9 +364,16 @@ async def get_consolidated(
         .all()
     )
     # Group by product key (barcode or sku+product_name); preserve order of first occurrence
+    # Also build per-document line counts from lines_with_loc to avoid touching d.lines after commit (500 fix)
     product_order: List[tuple] = []  # (barcode_or_key, product_name, sku, expiry_display)
     groups: dict = {}
+    doc_line_stats: dict = {}  # doc_id -> {"total": int, "done": int}
     for line, loc in lines_with_loc:
+        doc_id = line.document_id
+        doc_line_stats.setdefault(doc_id, {"total": 0, "done": 0})
+        doc_line_stats[doc_id]["total"] += 1
+        if (line.picked_qty or 0) >= (line.required_qty or 0):
+            doc_line_stats[doc_id]["done"] += 1
         key = (line.barcode or line.sku or str(line.product_id or ""), line.product_name or "", line.sku)
         if key not in groups:
             groups[key] = []
@@ -407,8 +414,8 @@ async def get_consolidated(
             id=d.id,
             reference_number=d.doc_no,
             status=d.status,
-            lines_total=len(d.lines),
-            lines_done=sum(1 for line in d.lines if (line.picked_qty or 0) >= (line.required_qty or 0)),
+            lines_total=doc_line_stats.get(d.id, {}).get("total", 0),
+            lines_done=doc_line_stats.get(d.id, {}).get("done", 0),
         )
         for d in documents
     ]

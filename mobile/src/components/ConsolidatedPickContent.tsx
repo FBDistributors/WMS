@@ -90,22 +90,42 @@ export function ConsolidatedPickContent({
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  // When returning from Scanner: restore selected product and apply pending barcode in one effect
+  // When returning from Scanner: restore selected product and apply pending barcode only if scan matches product
   useEffect(() => {
     if (!data?.products) return;
     if (selectedProductKey && onProductSelect) {
       const prod = data.products.find((p) => consolidatedProductKey(p) === selectedProductKey);
-      if (prod) {
+      if (prod && pendingScannedBarcode && onClearPendingBarcode) {
+        const scanned = pendingScannedBarcode.trim();
+        const matchBarcode = (prod.barcode || '').trim();
+        const matchSku = (prod.sku || '').trim();
+        const matches = (matchBarcode && scanned === matchBarcode) || (matchSku && scanned === matchSku);
+        if (!matches) {
+          Alert.alert(t('error'), t('consolidatedScanMismatch'));
+          onClearPendingBarcode();
+          onProductSelect(null);
+          return;
+        }
         setSelectedProduct(prod);
         onProductSelect(null);
-        if (pendingScannedBarcode && onClearPendingBarcode) {
-          setScannedBarcodeForQty(pendingScannedBarcode);
-          const remaining = Math.max(1, Math.round(prod.total_required - prod.total_picked));
-          setProductQtyInput(String(remaining));
-          onClearPendingBarcode();
-        }
+        setScannedBarcodeForQty(pendingScannedBarcode);
+        const remaining = Math.max(1, Math.round(prod.total_required - prod.total_picked));
+        setProductQtyInput(String(remaining));
+        onClearPendingBarcode();
+      } else if (prod && !pendingScannedBarcode) {
+        setSelectedProduct(prod);
+        onProductSelect(null);
       }
     } else if (pendingScannedBarcode && selectedProduct && onClearPendingBarcode) {
+      const scanned = pendingScannedBarcode.trim();
+      const matchBarcode = (selectedProduct.barcode || '').trim();
+      const matchSku = (selectedProduct.sku || '').trim();
+      const matches = (matchBarcode && scanned === matchBarcode) || (matchSku && scanned === matchSku);
+      if (!matches) {
+        Alert.alert(t('error'), t('consolidatedScanMismatch'));
+        onClearPendingBarcode();
+        return;
+      }
       setScannedBarcodeForQty(pendingScannedBarcode);
       const remaining = Math.max(1, Math.round(selectedProduct.total_required - selectedProduct.total_picked));
       setProductQtyInput(String(remaining));
@@ -118,6 +138,7 @@ export function ConsolidatedPickContent({
     pendingScannedBarcode,
     selectedProduct,
     onClearPendingBarcode,
+    t,
   ]);
 
   const closeProductModal = useCallback(() => {

@@ -128,6 +128,7 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     consolidatedProductByOrder: "Buyurtma bo'yicha",
     consolidatedScanHint: "Shtrixkod + miqdor (ixtiyoriy)",
     consolidatedQuantity: "Miqdor",
+    consolidatedScanMismatch: "Skanlangan mahsulot tanlangan pozitsiyaga mos kelmadi. To'g'ri mahsulotni skanlang.",
     toggleOrdersList: "Buyurtmalar",
     toggleGeneralList: "Umumiy",
 
@@ -370,6 +371,7 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     consolidatedProductByOrder: 'По заказам',
     consolidatedScanHint: 'Штрихкод + кол-во (необяз.)',
     consolidatedQuantity: 'Кол-во',
+    consolidatedScanMismatch: 'Отсканированный товар не совпадает с выбранной позицией. Отсканируйте правильный товар.',
     toggleOrdersList: 'Заказы',
     toggleGeneralList: 'Общий',
 
@@ -611,6 +613,7 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     consolidatedProductByOrder: 'By order',
     consolidatedScanHint: 'Barcode + qty (optional)',
     consolidatedQuantity: 'Qty',
+    consolidatedScanMismatch: 'Scanned product does not match the selected position. Scan the correct product.',
     toggleOrdersList: 'Orders',
     toggleGeneralList: 'General',
 
