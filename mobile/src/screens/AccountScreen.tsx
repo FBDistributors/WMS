@@ -276,14 +276,6 @@ export function AccountScreen() {
   return (
     <SafeAreaView style={[styles.container, isDark && styles.containerDark]} edges={['top']}>
       <View style={[styles.header, isDark && styles.headerDark]}>
-        <TouchableOpacity
-          style={[styles.backButton, isDark && styles.backButtonDark]}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <Icon name="arrow-left" size={24} color={isDark ? '#93c5fd' : '#1976d2'} />
-        </TouchableOpacity>
         <Text style={[styles.headerTitle, isDark && styles.headerTitleDark]}>{t('account')}</Text>
       </View>
 
@@ -558,6 +550,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: '#fff',

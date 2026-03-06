@@ -15,6 +15,7 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { RootStackParamList } from '../types/navigation';
 import { useLocale } from '../i18n/LocaleContext';
+import { useTheme } from '../theme/ThemeContext';
 import {
   getPickerProductDetail,
   type PickerProductDetailResponse,
@@ -28,6 +29,8 @@ export function InventoryDetailScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<DetailRoute>();
   const { t, locale } = useLocale();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const productId = route.params?.productId;
   const [data, setData] = useState<PickerProductDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,15 +61,15 @@ export function InventoryDetailScreen() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
+      <View style={[styles.container, isDark && styles.containerDark]}>
+        <View style={[styles.header, isDark && styles.headerDark]}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Icon name="arrow-left" size={24} color="#1a237e" />
+            <Icon name="arrow-left" size={24} color={isDark ? '#93c5fd' : '#1a237e'} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('invTitle')}</Text>
+          <Text style={[styles.headerTitle, isDark && styles.headerTitleDark]}>{t('invTitle')}</Text>
         </View>
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#1a237e" />
+        <View style={[styles.centered, isDark && styles.centeredDark]}>
+          <ActivityIndicator size="large" color={isDark ? '#93c5fd' : '#1a237e'} />
         </View>
       </View>
     );
@@ -74,16 +77,16 @@ export function InventoryDetailScreen() {
 
   if (error || !data) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
+      <View style={[styles.container, isDark && styles.containerDark]}>
+        <View style={[styles.header, isDark && styles.headerDark]}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Icon name="arrow-left" size={24} color="#1a237e" />
+            <Icon name="arrow-left" size={24} color={isDark ? '#93c5fd' : '#1a237e'} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('invTitle')}</Text>
+          <Text style={[styles.headerTitle, isDark && styles.headerTitleDark]}>{t('invTitle')}</Text>
         </View>
-        <View style={styles.centered}>
-          <Icon name="alert-circle-outline" size={48} color="#c62828" />
-          <Text style={styles.errorText}>{error ?? t('invNoResults')}</Text>
+        <View style={[styles.centered, isDark && styles.centeredDark]}>
+          <Icon name="alert-circle-outline" size={48} color="#f87171" />
+          <Text style={[styles.errorText, isDark && styles.errorTextDark]}>{error ?? t('invNoResults')}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={load}>
             <Text style={styles.retryBtnText}>{t('invRetry')}</Text>
           </TouchableOpacity>
@@ -93,33 +96,33 @@ export function InventoryDetailScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={[styles.container, isDark && styles.containerDark]}>
+      <View style={[styles.header, isDark && styles.headerDark]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backBtn}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
-          <Icon name="arrow-left" size={24} color="#1a237e" />
+          <Icon name="arrow-left" size={24} color={isDark ? '#93c5fd' : '#1a237e'} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{data.name}</Text>
+        <Text style={[styles.headerTitle, isDark && styles.headerTitleDark]} numberOfLines={1}>{data.name}</Text>
       </View>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.card}>
-          <Text style={styles.productName}>{data.name}</Text>
+      <ScrollView style={[styles.scroll, isDark && styles.scrollDark]} contentContainerStyle={styles.scrollContent}>
+        <View style={[styles.card, isDark && styles.cardDark]}>
+          <Text style={[styles.productName, isDark && styles.productNameDark]}>{data.name}</Text>
           {data.main_barcode ? (
-            <Text style={styles.barcode}>{t('invShtrixKod')}: {data.main_barcode}</Text>
+            <Text style={[styles.barcode, isDark && styles.barcodeDark]}>{t('invShtrixKod')}: {data.main_barcode}</Text>
           ) : null}
-          <Text style={styles.productCode}>{t('invKod')}: {data.code}</Text>
+          <Text style={[styles.productCode, isDark && styles.productCodeDark]}>{t('invKod')}: {data.code}</Text>
         </View>
-        <Text style={styles.sectionLabel}>{t('invMoreLocations')}</Text>
+        <Text style={[styles.sectionLabel, isDark && styles.sectionLabelDark]}>{t('invMoreLocations')}</Text>
         {data.locations.map((loc) => (
-          <View key={`${loc.location_id}-${loc.lot_id}`} style={styles.locCard}>
+          <View key={`${loc.location_id}-${loc.lot_id}`} style={[styles.locCard, isDark && styles.locCardDark]}>
             <View style={styles.locRow}>
-              <Text style={styles.locCode}>{loc.location_code}</Text>
-              <Text style={styles.locExpiry}>{formatExpiryDisplay(loc.expiry_date, locale)}</Text>
+              <Text style={[styles.locCode, isDark && styles.locCodeDark]}>{loc.location_code}</Text>
+              <Text style={[styles.locExpiry, isDark && styles.locExpiryDark]}>{formatExpiryDisplay(loc.expiry_date, locale)}</Text>
             </View>
-            <Text style={styles.locMeta}>
+            <Text style={[styles.locMeta, isDark && styles.locMetaDark]}>
               {t('invQoldiq')}: {Math.round(loc.available_qty)}
             </Text>
           </View>
@@ -236,4 +239,20 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
+  // Dark
+  containerDark: { backgroundColor: '#0f172a' },
+  headerDark: { backgroundColor: '#1e293b', borderBottomColor: '#334155' },
+  headerTitleDark: { color: '#f1f5f9' },
+  scrollDark: { backgroundColor: '#0f172a' },
+  cardDark: { backgroundColor: '#1e293b' },
+  productNameDark: { color: '#f1f5f9' },
+  barcodeDark: { color: '#94a3b8' },
+  productCodeDark: { color: '#93c5fd' },
+  sectionLabelDark: { color: '#94a3b8' },
+  locCardDark: { backgroundColor: '#1e293b' },
+  locCodeDark: { color: '#f1f5f9' },
+  locExpiryDark: { color: '#94a3b8' },
+  locMetaDark: { color: '#94a3b8' },
+  centeredDark: { backgroundColor: '#0f172a' },
+  errorTextDark: { color: '#fca5a5' },
 });

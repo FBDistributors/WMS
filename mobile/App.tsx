@@ -28,6 +28,8 @@ import { ReturnsRedirectScreen } from './src/screens/ReturnsRedirectScreen';
 import { KirimScreen } from './src/screens/KirimScreen';
 import { KirimFormScreen } from './src/screens/KirimFormScreen';
 import { MovementScreen } from './src/screens/MovementScreen';
+import { withPickerFooter } from './src/components/WithPickerFooter';
+import { TaskCountProvider } from './src/context/TaskCountContext';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -46,9 +48,27 @@ export default function App() {
     return cleanup;
   }, []);
 
+  const PickTaskListWithFooter = React.useMemo(
+    () => withPickerFooter(PickTaskList, 'PickTaskList'),
+    []
+  );
+  const InventoryWithFooter = React.useMemo(
+    () => withPickerFooter(InventoryScreen, 'Inventory'),
+    []
+  );
+  const HisobWithFooter = React.useMemo(
+    () => withPickerFooter(AccountScreen, 'Hisob'),
+    []
+  );
+  const KirimWithFooter = React.useMemo(
+    () => withPickerFooter(KirimScreen, 'Kirim'),
+    []
+  );
+
   return (
     <LocaleProvider>
       <ThemeProvider>
+      <TaskCountProvider>
       <NetworkProvider>
       <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
@@ -59,22 +79,23 @@ export default function App() {
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="PickerHome" component={PickerHome} />
-        <Stack.Screen name="PickTaskList" component={PickTaskList} />
+        <Stack.Screen name="PickTaskList" component={PickTaskListWithFooter} />
         <Stack.Screen name="ConsolidatedPick" component={ConsolidatedPickScreen} />
         <Stack.Screen name="PickTaskDetails" component={PickTaskDetails} />
         <Stack.Screen name="Picker" component={PickerScreen} />
         <Stack.Screen name="Scanner" component={ScannerScreen} />
-        <Stack.Screen name="Hisob" component={AccountScreen} />
-        <Stack.Screen name="Inventory" component={InventoryScreen} />
+        <Stack.Screen name="Hisob" component={HisobWithFooter} />
+        <Stack.Screen name="Inventory" component={InventoryWithFooter} />
         <Stack.Screen name="InventoryDetail" component={InventoryDetailScreen} />
         <Stack.Screen name="QueueScreen" component={QueueScreen} />
         <Stack.Screen name="Returns" component={ReturnsRedirectScreen} />
-        <Stack.Screen name="Kirim" component={KirimScreen} />
+        <Stack.Screen name="Kirim" component={KirimWithFooter} />
         <Stack.Screen name="KirimForm" component={KirimFormScreen} />
         <Stack.Screen name="Movement" component={MovementScreen} />
       </Stack.Navigator>
     </NavigationContainer>
     </NetworkProvider>
+    </TaskCountProvider>
     </ThemeProvider>
     </LocaleProvider>
   );

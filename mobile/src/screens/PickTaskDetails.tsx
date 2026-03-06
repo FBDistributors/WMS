@@ -19,6 +19,7 @@ import { completePickDocument, getTaskById, INCOMPLETE_REASON_KEYS, skipLine, su
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { ScanInput } from '../components/ScanInput';
 import { useLocale } from '../i18n/LocaleContext';
+import { useTheme } from '../theme/ThemeContext';
 import { playSuccessBeep } from '../utils/playBeep';
 import { useNetwork } from '../network';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -77,6 +78,8 @@ const STATUS_KEYS: Record<string, string> = {
 
 export function PickTaskDetails() {
   const { t } = useLocale();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const { isOnline } = useNetwork();
@@ -393,61 +396,61 @@ export function PickTaskDetails() {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#1976d2" />
-        <Text style={styles.loadingText}>{t('loading')}</Text>
+      <View style={[styles.centered, isDark && styles.centeredDark]}>
+        <ActivityIndicator size="large" color={isDark ? '#93c5fd' : '#1976d2'} />
+        <Text style={[styles.loadingText, isDark && styles.loadingTextDark]}>{t('loading')}</Text>
       </View>
     );
   }
 
   if (error || !doc) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>{error || t('notFound')}</Text>
+      <View style={[styles.centered, isDark && styles.centeredDark]}>
+        <Text style={[styles.errorText, isDark && styles.errorTextDark]}>{error || t('notFound')}</Text>
         <TouchableOpacity style={styles.retryBtn} onPress={load}>
           <Text style={styles.retryBtnText}>{t('retry')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-          <Icon name="arrow-left" size={24} color="#1976d2" />
+          <Icon name="arrow-left" size={24} color={isDark ? '#93c5fd' : '#1976d2'} />
         </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={[styles.container, isDark && styles.containerDark]}>
+      <View style={[styles.header, isDark && styles.headerDark]}>
         <TouchableOpacity onPress={goBack} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-          <Icon name="arrow-left" size={24} color="#1976d2" />
+          <Icon name="arrow-left" size={24} color={isDark ? '#93c5fd' : '#1976d2'} />
         </TouchableOpacity>
-        <Text style={styles.title}>{doc.reference_number ?? '—'}</Text>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>
+        <Text style={[styles.title, isDark && styles.titleDark]}>{doc.reference_number ?? '—'}</Text>
+        <View style={[styles.badge, isDark && styles.badgeDark]}>
+          <Text style={[styles.badgeText, isDark && styles.badgeTextDark]}>
             {isController && doc.status === 'picked'
               ? t('statusPendingVerify')
               : t(STATUS_KEYS[doc.status] ?? 'statusNew')}
           </Text>
         </View>
-        <Text style={styles.progressText}>
+        <Text style={[styles.progressText, isDark && styles.progressTextDark]}>
           {t('picked')}: {(doc.progress?.picked ?? 0)} / {(doc.progress?.required ?? 0)}
         </Text>
       </View>
 
       {isController && doc.incomplete_reason && (
-        <View style={styles.incompleteReasonBanner}>
-          <Text style={styles.incompleteReasonBannerLabel}>{t('incompleteReasonLabel')}</Text>
-          <Text style={styles.incompleteReasonBannerValue}>
+        <View style={[styles.incompleteReasonBanner, isDark && styles.incompleteReasonBannerDark]}>
+          <Text style={[styles.incompleteReasonBannerLabel, isDark && styles.incompleteReasonBannerLabelDark]}>{t('incompleteReasonLabel')}</Text>
+          <Text style={[styles.incompleteReasonBannerValue, isDark && styles.incompleteReasonBannerValueDark]}>
             {t(`reason_${doc.incomplete_reason}` as 'reason_expired') || doc.incomplete_reason}
           </Text>
         </View>
       )}
 
       <ScrollView
-        style={styles.scroll}
+        style={[styles.scroll, isDark && styles.scrollDark]}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.sectionTitle}>{t('positions')}</Text>
+        <Text style={[styles.sectionTitle, isDark && styles.sectionTitleDark]}>{t('positions')}</Text>
         {(doc.lines ?? []).filter(Boolean).map((line, index) => (
           <LineCard
             key={line?.id ?? `line-${index}`}
@@ -465,6 +468,7 @@ export function PickTaskDetails() {
             readOnly={isController && Number((line as PickingLine).qty_picked) < Number((line as PickingLine).qty_required)}
             isController={isController}
             controllerVerified={isController && controllerVerifiedLineIds.has(String((line as PickingLine).id))}
+            isDark={isDark}
           />
         ))}
       </ScrollView>
@@ -480,20 +484,20 @@ export function PickTaskDetails() {
           activeOpacity={1}
           onPress={closeLineScan}
         >
-          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+          <View style={[styles.modalContent, isDark && styles.modalContentDark]} onStartShouldSetResponder={() => true}>
             {selectedLine && (
               <>
                 <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle} numberOfLines={2}>
+                  <Text style={[styles.modalTitle, isDark && styles.modalTitleDark]} numberOfLines={2}>
                     {t('modalPickTitle')}: {selectedLine.product_name}
                   </Text>
                   <TouchableOpacity onPress={closeLineScan} hitSlop={12}>
-                    <Text style={styles.modalClose}>✕</Text>
+                    <Text style={[styles.modalClose, isDark && styles.modalCloseDark]}>✕</Text>
                   </TouchableOpacity>
                 </View>
                 {!scannedBarcodeForQty ? (
                   <>
-                    <Text style={styles.modalHint}>
+                    <Text style={[styles.modalHint, isDark && styles.modalHintDark]}>
                       {t('modalScanHint')}
                     </Text>
                     <TouchableOpacity
@@ -523,18 +527,18 @@ export function PickTaskDetails() {
                   </>
                 ) : (
                   <>
-                    <Text style={styles.modalHint}>
+                    <Text style={[styles.modalHint, isDark && styles.modalHintDark]}>
                       {isController
                         ? t('quantityVerify', { n: selectedLine.qty_picked })
                         : t('quantityRemaining', { n: selectedLine.qty_required - selectedLine.qty_picked })}
                     </Text>
                     <TextInput
-                      style={styles.qtyInput}
+                      style={[styles.qtyInput, isDark && styles.qtyInputDark]}
                       value={qtyInput}
                       onChangeText={setQtyInput}
                       keyboardType="number-pad"
                       placeholder={t('quantity')}
-                      placeholderTextColor="#999"
+                      placeholderTextColor={isDark ? '#64748b' : '#999'}
                       maxLength={4}
                     />
                     <TouchableOpacity
@@ -565,23 +569,28 @@ export function PickTaskDetails() {
           activeOpacity={1}
           onPress={() => setIncompleteReasonModalVisible(false)}
         >
-          <View style={[styles.modalContent, styles.incompleteReasonModal]} onStartShouldSetResponder={() => true}>
-            <Text style={styles.incompleteReasonTitle}>{t('incompleteReasonTitle')}</Text>
-            <Text style={styles.incompleteReasonHint}>{t('incompleteReasonSelect')}</Text>
+          <View style={[styles.modalContent, styles.incompleteReasonModal, isDark && styles.modalContentDark]} onStartShouldSetResponder={() => true}>
+            <Text style={[styles.incompleteReasonTitle, isDark && styles.incompleteReasonTitleDark]}>{t('incompleteReasonTitle')}</Text>
+            <Text style={[styles.incompleteReasonHint, isDark && styles.incompleteReasonHintDark]}>{t('incompleteReasonSelect')}</Text>
             <ScrollView style={styles.incompleteReasonList} nestedScrollEnabled>
               {INCOMPLETE_REASON_KEYS.map((key) => (
                 <TouchableOpacity
                   key={key}
-                  style={[styles.incompleteReasonRow, selectedIncompleteReason === key && styles.incompleteReasonRowSelected]}
+                  style={[
+                    styles.incompleteReasonRow,
+                    selectedIncompleteReason === key && styles.incompleteReasonRowSelected,
+                    isDark && styles.incompleteReasonRowDark,
+                    selectedIncompleteReason === key && isDark && styles.incompleteReasonRowSelectedDark,
+                  ]}
                   onPress={() => setSelectedIncompleteReason(key)}
                   activeOpacity={0.7}
                 >
                   <Icon
                     name={selectedIncompleteReason === key ? 'radiobox-marked' : 'radiobox-blank'}
                     size={22}
-                    color={selectedIncompleteReason === key ? '#1976d2' : '#666'}
+                    color={selectedIncompleteReason === key ? (isDark ? '#93c5fd' : '#1976d2') : (isDark ? '#94a3b8' : '#666')}
                   />
-                  <Text style={styles.incompleteReasonRowText}>{t(`reason_${key}`)}</Text>
+                  <Text style={[styles.incompleteReasonRowText, isDark && styles.incompleteReasonRowTextDark]}>{t(`reason_${key}`)}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -594,7 +603,7 @@ export function PickTaskDetails() {
                 <Text style={styles.incompleteReasonConfirmText}>{t('incompleteConfirmComplete')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.incompleteReasonCancel} onPress={() => setIncompleteReasonModalVisible(false)}>
-                <Text style={styles.incompleteReasonCancelText}>{t('cancel')}</Text>
+                <Text style={[styles.incompleteReasonCancelText, isDark && styles.incompleteReasonCancelTextDark]}>{t('cancel')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -612,28 +621,33 @@ export function PickTaskDetails() {
           activeOpacity={1}
           onPress={closeLineReasonModal}
         >
-          <View style={[styles.modalContent, styles.incompleteReasonModal]} onStartShouldSetResponder={() => true}>
-            <Text style={styles.incompleteReasonTitle}>{t('lineReasonModalTitle')}</Text>
+          <View style={[styles.modalContent, styles.incompleteReasonModal, isDark && styles.modalContentDark]} onStartShouldSetResponder={() => true}>
+            <Text style={[styles.incompleteReasonTitle, isDark && styles.incompleteReasonTitleDark]}>{t('lineReasonModalTitle')}</Text>
             {lineForReasonModal && (
-              <Text style={styles.modalHint} numberOfLines={2}>
+              <Text style={[styles.modalHint, isDark && styles.modalHintDark]} numberOfLines={2}>
                 {lineForReasonModal.product_name}
               </Text>
             )}
-            <Text style={styles.incompleteReasonHint}>{t('incompleteReasonSelect')}</Text>
+            <Text style={[styles.incompleteReasonHint, isDark && styles.incompleteReasonHintDark]}>{t('incompleteReasonSelect')}</Text>
             <ScrollView style={styles.incompleteReasonList} nestedScrollEnabled>
               {INCOMPLETE_REASON_KEYS.map((key) => (
                 <TouchableOpacity
                   key={key}
-                  style={[styles.incompleteReasonRow, selectedLineReason === key && styles.incompleteReasonRowSelected]}
+                  style={[
+                    styles.incompleteReasonRow,
+                    selectedLineReason === key && styles.incompleteReasonRowSelected,
+                    isDark && styles.incompleteReasonRowDark,
+                    selectedLineReason === key && isDark && styles.incompleteReasonRowSelectedDark,
+                  ]}
                   onPress={() => setSelectedLineReason(key)}
                   activeOpacity={0.7}
                 >
                   <Icon
                     name={selectedLineReason === key ? 'radiobox-marked' : 'radiobox-blank'}
                     size={22}
-                    color={selectedLineReason === key ? '#1976d2' : '#666'}
+                    color={selectedLineReason === key ? (isDark ? '#93c5fd' : '#1976d2') : (isDark ? '#94a3b8' : '#666')}
                   />
-                  <Text style={styles.incompleteReasonRowText}>{t(`reason_${key}`)}</Text>
+                  <Text style={[styles.incompleteReasonRowText, isDark && styles.incompleteReasonRowTextDark]}>{t(`reason_${key}`)}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -648,14 +662,14 @@ export function PickTaskDetails() {
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.incompleteReasonCancel} onPress={closeLineReasonModal} disabled={submitting}>
-                <Text style={styles.incompleteReasonCancelText}>{t('cancel')}</Text>
+                <Text style={[styles.incompleteReasonCancelText, isDark && styles.incompleteReasonCancelTextDark]}>{t('cancel')}</Text>
               </TouchableOpacity>
             </View>
           </View>
         </TouchableOpacity>
       </Modal>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, isDark && styles.footerDark]}>
         {isController && (
           <TouchableOpacity
             style={styles.scanBottomBtn}
@@ -695,6 +709,7 @@ function LineCard({
   readOnly,
   isController,
   controllerVerified,
+  isDark,
 }: {
   line: PickingLine;
   onPress?: () => void;
@@ -704,6 +719,7 @@ function LineCard({
   readOnly?: boolean;
   isController?: boolean;
   controllerVerified?: boolean;
+  isDark?: boolean;
 }) {
   const qtyPicked = Number(line.qty_picked) || 0;
   const qtyRequired = Number(line.qty_required) || 0;
@@ -713,6 +729,7 @@ function LineCard({
 
   const cardStyle = [
     styles.lineCard,
+    isDark && styles.lineCardDark,
     isRejected
       ? styles.lineCardRejected
       : isController
@@ -722,6 +739,7 @@ function LineCard({
               ? styles.lineCardDone
               : undefined)
         : (isDone ? styles.lineCardDone : isIncomplete ? styles.lineCardIncomplete : undefined),
+    isRejected && isDark && styles.lineCardRejectedDark,
   ].filter(Boolean);
 
   const showDoneBadge = !isController && isDone && !isRejected;
@@ -731,9 +749,9 @@ function LineCard({
 
   const content = (
     <>
-      <Text style={styles.lineName}>{line.product_name ?? '—'}</Text>
-      <Text style={styles.lineMeta}>{t('locationLabel')}: {line.location_code ?? '—'}</Text>
-      <Text style={styles.lineMeta}>{t('barcodeLabel')}: {line.barcode ?? '—'}</Text>
+      <Text style={[styles.lineName, isDark && styles.lineNameDark]}>{line.product_name ?? '—'}</Text>
+      <Text style={[styles.lineMeta, isDark && styles.lineMetaDark]}>{t('locationLabel')}: {line.location_code ?? '—'}</Text>
+      <Text style={[styles.lineMeta, isDark && styles.lineMetaDark]}>{t('barcodeLabel')}: {line.barcode ?? '—'}</Text>
       <Text style={styles.lineQty}>
         {qtyPicked} / {qtyRequired}
       </Text>
@@ -1010,4 +1028,37 @@ const styles = StyleSheet.create({
   },
   incompleteReasonBannerLabel: { fontSize: 12, color: '#e65100', marginBottom: 2 },
   incompleteReasonBannerValue: { fontSize: 15, fontWeight: '600', color: '#bf360c' },
+  // Dark
+  containerDark: { backgroundColor: '#0f172a' },
+  centeredDark: { backgroundColor: '#0f172a' },
+  loadingTextDark: { color: '#94a3b8' },
+  errorTextDark: { color: '#fca5a5' },
+  headerDark: { backgroundColor: '#1e293b', borderBottomColor: '#334155' },
+  titleDark: { color: '#f1f5f9' },
+  badgeDark: { backgroundColor: '#1e3a5f' },
+  badgeTextDark: { color: '#93c5fd' },
+  progressTextDark: { color: '#94a3b8' },
+  incompleteReasonBannerDark: { backgroundColor: '#422006', borderBottomColor: '#78350f' },
+  incompleteReasonBannerLabelDark: { color: '#fcd34d' },
+  incompleteReasonBannerValueDark: { color: '#fde68a' },
+  scrollDark: { backgroundColor: '#0f172a' },
+  sectionTitleDark: { color: '#f1f5f9' },
+  lineCardDark: { backgroundColor: '#1e293b', borderColor: '#334155' },
+  lineCardRejectedDark: { borderColor: '#dc2626' },
+  lineNameDark: { color: '#f1f5f9' },
+  lineMetaDark: { color: '#94a3b8' },
+  lineQtyDark: { color: '#f1f5f9' },
+  lineSkippedReasonTextDark: { color: '#fca5a5' },
+  footerDark: { backgroundColor: '#1e293b', borderTopColor: '#334155' },
+  modalContentDark: { backgroundColor: '#1e293b' },
+  modalTitleDark: { color: '#f1f5f9' },
+  modalCloseDark: { color: '#94a3b8' },
+  modalHintDark: { color: '#94a3b8' },
+  qtyInputDark: { backgroundColor: '#334155', borderColor: '#475569', color: '#f1f5f9' },
+  incompleteReasonTitleDark: { color: '#f1f5f9' },
+  incompleteReasonHintDark: { color: '#94a3b8' },
+  incompleteReasonRowDark: { backgroundColor: '#334155' },
+  incompleteReasonRowSelectedDark: { backgroundColor: '#1e3a5f' },
+  incompleteReasonRowTextDark: { color: '#f1f5f9' },
+  incompleteReasonCancelTextDark: { color: '#93c5fd' },
 });

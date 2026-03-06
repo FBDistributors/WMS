@@ -18,6 +18,7 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { RootStackParamList } from '../types/navigation';
 import { useLocale } from '../i18n/LocaleContext';
+import { useTheme } from '../theme/ThemeContext';
 import {
   listPickerInventory,
   listPickerLocations,
@@ -33,29 +34,31 @@ function InventoryCard({
   item,
   onPress,
   t,
+  isDark,
 }: {
   item: PickerInventoryItem;
   onPress: () => void;
   t: (key: string) => string;
+  isDark?: boolean;
 }) {
   return (
     <TouchableOpacity
-      style={styles.card}
+      style={[styles.card, isDark && styles.cardDark]}
       onPress={onPress}
       activeOpacity={0.8}
     >
       <View style={styles.cardRow}>
         <View style={styles.cardMain}>
-          <Text style={styles.cardTitle}>{item.name}</Text>
+          <Text style={[styles.cardTitle, isDark && styles.cardTitleDark]}>{item.name}</Text>
           {item.main_barcode ? (
-            <Text style={styles.cardBarcode}>{item.main_barcode}</Text>
+            <Text style={[styles.cardBarcode, isDark && styles.cardBarcodeDark]}>{item.main_barcode}</Text>
           ) : null}
-          <Text style={styles.cardCode}>{item.code}</Text>
-          <Text style={styles.cardMetaText}>
+          <Text style={[styles.cardCode, isDark && styles.cardCodeDark]}>{item.code}</Text>
+          <Text style={[styles.cardMetaText, isDark && styles.cardMetaTextDark]}>
             {t('invQoldiq')}: {Math.round(Number(item.available_qty))}
           </Text>
         </View>
-        <Icon name="chevron-right" size={22} color="#666" />
+        <Icon name="chevron-right" size={22} color={isDark ? '#94a3b8' : '#666'} />
       </View>
     </TouchableOpacity>
   );
@@ -64,6 +67,8 @@ function InventoryCard({
 export function InventoryScreen() {
   const navigation = useNavigation<Nav>();
   const { t } = useLocale();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [query, setQuery] = useState('');
   const [locationId, setLocationId] = useState('');
   const [locations, setLocations] = useState<PickerLocationOption[]>([]);
@@ -139,6 +144,7 @@ export function InventoryScreen() {
         navigation.navigate('InventoryDetail', { productId: item.product_id })
       }
       t={t}
+      isDark={isDark}
     />
   );
 
@@ -149,25 +155,23 @@ export function InventoryScreen() {
   }, [load]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isDark && styles.containerDark]}>
       {/* Header */}
       <AppHeader
         title={t('invTitle')}
-        showBack
-        onBack={() => navigation.goBack()}
         showLogo={true}
         onRefresh={onHeaderRefresh}
         refreshing={refreshing}
       />
 
       {/* Search + location */}
-      <View style={styles.toolbar}>
-        <View style={styles.searchWrap}>
-          <Icon name="magnify" size={20} color="#666" style={styles.searchIcon} />
+      <View style={[styles.toolbar, isDark && styles.toolbarDark]}>
+        <View style={[styles.searchWrap, isDark && styles.searchWrapDark]}>
+          <Icon name="magnify" size={20} color={isDark ? '#94a3b8' : '#666'} style={styles.searchIcon} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, isDark && styles.searchInputDark]}
             placeholder={t('invSearchPlaceholder')}
-            placeholderTextColor="#999"
+            placeholderTextColor={isDark ? '#64748b' : '#999'}
             value={query}
             onChangeText={setQuery}
             onSubmitEditing={load}
@@ -180,20 +184,20 @@ export function InventoryScreen() {
       </View>
       {locations.length > 0 && (
         <>
-          <View style={styles.filterRow}>
-            <Text style={styles.filterLabel}>{t('invBestLocation')}:</Text>
+          <View style={[styles.filterRow, isDark && styles.filterRowDark]}>
+            <Text style={[styles.filterLabel, isDark && styles.filterLabelDark]}>{t('invBestLocation')}:</Text>
             <TouchableOpacity
               style={styles.pickerTouch}
               onPress={() => setLocationModalVisible(true)}
               activeOpacity={0.7}
             >
-              <Icon name="map-marker" size={18} color="#666" style={styles.pickerIcon} />
-              <Text style={styles.pickerText}>
+              <Icon name="map-marker" size={18} color={isDark ? '#94a3b8' : '#666'} style={styles.pickerIcon} />
+              <Text style={[styles.pickerText, isDark && styles.pickerTextDark]}>
                 {locationId
                   ? locations.find((l) => l.id === locationId)?.code ?? locationId
                   : t('invAllLocations')}
               </Text>
-              <Icon name="chevron-down" size={20} color="#666" />
+              <Icon name="chevron-down" size={20} color={isDark ? '#94a3b8' : '#666'} />
             </TouchableOpacity>
           </View>
           <Modal
@@ -207,26 +211,26 @@ export function InventoryScreen() {
               activeOpacity={1}
               onPress={() => setLocationModalVisible(false)}
             >
-              <View style={styles.modalContent}>
+              <View style={[styles.modalContent, isDark && styles.modalContentDark]}>
                 <TouchableOpacity
-                  style={styles.modalRow}
+                  style={[styles.modalRow, isDark && styles.modalRowDark]}
                   onPress={() => {
                     setLocationId('');
                     setLocationModalVisible(false);
                   }}
                 >
-                  <Text style={styles.modalRowText}>{t('invAllLocations')}</Text>
+                  <Text style={[styles.modalRowText, isDark && styles.modalRowTextDark]}>{t('invAllLocations')}</Text>
                 </TouchableOpacity>
                 {locations.map((loc) => (
                   <TouchableOpacity
                     key={loc.id}
-                    style={styles.modalRow}
+                    style={[styles.modalRow, isDark && styles.modalRowDark]}
                     onPress={() => {
                       setLocationId(loc.id);
                       setLocationModalVisible(false);
                     }}
                   >
-                    <Text style={styles.modalRowText}>{loc.code} — {loc.name}</Text>
+                    <Text style={[styles.modalRowText, isDark && styles.modalRowTextDark]}>{loc.code} — {loc.name}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -236,21 +240,21 @@ export function InventoryScreen() {
       )}
 
       {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#1a237e" />
+        <View style={[styles.centered, isDark && styles.centeredDark]}>
+          <ActivityIndicator size="large" color={isDark ? '#93c5fd' : '#1a237e'} />
         </View>
       ) : error ? (
-        <View style={styles.centered}>
-          <Icon name="alert-circle-outline" size={48} color="#c62828" />
-          <Text style={styles.errorText}>{error}</Text>
+        <View style={[styles.centered, isDark && styles.centeredDark]}>
+          <Icon name="alert-circle-outline" size={48} color="#f87171" />
+          <Text style={[styles.errorText, isDark && styles.errorTextDark]}>{error}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={load} activeOpacity={0.7}>
             <Text style={styles.retryBtnText}>{t('invRetry')}</Text>
           </TouchableOpacity>
         </View>
       ) : items.length === 0 ? (
-        <View style={styles.centered}>
-          <Icon name="package-variant-closed" size={48} color="#666" />
-          <Text style={styles.emptyText}>{t('invNoResults')}</Text>
+        <View style={[styles.centered, isDark && styles.centeredDark]}>
+          <Icon name="package-variant-closed" size={48} color={isDark ? '#64748b' : '#666'} />
+          <Text style={[styles.emptyText, isDark && styles.emptyTextDark]}>{t('invNoResults')}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={load} activeOpacity={0.7}>
             <Text style={styles.retryBtnText}>{t('invRetry')}</Text>
           </TouchableOpacity>
@@ -261,7 +265,7 @@ export function InventoryScreen() {
           renderItem={renderItem}
           keyExtractor={(item) => item.product_id}
           contentContainerStyle={styles.listContent}
-          style={styles.list}
+          style={[styles.list, isDark && styles.listDark]}
           onEndReached={loadMore}
           onEndReachedThreshold={0.3}
           ListFooterComponent={
@@ -449,4 +453,24 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
+  // Dark
+  containerDark: { backgroundColor: '#0f172a' },
+  toolbarDark: { backgroundColor: '#1e293b' },
+  searchWrapDark: { backgroundColor: '#334155' },
+  searchInputDark: { color: '#f1f5f9' },
+  filterRowDark: { backgroundColor: '#1e293b' },
+  filterLabelDark: { color: '#94a3b8' },
+  pickerTextDark: { color: '#f1f5f9' },
+  modalContentDark: { backgroundColor: '#1e293b' },
+  modalRowDark: { borderBottomColor: '#334155' },
+  modalRowTextDark: { color: '#f1f5f9' },
+  listDark: { backgroundColor: '#0f172a' },
+  cardDark: { backgroundColor: '#1e293b', shadowColor: '#000' },
+  cardTitleDark: { color: '#f1f5f9' },
+  cardBarcodeDark: { color: '#94a3b8' },
+  cardCodeDark: { color: '#93c5fd' },
+  cardMetaTextDark: { color: '#94a3b8' },
+  centeredDark: { backgroundColor: '#0f172a' },
+  errorTextDark: { color: '#fca5a5' },
+  emptyTextDark: { color: '#94a3b8' },
 });

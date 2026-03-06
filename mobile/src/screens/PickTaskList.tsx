@@ -16,6 +16,7 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../types/navigation';
 import { useLocale } from '../i18n/LocaleContext';
+import { useTheme } from '../theme/ThemeContext';
 import type { PickingListItem } from '../api/picking.types';
 import { UNAUTHORIZED_MSG } from '../api/client';
 import { getOpenTasks, getControllers, sendToController, type ControllerUser } from '../api/picking';
@@ -41,12 +42,14 @@ function TaskRow({
   onPress,
   onSendToController,
   t,
+  isDark,
 }: {
   item: PickingListItem;
   profileType: 'picker' | 'controller';
   onPress: () => void;
   onSendToController?: (doc: PickingListItem) => void;
   t: (key: string, params?: Record<string, string | number>) => string;
+  isDark?: boolean;
 }) {
   const statusText =
     profileType === 'controller' && item.status === 'picked'
@@ -62,19 +65,24 @@ function TaskRow({
   return (
     <View style={styles.rowWrap}>
       <TouchableOpacity
-        style={[styles.row, isFullyPicked && styles.rowFullyPicked]}
+        style={[
+          styles.row,
+          isFullyPicked && styles.rowFullyPicked,
+          isDark && styles.rowDark,
+          isFullyPicked && isDark && styles.rowFullyPickedDark,
+        ]}
         onPress={onPress}
         activeOpacity={0.7}
       >
-        <Text style={styles.rowRef}>{item.reference_number}</Text>
-        <Text style={styles.rowMeta}>
+        <Text style={[styles.rowRef, isDark && styles.rowRefDark]}>{item.reference_number}</Text>
+        <Text style={[styles.rowMeta, isDark && styles.rowMetaDark]}>
           {t('linesCount', { done: item.lines_done, total: item.lines_total })}
         </Text>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{statusText}</Text>
+        <View style={[styles.badge, isDark && styles.badgeDark]}>
+          <Text style={[styles.badgeText, isDark && styles.badgeTextDark]}>{statusText}</Text>
         </View>
         {profileType === 'picker' && item.status === 'picked' && item.controlled_by_user_id && (
-          <Text style={styles.sentLabel}>{t('sendToControllerDone')}</Text>
+          <Text style={[styles.sentLabel, isDark && styles.sentLabelDark]}>{t('sendToControllerDone')}</Text>
         )}
       </TouchableOpacity>
       {showSendBtn && onSendToController && (
@@ -94,6 +102,8 @@ export function PickTaskList() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<PickTaskListRoute>();
   const { t } = useLocale();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const { isOnline } = useNetwork();
   const profileType = route.params?.profileType ?? 'picker';
   const completedMessage = route.params?.completedMessage;
@@ -209,17 +219,17 @@ export function PickTaskList() {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#1976d2" />
-        <Text style={styles.loadingText}>{t('loading')}</Text>
+      <View style={[styles.centered, isDark && styles.centeredDark]}>
+        <ActivityIndicator size="large" color={isDark ? '#93c5fd' : '#1976d2'} />
+        <Text style={[styles.loadingText, isDark && styles.loadingTextDark]}>{t('loading')}</Text>
       </View>
     );
   }
 
   if (error) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>{error}</Text>
+      <View style={[styles.centered, isDark && styles.centeredDark]}>
+        <Text style={[styles.errorText, isDark && styles.errorTextDark]}>{error}</Text>
         <TouchableOpacity style={styles.retryBtn} onPress={load}>
           <Text style={styles.retryBtnText}>{t('retry')}</Text>
         </TouchableOpacity>
@@ -233,27 +243,19 @@ export function PickTaskList() {
   const isPicker = profileType === 'picker';
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isDark && styles.containerDark]}>
       {showCompletedBanner && completedMessage ? (
         <View style={styles.completedBanner}>
           <Icon name="check-circle" size={20} color="#fff" />
           <Text style={styles.completedBannerText}>{completedMessage}</Text>
         </View>
       ) : null}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.reset({ index: 0, routes: [{ name: 'PickerHome' }] })}
-          activeOpacity={0.7}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <Icon name="arrow-left" size={24} color="#1976d2" />
-        </TouchableOpacity>
+      <View style={[styles.header, isDark && styles.headerDark]}>
         <View style={styles.headerCenter}>
-          <Text style={styles.title}>
+          <Text style={[styles.title, isDark && styles.titleDark]}>
             {showConsolidated ? t('consolidatedPickTitle') : t('openTasks')}
           </Text>
-          <Text style={styles.count}>
+          <Text style={[styles.count, isDark && styles.countDark]}>
             {showConsolidated ? t('consolidatedMyTasks') : `${list.length}${t('countTa')}`}
           </Text>
         </View>
@@ -263,32 +265,32 @@ export function PickTaskList() {
           disabled={loading}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
-          <Icon name="refresh" size={24} color={loading ? '#999' : '#1976d2'} />
+          <Icon name="refresh" size={24} color={loading ? '#999' : (isDark ? '#93c5fd' : '#1976d2')} />
         </TouchableOpacity>
       </View>
       <View style={styles.toggleAndContent} {...(isPicker ? panResponder.panHandlers : {})}>
       {isPicker && (
-        <View style={styles.toggleWrap}>
+        <View style={[styles.toggleWrap, isDark && styles.toggleWrapDark]}>
           <TouchableOpacity
-            style={[styles.toggleSegment, !showConsolidated && styles.toggleSegmentActive]}
+            style={[styles.toggleSegment, !showConsolidated && styles.toggleSegmentActive, isDark && styles.toggleSegmentDark, !showConsolidated && isDark && styles.toggleSegmentActiveDark]}
             onPress={() => setShowConsolidated(false)}
             activeOpacity={0.8}
           >
             <Icon
               name="format-list-bulleted"
               size={24}
-              color={!showConsolidated ? '#111' : '#666'}
+              color={!showConsolidated ? (isDark ? '#f1f5f9' : '#111') : (isDark ? '#94a3b8' : '#666')}
             />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.toggleSegment, showConsolidated && styles.toggleSegmentActive]}
+            style={[styles.toggleSegment, showConsolidated && styles.toggleSegmentActive, isDark && styles.toggleSegmentDark, showConsolidated && isDark && styles.toggleSegmentActiveDark]}
             onPress={() => setShowConsolidated(true)}
             activeOpacity={0.8}
           >
             <Icon
               name="format-list-group"
               size={24}
-              color={showConsolidated ? '#111' : '#666'}
+              color={showConsolidated ? (isDark ? '#f1f5f9' : '#111') : (isDark ? '#94a3b8' : '#666')}
             />
           </TouchableOpacity>
         </View>
@@ -303,7 +305,7 @@ export function PickTaskList() {
         />
       ) : list.length === 0 ? (
         <View style={styles.empty}>
-          <Text style={styles.emptyText}>{t('openTasksEmpty')}</Text>
+          <Text style={[styles.emptyText, isDark && styles.emptyTextDark]}>{t('openTasksEmpty')}</Text>
         </View>
       ) : (
         <FlatList
@@ -314,6 +316,7 @@ export function PickTaskList() {
               item={item}
               profileType={profileType}
               t={t}
+              isDark={isDark}
               onPress={() =>
                 navigation.navigate('PickTaskDetails', { taskId: item.id, profileType })
               }
@@ -336,19 +339,19 @@ export function PickTaskList() {
           activeOpacity={1}
           onPress={() => setControllerModalDoc(null)}
         >
-          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
-            <Text style={styles.modalTitle}>{t('selectController')}</Text>
+          <View style={[styles.modalContent, isDark && styles.modalContentDark]} onStartShouldSetResponder={() => true}>
+            <Text style={[styles.modalTitle, isDark && styles.modalTitleDark]}>{t('selectController')}</Text>
             {controllers.length === 0 && !loading && (
-              <Text style={styles.modalEmpty}>{t('openTasksEmpty')}</Text>
+              <Text style={[styles.modalEmpty, isDark && styles.modalEmptyDark]}>{t('openTasksEmpty')}</Text>
             )}
             {controllers.map((c) => (
               <TouchableOpacity
                 key={c.id}
-                style={styles.controllerRow}
+                style={[styles.controllerRow, isDark && styles.controllerRowDark]}
                 onPress={() => sendToControllerConfirm(c.id)}
                 disabled={sending}
               >
-                <Text style={styles.controllerName}>
+                <Text style={[styles.controllerName, isDark && styles.controllerNameDark]}>
                   {c.full_name || c.username}
                 </Text>
               </TouchableOpacity>
@@ -357,7 +360,7 @@ export function PickTaskList() {
               style={styles.modalCancel}
               onPress={() => setControllerModalDoc(null)}
             >
-              <Text style={styles.modalCancelText}>{t('cancel')}</Text>
+              <Text style={[styles.modalCancelText, isDark && styles.modalCancelTextDark]}>{t('cancel')}</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -429,7 +432,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 6,
   },
-  headerCenter: { flex: 1, marginLeft: 12 },
+  headerCenter: { flex: 1 },
   title: { fontSize: 20, fontWeight: '700', color: '#111' },
   count: { fontSize: 14, color: '#666', marginTop: 4 },
   refreshBtn: { padding: 4 },
@@ -512,4 +515,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalCancelText: { fontSize: 16, color: '#1976d2', fontWeight: '600' },
+  // Dark
+  containerDark: { backgroundColor: '#0f172a' },
+  headerDark: { backgroundColor: '#1e293b', borderBottomColor: '#334155' },
+  titleDark: { color: '#f1f5f9' },
+  countDark: { color: '#94a3b8' },
+  toggleWrapDark: { backgroundColor: '#334155' },
+  toggleSegmentDark: {},
+  toggleSegmentActiveDark: { backgroundColor: '#475569' },
+  rowDark: { backgroundColor: '#1e293b', borderColor: '#334155' },
+  rowFullyPickedDark: { backgroundColor: '#14532d', borderColor: '#166534' },
+  rowRefDark: { color: '#f1f5f9' },
+  rowMetaDark: { color: '#94a3b8' },
+  badgeDark: { backgroundColor: '#1e3a5f' },
+  badgeTextDark: { color: '#93c5fd' },
+  sentLabelDark: { color: '#86efac' },
+  emptyTextDark: { color: '#94a3b8' },
+  centeredDark: { backgroundColor: '#0f172a' },
+  loadingTextDark: { color: '#94a3b8' },
+  errorTextDark: { color: '#fca5a5' },
+  modalContentDark: { backgroundColor: '#1e293b' },
+  modalTitleDark: { color: '#f1f5f9' },
+  modalEmptyDark: { color: '#94a3b8' },
+  controllerRowDark: { borderBottomColor: '#334155' },
+  controllerNameDark: { color: '#f1f5f9' },
+  modalCancelTextDark: { color: '#93c5fd' },
 });
