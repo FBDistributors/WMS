@@ -14,6 +14,7 @@ import {
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useLocale } from '../i18n/LocaleContext';
+import { useTheme } from '../theme/ThemeContext';
 import { useNetwork } from '../network';
 import { getQueueForUI, retryFailedItem, type OfflineQueueItem } from '../offline/offlineQueue';
 import { syncPendingQueue } from '../offline/syncEngine';
@@ -22,6 +23,8 @@ import { UNAUTHORIZED_MSG } from '../api/client';
 export function QueueScreen() {
   const { t } = useLocale();
   const navigation = useNavigation();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const { isOnline } = useNetwork();
   const [pending, setPending] = useState<OfflineQueueItem[]>([]);
   const [failed, setFailed] = useState<OfflineQueueItem[]>([]);
@@ -87,14 +90,14 @@ export function QueueScreen() {
       } catch {}
       const label = `${item.type} ${payload.taskId ?? item.id}`;
       return (
-        <View style={[styles.row, isFailed && styles.rowFailed]}>
+        <View style={[styles.row, isFailed && styles.rowFailed, isDark && styles.rowDark, isFailed && isDark && styles.rowFailedDark]}>
           <View style={styles.rowBody}>
-            <Text style={styles.rowType}>{item.type}</Text>
-            <Text style={styles.rowPayload} numberOfLines={1}>
+            <Text style={[styles.rowType, isDark && styles.rowTypeDark]}>{item.type}</Text>
+            <Text style={[styles.rowPayload, isDark && styles.rowPayloadDark]} numberOfLines={1}>
               {label}
             </Text>
             {isFailed && item.error ? (
-              <Text style={styles.rowError} numberOfLines={2}>
+              <Text style={[styles.rowError, isDark && styles.rowErrorDark]} numberOfLines={2}>
                 {item.error}
               </Text>
             ) : null}
@@ -107,18 +110,18 @@ export function QueueScreen() {
         </View>
       );
     },
-    [handleRetry, t]
+    [handleRetry, t, isDark]
   );
 
   const total = pending.length + failed.length;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={[styles.container, isDark && styles.containerDark]}>
+      <View style={[styles.header, isDark && styles.headerDark]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-          <Icon name="arrow-left" size={24} color="#1976d2" />
+          <Icon name="arrow-left" size={24} color={isDark ? '#93c5fd' : '#1976d2'} />
         </TouchableOpacity>
-        <Text style={styles.title}>{t('offlineQueue')}</Text>
+        <Text style={[styles.title, isDark && styles.titleDark]}>{t('offlineQueue')}</Text>
         {isOnline && total > 0 && (
           <TouchableOpacity
             style={[styles.syncBtn, syncing && styles.syncBtnDisabled]}
@@ -134,15 +137,15 @@ export function QueueScreen() {
         )}
       </View>
       {total === 0 ? (
-        <View style={styles.empty}>
-          <Icon name="check-circle-outline" size={64} color="#4caf50" />
-          <Text style={styles.emptyText}>{t('queueEmpty')}</Text>
+        <View style={[styles.empty, isDark && styles.emptyDark]}>
+          <Icon name="check-circle-outline" size={64} color={isDark ? '#4ade80' : '#4caf50'} />
+          <Text style={[styles.emptyText, isDark && styles.emptyTextDark]}>{t('queueEmpty')}</Text>
         </View>
       ) : (
         <>
           {pending.length > 0 && (
             <>
-              <Text style={styles.sectionTitle}>{t('queuePending')} ({pending.length})</Text>
+              <Text style={[styles.sectionTitle, isDark && styles.sectionTitleDark]}>{t('queuePending')} ({pending.length})</Text>
               <FlatList
                 data={pending}
                 keyExtractor={(item) => item.id}
@@ -153,7 +156,7 @@ export function QueueScreen() {
           )}
           {failed.length > 0 && (
             <>
-              <Text style={[styles.sectionTitle, styles.sectionFailed]}>
+              <Text style={[styles.sectionTitle, styles.sectionFailed, isDark && styles.sectionFailedDark]}>
                 {t('queueFailed')} ({failed.length})
               </Text>
               <FlatList
@@ -220,4 +223,16 @@ const styles = StyleSheet.create({
   retryBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   emptyText: { fontSize: 16, color: '#666', marginTop: 12 },
+  containerDark: { backgroundColor: '#0f172a' },
+  headerDark: { backgroundColor: '#1e293b', borderBottomColor: '#334155' },
+  titleDark: { color: '#f1f5f9' },
+  sectionTitleDark: { color: '#94a3b8' },
+  sectionFailedDark: { color: '#f87171' },
+  rowDark: { backgroundColor: '#1e293b', borderColor: '#334155' },
+  rowFailedDark: { borderColor: '#7f1d1d', backgroundColor: '#291c1c' },
+  rowTypeDark: { color: '#94a3b8' },
+  rowPayloadDark: { color: '#f1f5f9' },
+  rowErrorDark: { color: '#f87171' },
+  emptyDark: {},
+  emptyTextDark: { color: '#94a3b8' },
 });

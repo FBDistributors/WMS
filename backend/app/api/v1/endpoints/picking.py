@@ -555,7 +555,14 @@ async def consolidated_pick(
         if first_picked_line_id is not None:
             db.add(PickRequest(request_id=payload.request_id, line_id=first_picked_line_id))
         db.commit()
-        return await get_consolidated(db=db, user=user)
+        try:
+            return await get_consolidated(db=db, user=user)
+        except Exception as e:
+            logger.exception("get_consolidated after consolidated_pick: %s", e)
+            raise HTTPException(
+                status_code=500,
+                detail="Yig'ish saqlandi, lekin yangi ro'yxat yuklanmadi. " + (str(e).strip() or type(e).__name__),
+            ) from e
     except HTTPException:
         raise
     except Exception as e:

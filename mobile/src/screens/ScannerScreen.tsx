@@ -20,6 +20,7 @@ import { useProductByBarcode } from '../hooks/useProductByBarcode';
 import { ProductCard } from '../components/ProductCard';
 import { UNAUTHORIZED_MSG } from '../api/client';
 import { useLocale } from '../i18n/LocaleContext';
+import { useTheme } from '../theme/ThemeContext';
 
 const DEBOUNCE_MS = 1500;
 const SUPPORTED_CODE_TYPES = ['ean-13', 'ean-8', 'code-128', 'qr'] as const;
@@ -36,6 +37,8 @@ export function ScannerScreen() {
   const navigation = useNavigation();
   const route = useRoute<ScannerRoute>();
   const { t } = useLocale();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const params = route.params ?? {};
   const device = useCameraDevice('back');
   const { status: permStatus, requestOrOpenSettings } = useCameraPermission();
@@ -90,6 +93,7 @@ export function ScannerScreen() {
                   profileType,
                   scannedBarcode: value,
                   openConsolidated: true,
+                  selectedProductKey: params.selectedProductKey,
                 },
               },
             ],
@@ -99,7 +103,7 @@ export function ScannerScreen() {
       }
       fetchByBarcode(value);
     },
-    [fetchByBarcode, params.returnToPick, params.returnToConsolidated, params.taskId, params.profileType, navigation]
+    [fetchByBarcode, params.returnToPick, params.returnToConsolidated, params.taskId, params.profileType, params.selectedProductKey, navigation]
   );
 
   const codeScanner = useCodeScanner({
@@ -161,12 +165,12 @@ export function ScannerScreen() {
   // Loading or no device: show visible UI (not black)
   if (permStatus === 'loading' || !device) {
     return (
-      <View style={[styles.centered, styles.whiteBg]}>
-        <Text style={styles.message}>Camera screen loading…</Text>
+      <View style={[styles.centered, isDark ? styles.centeredDark : styles.whiteBg]}>
+        <Text style={[styles.message, isDark && styles.messageDark]}>Camera screen loading…</Text>
         {!device ? (
-          <Text style={styles.messageSmall}>No camera device (emulator may have none)</Text>
+          <Text style={[styles.messageSmall, isDark && styles.messageSmallDark]}>No camera device (emulator may have none)</Text>
         ) : (
-          <ActivityIndicator size="large" color="#333" />
+          <ActivityIndicator size="large" color={isDark ? '#93c5fd' : '#333'} />
         )}
       </View>
     );
@@ -175,9 +179,9 @@ export function ScannerScreen() {
   // Permission denied / not determined: show permission UI (visible, not black)
   if (permStatus !== 'granted') {
     return (
-      <View style={[styles.centered, styles.whiteBg]}>
-        <Text style={styles.message}>Camera access is required to scan barcodes.</Text>
-        <Text style={styles.messageSmall}>
+      <View style={[styles.centered, isDark ? styles.centeredDark : styles.whiteBg]}>
+        <Text style={[styles.message, isDark && styles.messageDark]}>Camera access is required to scan barcodes.</Text>
+        <Text style={[styles.messageSmall, isDark && styles.messageSmallDark]}>
           {permStatus === 'denied' ? 'Permission denied. Open Settings to enable.' : 'Tap below to allow.'}
         </Text>
         <TouchableOpacity style={styles.button} onPress={handleRequestPermission}>
@@ -342,4 +346,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     textAlign: 'center',
   },
+  centeredDark: { backgroundColor: '#0f172a' },
+  messageDark: { color: '#f1f5f9' },
+  messageSmallDark: { color: '#94a3b8' },
 });

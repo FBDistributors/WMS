@@ -3,8 +3,6 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  BackHandler,
-  Platform,
   PanResponder,
   ScrollView,
   StyleSheet,
@@ -12,7 +10,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import RNExitApp from 'react-native-exit-app';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
@@ -113,19 +110,6 @@ export function PickerHome() {
   }, []);
 
   useFocusEffect(useCallback(() => { refreshCounts(); }, [refreshCounts]));
-
-  useFocusEffect(
-    useCallback(() => {
-      const onBack = () => {
-        if (Platform.OS === 'android') {
-          RNExitApp.exitApp();
-        }
-        return true;
-      };
-      const sub = BackHandler.addEventListener('hardwareBackPress', onBack);
-      return () => sub.remove();
-    }, [])
-  );
 
   const onHeaderRefresh = useCallback(async () => {
     setRefreshing(true);

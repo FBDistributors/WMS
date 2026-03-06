@@ -170,6 +170,7 @@ export function ConsolidatedPickContent({
     nav.navigate('Scanner', {
       returnToConsolidated: true,
       profileType: 'picker',
+      selectedProductKey: consolidatedProductKey(selectedProduct),
     } as any);
   }, [selectedProduct, navigation, hideModalForScanner]);
 

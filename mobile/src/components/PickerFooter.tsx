@@ -1,6 +1,5 @@
 /**
- * Pastki menyu — bitta pill (Telegram uslubi), barcha tablar va scan.
- * Buyurtmalar, Mahsulotlar, Hisob sahifalarida ham ko'rinishi uchun ishlatiladi.
+ * Pastki menyu — oddiy navbar, tablar va scan, bezaksiz.
  */
 import React, { memo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -27,7 +26,6 @@ function TabItem({
   badge,
   activeColor,
   inactiveColor,
-  isDark,
 }: {
   iconName: string;
   label: string;
@@ -36,11 +34,10 @@ function TabItem({
   badge?: number;
   activeColor: string;
   inactiveColor: string;
-  isDark: boolean;
 }) {
   const color = active ? activeColor : inactiveColor;
-  const content = (
-    <>
+  return (
+    <TouchableOpacity style={footerStyles.tab} onPress={onPress} activeOpacity={0.7}>
       <View style={footerStyles.tabIconWrap}>
         <Icon name={iconName as any} size={TAB_ICON_SIZE} color={color} />
         {badge != null && badge > 0 && (
@@ -54,19 +51,6 @@ function TabItem({
       <Text style={[footerStyles.tabLabel, { color }]} numberOfLines={1}>
         {label}
       </Text>
-    </>
-  );
-  return (
-    <TouchableOpacity
-      style={footerStyles.tab}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      {active ? (
-        <View style={[footerStyles.tabPill, isDark && footerStyles.tabPillDark]}>{content}</View>
-      ) : (
-        content
-      )}
     </TouchableOpacity>
   );
 }
@@ -84,59 +68,54 @@ function PickerFooterInner({ currentRoute, profileType = 'picker' }: PickerFoote
   const isDark = theme === 'dark';
   const navActiveColor = isDark ? '#93c5fd' : BOTTOM_ACTIVE;
   const navInactiveColor = isDark ? '#94a3b8' : BOTTOM_INACTIVE;
-  const pillBg = isDark ? 'rgba(30,41,59,0.92)' : 'rgba(255,255,255,0.92)';
+  const barBg = isDark ? '#1e293b' : '#fff';
+  const borderColor = isDark ? '#334155' : '#e0e0e0';
 
   return (
-    <View style={footerStyles.pillWrap} collapsable={false}>
-      <View style={[footerStyles.pill, { backgroundColor: pillBg }]} collapsable={false}>
-        <View style={footerStyles.row} pointerEvents="box-none">
-          <TabItem
-            iconName="home"
-            label={t('tabMain')}
-            active={currentRoute === 'PickerHome'}
-            onPress={() => navigation.navigate('PickerHome', { profileType })}
-            activeColor={navActiveColor}
-            inactiveColor={navInactiveColor}
-            isDark={isDark}
-          />
-          <TabItem
-            iconName="clipboard-list-outline"
-            label={t('tabPickLists')}
-            active={currentRoute === 'PickTaskList'}
-            onPress={() => navigation.navigate('PickTaskList', { profileType })}
-            badge={taskCount}
-            activeColor={navActiveColor}
-            inactiveColor={navInactiveColor}
-            isDark={isDark}
-          />
-          <View style={footerStyles.scanWrap} pointerEvents="box-none">
-            <TouchableOpacity
-              style={footerStyles.scanBtn}
-              onPress={() => navigation.navigate('Scanner')}
-              activeOpacity={0.8}
-            >
-              <Icon name="barcode-scan" size={34} color="#fff" />
-            </TouchableOpacity>
-          </View>
-          <TabItem
-            iconName="package-variant"
-            label={t('tabInventory')}
-            active={currentRoute === 'Inventory'}
-            onPress={() => navigation.navigate('Inventory')}
-            activeColor={navActiveColor}
-            inactiveColor={navInactiveColor}
-            isDark={isDark}
-          />
-          <TabItem
-            iconName="package-down"
-            label={t('tabKirim')}
-            active={currentRoute === 'Kirim'}
-            onPress={() => navigation.navigate('Kirim')}
-            activeColor={navActiveColor}
-            inactiveColor={navInactiveColor}
-            isDark={isDark}
-          />
+    <View style={[footerStyles.footerBar, { backgroundColor: barBg, borderTopColor: borderColor }]}>
+      <View style={footerStyles.row} pointerEvents="box-none">
+        <TabItem
+          iconName="home"
+          label={t('tabMain')}
+          active={currentRoute === 'PickerHome'}
+          onPress={() => navigation.navigate('PickerHome', { profileType })}
+          activeColor={navActiveColor}
+          inactiveColor={navInactiveColor}
+        />
+        <TabItem
+          iconName="clipboard-list-outline"
+          label={t('tabPickLists')}
+          active={currentRoute === 'PickTaskList'}
+          onPress={() => navigation.navigate('PickTaskList', { profileType })}
+          badge={taskCount}
+          activeColor={navActiveColor}
+          inactiveColor={navInactiveColor}
+        />
+        <View style={footerStyles.scanWrap}>
+          <TouchableOpacity
+            style={footerStyles.scanBtn}
+            onPress={() => navigation.navigate('Scanner')}
+            activeOpacity={0.8}
+          >
+            <Icon name="barcode-scan" size={32} color="#fff" />
+          </TouchableOpacity>
         </View>
+        <TabItem
+          iconName="package-variant"
+          label={t('tabInventory')}
+          active={currentRoute === 'Inventory'}
+          onPress={() => navigation.navigate('Inventory')}
+          activeColor={navActiveColor}
+          inactiveColor={navInactiveColor}
+        />
+        <TabItem
+          iconName="package-down"
+          label={t('tabKirim')}
+          active={currentRoute === 'Kirim'}
+          onPress={() => navigation.navigate('Kirim')}
+          activeColor={navActiveColor}
+          inactiveColor={navInactiveColor}
+        />
       </View>
     </View>
   );
@@ -145,29 +124,17 @@ function PickerFooterInner({ currentRoute, profileType = 'picker' }: PickerFoote
 export const PickerFooter = memo(PickerFooterInner);
 
 const footerStyles = StyleSheet.create({
-  pillWrap: {
-    paddingHorizontal: 12,
-    paddingTop: 6,
-    paddingBottom: 10,
-    alignItems: 'center',
-  },
-  pill: {
+  footerBar: {
     width: '100%',
-    maxWidth: 400,
-    borderRadius: 28,
-    overflow: 'hidden',
-    paddingTop: 16,
-    paddingBottom: 8,
-    paddingHorizontal: 6,
-    minHeight: 62,
-    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#e0e0e0',
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    paddingHorizontal: 4,
-    paddingVertical: 2,
   },
   tab: {
     flex: 1,
@@ -175,18 +142,6 @@ const footerStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 4,
-    paddingHorizontal: 4,
-  },
-  tabPill: {
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: 'rgba(0,0,0,0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabPillDark: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
   },
   tabIconWrap: { position: 'relative', marginBottom: 2 },
   tabBadge: {
@@ -207,22 +162,14 @@ const footerStyles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 10,
-    elevation: 12,
   },
   scanBtn: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: '#1976d2',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: -6,
-    transform: [{ translateY: -22 }],
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 12,
+    transform: [{ translateY: -14 }],
   },
 });

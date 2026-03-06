@@ -11,6 +11,7 @@ export type RootStackParamList = {
     completedMessage?: string;
     scannedBarcode?: string;
     openConsolidated?: boolean;
+    selectedProductKey?: string;
   } | undefined;
   ConsolidatedPick: undefined;
   PickTaskDetails: { taskId: string; scannedBarcode?: string; lineId?: string; profileType?: 'picker' | 'controller' };
@@ -24,6 +25,7 @@ export type RootStackParamList = {
     taskId?: string;
     lineId?: string;
     profileType?: 'picker' | 'controller';
+    selectedProductKey?: string;
     inventoryStep?: 1 | 2 | 3;
     inventoryLocationId?: string;
     inventoryLocationCode?: string;

@@ -7,17 +7,20 @@ import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../types/navigation';
 import { BRAND } from '../config/branding';
+import { useTheme } from '../theme/ThemeContext';
 
 type HomeNav = StackNavigationProp<RootStackParamList, 'Home'>;
 
 export function HomeScreen() {
   const navigation = useNavigation<HomeNav>();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isDark && styles.containerDark]}>
       <Image source={require('../assets/logo.png')} style={[styles.logo, { width: BRAND.loginLogoSize, height: BRAND.loginLogoSize }]} resizeMode="contain" />
-      <Text style={styles.brand}>{BRAND.name}</Text>
-      <Text style={styles.subtitle}>Skaner yoki terish (Picker)</Text>
+      <Text style={[styles.brand, isDark && styles.brandDark]}>{BRAND.name}</Text>
+      <Text style={[styles.subtitle, isDark && styles.subtitleDark]}>Skaner yoki terish (Picker)</Text>
 
       <TouchableOpacity
         style={styles.primaryBtn}
@@ -28,11 +31,11 @@ export function HomeScreen() {
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={styles.secondaryBtn}
+        style={[styles.secondaryBtn, isDark && styles.secondaryBtnDark]}
         onPress={() => navigation.navigate('Scanner')}
         activeOpacity={0.8}
       >
-        <Text style={styles.secondaryBtnText}>Skaner (barcode)</Text>
+        <Text style={[styles.secondaryBtnText, isDark && styles.secondaryBtnTextDark]}>Skaner (barcode)</Text>
       </TouchableOpacity>
     </View>
   );
@@ -91,4 +94,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
   },
+  containerDark: { backgroundColor: '#0f172a' },
+  brandDark: { color: '#f1f5f9' },
+  subtitleDark: { color: '#94a3b8' },
+  secondaryBtnDark: { backgroundColor: '#1e293b', borderColor: '#334155' },
+  secondaryBtnTextDark: { color: '#e2e8f0' },
 });

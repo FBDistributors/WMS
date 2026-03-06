@@ -19,6 +19,7 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { RootStackParamList } from '../types/navigation';
 import { useLocale } from '../i18n/LocaleContext';
+import { useTheme } from '../theme/ThemeContext';
 import { useNetwork } from '../network';
 import { getPickerProductDetail, type PickerProductDetailResponse, type PickerProductLocation } from '../api/inventory';
 import { getPickers, type PickerUser } from '../api/picking';
@@ -53,6 +54,8 @@ export function ReturnsScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<ReturnsRoute>();
   const { t, locale } = useLocale();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const { isOnline } = useNetwork();
   const params = route.params as { scannedProductId?: string; scannedBarcode?: string } | undefined;
 
@@ -166,7 +169,7 @@ export function ReturnsScreen() {
   const canAddLine = currentProduct && currentLocation && currentQty.trim().length > 0;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, isDark && styles.containerDark]} edges={['top']}>
       <AppHeader
         title={t('returnsTitle')}
         showLogo={false}
@@ -174,9 +177,9 @@ export function ReturnsScreen() {
         onBack={() => navigation.goBack()}
       />
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <ScrollView style={[styles.scroll, isDark && styles.scrollDark]} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         {/* Shtrix maydoni eng yuqorida — dropdown uchun joy */}
-        <Text style={styles.manualEntryLabel}>{t('kirimManualEntry')}</Text>
+        <Text style={[styles.manualEntryLabel, isDark && styles.manualEntryLabelDark]}>{t('kirimManualEntry')}</Text>
         <BarcodeSearchInput
           value={barcodeSearchValue}
           onChangeText={setBarcodeSearchValue}
@@ -194,55 +197,55 @@ export function ReturnsScreen() {
         </TouchableOpacity>
 
         {loadingProduct && (
-          <View style={styles.loadingRow}>
-            <ActivityIndicator size="small" color="#1a237e" />
-            <Text style={styles.loadingText}>{t('loading')}</Text>
+          <View style={[styles.loadingRow, isDark && styles.loadingRowDark]}>
+            <ActivityIndicator size="small" color={isDark ? '#93c5fd' : '#1a237e'} />
+            <Text style={[styles.loadingText, isDark && styles.loadingTextDark]}>{t('loading')}</Text>
           </View>
         )}
 
         {productError && (
           <View style={styles.errorRow}>
-            <Text style={styles.errorText}>{productError}</Text>
+            <Text style={[styles.errorText, isDark && styles.errorTextDark]}>{productError}</Text>
           </View>
         )}
 
         {/* Current product: quantity + location */}
         {currentProduct && !loadingProduct && (
-          <View style={styles.card}>
-            <Text style={styles.productName} numberOfLines={2}>{currentProduct.name}</Text>
-            <Text style={styles.label}>{t('quantity')}</Text>
+          <View style={[styles.card, isDark && styles.cardDark]}>
+            <Text style={[styles.productName, isDark && styles.productNameDark]} numberOfLines={2}>{currentProduct.name}</Text>
+            <Text style={[styles.label, isDark && styles.labelDark]}>{t('quantity')}</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, isDark && styles.inputDark]}
               value={currentQty}
               onChangeText={setCurrentQty}
               keyboardType="number-pad"
               placeholder="0"
-              placeholderTextColor="#999"
+              placeholderTextColor={isDark ? '#64748b' : '#999'}
             />
-            <Text style={styles.label}>{t('locationLabel')}</Text>
+            <Text style={[styles.label, isDark && styles.labelDark]}>{t('locationLabel')}</Text>
             <TouchableOpacity
-              style={styles.dropdownTrigger}
+              style={[styles.dropdownTrigger, isDark && styles.dropdownTriggerDark]}
               onPress={() => setLocationDropdownOpen((v) => !v)}
             >
-              <Text style={styles.dropdownTriggerText}>
+              <Text style={[styles.dropdownTriggerText, isDark && styles.dropdownTriggerTextDark]}>
                 {currentLocation ? currentLocation.location_code : t('returnsSelectLocation')}
               </Text>
-              <Icon name={locationDropdownOpen ? 'chevron-up' : 'chevron-down'} size={22} color="#555" />
+              <Icon name={locationDropdownOpen ? 'chevron-up' : 'chevron-down'} size={22} color={isDark ? '#94a3b8' : '#555'} />
             </TouchableOpacity>
             {locationDropdownOpen && (
               <>
                 <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setLocationDropdownOpen(false)} />
-                <View style={styles.dropdown}>
+                <View style={[styles.dropdown, isDark && styles.dropdownDark]}>
                   {locations.map((loc) => (
                     <TouchableOpacity
                       key={loc.lot_id + loc.location_id}
-                      style={styles.dropdownItem}
+                      style={[styles.dropdownItem, isDark && styles.dropdownItemDark]}
                       onPress={() => {
                         setCurrentLocation(loc);
                         setLocationDropdownOpen(false);
                       }}
                     >
-                      <Text style={styles.dropdownItemText}>
+                      <Text style={[styles.dropdownItemText, isDark && styles.dropdownItemTextDark]}>
                         {loc.location_code} — {loc.batch_no} {loc.expiry_date ? `(${formatExpiryDisplay(loc.expiry_date, locale)})` : ''} — {Math.round(Number(loc.available_qty))} {t('invAvailable')}
                       </Text>
                     </TouchableOpacity>
@@ -262,16 +265,16 @@ export function ReturnsScreen() {
 
         {/* List of added lines */}
         {lines.length > 0 && (
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>{t('returnsLines')} ({lines.length})</Text>
+          <View style={[styles.card, isDark && styles.cardDark]}>
+            <Text style={[styles.sectionTitle, isDark && styles.sectionTitleDark]}>{t('returnsLines')} ({lines.length})</Text>
             {lines.map((line) => (
-              <View key={line.id} style={styles.lineRow}>
+              <View key={line.id} style={[styles.lineRow, isDark && styles.lineRowDark]}>
                 <View style={styles.lineInfo}>
-                  <Text style={styles.lineProduct} numberOfLines={1}>{line.productName}</Text>
-                  <Text style={styles.lineMeta}>{line.locationCode} · {line.qty} dona</Text>
+                  <Text style={[styles.lineProduct, isDark && styles.lineProductDark]} numberOfLines={1}>{line.productName}</Text>
+                  <Text style={[styles.lineMeta, isDark && styles.lineMetaDark]}>{line.locationCode} · {line.qty} dona</Text>
                 </View>
                 <TouchableOpacity onPress={() => removeLine(line.id)} hitSlop={12}>
-                  <Icon name="close-circle-outline" size={24} color="#c62828" />
+                  <Icon name="close-circle-outline" size={24} color={isDark ? '#f87171' : '#c62828'} />
                 </TouchableOpacity>
               </View>
             ))}
@@ -287,18 +290,18 @@ export function ReturnsScreen() {
 
         {/* Yig'uvchini tanlab yuborish */}
         {finished && lines.length > 0 && (
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>{t('returnsAssignPicker')}</Text>
+          <View style={[styles.card, isDark && styles.cardDark]}>
+            <Text style={[styles.sectionTitle, isDark && styles.sectionTitleDark]}>{t('returnsAssignPicker')}</Text>
             <TouchableOpacity
-              style={styles.secondaryBtn}
+              style={[styles.secondaryBtn, isDark && styles.secondaryBtnDark]}
               onPress={() => setPickerModalVisible(true)}
             >
-              <Text style={styles.secondaryBtnText}>
+              <Text style={[styles.secondaryBtnText, isDark && styles.secondaryBtnTextDark]}>
                 {selectedPickerId
                   ? pickers.find((p) => p.id === selectedPickerId)?.full_name || pickers.find((p) => p.id === selectedPickerId)?.username
                   : t('returnsSelectPicker')}
               </Text>
-              <Icon name="account-outline" size={22} color="#1a237e" />
+              <Icon name="account-outline" size={22} color={isDark ? '#93c5fd' : '#1a237e'} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.primaryBtn, styles.primaryBtnSmall, !selectedPickerId && styles.primaryBtnDisabled]}
@@ -323,22 +326,22 @@ export function ReturnsScreen() {
         onRequestClose={() => setPickerModalVisible(false)}
       >
         <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setPickerModalVisible(false)}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t('returnsSelectPicker')}</Text>
+          <View style={[styles.modalContent, isDark && styles.modalContentDark]}>
+            <View style={[styles.modalHeader, isDark && styles.modalHeaderDark]}>
+              <Text style={[styles.modalTitle, isDark && styles.modalTitleDark]}>{t('returnsSelectPicker')}</Text>
               <TouchableOpacity onPress={() => setPickerModalVisible(false)}>
-                <Icon name="close" size={24} color="#333" />
+                <Icon name="close" size={24} color={isDark ? '#e2e8f0' : '#333'} />
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.modalList}>
               {pickers.map((p) => (
                 <TouchableOpacity
                   key={p.id}
-                  style={[styles.modalItem, selectedPickerId === p.id && styles.modalItemActive]}
+                  style={[styles.modalItem, selectedPickerId === p.id && styles.modalItemActive, isDark && styles.modalItemDark, selectedPickerId === p.id && isDark && styles.modalItemActiveDark]}
                   onPress={() => setSelectedPickerId(p.id)}
                 >
-                  <Text style={styles.modalItemText}>{p.full_name || p.username}</Text>
-                  {selectedPickerId === p.id && <Icon name="check-circle" size={22} color="#1a237e" />}
+                  <Text style={[styles.modalItemText, isDark && styles.modalItemTextDark]}>{p.full_name || p.username}</Text>
+                  {selectedPickerId === p.id && <Icon name="check-circle" size={22} color={isDark ? '#93c5fd' : '#1a237e'} />}
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -490,4 +493,31 @@ const styles = StyleSheet.create({
   },
   modalItemActive: { backgroundColor: '#e8eaf6' },
   modalItemText: { fontSize: 16, color: '#333' },
+  containerDark: { backgroundColor: '#0f172a' },
+  scrollDark: {},
+  manualEntryLabelDark: { color: '#94a3b8' },
+  loadingRowDark: {},
+  loadingTextDark: { color: '#94a3b8' },
+  errorTextDark: { color: '#f87171' },
+  cardDark: { backgroundColor: '#1e293b' },
+  productNameDark: { color: '#f1f5f9' },
+  labelDark: { color: '#94a3b8' },
+  inputDark: { borderColor: '#334155', backgroundColor: '#1e293b', color: '#f1f5f9' },
+  dropdownTriggerDark: { borderColor: '#334155', backgroundColor: '#1e293b' },
+  dropdownTriggerTextDark: { color: '#f1f5f9' },
+  dropdownDark: { backgroundColor: '#1e293b', borderColor: '#334155' },
+  dropdownItemDark: { borderBottomColor: '#334155' },
+  dropdownItemTextDark: { color: '#e2e8f0' },
+  sectionTitleDark: { color: '#e2e8f0' },
+  lineRowDark: { borderBottomColor: '#334155' },
+  lineProductDark: { color: '#f1f5f9' },
+  lineMetaDark: { color: '#94a3b8' },
+  secondaryBtnDark: { borderColor: '#60a5fa' },
+  secondaryBtnTextDark: { color: '#93c5fd' },
+  modalContentDark: { backgroundColor: '#1e293b' },
+  modalHeaderDark: { borderBottomColor: '#334155' },
+  modalTitleDark: { color: '#f1f5f9' },
+  modalItemDark: { borderBottomColor: '#334155' },
+  modalItemActiveDark: { backgroundColor: '#1e3a5f' },
+  modalItemTextDark: { color: '#f1f5f9' },
 });

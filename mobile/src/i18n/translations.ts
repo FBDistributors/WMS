@@ -128,6 +128,8 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     consolidatedProductByOrder: "Buyurtma bo'yicha",
     consolidatedScanHint: "Shtrixkod + miqdor (ixtiyoriy)",
     consolidatedQuantity: "Miqdor",
+    toggleOrdersList: "Buyurtmalar",
+    toggleGeneralList: "Umumiy",
 
     // Mahsulotlar (picker inventory)
     invTitle: "Mahsulotlar",
@@ -368,6 +370,8 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     consolidatedProductByOrder: 'По заказам',
     consolidatedScanHint: 'Штрихкод + кол-во (необяз.)',
     consolidatedQuantity: 'Кол-во',
+    toggleOrdersList: 'Заказы',
+    toggleGeneralList: 'Общий',
 
     invTitle: 'Товары',
     invSearchPlaceholder: 'SKU, название или штрихкод',
@@ -607,6 +611,8 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     consolidatedProductByOrder: 'By order',
     consolidatedScanHint: 'Barcode + qty (optional)',
     consolidatedQuantity: 'Qty',
+    toggleOrdersList: 'Orders',
+    toggleGeneralList: 'General',
 
     invTitle: 'Products',
     invSearchPlaceholder: 'SKU, name or barcode',

@@ -166,6 +166,10 @@ export function PickTaskList() {
         setPendingScannedBarcode(params.scannedBarcode);
         navigation.setParams({ scannedBarcode: undefined });
       }
+      if (params.selectedProductKey !== undefined) {
+        setSelectedProductKey(params.selectedProductKey ?? null);
+        navigation.setParams({ selectedProductKey: undefined });
+      }
     }, [route.params, navigation])
   );
 
@@ -269,32 +273,6 @@ export function PickTaskList() {
         </TouchableOpacity>
       </View>
       <View style={styles.toggleAndContent} {...(isPicker ? panResponder.panHandlers : {})}>
-      {isPicker && (
-        <View style={[styles.toggleWrap, isDark && styles.toggleWrapDark]}>
-          <TouchableOpacity
-            style={[styles.toggleSegment, !showConsolidated && styles.toggleSegmentActive, isDark && styles.toggleSegmentDark, !showConsolidated && isDark && styles.toggleSegmentActiveDark]}
-            onPress={() => setShowConsolidated(false)}
-            activeOpacity={0.8}
-          >
-            <Icon
-              name="format-list-bulleted"
-              size={24}
-              color={!showConsolidated ? (isDark ? '#f1f5f9' : '#111') : (isDark ? '#94a3b8' : '#666')}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.toggleSegment, showConsolidated && styles.toggleSegmentActive, isDark && styles.toggleSegmentDark, showConsolidated && isDark && styles.toggleSegmentActiveDark]}
-            onPress={() => setShowConsolidated(true)}
-            activeOpacity={0.8}
-          >
-            <Icon
-              name="format-list-group"
-              size={24}
-              color={showConsolidated ? (isDark ? '#f1f5f9' : '#111') : (isDark ? '#94a3b8' : '#666')}
-            />
-          </TouchableOpacity>
-        </View>
-      )}
       {showConsolidated && isPicker ? (
         <ConsolidatedPickContent
           embeddedInPickTaskList
@@ -327,6 +305,45 @@ export function PickTaskList() {
         />
       )}
       </View>
+
+      {isPicker && (
+        <View style={[styles.toggleWrapBottom, isDark && styles.toggleWrapDark]}>
+          <TouchableOpacity
+            style={[styles.toggleSegment, !showConsolidated && styles.toggleSegmentActive, isDark && styles.toggleSegmentDark, !showConsolidated && isDark && styles.toggleSegmentActiveDark]}
+            onPress={() => setShowConsolidated(false)}
+            activeOpacity={0.8}
+          >
+            <Text
+              style={[
+                styles.toggleSegmentText,
+                !showConsolidated && styles.toggleSegmentTextActive,
+                isDark && styles.toggleSegmentTextDark,
+                !showConsolidated && isDark && styles.toggleSegmentTextActiveDark,
+              ]}
+              numberOfLines={1}
+            >
+              {t('toggleOrdersList')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.toggleSegment, showConsolidated && styles.toggleSegmentActive, isDark && styles.toggleSegmentDark, showConsolidated && isDark && styles.toggleSegmentActiveDark]}
+            onPress={() => setShowConsolidated(true)}
+            activeOpacity={0.8}
+          >
+            <Text
+              style={[
+                styles.toggleSegmentText,
+                showConsolidated && styles.toggleSegmentTextActive,
+                isDark && styles.toggleSegmentTextDark,
+                showConsolidated && isDark && styles.toggleSegmentTextActiveDark,
+              ]}
+              numberOfLines={1}
+            >
+              {t('toggleGeneralList')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <Modal
         visible={!!controllerModalDoc}
@@ -443,16 +460,42 @@ const styles = StyleSheet.create({
     backgroundColor: '#e0e0e0',
     borderRadius: 12,
     padding: 4,
-    marginVertical: 10,
+    marginTop: 10,
+    marginBottom: 18,
+    gap: 0,
+  },
+  toggleWrapBottom: {
+    flexDirection: 'row',
+    alignSelf: 'center',
+    backgroundColor: '#e0e0e0',
+    borderRadius: 12,
+    padding: 4,
+    marginTop: 8,
+    marginBottom: 12,
+    marginHorizontal: 16,
     gap: 0,
   },
   toggleSegment: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     borderRadius: 10,
   },
   toggleSegmentActive: {
     backgroundColor: '#fff',
+  },
+  toggleSegmentText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#666',
+  },
+  toggleSegmentTextActive: {
+    color: '#111',
+  },
+  toggleSegmentTextDark: {
+    color: '#94a3b8',
+  },
+  toggleSegmentTextActiveDark: {
+    color: '#f1f5f9',
   },
   listContent: { padding: 16, paddingBottom: 24 },
   rowWrap: { marginBottom: 12 },

@@ -19,6 +19,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { RootStackParamList } from '../types/navigation';
 import type { PickItem, PickTask, PickProgress } from '../types/picker';
 import { getPickTask } from '../services/pickerService';
+import { useTheme } from '../theme/ThemeContext';
 
 type PickerNav = StackNavigationProp<RootStackParamList, 'Picker'>;
 type PickerRoute = RouteProp<RootStackParamList, 'Picker'>;
@@ -42,6 +43,8 @@ function computeProgress(lines: PickItem[]): PickProgress {
 export function PickerScreen() {
   const navigation = useNavigation<PickerNav>();
   const route = useRoute<PickerRoute>();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const taskId = route.params?.taskId ?? 'doc-mock-1';
   const onBack = useCallback(() => navigation.goBack(), [navigation]);
   const [task, setTask] = useState<PickTask | null>(null);
@@ -164,23 +167,23 @@ export function PickerScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#1976d2" />
-        <Text style={styles.loadingText}>Yuklanmoqda…</Text>
+      <View style={[styles.centered, isDark && styles.centeredDark]}>
+        <ActivityIndicator size="large" color={isDark ? '#93c5fd' : '#1976d2'} />
+        <Text style={[styles.loadingText, isDark && styles.loadingTextDark]}>Yuklanmoqda…</Text>
       </View>
     );
   }
 
   if (error || !task) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>{error || 'Hujjat topilmadi'}</Text>
+      <View style={[styles.centered, isDark && styles.centeredDark]}>
+        <Text style={[styles.errorText, isDark && styles.errorTextDark]}>{error || 'Hujjat topilmadi'}</Text>
         <TouchableOpacity style={styles.retryBtn} onPress={loadTask}>
           <Text style={styles.retryBtnText}>Qayta urinish</Text>
         </TouchableOpacity>
         {onBack && (
           <TouchableOpacity style={styles.backBtn} onPress={onBack} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Icon name="arrow-left" size={24} color="#1976d2" />
+            <Icon name="arrow-left" size={24} color={isDark ? '#93c5fd' : '#1976d2'} />
           </TouchableOpacity>
         )}
       </View>
@@ -188,44 +191,44 @@ export function PickerScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isDark && styles.containerDark]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, isDark && styles.headerDark]}>
         {onBack && (
           <TouchableOpacity onPress={onBack} style={styles.backLink} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Icon name="arrow-left" size={24} color="#1976d2" />
+            <Icon name="arrow-left" size={24} color={isDark ? '#93c5fd' : '#1976d2'} />
           </TouchableOpacity>
         )}
-        <Text style={styles.title}>{task.reference_number}</Text>
+        <Text style={[styles.title, isDark && styles.titleDark]}>{task.reference_number}</Text>
         <View style={styles.statusRow}>
-          <Text style={styles.statusLabel}>Holat: </Text>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{STATUS_LABEL[task.status] ?? task.status}</Text>
+          <Text style={[styles.statusLabel, isDark && styles.statusLabelDark]}>Holat: </Text>
+          <View style={[styles.badge, isDark && styles.badgeDark]}>
+            <Text style={[styles.badgeText, isDark && styles.badgeTextDark]}>{STATUS_LABEL[task.status] ?? task.status}</Text>
           </View>
         </View>
       </View>
 
       {/* Progress */}
-      <View style={styles.progressCard}>
-        <Text style={styles.progressText}>
+      <View style={[styles.progressCard, isDark && styles.progressCardDark]}>
+        <Text style={[styles.progressText, isDark && styles.progressTextDark]}>
           Terildi: {progress.picked} / {progress.required}
         </Text>
-        <Text style={styles.progressSub}>
+        <Text style={[styles.progressSub, isDark && styles.progressSubDark]}>
           Qatorlar: {progress.linesDone} / {progress.linesTotal}
         </Text>
       </View>
 
       {/* Scan input */}
       <View style={styles.scanBlock}>
-        <Text style={styles.scanLabel}>Shtrixkod / SKU</Text>
+        <Text style={[styles.scanLabel, isDark && styles.scanLabelDark]}>Shtrixkod / SKU</Text>
         <TextInput
-          style={styles.scanInput}
+          style={[styles.scanInput, isDark && styles.scanInputDark]}
           value={barcodeValue}
           onChangeText={setBarcodeValue}
           onSubmitEditing={handleBarcodeSubmit}
           returnKeyType="done"
           placeholder="Skanerlang yoki yozing"
-          placeholderTextColor="#999"
+          placeholderTextColor={isDark ? '#64748b' : '#999'}
         />
         <TouchableOpacity style={styles.scanSubmitBtn} onPress={handleBarcodeSubmit}>
           <Text style={styles.scanSubmitText}>Qidirish</Text>
@@ -235,11 +238,11 @@ export function PickerScreen() {
       {/* Search filter */}
       <View style={styles.searchBlock}>
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, isDark && styles.scanInputDark]}
           value={searchQuery}
           onChangeText={setSearchQuery}
           placeholder="Mahsulot / shtrix / lokatsiya bo‘yicha qidirish"
-          placeholderTextColor="#999"
+          placeholderTextColor={isDark ? '#64748b' : '#999'}
         />
       </View>
 
@@ -249,9 +252,9 @@ export function PickerScreen() {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.sectionTitle}>Pozitsiyalar</Text>
+        <Text style={[styles.sectionTitle, isDark && styles.sectionTitleDark]}>Pozitsiyalar</Text>
         {filteredLines.length === 0 ? (
-          <Text style={styles.emptyList}>Qidiruv bo‘yicha hech narsa topilmadi</Text>
+          <Text style={[styles.emptyList, isDark && styles.emptyListDark]}>Qidiruv bo‘yicha hech narsa topilmadi</Text>
         ) : (
           filteredLines.map((line) => {
             const remaining = line.qty_required - line.qty_picked;
@@ -259,11 +262,11 @@ export function PickerScreen() {
             return (
               <View
                 key={line.id}
-                style={[styles.itemCard, isDone && styles.itemCardDone]}
+                style={[styles.itemCard, isDone && styles.itemCardDone, isDark && styles.itemCardDark, isDone && isDark && styles.itemCardDoneDark]}
               >
-                <Text style={styles.itemName}>{line.product_name}</Text>
-                <Text style={styles.itemMeta}>Lokatsiya: {line.location_code}</Text>
-                <Text style={styles.itemMeta}>Shtrix: {line.barcode ?? '—'}</Text>
+                <Text style={[styles.itemName, isDark && styles.itemNameDark]}>{line.product_name}</Text>
+                <Text style={[styles.itemMeta, isDark && styles.itemMetaDark]}>Lokatsiya: {line.location_code}</Text>
+                <Text style={[styles.itemMeta, isDark && styles.itemMetaDark]}>Shtrix: {line.barcode ?? '—'}</Text>
                 <View style={styles.itemQtyRow}>
                   <Text style={styles.itemQtyLabel}>Kerak: {line.qty_required}</Text>
                   <Text style={styles.itemQtyLabel}>Terilgan: {line.qty_picked}</Text>
@@ -300,7 +303,7 @@ export function PickerScreen() {
       </ScrollView>
 
       {/* Sticky action bar */}
-      <View style={styles.footer}>
+      <View style={[styles.footer, isDark && styles.footerDark]}>
         <TouchableOpacity
           style={[styles.footerBtn, styles.footerBtnPrimary]}
           onPress={handleComplete}
@@ -311,11 +314,11 @@ export function PickerScreen() {
           </Text>
         </TouchableOpacity>
         <View style={styles.footerRow}>
-          <TouchableOpacity style={styles.footerBtnSecondary} onPress={handlePause}>
-            <Text style={styles.footerBtnSecondaryText}>To‘xtatish</Text>
+          <TouchableOpacity style={[styles.footerBtnSecondary, isDark && styles.footerBtnSecondaryDark]} onPress={handlePause}>
+            <Text style={[styles.footerBtnSecondaryText, isDark && styles.footerBtnSecondaryTextDark]}>To‘xtatish</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.footerBtnSecondary} onPress={handleCancel}>
-            <Text style={styles.footerBtnSecondaryText}>Bekor qilish</Text>
+          <TouchableOpacity style={[styles.footerBtnSecondary, isDark && styles.footerBtnSecondaryDark]} onPress={handleCancel}>
+            <Text style={[styles.footerBtnSecondaryText, isDark && styles.footerBtnSecondaryTextDark]}>Bekor qilish</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -488,4 +491,27 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
   },
   footerBtnSecondaryText: { fontSize: 16, color: '#333', fontWeight: '500' },
+  containerDark: { backgroundColor: '#0f172a' },
+  centeredDark: { backgroundColor: '#0f172a' },
+  loadingTextDark: { color: '#94a3b8' },
+  errorTextDark: { color: '#f87171' },
+  headerDark: { backgroundColor: '#1e293b', borderBottomColor: '#334155' },
+  titleDark: { color: '#f1f5f9' },
+  statusLabelDark: { color: '#94a3b8' },
+  badgeDark: { backgroundColor: '#1e3a5f' },
+  badgeTextDark: { color: '#93c5fd' },
+  progressCardDark: { backgroundColor: '#1e293b', borderColor: '#334155' },
+  progressTextDark: { color: '#f1f5f9' },
+  progressSubDark: { color: '#94a3b8' },
+  scanLabelDark: { color: '#e2e8f0' },
+  scanInputDark: { backgroundColor: '#1e293b', borderColor: '#334155', color: '#f1f5f9' },
+  footerDark: { backgroundColor: '#1e293b', borderTopColor: '#334155' },
+  footerBtnSecondaryDark: { backgroundColor: '#334155', borderColor: '#475569' },
+  footerBtnSecondaryTextDark: { color: '#e2e8f0' },
+  sectionTitleDark: { color: '#f1f5f9' },
+  emptyListDark: { color: '#94a3b8' },
+  itemCardDark: { backgroundColor: '#1e293b', borderColor: '#334155' },
+  itemCardDoneDark: { backgroundColor: '#14532d', borderColor: '#166534' },
+  itemNameDark: { color: '#f1f5f9' },
+  itemMetaDark: { color: '#94a3b8' },
 });

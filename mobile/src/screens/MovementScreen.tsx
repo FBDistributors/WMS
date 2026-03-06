@@ -23,6 +23,7 @@ import { useNetwork } from '../network';
 import { getPickerProductDetail, listPickerLocations } from '../api/inventory';
 import type { PickerProductDetailResponse, PickerProductLocation, PickerLocationOption } from '../api/inventory';
 import { createStockMovement } from '../api/movements';
+import { useTheme } from '../theme/ThemeContext';
 import { AppHeader } from '../components/AppHeader';
 import { BarcodeSearchInput } from '../components/BarcodeSearchInput';
 
@@ -33,6 +34,8 @@ export function MovementScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<MovementRoute>();
   const { t } = useLocale();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const { isOnline } = useNetwork();
   const params = route.params ?? {};
 
@@ -140,27 +143,27 @@ export function MovementScreen() {
 
   if (loadingProduct) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={[styles.container, isDark && styles.containerDark]} edges={['top']}>
         <AppHeader title={t('movementTitle')} showBack onBack={() => navigation.goBack()} />
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#1a237e" />
-          <Text style={styles.loadingText}>{t('loading')}</Text>
+        <View style={[styles.centered, isDark && styles.centeredDark]}>
+          <ActivityIndicator size="large" color={isDark ? '#93c5fd' : '#1a237e'} />
+          <Text style={[styles.loadingText, isDark && styles.loadingTextDark]}>{t('loading')}</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, isDark && styles.containerDark]} edges={['top']}>
       <AppHeader
         title={t('movementTitle')}
         showBack
         onBack={() => navigation.goBack()}
       />
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <ScrollView style={[styles.scroll, isDark && styles.scrollDark]} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         {!product ? (
           <>
-            <Text style={styles.manualEntryLabel}>{t('kirimManualEntry')}</Text>
+            <Text style={[styles.manualEntryLabel, isDark && styles.manualEntryLabelDark]}>{t('kirimManualEntry')}</Text>
             <BarcodeSearchInput
               value={barcodeSearchValue}
               onChangeText={setBarcodeSearchValue}
@@ -172,32 +175,32 @@ export function MovementScreen() {
               onClearError={() => setProductError(null)}
               dropdownMaxHeight={200}
             />
-            <Text style={styles.hint}>{t('movementScanHint')}</Text>
+            <Text style={[styles.hint, isDark && styles.hintDark]}>{t('movementScanHint')}</Text>
             <TouchableOpacity style={styles.scanBtn} onPress={handleScan} activeOpacity={0.8}>
               <Icon name="barcode-scan" size={32} color="#fff" />
               <Text style={styles.scanBtnText}>{t('movementScan')}</Text>
             </TouchableOpacity>
             {productError ? (
-              <Text style={styles.errorText}>{productError}</Text>
+              <Text style={[styles.errorText, isDark && styles.errorTextDark]}>{productError}</Text>
             ) : null}
           </>
         ) : (
           <>
-            <View style={styles.productCard}>
-              <Text style={styles.productName}>{product.name}</Text>
-              <Text style={styles.productCode}>{product.code}</Text>
+            <View style={[styles.productCard, isDark && styles.productCardDark]}>
+              <Text style={[styles.productName, isDark && styles.productNameDark]}>{product.name}</Text>
+              <Text style={[styles.productCode, isDark && styles.productCodeDark]}>{product.code}</Text>
             </View>
 
-            <Text style={styles.sectionLabel}>{t('movementFrom')}</Text>
+            <Text style={[styles.sectionLabel, isDark && styles.sectionLabelDark]}>{t('movementFrom')}</Text>
             {product.locations.length === 0 ? (
-              <Text style={styles.muted}>{t('movementNoLocations')}</Text>
+              <Text style={[styles.muted, isDark && styles.mutedDark]}>{t('movementNoLocations')}</Text>
             ) : (
               product.locations.map((loc) => {
                 const selected = fromLocation?.location_id === loc.location_id && fromLocation?.lot_id === loc.lot_id;
                 return (
                   <TouchableOpacity
                     key={`${loc.location_id}-${loc.lot_id}`}
-                    style={[styles.locationRow, selected && styles.locationRowSelected]}
+                    style={[styles.locationRow, selected && styles.locationRowSelected, isDark && styles.locationRowDark, selected && isDark && styles.locationRowSelectedDark]}
                     onPress={() => {
                       setFromLocation(loc);
                       setToLocation(null);
@@ -205,9 +208,9 @@ export function MovementScreen() {
                     }}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.locCode}>{loc.location_code}</Text>
-                    <Text style={styles.locBatch}>{loc.batch_no}</Text>
-                    <Text style={styles.locQty}>{Math.round(Number(loc.available_qty))} dono</Text>
+                    <Text style={[styles.locCode, isDark && styles.locCodeDark]}>{loc.location_code}</Text>
+                    <Text style={[styles.locBatch, isDark && styles.locBatchDark]}>{loc.batch_no}</Text>
+                    <Text style={[styles.locQty, isDark && styles.locQtyDark]}>{Math.round(Number(loc.available_qty))} dono</Text>
                   </TouchableOpacity>
                 );
               })
@@ -215,11 +218,11 @@ export function MovementScreen() {
 
             {fromLocation && (
               <>
-                <Text style={styles.sectionLabel}>{t('movementTo')}</Text>
+                <Text style={[styles.sectionLabel, isDark && styles.sectionLabelDark]}>{t('movementTo')}</Text>
                 <TextInput
-                  style={styles.searchInput}
+                  style={[styles.searchInput, isDark && styles.searchInputDark]}
                   placeholder={t('movementToSearch')}
-                  placeholderTextColor="#999"
+                  placeholderTextColor={isDark ? '#64748b' : '#999'}
                   value={toLocation ? toLocation.code : locationSearch}
                   onChangeText={(text) => {
                     setLocationSearch(text);
@@ -234,34 +237,34 @@ export function MovementScreen() {
                         .map((loc) => (
                           <TouchableOpacity
                             key={loc.id}
-                            style={styles.locationRow}
+                            style={[styles.locationRow, isDark && styles.locationRowDark]}
                             onPress={() => {
                               setToLocation(loc);
                               setLocationSearch(loc.code);
                             }}
                             activeOpacity={0.7}
                           >
-                            <Text style={styles.locCode}>{loc.code}</Text>
-                            {loc.name ? <Text style={styles.locBatch}>{loc.name}</Text> : null}
+                            <Text style={[styles.locCode, isDark && styles.locCodeDark]}>{loc.code}</Text>
+                            {loc.name ? <Text style={[styles.locBatch, isDark && styles.locBatchDark]}>{loc.name}</Text> : null}
                           </TouchableOpacity>
                         ))}
                     </View>
                     {filteredToLocations.filter((l) => l.id !== fromLocation.location_id).length === 0 && locationSearch.trim().length > 0 && (
-                      <Text style={styles.muted}>{t('kirimLocationNoResults')}</Text>
+                      <Text style={[styles.muted, isDark && styles.mutedDark]}>{t('kirimLocationNoResults')}</Text>
                     )}
                   </>
                 )}
 
-                <Text style={styles.sectionLabel}>{t('movementQty')}</Text>
+                <Text style={[styles.sectionLabel, isDark && styles.sectionLabelDark]}>{t('movementQty')}</Text>
                 <TextInput
-                  style={styles.qtyInput}
+                  style={[styles.qtyInput, isDark && styles.qtyInputDark]}
                   placeholder={`1–${maxQty}`}
-                  placeholderTextColor="#999"
+                  placeholderTextColor={isDark ? '#64748b' : '#999'}
                   value={qty}
                   onChangeText={setQty}
                   keyboardType="number-pad"
                 />
-                <Text style={styles.muted}>{t('movementQtyMax', { max: maxQty })}</Text>
+                <Text style={[styles.muted, isDark && styles.mutedDark]}>{t('movementQtyMax', { max: maxQty })}</Text>
 
                 <TouchableOpacity
                   style={[styles.submitBtn, (!canSubmit || submitting) && styles.submitBtnDisabled]}
@@ -279,7 +282,7 @@ export function MovementScreen() {
             )}
 
             <TouchableOpacity style={styles.changeProductBtn} onPress={() => setProduct(null)}>
-              <Text style={styles.changeProductBtnText}>{t('movementChangeProduct')}</Text>
+              <Text style={[styles.changeProductBtnText, isDark && styles.changeProductBtnTextDark]}>{t('movementChangeProduct')}</Text>
             </TouchableOpacity>
           </>
         )}
@@ -363,4 +366,24 @@ const styles = StyleSheet.create({
   submitBtnText: { color: '#fff', fontSize: 17, fontWeight: '600' },
   changeProductBtn: { alignItems: 'center', paddingVertical: 12 },
   changeProductBtnText: { fontSize: 15, color: '#1a237e' },
+  containerDark: { backgroundColor: '#0f172a' },
+  centeredDark: {},
+  loadingTextDark: { color: '#94a3b8' },
+  scrollDark: {},
+  manualEntryLabelDark: { color: '#94a3b8' },
+  hintDark: { color: '#94a3b8' },
+  errorTextDark: { color: '#f87171' },
+  productCardDark: { backgroundColor: '#1e293b' },
+  productNameDark: { color: '#f1f5f9' },
+  productCodeDark: { color: '#94a3b8' },
+  sectionLabelDark: { color: '#e2e8f0' },
+  mutedDark: { color: '#94a3b8' },
+  locationRowDark: { backgroundColor: '#1e293b', borderColor: 'transparent' },
+  locationRowSelectedDark: { borderColor: '#60a5fa', backgroundColor: '#1e3a5f' },
+  locCodeDark: { color: '#f1f5f9' },
+  locBatchDark: { color: '#94a3b8' },
+  locQtyDark: { color: '#e2e8f0' },
+  searchInputDark: { borderColor: '#334155', backgroundColor: '#1e293b', color: '#f1f5f9' },
+  qtyInputDark: { borderColor: '#334155', backgroundColor: '#1e293b', color: '#f1f5f9' },
+  changeProductBtnTextDark: { color: '#93c5fd' },
 });
