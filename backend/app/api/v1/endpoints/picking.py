@@ -346,11 +346,18 @@ async def get_consolidated(
         )
     )
     documents = docs_query.all()
-    doc_map = {d.id: d for d in documents}
     if not documents:
         return ConsolidatedViewResponse(documents=[], products=[])
 
     doc_ids = [d.id for d in documents]
+    # Fresh query for doc_no/status to avoid touching expired attributes after consolidated_pick commit (500 fix)
+    doc_info_rows = (
+        db.query(DocumentModel.id, DocumentModel.doc_no, DocumentModel.status)
+        .filter(DocumentModel.id.in_(doc_ids))
+        .all()
+    )
+    doc_info_map = {r[0]: {"doc_no": r[1] or "", "status": r[2] or ""} for r in doc_info_rows}
+
     lines_with_loc = (
         db.query(DocumentLineModel, LocationModel)
         .outerjoin(LocationModel, DocumentLineModel.location_id == LocationModel.id)
@@ -378,8 +385,7 @@ async def get_consolidated(
         if key not in groups:
             groups[key] = []
             product_order.append((key, line.product_name or "", line.sku, _safe_expiry_date(line.expiry_date)))
-        doc = doc_map.get(line.document_id)
-        ref = doc.doc_no if doc else ""
+        ref = doc_info_map.get(line.document_id, {}).get("doc_no", "")
         pick_seq = loc.pick_sequence if loc else None
         groups[key].append(
             ConsolidatedLineItem(
@@ -412,8 +418,8 @@ async def get_consolidated(
     doc_summaries = [
         ConsolidatedDocumentSummary(
             id=d.id,
-            reference_number=d.doc_no,
-            status=d.status,
+            reference_number=doc_info_map.get(d.id, {}).get("doc_no", ""),
+            status=doc_info_map.get(d.id, {}).get("status", ""),
             lines_total=doc_line_stats.get(d.id, {}).get("total", 0),
             lines_done=doc_line_stats.get(d.id, {}).get("done", 0),
         )
