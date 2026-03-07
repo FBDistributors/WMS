@@ -12,10 +12,21 @@
     "disable": "O‘chirish",
     "reset_password": "Parolni yangilash"
   },
+  "columns": {
+    "code": "Kod",
+    "login": "Login",
+    "full_name": "Ism",
+    "role": "Rol",
+    "status": "Holat",
+    "actions": "Amallar"
+  },
   "form": {
     "create_title": "Foydalanuvchi yaratish",
     "details_title": "Foydalanuvchi ma'lumoti",
     "username": "Username",
+    "login": "Login",
+    "code": "Kod",
+    "code_hint": "Ixtiyoriy. Foydalanuvchi kodi (masalan 001, 002).",
     "full_name": "Full name",
     "role": "Role",
     "password": "Parol",

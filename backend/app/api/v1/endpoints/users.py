@@ -39,6 +39,7 @@ def _validate_password(password: str) -> None:
 
 class UserOut(BaseModel):
     id: UUID
+    code: Optional[str] = None
     username: str
     full_name: Optional[str] = None
     role: str
@@ -56,6 +57,7 @@ class UserListOut(BaseModel):
 
 
 class UserCreateIn(BaseModel):
+    code: Optional[str] = Field(default=None, max_length=32)
     username: str = Field(..., min_length=3, max_length=128)
     full_name: Optional[str] = Field(default=None, max_length=255)
     password: str = Field(..., min_length=6)
@@ -64,6 +66,7 @@ class UserCreateIn(BaseModel):
 
 
 class UserUpdateIn(BaseModel):
+    code: Optional[str] = Field(default=None, max_length=32)
     username: Optional[str] = Field(default=None, min_length=3, max_length=128)
     full_name: Optional[str] = Field(default=None, max_length=255)
     role: Optional[str] = None
@@ -78,6 +81,7 @@ class ResetPasswordIn(BaseModel):
 def _to_user_out(user: User) -> UserOut:
     return UserOut(
         id=user.id,
+        code=user.code,
         username=user.username,
         full_name=user.full_name,
         role=user.role,
@@ -141,8 +145,13 @@ async def create_user(
     existing = db.query(User).filter(User.username == payload.username).one_or_none()
     if existing:
         raise HTTPException(status_code=409, detail="Username already exists")
+    if payload.code:
+        code_exists = db.query(User).filter(User.code == payload.code.strip()).one_or_none()
+        if code_exists:
+            raise HTTPException(status_code=409, detail="User code already exists")
 
     new_user = User(
+        code=payload.code.strip() if payload.code and payload.code.strip() else None,
         username=payload.username,
         full_name=payload.full_name,
         password_hash=get_password_hash(payload.password),
@@ -177,9 +186,16 @@ async def update_user(
         raise HTTPException(status_code=404, detail="User not found")
 
     old_data = {"username": user.username, "role": user.role, "is_active": user.is_active}
-    updates = payload.dict(exclude_unset=True)
+    updates = payload.model_dump(exclude_unset=True)
     if "role" in updates and updates["role"] not in VALID_ROLES:
         raise HTTPException(status_code=400, detail="Invalid role")
+    if "code" in updates:
+        new_code = (updates["code"] or "").strip() or None
+        if new_code and new_code != (user.code or ""):
+            code_exists = db.query(User).filter(User.code == new_code).one_or_none()
+            if code_exists:
+                raise HTTPException(status_code=409, detail="User code already exists")
+        user.code = new_code
     if "username" in updates:
         new_username = updates["username"].strip() if updates["username"] else None
         if new_username and new_username != user.username:
@@ -207,7 +223,7 @@ async def update_user(
         else:
             user.granted_permissions = []
 
-    new_data = {"username": user.username, "role": user.role, "is_active": user.is_active}
+    new_data = {"username": user.username, "role": user.role, "is_active": user.is_active, "code": user.code}
     log_action(
         db,
         user_id=current_user.id,

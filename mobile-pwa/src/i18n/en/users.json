@@ -12,10 +12,21 @@
     "disable": "Disable",
     "reset_password": "Reset password"
   },
+  "columns": {
+    "code": "Code",
+    "login": "Login",
+    "full_name": "Name",
+    "role": "Role",
+    "status": "Status",
+    "actions": "Actions"
+  },
   "form": {
     "create_title": "Create user",
     "details_title": "User details",
     "username": "Username",
+    "login": "Login",
+    "code": "Code",
+    "code_hint": "Optional. User code (e.g. 001, 002).",
     "full_name": "Full name",
     "role": "Role",
     "password": "Password",

@@ -4,8 +4,8 @@ import { Pencil, Search, Users } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { TableScrollArea } from '../../components/TableScrollArea'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { Card } from '../../components/ui/card'
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
 import { listUsers } from '../../services/usersApi'
@@ -55,17 +55,17 @@ export function UsersPage() {
       }
     >
       <div className="mb-4 flex flex-wrap gap-2">
-        <div className="flex flex-1 items-center gap-2 rounded-2xl bg-white px-3 py-2 shadow-sm">
+        <div className="flex flex-1 items-center gap-2 rounded-2xl bg-white px-3 py-2 shadow-sm dark:bg-slate-800">
           <Search size={18} className="text-slate-400" />
           <input
-            className="w-full bg-transparent text-sm text-slate-900 outline-none"
+            className="w-full bg-transparent text-sm text-slate-900 outline-none dark:text-slate-100"
             placeholder={t('users:search_placeholder')}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
         </div>
         <select
-          className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+          className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
           value={roleFilter}
           onChange={(event) => setRoleFilter(event.target.value as UserRole | 'all')}
         >
@@ -91,8 +91,8 @@ export function UsersPage() {
 
       {isLoading ? (
         <div className="space-y-3">
-          <div className="h-14 w-full animate-pulse rounded-2xl bg-slate-200" />
-          <div className="h-14 w-full animate-pulse rounded-2xl bg-slate-200" />
+          <div className="h-14 w-full animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-700" />
+          <div className="h-14 w-full animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-700" />
         </div>
       ) : error ? (
         <EmptyState
@@ -110,37 +110,68 @@ export function UsersPage() {
           onAction={() => navigate('/admin/users/new')}
         />
       ) : (
-        <div className="space-y-3">
-          {filtered.map((user) => (
-            <Card
-              key={user.id}
-              className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{user.username}</div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">
-                  {user.full_name || '—'} · {t(`users:roles.${user.role}`)}
-                </div>
-                <div className="mt-1 font-mono text-xs text-slate-400 dark:text-slate-500" title={user.id}>
-                  {t('users:user_id')}: {user.id}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant={user.is_active ? 'success' : 'neutral'}>
-                  {user.is_active ? t('common:status.active') : t('common:status.inactive')}
-                </Badge>
-                <Button
-                  variant="ghost"
-                  className="p-2"
-                  onClick={() => navigate(`/admin/users/${user.id}`)}
-                  aria-label={t('users:actions.edit')}
+        <TableScrollArea className="rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
+          <table className="w-full min-w-[640px] border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/50">
+                <th className="whitespace-nowrap px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">
+                  {t('users:columns.code')}
+                </th>
+                <th className="whitespace-nowrap px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">
+                  {t('users:columns.login')}
+                </th>
+                <th className="whitespace-nowrap px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">
+                  {t('users:columns.full_name')}
+                </th>
+                <th className="whitespace-nowrap px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">
+                  {t('users:columns.role')}
+                </th>
+                <th className="whitespace-nowrap px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">
+                  {t('users:columns.status')}
+                </th>
+                <th className="whitespace-nowrap px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">
+                  {t('users:columns.actions')}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((user) => (
+                <tr
+                  key={user.id}
+                  className="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800/50"
                 >
-                  <Pencil size={16} />
-                </Button>
-              </div>
-            </Card>
-          ))}
-        </div>
+                  <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">
+                    {user.code ?? '—'}
+                  </td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                    {user.username}
+                  </td>
+                  <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
+                    {user.full_name || '—'}
+                  </td>
+                  <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
+                    {t(`users:roles.${user.role}`)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge variant={user.is_active ? 'success' : 'neutral'}>
+                      {user.is_active ? t('common:status.active') : t('common:status.inactive')}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Button
+                      variant="ghost"
+                      className="p-2"
+                      onClick={() => navigate(`/admin/users/${user.id}`)}
+                      aria-label={t('users:actions.edit')}
+                    >
+                      <Pencil size={16} />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableScrollArea>
       )}
     </AdminLayout>
   )

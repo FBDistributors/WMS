@@ -14,6 +14,7 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    code: Mapped[str | None] = mapped_column(String(32), nullable=True, unique=True)  # qisqa raqam "001", "002"
     username: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
     full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -33,6 +34,7 @@ class User(Base):
     session_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
+        Index("ix_users_code", "code"),
         Index("ix_users_username", "username"),
         Index("ix_users_full_name", "full_name"),
         Index("ix_users_active_session", "active_session_token", 

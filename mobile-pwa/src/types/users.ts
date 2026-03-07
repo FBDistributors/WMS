@@ -7,6 +7,7 @@ export type UserRole =
 
 export type UserRecord = {
   id: string
+  code?: string | null
   username: string
   full_name?: string | null
   role: UserRole
@@ -24,6 +25,7 @@ export type UsersListResponse = {
 }
 
 export type CreateUserPayload = {
+  code?: string | null
   username: string
   full_name?: string | null
   password: string
@@ -32,6 +34,7 @@ export type CreateUserPayload = {
 }
 
 export type UpdateUserPayload = {
+  code?: string | null
   username?: string
   full_name?: string | null
   role?: UserRole
