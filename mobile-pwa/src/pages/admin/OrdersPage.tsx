@@ -852,7 +852,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, dillerTableConfig.config, eligibleItems, error, isLoading, items, load, location.pathname, location.search, mode, movementPage, movementsData, navigate, orderSource, searchQuery, selectedMovementIds, selectedOrderIds, t, updatingOrderId])
 
   return (
-    <AdminLayout title={pageTitle} backTo={mode === 'statuses' ? '/admin' : undefined}>
+    <AdminLayout title={mode === 'statuses' ? pageTitle : undefined} backTo={mode === 'statuses' ? '/admin' : undefined}>
       <Card className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>

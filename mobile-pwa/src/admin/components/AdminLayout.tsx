@@ -12,7 +12,8 @@ import { useAuth } from '../../rbac/AuthProvider'
 import { useTheme } from '../../theme/ThemeProvider'
 
 type AdminLayoutProps = {
-  title: string
+  /** Headerda ko'rsatiladigan sarlavha; berilmasa yoki bo'sh bo'lsa headerda sarlavha ko'rinmaydi (sahifa ichidagi jadval/kartada qoladi). */
+  title?: string
   backTo?: string
   actionSlot?: ReactNode
   children: ReactNode
@@ -109,9 +110,11 @@ export function AdminLayout({ title, backTo, actionSlot, children }: AdminLayout
                 <Menu size={18} />
               </Button>
             )}
-            <div className="min-w-0 truncate text-base font-semibold text-slate-900 dark:text-slate-100 sm:text-lg">
-              {title}
-            </div>
+            {title ? (
+              <div className="min-w-0 truncate text-base font-semibold text-slate-900 dark:text-slate-100 sm:text-lg">
+                {title}
+              </div>
+            ) : null}
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
             {/* Mobil: til va tema faqat profil menyuda; planshet/desktop: headerda */}

@@ -132,7 +132,6 @@ export function BrandsPage() {
 
   return (
     <AdminLayout
-      title={t('brands:title')}
       actionSlot={
         canManage ? (
           <Button onClick={() => setDialog({ open: true, mode: 'create' })} className="shrink-0">

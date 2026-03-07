@@ -123,7 +123,6 @@ export function VipCustomersPage() {
 
   return (
     <AdminLayout
-      title={t('vipCustomers:title')}
       actionSlot={
         canManage ? (
           <Button onClick={() => setDialog({ open: true, mode: 'create' })} className="shrink-0">

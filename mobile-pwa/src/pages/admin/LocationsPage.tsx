@@ -255,7 +255,7 @@ export function LocationsPage() {
   }, [error, isLoading, items, filteredItems, paginatedItems, load, navigate, t])
 
   return (
-    <AdminLayout title={t('locations:title')}>
+    <AdminLayout>
       <Card className="min-w-0 space-y-4 overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3 min-w-0 flex-1">

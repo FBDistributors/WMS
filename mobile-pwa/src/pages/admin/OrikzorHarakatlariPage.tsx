@@ -299,7 +299,7 @@ export function OrikzorHarakatlariPage() {
   }, [load, setSearchParams])
 
   return (
-    <AdminLayout title={pageTitle}>
+    <AdminLayout>
       <Card className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
