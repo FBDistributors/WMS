@@ -5,6 +5,19 @@ from __future__ import annotations
 from datetime import date
 
 
+def min_expiry_date_from_months(months: int) -> date:
+    """Hozirgi sanadan `months` oy keyingi oyning 1-kuni. VIP muddat chegarasi uchun."""
+    if months <= 0:
+        months = 1
+    today = date.today()
+    year = today.year
+    month = today.month + months
+    while month > 12:
+        month -= 12
+        year += 1
+    return date(year, month, 1)
+
+
 def first_day_of_month(d: date | None) -> date | None:
     """Berilgan sanani shu oyning 1-kuniga qaytaradi. None qaytaradi."""
     if d is None:

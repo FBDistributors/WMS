@@ -32,8 +32,11 @@ from app.models.wave import (
     WavePickScan,
 )
 from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_ip, log_action
+from app.core.expiry import min_expiry_date_from_months
+from app.services.vip_service import get_vip_customer_expiry_months
 from app.services.wave_service import (
     STAGING_LOCATION_CODE,
+    _fefo_available_for_product,
     compute_wave_lines,
     get_staging_location_id,
 )
@@ -262,10 +265,16 @@ async def start_wave(
     if not staging_id:
         raise HTTPException(status_code=500, detail=f"Staging location {STAGING_LOCATION_CODE} not found")
 
-    from app.services.wave_service import _fefo_available_for_product
+    vip_map = get_vip_customer_expiry_months(db)
+    max_vip_months = 0
+    for wo in wave.orders:
+        order = wo.order if hasattr(wo, "order") else db.query(OrderModel).filter(OrderModel.id == wo.order_id).first()
+        if order and order.customer_id and order.customer_id in vip_map:
+            max_vip_months = max(max_vip_months, vip_map[order.customer_id])
+    min_expiry_date = min_expiry_date_from_months(max_vip_months) if max_vip_months > 0 else None
 
     for wl in wave.lines:
-        rows = _fefo_available_for_product(db, wl.product_id)
+        rows = _fefo_available_for_product(db, wl.product_id, min_expiry_date=min_expiry_date)
         remaining = wl.total_qty
         for row in rows:
             if remaining <= 0:

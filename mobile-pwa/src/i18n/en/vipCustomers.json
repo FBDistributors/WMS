@@ -1,0 +1,32 @@
+{
+  "title": "VIP customers",
+  "subtitle": "Special rules by expiry limit (customer id, name, months).",
+  "add": "Add VIP customer",
+  "edit": "Edit",
+  "confirm_delete_title": "Confirm delete",
+  "confirm_delete": "Delete «{{name}}»?",
+  "confirm_yes": "Yes, delete",
+  "save": "Save",
+  "saving": "Saving...",
+  "load_failed": "Failed to load VIP customers.",
+  "save_failed": "Failed to save.",
+  "empty": "No VIP customers",
+  "empty_desc": "Add your first VIP customer.",
+  "search": "Search",
+  "months": "mo",
+  "validation": {
+    "customer_id_required": "Customer ID is required.",
+    "months_range": "Expiry limit must be between 1 and 60 months."
+  },
+  "fields": {
+    "customer_id": "Customer ID",
+    "customer_name": "Customer name",
+    "min_expiry_months": "Expiry limit (months)"
+  },
+  "columns": {
+    "customer_id": "Customer ID",
+    "customer_name": "Customer name",
+    "min_expiry_months": "Expiry limit",
+    "actions": "Actions"
+  }
+}

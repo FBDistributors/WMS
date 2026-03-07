@@ -1,0 +1,32 @@
+{
+  "title": "VIP клиенты",
+  "subtitle": "Особые правила по сроку годности (id клиента, имя, месяцы).",
+  "add": "Добавить VIP клиента",
+  "edit": "Изменить",
+  "confirm_delete_title": "Подтвердить удаление",
+  "confirm_delete": "Удалить «{{name}}»?",
+  "confirm_yes": "Да, удалить",
+  "save": "Сохранить",
+  "saving": "Сохранение...",
+  "load_failed": "Не удалось загрузить VIP клиентов.",
+  "save_failed": "Не удалось сохранить.",
+  "empty": "VIP клиенты не найдены",
+  "empty_desc": "Добавьте первого VIP клиента.",
+  "search": "Поиск",
+  "months": "мес",
+  "validation": {
+    "customer_id_required": "ID клиента обязателен.",
+    "months_range": "Срок годности должен быть от 1 до 60 месяцев."
+  },
+  "fields": {
+    "customer_id": "ID клиента",
+    "customer_name": "Имя клиента",
+    "min_expiry_months": "Срок годности (месяцы)"
+  },
+  "columns": {
+    "customer_id": "ID клиента",
+    "customer_name": "Имя клиента",
+    "min_expiry_months": "Срок годности",
+    "actions": "Действия"
+  }
+}

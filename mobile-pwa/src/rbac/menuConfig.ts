@@ -37,6 +37,7 @@ export const CONTROLLER_MENU: MenuItem[] = [
 export const ADMIN_MENU: MenuItem[] = [
   { path: '/admin', labelKey: 'menu.dashboard', permissions: ['admin:access'] },
   { path: '/admin/orders', labelKey: 'menu.orders', permissions: ['orders:read'] },
+  { path: '/admin/vip-customers', labelKey: 'menu.vip_customers', permissions: ['orders:read'] },
   { path: '/admin/picking', labelKey: 'menu.picking', permissions: ['picking:read'] },
   { path: '/admin/inventory', labelKey: 'menu.inventory', permissions: ['inventory:read'] },
   { path: '/admin/inventory/movements', labelKey: 'menu.movements', permissions: ['movements:read'] },

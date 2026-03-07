@@ -11,6 +11,7 @@ import { ProfilePage } from '../pages/admin/ProfilePage'
 import { ProductDetailsPage } from '../pages/admin/ProductDetailsPage'
 import { ProductsPage } from '../pages/admin/ProductsPage'
 import { BrandsPage } from '../pages/admin/BrandsPage'
+import { VipCustomersPage } from '../pages/admin/VipCustomersPage'
 import { OrdersPage } from '../pages/admin/OrdersPage'
 import { OrikzorHarakatlariPage } from '../pages/admin/OrikzorHarakatlariPage'
 import { MovementDetailsPage } from '../pages/admin/MovementDetailsPage'
@@ -329,6 +330,16 @@ export function App() {
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">
               <RequirePermission permission="orders:read">
                 <OrderDetailsPage />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/vip-customers"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="orders:read">
+                <VipCustomersPage />
               </RequirePermission>
             </RequirePermission>
           }

@@ -8,7 +8,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Query, status
 
-from app.core.expiry import first_day_of_current_month
+from app.core.expiry import first_day_of_current_month, min_expiry_date_from_months
+from app.services.vip_service import get_vip_customer_expiry_months
 from pydantic import BaseModel, Field
 from decimal import Decimal
 from sqlalchemy import and_, func, or_
@@ -193,7 +194,17 @@ def _resolve_product_id(db: Session, line: OrderLineModel) -> UUID | None:
     return None
 
 
-def _fefo_available_lots(db: Session, product_id: UUID):
+def _fefo_available_lots(db: Session, product_id: UUID, min_expiry_date: date | None = None):
+    filters = [
+        StockLotModel.product_id == product_id,
+        LocationModel.zone_type == "NORMAL",
+        LocationModel.is_active.is_(True),
+        (StockLotModel.expiry_date.is_(None) | (StockLotModel.expiry_date >= first_day_of_current_month())),
+    ]
+    if min_expiry_date is not None:
+        filters.append(
+            (StockLotModel.expiry_date.is_(None) | (StockLotModel.expiry_date >= min_expiry_date))
+        )
     return (
         db.query(
             StockMovementModel.lot_id,
@@ -205,12 +216,7 @@ def _fefo_available_lots(db: Session, product_id: UUID):
         )
         .join(StockLotModel, StockLotModel.id == StockMovementModel.lot_id)
         .join(LocationModel, LocationModel.id == StockMovementModel.location_id)
-        .filter(
-            StockLotModel.product_id == product_id,
-            LocationModel.zone_type == "NORMAL",
-            LocationModel.is_active.is_(True),
-            (StockLotModel.expiry_date.is_(None) | (StockLotModel.expiry_date >= first_day_of_current_month())),
-        )
+        .filter(*filters)
         .group_by(
             StockMovementModel.lot_id,
             StockMovementModel.location_id,
@@ -263,6 +269,11 @@ def _allocate_order(
     shortages: list[AllocationShortage] = []
     document_lines: list[DocumentLineModel] = []
 
+    vip_map = get_vip_customer_expiry_months(db)
+    min_expiry_date: date | None = None
+    if order.customer_id and order.customer_id in vip_map:
+        min_expiry_date = min_expiry_date_from_months(vip_map[order.customer_id])
+
     for line in order.lines:
         product_id = _resolve_product_id(db, line)
         if not product_id:
@@ -279,7 +290,7 @@ def _allocate_order(
 
         remaining = Decimal(str(line.qty))
         allocated_total = Decimal("0")
-        available_lots = _fefo_available_lots(db, product_id)
+        available_lots = _fefo_available_lots(db, product_id, min_expiry_date=min_expiry_date)
 
         for lot_row in available_lots:
             if remaining <= 0:

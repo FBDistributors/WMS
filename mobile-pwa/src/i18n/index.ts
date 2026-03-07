@@ -13,6 +13,7 @@ import locationsUz from './uz/locations.json'
 import receivingUz from './uz/receiving.json'
 import inventoryUz from './uz/inventory.json'
 import brandsUz from './uz/brands.json'
+import vipCustomersUz from './uz/vipCustomers.json'
 import usersUz from './uz/users.json'
 import auditUz from './uz/audit.json'
 import kamomatUz from './uz/kamomat.json'
@@ -29,6 +30,7 @@ import locationsEn from './en/locations.json'
 import receivingEn from './en/receiving.json'
 import inventoryEn from './en/inventory.json'
 import brandsEn from './en/brands.json'
+import vipCustomersEn from './en/vipCustomers.json'
 import usersEn from './en/users.json'
 import auditEn from './en/audit.json'
 import kamomatEn from './en/kamomat.json'
@@ -45,6 +47,7 @@ import locationsRu from './ru/locations.json'
 import receivingRu from './ru/receiving.json'
 import inventoryRu from './ru/inventory.json'
 import brandsRu from './ru/brands.json'
+import vipCustomersRu from './ru/vipCustomers.json'
 import usersRu from './ru/users.json'
 import auditRu from './ru/audit.json'
 import kamomatRu from './ru/kamomat.json'
@@ -72,6 +75,7 @@ i18n.use(initReactI18next).init({
       receiving: receivingUz,
       inventory: inventoryUz,
       brands: brandsUz,
+      vipCustomers: vipCustomersUz,
       users: usersUz,
       audit: auditUz,
       kamomat: kamomatUz,
@@ -89,6 +93,7 @@ i18n.use(initReactI18next).init({
       receiving: receivingEn,
       inventory: inventoryEn,
       brands: brandsEn,
+      vipCustomers: vipCustomersEn,
       users: usersEn,
       audit: auditEn,
       kamomat: kamomatEn,
@@ -106,6 +111,7 @@ i18n.use(initReactI18next).init({
       receiving: receivingRu,
       inventory: inventoryRu,
       brands: brandsRu,
+      vipCustomers: vipCustomersRu,
       users: usersRu,
       audit: auditRu,
       kamomat: kamomatRu,
@@ -117,7 +123,7 @@ i18n.use(initReactI18next).init({
   fallbackLng: 'en',
   supportedLngs: SUPPORTED_LANGS,
   defaultNS: 'common',
-    ns: ['common', 'auth', 'admin', 'audit', 'kamomat', 'picking', 'picker', 'controller', 'products', 'orders', 'locations', 'receiving', 'inventory', 'brands', 'users'],
+    ns: ['common', 'auth', 'admin', 'audit', 'kamomat', 'picking', 'picker', 'controller', 'products', 'orders', 'locations', 'receiving', 'inventory', 'brands', 'vipCustomers', 'users'],
   interpolation: {
     escapeValue: false,
   },

@@ -1,0 +1,32 @@
+{
+  "title": "VIP mijozlar",
+  "subtitle": "Muddat chegarasi bo'yicha maxsus qoidalar (mijoz id, nomi, oy).",
+  "add": "VIP mijoz qo'shish",
+  "edit": "Tahrirlash",
+  "confirm_delete_title": "O'chirish",
+  "confirm_delete": "«{{name}}» o'chirilsinmi?",
+  "confirm_yes": "Ha, o'chirish",
+  "save": "Saqlash",
+  "saving": "Saqlanmoqda...",
+  "load_failed": "VIP mijozlar yuklanmadi.",
+  "save_failed": "Saqlab bo'lmadi.",
+  "empty": "VIP mijozlar topilmadi",
+  "empty_desc": "Birinchi VIP mijozni qo'shing.",
+  "search": "Qidiruv",
+  "months": "oy",
+  "validation": {
+    "customer_id_required": "Mijoz id majburiy.",
+    "months_range": "Muddat chegarasi 1–60 oy oralig'ida bo'lishi kerak."
+  },
+  "fields": {
+    "customer_id": "Mijoz id",
+    "customer_name": "Mijoz nomi",
+    "min_expiry_months": "Muddat chegarasi (oy)"
+  },
+  "columns": {
+    "customer_id": "Mijoz id",
+    "customer_name": "Mijoz nomi",
+    "min_expiry_months": "Muddat chegarasi",
+    "actions": "Amallar"
+  }
+}
