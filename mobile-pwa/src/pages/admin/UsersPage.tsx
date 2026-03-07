@@ -116,10 +116,13 @@ export function UsersPage() {
               key={user.id}
               className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
             >
-              <div>
-                <div className="text-sm font-semibold text-slate-900">{user.username}</div>
-                <div className="text-xs text-slate-500">
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{user.username}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">
                   {user.full_name || '—'} · {t(`users:roles.${user.role}`)}
+                </div>
+                <div className="mt-1 font-mono text-xs text-slate-400 dark:text-slate-500" title={user.id}>
+                  {t('users:user_id')}: {user.id}
                 </div>
               </div>
               <div className="flex items-center gap-2">

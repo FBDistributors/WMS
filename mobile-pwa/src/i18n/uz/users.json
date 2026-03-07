@@ -1,5 +1,6 @@
 {
   "title": "Users & Access",
+  "user_id": "Foydalanuvchi ID",
   "new_user": "Yangi foydalanuvchi",
   "search_placeholder": "Username yoki full name bo‘yicha qidirish",
   "load_error": "Foydalanuvchilar yuklanmadi. Qayta urinib ko‘ring.",

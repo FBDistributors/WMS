@@ -85,7 +85,7 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
         collapsed ? 'w-20' : 'w-64',
       ].join(' ')}
     >
-      <div className="mb-6 flex items-center justify-between gap-2">
+      <div className="mb-6 flex shrink-0 items-center justify-between gap-2">
         <Link to="/admin" className="flex items-center gap-2" onClick={onNavigate}>
           <img src={BRAND.logoIcon} alt="" className="h-9 w-auto shrink-0 object-contain" aria-hidden />
           {!collapsed && (
@@ -102,8 +102,9 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
         </Button>
       </div>
       <TooltipProvider>
-        <nav className="space-y-1">
-          {items.map(({ label, path, icon: Icon, key }) => {
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <nav className="space-y-1">
+            {items.map(({ label, path, icon: Icon, key }) => {
             // /admin/orders faqat o'sha sahifa yoki order-statuses yoki orders/:id da aktiv; orders-diller/orikzor alohida
             const isActive =
               path === '/admin/orders'
@@ -140,9 +141,10 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
               </Tooltip>
             )
           })}
-        </nav>
+          </nav>
+        </div>
 
-        <div className="mt-auto pt-4">
+        <div className="mt-auto shrink-0 pt-4">
           <div className="border-t border-slate-200 pt-4 dark:border-slate-800">
             {canSeeProfile ? (
               collapsed ? (

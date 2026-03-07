@@ -105,6 +105,14 @@ export function ProfilePage() {
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <div className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              {t('admin:profile.fields.user_id')}
+            </div>
+            <div className="mt-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200">
+              {user?.id ?? '—'}
+            </div>
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-slate-700 dark:text-slate-300">
               {t('admin:profile.fields.full_name')}
             </div>
             <div className="mt-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200">

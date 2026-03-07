@@ -157,6 +157,7 @@
     "update_picture": "Rasmni yangilash",
     "remove_photo": "Rasmni olib tashlash",
     "fields": {
+      "user_id": "Foydalanuvchi ID",
       "full_name": "To‘liq ism",
       "email": "Email",
       "role": "Rol",

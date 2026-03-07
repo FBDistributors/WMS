@@ -157,6 +157,7 @@
     "update_picture": "Update picture",
     "remove_photo": "Remove photo",
     "fields": {
+      "user_id": "User ID",
       "full_name": "Full name",
       "email": "Email",
       "role": "Role",

@@ -157,6 +157,7 @@
     "update_picture": "Обновить фото",
     "remove_photo": "Удалить фото",
     "fields": {
+      "user_id": "ID пользователя",
       "full_name": "Полное имя",
       "email": "Email",
       "role": "Роль",

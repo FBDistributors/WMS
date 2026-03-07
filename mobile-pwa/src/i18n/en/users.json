@@ -1,5 +1,6 @@
 {
   "title": "Users & Access",
+  "user_id": "User ID",
   "new_user": "New user",
   "search_placeholder": "Search by username or full name",
   "load_error": "Failed to load users. Please try again.",
