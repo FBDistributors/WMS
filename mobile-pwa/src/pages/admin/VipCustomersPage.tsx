@@ -171,7 +171,7 @@ export function VipCustomersPage() {
       <ConfirmDialog
         open={!!confirmDelete}
         title={t('vipCustomers:confirm_delete_title')}
-        message={t('vipCustomers:confirm_delete', { name: confirmDelete?.customer_name || confirmDelete?.customer_id ?? '' })}
+        message={t('vipCustomers:confirm_delete', { name: (confirmDelete?.customer_name || confirmDelete?.customer_id) ?? '' })}
         confirmLabel={t('vipCustomers:confirm_yes')}
         cancelLabel={t('common:buttons.cancel')}
         variant="danger"
