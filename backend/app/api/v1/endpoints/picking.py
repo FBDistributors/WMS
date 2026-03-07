@@ -6,7 +6,7 @@ from uuid import UUID
 import logging
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
@@ -103,6 +103,20 @@ class ConsolidatedPickRequest(BaseModel):
     barcode: str
     qty: float
     request_id: str
+
+    @field_validator("qty", mode="before")
+    @classmethod
+    def coerce_qty(cls, v):  # noqa: ANN001
+        """Ilovadan string yoki raqam kelishi mumkin; 500 oldini olish."""
+        if v is None:
+            raise ValueError("qty required")
+        try:
+            n = float(v) if not isinstance(v, (int, float)) else float(v)
+        except (TypeError, ValueError):
+            raise ValueError("qty must be a number")
+        if n <= 0:
+            raise ValueError("qty must be positive")
+        return n
 
 
 class PickLineRequest(BaseModel):
@@ -328,9 +342,8 @@ async def get_consolidated(
     if user.role != "picker":
         raise HTTPException(status_code=403, detail="Only for picker")
     ORDER_HIDDEN_STATUSES = ("completed", "packed", "shipped", "cancelled")
-    docs_query = (
-        db.query(DocumentModel)
-        .options(selectinload(DocumentModel.lines))
+    docs_id_query = (
+        db.query(DocumentModel.id)
         .outerjoin(OrderModel, DocumentModel.order_id == OrderModel.id)
         .filter(
             DocumentModel.assigned_to_user_id == user.id,
@@ -345,11 +358,9 @@ async def get_consolidated(
             DocumentModel.status != "cancelled",
         )
     )
-    documents = docs_query.all()
-    if not documents:
+    doc_ids = [r[0] for r in docs_id_query.all()]
+    if not doc_ids:
         return ConsolidatedViewResponse(documents=[], products=[])
-
-    doc_ids = [d.id for d in documents]
     # Fresh query for doc_no/status to avoid touching expired attributes after consolidated_pick commit (500 fix)
     doc_info_rows = (
         db.query(DocumentModel.id, DocumentModel.doc_no, DocumentModel.status)
@@ -415,15 +426,16 @@ async def get_consolidated(
                 lines=lines_list,
             )
         )
+    # doc_ids orqali yig'amiz — document ORM obyektlariga tayanmaslik (commit dan keyin 500 oldini olish)
     doc_summaries = [
         ConsolidatedDocumentSummary(
-            id=d.id,
-            reference_number=doc_info_map.get(d.id, {}).get("doc_no", ""),
-            status=doc_info_map.get(d.id, {}).get("status", ""),
-            lines_total=doc_line_stats.get(d.id, {}).get("total", 0),
-            lines_done=doc_line_stats.get(d.id, {}).get("done", 0),
+            id=doc_id,
+            reference_number=doc_info_map.get(doc_id, {}).get("doc_no", ""),
+            status=doc_info_map.get(doc_id, {}).get("status", ""),
+            lines_total=doc_line_stats.get(doc_id, {}).get("total", 0),
+            lines_done=doc_line_stats.get(doc_id, {}).get("done", 0),
         )
-        for d in documents
+        for doc_id in doc_ids
     ]
     return ConsolidatedViewResponse(documents=doc_summaries, products=products)
 

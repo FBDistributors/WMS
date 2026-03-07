@@ -41,8 +41,17 @@ export function UsersPage() {
   }, [load])
 
   const filtered = useMemo(() => {
-    if (roleFilter === 'all') return items
-    return items.filter((item) => item.role === roleFilter)
+    let list = roleFilter === 'all' ? items : items.filter((item) => item.role === roleFilter)
+    // Kod bo'yicha sort: 001 birinchi, keyin 002, ..., kod bo'sh yoki raqam emaslar oxirida
+    list = [...list].sort((a, b) => {
+      const codeA = a.code ?? ''
+      const codeB = b.code ?? ''
+      const numA = /^\d+$/.test(codeA) ? parseInt(codeA, 10) : Infinity
+      const numB = /^\d+$/.test(codeB) ? parseInt(codeB, 10) : Infinity
+      if (numA !== numB) return numA - numB
+      return (codeA || '').localeCompare(codeB || '')
+    })
+    return list
   }, [items, roleFilter])
 
   return (
@@ -111,25 +120,25 @@ export function UsersPage() {
         />
       ) : (
         <TableScrollArea className="rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
-          <table className="w-full min-w-[640px] border-collapse text-left text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/50">
-                <th className="whitespace-nowrap px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">
+          <table className="w-full min-w-[640px] table-auto border-collapse text-left text-sm">
+            <thead className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <tr className="border-b border-slate-200 dark:border-slate-700">
+                <th className="px-4 py-3 text-left font-medium">
                   {t('users:columns.code')}
                 </th>
-                <th className="whitespace-nowrap px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">
+                <th className="px-4 py-3 text-left font-medium">
                   {t('users:columns.login')}
                 </th>
-                <th className="whitespace-nowrap px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">
+                <th className="px-4 py-3 text-left font-medium">
                   {t('users:columns.full_name')}
                 </th>
-                <th className="whitespace-nowrap px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">
+                <th className="px-4 py-3 text-left font-medium">
                   {t('users:columns.role')}
                 </th>
-                <th className="whitespace-nowrap px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">
+                <th className="px-4 py-3 text-left font-medium">
                   {t('users:columns.status')}
                 </th>
-                <th className="whitespace-nowrap px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">
+                <th className="px-4 py-3 text-left font-medium">
                   {t('users:columns.actions')}
                 </th>
               </tr>
