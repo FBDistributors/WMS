@@ -7,7 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session
 
 from app.auth.deps import require_any_permission, require_permission
@@ -57,7 +57,6 @@ class UserListOut(BaseModel):
 
 
 class UserCreateIn(BaseModel):
-    code: Optional[str] = Field(default=None, max_length=32)
     username: str = Field(..., min_length=3, max_length=128)
     full_name: Optional[str] = Field(default=None, max_length=255)
     password: str = Field(..., min_length=6)
@@ -66,7 +65,6 @@ class UserCreateIn(BaseModel):
 
 
 class UserUpdateIn(BaseModel):
-    code: Optional[str] = Field(default=None, max_length=32)
     username: Optional[str] = Field(default=None, min_length=3, max_length=128)
     full_name: Optional[str] = Field(default=None, max_length=255)
     role: Optional[str] = None
@@ -145,13 +143,13 @@ async def create_user(
     existing = db.query(User).filter(User.username == payload.username).one_or_none()
     if existing:
         raise HTTPException(status_code=409, detail="Username already exists")
-    if payload.code:
-        code_exists = db.query(User).filter(User.code == payload.code.strip()).one_or_none()
-        if code_exists:
-            raise HTTPException(status_code=409, detail="User code already exists")
+
+    # Kod avtomatik ketma-ket (001, 002, ...), user_id kabi unikal va read-only
+    next_code_val = db.execute(text("SELECT nextval('user_code_seq')")).scalar()
+    new_code = str(next_code_val).zfill(3)
 
     new_user = User(
-        code=payload.code.strip() if payload.code and payload.code.strip() else None,
+        code=new_code,
         username=payload.username,
         full_name=payload.full_name,
         password_hash=get_password_hash(payload.password),
@@ -189,13 +187,7 @@ async def update_user(
     updates = payload.model_dump(exclude_unset=True)
     if "role" in updates and updates["role"] not in VALID_ROLES:
         raise HTTPException(status_code=400, detail="Invalid role")
-    if "code" in updates:
-        new_code = (updates["code"] or "").strip() or None
-        if new_code and new_code != (user.code or ""):
-            code_exists = db.query(User).filter(User.code == new_code).one_or_none()
-            if code_exists:
-                raise HTTPException(status_code=409, detail="User code already exists")
-        user.code = new_code
+    # code read-only, o'zgartirilmaydi
     if "username" in updates:
         new_username = updates["username"].strip() if updates["username"] else None
         if new_username and new_username != user.username:
@@ -223,7 +215,7 @@ async def update_user(
         else:
             user.granted_permissions = []
 
-    new_data = {"username": user.username, "role": user.role, "is_active": user.is_active, "code": user.code}
+    new_data = {"username": user.username, "role": user.role, "is_active": user.is_active}
     log_action(
         db,
         user_id=current_user.id,

@@ -39,7 +39,6 @@ export function UserDetailsPage() {
   const [user, setUser] = useState<UserRecord | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [code, setCode] = useState('')
   const [username, setUsername] = useState('')
   const [fullName, setFullName] = useState('')
   const [role, setRole] = useState<UserRole>('picker')
@@ -57,7 +56,6 @@ export function UserDetailsPage() {
     try {
       const data = await getUser(id)
       setUser(data)
-      setCode(data.code ?? '')
       setUsername(data.username)
       setFullName(data.full_name ?? '')
       setRole(data.role)
@@ -90,7 +88,6 @@ export function UserDetailsPage() {
     setError(null)
     try {
       await updateUser(user.id, {
-        code: code.trim() || null,
         username: trimmedUsername,
         full_name: fullName.trim() || null,
         role,
@@ -145,16 +142,23 @@ export function UserDetailsPage() {
     <AdminLayout title={t('users:form.details_title')}>
       <Card className="max-w-xl p-6">
         <form className="space-y-4" onSubmit={handleSave}>
-          <div>
-            <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-              {t('users:form.code')}
-            </label>
-            <input
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-              placeholder="001"
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-            />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                {t('users:form.code')}
+              </label>
+              <div className="mt-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                {user.code ?? '—'}
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                {t('users:user_id')}
+              </label>
+              <div className="mt-1 truncate rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400" title={user.id}>
+                {user.id}
+              </div>
+            </div>
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">

@@ -32,7 +32,6 @@ function generateStrongPassword(): string {
 export function UserCreatePage() {
   const navigate = useNavigate()
   const { t } = useTranslation(['users', 'common'])
-  const [code, setCode] = useState('')
   const [username, setUsername] = useState('')
   const [fullName, setFullName] = useState('')
   const [role, setRole] = useState<UserRole>('picker')
@@ -58,7 +57,6 @@ export function UserCreatePage() {
     setError(null)
     try {
       const created = await createUser({
-        code: code.trim() || null,
         username: username.trim(),
         full_name: fullName.trim() || null,
         password,
@@ -77,20 +75,6 @@ export function UserCreatePage() {
     <AdminLayout title={t('users:form.create_title')}>
       <Card className="max-w-xl p-6">
         <form className="space-y-4" onSubmit={handleSubmit}>
-          <div>
-            <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-              {t('users:form.code')}
-            </label>
-            <input
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-              placeholder="001"
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-            />
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {t('users:form.code_hint', "Ixtiyoriy. Foydalanuvchi kodi (masalan 001, 002).")}
-            </p>
-          </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
               {t('users:form.login')}
