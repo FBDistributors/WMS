@@ -123,6 +123,7 @@ export function VipCustomersPage() {
 
   return (
     <AdminLayout
+      title={t('vipCustomers:title')}
       actionSlot={
         canManage ? (
           <Button onClick={() => setDialog({ open: true, mode: 'create' })} className="shrink-0">
@@ -135,9 +136,6 @@ export function VipCustomersPage() {
       <Card className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              {t('vipCustomers:title')}
-            </div>
             <div className="text-sm text-slate-500 dark:text-slate-400">
               {t('vipCustomers:subtitle')}
             </div>

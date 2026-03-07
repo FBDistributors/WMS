@@ -132,6 +132,7 @@ export function BrandsPage() {
 
   return (
     <AdminLayout
+      title={t('brands:title')}
       actionSlot={
         canManage ? (
           <Button onClick={() => setDialog({ open: true, mode: 'create' })} className="shrink-0">
@@ -144,9 +145,6 @@ export function BrandsPage() {
       <Card className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              {t('brands:title')}
-            </div>
             <div className="text-sm text-slate-500 dark:text-slate-400">
               {t('brands:subtitle')}
             </div>

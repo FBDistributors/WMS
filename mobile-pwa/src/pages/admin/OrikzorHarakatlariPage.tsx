@@ -299,13 +299,10 @@ export function OrikzorHarakatlariPage() {
   }, [load, setSearchParams])
 
   return (
-    <AdminLayout>
+    <AdminLayout title={pageTitle}>
       <Card className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              {pageTitle}
-            </div>
             <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
               {isRefreshing ? (
                 <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
