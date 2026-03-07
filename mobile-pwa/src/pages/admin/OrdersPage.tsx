@@ -854,59 +854,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   return (
     <AdminLayout title={pageTitle} backTo={mode === 'statuses' ? '/admin' : undefined}>
       <Card className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-              <span>{t('orders:subtitle')}</span>
-              {group && group !== 'all' ? (
-                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/50 dark:text-blue-200">
-                  {t(`admin:dashboard.status_${group}`)}
-                </span>
-              ) : null}
-              {isRefreshing ? (
-                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
-                  {t('orders:refreshing')}
-                </span>
-              ) : null}
-              {orderSource === 'diller' && movementsData != null ? (
-                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
-                  {t('orders:movements_loaded', { count: movementsData.movement?.length ?? 0 })}
-                </span>
-              ) : syncResult ? (
-                <span className="flex flex-col gap-1">
-                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
-                    {t('orders:sync_result', { created: syncResult.created, updated: syncResult.updated, skipped: syncResult.skipped })}
-                  </span>
-                  {syncResult.detail || syncResult.errors_count ? (
-                    <span className="max-w-xl rounded bg-amber-100 px-2 py-1 text-xs text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 break-words">
-                      {syncResult.errors_count ? `${syncResult.errors_count} ta xato. ` : ''}
-                      {syncResult.detail ?? ''}
-                    </span>
-                  ) : null}
-                </span>
-              ) : null}
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {mode !== 'statuses' ? (
-              <Button
-                variant="ghost"
-                className="rounded-full px-3 py-3"
-                onClick={() => setIsSettingsOpen(true)}
-                aria-label={t('orders:table.settings_title')}
-              >
-                <Settings size={18} />
-              </Button>
-            ) : null}
-            {canSync && mode !== 'statuses' ? (
-              <Button onClick={handleSync} disabled={isSyncing}>
-                {isSyncing ? t('orders:syncing') : t('orders:sync')}
-              </Button>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <label className="flex-1 min-w-[180px] max-w-md text-sm text-slate-600 dark:text-slate-300">
             <span className="sr-only">{t('orders:filters.search')}</span>
             <input
@@ -1038,7 +986,56 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
               </>
             )}
           </div>
+          <div className="flex flex-1 items-center justify-end gap-2 min-w-0">
+            {mode !== 'statuses' ? (
+              <Button
+                variant="ghost"
+                className="rounded-full px-3 py-3 shrink-0"
+                onClick={() => setIsSettingsOpen(true)}
+                aria-label={t('orders:table.settings_title')}
+              >
+                <Settings size={18} />
+              </Button>
+            ) : null}
+            {canSync && mode !== 'statuses' ? (
+              <Button onClick={handleSync} disabled={isSyncing} className="shrink-0">
+                {isSyncing ? t('orders:syncing') : t('orders:sync')}
+              </Button>
+            ) : null}
+          </div>
         </div>
+
+        {(group && group !== 'all') || isRefreshing || (orderSource === 'diller' && movementsData != null) || syncResult ? (
+          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+            {group && group !== 'all' ? (
+              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/50 dark:text-blue-200">
+                {t(`admin:dashboard.status_${group}`)}
+              </span>
+            ) : null}
+            {isRefreshing ? (
+              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+                {t('orders:refreshing')}
+              </span>
+            ) : null}
+            {orderSource === 'diller' && movementsData != null ? (
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
+                {t('orders:movements_loaded', { count: movementsData.movement?.length ?? 0 })}
+              </span>
+            ) : syncResult ? (
+              <span className="flex flex-col gap-1">
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
+                  {t('orders:sync_result', { created: syncResult.created, updated: syncResult.updated, skipped: syncResult.skipped })}
+                </span>
+                {syncResult.detail || syncResult.errors_count ? (
+                  <span className="max-w-xl rounded bg-amber-100 px-2 py-1 text-xs text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 break-words">
+                    {syncResult.errors_count ? `${syncResult.errors_count} ta xato. ` : ''}
+                    {syncResult.detail ?? ''}
+                  </span>
+                ) : null}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
 
         {mode !== 'statuses' && canSend && selectedOrderIds.size > 0 ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/50">
