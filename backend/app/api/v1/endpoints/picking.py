@@ -358,16 +358,35 @@ async def get_consolidated(
             DocumentModel.status != "cancelled",
         )
     )
-    doc_ids = [r[0] for r in docs_id_query.all()]
+    doc_ids_raw = [r[0] for r in docs_id_query.all()]
+    doc_ids = list(dict.fromkeys(doc_ids_raw))  # uniq, order preserved
     if not doc_ids:
         return ConsolidatedViewResponse(documents=[], products=[])
+    try:
+        return _build_consolidated_response(db, doc_ids)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("get_consolidated error: %s", e)
+        raise HTTPException(
+            status_code=500,
+            detail="Umumiy yig'ish ro'yxati yuklanmadi: " + (str(e).strip() or type(e).__name__),
+        ) from e
+
+
+def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedViewResponse:
+    """Build consolidated view response (shared by GET and after POST). doc_ids must be non-empty."""
     # Fresh query for doc_no/status to avoid touching expired attributes after consolidated_pick commit (500 fix)
     doc_info_rows = (
         db.query(DocumentModel.id, DocumentModel.doc_no, DocumentModel.status)
         .filter(DocumentModel.id.in_(doc_ids))
         .all()
     )
-    doc_info_map = {r[0]: {"doc_no": r[1] or "", "status": r[2] or ""} for r in doc_info_rows}
+    doc_info_map = {r[0]: {"doc_no": str(r[1]) if r[1] is not None else "", "status": str(r[2]) if r[2] is not None else ""} for r in doc_info_rows}
+    # Ensure every doc_id has an entry (in case of race)
+    for doc_id in doc_ids:
+        if doc_id not in doc_info_map:
+            doc_info_map[doc_id] = {"doc_no": "", "status": ""}
 
     lines_with_loc = (
         db.query(DocumentLineModel, LocationModel)
@@ -398,15 +417,19 @@ async def get_consolidated(
             product_order.append((key, line.product_name or "", line.sku, _safe_expiry_date(line.expiry_date)))
         ref = doc_info_map.get(line.document_id, {}).get("doc_no", "")
         pick_seq = loc.pick_sequence if loc else None
+        try:
+            pick_seq_int = int(pick_seq) if pick_seq is not None else None
+        except (TypeError, ValueError):
+            pick_seq_int = None
         groups[key].append(
             ConsolidatedLineItem(
                 document_id=line.document_id,
                 line_id=line.id,
-                reference_number=ref,
+                reference_number=ref or "",
                 qty_required=float(line.required_qty or 0),
                 qty_picked=float(line.picked_qty or 0),
                 location_code=line.location_code or "",
-                pick_sequence=pick_seq,
+                pick_sequence=pick_seq_int,
                 expiry_date=_safe_expiry_date(line.expiry_date),
             )
         )
@@ -419,7 +442,7 @@ async def get_consolidated(
             ConsolidatedProduct(
                 barcode=barcode_or_sku if (barcode_or_sku and barcode_or_sku != str(None)) else None,
                 sku=sku,
-                product_name=product_name,
+                product_name=product_name or "",
                 total_required=total_required,
                 total_picked=total_picked,
                 expiry_date=expiry_display,
@@ -427,16 +450,19 @@ async def get_consolidated(
             )
         )
     # doc_ids orqali yig'amiz — document ORM obyektlariga tayanmaslik (commit dan keyin 500 oldini olish)
-    doc_summaries = [
-        ConsolidatedDocumentSummary(
-            id=doc_id,
-            reference_number=doc_info_map.get(doc_id, {}).get("doc_no", ""),
-            status=doc_info_map.get(doc_id, {}).get("status", ""),
-            lines_total=doc_line_stats.get(doc_id, {}).get("total", 0),
-            lines_done=doc_line_stats.get(doc_id, {}).get("done", 0),
+    doc_summaries = []
+    for doc_id in doc_ids:
+        info = doc_info_map.get(doc_id, {})
+        stats = doc_line_stats.get(doc_id, {})
+        doc_summaries.append(
+            ConsolidatedDocumentSummary(
+                id=doc_id,
+                reference_number=info.get("doc_no") or "",
+                status=info.get("status") or "",
+                lines_total=stats.get("total", 0) or 0,
+                lines_done=stats.get("done", 0) or 0,
+            )
         )
-        for doc_id in doc_ids
-    ]
     return ConsolidatedViewResponse(documents=doc_summaries, products=products)
 
 
