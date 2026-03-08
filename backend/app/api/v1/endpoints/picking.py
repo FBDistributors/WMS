@@ -404,6 +404,7 @@ def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedView
     # Also build per-document line counts from lines_with_loc to avoid touching d.lines after commit (500 fix)
     product_order: List[tuple] = []  # (barcode_or_key, product_name, sku, expiry_display)
     groups: dict = {}
+    first_line_attrs: dict = {}  # key -> (barcode, sku) from first line in group (real barcode/sku, not mixed)
     doc_line_stats: dict = {}  # doc_id -> {"total": int, "done": int}
     for line, loc in lines_with_loc:
         doc_id = line.document_id
@@ -414,6 +415,7 @@ def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedView
         key = (line.barcode or line.sku or str(line.product_id or ""), line.product_name or "", line.sku)
         if key not in groups:
             groups[key] = []
+            first_line_attrs[key] = (line.barcode, line.sku)
             product_order.append((key, line.product_name or "", line.sku, _safe_expiry_date(line.expiry_date)))
         ref = doc_info_map.get(line.document_id, {}).get("doc_no", "")
         pick_seq = loc.pick_sequence if loc else None
@@ -435,13 +437,15 @@ def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedView
         )
     products = []
     for (barcode_or_sku, product_name, sku), _name, _sku, expiry_display in product_order:
-        lines_list = groups[(barcode_or_sku, product_name, sku)]
+        key = (barcode_or_sku, product_name, sku)
+        lines_list = groups[key]
         total_required = sum(l.qty_required for l in lines_list)
         total_picked = sum(l.qty_picked for l in lines_list)
+        first_barcode, first_sku = first_line_attrs.get(key, (None, None))
         products.append(
             ConsolidatedProduct(
-                barcode=barcode_or_sku if (barcode_or_sku and barcode_or_sku != str(None)) else None,
-                sku=sku,
+                barcode=first_barcode if (first_barcode and str(first_barcode).strip()) else None,
+                sku=first_sku if (first_sku and str(first_sku).strip()) else sku,
                 product_name=product_name or "",
                 total_required=total_required,
                 total_picked=total_picked,

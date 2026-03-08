@@ -310,7 +310,7 @@ def _allocate_order(
                     location_id=lot_row.location_id,
                     sku=line.sku,
                     product_name=product_name,
-                    barcode=line.barcode,
+                    barcode=line.barcode or (product.barcode if product else None),
                     location_code=lot_row.location_code or "",
                     batch=lot_row.batch,
                     expiry_date=lot_row.expiry_date,
