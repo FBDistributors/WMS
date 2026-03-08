@@ -510,9 +510,11 @@ async def consolidated_pick(
     doc_ids = [r[0] for r in docs_query.all()]
     if not doc_ids:
         raise HTTPException(status_code=404, detail="Mahsulot topilmadi yoki sizning vazifangizda yo'q")
-    # Lines matching barcode (or sku), same sort order as consolidated view
-    lines = (
-        db.query(DocumentLineModel)
+    # Lines matching barcode (or sku), same sort order as consolidated view.
+    # Two-step to avoid PostgreSQL "FOR UPDATE cannot be applied to the nullable side of an outer join":
+    # 1) get ordered line IDs (join, no lock); 2) lock only document_lines by those IDs.
+    ordered_ids_query = (
+        db.query(DocumentLineModel.id)
         .outerjoin(LocationModel, DocumentLineModel.location_id == LocationModel.id)
         .filter(
             DocumentLineModel.document_id.in_(doc_ids),
@@ -527,11 +529,18 @@ async def consolidated_pick(
             LocationModel.code.asc().nulls_last(),
             DocumentLineModel.id,
         )
+    )
+    ordered_ids = [r[0] for r in ordered_ids_query.all()]
+    if not ordered_ids:
+        raise HTTPException(status_code=404, detail="Mahsulot topilmadi yoki sizning vazifangizda yo'q")
+    lines_locked = (
+        db.query(DocumentLineModel)
+        .filter(DocumentLineModel.id.in_(ordered_ids))
         .with_for_update()
         .all()
     )
-    if not lines:
-        raise HTTPException(status_code=404, detail="Mahsulot topilmadi yoki sizning vazifangizda yo'q")
+    order_map = {lid: i for i, lid in enumerate(ordered_ids)}
+    lines = sorted(lines_locked, key=lambda L: order_map[L.id])
 
     remaining = Decimal(str(qty))
     first_picked_line_id: Optional[UUID] = None
