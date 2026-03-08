@@ -64,6 +64,29 @@ function normalizeDocument(raw: PickingDocument | null): PickingDocument | null 
   return { ...raw, lines, progress };
 }
 
+/** Controller uchun: mahsulot bo'yicha guruhlash, har bir guruh bitta "umumiy" qator. */
+function groupLinesByProduct(lines: PickingLine[]): { virtualLine: PickingLine; groupLines: PickingLine[] }[] {
+  const map = new Map<string, PickingLine[]>();
+  for (const l of lines) {
+    const key = (l.product_name ?? '') + '|' + (l.barcode ?? l.sku ?? '');
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(l);
+  }
+  return [...map.values()].map((groupLines) => {
+    const first = groupLines[0];
+    const required = groupLines.reduce((s, l) => s + (Number(l.qty_required) || 0), 0);
+    const picked = groupLines.reduce((s, l) => s + (Number(l.qty_picked) || 0), 0);
+    const virtualLine: PickingLine = {
+      ...first,
+      id: first.id,
+      qty_required: required,
+      qty_picked: picked,
+      location_code: '—',
+    };
+    return { virtualLine, groupLines };
+  });
+}
+
 type Nav = StackNavigationProp<RootStackParamList, 'PickTaskDetails'>;
 type Route = RouteProp<RootStackParamList, 'PickTaskDetails'>;
 
@@ -451,26 +474,38 @@ export function PickTaskDetails() {
         keyboardShouldPersistTaps="handled"
       >
         <Text style={[styles.sectionTitle, isDark && styles.sectionTitleDark]}>{t('positions')}</Text>
-        {(doc.lines ?? []).filter(Boolean).map((line, index) => (
-          <LineCard
-            key={line?.id ?? `line-${index}`}
-            line={line as PickingLine}
-            onPress={
-              isController
-                ? (Number((line as PickingLine).qty_picked) >= Number((line as PickingLine).qty_required)
-                    ? () => openLineScan(line as PickingLine)
-                    : undefined)
-                : () => openLineScan(line as PickingLine)
-            }
-            onReportReason={!isController && isOnline ? openLineReasonModal : undefined}
-            isOnline={isOnline}
-            t={t}
-            readOnly={isController && Number((line as PickingLine).qty_picked) < Number((line as PickingLine).qty_required)}
-            isController={isController}
-            controllerVerified={isController && controllerVerifiedLineIds.has(String((line as PickingLine).id))}
-            isDark={isDark}
-          />
-        ))}
+        {(isController && doc?.lines?.length
+          ? groupLinesByProduct(doc.lines)
+          : (doc?.lines ?? []).filter(Boolean).map((line) => ({ virtualLine: line as PickingLine, groupLines: [line as PickingLine] }))
+        ).map(({ virtualLine, groupLines }, index) => {
+          const allGroupVerified = groupLines.every((l) => controllerVerifiedLineIds.has(String(l.id)));
+          const canVerify = isController && Number(virtualLine.qty_picked) >= Number(virtualLine.qty_required);
+          return (
+            <LineCard
+              key={virtualLine.id ?? `line-${index}`}
+              line={virtualLine}
+              onPress={
+                isController
+                  ? (canVerify && !allGroupVerified
+                      ? () => {
+                          const next = new Set(controllerVerifiedLineIds);
+                          groupLines.forEach((l) => next.add(String(l.id)));
+                          setControllerVerifiedLineIds(next);
+                          saveControllerVerifiedLineIds(taskId, next);
+                        }
+                      : undefined)
+                  : () => openLineScan(virtualLine)
+              }
+              onReportReason={!isController && isOnline ? openLineReasonModal : undefined}
+              isOnline={isOnline}
+              t={t}
+              readOnly={isController && Number(virtualLine.qty_picked) < Number(virtualLine.qty_required)}
+              isController={isController}
+              controllerVerified={isController && allGroupVerified}
+              isDark={isDark}
+            />
+          );
+        })}
       </ScrollView>
 
       <Modal
