@@ -313,7 +313,7 @@ export function PickTaskList() {
         <View style={[styles.toggleWrapBottom, isDark && styles.toggleWrapDark]}>
           <TouchableOpacity
             style={[styles.toggleSegment, !showConsolidated && styles.toggleSegmentActive, isDark && styles.toggleSegmentDark, !showConsolidated && isDark && styles.toggleSegmentActiveDark]}
-            onPress={() => setShowConsolidated(false)}
+            onPress={() => { setShowConsolidated(false); load(); }}
             activeOpacity={0.8}
           >
             <Text
