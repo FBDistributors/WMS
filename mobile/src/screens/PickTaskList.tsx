@@ -200,6 +200,7 @@ export function PickTaskList() {
         }
         await sendToController(controllerModalDoc.id, controllerId);
         setControllerModalDoc(null);
+        setList((prev) => prev.filter((d) => d.id !== controllerModalDoc.id));
         await load();
       } catch (e) {
         Alert.alert(t('error'), e instanceof Error ? e.message : t('error'));
