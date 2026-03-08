@@ -7,11 +7,26 @@ from typing import Dict, Iterable, List, Tuple
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.integrations.smartup.mapper import _resolve_external_id, map_order_to_wms_order
+from app.integrations.smartup.mapper import OrderLinePayload, _resolve_external_id, map_order_to_wms_order
 from app.integrations.smartup.schemas import SmartupOrder
 from app.models.order import Order, OrderLine
+from app.models.product import Product as ProductModel
 
 logger = logging.getLogger(__name__)
+
+
+def _enrich_order_line_names_from_products(db: Session, lines: List[OrderLinePayload]) -> None:
+    """Order line nomi bo'sh yoki faqat SKU bo'lsa, products jadvalidan SKU bo'yicha to'liq nomni olib to'ldiradi."""
+    for line in lines:
+        sku_str = (line.sku or "").strip()
+        if not sku_str:
+            continue
+        name_str = (line.name or "").strip()
+        if name_str and name_str != sku_str and len(name_str) >= 3:
+            continue
+        product = db.query(ProductModel).filter(ProductModel.sku == sku_str).first()
+        if product and (product.name or "").strip():
+            line.name = (product.name or "").strip()[:255]
 
 
 @dataclass
@@ -84,6 +99,7 @@ def import_orders(
             payload.source_external_id = external_id
         source = order_source if order_source else payload.source
         try:
+            _enrich_order_line_names_from_products(db, payload.lines)
             if existing:
                 existing.source = source
                 existing.order_number = payload.order_number

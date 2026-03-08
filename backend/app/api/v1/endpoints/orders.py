@@ -288,6 +288,9 @@ def _allocate_order(
             )
             continue
 
+        product = db.get(ProductModel, product_id)
+        product_name = (product.name if product else None) or line.name or ""
+
         remaining = Decimal(str(line.qty))
         allocated_total = Decimal("0")
         available_lots = _fefo_available_lots(db, product_id, min_expiry_date=min_expiry_date)
@@ -306,7 +309,7 @@ def _allocate_order(
                     lot_id=lot_row.lot_id,
                     location_id=lot_row.location_id,
                     sku=line.sku,
-                    product_name=line.name,
+                    product_name=product_name,
                     barcode=line.barcode,
                     location_code=lot_row.location_code or "",
                     batch=lot_row.batch,
