@@ -340,11 +340,9 @@ function ProductRow({
       <Text style={styles.productName} numberOfLines={2}>
         {product.product_name}
       </Text>
-      {product.barcode ? (
-        <Text style={styles.productMeta}>
-          {t('shtrixkodLabel')}: {product.barcode}
-        </Text>
-      ) : null}
+      <Text style={styles.productMeta}>
+        {t('shtrixkodLabel')}: {product.barcode || '—'}
+      </Text>
       {product.sku ? (
         <Text style={styles.productMeta}>
           {t('skuLabel')}: {product.sku}

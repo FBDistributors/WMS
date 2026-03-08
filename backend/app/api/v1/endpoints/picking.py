@@ -21,6 +21,7 @@ from app.models.location import Location as LocationModel
 from app.models.order import Order as OrderModel
 from app.models.picking import PickRequest
 from app.models.stock import StockMovement as StockMovementModel
+from app.models.product import Product as ProductModel
 from app.models.user import User as UserModel
 from app.models.user_fcm_token import UserFCMToken
 
@@ -404,7 +405,7 @@ def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedView
     # Also build per-document line counts from lines_with_loc to avoid touching d.lines after commit (500 fix)
     product_order: List[tuple] = []  # (barcode_or_key, product_name, sku, expiry_display)
     groups: dict = {}
-    first_line_attrs: dict = {}  # key -> (barcode, sku) from first line in group (real barcode/sku, not mixed)
+    first_line_attrs: dict = {}  # key -> (barcode, sku, product_id) from first line in group
     doc_line_stats: dict = {}  # doc_id -> {"total": int, "done": int}
     for line, loc in lines_with_loc:
         doc_id = line.document_id
@@ -415,7 +416,7 @@ def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedView
         key = (line.barcode or line.sku or str(line.product_id or ""), line.product_name or "", line.sku)
         if key not in groups:
             groups[key] = []
-            first_line_attrs[key] = (line.barcode, line.sku)
+            first_line_attrs[key] = (line.barcode, line.sku, line.product_id)
             product_order.append((key, line.product_name or "", line.sku, _safe_expiry_date(line.expiry_date)))
         ref = doc_info_map.get(line.document_id, {}).get("doc_no", "")
         pick_seq = loc.pick_sequence if loc else None
@@ -435,16 +436,32 @@ def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedView
                 expiry_date=_safe_expiry_date(line.expiry_date),
             )
         )
+    # Fallback barcode from Product when document_line has none
+    need_barcode_ids = []
+    for k in first_line_attrs:
+        b, _s, pid = first_line_attrs[k]
+        if pid and (not b or not str(b).strip()):
+            need_barcode_ids.append(pid)
+    need_barcode_ids = list(set(need_barcode_ids))
+    product_barcode_map: dict = {}
+    if need_barcode_ids:
+        for row in db.query(ProductModel.id, ProductModel.barcode).filter(ProductModel.id.in_(need_barcode_ids)).all():
+            if row.barcode and str(row.barcode).strip():
+                product_barcode_map[row.id] = row.barcode
     products = []
     for (barcode_or_sku, product_name, sku), _name, _sku, expiry_display in product_order:
         key = (barcode_or_sku, product_name, sku)
         lines_list = groups[key]
         total_required = sum(l.qty_required for l in lines_list)
         total_picked = sum(l.qty_picked for l in lines_list)
-        first_barcode, first_sku = first_line_attrs.get(key, (None, None))
+        first_barcode, first_sku, first_product_id = first_line_attrs.get(key, (None, None, None))
+        barcode = (
+            first_barcode if (first_barcode and str(first_barcode).strip()) else
+            (product_barcode_map.get(first_product_id) if first_product_id else None)
+        )
         products.append(
             ConsolidatedProduct(
-                barcode=first_barcode if (first_barcode and str(first_barcode).strip()) else None,
+                barcode=barcode if (barcode and str(barcode).strip()) else None,
                 sku=first_sku if (first_sku and str(first_sku).strip()) else sku,
                 product_name=product_name or "",
                 total_required=total_required,
