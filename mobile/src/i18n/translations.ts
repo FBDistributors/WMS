@@ -174,6 +174,8 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     verifyAllPickedLines: "Barcha terilgan pozitsiyalarni skaner orqali tekshiring.",
     submittingProgress: 'Jarayonda…',
     barcodeSkuShort: 'Shtrix / SKU',
+    shtrixkodLabel: 'Shtrixkod',
+    skuLabel: 'SKU',
 
     returnsTitle: "Qaytgan mahsulotlar",
     returnsAddLine: "Qo'shish",
@@ -416,6 +418,8 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     verifyAllPickedLines: 'Отсканируйте и проверьте все собранные позиции.',
     submittingProgress: 'Отправка…',
     barcodeSkuShort: 'Штрихкод / SKU',
+    shtrixkodLabel: 'Штрихкод',
+    skuLabel: 'SKU',
 
     returnsTitle: 'Возвраты',
     returnsAddLine: 'Добавить',
@@ -658,6 +662,8 @@ export const translations: Record<LocaleCode, Record<string, string>> = {
     verifyAllPickedLines: 'Please scan and verify all picked positions.',
     submittingProgress: 'Submitting…',
     barcodeSkuShort: 'Barcode / SKU',
+    shtrixkodLabel: 'Barcode',
+    skuLabel: 'SKU',
 
     returnsTitle: 'Returns',
     returnsAddLine: 'Add',
