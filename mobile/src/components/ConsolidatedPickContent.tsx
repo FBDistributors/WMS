@@ -6,7 +6,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -252,7 +254,12 @@ export function ConsolidatedPickContent({
         onRequestClose={closeProductModal}
       >
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeProductModal}>
-          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1, justifyContent: 'center' }}
+            keyboardVerticalOffset={40}
+          >
+            <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
             {selectedProduct && (
               <>
                 <View style={styles.modalHeader}>
@@ -273,7 +280,13 @@ export function ConsolidatedPickContent({
                     <Text style={styles.modalOr}>{t('orEnterManually')}</Text>
                     <ScanInput
                       onSubmit={handleProductBarcodeSubmit}
-                      placeholder={selectedProduct.barcode || selectedProduct.sku || t('barcodeSkuShort') || ''}
+                      placeholder={
+                        (() => {
+                          const b = (selectedProduct.barcode || '').trim();
+                          const s = (selectedProduct.sku || '').trim();
+                          return [b, s].filter(Boolean).join(' / ') || t('barcodeSkuShort') || '';
+                        })()
+                      }
                       label={t('barcodeSkuLabel')}
                       submitText={t('submit')}
                       disabled={submitting}
@@ -307,7 +320,8 @@ export function ConsolidatedPickContent({
                 )}
               </>
             )}
-          </View>
+            </View>
+          </KeyboardAvoidingView>
         </TouchableOpacity>
       </Modal>
     </View>
