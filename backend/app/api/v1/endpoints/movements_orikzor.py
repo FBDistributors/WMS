@@ -8,9 +8,13 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
 
 from app.auth.deps import require_permission
+from app.db import get_db
 from app.integrations.smartup.orikzor import fetch_orikzor_movements_raw
+from app.models.document import Document as DocumentModel
+from app.models.order import Order as OrderModel
 
 router = APIRouter()
 
@@ -86,6 +90,30 @@ def _fetch_orikzor_sync(
     return [_raw_to_display(m) for m in filtered]
 
 
+def _get_sent_movement_ids(db: Session) -> set[str]:
+    """Order + Document (SO) bor movement larning movement_id larini qaytaradi (source_external_id = movement:ID)."""
+    rows = (
+        db.query(OrderModel.source_external_id)
+        .join(DocumentModel, DocumentModel.order_id == OrderModel.id)
+        .filter(
+            DocumentModel.doc_type == "SO",
+            OrderModel.source_external_id.isnot(None),
+            OrderModel.source_external_id.like("movement:%"),
+        )
+        .distinct()
+        .all()
+    )
+    out: set[str] = set()
+    for (ext_id,) in rows:
+        if ext_id and ext_id.startswith("movement:"):
+            out.add(ext_id[9:].strip())
+    return out
+
+
+def _movement_id_from_display(m: dict[str, Any]) -> str:
+    return str(m.get("movement_id") or m.get("movement_number") or "").strip()
+
+
 @router.get("", summary="List O'rikzor movements from Smartup (movement$export proxy)")
 @router.get("/", summary="List O'rikzor movements from Smartup (movement$export proxy)")
 async def list_movements_orikzor(
@@ -97,6 +125,7 @@ async def list_movements_orikzor(
     limit: int = Query(50, ge=1, le=500, description="Max items per page"),
     offset: int = Query(0, ge=0, description="Skip N items"),
     refresh: bool = Query(False, description="Cache ni bypass qilish"),
+    db: Session = Depends(get_db),
     _user=Depends(require_permission("orders:read")),
 ) -> dict[str, Any]:
     """
@@ -131,6 +160,8 @@ async def list_movements_orikzor(
     if not refresh and key in _CACHE:
         full_list, expiry = _CACHE[key]
         if now < expiry:
+            sent_ids = _get_sent_movement_ids(db)
+            full_list = [m for m in full_list if _movement_id_from_display(m) not in sent_ids]
             total = len(full_list)
             chunk = full_list[offset : offset + limit]
             return {"movement": chunk, "total": total}
@@ -149,6 +180,8 @@ async def list_movements_orikzor(
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"O'rikzor export failed: {exc}") from exc
 
+    sent_ids = _get_sent_movement_ids(db)
+    full_list = [m for m in full_list if _movement_id_from_display(m) not in sent_ids]
     total = len(full_list)
     chunk = full_list[offset : offset + limit]
     return {"movement": chunk, "total": total}
