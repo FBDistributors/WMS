@@ -6,9 +6,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -261,12 +259,7 @@ export function ConsolidatedPickContent({
         onRequestClose={closeProductModal}
       >
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeProductModal}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ flex: 1, justifyContent: 'center' }}
-            keyboardVerticalOffset={40}
-          >
-            <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
             {selectedProduct && (
               <>
                 <View style={styles.modalHeader}>
@@ -327,8 +320,7 @@ export function ConsolidatedPickContent({
                 )}
               </>
             )}
-            </View>
-          </KeyboardAvoidingView>
+          </View>
         </TouchableOpacity>
       </Modal>
     </View>
@@ -435,14 +427,16 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    padding: 24,
+    justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    maxHeight: '70%',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 32,
+    minHeight: 260,
   },
   modalHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 },
   modalTitle: { fontSize: 18, fontWeight: '700', color: '#111', flex: 1 },
