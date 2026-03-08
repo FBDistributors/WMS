@@ -19,7 +19,7 @@ import { useLocale } from '../i18n/LocaleContext';
 import { useTheme } from '../theme/ThemeContext';
 import type { PickingListItem } from '../api/picking.types';
 import { UNAUTHORIZED_MSG } from '../api/client';
-import { getOpenTasks, getControllers, sendToController, type ControllerUser } from '../api/picking';
+import { getOpenTasks, getControllers, sendToController, completePickDocument, type ControllerUser } from '../api/picking';
 import { useNetwork } from '../network';
 import { getCachedPickTasks, saveCachedPickTasks } from '../offline/offlineDb';
 import { ConsolidatedPickContent } from '../components/ConsolidatedPickContent';
@@ -55,12 +55,12 @@ function TaskRow({
     profileType === 'controller' && item.status === 'picked'
       ? t('statusPendingVerify')
       : t(STATUS_KEYS[item.status] ?? item.status);
-  const showSendBtn =
-    profileType === 'picker' &&
-    item.status === 'picked' &&
-    !item.controlled_by_user_id;
   const isFullyPicked =
     item.lines_total > 0 && item.lines_done >= item.lines_total;
+  const showSendBtn =
+    profileType === 'picker' &&
+    isFullyPicked &&
+    !item.controlled_by_user_id;
 
   return (
     <View style={styles.rowWrap}>
@@ -209,6 +209,9 @@ export function PickTaskList() {
       if (!controllerModalDoc || sending) return;
       setSending(true);
       try {
+        if (controllerModalDoc.status !== 'picked') {
+          await completePickDocument(controllerModalDoc.id);
+        }
         await sendToController(controllerModalDoc.id, controllerId);
         setControllerModalDoc(null);
         await load();
