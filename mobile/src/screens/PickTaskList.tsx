@@ -1,10 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Modal,
-  PanResponder,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -173,19 +172,6 @@ export function PickTaskList() {
     }, [route.params, navigation])
   );
 
-  const SWIPE_THRESHOLD = 50;
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponderCapture: (_: unknown, { dx, dy }: { dx: number; dy: number }) =>
-        Math.abs(dx) > SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy) * 1.2,
-      onPanResponderRelease: (_: unknown, { dx }: { dx: number }) => {
-        if (dx > SWIPE_THRESHOLD) setShowConsolidated(false);
-        else if (dx < -SWIPE_THRESHOLD) setShowConsolidated(true);
-      },
-    })
-  ).current;
-
   const openControllerModal = useCallback(
     async (doc: PickingListItem) => {
       setControllerModalDoc(doc);
@@ -275,7 +261,7 @@ export function PickTaskList() {
           <Icon name="refresh" size={24} color={loading ? '#999' : (isDark ? '#93c5fd' : '#1976d2')} />
         </TouchableOpacity>
       </View>
-      <View style={styles.toggleAndContent} {...(isPicker ? panResponder.panHandlers : {})}>
+      <View style={styles.toggleAndContent}>
       {showConsolidated && isPicker ? (
         <ConsolidatedPickContent
           embeddedInPickTaskList

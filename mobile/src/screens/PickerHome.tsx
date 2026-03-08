@@ -1,9 +1,8 @@
 /**
  * Yig'uvchi sahifasi — header, offline banner, 3 ta karta, pastki nav.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  PanResponder,
   ScrollView,
   StyleSheet,
   Text,
@@ -117,20 +116,6 @@ export function PickerHome() {
     setRefreshing(false);
   }, [refreshCounts]);
 
-  const swipeToOrders = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => false,
-        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 20 && Math.abs(g.dx) > Math.abs(g.dy),
-        onPanResponderRelease: (_, g) => {
-          if (g.dx < -60 || g.vx < -0.2) {
-            navigation.navigate('PickTaskList', { profileType });
-          }
-        },
-      }),
-    [navigation, profileType]
-  );
-
   return (
     <SafeAreaView style={[styles.container, isDark && styles.containerDark]} edges={['top']}>
       {/* Header */}
@@ -167,8 +152,8 @@ export function PickerHome() {
         </View>
       )}
 
-      {/* Stats + Chart, then Offline queue card — yon siljish bilan Buyurtmalarga o'tish */}
-      <View style={styles.scrollWrap} {...swipeToOrders.panHandlers}>
+      {/* Stats + Chart, then Offline queue card */}
+      <View style={styles.scrollWrap}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}

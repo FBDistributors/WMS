@@ -161,12 +161,19 @@ export function ConsolidatedPickContent({
     (barcode: string) => {
       const b = barcode.trim();
       if (!b) return;
-      setScannedBarcodeForQty(b);
       if (!selectedProduct) return;
+      const matchBarcode = (selectedProduct.barcode ?? '').trim();
+      const matchSku = (selectedProduct.sku ?? '').trim();
+      const matches = (matchBarcode && b === matchBarcode) || (matchSku && b === matchSku);
+      if (!matches) {
+        Alert.alert(t('error'), t('consolidatedScanMismatch'));
+        return;
+      }
+      setScannedBarcodeForQty(b);
       const remaining = Math.max(1, Math.round(selectedProduct.total_required - selectedProduct.total_picked));
       setProductQtyInput(String(remaining));
     },
-    [selectedProduct]
+    [selectedProduct, t]
   );
 
   const handleProductQtyConfirm = useCallback(async () => {
