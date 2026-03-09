@@ -25,6 +25,7 @@ import { registerPushToken } from '../notifications/pushNotifications';
 import { AppHeader } from '../components/AppHeader';
 import { PickerFooter } from '../components/PickerFooter';
 import { useTaskCount } from '../context/TaskCountContext';
+import { useProfileType } from '../context/ProfileTypeContext';
 
 type Nav = StackNavigationProp<RootStackParamList, 'PickerHome'>;
 type PickerHomeRoute = RouteProp<RootStackParamList, 'PickerHome'>;
@@ -85,7 +86,7 @@ export function PickerHome() {
   const [queueCount, setQueueCount] = useState(0);
   const [stats, setStats] = useState<MyPickerStats | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const profileType = route.params?.profileType ?? 'picker';
+  const profileType = route.params?.profileType ?? useProfileType().profileType ?? 'picker';
   const headerTitle = profileType === 'controller' ? t('controllerTitle') : t('pickerTitle');
   const isDark = theme === 'dark';
 

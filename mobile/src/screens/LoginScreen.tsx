@@ -22,6 +22,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getStoredToken } from '../api/client';
 import { login, getMe } from '../api/auth';
 import { BRAND } from '../config/branding';
+import { useProfileType } from '../context/ProfileTypeContext';
 
 type Nav = StackNavigationProp<RootStackParamList, 'Login'>;
 
@@ -47,6 +48,7 @@ async function setLastUsername(username: string): Promise<void> {
 
 export function LoginScreen() {
   const navigation = useNavigation<Nav>();
+  const { setProfileType } = useProfileType();
   const { t, locale, setLocale } = useLocale();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -73,6 +75,7 @@ export function LoginScreen() {
         const me = await getMe();
         if (cancelled) return;
         const profileType = me.role === 'inventory_controller' ? 'controller' : 'picker';
+        setProfileType(profileType);
         navigation.replace('PickerHome', { profileType });
       } catch {
         if (!cancelled) setCheckingSession(false);
@@ -94,6 +97,7 @@ export function LoginScreen() {
       await setLastUsername(u);
       const me = await getMe();
       const profileType = me.role === 'inventory_controller' ? 'controller' : 'picker';
+      setProfileType(profileType);
       navigation.replace('PickerHome', { profileType });
     } catch (e) {
       const msg = e instanceof Error ? e.message : t('loginError');

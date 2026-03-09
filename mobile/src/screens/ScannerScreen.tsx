@@ -21,6 +21,7 @@ import { ProductCard } from '../components/ProductCard';
 import { UNAUTHORIZED_MSG } from '../api/client';
 import { useLocale } from '../i18n/LocaleContext';
 import { useTheme } from '../theme/ThemeContext';
+import { useProfileType } from '../context/ProfileTypeContext';
 
 const DEBOUNCE_MS = 1500;
 const SUPPORTED_CODE_TYPES = ['ean-13', 'ean-8', 'code-128', 'qr'] as const;
@@ -40,6 +41,7 @@ export function ScannerScreen() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const params = route.params ?? {};
+  const { profileType: contextProfileType } = useProfileType();
   const device = useCameraDevice('back');
   const { status: permStatus, requestOrOpenSettings } = useCameraPermission();
   const { product, error, status: fetchStatus, fetchByBarcode, reset } = useProductByBarcode();
@@ -61,7 +63,7 @@ export function ScannerScreen() {
       setIsScanning(false);
 
       if (params.returnToPick && params.taskId) {
-        const profileType = params.profileType ?? 'picker';
+        const profileType = params.profileType ?? contextProfileType ?? 'picker';
         const navParams: { taskId: string; scannedBarcode: string; profileType: string; lineId?: string } = {
           taskId: params.taskId,
           scannedBarcode: value,
@@ -81,7 +83,7 @@ export function ScannerScreen() {
         return;
       }
       if (params.returnToConsolidated) {
-        const profileType = params.profileType ?? 'picker';
+        const profileType = params.profileType ?? contextProfileType ?? 'picker';
         navigation.dispatch(
           CommonActions.reset({
             index: 1,
@@ -103,7 +105,7 @@ export function ScannerScreen() {
       }
       fetchByBarcode(value);
     },
-    [fetchByBarcode, params.returnToPick, params.returnToConsolidated, params.taskId, params.profileType, params.selectedProductKey, navigation]
+    [fetchByBarcode, params.returnToPick, params.returnToConsolidated, params.taskId, params.profileType, params.selectedProductKey, contextProfileType, navigation]
   );
 
   const codeScanner = useCodeScanner({

@@ -22,6 +22,7 @@ import { getOpenTasks, getControllers, sendToController, completePickDocument, t
 import { useNetwork } from '../network';
 import { getCachedPickTasks, saveCachedPickTasks } from '../offline/offlineDb';
 import { ConsolidatedPickContent } from '../components/ConsolidatedPickContent';
+import { useProfileType } from '../context/ProfileTypeContext';
 
 type Nav = StackNavigationProp<RootStackParamList, 'PickTaskList'>;
 type PickTaskListRoute = RouteProp<RootStackParamList, 'PickTaskList'>;
@@ -104,7 +105,7 @@ export function PickTaskList() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const { isOnline } = useNetwork();
-  const profileType = route.params?.profileType ?? 'picker';
+  const profileType = route.params?.profileType ?? useProfileType().profileType ?? 'picker';
   const completedMessage = route.params?.completedMessage;
   const [showCompletedBanner, setShowCompletedBanner] = useState(!!completedMessage);
   const [list, setList] = useState<PickingListItem[]>([]);

@@ -22,6 +22,7 @@ import { useLocale } from '../i18n/LocaleContext';
 import { useTheme } from '../theme/ThemeContext';
 import { playSuccessBeep } from '../utils/playBeep';
 import { useNetwork } from '../network';
+import { useProfileType } from '../context/ProfileTypeContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCachedPickTaskDetail, saveCachedPickTaskDetail } from '../offline/offlineDb';
 import { addToQueue } from '../offline/offlineQueue';
@@ -107,7 +108,7 @@ export function PickTaskDetails() {
   const route = useRoute<Route>();
   const { isOnline } = useNetwork();
   const taskId = route.params?.taskId ?? '';
-  const profileType = route.params?.profileType ?? 'picker';
+  const profileType = route.params?.profileType ?? useProfileType().profileType ?? 'picker';
   const isController = profileType === 'controller';
   const [doc, setDoc] = useState<PickingDocument | null>(null);
   const [loading, setLoading] = useState(true);
@@ -308,15 +309,14 @@ export function PickTaskDetails() {
       setSelectedIncompleteReason(null);
       setSubmitting(true);
       try {
-        const profileType = isController ? 'controller' : 'picker';
         if (isOnline) {
           await completePickDocument(String(taskId), incompleteReason ? { incomplete_reason: incompleteReason } : undefined);
           if (isController) AsyncStorage.removeItem(CONTROLLER_VERIFIED_KEY(String(taskId)));
-          navigation.reset({ index: 0, routes: [{ name: 'PickerHome' }] });
+          navigation.reset({ index: 0, routes: [{ name: 'PickerHome', params: { profileType } }] });
         } else {
           await addToQueue('PICK_CLOSE_TASK', { taskId, ts: Date.now(), incomplete_reason: incompleteReason });
           if (isController) AsyncStorage.removeItem(CONTROLLER_VERIFIED_KEY(String(taskId)));
-          navigation.reset({ index: 0, routes: [{ name: 'PickerHome' }] });
+          navigation.reset({ index: 0, routes: [{ name: 'PickerHome', params: { profileType } }] });
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : t('completeError');
@@ -326,7 +326,7 @@ export function PickTaskDetails() {
         setSubmitting(false);
       }
     },
-    [taskId, navigation, t, isOnline, isController]
+    [taskId, navigation, t, isOnline, isController, profileType]
   );
 
   const handleComplete = useCallback(async () => {
@@ -411,11 +411,11 @@ export function PickTaskDetails() {
 
   const goBack = useCallback(() => {
     if (doc?.status === 'completed') {
-      navigation.reset({ index: 0, routes: [{ name: 'PickerHome' }] });
+      navigation.reset({ index: 0, routes: [{ name: 'PickerHome', params: { profileType } }] });
     } else {
       navigation.goBack();
     }
-  }, [doc?.status, navigation]);
+  }, [doc?.status, navigation, profileType]);
 
   if (loading) {
     return (

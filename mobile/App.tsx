@@ -28,8 +28,10 @@ import { ReturnsRedirectScreen } from './src/screens/ReturnsRedirectScreen';
 import { KirimScreen } from './src/screens/KirimScreen';
 import { KirimFormScreen } from './src/screens/KirimFormScreen';
 import { MovementScreen } from './src/screens/MovementScreen';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { withPickerFooter } from './src/components/WithPickerFooter';
 import { TaskCountProvider } from './src/context/TaskCountContext';
+import { ProfileTypeProvider, PROFILE_TYPE_KEY } from './src/context/ProfileTypeContext';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -38,12 +40,14 @@ export default function App() {
 
   useEffect(() => {
     const cleanup = initNotificationOpenedListener((data) => {
-      if (data.taskId && navigationRef.current?.isReady()) {
-        navigationRef.current.navigate('PickTaskDetails', {
+      if (!data.taskId || !navigationRef.current?.isReady()) return;
+      AsyncStorage.getItem(PROFILE_TYPE_KEY).then((stored) => {
+        const profileType = stored === 'controller' ? 'controller' : 'picker';
+        navigationRef.current?.navigate('PickTaskDetails', {
           taskId: data.taskId,
-          profileType: 'picker',
+          profileType,
         });
-      }
+      });
     });
     return cleanup;
   }, []);
@@ -68,6 +72,7 @@ export default function App() {
   return (
     <LocaleProvider>
       <ThemeProvider>
+      <ProfileTypeProvider>
       <TaskCountProvider>
       <NetworkProvider>
       <NavigationContainer ref={navigationRef}>
@@ -96,6 +101,7 @@ export default function App() {
     </NavigationContainer>
     </NetworkProvider>
     </TaskCountProvider>
+    </ProfileTypeProvider>
     </ThemeProvider>
     </LocaleProvider>
   );

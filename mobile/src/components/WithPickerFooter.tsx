@@ -9,6 +9,7 @@ import { CommonActions, useRoute, useNavigation, useFocusEffect } from '@react-n
 import type { RouteProp } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../types/navigation';
+import { useProfileType } from '../context/ProfileTypeContext';
 import { PickerFooter } from './PickerFooter';
 
 type FooterRouteName = 'PickTaskList' | 'Inventory' | 'Kirim' | 'Hisob';
@@ -21,7 +22,9 @@ export function withPickerFooter<P extends object>(
     const route = useRoute<RouteProp<RootStackParamList, keyof RootStackParamList>>();
     const navigation = useNavigation<StackNavigationProp<RootStackParamList, keyof RootStackParamList>>();
     const profileType =
-      (route.params as { profileType?: 'picker' | 'controller' })?.profileType ?? 'picker';
+      (route.params as { profileType?: 'picker' | 'controller' })?.profileType
+      ?? useProfileType().profileType
+      ?? 'picker';
 
     useFocusEffect(
       useCallback(() => {
