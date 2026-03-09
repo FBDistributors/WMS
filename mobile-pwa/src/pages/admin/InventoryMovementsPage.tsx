@@ -95,6 +95,7 @@ export function InventoryMovementsPage() {
               <th className="px-4 py-3 text-left">{t('inventory:columns.product')}</th>
               <th className="px-4 py-3 text-left">{t('inventory:columns.lot')}</th>
               <th className="px-4 py-3 text-left">{t('inventory:columns.location')}</th>
+              <th className="px-4 py-3 text-left">{t('inventory:columns.created_by')}</th>
               <th className="px-4 py-3 text-left">{t('inventory:columns.created_at')}</th>
             </tr>
           </thead>
@@ -118,6 +119,9 @@ export function InventoryMovementsPage() {
                 </td>
                 <td className="px-4 py-3 text-slate-500">{row.lot_id}</td>
                 <td className="px-4 py-3 text-slate-500">{row.location_id}</td>
+                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                  {row.created_by_username ?? row.created_by_user_id ?? '—'}
+                </td>
                 <td className="px-4 py-3 text-slate-500">
                   {new Date(row.created_at).toLocaleString()}
                 </td>

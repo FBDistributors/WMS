@@ -78,6 +78,7 @@ class StockMovementOut(BaseModel):
     source_document_id: Optional[UUID] = None
     created_at: datetime
     created_by_user_id: Optional[UUID] = None
+    created_by_username: Optional[str] = None
 
 
 class StockMovementCreate(BaseModel):
@@ -268,7 +269,10 @@ def _to_lot(lot: StockLotModel) -> StockLotOut:
     )
 
 
-def _to_movement(movement: StockMovementModel) -> StockMovementOut:
+def _to_movement(
+    movement: StockMovementModel,
+    created_by_username: Optional[str] = None,
+) -> StockMovementOut:
     product = getattr(movement, "product", None)
     lot = getattr(movement, "lot", None)
     location = getattr(movement, "location", None)
@@ -288,6 +292,7 @@ def _to_movement(movement: StockMovementModel) -> StockMovementOut:
         source_document_id=movement.source_document_id,
         created_at=movement.created_at,
         created_by_user_id=movement.created_by_user_id,
+        created_by_username=created_by_username,
     )
 
 
@@ -496,7 +501,15 @@ async def list_stock_movements(
         .limit(limit)
         .all()
     )
-    return [_to_movement(movement) for movement in movements]
+    creator_ids = {m.created_by_user_id for m in movements if m.created_by_user_id}
+    creator_map = {}
+    if creator_ids:
+        for u in db.query(UserModel).filter(UserModel.id.in_(creator_ids)).all():
+            creator_map[u.id] = u.full_name or u.username or str(u.id)
+    return [
+        _to_movement(mov, creator_map.get(mov.created_by_user_id))
+        for mov in movements
+    ]
 
 
 @router.post("/movements", response_model=StockMovementOut, status_code=status.HTTP_201_CREATED)
@@ -567,7 +580,7 @@ async def create_stock_movement(
     )
     db.commit()
     db.refresh(movement)
-    return _to_movement(movement)
+    return _to_movement(movement, created_by_username=user.full_name or user.username)
 
 
 @router.get("/summary", response_model=List[InventorySummaryRow], summary="Inventory summary")

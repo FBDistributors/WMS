@@ -57,6 +57,7 @@ export type InventoryMovement = {
   source_document_id?: string | null
   created_at: string
   created_by_user_id?: string | null
+  created_by_username?: string | null
 }
 
 export type InventorySummaryQuery = {

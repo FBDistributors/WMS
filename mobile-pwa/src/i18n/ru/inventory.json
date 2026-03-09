@@ -30,6 +30,7 @@
     "movement_type": "Движение",
     "qty": "Кол-во",
     "lot": "Партия",
+    "created_by": "Кто выполнил",
     "created_at": "Создано"
   },
   "filters": {
