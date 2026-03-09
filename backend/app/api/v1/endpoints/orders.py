@@ -598,6 +598,10 @@ async def sync_orders_from_smartup(
     if payload.order_source == "diller" and payload.begin_deal_date is None and payload.end_deal_date is None:
         begin_date = today - timedelta(days=30)
         end_date = today
+    elif payload.begin_deal_date is None and payload.end_deal_date is None:
+        # SmartUP buyurtmalar: default oxirgi 7 kun
+        begin_date = today - timedelta(days=7)
+        end_date = today
     else:
         begin_date = payload.begin_deal_date or today
         end_date = payload.end_deal_date or today
