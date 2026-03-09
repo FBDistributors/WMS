@@ -126,6 +126,7 @@ export function PickTaskList() {
   const [incompleteReasonModalDoc, setIncompleteReasonModalDoc] = useState<PickingListItem | null>(null);
   const [selectedIncompleteReasonForSend, setSelectedIncompleteReasonForSend] = useState<string | null>(null);
   const [completingForController, setCompletingForController] = useState(false);
+  const [consolidatedRefreshKey, setConsolidatedRefreshKey] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -240,6 +241,7 @@ export function PickTaskList() {
         await sendToController(controllerModalDoc.id, controllerId);
         setControllerModalDoc(null);
         setList((prev) => prev.filter((d) => d.id !== controllerModalDoc.id));
+        setConsolidatedRefreshKey((k) => k + 1);
         await load();
       } catch (e) {
         Alert.alert(t('error'), e instanceof Error ? e.message : t('error'));
@@ -305,6 +307,7 @@ export function PickTaskList() {
       {showConsolidated && isPicker ? (
         <ConsolidatedPickContent
           embeddedInPickTaskList
+          consolidatedRefreshKey={consolidatedRefreshKey}
           pendingScannedBarcode={pendingScannedBarcode}
           onClearPendingBarcode={() => setPendingScannedBarcode(null)}
           selectedProductKey={selectedProductKey}

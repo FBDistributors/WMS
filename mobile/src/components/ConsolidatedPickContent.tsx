@@ -42,6 +42,8 @@ export interface ConsolidatedPickContentProps {
   onProductSelect?: (key: string | null) => void;
   /** When true, we are embedded in PickTaskList (for Scanner return target). */
   embeddedInPickTaskList?: boolean;
+  /** Incremented by parent after send-to-controller so consolidated view refetches when user returns to tab. */
+  consolidatedRefreshKey?: number;
 }
 
 export function ConsolidatedPickContent({
@@ -52,6 +54,7 @@ export function ConsolidatedPickContent({
   selectedProductKey,
   onProductSelect,
   embeddedInPickTaskList,
+  consolidatedRefreshKey,
 }: ConsolidatedPickContentProps) {
   const { t } = useLocale();
   const navigation = useNavigation<Nav>();
@@ -89,6 +92,11 @@ export function ConsolidatedPickContent({
   }, [isOnline, t, onAuthError, navigation]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  // Refetch when parent increments key (e.g. after send-to-controller) so consolidated list updates.
+  useEffect(() => {
+    load();
+  }, [consolidatedRefreshKey, load]);
 
   // When returning from Scanner: restore selected product and apply pending barcode only if scan matches product
   useEffect(() => {
