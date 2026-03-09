@@ -1,6 +1,5 @@
 {
   "title": "VIP customers",
-  "subtitle": "Special rules by expiry limit (customer id, name, months).",
   "add": "Add VIP customer",
   "edit": "Edit",
   "confirm_delete_title": "Confirm delete",
