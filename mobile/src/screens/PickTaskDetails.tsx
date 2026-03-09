@@ -479,23 +479,11 @@ export function PickTaskDetails() {
           : (doc?.lines ?? []).filter(Boolean).map((line) => ({ virtualLine: line as PickingLine, groupLines: [line as PickingLine] }))
         ).map(({ virtualLine, groupLines }, index) => {
           const allGroupVerified = groupLines.every((l) => controllerVerifiedLineIds.has(String(l.id)));
-          const canVerify = isController && Number(virtualLine.qty_picked) >= Number(virtualLine.qty_required);
           return (
             <LineCard
               key={virtualLine.id ?? `line-${index}`}
               line={virtualLine}
-              onPress={
-                isController
-                  ? (canVerify && !allGroupVerified
-                      ? () => {
-                          const next = new Set(controllerVerifiedLineIds);
-                          groupLines.forEach((l) => next.add(String(l.id)));
-                          setControllerVerifiedLineIds(next);
-                          saveControllerVerifiedLineIds(taskId, next);
-                        }
-                      : undefined)
-                  : () => openLineScan(virtualLine)
-              }
+              onPress={() => openLineScan(virtualLine)}
               onReportReason={!isController && isOnline ? openLineReasonModal : undefined}
               isOnline={isOnline}
               t={t}
