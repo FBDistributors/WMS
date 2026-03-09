@@ -375,8 +375,8 @@ async def get_consolidated(
     if user.role != "picker":
         raise HTTPException(status_code=403, detail="Only for picker")
     ORDER_HIDDEN_STATUSES = ("completed", "packed", "shipped", "cancelled")
-    # Exclude from consolidated view only when picked AND sent to controller (controlled_by set).
-    # Picked but not yet sent documents stay in the list until controllerga yuborilgach.
+    # Exclude from consolidated view when picked AND sent to controller (controlled_by set).
+    # Also exclude completed (controller tugatgan); matches Buyurtmalar ro'yxati.
     docs_id_query = (
         db.query(DocumentModel.id)
         .outerjoin(OrderModel, DocumentModel.order_id == OrderModel.id)
@@ -391,6 +391,7 @@ async def get_consolidated(
                 DocumentModel.controlled_by_user_id.is_(None),
             ),
             DocumentModel.status != "cancelled",
+            DocumentModel.status != "completed",
         )
     )
     doc_ids_raw = [r[0] for r in docs_id_query.all()]
@@ -546,7 +547,7 @@ async def consolidated_pick(
         return await get_consolidated(db=db, user=user)
 
     ORDER_HIDDEN_STATUSES = ("completed", "packed", "shipped", "cancelled")
-    # Same as get_consolidated: exclude only when picked AND sent to controller.
+    # Same as get_consolidated: exclude picked+controlled and completed.
     docs_query = (
         db.query(DocumentModel.id)
         .outerjoin(OrderModel, DocumentModel.order_id == OrderModel.id)
@@ -561,6 +562,7 @@ async def consolidated_pick(
                 DocumentModel.controlled_by_user_id.is_(None),
             ),
             DocumentModel.status != "cancelled",
+            DocumentModel.status != "completed",
         )
     )
     doc_ids = [r[0] for r in docs_query.all()]
