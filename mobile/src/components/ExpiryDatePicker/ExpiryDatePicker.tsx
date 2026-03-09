@@ -62,9 +62,9 @@ export function ExpiryDatePicker({
 }: ExpiryDatePickerProps) {
   const themeKey: ExpiryDatePickerTheme = darkMode ? 'dark' : 'light';
   const theme = expiryPickerThemes[themeKey];
-  const labels = expiryPickerLabels[locale];
-  const months = monthNamesShort[locale];
-  const weekLetters = weekdayLetters[locale];
+  const labels = expiryPickerLabels[locale] ?? expiryPickerLabels['uz'];
+  const months = monthNamesShort[locale] ?? monthNamesShort['uz'];
+  const weekLetters = weekdayLetters[locale] ?? weekdayLetters['uz'];
 
   const min = minDate ?? firstDayOfCurrentMonth();
   const max = maxDate ?? `${MAX_YEAR}-12-31`;

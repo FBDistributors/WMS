@@ -792,9 +792,9 @@ export function KirimFormScreen() {
               <Text style={styles.muted}>{t('inventoryNoProductsAtLocation')}</Text>
             ) : (
               <View style={styles.contentsList}>
-                {currentProduct.locations.map((loc) => (
+                {currentProduct.locations.map((loc, index) => (
                   <TouchableOpacity
-                    key={`${loc.location_id}-${loc.lot_id}`}
+                    key={`loc-${index}-${loc.location_id ?? ''}-${loc.lot_id ?? ''}`}
                     style={styles.contentsRow}
                     onPress={() => {
                       setSelectedScannedLocation(loc);
