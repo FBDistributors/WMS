@@ -505,7 +505,13 @@ async def list_stock_movements(
     creator_map = {}
     if creator_ids:
         for u in db.query(UserModel).filter(UserModel.id.in_(creator_ids)).all():
-            creator_map[u.id] = u.full_name or u.username or str(u.id)
+            # Ism-familiya yoki username; UUID hech qachon ko'rsatilmasin
+            creator_map[u.id] = (
+                (u.full_name and u.full_name.strip()) or
+                (u.username and u.username.strip()) or
+                (u.code and f"#{u.code}".strip()) or
+                "—"
+            )
     return [
         _to_movement(mov, creator_map.get(mov.created_by_user_id))
         for mov in movements
@@ -580,7 +586,13 @@ async def create_stock_movement(
     )
     db.commit()
     db.refresh(movement)
-    return _to_movement(movement, created_by_username=user.full_name or user.username)
+    display_name = (
+        (user.full_name and user.full_name.strip())
+        or (user.username and user.username.strip())
+        or (user.code and f"#{user.code}")
+        or "—"
+    )
+    return _to_movement(movement, created_by_username=display_name)
 
 
 @router.get("/summary", response_model=List[InventorySummaryRow], summary="Inventory summary")

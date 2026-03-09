@@ -120,7 +120,7 @@ export function InventoryMovementsPage() {
                 <td className="px-4 py-3 text-slate-500">{row.lot_id}</td>
                 <td className="px-4 py-3 text-slate-500">{row.location_id}</td>
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                  {row.created_by_username ?? row.created_by_user_id ?? '—'}
+                  {row.created_by_username ?? '—'}
                 </td>
                 <td className="px-4 py-3 text-slate-500">
                   {new Date(row.created_at).toLocaleString()}
