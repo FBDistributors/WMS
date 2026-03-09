@@ -301,38 +301,23 @@ export function OrikzorHarakatlariPage() {
   return (
     <AdminLayout title={pageTitle}>
       <Card className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-              {isRefreshing ? (
-                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
-                  {t('orders:refreshing')}
-                </span>
-              ) : null}
-              {movementTotal > 0 ? (
-                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
-                  {t('orders:movements_loaded', { count: movementTotal })}
-                </span>
-              ) : null}
-            </div>
+        {(isRefreshing || movementTotal > 0) ? (
+          <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+            {isRefreshing ? (
+              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+                {t('orders:refreshing')}
+              </span>
+            ) : null}
+            {movementTotal > 0 ? (
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
+                {t('orders:movements_loaded', { count: movementTotal })}
+              </span>
+            ) : null}
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              className="rounded-full px-3 py-3"
-              onClick={() => setIsSettingsOpen(true)}
-              aria-label={t('orders:table.settings_title')}
-            >
-              <Settings size={18} />
-            </Button>
-            <Button onClick={handleSmartupSync} disabled={isRefreshing}>
-              {isRefreshing ? t('orders:syncing') : t('orders:sync')}
-            </Button>
-          </div>
-        </div>
+        ) : null}
 
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="flex-1 min-w-[180px] max-w-md text-sm text-slate-600 dark:text-slate-300">
+        <div className="flex flex-nowrap items-end gap-3">
+          <label className="min-w-[180px] flex-1 max-w-md text-sm text-slate-600 dark:text-slate-300">
             <span className="sr-only">{t('orders:filters.search')}</span>
             <input
               type="search"
@@ -351,7 +336,7 @@ export function OrikzorHarakatlariPage() {
               placeholder={t('orders:filters.search_placeholder_orikzor')}
             />
           </label>
-          <div className="relative" ref={filterPanelRef}>
+          <div className="relative shrink-0" ref={filterPanelRef}>
             <Button
               variant="outline"
               onClick={() => setFilterPanelOpen((o) => !o)}
@@ -447,6 +432,17 @@ export function OrikzorHarakatlariPage() {
               </>
             )}
           </div>
+          <Button
+            variant="ghost"
+            className="shrink-0 rounded-full px-3 py-3"
+            onClick={() => setIsSettingsOpen(true)}
+            aria-label={t('orders:table.settings_title')}
+          >
+            <Settings size={18} />
+          </Button>
+          <Button className="shrink-0" onClick={handleSmartupSync} disabled={isRefreshing}>
+            {isRefreshing ? t('orders:syncing') : t('orders:sync')}
+          </Button>
         </div>
         {canSendToPicking && selectedMovementIds.size > 0 ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/50">
