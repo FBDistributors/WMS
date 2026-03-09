@@ -115,10 +115,10 @@ export async function consolidatedPick(
   return data;
 }
 
-/** Bitta qator uchun +1 yoki -1 (backend: delta + request_id). */
+/** Bitta qator uchun delta (+N yoki -N). Backend bitta so'rovda qabul qiladi. */
 export async function pickLine(
   lineId: string,
-  delta: 1 | -1,
+  delta: number,
   requestId: string
 ): Promise<PickLineResponse> {
   const { data } = await apiClient.post<PickLineResponse>(`${PICKING}/lines/${lineId}/pick`, {
@@ -137,8 +137,7 @@ export async function skipLine(lineId: string, reason: string): Promise<PickLine
 }
 
 /**
- * Shtrixkod yoki SKU bo'yicha topib, bitta birlik terish (+1).
- * Agar qty berilsa, shuncha marta pickLine(+1) chaqiriladi.
+ * Shtrixkod yoki SKU bo'yicha topib, bitta so'rovda terish (qty birlik).
  */
 export async function submitScan(
   taskId: string,
@@ -157,9 +156,5 @@ export async function submitScan(
   if (line.qty_picked + count > line.qty_required) {
     throw new Error(`Kerakli miqdor: ${line.qty_required}, terilgan: ${line.qty_picked}`);
   }
-  let last: PickLineResponse = null!;
-  for (let i = 0; i < count; i++) {
-    last = await pickLine(line.id, 1, `scan-${taskId}-${line.id}-${Date.now()}-${i}`);
-  }
-  return last;
+  return await pickLine(line.id, count, `scan-${taskId}-${line.id}-${Date.now()}`);
 }

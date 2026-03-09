@@ -125,8 +125,17 @@ class ConsolidatedPickRequest(BaseModel):
 
 
 class PickLineRequest(BaseModel):
-    delta: Literal[-1, 1]
+    delta: int
     request_id: str
+
+    @field_validator("delta")
+    @classmethod
+    def delta_nonzero_bounded(cls, v: int) -> int:
+        if v == 0:
+            raise ValueError("delta must not be zero")
+        if v < -10000 or v > 10000:
+            raise ValueError("delta must be between -10000 and 10000")
+        return v
 
 
 class PickLineResponse(BaseModel):

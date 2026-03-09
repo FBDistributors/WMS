@@ -25,9 +25,7 @@ export async function syncPendingQueue(onItemDone?: (id: string) => void): Promi
         case 'PICK_CONFIRM_ITEM': {
           const p = payload as unknown as PickSetQtyPayload;
           const count = p.qty ?? 1;
-          for (let i = 0; i < count; i++) {
-            await pickLine(p.itemId, 1, `sync-${item.id}-${i}-${Date.now()}`);
-          }
+          await pickLine(p.itemId, count, `sync-${item.id}-${Date.now()}`);
           break;
         }
         case 'PICK_CLOSE_TASK': {
