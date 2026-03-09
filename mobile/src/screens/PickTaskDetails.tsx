@@ -15,7 +15,7 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../types/navigation';
 import type { PickingDocument, PickingLine } from '../api/picking.types';
 import apiClient, { UNAUTHORIZED_MSG } from '../api/client';
-import { completePickDocument, getTaskById, INCOMPLETE_REASON_KEYS, skipLine, submitScan } from '../api/picking';
+import { completePickDocument, getTaskById, INCOMPLETE_REASON_KEYS, pickLine, skipLine, submitScan } from '../api/picking';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { ScanInput } from '../components/ScanInput';
 import { useLocale } from '../i18n/LocaleContext';
@@ -260,9 +260,14 @@ export function PickTaskDetails() {
       }
       void playSuccessBeep();
       closeLineScan();
-      const lineIdStr = String(selectedLine.id);
+      const lineIdsToVerify = (doc.lines ?? []).filter(
+        (l) =>
+          l.product_name === selectedLine.product_name &&
+          (l.barcode === selectedLine.barcode || l.sku === selectedLine.sku)
+      ).map((l) => String(l.id));
       setControllerVerifiedLineIds((prev) => {
-        const next = new Set(prev).add(lineIdStr);
+        const next = new Set(prev);
+        lineIdsToVerify.forEach((id) => next.add(id));
         saveControllerVerifiedLineIds(String(taskId), next);
         return next;
       });
@@ -276,7 +281,7 @@ export function PickTaskDetails() {
     setSubmitting(true);
     try {
       if (isOnline) {
-        const res = await submitScan(taskId, { barcode: scannedBarcodeForQty, qty });
+        const res = await pickLine(selectedLine.id, qty, `scan-${taskId}-${selectedLine.id}-${Date.now()}`);
         setDoc((prev) => (prev ? { ...prev, lines: prev.lines.map((l) => (l.id === res.line.id ? res.line : l)), progress: res.progress, status: res.document_status } : prev));
         await saveCachedPickTaskDetail(taskId, { ...doc, lines: (doc.lines ?? []).map((l) => (l.id === res.line.id ? res.line : l)), progress: res.progress, status: res.document_status } as PickingDocument);
         closeLineScan();
