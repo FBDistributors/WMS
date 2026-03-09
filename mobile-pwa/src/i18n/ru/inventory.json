@@ -10,6 +10,8 @@
   "empty_desc": "Остатки появятся после приёмки.",
   "enter_stock": "Ввести остаток",
   "export_excel": "Скачать в Excel",
+  "export_with_expiry": "Остаток со сроком",
+  "export_qty_only": "Только остаток",
   "export_failed": "Не удалось выгрузить Excel.",
   "empty_details": "Детали не найдены",
   "empty_details_desc": "Измените фильтры, чтобы увидеть детали.",

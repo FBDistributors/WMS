@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Search, PackagePlus, Settings, FileSpreadsheet } from 'lucide-react'
+import { Search, PackagePlus, Settings, FileSpreadsheet, ChevronDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import * as XLSX from 'xlsx'
 
@@ -45,6 +45,8 @@ export function InventorySummaryPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
+  const [excelMenuOpen, setExcelMenuOpen] = useState(false)
+  const excelMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), DEBOUNCE_MS)
@@ -97,46 +99,93 @@ export function InventorySummaryPage() {
   const pageStart = data.total === 0 ? 0 : offset + 1
   const pageEnd = Math.min(offset + PAGE_SIZE, data.total)
 
-  const handleExportExcel = useCallback(async () => {
-    setIsExporting(true)
-    try {
-      const res = await getInventorySummaryLight({
-        search: debouncedSearch.trim() || undefined,
-        only_available: onlyAvailable,
-        include_locations: true,
-        limit: EXPORT_LIMIT,
-        offset: 0,
-      })
-      const headers = [
-        t('inventory:columns.code'),
-        t('inventory:columns.barcode'),
-        t('inventory:columns.product'),
-        t('inventory:columns.brand'),
-        t('inventory:columns.total_qty'),
-        t('inventory:columns.available'),
-      ]
-      const rows = (res.items ?? []).map((row) => [
-        row.product_code,
-        row.barcode ?? '',
-        row.product_name,
-        row.brand_name ?? '',
-        Math.round(Number(row.total_qty)),
-        Math.round(Number(row.available_qty)),
-      ])
-      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
-      const wb = XLSX.utils.book_new()
-      const sheetName = (t('inventory:title') || 'Qoldiq').slice(0, 31)
-      XLSX.utils.book_append_sheet(wb, ws, sheetName)
-      const fileName = `qoldiq_${new Date().toISOString().slice(0, 10)}.xlsx`
-      XLSX.writeFile(wb, fileName)
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : t('inventory:load_failed')
-      setError(msg)
-      window.alert(`${t('inventory:export_failed')}\n\n${msg}`)
-    } finally {
-      setIsExporting(false)
+  useEffect(() => {
+    if (!excelMenuOpen) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (excelMenuRef.current && !excelMenuRef.current.contains(e.target as Node)) {
+        setExcelMenuOpen(false)
+      }
     }
-  }, [debouncedSearch, onlyAvailable, t])
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [excelMenuOpen])
+
+  const handleExportExcel = useCallback(
+    async (withExpiry: boolean) => {
+      setExcelMenuOpen(false)
+      setIsExporting(true)
+      try {
+        const res = await getInventorySummaryLight({
+          search: debouncedSearch.trim() || undefined,
+          only_available: onlyAvailable,
+          include_locations: true,
+          limit: EXPORT_LIMIT,
+          offset: 0,
+        })
+        const sheetName = (t('inventory:title') || 'Qoldiq').slice(0, 31)
+        const fileName = withExpiry
+          ? `qoldiq_muddati_${new Date().toISOString().slice(0, 10)}.xlsx`
+          : `qoldiq_${new Date().toISOString().slice(0, 10)}.xlsx`
+
+        if (withExpiry) {
+          const headers = [
+            t('inventory:columns.code'),
+            t('inventory:columns.barcode'),
+            t('inventory:columns.product'),
+            t('inventory:columns.brand'),
+            t('inventory:columns.location'),
+            t('inventory:columns.qty'),
+            t('inventory:columns.available'),
+            t('inventory:columns.expiry'),
+          ]
+          const rows = (res.items ?? []).flatMap((row) =>
+            (row.locations ?? []).map((loc) => [
+              row.product_code,
+              row.barcode ?? '',
+              row.product_name,
+              row.brand_name ?? '',
+              loc.location_code,
+              Math.round(Number(loc.qty)),
+              Math.round(Number(loc.available_qty)),
+              loc.expiry_date ?? '',
+            ])
+          )
+          const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+          const wb = XLSX.utils.book_new()
+          XLSX.utils.book_append_sheet(wb, ws, sheetName)
+          XLSX.writeFile(wb, fileName)
+        } else {
+          const headers = [
+            t('inventory:columns.code'),
+            t('inventory:columns.barcode'),
+            t('inventory:columns.product'),
+            t('inventory:columns.brand'),
+            t('inventory:columns.total_qty'),
+            t('inventory:columns.available'),
+          ]
+          const rows = (res.items ?? []).map((row) => [
+            row.product_code,
+            row.barcode ?? '',
+            row.product_name,
+            row.brand_name ?? '',
+            Math.round(Number(row.total_qty)),
+            Math.round(Number(row.available_qty)),
+          ])
+          const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+          const wb = XLSX.utils.book_new()
+          XLSX.utils.book_append_sheet(wb, ws, sheetName)
+          XLSX.writeFile(wb, fileName)
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : t('inventory:load_failed')
+        setError(msg)
+        window.alert(`${t('inventory:export_failed')}\n\n${msg}`)
+      } finally {
+        setIsExporting(false)
+      }
+    },
+    [debouncedSearch, onlyAvailable, t]
+  )
 
   const content = useMemo(() => {
     if (isLoading) {
@@ -285,16 +334,39 @@ export function InventorySummaryPage() {
           >
             <Settings size={18} />
           </Button>
-          <Button
-            variant="secondary"
-            onClick={handleExportExcel}
-            disabled={isExporting}
-            title={t('inventory:export_excel')}
-            aria-label={t('inventory:export_excel')}
-          >
-            <FileSpreadsheet size={18} />
-            <span className="hidden sm:inline">{t('inventory:export_excel')}</span>
-          </Button>
+          <div className="relative" ref={excelMenuRef}>
+            <Button
+              variant="secondary"
+              onClick={() => setExcelMenuOpen((o) => !o)}
+              disabled={isExporting}
+              title={t('inventory:export_excel')}
+              aria-label={t('inventory:export_excel')}
+              aria-expanded={excelMenuOpen}
+            >
+              <FileSpreadsheet size={18} />
+              <ChevronDown size={16} className="opacity-70" />
+            </Button>
+            {excelMenuOpen && (
+              <div className="absolute right-0 top-full z-50 mt-1 min-w-[12rem] rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                  onClick={() => handleExportExcel(true)}
+                >
+                  <FileSpreadsheet size={16} />
+                  {t('inventory:export_with_expiry')}
+                </button>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                  onClick={() => handleExportExcel(false)}
+                >
+                  <FileSpreadsheet size={16} />
+                  {t('inventory:export_qty_only')}
+                </button>
+              </div>
+            )}
+          </div>
           <Button variant="secondary" onClick={load}>
             {t('common:buttons.refresh')}
           </Button>
