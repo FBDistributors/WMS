@@ -341,6 +341,8 @@ async def list_picking_documents(
                 DocumentModel.controlled_by_user_id.is_(None),
             )
         )
+        # Controller tekshirib yakunlagan hujjatlar yig'uvchi ro'yxatida ko'rinmasin
+        query = query.filter(DocumentModel.status != "completed")
     elif user.role == "inventory_controller":
         query = query.filter(
             DocumentModel.controlled_by_user_id == user.id,
