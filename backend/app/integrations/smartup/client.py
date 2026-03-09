@@ -35,6 +35,8 @@ class SmartupClient:
         begin_deal_date: str,
         end_deal_date: str,
         filial_code: str | None,
+        begin_modified_on: str | None = None,
+        end_modified_on: str | None = None,
     ) -> SmartupOrderExportResponse:
         if not self.base_url:
             raise RuntimeError("SMARTUP_BASE_URL is not configured")
@@ -57,8 +59,8 @@ class SmartupClient:
             "delivery_date": "",
             "begin_created_on": "",
             "end_created_on": "",
-            "begin_modified_on": "",
-            "end_modified_on": "",
+            "begin_modified_on": (begin_modified_on or "").strip() or "",
+            "end_modified_on": (end_modified_on or "").strip() or "",
         }
         data = json.dumps(payload).encode("utf-8")
         credentials = f"{self.username}:{self.password}"

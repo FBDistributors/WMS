@@ -618,12 +618,14 @@ async def sync_orders_from_smartup(
             )
             filial_override = (payload.filial_id or "").strip() or None
         else:
-            # Oddiy buyurtmalar: order$export (savdo buyurtmalari)
+            # Oddiy buyurtmalar: order$export (savdo buyurtmalari). Oxirgi 7 kun o'zgartirilganlari (modified_on).
             client = SmartupClient(filial_id=(payload.filial_id or "").strip() or None)
             response = client.export_orders(
                 begin_deal_date=begin_date.strftime("%d.%m.%Y"),
                 end_deal_date=end_date.strftime("%d.%m.%Y"),
                 filial_code=payload.filial_code,
+                begin_modified_on=begin_date.strftime("%d.%m.%Y"),
+                end_modified_on=end_date.strftime("%d.%m.%Y"),
             )
             filial_override = (payload.filial_id or "").strip() or None
         created, updated, skipped, import_errors, _ = import_orders(
