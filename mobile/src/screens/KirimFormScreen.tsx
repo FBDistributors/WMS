@@ -180,14 +180,21 @@ export function KirimFormScreen() {
             name: invLocCode,
           });
           setInventoryLocationSearch(invLocCode);
-          setInventoryStep(3);
-          loadProductById(pid);
-        } else {
-          setInventorySubMode('byScan');
           setInventoryStep(2);
-          loadProductById(pid);
-          setSelectedScannedLocation(null);
+          navigation.setParams({
+            ...route.params,
+            scannedProductId: undefined,
+            scannedBarcode: undefined,
+            inventoryStep: undefined,
+            inventoryLocationId: undefined,
+            inventoryLocationCode: undefined,
+          } as any);
+          return;
         }
+        setInventorySubMode('byScan');
+        setInventoryStep(2);
+        loadProductById(pid);
+        setSelectedScannedLocation(null);
         navigation.setParams({
           ...route.params,
           scannedProductId: undefined,
@@ -247,28 +254,6 @@ export function KirimFormScreen() {
       })
       .finally(() => setLoadingContents(false));
   }, [flow, inventorySubMode, inventoryStep, inventoryLocation?.code, t]);
-
-  useEffect(() => {
-    if (flow !== 'inventory' || inventorySubMode !== 'byLocation' || inventoryStep !== 3 || !currentProduct?.product_id || !inventoryLocation?.code) {
-      setInventoryScannedLots([]);
-      return;
-    }
-    setLoadingScannedLots(true);
-    setInventoryScannedLots([]);
-    setInventoryScannedActualQty('');
-    setInventoryScannedExpiry('');
-    getLocationContents(inventoryLocation.code)
-      .then((res) => {
-        const forProduct = res.items.filter((i) => i.product_id === currentProduct.product_id);
-        setInventoryScannedLots(forProduct);
-        if (forProduct.length === 1) {
-          setInventoryScannedActualQty(String(Math.round(Number(forProduct[0].available_qty))));
-          setInventoryScannedExpiry(forProduct[0].expiry_date ?? '');
-        }
-      })
-      .catch(() => setInventoryScannedLots([]))
-      .finally(() => setLoadingScannedLots(false));
-  }, [flow, inventorySubMode, inventoryStep, currentProduct?.product_id, inventoryLocation?.code]);
 
   useEffect(() => {
     if (currentProduct) {
@@ -334,7 +319,7 @@ export function KirimFormScreen() {
       flow,
     };
     if (flow === 'inventory' && inventorySubMode === 'byLocation' && inventoryLocation) {
-      scanParams.inventoryStep = inventoryStep;
+      scanParams.inventoryStep = Math.min(inventoryStep ?? 2, 2);
       scanParams.inventoryLocationId = inventoryLocation.id;
       scanParams.inventoryLocationCode = inventoryLocation.code;
     }
@@ -693,15 +678,6 @@ export function KirimFormScreen() {
               >
                 <Text style={styles.scanBtnText}>{t('inventoryViewLocationContents')}</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.scanBtnTop, styles.scanBtnSecondary, !inventoryLocation && styles.buttonDisabled]}
-                onPress={() => inventoryLocation && setInventoryStep(3)}
-                activeOpacity={0.8}
-                disabled={!inventoryLocation}
-              >
-                <Icon name="barcode-scan" size={22} color="#1a237e" />
-                <Text style={styles.scanBtnTextSecondary}>{t('inventoryAddProductScan')}</Text>
-              </TouchableOpacity>
             </View>
           </>
         )}
@@ -773,14 +749,6 @@ export function KirimFormScreen() {
                     )}
                   </TouchableOpacity>
                 )}
-                <TouchableOpacity
-                  style={[styles.scanBtnTop, styles.scanBtnSecondary]}
-                  onPress={() => setInventoryStep(3)}
-                  activeOpacity={0.8}
-                >
-                  <Icon name="barcode-scan" size={22} color="#1a237e" />
-                  <Text style={styles.scanBtnTextSecondary}>{t('inventoryAddProductScan')}</Text>
-                </TouchableOpacity>
                 </>
             )}
           </>
@@ -928,19 +896,9 @@ export function KirimFormScreen() {
           </>
         )}
 
-        {/* Inventarizatsiya byLocation step 3 (skaner orqali mahsulot qo'shish) va boshqa flow: barcode/skaner */}
-        {((flow === 'inventory' && inventorySubMode === 'byLocation' && inventoryStep === 3) || flow !== 'inventory') && (
+        {/* New / Return flow: barcode/skaner (inventarizatsiyada mahsulot qo'shish yo'q) */}
+        {flow !== 'inventory' && (
           <>
-            {flow === 'inventory' && inventorySubMode === 'byLocation' && inventoryStep === 3 && inventoryLocation && (
-              <View style={styles.inventoryLocationChosenBar}>
-                <Text style={styles.inventoryLocationChosenText}>
-                  {t('inventorySelectedLocation')}: {inventoryLocation.code}
-                </Text>
-                <TouchableOpacity onPress={() => setInventoryStep(2)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-                  <Text style={styles.inventoryLocationChangeLink}>{t('inventoryChangeLocation')}</Text>
-                </TouchableOpacity>
-              </View>
-            )}
             <View style={styles.barcodeBlockTop}>
               <Text style={styles.manualEntryLabel}>{t('kirimManualEntry')}</Text>
               <BarcodeSearchInput
@@ -975,88 +933,7 @@ export function KirimFormScreen() {
           </View>
         )}
 
-        {flow === 'inventory' && inventorySubMode === 'byLocation' && inventoryStep === 3 && inventoryLocation && currentProduct && !loadingProduct && (
-          <>
-            {loadingScannedLots ? (
-              <View style={styles.loadingRow}>
-                <ActivityIndicator size="small" color="#1a237e" />
-                <Text style={styles.loadingText}>{t('loading')}</Text>
-              </View>
-            ) : inventoryScannedLots.length === 0 ? (
-              <View style={styles.card}>
-                <Text style={styles.productName} numberOfLines={2}>{currentProduct.name}</Text>
-                <Text style={styles.muted}>{t('inventoryProductNotAtLocation')}</Text>
-                <TouchableOpacity style={styles.inventoryScanAnotherBtn} onPress={() => { setCurrentProduct(null); setInventoryScannedLots([]); }}>
-                  <Text style={styles.inventoryScanAnotherBtnText}>{t('inventoryScanAnother')}</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={styles.card}>
-                <Text style={styles.productName} numberOfLines={2}>{currentProduct.name}</Text>
-                <Text style={styles.contentsRowMeta}>
-                  {inventoryScannedLots[0].batch_no}
-                  {inventoryScannedLots[0].expiry_date ? ` • ${inventoryScannedLots[0].expiry_date}` : ''}
-                </Text>
-                <View style={styles.inventoryLocationReadOnly}>
-                  <Text style={styles.label}>{t('inventorySystemQty')}</Text>
-                  <Text style={styles.inventoryLocationCode}>{Math.round(Number(inventoryScannedLots[0].available_qty))}</Text>
-                </View>
-                <Text style={styles.label}>{t('inventoryActualQty')}</Text>
-                <TextInput
-                  style={styles.input}
-                  value={inventoryScannedActualQty}
-                  onChangeText={setInventoryScannedActualQty}
-                  placeholder={t('inventoryActualQty')}
-                  placeholderTextColor="#999"
-                  keyboardType="number-pad"
-                />
-                <Text style={styles.label}>{t('inventoryExpiryDate')}</Text>
-                <View style={styles.expiryRow}>
-                  <TouchableOpacity
-                    style={styles.expiryInputTouchable}
-                    onPress={() => setExpiryCalendarOpenScanned(true)}
-                  >
-                    <Text style={[styles.expiryInputText, !inventoryScannedExpiry && styles.expiryInputPlaceholder]}>
-                      {inventoryScannedExpiry || t('kirimExpiryPlaceholder')}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.expiryCalendarBtn}
-                    onPress={() => setExpiryCalendarOpenScanned(true)}
-                  >
-                    <Icon name="calendar" size={24} color="#1a237e" />
-                  </TouchableOpacity>
-                </View>
-                <ExpiryDatePicker
-                  visible={expiryCalendarOpenScanned}
-                  onClose={() => setExpiryCalendarOpenScanned(false)}
-                  value={inventoryScannedExpiry || null}
-                  onChange={(iso) => {
-                    setInventoryScannedExpiry(iso || '');
-                    setExpiryCalendarOpenScanned(false);
-                  }}
-                  minDate={todayISO()}
-                  locale={locale}
-                  darkMode={false}
-                />
-                <TouchableOpacity
-                  style={[styles.scanBtnTop, submittingScannedAdjust && styles.buttonDisabled]}
-                  onPress={handleSubmitScannedAdjust}
-                  disabled={submittingScannedAdjust}
-                  activeOpacity={0.8}
-                >
-                  {submittingScannedAdjust ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Text style={styles.scanBtnText}>{t('inventoryAdjustSubmit')}</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            )}
-          </>
-        )}
-
-        {!(flow === 'inventory' && (inventoryStep === 0 || (inventorySubMode === 'byLocation' && (inventoryStep === 1 || inventoryStep === 2)) || (inventorySubMode === 'byScan' && (inventoryStep === 2 || inventoryStep === 3)))) && (flow === 'inventory' ? inventorySubMode === 'byLocation' && inventoryLocation && currentProduct : currentProduct) && !loadingProduct && !(flow === 'inventory' && inventorySubMode === 'byLocation' && inventoryStep === 3 && inventoryScannedLots.length > 0) && (
+        {!(flow === 'inventory' && (inventoryStep === 0 || (inventorySubMode === 'byLocation' && (inventoryStep === 1 || inventoryStep === 2)) || (inventorySubMode === 'byScan' && (inventoryStep === 2 || inventoryStep === 3)))) && (flow !== 'inventory' && currentProduct) && !loadingProduct && (
           <View style={styles.card}>
             <Text style={styles.productName} numberOfLines={2}>{currentProduct?.name ?? ''}</Text>
             <Text style={styles.label}>{t('quantity')}</Text>
