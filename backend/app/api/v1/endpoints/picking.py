@@ -53,6 +53,8 @@ class PickingDocument(BaseModel):
     lines: List[PickingLine]
     progress: PickingProgress
     incomplete_reason: Optional[str] = None
+    assigned_to_user_id: Optional[UUID] = None
+    assigned_to_user_name: Optional[str] = None
 
 
 class PickingListItem(BaseModel):
@@ -62,6 +64,8 @@ class PickingListItem(BaseModel):
     lines_total: int
     lines_done: int
     controlled_by_user_id: Optional[UUID] = None
+    assigned_to_user_id: Optional[UUID] = None
+    assigned_to_user_name: Optional[str] = None
 
 
 class ConsolidatedLineItem(BaseModel):
@@ -212,6 +216,13 @@ def _to_picking_line(line: DocumentLineModel) -> PickingLine:
     )
 
 
+def _picker_name(doc: DocumentModel) -> Optional[str]:
+    user = getattr(doc, "assigned_to_user", None)
+    if user is None:
+        return None
+    return getattr(user, "full_name", None) or getattr(user, "username", None)
+
+
 def _to_picking_document(doc: DocumentModel) -> PickingDocument:
     lines = getattr(doc, "lines", None) or []
     return PickingDocument(
@@ -221,6 +232,8 @@ def _to_picking_document(doc: DocumentModel) -> PickingDocument:
         lines=[_to_picking_line(line) for line in lines],
         progress=_calculate_progress(lines),
         incomplete_reason=getattr(doc, "incomplete_reason", None),
+        assigned_to_user_id=doc.assigned_to_user_id,
+        assigned_to_user_name=_picker_name(doc),
     )
 
 
@@ -233,6 +246,8 @@ def _to_picking_document_with_lines(doc: DocumentModel, lines: List[DocumentLine
         lines=[_to_picking_line(line) for line in lines],
         progress=_calculate_progress(lines),
         incomplete_reason=getattr(doc, "incomplete_reason", None),
+        assigned_to_user_id=doc.assigned_to_user_id,
+        assigned_to_user_name=_picker_name(doc),
     )
 
 
@@ -246,6 +261,8 @@ def _to_picking_list_item(doc: DocumentModel) -> PickingListItem:
         lines_total=lines_total,
         lines_done=lines_done,
         controlled_by_user_id=doc.controlled_by_user_id,
+        assigned_to_user_id=doc.assigned_to_user_id,
+        assigned_to_user_name=_picker_name(doc),
     )
 
 
@@ -264,6 +281,7 @@ async def get_picking_document(
 ):
     document = (
         db.query(DocumentModel)
+        .options(selectinload(DocumentModel.assigned_to_user))
         .filter(DocumentModel.id == document_id)
         .one_or_none()
     )
@@ -302,7 +320,10 @@ async def list_picking_documents(
     ORDER_HIDDEN_STATUSES = ("completed", "packed", "shipped", "cancelled")
     query = (
         db.query(DocumentModel)
-        .options(selectinload(DocumentModel.lines))
+        .options(
+            selectinload(DocumentModel.lines),
+            selectinload(DocumentModel.assigned_to_user),
+        )
         .outerjoin(OrderModel, DocumentModel.order_id == OrderModel.id)
         .filter(
             or_(

@@ -457,6 +457,11 @@ export function PickTaskDetails() {
         <Text style={[styles.progressText, isDark && styles.progressTextDark]}>
           {t('picked')}: {(doc.progress?.picked ?? 0)} / {(doc.progress?.required ?? 0)}
         </Text>
+        {isController && (
+          <Text style={[styles.pickerNameText, isDark && styles.pickerNameTextDark]}>
+            {t('pickerNameLabel')}: {doc.assigned_to_user_name ?? '—'}
+          </Text>
+        )}
       </View>
 
       {isController && doc.incomplete_reason && (
@@ -855,6 +860,7 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontSize: 13, fontWeight: '600', color: '#1565c0' },
   progressText: { fontSize: 14, color: '#666', marginTop: 6 },
+  pickerNameText: { fontSize: 13, color: '#555', marginTop: 4 },
   scroll: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 24 },
   sectionTitle: { fontSize: 18, fontWeight: '600', color: '#111', marginBottom: 12 },
@@ -1061,6 +1067,7 @@ const styles = StyleSheet.create({
   badgeDark: { backgroundColor: '#1e3a5f' },
   badgeTextDark: { color: '#93c5fd' },
   progressTextDark: { color: '#94a3b8' },
+  pickerNameTextDark: { color: '#94a3b8' },
   incompleteReasonBannerDark: { backgroundColor: '#422006', borderBottomColor: '#78350f' },
   incompleteReasonBannerLabelDark: { color: '#fcd34d' },
   incompleteReasonBannerValueDark: { color: '#fde68a' },

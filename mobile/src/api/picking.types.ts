@@ -27,6 +27,8 @@ export interface PickingDocument {
   progress: PickingProgress;
   /** Yig'uvchi to'liq yig'maganda tanlagan sabab (controller ko'radi). */
   incomplete_reason?: string | null;
+  assigned_to_user_id?: string | null;
+  assigned_to_user_name?: string | null;
 }
 
 export interface PickingListItem {
@@ -36,6 +38,8 @@ export interface PickingListItem {
   lines_total: number;
   lines_done: number;
   controlled_by_user_id?: string | null;
+  assigned_to_user_id?: string | null;
+  assigned_to_user_name?: string | null;
 }
 
 export interface PickLineResponse {

@@ -4,6 +4,7 @@ import {
   Alert,
   FlatList,
   Modal,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -18,7 +19,7 @@ import { useLocale } from '../i18n/LocaleContext';
 import { useTheme } from '../theme/ThemeContext';
 import type { PickingListItem } from '../api/picking.types';
 import { UNAUTHORIZED_MSG } from '../api/client';
-import { getOpenTasks, getControllers, sendToController, completePickDocument, type ControllerUser } from '../api/picking';
+import { getOpenTasks, getControllers, sendToController, completePickDocument, INCOMPLETE_REASON_KEYS, type ControllerUser } from '../api/picking';
 import { useNetwork } from '../network';
 import { getCachedPickTasks, saveCachedPickTasks } from '../offline/offlineDb';
 import { ConsolidatedPickContent } from '../components/ConsolidatedPickContent';
@@ -59,7 +60,7 @@ function TaskRow({
     item.lines_total > 0 && item.lines_done >= item.lines_total;
   const showSendBtn =
     profileType === 'picker' &&
-    isFullyPicked &&
+    item.lines_done > 0 &&
     !item.controlled_by_user_id;
 
   return (
@@ -78,6 +79,11 @@ function TaskRow({
         <Text style={[styles.rowMeta, isDark && styles.rowMetaDark]}>
           {t('linesCount', { done: item.lines_done, total: item.lines_total })}
         </Text>
+        {profileType === 'controller' && (item.assigned_to_user_name != null || item.assigned_to_user_id != null) && (
+          <Text style={[styles.rowPickerName, isDark && styles.rowPickerNameDark]} numberOfLines={1}>
+            {t('pickerNameLabel')}: {item.assigned_to_user_name ?? '—'}
+          </Text>
+        )}
         <View style={[styles.badge, isDark && styles.badgeDark]}>
           <Text style={[styles.badgeText, isDark && styles.badgeTextDark]}>{statusText}</Text>
         </View>
@@ -117,6 +123,9 @@ export function PickTaskList() {
   const [showConsolidated, setShowConsolidated] = useState(false);
   const [pendingScannedBarcode, setPendingScannedBarcode] = useState<string | null>(null);
   const [selectedProductKey, setSelectedProductKey] = useState<string | null>(null);
+  const [incompleteReasonModalDoc, setIncompleteReasonModalDoc] = useState<PickingListItem | null>(null);
+  const [selectedIncompleteReasonForSend, setSelectedIncompleteReasonForSend] = useState<string | null>(null);
+  const [completingForController, setCompletingForController] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -190,6 +199,35 @@ export function PickTaskList() {
     },
     [isOnline, t]
   );
+
+  const handleSendToControllerPress = useCallback(
+    (doc: PickingListItem) => {
+      const isFullyPicked = doc.lines_total > 0 && doc.lines_done >= doc.lines_total;
+      if (isFullyPicked) {
+        openControllerModal(doc);
+      } else {
+        setSelectedIncompleteReasonForSend(null);
+        setIncompleteReasonModalDoc(doc);
+      }
+    },
+    [openControllerModal]
+  );
+
+  const confirmIncompleteReasonForSend = useCallback(async () => {
+    if (!incompleteReasonModalDoc || !selectedIncompleteReasonForSend || !isOnline) return;
+    setCompletingForController(true);
+    try {
+      await completePickDocument(incompleteReasonModalDoc.id, { incomplete_reason: selectedIncompleteReasonForSend });
+      const doc = incompleteReasonModalDoc;
+      setIncompleteReasonModalDoc(null);
+      setSelectedIncompleteReasonForSend(null);
+      openControllerModal(doc);
+    } catch (e) {
+      Alert.alert(t('error'), e instanceof Error ? e.message : t('error'));
+    } finally {
+      setCompletingForController(false);
+    }
+  }, [incompleteReasonModalDoc, selectedIncompleteReasonForSend, isOnline, openControllerModal, t]);
 
   const sendToControllerConfirm = useCallback(
     async (controllerId: string) => {
@@ -289,7 +327,7 @@ export function PickTaskList() {
               onPress={() =>
                 navigation.navigate('PickTaskDetails', { taskId: item.id, profileType })
               }
-              onSendToController={profileType === 'picker' ? openControllerModal : undefined}
+              onSendToController={profileType === 'picker' ? handleSendToControllerPress : undefined}
             />
           )}
           contentContainerStyle={styles.listContent}
@@ -335,6 +373,61 @@ export function PickTaskList() {
           </TouchableOpacity>
         </View>
       )}
+
+      <Modal
+        visible={!!incompleteReasonModalDoc}
+        transparent
+        animationType="slide"
+        onRequestClose={() => { if (!completingForController) setIncompleteReasonModalDoc(null); }}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => { if (!completingForController) setIncompleteReasonModalDoc(null); }}
+        >
+          <View style={[styles.modalContent, styles.incompleteReasonModal, isDark && styles.modalContentDark]} onStartShouldSetResponder={() => true}>
+            <Text style={[styles.incompleteReasonTitle, isDark && styles.incompleteReasonTitleDark]}>{t('incompleteReasonTitle')}</Text>
+            <Text style={[styles.incompleteReasonHint, isDark && styles.incompleteReasonHintDark]}>{t('incompleteReasonSelect')}</Text>
+            <ScrollView style={styles.incompleteReasonList} nestedScrollEnabled>
+              {INCOMPLETE_REASON_KEYS.map((key) => (
+                <TouchableOpacity
+                  key={key}
+                  style={[
+                    styles.incompleteReasonRow,
+                    selectedIncompleteReasonForSend === key && styles.incompleteReasonRowSelected,
+                    isDark && styles.incompleteReasonRowDark,
+                    selectedIncompleteReasonForSend === key && isDark && styles.incompleteReasonRowSelectedDark,
+                  ]}
+                  onPress={() => setSelectedIncompleteReasonForSend(key)}
+                  activeOpacity={0.7}
+                  disabled={completingForController}
+                >
+                  <Icon
+                    name={selectedIncompleteReasonForSend === key ? 'radiobox-marked' : 'radiobox-blank'}
+                    size={22}
+                    color={selectedIncompleteReasonForSend === key ? (isDark ? '#93c5fd' : '#1976d2') : (isDark ? '#94a3b8' : '#666')}
+                  />
+                  <Text style={[styles.incompleteReasonRowText, isDark && styles.incompleteReasonRowTextDark]}>{t(`reason_${key}`)}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <View style={styles.incompleteReasonActions}>
+              <TouchableOpacity
+                style={[styles.incompleteReasonConfirm, (!selectedIncompleteReasonForSend || completingForController) && styles.incompleteReasonConfirmDisabled]}
+                onPress={confirmIncompleteReasonForSend}
+                disabled={!selectedIncompleteReasonForSend || completingForController}
+              >
+                <Text style={styles.incompleteReasonConfirmText}>
+                  {completingForController ? '…' : t('incompleteConfirmComplete')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.incompleteReasonCancel} onPress={() => setIncompleteReasonModalDoc(null)} disabled={completingForController}>
+                <Text style={[styles.incompleteReasonCancelText, isDark && styles.incompleteReasonCancelTextDark]}>{t('cancel')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       <Modal
         visible={!!controllerModalDoc}
@@ -512,6 +605,7 @@ const styles = StyleSheet.create({
   sentLabel: { fontSize: 12, color: '#2e7d32', marginTop: 6 },
   rowRef: { fontSize: 18, fontWeight: '600', color: '#111' },
   rowMeta: { fontSize: 14, color: '#666', marginTop: 4 },
+  rowPickerName: { fontSize: 12, color: '#555', marginTop: 2 },
   badge: {
     alignSelf: 'flex-start',
     backgroundColor: '#e3f2fd',
@@ -549,6 +643,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalCancelText: { fontSize: 16, color: '#1976d2', fontWeight: '600' },
+  incompleteReasonModal: { maxHeight: '80%' },
+  incompleteReasonTitle: { fontSize: 18, fontWeight: '700', color: '#111', marginBottom: 8 },
+  incompleteReasonHint: { fontSize: 14, color: '#666', marginBottom: 12 },
+  incompleteReasonList: { maxHeight: 280, marginBottom: 16 },
+  incompleteReasonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    marginBottom: 6,
+    backgroundColor: '#f5f5f5',
+  },
+  incompleteReasonRowSelected: { backgroundColor: '#e3f2fd' },
+  incompleteReasonRowText: { fontSize: 16, color: '#111', flex: 1, marginLeft: 10 },
+  incompleteReasonActions: { gap: 10 },
+  incompleteReasonConfirm: {
+    backgroundColor: '#1976d2',
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  incompleteReasonConfirmDisabled: { opacity: 0.5 },
+  incompleteReasonConfirmText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  incompleteReasonCancel: { paddingVertical: 12, alignItems: 'center' },
+  incompleteReasonCancelText: { color: '#666', fontSize: 16 },
   // Dark
   containerDark: { backgroundColor: '#0f172a' },
   headerDark: { backgroundColor: '#1e293b', borderBottomColor: '#334155' },
@@ -561,6 +681,7 @@ const styles = StyleSheet.create({
   rowFullyPickedDark: { backgroundColor: '#14532d', borderColor: '#166534' },
   rowRefDark: { color: '#f1f5f9' },
   rowMetaDark: { color: '#94a3b8' },
+  rowPickerNameDark: { color: '#94a3b8' },
   badgeDark: { backgroundColor: '#1e3a5f' },
   badgeTextDark: { color: '#93c5fd' },
   sentLabelDark: { color: '#86efac' },
@@ -574,4 +695,10 @@ const styles = StyleSheet.create({
   controllerRowDark: { borderBottomColor: '#334155' },
   controllerNameDark: { color: '#f1f5f9' },
   modalCancelTextDark: { color: '#93c5fd' },
+  incompleteReasonTitleDark: { color: '#f1f5f9' },
+  incompleteReasonHintDark: { color: '#94a3b8' },
+  incompleteReasonRowDark: { backgroundColor: '#334155' },
+  incompleteReasonRowSelectedDark: { backgroundColor: '#1e3a5f' },
+  incompleteReasonRowTextDark: { color: '#f1f5f9' },
+  incompleteReasonCancelTextDark: { color: '#93c5fd' },
 });
