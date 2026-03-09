@@ -27,8 +27,8 @@ STATUS_PARTIAL = "PARTIAL"
 
 
 def _get_orders_date_range() -> Tuple[date, date]:
-    """Get date range for order sync (last N days). Default 1 — SmartUp timeout kamayishi uchun."""
-    days = int(os.getenv("SYNC_ORDERS_DAYS_BACK", "1"))
+    """Get date range for order sync (last N days). Default 7 — oxirgi 7 kun o'zgarishlari."""
+    days = int(os.getenv("SYNC_ORDERS_DAYS_BACK", "7"))
     days = max(1, min(days, 90))
     end_date = date.today()
     start_date = end_date - timedelta(days=days)
@@ -77,24 +77,22 @@ def sync_products() -> Tuple[int, str | None, list]:
 def sync_orders() -> Tuple[int, str | None, list]:
     """
     Fetch orders from SmartUp API and upsert into orders table.
-    Kunma-kun so'rov (har kuni alohida) — SmartUp tezroq javob beradi, timeout kam.
+    Oxirgi N kun (SYNC_ORDERS_DAYS_BACK) o'zgartirilgan buyurtmalar — modified_on orqali bitta so'rov.
     """
     try:
         start_date, end_date = _get_orders_date_range()
         client = SmartupClient()
-        all_items: list = []
-        today = end_date
-        current = start_date
-        while current <= today:
-            day_str = current.strftime("%d.%m.%Y")
-            response = client.export_orders(
-                begin_deal_date=day_str,
-                end_deal_date=day_str,
-                filial_code=None,
-            )
-            all_items.extend(response.items)
-            logger.info("Orders sync: %s -> %d buyurtma", day_str, len(response.items))
-            current += timedelta(days=1)
+        begin_str = start_date.strftime("%d.%m.%Y")
+        end_str = end_date.strftime("%d.%m.%Y")
+        response = client.export_orders(
+            begin_deal_date=begin_str,
+            end_deal_date=end_str,
+            filial_code=None,
+            begin_modified_on=begin_str,
+            end_modified_on=end_str,
+        )
+        all_items = response.items
+        logger.info("Orders sync: %s..%s -> %d buyurtma (modified_on)", begin_str, end_str, len(all_items))
 
         db = SessionLocal()
         try:
