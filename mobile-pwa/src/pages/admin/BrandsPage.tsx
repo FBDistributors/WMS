@@ -143,33 +143,26 @@ export function BrandsPage() {
       }
     >
       <Card className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-sm text-slate-500 dark:text-slate-400">
-              {t('brands:subtitle')}
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="text-sm text-slate-600 dark:text-slate-300">
-              {t('brands:search')}
-              <input
-                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
-            </label>
-            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-              <input
-                type="checkbox"
-                checked={includeInactive}
-                onChange={(event) => setIncludeInactive(event.target.checked)}
-              />
-              {t('brands:show_inactive')}
-            </label>
-            <Button variant="secondary" onClick={load}>
-              {t('common:buttons.refresh')}
-            </Button>
-          </div>
+        <div className="flex flex-nowrap items-end gap-3">
+          <label className="text-sm text-slate-600 dark:text-slate-300">
+            {t('brands:search')}
+            <input
+              className="mt-1 w-full min-w-[180px] rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </label>
+          <label className="flex shrink-0 items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+            <input
+              type="checkbox"
+              checked={includeInactive}
+              onChange={(event) => setIncludeInactive(event.target.checked)}
+            />
+            {t('brands:show_inactive')}
+          </label>
+          <Button variant="secondary" onClick={load} className="shrink-0">
+            {t('common:buttons.refresh')}
+          </Button>
         </div>
         {unknownCodes.length > 0 && canManage ? (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10">
