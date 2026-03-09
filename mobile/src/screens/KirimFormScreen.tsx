@@ -123,6 +123,7 @@ export function KirimFormScreen() {
       setProductError('Mahsulot tanlanmadi');
       return;
     }
+    console.warn('[KirimCrash] loadProductById start', trimmed);
     setLoadingProduct(true);
     setProductError(null);
     setCurrentProduct(null);
@@ -135,12 +136,14 @@ export function KirimFormScreen() {
         res.product_id != null &&
         res.name != null;
       if (valid) {
+        console.warn('[KirimCrash] loadProductById success', res.product_id, 'locations:', res.locations?.length ?? 0);
         setCurrentProduct({ ...res, locations: res.locations ?? [] });
       } else {
         setProductError('Server javobi noto\u2018g\u2018ri');
         setCurrentProduct(null);
       }
     } catch (e) {
+      console.warn('[KirimCrash] loadProductById catch', e);
       let msg: string;
       try {
         msg = e instanceof Error ? e.message : t('invLoadError');
@@ -161,6 +164,7 @@ export function KirimFormScreen() {
         setProductError('Mahsulot tanlanmadi');
         return;
       }
+      console.warn('[KirimCrash] handleSelectProductFromBarcode', productId);
       loadProductById(productId);
     },
     [loadProductById]
@@ -933,7 +937,10 @@ export function KirimFormScreen() {
           </View>
         )}
 
-        {!(flow === 'inventory' && (inventoryStep === 0 || (inventorySubMode === 'byLocation' && (inventoryStep === 1 || inventoryStep === 2)) || (inventorySubMode === 'byScan' && (inventoryStep === 2 || inventoryStep === 3)))) && (flow !== 'inventory' && currentProduct) && !loadingProduct && (
+        {!(flow === 'inventory' && (inventoryStep === 0 || (inventorySubMode === 'byLocation' && (inventoryStep === 1 || inventoryStep === 2)) || (inventorySubMode === 'byScan' && (inventoryStep === 2 || inventoryStep === 3)))) && (flow !== 'inventory' && currentProduct) && !loadingProduct && (() => {
+          console.warn('[KirimCrash] render product card', currentProduct?.product_id, 'locale', locale);
+          return true;
+        })() && (
           <View style={styles.card}>
             <Text style={styles.productName} numberOfLines={2}>{currentProduct?.name ?? ''}</Text>
             <Text style={styles.label}>{t('quantity')}</Text>

@@ -17,6 +17,7 @@ import {
   expiryPickerLabels,
   monthNamesLong,
   monthNamesShort,
+  weekdayLetters,
 } from './localeLabels';
 import type { ExpiryDatePickerTheme } from './theme';
 import { expiryPickerThemes } from './theme';

@@ -75,6 +75,7 @@ export function BarcodeSearchInput({
       if (rawId == null || rawId === '') return;
       const productId = String(rawId).trim();
       if (!productId) return;
+      console.warn('[KirimCrash] BarcodeSearchInput select', productId);
       onSelectProduct(productId);
       onChangeText('');
       setShowDropdown(false);
