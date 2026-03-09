@@ -135,7 +135,7 @@ export function KirimFormScreen() {
         res.product_id != null &&
         res.name != null;
       if (valid) {
-        setCurrentProduct(res);
+        setCurrentProduct({ ...res, locations: res.locations ?? [] });
       } else {
         setProductError('Server javobi noto\u2018g\u2018ri');
         setCurrentProduct(null);

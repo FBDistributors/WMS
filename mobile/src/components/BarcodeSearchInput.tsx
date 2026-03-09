@@ -121,9 +121,9 @@ export function BarcodeSearchInput({
             showsVerticalScrollIndicator={true}
             bounces={false}
           >
-            {searchResults.map((item) => (
+            {searchResults.map((item, index) => (
               <TouchableOpacity
-                key={item.product_id}
+                key={item.product_id ?? item.code ?? `row-${index}`}
                 style={styles.dropdownItem}
                 onPress={() => handleSelect(item)}
                 activeOpacity={0.7}

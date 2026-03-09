@@ -374,6 +374,6 @@ export function formatExpiryDisplay(isoDate: string | null, locale: ExpiryPicker
   const year = parseInt(yStr!, 10);
   const month = parseInt(mStr!, 10);
   if (month < 1 || month > 12) return isoDate;
-  const names = monthNamesLong[locale];
+  const names = monthNamesLong[locale] ?? monthNamesLong['uz'];
   return `${names[month - 1]} ${year}`;
 }
