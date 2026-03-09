@@ -73,6 +73,7 @@ export function ExpiryDatePicker({
   const [step, setStep] = useState<1 | 2>(1);
   const [pickerYear, setPickerYear] = useState<number | null>(null);
   const [pickerMonth, setPickerMonth] = useState<number | null>(null);
+  const [pendingDay, setPendingDay] = useState<{ year: number; month: number; day: number } | null>(null);
 
   const allYears = useMemo(
     () => Array.from({ length: MAX_YEAR - MIN_YEAR + 1 }, (_, i) => MIN_YEAR + i),
