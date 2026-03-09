@@ -118,15 +118,36 @@ export function KirimFormScreen() {
   const title = flow === 'new' ? t('kirimNewProducts') : flow === 'inventory' ? t('kirimInventory') : t('kirimCustomerReturns');
 
   const loadProductById = useCallback(async (productId: string) => {
+    const trimmed = (productId ?? '').trim();
+    if (!trimmed) {
+      setProductError('Mahsulot tanlanmadi');
+      return;
+    }
     setLoadingProduct(true);
     setProductError(null);
     setCurrentProduct(null);
     setCurrentQty('');
     try {
-      const res = await getPickerProductDetail(productId);
-      setCurrentProduct(res);
+      const res = await getPickerProductDetail(trimmed);
+      const valid =
+        res != null &&
+        typeof res === 'object' &&
+        res.product_id != null &&
+        res.name != null;
+      if (valid) {
+        setCurrentProduct(res);
+      } else {
+        setProductError('Server javobi noto\u2018g\u2018ri');
+        setCurrentProduct(null);
+      }
     } catch (e) {
-      setProductError(e instanceof Error ? e.message : t('invLoadError'));
+      let msg: string;
+      try {
+        msg = e instanceof Error ? e.message : t('invLoadError');
+      } catch {
+        msg = 'Mahsulot yuklanmadi';
+      }
+      setProductError(msg);
     } finally {
       setLoadingProduct(false);
     }
@@ -136,6 +157,10 @@ export function KirimFormScreen() {
 
   const handleSelectProductFromBarcode = useCallback(
     (productId: string) => {
+      if (productId == null || String(productId).trim() === '') {
+        setProductError('Mahsulot tanlanmadi');
+        return;
+      }
       loadProductById(productId);
     },
     [loadProductById]
@@ -434,6 +459,7 @@ export function KirimFormScreen() {
   const addLine = useCallback(() => {
     const location = flow === 'inventory' ? inventoryLocation : selectedLocation;
     if (!currentProduct || !location) return;
+    if (!currentProduct?.product_id || !currentProduct?.name) return;
     const qty = Math.floor(Number(currentQty) || 0);
     // Kirim: dono qo‘shiladi, mavjud zaxoraga bog‘lamaymiz; faqat 1–99999 oralig‘ida
     const maxQty = 99999;
@@ -1032,7 +1058,7 @@ export function KirimFormScreen() {
 
         {!(flow === 'inventory' && (inventoryStep === 0 || (inventorySubMode === 'byLocation' && (inventoryStep === 1 || inventoryStep === 2)) || (inventorySubMode === 'byScan' && (inventoryStep === 2 || inventoryStep === 3)))) && (flow === 'inventory' ? inventorySubMode === 'byLocation' && inventoryLocation && currentProduct : currentProduct) && !loadingProduct && !(flow === 'inventory' && inventorySubMode === 'byLocation' && inventoryStep === 3 && inventoryScannedLots.length > 0) && (
           <View style={styles.card}>
-            <Text style={styles.productName} numberOfLines={2}>{currentProduct.name}</Text>
+            <Text style={styles.productName} numberOfLines={2}>{currentProduct?.name ?? ''}</Text>
             <Text style={styles.label}>{t('quantity')}</Text>
             <TextInput
               style={styles.input}

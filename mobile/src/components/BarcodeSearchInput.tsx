@@ -71,7 +71,11 @@ export function BarcodeSearchInput({
 
   const handleSelect = useCallback(
     (item: PickerInventoryItem) => {
-      onSelectProduct(item.product_id);
+      const rawId = item?.product_id;
+      if (rawId == null || rawId === '') return;
+      const productId = String(rawId).trim();
+      if (!productId) return;
+      onSelectProduct(productId);
       onChangeText('');
       setShowDropdown(false);
       setSearchResults([]);

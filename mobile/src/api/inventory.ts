@@ -81,6 +81,13 @@ export async function getPickerProductDetail(
   const { data } = await apiClient.get<PickerProductDetailResponse>(
     `${INV}/picker/${productId}`
   );
+  if (
+    data == null ||
+    typeof data !== 'object' ||
+    data.product_id == null
+  ) {
+    throw new Error('Server javobi noto\u2018g\u2018ri');
+  }
   return data;
 }
 
