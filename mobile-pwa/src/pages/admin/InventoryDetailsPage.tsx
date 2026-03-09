@@ -111,15 +111,7 @@ export function InventoryDetailsPage() {
   }, [error, isLoading, items, load, t])
 
   return (
-    <AdminLayout
-      title={t('inventory:details_title')}
-      actionSlot={
-        <Button variant="ghost" onClick={() => navigate('/admin/inventory')}>
-          <ArrowLeft size={16} />
-          {t('inventory:back_to_summary')}
-        </Button>
-      }
-    >
+    <AdminLayout title={t('inventory:details_title')}>
       <Card className="mb-4 space-y-3">
         <div className="grid gap-3 md:grid-cols-3">
           <label className="text-sm text-slate-600 dark:text-slate-300">
@@ -162,7 +154,15 @@ export function InventoryDetailsPage() {
           </Button>
         </div>
       </Card>
-      <Card className="space-y-4">{content}</Card>
+      <Card className="space-y-4">
+        <div className="flex justify-start">
+          <Button variant="ghost" onClick={() => navigate('/admin/inventory')}>
+            <ArrowLeft size={16} />
+            {t('inventory:back_to_summary')}
+          </Button>
+        </div>
+        {content}
+      </Card>
     </AdminLayout>
   )
 }
