@@ -69,11 +69,6 @@ export function KamomatlarPage() {
   const pageStart = offset + 1
   const pageEnd = offset + items.length
 
-  const handleApply = () => {
-    setOffset(0)
-    void load()
-  }
-
   const content = () => {
     if (isLoading) {
       return <TableSkeleton rows={6} columns={7} />
