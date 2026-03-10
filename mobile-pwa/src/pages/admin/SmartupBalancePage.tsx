@@ -11,7 +11,7 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { TableSkeleton } from '../../components/ui/TableSkeleton'
 import { getSmartupBalance } from '../../services/inventoryApi'
 
-const HIDDEN_COLUMNS = new Set(['inventory_kind', 'product_id', 'batch_number', 'groups'])
+const HIDDEN_COLUMNS = new Set(['inventory_kind', 'product_id', 'batch_number', 'groups', 'warehouse_code', 'date'])
 const NUMBER_COLUMNS = new Set(['quantity', 'input_price'])
 
 /** API javobidan jadval uchun qatorlar ro'yxatini ajratib oladi. */
@@ -65,6 +65,10 @@ export function SmartupBalancePage() {
   const { t } = useTranslation(['inventory', 'common'])
   const [searchParams, setSearchParams] = useSearchParams()
   const searchQuery = searchParams.get('q') ?? ''
+  const todayLabel = useMemo(
+    () => new Date().toLocaleDateString('ru-RU'),
+    []
+  )
   const [data, setData] = useState<unknown>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -194,7 +198,11 @@ export function SmartupBalancePage() {
     <AdminLayout titleSlot={<InventoryHeaderTabs />}>
       <Card className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-1 flex-wrap items-center gap-2">
+          <div className="flex flex-col gap-1 text-sm text-slate-800 dark:text-slate-100">
+            <span className="font-semibold">Основной склад - НОВЫЙ</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">{todayLabel}</span>
+          </div>
+          <div className="flex flex-1 flex-wrap items-center gap-2 justify-end">
             <input
               type="search"
               value={searchQuery}
