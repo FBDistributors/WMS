@@ -203,6 +203,8 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         const query: Record<string, string | number | boolean> = {
           begin_created_on: beginStr,
           end_created_on: endStr,
+          begin_modified_on: beginStr,
+          end_modified_on: endStr,
           limit: MOVEMENT_PAGE_SIZE,
           offset: page * MOVEMENT_PAGE_SIZE,
         }
@@ -284,21 +286,38 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     }
   }, [filterPanelOpen, brandFilter, dateFrom, dateTo])
 
-  // Avtoyangilash: orqada yangilash — jadval o‘chirilmasdan, chaqnashsiz
+  // Avto sync: har 5 daqiqada, sahifa aktiv — diller: load(..., true); buyurtmalar: sync 7 kun + load
   useEffect(() => {
     if (typeof document === 'undefined') return
+    const runAutoSync = () => {
+      if (document.visibilityState !== 'visible') return
+      if (orderSource === 'diller') {
+        void load(true, undefined, true)
+        return
+      }
+      if (orderSource && orderSource !== 'diller') {
+        const today = new Date()
+        const endDeal = today.toISOString().slice(0, 10)
+        const beginDeal = new Date(today)
+        beginDeal.setDate(beginDeal.getDate() - 7)
+        const beginDealStr = beginDeal.toISOString().slice(0, 10)
+        syncSmartupOrders({ order_source: orderSource, begin_deal_date: beginDealStr, end_deal_date: endDeal })
+          .then(() => void load(true))
+          .catch(() => {})
+        return
+      }
+      void load(true)
+    }
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') void load(true)
+      runAutoSync()
     }
     document.addEventListener('visibilitychange', handleVisibility)
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') void load(true)
-    }, 60_000)
+    const interval = setInterval(runAutoSync, 300_000)
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility)
       clearInterval(interval)
     }
-  }, [load])
+  }, [load, orderSource])
 
 
   const handleSync = async () => {
@@ -310,9 +329,14 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         await load(false, undefined, true)
         return
       }
+      const today = new Date()
+      const endDeal = today.toISOString().slice(0, 10)
+      const beginDeal = new Date(today)
+      beginDeal.setDate(beginDeal.getDate() - 7)
+      const beginDealStr = beginDeal.toISOString().slice(0, 10)
       const payload: { order_source?: string; begin_deal_date?: string; end_deal_date?: string } = orderSource
-        ? { order_source: orderSource }
-        : {}
+        ? { order_source: orderSource, begin_deal_date: beginDealStr, end_deal_date: endDeal }
+        : { begin_deal_date: beginDealStr, end_deal_date: endDeal }
       const result = await syncSmartupOrders(payload)
       setSyncResult(result)
       await load()
