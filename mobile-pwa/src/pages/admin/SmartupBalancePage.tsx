@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Filter, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -8,22 +7,12 @@ import { InventoryHeaderTabs } from '../../admin/components/inventory/InventoryH
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
-import { DateInput } from '../../components/DateInput'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { TableSkeleton } from '../../components/ui/TableSkeleton'
 import { getSmartupBalance } from '../../services/inventoryApi'
 
 const HIDDEN_COLUMNS = new Set(['inventory_kind', 'product_id', 'batch_number', 'groups'])
 const NUMBER_COLUMNS = new Set(['quantity', 'input_price'])
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10)
-}
-function daysAgoISO(days: number) {
-  const d = new Date()
-  d.setDate(d.getDate() - days)
-  return d.toISOString().slice(0, 10)
-}
 
 /** API javobidan jadval uchun qatorlar ro'yxatini ajratib oladi. */
 function normalizeToRows(data: unknown): Record<string, unknown>[] {
@@ -54,11 +43,12 @@ function getColumns(rows: Record<string, unknown>[]): string[] {
   )
 }
 
+/** Butun son, minglik ajratuvchi vergul (,) */
 function formatNumber(value: unknown): string {
   if (value == null) return '—'
   const n = typeof value === 'number' ? value : Number(value)
   if (Number.isNaN(n)) return String(value)
-  return new Intl.NumberFormat('uz-UZ', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(n)
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Math.round(n))
 }
 
 function getCellDisplay(col: string, value: unknown): string {
@@ -72,19 +62,13 @@ const INITIAL_PAGE_SIZE = 50
 const LOAD_MORE_SIZE = 50
 
 export function SmartupBalancePage() {
-  const { t } = useTranslation(['inventory', 'common', 'orders'])
+  const { t } = useTranslation(['inventory', 'common'])
   const [searchParams, setSearchParams] = useSearchParams()
   const searchQuery = searchParams.get('q') ?? ''
-  const dateFrom = searchParams.get('date_from') ?? ''
-  const dateTo = searchParams.get('date_to') ?? ''
   const [data, setData] = useState<unknown>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [visibleCount, setVisibleCount] = useState(INITIAL_PAGE_SIZE)
-  const [filterPanelOpen, setFilterPanelOpen] = useState(false)
-  const [filterDateFrom, setFilterDateFrom] = useState(dateFrom || daysAgoISO(30))
-  const [filterDateTo, setFilterDateTo] = useState(dateTo || todayISO())
-  const filterPanelRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async (forceRefresh = false) => {
     setIsLoading(true)
@@ -106,42 +90,17 @@ export function SmartupBalancePage() {
 
   useEffect(() => {
     setVisibleCount(INITIAL_PAGE_SIZE)
-  }, [searchQuery, dateFrom, dateTo])
+  }, [searchQuery])
 
   const rawRows = useMemo(() => normalizeToRows(data), [data])
 
-  function rowDateToYYYYMMDD(cell: unknown): string | null {
-    if (cell == null) return null
-    const str = String(cell).trim()
-    if (str.length >= 10 && str[4] === '-' && str[7] === '-') return str.slice(0, 10)
-    const d = new Date(str)
-    if (Number.isNaN(d.getTime())) return null
-    return d.toISOString().slice(0, 10)
-  }
-
   const filteredRows = useMemo(() => {
-    let list = rawRows
     const q = searchQuery.trim().toLowerCase()
-    if (q) {
-      list = list.filter((row) =>
-        Object.values(row).some((v) => v != null && String(v).toLowerCase().includes(q))
-      )
-    }
-    // Sana filtri faqat jadval uchun (yuklangan qatorlarni filtrlash), SmartUP API ga yuborilmaydi
-    const fromStr = dateFrom.trim()
-    const toStr = dateTo.trim()
-    if (fromStr && toStr) {
-      const dateKey = Object.keys(list[0] ?? {}).find((k) => k.toLowerCase() === 'date')
-      if (dateKey) {
-        list = list.filter((row) => {
-          const ymd = rowDateToYYYYMMDD(row[dateKey])
-          if (ymd == null) return true
-          return ymd >= fromStr && ymd <= toStr
-        })
-      }
-    }
-    return list
-  }, [rawRows, searchQuery, dateFrom, dateTo])
+    if (!q) return rawRows
+    return rawRows.filter((row) =>
+      Object.values(row).some((v) => v != null && String(v).toLowerCase().includes(q))
+    )
+  }, [rawRows, searchQuery])
 
   const allRows = filteredRows
   const rows = useMemo(
@@ -154,13 +113,6 @@ export function SmartupBalancePage() {
   }, [allRows.length])
 
   const columns = useMemo(() => getColumns(rawRows.length > 0 ? rawRows : rows), [rawRows, rows])
-
-  useEffect(() => {
-    if (filterPanelOpen) {
-      setFilterDateFrom(dateFrom)
-      setFilterDateTo(dateTo)
-    }
-  }, [filterPanelOpen, dateFrom, dateTo])
 
   const content = useMemo(() => {
     if (isLoading) {
@@ -199,7 +151,10 @@ export function SmartupBalancePage() {
             <thead className="text-xs uppercase text-slate-500">
               <tr className="border-b border-slate-200 dark:border-slate-800">
                 {columns.map((col) => (
-                  <th key={col} className="whitespace-nowrap px-3 py-3 text-left">
+                  <th
+                    key={col}
+                    className={`whitespace-nowrap px-3 py-3 ${NUMBER_COLUMNS.has(col.toLowerCase()) ? 'text-right tabular-nums' : 'text-left'}`}
+                  >
                     {col}
                   </th>
                 ))}
@@ -211,8 +166,11 @@ export function SmartupBalancePage() {
                   key={idx}
                   className="border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/40"
                 >
-{columns.map((col) => (
-                  <td key={col} className="whitespace-nowrap px-3 py-3 text-slate-700 dark:text-slate-200">
+                  {columns.map((col) => (
+                    <td
+                      key={col}
+                      className={`whitespace-nowrap px-3 py-3 text-slate-700 dark:text-slate-200 ${NUMBER_COLUMNS.has(col.toLowerCase()) ? 'text-right tabular-nums' : ''}`}
+                    >
                       {getCellDisplay(col, row[col])}
                     </td>
                   ))}
@@ -254,101 +212,6 @@ export function SmartupBalancePage() {
               className="max-w-xs rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
               aria-label={t('inventory:smartup_balance_search_placeholder')}
             />
-            <div className="relative shrink-0" ref={filterPanelRef}>
-              <Button
-                variant="outline"
-                onClick={() => setFilterPanelOpen((o) => !o)}
-                className="gap-2"
-                disabled={rawRows.length === 0}
-                aria-label={t('orders:filters.filter_btn')}
-                aria-expanded={filterPanelOpen}
-                title={rawRows.length === 0 ? t('inventory:smartup_balance_filter_after_load') : undefined}
-              >
-                <Filter size={18} />
-                {t('orders:filters.filter_btn')}
-              </Button>
-              {filterPanelOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    aria-hidden
-                    onClick={() => setFilterPanelOpen(false)}
-                  />
-                  <div className="absolute left-0 top-full z-50 mt-2 w-full min-w-[280px] max-w-sm rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900">
-                    <div className="mb-3 flex items-center justify-between">
-                      <span className="font-semibold text-slate-900 dark:text-slate-100">
-                        {t('orders:filters.filter_panel_title')}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setFilterPanelOpen(false)}
-                        className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 dark:hover:text-slate-400 dark:hover:bg-slate-800"
-                        aria-label={t('common:close')}
-                      >
-                        <X size={18} />
-                      </button>
-                    </div>
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-2">
-                        <label className="block text-sm text-slate-600 dark:text-slate-400">
-                          {t('orders:filters.date_from')}
-                          <DateInput
-                            value={filterDateFrom}
-                            onChange={setFilterDateFrom}
-                            className="mt-1 w-full"
-                            aria-label={t('orders:filters.date_from')}
-                          />
-                        </label>
-                        <label className="block text-sm text-slate-600 dark:text-slate-400">
-                          {t('orders:filters.date_to')}
-                          <DateInput
-                            value={filterDateTo}
-                            onChange={setFilterDateTo}
-                            className="mt-1 w-full"
-                            aria-label={t('orders:filters.date_to')}
-                          />
-                        </label>
-                      </div>
-                    </div>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <Button
-                        variant="secondary"
-                        onClick={() => {
-                          setSearchParams((prev) => {
-                            const next = new URLSearchParams(prev)
-                            next.delete('date_from')
-                            next.delete('date_to')
-                            next.delete('offset')
-                            return next
-                          })
-                          setFilterPanelOpen(false)
-                        }}
-                      >
-                        {t('orders:filters.filter_clear')}
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          setSearchParams((prev) => {
-                            const next = new URLSearchParams(prev)
-                            const df = filterDateFrom.trim()
-                            const dt = filterDateTo.trim()
-                            if (df) next.set('date_from', df)
-                            else next.delete('date_from')
-                            if (dt) next.set('date_to', dt)
-                            else next.delete('date_to')
-                            next.delete('offset')
-                            return next
-                          })
-                          setFilterPanelOpen(false)
-                        }}
-                      >
-                        {t('orders:filters.filter_apply')}
-                      </Button>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
           </div>
           <div className="flex items-center gap-2">
             <Link to="/admin/inventory">
