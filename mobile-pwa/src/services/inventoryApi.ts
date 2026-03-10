@@ -259,7 +259,11 @@ export async function bulkOpeningBalance(payload: BulkOpeningBalancePayload) {
   })
 }
 
-/** SmartUP balance$export — faqat bugungi kun ma'lumoti (struktura API javobiga qarab). */
-export async function getSmartupBalance(signal?: AbortSignal) {
-  return fetchJSON<unknown>('/api/v1/inventory/smartup-balance', { signal })
+/** SmartUP balance$export — cache yoki refresh=1 da SmartUP dan yangilash. */
+export async function getSmartupBalance(options?: { signal?: AbortSignal; refresh?: boolean }) {
+  const refresh = options?.refresh === true
+  return fetchJSON<unknown>('/api/v1/inventory/smartup-balance', {
+    signal: options?.signal,
+    query: refresh ? { refresh: '1' } : undefined,
+  })
 }

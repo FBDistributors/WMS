@@ -40,11 +40,11 @@ export function SmartupBalancePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (forceRefresh = false) => {
     setIsLoading(true)
     setError(null)
     try {
-      const res = await getSmartupBalance()
+      const res = await getSmartupBalance({ refresh: forceRefresh })
       setData(res)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('inventory:load_failed'))
@@ -54,7 +54,7 @@ export function SmartupBalancePage() {
   }, [t])
 
   useEffect(() => {
-    void load()
+    void load(false)
   }, [load])
 
   const rows = useMemo(() => normalizeToRows(data), [data])
@@ -69,17 +69,17 @@ export function SmartupBalancePage() {
         <EmptyState
           title={error}
           actionLabel={t('common:buttons.retry')}
-          onAction={load}
+          onAction={() => load(true)}
         />
       )
     }
     if (rows.length === 0) {
       return (
         <EmptyState
-          title={t('inventory:empty')}
-          description={t('inventory:smartup_balance_table_hint')}
-          actionLabel={t('common:buttons.refresh')}
-          onAction={load}
+          title={t('inventory:smartup_balance_empty_title')}
+          description={t('inventory:smartup_balance_empty_desc')}
+          actionLabel={t('inventory:smartup_balance_load_btn')}
+          onAction={() => load(true)}
         />
       )
     }
@@ -125,7 +125,7 @@ export function SmartupBalancePage() {
             <Link to="/admin/inventory">
               <Button variant="secondary">{t('inventory:back_to_summary')}</Button>
             </Link>
-            <Button variant="secondary" onClick={load} disabled={isLoading}>
+            <Button variant="secondary" onClick={() => load(true)} disabled={isLoading}>
               {t('common:buttons.refresh')}
             </Button>
           </div>
