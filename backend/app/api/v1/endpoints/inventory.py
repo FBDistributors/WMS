@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import date, datetime
 from decimal import Decimal
-from typing import List, Optional
+from typing import Any, List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Query, status
@@ -26,6 +27,7 @@ from app.models.stock import ON_HAND_MOVEMENT_TYPES
 from app.models.stock import StockLot as StockLotModel
 from app.models.stock import StockMovement as StockMovementModel
 from app.models.user import User as UserModel
+from app.integrations.smartup import balance_export as smartup_balance_export
 
 router = APIRouter()
 
@@ -1391,6 +1393,27 @@ async def fix_duplicate_pick(
         fixed=False,
         message="Ortiqcha pick topilmadi yoki allaqachon to'g'ri.",
     )
+
+
+@router.get(
+    "/smartup-balance",
+    response_model=None,
+    summary="SmartUP balance$export (faqat bugungi kun)",
+)
+async def get_smartup_balance(
+    _user=Depends(require_permission("inventory:read")),
+) -> Any:
+    """
+    SmartUP balance$export dan faqat bugungi kun qoldiq ma'lumotini yuklaydi.
+    Login/parol boshqa SmartUP API lar bilan bir xil (env).
+    """
+    try:
+        result = await asyncio.to_thread(smartup_balance_export.fetch_balance_from_smartup)
+        return result
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 router.include_router(picker_inventory.router)
