@@ -13,7 +13,6 @@ export const INVENTORY_TABLE_COLUMN_IDS = [
   'product',
   'brand',
   'total_qty',
-  'available',
   'smartup_qoldiq',
   'smartup_bron',
 ]
@@ -24,7 +23,6 @@ export const DEFAULT_VISIBLE_COLUMNS = [
   'product',
   'brand',
   'total_qty',
-  'available',
   'smartup_qoldiq',
   'smartup_bron',
 ]

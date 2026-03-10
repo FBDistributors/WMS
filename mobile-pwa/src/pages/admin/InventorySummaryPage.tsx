@@ -25,7 +25,6 @@ const COLUMN_OPTIONS = [
   { id: 'product', labelKey: 'inventory:columns.product' },
   { id: 'brand', labelKey: 'inventory:columns.brand' },
   { id: 'total_qty', labelKey: 'inventory:columns.total_qty' },
-  { id: 'available', labelKey: 'inventory:columns.available' },
   { id: 'smartup_qoldiq', labelKey: 'inventory:columns.smartup_qoldiq' },
   { id: 'smartup_bron', labelKey: 'inventory:columns.smartup_bron' },
 ]
@@ -217,16 +216,25 @@ export function InventorySummaryPage() {
             t('inventory:columns.product'),
             t('inventory:columns.brand'),
             t('inventory:columns.total_qty'),
-            t('inventory:columns.available'),
+            t('inventory:columns.smartup_qoldiq'),
+            t('inventory:columns.smartup_bron'),
           ]
-          const rows = (res.items ?? []).map((row) => [
-            row.product_code,
-            row.barcode ?? '',
-            row.product_name,
-            row.brand_name ?? '',
-            Math.round(Number(row.total_qty)),
-            Math.round(Number(row.available_qty)),
-          ])
+          const rows = (res.items ?? []).map((row) => {
+            const jami = Math.round(Number(row.total_qty))
+            const q001 = Number(smartupQoldiqByCode.get(row.product_code) ?? 0)
+            const q002 = Number(smartupBronByCode.get(row.product_code) ?? 0)
+            const smartupQoldiq = q001 + q002
+            const farq = jami - smartupQoldiq
+            return [
+              row.product_code,
+              row.barcode ?? '',
+              row.product_name,
+              row.brand_name ?? '',
+              jami,
+              smartupQoldiq === 0 ? '' : Math.round(smartupQoldiq),
+              farq,
+            ]
+          })
           const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
           const wb = XLSX.utils.book_new()
           XLSX.utils.book_append_sheet(wb, ws, sheetName)
@@ -240,7 +248,7 @@ export function InventorySummaryPage() {
         setIsExporting(false)
       }
     },
-    [debouncedSearch, onlyAvailable, t]
+    [debouncedSearch, onlyAvailable, t, smartupQoldiqByCode, smartupBronByCode]
   )
 
   const content = useMemo(() => {
@@ -332,7 +340,6 @@ export function InventorySummaryPage() {
                         )}
                         {columnId === 'brand' && (row.brand_name ?? '—')}
                         {columnId === 'total_qty' && Math.round(Number(row.total_qty))}
-                        {columnId === 'available' && Math.round(Number(row.available_qty))}
                         {columnId === 'smartup_qoldiq' &&
                           (() => {
                             const q001 = Number(smartupQoldiqByCode.get(row.product_code) ?? 0)
