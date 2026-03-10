@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Plus } from 'lucide-react'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { Button } from '../../components/ui/button'
@@ -19,7 +18,6 @@ type MovementKind = 'expired' | 'damaged' | 'simple'
 
 export function MovementPage() {
   const { t } = useTranslation(['admin', 'inventory', 'common'])
-  const [modalOpen, setModalOpen] = useState(false)
   const [movementKind, setMovementKind] = useState<MovementKind>('simple')
   const [productSearch, setProductSearch] = useState('')
   const [productList, setProductList] = useState<InventorySummaryRow[]>([])
@@ -35,8 +33,15 @@ export function MovementPage() {
   const [submitLoading, setSubmitLoading] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const openModal = useCallback(() => {
-    setModalOpen(true)
+  useEffect(() => {
+    setLocationsLoading(true)
+    getLocations(false)
+      .then(setLocations)
+      .catch(() => setLocations([]))
+      .finally(() => setLocationsLoading(false))
+  }, [])
+
+  const resetForm = useCallback(() => {
     setMovementKind('simple')
     setProductSearch('')
     setProductList([])
@@ -47,15 +52,6 @@ export function MovementPage() {
     setQty('')
     setSubmitError(null)
   }, [])
-
-  useEffect(() => {
-    if (!modalOpen) return
-    setLocationsLoading(true)
-    getLocations(false)
-      .then(setLocations)
-      .catch(() => setLocations([]))
-      .finally(() => setLocationsLoading(false))
-  }, [modalOpen])
 
   const searchProducts = useCallback(async () => {
     const q = productSearch.trim()
@@ -134,206 +130,186 @@ export function MovementPage() {
         movement_type: 'adjust',
         reason_code: 'inventory_overage',
       })
-      setModalOpen(false)
       alert(t('admin:movement_page.success'))
+      resetForm()
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : t('admin:movement_page.error'))
     } finally {
       setSubmitLoading(false)
     }
-  }, [canSubmit, selectedProduct, fromRow, toLocationId, qtyNum, t])
+  }, [canSubmit, selectedProduct, fromRow, toLocationId, qtyNum, t, resetForm])
 
   return (
-    <>
-      <AdminLayout
-        title={t('admin:menu.movement')}
-        actionSlot={
-          <Button onClick={openModal}>
-            <Plus size={18} />
-            {t('admin:movement_page.do_button')}
-          </Button>
-        }
-      >
-        <Card className="p-4">
-          <Link
-            to="/admin/kamomat"
-            className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-          >
-            {t('admin:movement_page.view_history_link')}
-            <span aria-hidden>→</span>
-          </Link>
-        </Card>
-      </AdminLayout>
+    <AdminLayout title={t('admin:menu.movement')}>
+      <Card className="p-4">
+        <Link
+          to="/admin/kamomat"
+          className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+        >
+          {t('admin:movement_page.view_history_link')}
+          <span aria-hidden>→</span>
+        </Link>
+      </Card>
 
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto px-4 py-6">
-          <button
-            type="button"
-            className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm"
-            onClick={() => setModalOpen(false)}
-            aria-label={t('admin:movement_page.cancel')}
+      <Card className="p-6">
+        <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
+          {t('admin:movement_page.do_button')}
+        </h3>
+
+        <div className="mb-3">
+          <span className="mb-2 block text-sm font-medium text-slate-600 dark:text-slate-400">
+            {t('admin:movement_page.kind_label')}
+          </span>
+          <div className="flex gap-2">
+            {(['expired', 'damaged', 'simple'] as const).map((kind) => (
+              <Button
+                key={kind}
+                variant={movementKind === kind ? 'default' : 'secondary'}
+                onClick={() => {
+                  setMovementKind(kind)
+                  setToLocationId('')
+                }}
+              >
+                {t(`admin:movement_page.type_${kind}`)}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mb-3">
+          <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-400">
+            {t('admin:movement_page.product_search')}
+          </label>
+          <input
+            type="text"
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            value={productSearch}
+            onChange={(e) => setProductSearch(e.target.value)}
+            placeholder={t('admin:movement_page.select_product')}
           />
-          <div className="relative w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
-            <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
-              {t('admin:movement_page.do_button')}
-            </h3>
-
-            <div className="mb-3">
-              <span className="mb-2 block text-sm font-medium text-slate-600 dark:text-slate-400">
-                {t('admin:movement_page.kind_label')}
-              </span>
-              <div className="flex gap-2">
-                {(['expired', 'damaged', 'simple'] as const).map((kind) => (
-                  <Button
-                    key={kind}
-                    variant={movementKind === kind ? 'default' : 'secondary'}
-                    onClick={() => {
-                      setMovementKind(kind)
-                      setToLocationId('')
-                    }}
-                  >
-                    {t(`admin:movement_page.type_${kind}`)}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <div className="mb-3">
-              <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-400">
-                {t('admin:movement_page.product_search')}
-              </label>
-              <input
-                type="text"
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                value={productSearch}
-                onChange={(e) => setProductSearch(e.target.value)}
-                placeholder={t('admin:movement_page.select_product')}
-              />
-              {productSearching && (
-                <p className="mt-1 text-xs text-slate-500">...</p>
-              )}
-              {productList.length > 0 && !selectedProduct && (
-                <ul className="mt-1 max-h-32 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-700">
-                  {productList.slice(0, 10).map((p) => (
-                    <li key={p.product_id}>
-                      <button
-                        type="button"
-                        className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
-                        onClick={() => selectProduct(p)}
-                      >
-                        {p.product_code} — {p.name}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {selectedProduct && (
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                  {selectedProduct.product_code} — {selectedProduct.name}
+          {productSearching && (
+            <p className="mt-1 text-xs text-slate-500">...</p>
+          )}
+          {productList.length > 0 && !selectedProduct && (
+            <ul className="mt-1 max-h-32 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-700">
+              {productList.slice(0, 10).map((p) => (
+                <li key={p.product_id}>
                   <button
                     type="button"
-                    className="ml-2 text-blue-600"
-                    onClick={() => {
-                      setSelectedProduct(null)
-                      setDetails([])
-                      setFromRow(null)
-                    }}
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
+                    onClick={() => selectProduct(p)}
                   >
-                    (x)
+                    {p.product_code} — {p.name}
                   </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {selectedProduct && (
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              {selectedProduct.product_code} — {selectedProduct.name}
+              <button
+                type="button"
+                className="ml-2 text-blue-600"
+                onClick={() => {
+                  setSelectedProduct(null)
+                  setDetails([])
+                  setFromRow(null)
+                }}
+              >
+                (x)
+              </button>
+            </p>
+          )}
+        </div>
+
+        {detailsLoading && <p className="mb-2 text-sm text-slate-500">...</p>}
+        {details.length > 0 && (
+          <div className="mb-3">
+            <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-400">
+              {t('admin:movement_page.select_from')}
+            </label>
+            <div className="max-h-36 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-700">
+              {details.map((row) => (
+                <button
+                  key={`${row.lot_id}-${row.location_id}`}
+                  type="button"
+                  className={`block w-full border-b border-slate-100 px-3 py-2 text-left text-sm last:border-0 dark:border-slate-700 ${
+                    fromRow?.location_id === row.location_id && fromRow?.lot_id === row.lot_id
+                      ? 'bg-blue-50 dark:bg-blue-950'
+                      : 'hover:bg-slate-50 dark:hover:bg-slate-800'
+                  }`}
+                  onClick={() => {
+                    setFromRow(row)
+                    setToLocationId('')
+                  }}
+                >
+                  {row.location_code} | {row.batch} | {Math.round(Number(row.available))} {t('admin:movement_page.pcs')}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {fromRow && (
+          <>
+            <div className="mb-3">
+              <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-400">
+                {t('admin:movement_page.select_to')}
+              </label>
+              <select
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                value={toLocationId}
+                onChange={(e) => setToLocationId(e.target.value)}
+              >
+                <option value="">—</option>
+                {toLocationOptions.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.code} {loc.zone_type ? `(${loc.zone_type})` : ''}
+                  </option>
+                ))}
+              </select>
+              {toLocationOptions.length === 0 && !locationsLoading && (
+                <p className="mt-1 text-xs text-amber-600">
+                  {movementKind === 'expired'
+                    ? t('admin:movement_page.no_expired_zone')
+                    : movementKind === 'damaged'
+                      ? t('admin:movement_page.no_damaged_zone')
+                      : t('admin:movement_page.select_other')}
                 </p>
               )}
             </div>
-
-            {detailsLoading && <p className="mb-2 text-sm text-slate-500">...</p>}
-            {details.length > 0 && (
-              <div className="mb-3">
-                <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-400">
-                  {t('admin:movement_page.select_from')}
-                </label>
-                <div className="max-h-36 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-700">
-                  {details.map((row) => (
-                    <button
-                      key={`${row.lot_id}-${row.location_id}`}
-                      type="button"
-                      className={`block w-full border-b border-slate-100 px-3 py-2 text-left text-sm last:border-0 dark:border-slate-700 ${
-                        fromRow?.location_id === row.location_id && fromRow?.lot_id === row.lot_id
-                          ? 'bg-blue-50 dark:bg-blue-950'
-                          : 'hover:bg-slate-50 dark:hover:bg-slate-800'
-                      }`}
-                      onClick={() => {
-                        setFromRow(row)
-                        setToLocationId('')
-                      }}
-                    >
-                      {row.location_code} | {row.batch} | {Math.round(Number(row.available))} {t('admin:movement_page.pcs')}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {fromRow && (
-              <>
-                <div className="mb-3">
-                  <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-400">
-                    {t('admin:movement_page.select_to')}
-                  </label>
-                  <select
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    value={toLocationId}
-                    onChange={(e) => setToLocationId(e.target.value)}
-                  >
-                    <option value="">—</option>
-                    {toLocationOptions.map((loc) => (
-                      <option key={loc.id} value={loc.id}>
-                        {loc.code} {loc.zone_type ? `(${loc.zone_type})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  {toLocationOptions.length === 0 && !locationsLoading && (
-                    <p className="mt-1 text-xs text-amber-600">
-                      {movementKind === 'expired'
-                        ? t('admin:movement_page.no_expired_zone')
-                        : movementKind === 'damaged'
-                          ? t('admin:movement_page.no_damaged_zone')
-                          : t('admin:movement_page.select_other')}
-                    </p>
-                  )}
-                </div>
-                <div className="mb-4">
-                  <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-400">
-                    {t('admin:movement_page.qty')} (max {maxQty} {t('admin:movement_page.pcs')})
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={maxQty}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    value={qty}
-                    onChange={(e) => setQty(e.target.value)}
-                  />
-                </div>
-              </>
-            )}
-
-            {submitError && (
-              <p className="mb-3 text-sm text-red-600 dark:text-red-400">{submitError}</p>
-            )}
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => setModalOpen(false)} disabled={submitLoading}>
-                {t('admin:movement_page.cancel')}
-              </Button>
-              <Button
-                onClick={handleSubmit}
-                disabled={!canSubmit || submitLoading}
-              >
-                {submitLoading ? '...' : t('admin:movement_page.submit')}
-              </Button>
+            <div className="mb-4">
+              <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-400">
+                {t('admin:movement_page.qty')} (max {maxQty} {t('admin:movement_page.pcs')})
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={maxQty}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                value={qty}
+                onChange={(e) => setQty(e.target.value)}
+              />
             </div>
-          </div>
+          </>
+        )}
+
+        {submitError && (
+          <p className="mb-3 text-sm text-red-600 dark:text-red-400">{submitError}</p>
+        )}
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={resetForm} disabled={submitLoading}>
+            {t('admin:movement_page.cancel')}
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={!canSubmit || submitLoading}
+          >
+            {submitLoading ? '...' : t('admin:movement_page.submit')}
+          </Button>
         </div>
-      )}
-    </>
+      </Card>
+    </AdminLayout>
   )
 }
