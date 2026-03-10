@@ -334,17 +334,21 @@ export function InventorySummaryPage() {
                         {columnId === 'total_qty' && Math.round(Number(row.total_qty))}
                         {columnId === 'available' && Math.round(Number(row.available_qty))}
                         {columnId === 'smartup_qoldiq' &&
-                          (smartupQoldiqByCode.has(row.product_code)
-                            ? Math.round(
-                                Number(smartupQoldiqByCode.get(row.product_code) ?? 0),
-                              )
-                            : '—')}
+                          (() => {
+                            const q001 = Number(smartupQoldiqByCode.get(row.product_code) ?? 0)
+                            const q002 = Number(smartupBronByCode.get(row.product_code) ?? 0)
+                            const sum = q001 + q002
+                            return q001 === 0 && q002 === 0 ? '—' : Math.round(sum)
+                          })()}
                         {columnId === 'smartup_bron' &&
-                          (smartupBronByCode.has(row.product_code)
-                            ? Math.round(
-                                Number(smartupBronByCode.get(row.product_code) ?? 0),
-                              )
-                            : '—')}
+                          (() => {
+                            const jami = Math.round(Number(row.total_qty))
+                            const q001 = Number(smartupQoldiqByCode.get(row.product_code) ?? 0)
+                            const q002 = Number(smartupBronByCode.get(row.product_code) ?? 0)
+                            const smartupQoldiq = q001 + q002
+                            const farq = jami - smartupQoldiq
+                            return farq === 0 ? 0 : farq
+                          })()}
                         {columnId === 'location' &&
                           (locs.length === 0 ? (
                           <Link
