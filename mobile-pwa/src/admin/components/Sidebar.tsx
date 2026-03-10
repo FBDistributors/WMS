@@ -127,7 +127,7 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
                     : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
                 ].join(' ')}
               >
-                <Icon size={18} />
+                <Icon size={collapsed ? 24 : 18} className="shrink-0" />
                 <span className={collapsed ? 'sr-only' : ''}>{t(`menu.${key}`, label)}</span>
               </Link>
             )
@@ -154,7 +154,7 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
                       to="/admin/profile"
                       className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition-colors hover:bg-slate-100 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
                     >
-                      {initials || <UserCircle2 size={18} />}
+                      {initials || <UserCircle2 size={24} />}
                     </Link>
                   </TooltipTrigger>
                   <TooltipContent side="right">{t('admin:menu.profile')}</TooltipContent>
