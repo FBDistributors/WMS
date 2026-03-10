@@ -33,6 +33,16 @@ const DEBOUNCE_MS = 400
 const PAGE_SIZE = 50
 const EXPORT_LIMIT = 10000
 
+const NUMBER_FORMATTER = new Intl.NumberFormat('en-US', {
+  maximumFractionDigits: 0,
+})
+
+function formatInt(value: unknown): string {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return String(value ?? '')
+  return NUMBER_FORMATTER.format(Math.round(n))
+}
+
 export function InventorySummaryPage() {
   const navigate = useNavigate()
   const { t } = useTranslation(['inventory', 'common'])
@@ -290,7 +300,9 @@ export function InventorySummaryPage() {
                         ? 'min-w-[9rem] text-left'
                         : columnId === 'product'
                           ? 'min-w-[12rem] text-left'
-                          : columnId === 'smartup_qoldiq' || columnId === 'smartup_bron'
+                          : columnId === 'total_qty' ||
+                              columnId === 'smartup_qoldiq' ||
+                              columnId === 'smartup_bron'
                             ? 'text-right tabular-nums'
                             : 'text-left'
                     }`}
@@ -318,7 +330,9 @@ export function InventorySummaryPage() {
                             ? 'min-w-[9rem]'
                             : columnId === 'product'
                               ? 'min-w-[12rem]'
-                              : columnId === 'smartup_qoldiq' || columnId === 'smartup_bron'
+                              : columnId === 'total_qty' ||
+                                  columnId === 'smartup_qoldiq' ||
+                                  columnId === 'smartup_bron'
                                 ? 'text-right tabular-nums'
                                 : ''
                         }`}
@@ -339,13 +353,13 @@ export function InventorySummaryPage() {
                           </span>
                         )}
                         {columnId === 'brand' && (row.brand_name ?? '—')}
-                        {columnId === 'total_qty' && Math.round(Number(row.total_qty))}
+                        {columnId === 'total_qty' && formatInt(row.total_qty)}
                         {columnId === 'smartup_qoldiq' &&
                           (() => {
                             const q001 = Number(smartupQoldiqByCode.get(row.product_code) ?? 0)
                             const q002 = Number(smartupBronByCode.get(row.product_code) ?? 0)
                             const sum = q001 + q002
-                            return q001 === 0 && q002 === 0 ? '—' : Math.round(sum)
+                            return q001 === 0 && q002 === 0 ? '—' : formatInt(sum)
                           })()}
                         {columnId === 'smartup_bron' &&
                           (() => {
@@ -354,7 +368,13 @@ export function InventorySummaryPage() {
                             const q002 = Number(smartupBronByCode.get(row.product_code) ?? 0)
                             const smartupQoldiq = q001 + q002
                             const farq = jami - smartupQoldiq
-                            return farq === 0 ? 0 : farq
+                            if (farq === 0) return 0
+                            const formatted = formatInt(farq)
+                            return (
+                              <span className="text-rose-500">
+                                {formatted}
+                              </span>
+                            )
                           })()}
                         {columnId === 'location' &&
                           (locs.length === 0 ? (
