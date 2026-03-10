@@ -495,7 +495,7 @@ export function InventorySummaryPage() {
         </div>
 
 
-        <div className="max-h-[calc(100vh-320px)] min-h-0 overflow-auto">
+        <div className="max-h-[calc(100vh-240px)] min-h-0 overflow-auto">
           {content}
         </div>
 
