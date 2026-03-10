@@ -49,7 +49,14 @@
     "search_placeholder": "Search by product, batch, location or who did it",
     "filter_btn": "Filter",
     "filter_by_date": "Filter by date",
-    "search_no_results": "No results for this search."
+    "search_no_results": "No results for this search.",
+    "move_entire_location_title": "Move entire location",
+    "move_entire_location_from": "From (location)",
+    "move_entire_location_to": "To (location)",
+    "move_entire_location_submit": "Move all",
+    "move_entire_location_success": "{{count}} item(s) moved",
+    "move_entire_location_error": "Move failed",
+    "move_entire_location_empty": "No products to move at this location"
   },
   "settings": {
     "title": "Settings",

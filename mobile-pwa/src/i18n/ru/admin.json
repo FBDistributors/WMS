@@ -49,7 +49,14 @@
     "search_placeholder": "Поиск по товару, партии, локации или кто выполнил",
     "filter_btn": "Фильтр",
     "filter_by_date": "Фильтр по дате",
-    "search_no_results": "По запросу ничего не найдено."
+    "search_no_results": "По запросу ничего не найдено.",
+    "move_entire_location_title": "Переместить всю локацию",
+    "move_entire_location_from": "Откуда (локация)",
+    "move_entire_location_to": "Куда (локация)",
+    "move_entire_location_submit": "Переместить всё",
+    "move_entire_location_success": "Перемещено {{count}} позиций",
+    "move_entire_location_error": "Ошибка перемещения",
+    "move_entire_location_empty": "В этой локации нет товаров для перемещения"
   },
   "settings": {
     "title": "Настройки",

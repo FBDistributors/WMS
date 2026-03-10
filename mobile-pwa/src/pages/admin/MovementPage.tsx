@@ -9,6 +9,7 @@ import {
   createMovement,
   getInventoryDetails,
   getInventorySummary,
+  getInventoryByLocation,
   type InventoryDetailRow,
   type InventorySummaryRow,
 } from '../../services/inventoryApi'
@@ -32,6 +33,11 @@ export function MovementPage() {
   const [qty, setQty] = useState('')
   const [submitLoading, setSubmitLoading] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [bulkFromLocationId, setBulkFromLocationId] = useState('')
+  const [bulkToLocationId, setBulkToLocationId] = useState('')
+  const [bulkLoading, setBulkLoading] = useState(false)
+  const [bulkError, setBulkError] = useState<string | null>(null)
+  const [bulkSuccessCount, setBulkSuccessCount] = useState<number | null>(null)
 
   useEffect(() => {
     setLocationsLoading(true)
@@ -139,6 +145,52 @@ export function MovementPage() {
     }
   }, [canSubmit, selectedProduct, fromRow, toLocationId, qtyNum, t, resetForm])
 
+  const canBulkMove =
+    bulkFromLocationId &&
+    bulkToLocationId &&
+    bulkFromLocationId !== bulkToLocationId &&
+    !bulkLoading
+
+  const handleBulkMove = useCallback(async () => {
+    if (!canBulkMove) return
+    setBulkLoading(true)
+    setBulkError(null)
+    setBulkSuccessCount(null)
+    try {
+      const rows = await getInventoryByLocation(bulkFromLocationId)
+      const toMove = rows.filter((r) => Number(r.available) > 0)
+      if (toMove.length === 0) {
+        setBulkError(t('admin:movement_page.move_entire_location_empty'))
+        setBulkLoading(false)
+        return
+      }
+      for (const row of toMove) {
+        const qty = Math.round(Number(row.available))
+        await createMovement({
+          product_id: row.product_id,
+          lot_id: row.lot_id,
+          location_id: bulkFromLocationId,
+          qty_change: -qty,
+          movement_type: 'adjust',
+          reason_code: 'inventory_shortage',
+        })
+        await createMovement({
+          product_id: row.product_id,
+          lot_id: row.lot_id,
+          location_id: bulkToLocationId,
+          qty_change: qty,
+          movement_type: 'adjust',
+          reason_code: 'inventory_overage',
+        })
+      }
+      setBulkSuccessCount(toMove.length)
+    } catch (err) {
+      setBulkError(err instanceof Error ? err.message : t('admin:movement_page.move_entire_location_error'))
+    } finally {
+      setBulkLoading(false)
+    }
+  }, [canBulkMove, bulkFromLocationId, bulkToLocationId, t])
+
   return (
     <AdminLayout title={t('admin:menu.movement')}>
       <Card className="p-4">
@@ -226,27 +278,54 @@ export function MovementPage() {
         {detailsLoading && <p className="mb-2 text-sm text-slate-500">...</p>}
         {details.length > 0 && (
           <div className="mb-3">
-            <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-400">
+            <label className="mb-2 block text-sm font-medium text-slate-600 dark:text-slate-400">
               {t('admin:movement_page.select_from')}
             </label>
-            <div className="max-h-36 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-700">
-              {details.map((row) => (
-                <button
-                  key={`${row.lot_id}-${row.location_id}`}
-                  type="button"
-                  className={`block w-full border-b border-slate-100 px-3 py-2 text-left text-sm last:border-0 dark:border-slate-700 ${
-                    fromRow?.location_id === row.location_id && fromRow?.lot_id === row.lot_id
-                      ? 'bg-blue-50 dark:bg-blue-950'
-                      : 'hover:bg-slate-50 dark:hover:bg-slate-800'
-                  }`}
-                  onClick={() => {
-                    setFromRow(row)
-                    setToLocationId('')
-                  }}
-                >
-                  {row.location_code} | {row.batch} | {Math.round(Number(row.available))} {t('admin:movement_page.pcs')}
-                </button>
-              ))}
+            <div className="max-h-48 overflow-auto rounded-xl border border-slate-200 dark:border-slate-700">
+              <table className="min-w-full text-sm">
+                <thead className="sticky top-0 border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase text-slate-500 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-400">
+                  <tr>
+                    <th className="px-4 py-2.5">{t('inventory:columns.location')}</th>
+                    <th className="px-4 py-2.5">{t('inventory:columns.batch')}</th>
+                    <th className="px-4 py-2.5 text-right">{t('inventory:columns.qty')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {details.map((row) => (
+                    <tr
+                      key={`${row.lot_id}-${row.location_id}`}
+                      role="button"
+                      tabIndex={0}
+                      className={`cursor-pointer border-b border-slate-100 transition-colors last:border-0 dark:border-slate-700 ${
+                        fromRow?.location_id === row.location_id && fromRow?.lot_id === row.lot_id
+                          ? 'bg-blue-50 dark:bg-blue-950'
+                          : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                      }`}
+                      onClick={() => {
+                        setFromRow(row)
+                        setToLocationId('')
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          setFromRow(row)
+                          setToLocationId('')
+                        }
+                      }}
+                    >
+                      <td className="px-4 py-2.5 font-medium text-slate-800 dark:text-slate-200">
+                        {row.location_code}
+                      </td>
+                      <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300">
+                        {row.batch}
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-slate-700 dark:text-slate-300">
+                        {Math.round(Number(row.available))} {t('admin:movement_page.pcs')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
@@ -309,6 +388,70 @@ export function MovementPage() {
             {submitLoading ? '...' : t('admin:movement_page.submit')}
           </Button>
         </div>
+      </Card>
+
+      <Card className="p-6">
+        <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
+          {t('admin:movement_page.move_entire_location_title')}
+        </h3>
+        <div className="mb-3">
+          <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-400">
+            {t('admin:movement_page.move_entire_location_from')}
+          </label>
+          <select
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            value={bulkFromLocationId}
+            onChange={(e) => {
+              setBulkFromLocationId(e.target.value)
+              setBulkError(null)
+              setBulkSuccessCount(null)
+            }}
+          >
+            <option value="">—</option>
+            {locations.map((loc) => (
+              <option key={loc.id} value={loc.id}>
+                {loc.code} {loc.zone_type ? `(${loc.zone_type})` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="mb-3">
+          <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-400">
+            {t('admin:movement_page.move_entire_location_to')}
+          </label>
+          <select
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            value={bulkToLocationId}
+            onChange={(e) => {
+              setBulkToLocationId(e.target.value)
+              setBulkError(null)
+              setBulkSuccessCount(null)
+            }}
+          >
+            <option value="">—</option>
+            {locations
+              .filter((loc) => loc.id !== bulkFromLocationId)
+              .map((loc) => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.code} {loc.zone_type ? `(${loc.zone_type})` : ''}
+                </option>
+              ))}
+          </select>
+        </div>
+        {bulkError && (
+          <p className="mb-3 text-sm text-red-600 dark:text-red-400">{bulkError}</p>
+        )}
+        {bulkSuccessCount != null && (
+          <p className="mb-3 text-sm text-green-600 dark:text-green-400">
+            {t('admin:movement_page.move_entire_location_success', { count: bulkSuccessCount })}
+          </p>
+        )}
+        <Button
+          onClick={handleBulkMove}
+          disabled={!canBulkMove}
+        >
+          {bulkLoading ? '...' : t('admin:movement_page.move_entire_location_submit')}
+        </Button>
       </Card>
     </AdminLayout>
   )

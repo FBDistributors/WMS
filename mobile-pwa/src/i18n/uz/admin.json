@@ -40,7 +40,7 @@
     "no_expired_zone": "EXPIRED zonadagi joy topilmadi",
     "no_damaged_zone": "DAMAGED zonadagi joy topilmadi",
     "select_other": "Boshqa joy tanlang",
-    "pcs": "dono",
+    "pcs": "dona",
     "reason_shortage": "Chiqim (manbadan)",
     "reason_overage": "Kirim (manbaga)",
     "detail_title": "Ko'chirish tafsiloti",
@@ -49,7 +49,14 @@
     "search_placeholder": "Mahsulot, partiya, joylashuv yoki kim qilgani bo'yicha qidirish",
     "filter_btn": "Filter",
     "filter_by_date": "Sana bo'yicha filter",
-    "search_no_results": "Qidiruv bo'yicha natija topilmadi."
+    "search_no_results": "Qidiruv bo'yicha natija topilmadi.",
+    "move_entire_location_title": "Butun lokatsiyani ko'chirish",
+    "move_entire_location_from": "Qayerdan (lokatsiya)",
+    "move_entire_location_to": "Qayerga (lokatsiya)",
+    "move_entire_location_submit": "Barchasini ko'chirish",
+    "move_entire_location_success": "{{count}} ta pozitsiya ko'chirildi",
+    "move_entire_location_error": "Ko'chirishda xato",
+    "move_entire_location_empty": "Bu joyda ko'chiriladigan mahsulot yo'q"
   },
   "settings": {
     "title": "Sozlamalar",
