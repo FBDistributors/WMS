@@ -33,9 +33,10 @@ def fetch_balance_from_smartup(filial_id: str | None = None) -> dict:
 
     today = date.today()
     date_str = today.strftime("%d.%m.%Y")
+    warehouse_code = (os.getenv("SMARTUP_BALANCE_WAREHOUSE_CODE") or "001").strip()
 
     payload = {
-        "warehouse_codes": [{"warehouse_code": ""}],
+        "warehouse_codes": [{"warehouse_code": warehouse_code}],
         "filial_code": "",
         "begin_date": date_str,
         "end_date": date_str,
@@ -51,7 +52,7 @@ def fetch_balance_from_smartup(filial_id: str | None = None) -> dict:
         "filial_id": header_filial,
     }
 
-    logger.info("Smartup balance$export: url=%s sana=%s", url.split("?")[0], date_str)
+    logger.info("Smartup balance$export: url=%s sana=%s warehouse_code=%s", url.split("?")[0], date_str, warehouse_code)
     request = urllib.request.Request(url, data=data, headers=headers, method="POST")
     try:
         with urllib.request.urlopen(request, timeout=90) as response:
