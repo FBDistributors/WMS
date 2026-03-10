@@ -159,6 +159,7 @@ class SendMovementToPickingRequest(BaseModel):
 
 class OrderStatusUpdateRequest(BaseModel):
     status: str = Field(..., description="picked, packed, shipped yoki boshqa ruxsat etilgan status")
+    controller_user_id: Optional[UUID] = Field(None, description="Tekshiruvda: controllerga yuborish uchun controller user id")
 
 
 ALLOWED_ADMIN_ORDER_STATUSES = {"imported", "B#S", "allocated", "ready_for_picking", "picking", "picked", "completed", "packed", "shipped", "cancelled"}
@@ -524,6 +525,25 @@ async def list_picker_users(
     return [PickerUser(id=user.id, name=user.full_name or user.username) for user in users]
 
 
+class ControllerUser(BaseModel):
+    id: UUID
+    name: str
+
+
+@router.get("/controllers", response_model=List[ControllerUser], summary="List controller users")
+async def list_controller_users(
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("documents:edit_status")),
+):
+    users = (
+        db.query(User)
+        .filter(User.role == "inventory_controller", User.is_active.is_(True))
+        .order_by(User.full_name, User.username)
+        .all()
+    )
+    return [ControllerUser(id=user.id, name=user.full_name or user.username) for user in users]
+
+
 @router.get("/{order_id}", response_model=OrderDetails, summary="Get order")
 async def get_order(
     order_id: UUID,
@@ -564,6 +584,36 @@ async def update_order_status(
         raise HTTPException(status_code=404, detail="Order not found")
     old_status = order.status
     order.status = payload.status
+
+    if payload.status == "picked" and payload.controller_user_id is not None:
+        doc = (
+            db.query(DocumentModel)
+            .filter(DocumentModel.order_id == order.id, DocumentModel.doc_type == "SO")
+            .one_or_none()
+        )
+        if doc:
+            controller_user = (
+                db.query(User)
+                .filter(
+                    User.id == payload.controller_user_id,
+                    User.role == "inventory_controller",
+                    User.is_active.is_(True),
+                )
+                .one_or_none()
+            )
+            if not controller_user:
+                raise HTTPException(status_code=400, detail="Invalid controller")
+            doc.controlled_by_user_id = payload.controller_user_id
+
+    if payload.status == "completed":
+        doc = (
+            db.query(DocumentModel)
+            .filter(DocumentModel.order_id == order.id, DocumentModel.doc_type == "SO")
+            .one_or_none()
+        )
+        if doc:
+            doc.status = "completed"
+
     log_action(
         db,
         user_id=user.id,

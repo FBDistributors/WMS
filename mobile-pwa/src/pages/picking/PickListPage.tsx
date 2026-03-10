@@ -80,7 +80,11 @@ export function PickListPage() {
             <li key={doc.id}>
               <Link to={`${BASE_PATH}/${doc.id}`}>
                 <div>
-                  <strong>{doc.document_no}</strong>
+                  <strong>
+                  {doc.order_number
+                    ? t('picking:order_number_display', { number: doc.order_number })
+                    : doc.document_no}
+                </strong>
                 </div>
                 <div>
                   {t('picking:progress_picked', {

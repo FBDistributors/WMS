@@ -4,6 +4,7 @@ import type { ActivePick, DashboardSummary } from '../types/dashboard'
 type ApiPickDocumentItem = {
   id: string
   document_no: string
+  order_number?: string | null
   status: string
   lines_picked: number
   lines_total: number
@@ -107,6 +108,7 @@ export async function getPickDocuments(params?: {
   return data.items.map((item) => ({
     id: item.id,
     document_no: item.document_no,
+    order_number: item.order_number ?? undefined,
     status: item.status,
     picked: item.lines_picked,
     total: item.lines_total,

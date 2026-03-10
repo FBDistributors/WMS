@@ -35,7 +35,11 @@ export function PickListCard({ item, onClick, onCancel, isCancelling }: PickList
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-2">
           <div className="text-sm text-slate-500">{t('document_label')}</div>
-          <div className="text-lg font-semibold text-slate-900">{item.document_no}</div>
+          <div className="text-lg font-semibold text-slate-900">
+            {item.order_number
+              ? t('order_number_display', { number: item.order_number })
+              : item.document_no}
+          </div>
           <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
             <CalendarDays size={14} />
             <span>{item.created_at ?? '—'}</span>

@@ -106,7 +106,9 @@ export function PickDetailsPage() {
   return (
     <div className="min-h-screen bg-slate-50 px-4 pb-24">
       <AppHeader
-        title={t('document_number', { number: data.document_no })}
+        title={data.order_number
+          ? t('order_number_display', { number: data.order_number })
+          : t('document_number', { number: data.document_no })}
         onBack={() => navigate(-1)}
         hideUserMenu
       />

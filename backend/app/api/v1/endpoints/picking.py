@@ -55,6 +55,7 @@ class PickingDocument(BaseModel):
     incomplete_reason: Optional[str] = None
     assigned_to_user_id: Optional[UUID] = None
     assigned_to_user_name: Optional[str] = None
+    order_number: Optional[str] = None
 
 
 class PickingListItem(BaseModel):
@@ -66,6 +67,7 @@ class PickingListItem(BaseModel):
     controlled_by_user_id: Optional[UUID] = None
     assigned_to_user_id: Optional[UUID] = None
     assigned_to_user_name: Optional[str] = None
+    order_number: Optional[str] = None
 
 
 class ConsolidatedLineItem(BaseModel):
@@ -243,6 +245,7 @@ def _to_picking_document(doc: DocumentModel) -> PickingDocument:
         incomplete_reason=getattr(doc, "incomplete_reason", None),
         assigned_to_user_id=doc.assigned_to_user_id,
         assigned_to_user_name=_picker_name(doc),
+        order_number=_order_number(doc),
     )
 
 
@@ -257,7 +260,13 @@ def _to_picking_document_with_lines(doc: DocumentModel, lines: List[DocumentLine
         incomplete_reason=getattr(doc, "incomplete_reason", None),
         assigned_to_user_id=doc.assigned_to_user_id,
         assigned_to_user_name=_picker_name(doc),
+        order_number=_order_number(doc),
     )
+
+
+def _order_number(doc: DocumentModel) -> Optional[str]:
+    order = getattr(doc, "order", None)
+    return order.order_number if order else None
 
 
 def _to_picking_list_item(doc: DocumentModel) -> PickingListItem:
@@ -272,6 +281,7 @@ def _to_picking_list_item(doc: DocumentModel) -> PickingListItem:
         controlled_by_user_id=doc.controlled_by_user_id,
         assigned_to_user_id=doc.assigned_to_user_id,
         assigned_to_user_name=_picker_name(doc),
+        order_number=_order_number(doc),
     )
 
 
@@ -290,7 +300,10 @@ async def get_picking_document(
 ):
     document = (
         db.query(DocumentModel)
-        .options(selectinload(DocumentModel.assigned_to_user))
+        .options(
+            selectinload(DocumentModel.assigned_to_user),
+            selectinload(DocumentModel.order),
+        )
         .filter(DocumentModel.id == document_id)
         .one_or_none()
     )
@@ -332,6 +345,7 @@ async def list_picking_documents(
         .options(
             selectinload(DocumentModel.lines),
             selectinload(DocumentModel.assigned_to_user),
+            selectinload(DocumentModel.order),
         )
         .outerjoin(OrderModel, DocumentModel.order_id == OrderModel.id)
         .filter(

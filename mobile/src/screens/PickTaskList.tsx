@@ -75,7 +75,9 @@ function TaskRow({
         onPress={onPress}
         activeOpacity={0.7}
       >
-        <Text style={[styles.rowRef, isDark && styles.rowRefDark]}>{item.reference_number}</Text>
+        <Text style={[styles.rowRef, isDark && styles.rowRefDark]}>
+          {item.order_number ? t('orderNumberDisplay', { number: item.order_number }) : item.reference_number}
+        </Text>
         <Text style={[styles.rowMeta, isDark && styles.rowMetaDark]}>
           {t('linesCount', { done: item.lines_done, total: item.lines_total })}
         </Text>

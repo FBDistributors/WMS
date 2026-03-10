@@ -54,6 +54,7 @@ class Document(Base):
         foreign_keys=[controlled_by_user_id],
         lazy="selectin",
     )
+    order = relationship("Order", foreign_keys=[order_id], lazy="selectin")
 
     __table_args__ = (
         UniqueConstraint("doc_no", "doc_type", name="uq_documents_doc_no_doc_type"),

@@ -6,6 +6,7 @@
   "empty_title": "Документы не найдены",
   "empty_desc": "Пока нет списков подбора.",
   "details_title": "Детали подбора",
+  "order_number_display": "Заказ #{{number}}",
   "document_not_found": "Документ не найден",
   "document_id_missing": "ID документа не найден.",
   "load_failed": "Не удалось загрузить документ. Попробуйте снова.",

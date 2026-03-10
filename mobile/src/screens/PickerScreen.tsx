@@ -199,7 +199,9 @@ export function PickerScreen() {
             <Icon name="arrow-left" size={24} color={isDark ? '#93c5fd' : '#1976d2'} />
           </TouchableOpacity>
         )}
-        <Text style={[styles.title, isDark && styles.titleDark]}>{task.reference_number}</Text>
+        <Text style={[styles.title, isDark && styles.titleDark]}>
+          {task.order_number ? t('orderNumberDisplay', { number: task.order_number }) : task.reference_number}
+        </Text>
         <View style={styles.statusRow}>
           <Text style={[styles.statusLabel, isDark && styles.statusLabelDark]}>Holat: </Text>
           <View style={[styles.badge, isDark && styles.badgeDark]}>

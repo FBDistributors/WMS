@@ -116,7 +116,9 @@ export function PickListsPage() {
                 onClick={() => navigate(`/picking/mobile-pwa/${item.id}`)}
               >
                 <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">
-                  {item.document_no}
+                  {item.order_number
+                    ? t('picking:order_number_display', { number: item.order_number })
+                    : item.document_no}
                 </td>
                 <td className="px-4 py-3">
                   <span

@@ -29,6 +29,8 @@ export interface PickingDocument {
   incomplete_reason?: string | null;
   assigned_to_user_id?: string | null;
   assigned_to_user_name?: string | null;
+  /** Buyurtma raqami (order dan; admin bilan bir xil). */
+  order_number?: string | null;
 }
 
 export interface PickingListItem {
@@ -40,6 +42,8 @@ export interface PickingListItem {
   controlled_by_user_id?: string | null;
   assigned_to_user_id?: string | null;
   assigned_to_user_name?: string | null;
+  /** Buyurtma raqami (order dan; admin bilan bir xil). */
+  order_number?: string | null;
 }
 
 export interface PickLineResponse {

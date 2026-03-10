@@ -17,6 +17,7 @@ export interface PickItem {
 export interface PickTask {
   id: string;
   reference_number: string;
+  order_number?: string | null;
   status: PickTaskStatus;
   lines: PickItem[];
 }

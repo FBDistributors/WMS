@@ -16,6 +16,7 @@ export type PickingProgress = {
 export type PickingDocument = {
   id: string
   reference_number: string
+  order_number?: string | null
   status: string
   lines: PickingLine[]
   progress: PickingProgress

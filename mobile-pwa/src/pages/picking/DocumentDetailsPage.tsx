@@ -196,7 +196,11 @@ export function DocumentDetailsPage() {
   return (
     <div style={{ padding: '16px' }}>
       <Link to={BASE_PATH}>← {t('picking:list_title')}</Link>
-      <h1 style={{ marginTop: '12px' }}>{document.reference_number}</h1>
+      <h1 style={{ marginTop: '12px' }}>
+        {document.order_number
+          ? t('picking:order_number_display', { number: document.order_number })
+          : document.reference_number}
+      </h1>
       <div>
         {t('picking:status_label')}: {document.status}
       </div>

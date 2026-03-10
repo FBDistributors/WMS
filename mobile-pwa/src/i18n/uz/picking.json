@@ -6,6 +6,7 @@
   "empty_title": "Hujjatlar topilmadi",
   "empty_desc": "Hozircha pick listlar yo‘q.",
   "details_title": "Hujjat tafsilotlari",
+  "order_number_display": "Buyurtma #{{number}}",
   "document_not_found": "Hujjat topilmadi",
   "document_id_missing": "Hujjat ID topilmadi.",
   "load_failed": "Hujjat yuklanmadi. Qayta urinib ko‘ring.",

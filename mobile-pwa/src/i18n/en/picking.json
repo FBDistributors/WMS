@@ -6,6 +6,7 @@
   "empty_title": "No documents found",
   "empty_desc": "There are no pick lists yet.",
   "details_title": "Pick details",
+  "order_number_display": "Order #{{number}}",
   "document_not_found": "Document not found",
   "document_id_missing": "Document ID not found.",
   "load_failed": "Failed to load document. Please try again.",

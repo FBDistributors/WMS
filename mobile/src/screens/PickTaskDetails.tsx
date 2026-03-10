@@ -451,7 +451,9 @@ export function PickTaskDetails() {
         <TouchableOpacity onPress={goBack} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <Icon name="arrow-left" size={24} color={isDark ? '#93c5fd' : '#1976d2'} />
         </TouchableOpacity>
-        <Text style={[styles.title, isDark && styles.titleDark]}>{doc.reference_number ?? '—'}</Text>
+        <Text style={[styles.title, isDark && styles.titleDark]}>
+          {doc.order_number ? t('orderNumberDisplay', { number: doc.order_number }) : (doc.reference_number ?? '—')}
+        </Text>
         <View style={[styles.badge, isDark && styles.badgeDark]}>
           <Text style={[styles.badgeText, isDark && styles.badgeTextDark]}>
             {isController && doc.status === 'picked'

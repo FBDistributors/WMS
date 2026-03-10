@@ -14,7 +14,7 @@ import { Card } from '../../components/ui/card'
 import { DateInput } from '../../components/DateInput'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { TableSkeleton } from '../../components/ui/TableSkeleton'
-import { getMovements, getOrders, syncSmartupOrders, updateOrderStatus, type MovementItem, type OrderListItem, type MovementsResponse } from '../../services/ordersApi'
+import { getMovements, getOrders, syncSmartupOrders, updateOrderStatus, getControllerUsers, type MovementItem, type OrderListItem, type MovementsResponse, type ControllerUser } from '../../services/ordersApi'
 import { getBrands, type Brand } from '../../services/brandsApi'
 import { useAuth } from '../../rbac/AuthProvider'
 
@@ -182,6 +182,11 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const [movementPage, setMovementPage] = useState(0)
   const [selectedMovementIds, setSelectedMovementIds] = useState<Set<string>>(new Set())
   const [sendMovementDialogOpen, setSendMovementDialogOpen] = useState(false)
+  const [controllerModalOrder, setControllerModalOrder] = useState<OrderListItem | null>(null)
+  const [controllers, setControllers] = useState<ControllerUser[]>([])
+  const [controllerModalLoading, setControllerModalLoading] = useState(false)
+  const [selectedControllerId, setSelectedControllerId] = useState('')
+  const [controllerModalSubmitting, setControllerModalSubmitting] = useState(false)
 
   const ELIGIBLE_PICKING_STATUSES = new Set(['imported', 'B#S', 'ready_for_picking', 'allocated'])
   const canBeSentToPicking = (order: OrderListItem) =>
@@ -745,8 +750,22 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                   disabled={isUpdating}
                   onChange={async (e) => {
                     const newSimple = e.target.value as 'picking' | 'picked' | 'completed'
-                    const backendStatus = newSimple // picking / picked / completed backend da qabul qilinadi
+                    const backendStatus = newSimple
                     if (backendStatus === order.status) return
+                    if (backendStatus === 'picked') {
+                      setControllerModalOrder(order)
+                      setSelectedControllerId('')
+                      setControllerModalLoading(true)
+                      try {
+                        const list = await getControllerUsers()
+                        setControllers(list)
+                      } catch {
+                        setControllers([])
+                      } finally {
+                        setControllerModalLoading(false)
+                      }
+                      return
+                    }
                     setUpdatingOrderId(order.id)
                     try {
                       await updateOrderStatus(order.id, backendStatus)
@@ -1216,6 +1235,76 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             void load(true)
           }}
         />
+      )}
+      {controllerModalOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
+          <button
+            type="button"
+            className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm"
+            onClick={() => setControllerModalOrder(null)}
+            aria-label={t('common:buttons.close')}
+          />
+          <div className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
+              <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                {t('orders:controller_modal.title')}
+              </div>
+              <Button variant="ghost" className="rounded-full px-3 py-3" onClick={() => setControllerModalOrder(null)}>
+                <X size={18} />
+              </Button>
+            </div>
+            <div className="space-y-4 px-6 py-5">
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                {controllerModalOrder.order_number}
+              </p>
+              <label className="block text-sm text-slate-600 dark:text-slate-300">
+                {t('orders:controller_modal.controller_label')}
+                <select
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                  value={selectedControllerId}
+                  onChange={(e) => setSelectedControllerId(e.target.value)}
+                  disabled={controllerModalLoading}
+                >
+                  <option value="">
+                    {controllerModalLoading
+                      ? t('orders:controller_modal.loading')
+                      : t('orders:controller_modal.controller_skip')}
+                  </option>
+                  {controllers.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="flex items-center justify-end gap-2">
+                <Button variant="ghost" onClick={() => setControllerModalOrder(null)} disabled={controllerModalSubmitting}>
+                  {t('common:buttons.cancel')}
+                </Button>
+                <Button
+                  disabled={controllerModalSubmitting}
+                  onClick={async () => {
+                    if (!controllerModalOrder) return
+                    setControllerModalSubmitting(true)
+                    try {
+                      await updateOrderStatus(
+                        controllerModalOrder.id,
+                        'picked',
+                        selectedControllerId.trim() || undefined
+                      )
+                      setControllerModalOrder(null)
+                      void load()
+                    } finally {
+                      setControllerModalSubmitting(false)
+                    }
+                  }}
+                >
+                  {controllerModalSubmitting ? t('common:loading') : t('orders:controller_modal.confirm')}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
       <OrdersTableSettings
         open={isSettingsOpen}

@@ -5,7 +5,9 @@ export type PickListStatus = 'NEW' | 'IN_PROGRESS' | 'DONE' | 'ERROR'
 export type PickList = {
   id: string
   document_no: string
+  order_number?: string | null
   created_at?: string
+  completed_at?: string | null
   status: PickListStatus
   total_lines: number
   picked_lines: number
@@ -36,6 +38,7 @@ type BackendPickingListItem = {
   status: string
   lines_total: number
   lines_done: number
+  completed_at?: string | null
 }
 
 type BackendDocumentLine = {
@@ -53,6 +56,7 @@ type BackendDocumentLine = {
 type BackendPickingDetails = {
   id: string
   reference_number: string
+  order_number?: string | null
   status: string
   lines: BackendDocumentLine[]
   progress: {
@@ -100,9 +104,11 @@ function mapList(item: BackendPickingListItem): PickList {
   return {
     id: item.id,
     document_no: item.reference_number,
+    order_number: item.order_number ?? undefined,
     status: mapStatus(item.status),
     total_lines: item.lines_total,
     picked_lines: item.lines_done,
+    completed_at: item.completed_at ?? undefined,
   }
 }
 
@@ -112,6 +118,7 @@ function mapDetails(doc: BackendPickingDetails): PickListDetails {
   return {
     id: doc.id,
     document_no: doc.reference_number,
+    order_number: doc.order_number ?? undefined,
     status: mapStatus(doc.status),
     total_lines: totalLines,
     picked_lines: pickedLines,

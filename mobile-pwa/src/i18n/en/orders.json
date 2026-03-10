@@ -46,6 +46,14 @@
     "network_error": "Could not connect to server. Check your internet and try again.",
     "request_timeout": "Request timed out. Server may be slow, please try again later."
   },
+  "controller_modal": {
+    "title": "Under review — select controller",
+    "controller_label": "Controller",
+    "controller_placeholder": "Select controller",
+    "controller_skip": "Not sent to controller",
+    "confirm": "Confirm",
+    "loading": "Loading controllers..."
+  },
   "filters": {
     "status": "Status",
     "all": "All",

@@ -18,6 +18,7 @@ export type DashboardSummary = {
 export type ActivePick = {
   id: string
   document_no: string
+  order_number?: string | null
   status: string
   picked: number
   total: number

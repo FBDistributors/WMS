@@ -46,6 +46,14 @@
     "network_error": "Serverga ulanib bo'lmadi. Internetingizni tekshiring va keyinroq qayta urinib ko'ring.",
     "request_timeout": "So'rov vaqti tugadi. Server sekin ishlayapti, keyinroq qayta urinib ko'ring."
   },
+  "controller_modal": {
+    "title": "Tekshiruvda — kontrolyor tanlash",
+    "controller_label": "Kontrolyor",
+    "controller_placeholder": "Kontrolyor tanlang",
+    "controller_skip": "Controllerga yuborilmagan",
+    "confirm": "Tasdiqlash",
+    "loading": "Kontrolyorlar yuklanmoqda..."
+  },
   "filters": {
     "status": "Holat",
     "all": "Barchasi",

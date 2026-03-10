@@ -24,7 +24,7 @@ type ActivePickListProps = {
 }
 
 export function ActivePickList({ items, onOpen }: ActivePickListProps) {
-  const { t } = useTranslation(['admin', 'common'])
+  const { t } = useTranslation(['admin', 'common', 'picking'])
   if (items.length === 0) {
     return (
       <Card>
@@ -42,7 +42,11 @@ export function ActivePickList({ items, onOpen }: ActivePickListProps) {
         return (
           <Card key={item.id} className="space-y-2">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{item.document_no}</div>
+              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              {item.order_number
+                ? t('picking:order_number_display', { number: item.order_number })
+                : item.document_no}
+            </div>
               <Badge variant={variant}>
                 {t(statusKey)}
               </Badge>

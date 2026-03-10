@@ -22,6 +22,7 @@ DEFAULT_FILIAL_ID = os.getenv("WMS_DEFAULT_FILIAL_ID", "3788131").strip()
 class PickDocumentListItem(BaseModel):
     id: UUID
     document_no: str
+    order_number: Optional[str] = None
     status: str
     lines_picked: int
     lines_total: int
@@ -191,6 +192,7 @@ async def get_pick_documents(
             selectinload(DocumentModel.lines),
             selectinload(DocumentModel.assigned_to_user),
             selectinload(DocumentModel.controlled_by_user),
+            selectinload(DocumentModel.order),
         )
         .filter(DocumentModel.doc_type == "SO", DocumentModel.status != "cancelled")
     )
@@ -207,10 +209,14 @@ async def get_pick_documents(
         controller_name = None
         if doc.controlled_by_user:
             controller_name = doc.controlled_by_user.full_name or doc.controlled_by_user.username
+        order_number = None
+        if getattr(doc, "order", None) and doc.order:
+            order_number = doc.order.order_number
         items.append(
             PickDocumentListItem(
                 id=doc.id,
                 document_no=doc.doc_no,
+                order_number=order_number,
                 status=doc.status,
                 lines_picked=lines_picked,
                 lines_total=lines_total,

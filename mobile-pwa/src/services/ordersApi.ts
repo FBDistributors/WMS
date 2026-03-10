@@ -168,8 +168,17 @@ export type PickerUser = {
   name: string
 }
 
+export type ControllerUser = {
+  id: string
+  name: string
+}
+
 export async function getPickerUsers() {
   return fetchJSON<PickerUser[]>('/api/v1/orders/pickers')
+}
+
+export async function getControllerUsers() {
+  return fetchJSON<ControllerUser[]>('/api/v1/orders/controllers')
 }
 
 export async function sendOrderToPicking(orderId: string, assignedToUserId: string) {
@@ -231,10 +240,18 @@ export async function shipOrder(orderId: string) {
   })
 }
 
-/** Admin: buyurtma statusini o'zgartirish (documents:edit_status kerak). */
-export async function updateOrderStatus(orderId: string, status: string) {
+/** Admin: buyurtma statusini o'zgartirish (documents:edit_status kerak). Tekshiruvda: controller_user_id ixtiyoriy (controllerga yuborish). */
+export async function updateOrderStatus(
+  orderId: string,
+  status: string,
+  controllerUserId?: string
+) {
+  const body: { status: string; controller_user_id?: string } = { status }
+  if (status === 'picked' && controllerUserId) {
+    body.controller_user_id = controllerUserId
+  }
   return fetchJSON<OrderDetails>(`/api/v1/orders/${orderId}/status`, {
     method: 'PATCH',
-    body: { status },
+    body,
   })
 }

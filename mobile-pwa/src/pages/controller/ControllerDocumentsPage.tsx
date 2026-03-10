@@ -7,7 +7,7 @@ import { AppHeader } from '../../components/layout/AppHeader'
 import { listPickLists, type PickList } from '../../services/pickingApi'
 
 export function ControllerDocumentsPage() {
-  const { t } = useTranslation('controller')
+  const { t, i18n } = useTranslation('controller')
   const navigate = useNavigate()
   const [docs, setDocs] = useState<PickList[]>([])
   const [loading, setLoading] = useState(true)
@@ -73,11 +73,18 @@ export function ControllerDocumentsPage() {
               >
                 <div className="min-w-0 flex-1">
                   <div className="font-medium text-slate-900 dark:text-slate-100">
-                    {doc.document_no}
+                    {doc.order_number
+                      ? t('picking:order_number_display', { number: doc.order_number })
+                      : doc.document_no}
                   </div>
                   <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                     {doc.picked_lines} / {doc.total_lines} {t('documents.lines')}
                   </div>
+                  {doc.status === 'DONE' && doc.completed_at && (
+                    <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                      {t('documents.completed_at')}: {new Date(doc.completed_at).toLocaleString(i18n.language, { dateStyle: 'short', timeStyle: 'short' })}
+                    </div>
+                  )}
                 </div>
                 <span
                   className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${statusBadge(doc.status)}`}
