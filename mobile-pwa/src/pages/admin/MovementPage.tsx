@@ -35,7 +35,9 @@ export function MovementPage() {
   const [submitLoading, setSubmitLoading] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [bulkFromLocationId, setBulkFromLocationId] = useState('')
+  const [bulkFromLocationSearch, setBulkFromLocationSearch] = useState('')
   const [bulkToLocationId, setBulkToLocationId] = useState('')
+  const [bulkToLocationSearch, setBulkToLocationSearch] = useState('')
   const [bulkLoading, setBulkLoading] = useState(false)
   const [bulkError, setBulkError] = useState<string | null>(null)
   const [bulkSuccessCount, setBulkSuccessCount] = useState<number | null>(null)
@@ -103,7 +105,7 @@ export function MovementPage() {
 
   const toLocationFiltered = useMemo(() => {
     const q = toLocationSearch.trim().toLowerCase()
-    if (!q) return toLocationOptions.slice(0, 15)
+    if (!q) return []
     return toLocationOptions.filter((loc) => loc.code.toLowerCase().includes(q)).slice(0, 15)
   }, [toLocationOptions, toLocationSearch])
 
@@ -195,10 +197,26 @@ export function MovementPage() {
 
   const resetBulkForm = useCallback(() => {
     setBulkFromLocationId('')
+    setBulkFromLocationSearch('')
     setBulkToLocationId('')
+    setBulkToLocationSearch('')
     setBulkError(null)
     setBulkSuccessCount(null)
   }, [])
+
+  const bulkFromFiltered = useMemo(() => {
+    const q = bulkFromLocationSearch.trim().toLowerCase()
+    if (!q) return []
+    return locations.filter((loc) => loc.code.toLowerCase().includes(q)).slice(0, 15)
+  }, [locations, bulkFromLocationSearch])
+
+  const bulkToFiltered = useMemo(() => {
+    const q = bulkToLocationSearch.trim().toLowerCase()
+    if (!q) return []
+    return locations
+      .filter((loc) => loc.id !== bulkFromLocationId && loc.code.toLowerCase().includes(q))
+      .slice(0, 15)
+  }, [locations, bulkFromLocationId, bulkToLocationSearch])
 
   return (
     <AdminLayout title={t('admin:menu.movement')}>
@@ -213,10 +231,10 @@ export function MovementPage() {
       </Card>
 
       <Card className="overflow-hidden">
-        <div className="flex border-b border-slate-200 dark:border-slate-700">
+        <div className="flex gap-1 border-b border-slate-200 dark:border-slate-700">
           <button
             type="button"
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+            className={`px-4 py-2.5 text-sm font-medium transition-colors ${
               activeTab === 'product'
                 ? 'border-b-2 border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
                 : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'
@@ -227,7 +245,7 @@ export function MovementPage() {
           </button>
           <button
             type="button"
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+            className={`px-4 py-2.5 text-sm font-medium transition-colors whitespace-nowrap ${
               activeTab === 'location'
                 ? 'border-b-2 border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
                 : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'
@@ -361,7 +379,7 @@ export function MovementPage() {
                 }}
                 placeholder={t('admin:movement_page.to_location_code_placeholder')}
               />
-              {toLocationFiltered.length > 0 && !toLocationId && (
+              {toLocationSearch.trim().length > 0 && toLocationFiltered.length > 0 && !toLocationId && (
                 <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
                   {toLocationFiltered.map((loc) => (
                     <li key={loc.id}>
@@ -420,49 +438,83 @@ export function MovementPage() {
 
           {activeTab === 'location' && (
             <>
-        <div className="mb-3">
+        <div className="mb-3 relative">
           <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-400">
             {t('admin:movement_page.move_entire_location_from')}
           </label>
-          <select
+          <input
+            type="text"
             className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-            value={bulkFromLocationId}
+            value={bulkFromLocationId ? (locations.find((l) => l.id === bulkFromLocationId)?.code ?? bulkFromLocationSearch) : bulkFromLocationSearch}
             onChange={(e) => {
-              setBulkFromLocationId(e.target.value)
+              setBulkFromLocationSearch(e.target.value)
+              setBulkFromLocationId('')
+              setBulkToLocationId('')
+              setBulkToLocationSearch('')
               setBulkError(null)
               setBulkSuccessCount(null)
             }}
-          >
-            <option value="">—</option>
-            {locations.map((loc) => (
-              <option key={loc.id} value={loc.id}>
-                {loc.code} {loc.zone_type ? `(${loc.zone_type})` : ''}
-              </option>
-            ))}
-          </select>
+            placeholder={t('admin:movement_page.to_location_code_placeholder')}
+          />
+          {bulkFromLocationSearch.trim().length > 0 && bulkFromFiltered.length > 0 && !bulkFromLocationId && (
+            <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
+              {bulkFromFiltered.map((loc) => (
+                <li key={loc.id}>
+                  <button
+                    type="button"
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
+                    onClick={() => {
+                      setBulkFromLocationId(loc.id)
+                      setBulkFromLocationSearch(loc.code)
+                      setBulkToLocationId('')
+                      setBulkToLocationSearch('')
+                      setBulkError(null)
+                      setBulkSuccessCount(null)
+                    }}
+                  >
+                    {loc.code} {loc.zone_type ? `(${loc.zone_type})` : ''}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
-        <div className="mb-3">
+        <div className="mb-3 relative">
           <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-400">
             {t('admin:movement_page.move_entire_location_to')}
           </label>
-          <select
+          <input
+            type="text"
             className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-            value={bulkToLocationId}
+            value={bulkToLocationId ? (locations.find((l) => l.id === bulkToLocationId)?.code ?? bulkToLocationSearch) : bulkToLocationSearch}
             onChange={(e) => {
-              setBulkToLocationId(e.target.value)
+              setBulkToLocationSearch(e.target.value)
+              setBulkToLocationId('')
               setBulkError(null)
               setBulkSuccessCount(null)
             }}
-          >
-            <option value="">—</option>
-            {locations
-              .filter((loc) => loc.id !== bulkFromLocationId)
-              .map((loc) => (
-                <option key={loc.id} value={loc.id}>
-                  {loc.code} {loc.zone_type ? `(${loc.zone_type})` : ''}
-                </option>
+            placeholder={t('admin:movement_page.to_location_code_placeholder')}
+          />
+          {bulkToLocationSearch.trim().length > 0 && bulkToFiltered.length > 0 && !bulkToLocationId && (
+            <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
+              {bulkToFiltered.map((loc) => (
+                <li key={loc.id}>
+                  <button
+                    type="button"
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
+                    onClick={() => {
+                      setBulkToLocationId(loc.id)
+                      setBulkToLocationSearch(loc.code)
+                      setBulkError(null)
+                      setBulkSuccessCount(null)
+                    }}
+                  >
+                    {loc.code} {loc.zone_type ? `(${loc.zone_type})` : ''}
+                  </button>
+                </li>
               ))}
-          </select>
+            </ul>
+          )}
         </div>
         {bulkError && (
           <p className="mb-3 text-sm text-red-600 dark:text-red-400">{bulkError}</p>
