@@ -1,5 +1,11 @@
 {
   "title": "Orders",
+  "tabs": {
+    "buyurtmalar": "Orders",
+    "yigishda": "In picking",
+    "tekshiruvda": "In review",
+    "yakunlangan": "Completed"
+  },
   "subtitle": "Smartup orders imported into WMS.",
   "subtitle_orikzor": "Internal movements via separate API.",
   "load_failed": "Failed to load orders.",

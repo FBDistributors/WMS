@@ -1,5 +1,11 @@
 {
   "title": "Заказы",
+  "tabs": {
+    "buyurtmalar": "Заказы",
+    "yigishda": "В подборе",
+    "tekshiruvda": "На проверке",
+    "yakunlangan": "Завершённые"
+  },
   "subtitle": "Заказы, импортированные из Smartup.",
   "subtitle_orikzor": "Внутренние движения через отдельный API.",
   "load_failed": "Не удалось загрузить заказы.",

@@ -109,6 +109,14 @@ const GROUP_TO_STATUS: Record<string, string | undefined> = {
   all: undefined,
 }
 
+/** Asosiy Buyurtmalar sahifasidagi status tablari (faqat mode=default, orderSource yo'q) */
+const ORDER_TABS = [
+  { value: 'all', labelKey: 'orders:tabs.buyurtmalar' },
+  { value: 'yigishda', labelKey: 'orders:tabs.yigishda' },
+  { value: 'tekshiruvda', labelKey: 'orders:tabs.tekshiruvda' },
+  { value: 'yakunlangan', labelKey: 'orders:tabs.yakunlangan' },
+] as const
+
 type OrdersPageProps = { mode?: 'default' | 'statuses'; orderSource?: 'diller' }
 
 export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
@@ -583,10 +591,11 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         />
       )
     }
+    const defaultWithStatusTab = mode === 'default' && !orderSource && (group === 'yigishda' || group === 'tekshiruvda' || group === 'yakunlangan')
     const columnOptionsForMode =
       orderSource === 'diller'
         ? COLUMN_OPTIONS_DILLER
-        : mode === 'statuses'
+        : mode === 'statuses' || defaultWithStatusTab
           ? COLUMN_OPTIONS_STATUSES
           : mode === 'default'
             ? COLUMN_OPTIONS_DEFAULT
@@ -594,7 +603,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     const visibleColumns =
       orderSource === 'diller'
         ? new Set(dillerTableConfig.config.visibleColumns.filter((id) => COLUMN_OPTIONS_DILLER.some((c) => c.id === id)))
-        : mode === 'statuses'
+        : mode === 'statuses' || defaultWithStatusTab
           ? new Set(COLUMN_OPTIONS_STATUSES.map((c) => c.id))
           : new Set(
               mode === 'default'
@@ -604,13 +613,13 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     const orderedColumns =
       orderSource === 'diller'
         ? dillerTableConfig.config.columnOrder.filter((id) => COLUMN_OPTIONS_DILLER.some((c) => c.id === id))
-        : mode === 'statuses'
+        : mode === 'statuses' || defaultWithStatusTab
           ? COLUMN_OPTIONS_STATUSES.map((c) => c.id)
           : config.columnOrder.filter((id) =>
               columnOptionsForMode.some((column) => column.id === id)
             )
     const getStatusRowClass = (order: OrderListItem) => {
-      if (mode !== 'statuses') return ''
+      if (mode !== 'statuses' && !defaultWithStatusTab) return ''
       if (order.is_incomplete) return 'bg-red-50 dark:bg-red-950/30'
       const status = order.status
       if (status === 'allocated' || status === 'ready_for_picking' || status === 'picking')
@@ -877,9 +886,40 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     )
   }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, dillerTableConfig.config, eligibleItems, error, isLoading, items, load, location.pathname, location.search, mode, movementPage, movementsData, navigate, orderSource, searchQuery, selectedMovementIds, selectedOrderIds, t, updatingOrderId])
 
+  const showOrderTabs = mode === 'default' && !orderSource
+
   return (
     <AdminLayout title={pageTitle} backTo={mode === 'statuses' ? '/admin' : undefined}>
       <Card className="space-y-4">
+        {showOrderTabs ? (
+          <div className="flex border-b border-slate-200 dark:border-slate-700 gap-0 overflow-x-auto">
+            {ORDER_TABS.map((tab) => {
+              const isActive = group === tab.value
+              return (
+                <button
+                  key={tab.value}
+                  type="button"
+                  onClick={() => {
+                    setSearchParams((prev) => {
+                      const next = new URLSearchParams(prev)
+                      next.set('group', tab.value)
+                      next.delete('offset')
+                      return next
+                    })
+                  }}
+                  className={`shrink-0 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'border-sky-500 text-sky-600 dark:text-sky-400 dark:border-sky-400'
+                      : 'border-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
+                  }`}
+                  aria-current={isActive ? 'page' : undefined}
+                >
+                  {t(tab.labelKey)}
+                </button>
+              )
+            })}
+          </div>
+        ) : null}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <label className="flex-1 min-w-[180px] max-w-md text-sm text-slate-600 dark:text-slate-300">
             <span className="sr-only">{t('orders:filters.search')}</span>
@@ -1063,7 +1103,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
           </div>
         ) : null}
 
-        {mode !== 'statuses' && canSend && selectedOrderIds.size > 0 ? (
+        {mode !== 'statuses' && canSend && selectedOrderIds.size > 0 && onlyNotSentToPicking ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/50">
             <span className="text-sm text-slate-600 dark:text-slate-300">
               {t('orders:send_selected_to_picking', { count: selectedOrderIds.size })}
