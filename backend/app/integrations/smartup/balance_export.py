@@ -37,10 +37,10 @@ def fetch_balance_from_smartup(
     date_str = today.strftime("%d.%m.%Y")
 
     payload = {
-        "filial_codes": [{"filial_code": ""}],
+        "warehouse_codes": [{"warehouse_code": ""}],
         "filial_code": "",
-        "begin_balance_date": date_str,
-        "end_balance_date": date_str,
+        "begin_date": date_str,
+        "end_date": date_str,
     }
     data = json.dumps(payload).encode("utf-8")
     credentials = f"{username}:{password}"
