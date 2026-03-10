@@ -102,7 +102,7 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
         </Button>
       </div>
       <TooltipProvider>
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide">
           <nav className="space-y-1">
             {items.map(({ label, path, icon: Icon, key }) => {
             // /admin/orders faqat o'sha sahifa yoki order-statuses yoki orders/:id da aktiv; orders-diller/orikzor alohida
