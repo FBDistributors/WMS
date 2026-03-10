@@ -208,6 +208,7 @@ export function MovementPage() {
               <th className="px-4 py-3 text-left">{t('inventory:columns.product')}</th>
               <th className="px-4 py-3 text-left">{t('inventory:columns.lot')}</th>
               <th className="px-4 py-3 text-left">{t('inventory:columns.location')}</th>
+              <th className="px-4 py-3 text-left">{t('inventory:columns.created_by')}</th>
               <th className="px-4 py-3 text-left">{t('inventory:columns.created_at')}</th>
             </tr>
           </thead>
@@ -242,6 +243,9 @@ export function MovementPage() {
                 </td>
                 <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
                   {row.location_code ?? row.location_id}
+                </td>
+                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
+                  {row.created_by_username ?? row.created_by_user_id ?? '—'}
                 </td>
                 <td className="px-4 py-3 text-slate-500">
                   {new Date(row.created_at).toLocaleString()}
@@ -502,6 +506,14 @@ export function MovementPage() {
                     : detailRow.reason_code === 'inventory_shortage'
                       ? t('admin:movement_page.reason_shortage')
                       : detailRow.reason_code ?? '—'}
+                </span>
+              </div>
+              <div>
+                <span className="font-medium text-slate-500 dark:text-slate-400">
+                  {t('inventory:columns.created_by')}:{' '}
+                </span>
+                <span className="text-slate-800 dark:text-slate-200">
+                  {detailRow.created_by_username ?? detailRow.created_by_user_id ?? '—'}
                 </span>
               </div>
               <div>
