@@ -15,6 +15,7 @@
   "smartup_balance_empty_title": "Данные за сегодня ещё не загружены",
   "smartup_balance_empty_desc": "Нажмите кнопку «Загрузить».",
   "smartup_balance_load_btn": "Загрузить",
+  "smartup_balance_load_more": "Загрузить ещё",
   "export_excel": "Скачать в Excel",
   "export_with_expiry": "Остаток со сроком",
   "export_qty_only": "Только остаток",

@@ -5,6 +5,7 @@
   "smartup_balance_empty_title":"Today's data not loaded yet",
   "smartup_balance_empty_desc":"Click the Load button.",
   "smartup_balance_load_btn":"Load",
+  "smartup_balance_load_more":"Load more",
   "export_excel":"Export to Excel",
   "export_with_expiry":"Stock with expiry",
   "export_qty_only":"Stock only",

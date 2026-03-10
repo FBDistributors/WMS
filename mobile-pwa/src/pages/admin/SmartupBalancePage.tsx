@@ -35,15 +35,20 @@ function getColumns(rows: Record<string, unknown>[]): string[] {
   return Object.keys(first).filter((k) => first[k] !== undefined && first[k] !== null)
 }
 
+const INITIAL_PAGE_SIZE = 50
+const LOAD_MORE_SIZE = 50
+
 export function SmartupBalancePage() {
   const { t } = useTranslation(['inventory', 'common'])
   const [data, setData] = useState<unknown>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [visibleCount, setVisibleCount] = useState(INITIAL_PAGE_SIZE)
 
   const load = useCallback(async (forceRefresh = false) => {
     setIsLoading(true)
     setError(null)
+    if (forceRefresh) setVisibleCount(INITIAL_PAGE_SIZE)
     try {
       const res = await getSmartupBalance({ refresh: forceRefresh })
       setData(res)
@@ -58,8 +63,17 @@ export function SmartupBalancePage() {
     void load(false)
   }, [load])
 
-  const rows = useMemo(() => normalizeToRows(data), [data])
-  const columns = useMemo(() => getColumns(rows), [rows])
+  const allRows = useMemo(() => normalizeToRows(data), [data])
+  const rows = useMemo(
+    () => allRows.slice(0, visibleCount),
+    [allRows, visibleCount]
+  )
+  const hasMore = allRows.length > visibleCount
+  const loadMore = useCallback(() => {
+    setVisibleCount((n) => Math.min(n + LOAD_MORE_SIZE, allRows.length))
+  }, [allRows.length])
+
+  const columns = useMemo(() => getColumns(allRows.length > 0 ? allRows : rows), [allRows, rows])
 
   const content = useMemo(() => {
     if (isLoading) {
@@ -85,35 +99,44 @@ export function SmartupBalancePage() {
       )
     }
     return (
-      <TableScrollArea inline>
-        <table className="w-max min-w-full text-sm">
-          <thead className="text-xs uppercase text-slate-500">
-            <tr className="border-b border-slate-200 dark:border-slate-800">
-              {columns.map((col) => (
-                <th key={col} className="whitespace-nowrap px-3 py-3 text-left">
-                  {col}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, idx) => (
-              <tr
-                key={idx}
-                className="border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/40"
-              >
+      <div className="flex flex-col gap-3">
+        <TableScrollArea inline className="flex-1 min-h-0">
+          <table className="w-max min-w-full text-sm">
+            <thead className="text-xs uppercase text-slate-500">
+              <tr className="border-b border-slate-200 dark:border-slate-800">
                 {columns.map((col) => (
-                  <td key={col} className="whitespace-nowrap px-3 py-3 text-slate-700 dark:text-slate-200">
-                    {row[col] != null ? String(row[col]) : '—'}
-                  </td>
+                  <th key={col} className="whitespace-nowrap px-3 py-3 text-left">
+                    {col}
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </TableScrollArea>
+            </thead>
+            <tbody>
+              {rows.map((row, idx) => (
+                <tr
+                  key={idx}
+                  className="border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/40"
+                >
+                  {columns.map((col) => (
+                    <td key={col} className="whitespace-nowrap px-3 py-3 text-slate-700 dark:text-slate-200">
+                      {row[col] != null ? String(row[col]) : '—'}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableScrollArea>
+        {hasMore && (
+          <div className="flex justify-center pb-2">
+            <Button variant="secondary" onClick={loadMore}>
+              {t('inventory:smartup_balance_load_more')} ({visibleCount} / {allRows.length})
+            </Button>
+          </div>
+        )}
+      </div>
     )
-  }, [columns, error, isLoading, load, rows, t])
+  }, [columns, error, isLoading, load, rows, allRows.length, visibleCount, hasMore, loadMore, t])
 
   return (
     <AdminLayout titleSlot={<InventoryHeaderTabs />}>
@@ -131,7 +154,7 @@ export function SmartupBalancePage() {
             </Button>
           </div>
         </div>
-        <div className="max-h-[calc(100vh-320px)] min-h-0 overflow-auto">{content}</div>
+        <div className="min-h-[min(70vh,600px)] max-h-[calc(100vh-220px)] flex flex-col overflow-auto">{content}</div>
       </Card>
     </AdminLayout>
   )
