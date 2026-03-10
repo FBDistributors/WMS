@@ -6,6 +6,8 @@
   "smartup_balance_empty_desc":"Click the Load button.",
   "smartup_balance_load_btn":"Load",
   "smartup_balance_load_more":"Load more",
+  "smartup_balance_search_placeholder":"Search by code, barcode, warehouse, date",
+  "smartup_balance_no_results":"No records match the filter",
   "export_excel":"Export to Excel",
   "export_with_expiry":"Stock with expiry",
   "export_qty_only":"Stock only",

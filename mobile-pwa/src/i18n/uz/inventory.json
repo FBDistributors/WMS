@@ -6,6 +6,8 @@
   "smartup_balance_empty_desc":"Yuklash tugmasini bosing.",
   "smartup_balance_load_btn":"Yuklash",
   "smartup_balance_load_more":"Yana yuklash",
+  "smartup_balance_search_placeholder":"Kod, shtrix, ombor, sana bo'yicha qidirish",
+  "smartup_balance_no_results":"Filtrga mos yozuvlar topilmadi",
   "export_excel":"Excelga yuklash",
   "export_with_expiry":"Qoldiq muddati bilan",
   "export_qty_only":"Qoldiqni o'zi",
