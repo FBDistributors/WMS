@@ -44,7 +44,11 @@
     "reason_shortage": "Out (from source)",
     "reason_overage": "In (to destination)",
     "detail_title": "Transfer detail",
-    "detail_reason": "Action"
+    "detail_reason": "Action",
+    "search_placeholder": "Search by product, batch, location or who did it",
+    "filter_btn": "Filter",
+    "filter_by_date": "Filter by date",
+    "search_no_results": "No results for this search."
   },
   "settings": {
     "title": "Settings",

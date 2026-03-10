@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus } from 'lucide-react'
+import { Filter, Plus, X } from 'lucide-react'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { DateInput } from '../../components/DateInput'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
@@ -43,6 +44,12 @@ export function MovementPage() {
   const [submitLoading, setSubmitLoading] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [detailRow, setDetailRow] = useState<InventoryMovement | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterDateFrom, setFilterDateFrom] = useState('')
+  const [filterDateTo, setFilterDateTo] = useState('')
+  const [historyOffset, setHistoryOffset] = useState(0)
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
 
   const loadHistory = useCallback(async () => {
     setIsLoading(true)
@@ -51,8 +58,10 @@ export function MovementPage() {
       const data = await getInventoryMovements({
         movement_type: 'adjust',
         reason_code: 'inventory_shortage,inventory_overage',
+        date_from: filterDateFrom.trim() || undefined,
+        date_to: filterDateTo.trim() || undefined,
         limit: PAGE_SIZE,
-        offset: 0,
+        offset: historyOffset,
       })
       setItems(data)
     } catch (err) {
@@ -60,7 +69,7 @@ export function MovementPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [t])
+  }, [t, filterDateFrom, filterDateTo, historyOffset])
 
   useEffect(() => {
     void loadHistory()
@@ -175,6 +184,22 @@ export function MovementPage() {
     }
   }, [canSubmit, selectedProduct, fromRow, toLocationId, qtyNum, loadHistory, t])
 
+  const filteredItems = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return items
+    return items.filter((row) => {
+      const product = [row.product_code, row.product_name].filter(Boolean).join(' ').toLowerCase()
+      const batch = (row.batch ?? row.lot_id ?? '').toString().toLowerCase()
+      const location = (row.location_code ?? row.location_id ?? '').toString().toLowerCase()
+      const who = (row.created_by_username ?? row.created_by_user_id ?? '').toString().toLowerCase()
+      return product.includes(q) || batch.includes(q) || location.includes(q) || who.includes(q)
+    })
+  }, [items, searchQuery])
+
+  const hasNextPage = items.length >= PAGE_SIZE
+  const pageStart = historyOffset + 1
+  const pageEnd = historyOffset + items.length
+
   const content = () => {
     if (isLoading) {
       return <TableSkeleton rows={6} columns={5} />
@@ -198,6 +223,13 @@ export function MovementPage() {
         />
       )
     }
+    if (filteredItems.length === 0) {
+      return (
+        <p className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+          {t('admin:movement_page.search_no_results')}
+        </p>
+      )
+    }
     return (
       <TableScrollArea>
         <table className="min-w-full text-sm">
@@ -213,7 +245,7 @@ export function MovementPage() {
             </tr>
           </thead>
           <tbody>
-            {items.map((row) => (
+            {filteredItems.map((row) => (
               <tr
                 key={row.id}
                 className="cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
@@ -272,7 +304,122 @@ export function MovementPage() {
         <h2 className="mb-3 text-lg font-medium text-slate-700 dark:text-slate-300">
           {t('admin:movement_page.history')}
         </h2>
-        <Card className="space-y-4">{content()}</Card>
+        <Card className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <label className="flex-1 min-w-[180px] max-w-md text-sm text-slate-600 dark:text-slate-300">
+              <span className="sr-only">{t('admin:movement_page.search_placeholder')}</span>
+              <input
+                type="search"
+                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={t('admin:movement_page.search_placeholder')}
+              />
+            </label>
+            <div className="relative" ref={filterPanelRef}>
+              <Button
+                variant="outline"
+                onClick={() => setFilterPanelOpen((o) => !o)}
+                className="gap-2"
+                aria-label={t('admin:movement_page.filter_btn')}
+                aria-expanded={filterPanelOpen}
+              >
+                <Filter size={18} />
+                {t('admin:movement_page.filter_btn')}
+              </Button>
+              {filterPanelOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    aria-hidden
+                    onClick={() => setFilterPanelOpen(false)}
+                  />
+                  <div className="absolute right-0 top-full z-50 mt-2 w-full min-w-[280px] max-w-sm rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                    <div className="mb-3 flex items-center justify-between">
+                      <span className="font-semibold text-slate-900 dark:text-slate-100">
+                        {t('admin:movement_page.filter_by_date')}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setFilterPanelOpen(false)}
+                        className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 dark:hover:text-slate-400 dark:hover:bg-slate-800"
+                        aria-label={t('common:close')}
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      <label className="block text-sm text-slate-600 dark:text-slate-400">
+                        {t('inventory:filters.date_from')}
+                        <DateInput
+                          value={filterDateFrom}
+                          onChange={setFilterDateFrom}
+                          className="mt-1 w-full"
+                          aria-label={t('inventory:filters.date_from')}
+                        />
+                      </label>
+                      <label className="block text-sm text-slate-600 dark:text-slate-400">
+                        {t('inventory:filters.date_to')}
+                        <DateInput
+                          value={filterDateTo}
+                          onChange={setFilterDateTo}
+                          className="mt-1 w-full"
+                          aria-label={t('inventory:filters.date_to')}
+                        />
+                      </label>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          setFilterDateFrom('')
+                          setFilterDateTo('')
+                          setHistoryOffset(0)
+                          setFilterPanelOpen(false)
+                        }}
+                      >
+                        {t('orders:filters.filter_clear')}
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setHistoryOffset(0)
+                          setFilterPanelOpen(false)
+                        }}
+                      >
+                        {t('inventory:filters.apply')}
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+          {content()}
+          {items.length > 0 && (
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <span className="mr-auto text-sm text-slate-600 dark:text-slate-400">
+                {pageStart}–{pageEnd}
+                {hasNextPage ? '+' : ''}
+              </span>
+              <Button
+                variant="secondary"
+                disabled={historyOffset === 0}
+                onClick={() => {
+                  setHistoryOffset((o) => Math.max(0, o - PAGE_SIZE))
+                }}
+              >
+                {t('common:buttons.back')}
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={!hasNextPage}
+                onClick={() => setHistoryOffset((o) => o + PAGE_SIZE)}
+              >
+                {t('common:buttons.next')}
+              </Button>
+            </div>
+          )}
+        </Card>
       </AdminLayout>
 
       {modalOpen && (

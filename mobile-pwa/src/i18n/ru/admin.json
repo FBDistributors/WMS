@@ -44,7 +44,11 @@
     "reason_shortage": "Расход (из источника)",
     "reason_overage": "Приход (в назначение)",
     "detail_title": "Детали перемещения",
-    "detail_reason": "Действие"
+    "detail_reason": "Действие",
+    "search_placeholder": "Поиск по товару, партии, локации или кто выполнил",
+    "filter_btn": "Фильтр",
+    "filter_by_date": "Фильтр по дате",
+    "search_no_results": "По запросу ничего не найдено."
   },
   "settings": {
     "title": "Настройки",

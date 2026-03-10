@@ -44,7 +44,11 @@
     "reason_shortage": "Chiqim (manbadan)",
     "reason_overage": "Kirim (manbaga)",
     "detail_title": "Ko'chirish tafsiloti",
-    "detail_reason": "Harakat"
+    "detail_reason": "Harakat",
+    "search_placeholder": "Mahsulot, partiya, joylashuv yoki kim qilgani bo'yicha qidirish",
+    "filter_btn": "Filter",
+    "filter_by_date": "Sana bo'yicha filter",
+    "search_no_results": "Qidiruv bo'yicha natija topilmadi."
   },
   "settings": {
     "title": "Sozlamalar",
