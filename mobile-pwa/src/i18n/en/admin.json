@@ -46,6 +46,8 @@
     "detail_title": "Transfer detail",
     "detail_reason": "Action",
     "view_history_link": "View transfer history",
+    "section_simple_transfer": "Simple or unit transfer",
+    "section_move_entire_location": "Move all products in a location",
     "search_placeholder": "Search by product, batch, location or who did it",
     "filter_btn": "Filter",
     "filter_by_date": "Filter by date",

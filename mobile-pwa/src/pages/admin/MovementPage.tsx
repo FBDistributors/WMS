@@ -191,6 +191,13 @@ export function MovementPage() {
     }
   }, [canBulkMove, bulkFromLocationId, bulkToLocationId, t])
 
+  const resetBulkForm = useCallback(() => {
+    setBulkFromLocationId('')
+    setBulkToLocationId('')
+    setBulkError(null)
+    setBulkSuccessCount(null)
+  }, [])
+
   return (
     <AdminLayout title={t('admin:menu.movement')}>
       <Card className="p-4">
@@ -205,7 +212,7 @@ export function MovementPage() {
 
       <Card className="p-6">
         <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
-          {t('admin:movement_page.do_button')}
+          {t('admin:movement_page.section_simple_transfer')}
         </h3>
 
         <div className="mb-3">
@@ -392,7 +399,7 @@ export function MovementPage() {
 
       <Card className="p-6">
         <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
-          {t('admin:movement_page.move_entire_location_title')}
+          {t('admin:movement_page.section_move_entire_location')}
         </h3>
         <div className="mb-3">
           <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-400">
@@ -446,12 +453,17 @@ export function MovementPage() {
             {t('admin:movement_page.move_entire_location_success', { count: bulkSuccessCount })}
           </p>
         )}
-        <Button
-          onClick={handleBulkMove}
-          disabled={!canBulkMove}
-        >
-          {bulkLoading ? '...' : t('admin:movement_page.move_entire_location_submit')}
-        </Button>
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={resetBulkForm} disabled={bulkLoading}>
+            {t('admin:movement_page.cancel')}
+          </Button>
+          <Button
+            onClick={handleBulkMove}
+            disabled={!canBulkMove}
+          >
+            {bulkLoading ? '...' : t('admin:movement_page.move_entire_location_submit')}
+          </Button>
+        </div>
       </Card>
     </AdminLayout>
   )
