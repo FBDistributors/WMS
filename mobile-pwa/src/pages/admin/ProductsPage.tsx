@@ -12,6 +12,7 @@ import { useTableConfig } from '../../admin/hooks/useTableConfig'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { TableSkeleton } from '../../components/ui/TableSkeleton'
 import {
   getProducts,
   listProductsSyncRuns,
@@ -157,12 +158,7 @@ export function ProductsPage() {
 
   const content = useMemo(() => {
     if (isLoading) {
-      return (
-        <div className="space-y-3">
-          <div className="h-20 w-full animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800" />
-          <div className="h-20 w-full animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800" />
-        </div>
-      )
+      return <TableSkeleton rows={6} columns={5} rowHeight="h-20" />
     }
 
     if (error) {

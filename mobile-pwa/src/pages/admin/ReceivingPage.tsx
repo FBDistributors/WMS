@@ -11,6 +11,7 @@ import { Card } from '../../components/ui/card'
 import { DateInput } from '../../components/DateInput'
 import { MonthYearInput } from '../../components/MonthYearInput'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { TableSkeleton } from '../../components/ui/TableSkeleton'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { getProducts, type Product } from '../../services/productsApi'
 import { getLocations, type Location } from '../../services/locationsApi'
@@ -663,7 +664,7 @@ export function ReceivingPage() {
           </div>
         </div>
         {isLoading ? (
-          <div className="h-24 w-full animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800" />
+          <TableSkeleton rows={5} columns={4} />
         ) : receipts.length === 0 ? (
           <EmptyState title={t('receiving:empty')} description={t('receiving:empty_desc')} />
         ) : filteredReceipts.length === 0 ? (

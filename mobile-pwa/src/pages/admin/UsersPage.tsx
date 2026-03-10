@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Pencil, Search, Users } from 'lucide-react'
+import { Pencil, RefreshCw, Search, Users } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { TableSkeleton } from '../../components/ui/TableSkeleton'
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
 import { listUsers } from '../../services/usersApi'
@@ -93,16 +94,14 @@ export function UsersPage() {
             </option>
           ))}
         </select>
-        <Button variant="ghost" onClick={load}>
+        <Button variant="ghost" onClick={load} disabled={isLoading}>
+          <RefreshCw size={16} className={isLoading ? 'animate-spin shrink-0' : 'shrink-0'} />
           {t('common:buttons.refresh')}
         </Button>
       </div>
 
       {isLoading ? (
-        <div className="space-y-3">
-          <div className="h-14 w-full animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-700" />
-          <div className="h-14 w-full animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-700" />
-        </div>
+        <TableSkeleton rows={6} columns={4} rowHeight="h-14" />
       ) : error ? (
         <EmptyState
           icon={<Users size={32} />}

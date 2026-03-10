@@ -9,6 +9,7 @@ import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { TableSkeleton } from '../../components/ui/TableSkeleton'
 import { getLocations, type Location } from '../../services/locationsApi'
 import { getInventoryDetails, type InventoryDetailRow } from '../../services/inventoryApi'
 import { formatExpiryDate } from '../../utils/expiry'
@@ -53,7 +54,7 @@ export function InventoryDetailsPage() {
 
   const content = useMemo(() => {
     if (isLoading) {
-      return <div className="h-24 w-full animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800" />
+      return <TableSkeleton rows={6} columns={5} />
     }
     if (error) {
       return (

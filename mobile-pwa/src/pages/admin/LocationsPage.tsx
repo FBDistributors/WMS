@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Download, Pencil, Plus, Printer, QrCode, X } from 'lucide-react'
+import { Download, Pencil, Plus, Printer, QrCode, RefreshCw, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import JsBarcode from 'jsbarcode'
 import QRCode from 'qrcode'
@@ -11,6 +11,7 @@ import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { TableSkeleton } from '../../components/ui/TableSkeleton'
 import {
   createLocation,
   deactivateLocation,
@@ -101,7 +102,7 @@ export function LocationsPage() {
 
   const content = useMemo(() => {
     if (isLoading) {
-      return <div className="h-24 w-full animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800" />
+      return <TableSkeleton rows={6} columns={6} />
     }
     if (error) {
       return (
@@ -296,6 +297,7 @@ export function LocationsPage() {
         {!isLoading && !error && filteredItems.length > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-4 dark:border-slate-800">
             <Button variant="outline" onClick={() => void load()} disabled={isLoading}>
+              <RefreshCw size={16} className={isLoading ? 'animate-spin shrink-0' : 'shrink-0'} />
               {t('common:buttons.refresh')}
             </Button>
             <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">

@@ -8,6 +8,7 @@ import { Card } from '../../components/ui/card'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { TableSkeleton } from '../../components/ui/TableSkeleton'
 import { getProducts, type Product } from '../../services/productsApi'
 
 const statusVariant = (isActive: boolean) => (isActive ? 'success' : 'neutral')
@@ -49,12 +50,7 @@ export function ProductsListPage() {
 
   const content = useMemo(() => {
     if (isLoading) {
-      return (
-        <div className="space-y-3">
-          <div className="h-16 w-full animate-pulse rounded-2xl bg-slate-200" />
-          <div className="h-16 w-full animate-pulse rounded-2xl bg-slate-200" />
-        </div>
-      )
+      return <TableSkeleton rows={5} columns={4} rowHeight="h-16" />
     }
 
     if (error) {

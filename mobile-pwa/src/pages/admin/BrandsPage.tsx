@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Pencil, Plus, X } from 'lucide-react'
+import { Pencil, Plus, RefreshCw, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { TableSkeleton } from '../../components/ui/TableSkeleton'
 import {
   createBrand,
   deactivateBrand,
@@ -61,7 +62,7 @@ export function BrandsPage() {
 
   const content = useMemo(() => {
     if (isLoading) {
-      return <div className="h-24 w-full animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800" />
+      return <TableSkeleton rows={6} columns={4} />
     }
     if (error) {
       return <EmptyState title={error} actionLabel={t('common:buttons.retry')} onAction={load} />
@@ -160,7 +161,8 @@ export function BrandsPage() {
             />
             {t('brands:show_inactive')}
           </label>
-          <Button variant="secondary" onClick={load} className="shrink-0">
+          <Button variant="secondary" onClick={load} className="shrink-0" disabled={isLoading}>
+            <RefreshCw size={16} className={isLoading ? 'animate-spin shrink-0' : 'shrink-0'} />
             {t('common:buttons.refresh')}
           </Button>
         </div>

@@ -7,6 +7,7 @@ import { AdminLayout } from '../../admin/components/AdminLayout'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { TableSkeleton } from '../../components/ui/TableSkeleton'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { listPickLists, cancelPickList, type PickList } from '../../services/pickingApi'
 import { useAuth } from '../../rbac/AuthProvider'
@@ -74,7 +75,7 @@ export function PickListsPage() {
 
   const content = useMemo(() => {
     if (isLoading) {
-      return <div className="h-24 w-full animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800" />
+      return <TableSkeleton rows={6} columns={4} />
     }
     if (error) {
       return (
