@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Search, PackagePlus, Settings, FileSpreadsheet, ChevronDown, Database } from 'lucide-react'
+import { Search, PackagePlus, Settings, FileSpreadsheet, ChevronDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import * as XLSX from 'xlsx'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { InventoryHeaderTabs } from '../../admin/components/inventory/InventoryHeaderTabs'
 import { InventoryTableSettings } from '../../admin/components/inventory/InventoryTableSettings'
 import { useInventoryTableConfig } from '../../admin/hooks/useInventoryTableConfig'
 import { TableScrollArea } from '../../components/TableScrollArea'
@@ -299,7 +300,7 @@ export function InventorySummaryPage() {
   }, [config.columnOrder, config.visibleColumns, data.items, error, isLoading, load, navigate, t])
 
   return (
-    <AdminLayout title={t('inventory:title')}>
+    <AdminLayout titleSlot={<InventoryHeaderTabs />}>
       <Card className="space-y-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex flex-1 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
@@ -319,14 +320,6 @@ export function InventorySummaryPage() {
             />
             {t('inventory:filters.only_available')}
           </label>
-          <Link
-            to="/admin/inventory/smartup-balance"
-            className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-200 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
-            title={t('inventory:smartup_balance_short')}
-          >
-            <Database size={18} />
-            {t('inventory:smartup_balance_short')}
-          </Link>
           <Link
             to="/admin/receiving"
             className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-200 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"

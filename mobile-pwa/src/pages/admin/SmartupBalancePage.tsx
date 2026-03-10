@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { InventoryHeaderTabs } from '../../admin/components/inventory/InventoryHeaderTabs'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
@@ -114,7 +115,7 @@ export function SmartupBalancePage() {
   }, [columns, error, isLoading, load, rows, t])
 
   return (
-    <AdminLayout title={t('inventory:smartup_balance_title')}>
+    <AdminLayout titleSlot={<InventoryHeaderTabs />}>
       <Card className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-slate-600 dark:text-slate-400">

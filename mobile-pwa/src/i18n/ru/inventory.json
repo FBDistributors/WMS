@@ -11,7 +11,7 @@
   "enter_stock": "Ввести остаток",
   "smartup_balance_title": "Остаток (SmartUP)",
   "smartup_balance_table_hint": "Данные из SmartUP за сегодня.",
-  "smartup_balance_short": "Данные остатка SmartUP",
+  "smartup_balance_short": "Остаток SmartUP",
   "export_excel": "Скачать в Excel",
   "export_with_expiry": "Остаток со сроком",
   "export_qty_only": "Только остаток",

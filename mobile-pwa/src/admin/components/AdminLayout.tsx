@@ -14,12 +14,14 @@ import { useTheme } from '../../theme/ThemeProvider'
 type AdminLayoutProps = {
   /** Headerda ko'rsatiladigan sarlavha; berilmasa yoki bo'sh bo'lsa headerda sarlavha ko'rinmaydi (sahifa ichidagi jadval/kartada qoladi). */
   title?: string
+  /** Headerda sarlavha o'rniga custom content (masalan tablar). titleSlot berilsa title e'tiborsiz qolinadi. */
+  titleSlot?: ReactNode
   backTo?: string
   actionSlot?: ReactNode
   children: ReactNode
 }
 
-export function AdminLayout({ title, backTo, actionSlot, children }: AdminLayoutProps) {
+export function AdminLayout({ title, titleSlot, backTo, actionSlot, children }: AdminLayoutProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -110,7 +112,9 @@ export function AdminLayout({ title, backTo, actionSlot, children }: AdminLayout
                 <Menu size={18} />
               </Button>
             )}
-            {title ? (
+            {titleSlot != null ? (
+              <div className="min-w-0">{titleSlot}</div>
+            ) : title ? (
               <div className="min-w-0 truncate text-base font-semibold text-slate-900 dark:text-slate-100 sm:text-lg">
                 {title}
               </div>
