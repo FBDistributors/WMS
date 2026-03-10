@@ -42,7 +42,9 @@
     "qty": "Кол-во",
     "lot": "Партия",
     "created_by": "Кто выполнил",
-    "created_at": "Создано"
+    "created_at": "Создано",
+    "smartup_qoldiq": "Остаток SmartUP",
+    "smartup_bron": "Smartup Bron"
   },
   "filters": {
     "apply": "Применить",

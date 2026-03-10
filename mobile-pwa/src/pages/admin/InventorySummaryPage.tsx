@@ -16,6 +16,7 @@ import { TableSkeleton } from '../../components/ui/TableSkeleton'
 import {
   getInventorySummaryLight,
   type InventorySummaryLightRow,
+  getSmartupBalance,
 } from '../../services/inventoryApi'
 
 const COLUMN_OPTIONS = [
@@ -25,6 +26,8 @@ const COLUMN_OPTIONS = [
   { id: 'brand', labelKey: 'inventory:columns.brand' },
   { id: 'total_qty', labelKey: 'inventory:columns.total_qty' },
   { id: 'available', labelKey: 'inventory:columns.available' },
+  { id: 'smartup_qoldiq', labelKey: 'inventory:columns.smartup_qoldiq' },
+  { id: 'smartup_bron', labelKey: 'inventory:columns.smartup_bron' },
 ]
 
 const DEBOUNCE_MS = 400
@@ -49,6 +52,8 @@ export function InventorySummaryPage() {
   const [isExporting, setIsExporting] = useState(false)
   const [excelMenuOpen, setExcelMenuOpen] = useState(false)
   const excelMenuRef = useRef<HTMLDivElement>(null)
+  const [smartupQoldiqByCode, setSmartupQoldiqByCode] = useState<Map<string, number>>(new Map())
+  const [smartupBronByCode, setSmartupBronByCode] = useState<Map<string, number>>(new Map())
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), DEBOUNCE_MS)
@@ -59,16 +64,65 @@ export function InventorySummaryPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const res = await getInventorySummaryLight({
-        search: debouncedSearch.trim() || undefined,
-        only_available: onlyAvailable,
-        include_locations: true,
-        limit: PAGE_SIZE,
-        offset,
-      })
-      setData({ items: res.items, total: res.total })
+      const [summaryRes, smartupQoldiqRes, smartupBronRes] = await Promise.all([
+        getInventorySummaryLight({
+          search: debouncedSearch.trim() || undefined,
+          only_available: onlyAvailable,
+          include_locations: true,
+          limit: PAGE_SIZE,
+          offset,
+        }),
+        getSmartupBalance({ warehouse_code: '001' }),
+        getSmartupBalance({ warehouse_code: '002' }),
+      ])
+
+      setData({ items: summaryRes.items, total: summaryRes.total })
+
+      const buildMap = (raw: unknown): Map<string, number> => {
+        const result = new Map<string, number>()
+        if (!raw || typeof raw !== 'object') return result
+        const obj = raw as Record<string, unknown>
+        const listSources = ['balance', 'items', 'data', 'movement', 'export']
+        let rows: unknown[] = []
+        if (Array.isArray(raw)) {
+          rows = raw
+        } else {
+          for (const key of listSources) {
+            const val = obj[key]
+            if (Array.isArray(val)) {
+              rows = val
+              break
+            }
+          }
+        }
+        for (const row of rows) {
+          if (!row || typeof row !== 'object') continue
+          const rec = row as Record<string, unknown>
+          const keys = Object.keys(rec)
+          const productKey =
+            keys.find((k) => k.toLowerCase() === 'product_code') ??
+            keys.find((k) => k.toLowerCase().includes('product') && k.toLowerCase().includes('code'))
+          const qtyKey = keys.find((k) => k.toLowerCase() === 'quantity') ?? keys.find((k) => k.toLowerCase().startsWith('qty'))
+          if (!productKey || !qtyKey) continue
+          const codeRaw = rec[productKey]
+          const qtyRaw = rec[qtyKey]
+          if (codeRaw == null || qtyRaw == null) continue
+          const code = String(codeRaw).trim()
+          if (!code) continue
+          const qtyNum = Number(qtyRaw)
+          if (!Number.isFinite(qtyNum)) continue
+          const prev = result.get(code) ?? 0
+          result.set(code, prev + qtyNum)
+        }
+        return result
+      }
+
+      setSmartupQoldiqByCode(buildMap(smartupQoldiqRes))
+      setSmartupBronByCode(buildMap(smartupBronRes))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('inventory:load_failed'))
+      setSmartupQoldiqByCode(new Map())
+      setSmartupBronByCode(new Map())
     } finally {
       setIsLoading(false)
     }
@@ -223,8 +277,14 @@ export function InventorySummaryPage() {
                 visibleColumns.has(columnId) ? (
                   <th
                     key={columnId}
-                    className={`px-3 py-3 text-left ${
-                      columnId === 'barcode' ? 'min-w-[9rem]' : columnId === 'product' ? 'min-w-[12rem]' : ''
+                    className={`px-3 py-3 ${
+                      columnId === 'barcode'
+                        ? 'min-w-[9rem] text-left'
+                        : columnId === 'product'
+                          ? 'min-w-[12rem] text-left'
+                          : columnId === 'smartup_qoldiq' || columnId === 'smartup_bron'
+                            ? 'text-right tabular-nums'
+                            : 'text-left'
                     }`}
                   >
                     {columnLabels.get(columnId)}
@@ -244,11 +304,17 @@ export function InventorySummaryPage() {
                   {orderedColumns.map((columnId) =>
                     visibleColumns.has(columnId) ? (
                       <td
-                      key={columnId}
-                      className={`whitespace-nowrap px-3 py-3 ${
-                        columnId === 'barcode' ? 'min-w-[9rem]' : columnId === 'product' ? 'min-w-[12rem]' : ''
-                      }`}
-                    >
+                        key={columnId}
+                        className={`whitespace-nowrap px-3 py-3 ${
+                          columnId === 'barcode'
+                            ? 'min-w-[9rem]'
+                            : columnId === 'product'
+                              ? 'min-w-[12rem]'
+                              : columnId === 'smartup_qoldiq' || columnId === 'smartup_bron'
+                                ? 'text-right tabular-nums'
+                                : ''
+                        }`}
+                      >
                         {columnId === 'code' && (
                           <span className="font-mono">{row.product_code}</span>
                         )}
@@ -267,6 +333,18 @@ export function InventorySummaryPage() {
                         {columnId === 'brand' && (row.brand_name ?? '—')}
                         {columnId === 'total_qty' && Math.round(Number(row.total_qty))}
                         {columnId === 'available' && Math.round(Number(row.available_qty))}
+                        {columnId === 'smartup_qoldiq' &&
+                          (smartupQoldiqByCode.has(row.product_code)
+                            ? Math.round(
+                                Number(smartupQoldiqByCode.get(row.product_code) ?? 0),
+                              )
+                            : '—')}
+                        {columnId === 'smartup_bron' &&
+                          (smartupBronByCode.has(row.product_code)
+                            ? Math.round(
+                                Number(smartupBronByCode.get(row.product_code) ?? 0),
+                              )
+                            : '—')}
                         {columnId === 'location' &&
                           (locs.length === 0 ? (
                           <Link
@@ -298,7 +376,18 @@ export function InventorySummaryPage() {
         </table>
       </TableScrollArea>
     )
-  }, [config.columnOrder, config.visibleColumns, data.items, error, isLoading, load, navigate, t])
+  }, [
+    config.columnOrder,
+    config.visibleColumns,
+    data.items,
+    error,
+    isLoading,
+    load,
+    navigate,
+    smartupQoldiqByCode,
+    smartupBronByCode,
+    t,
+  ])
 
   return (
     <AdminLayout titleSlot={<InventoryHeaderTabs />}>
