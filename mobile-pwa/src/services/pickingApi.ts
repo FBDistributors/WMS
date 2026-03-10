@@ -35,6 +35,7 @@ export type PickListDetails = PickList & {
 type BackendPickingListItem = {
   id: string
   reference_number: string
+  order_number?: string | null
   status: string
   lines_total: number
   lines_done: number
