@@ -48,6 +48,8 @@
     "view_history_link": "View transfer history",
     "section_simple_transfer": "Simple or unit transfer",
     "section_move_entire_location": "Move all products in a location",
+    "tab_product": "Move product",
+    "to_location_code_placeholder": "Type location code",
     "search_placeholder": "Search by product, batch, location or who did it",
     "filter_btn": "Filter",
     "filter_by_date": "Filter by date",

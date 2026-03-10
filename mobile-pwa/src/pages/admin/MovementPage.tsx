@@ -15,11 +15,11 @@ import {
 } from '../../services/inventoryApi'
 import { getLocations, type Location } from '../../services/locationsApi'
 
-type MovementKind = 'expired' | 'damaged' | 'simple'
+type ActiveTab = 'product' | 'location'
 
 export function MovementPage() {
   const { t } = useTranslation(['admin', 'inventory', 'common'])
-  const [movementKind, setMovementKind] = useState<MovementKind>('simple')
+  const [activeTab, setActiveTab] = useState<ActiveTab>('product')
   const [productSearch, setProductSearch] = useState('')
   const [productList, setProductList] = useState<InventorySummaryRow[]>([])
   const [productSearching, setProductSearching] = useState(false)
@@ -28,6 +28,7 @@ export function MovementPage() {
   const [detailsLoading, setDetailsLoading] = useState(false)
   const [fromRow, setFromRow] = useState<InventoryDetailRow | null>(null)
   const [toLocationId, setToLocationId] = useState('')
+  const [toLocationSearch, setToLocationSearch] = useState('')
   const [locations, setLocations] = useState<Location[]>([])
   const [locationsLoading, setLocationsLoading] = useState(false)
   const [qty, setQty] = useState('')
@@ -48,13 +49,13 @@ export function MovementPage() {
   }, [])
 
   const resetForm = useCallback(() => {
-    setMovementKind('simple')
     setProductSearch('')
     setProductList([])
     setSelectedProduct(null)
     setDetails([])
     setFromRow(null)
     setToLocationId('')
+    setToLocationSearch('')
     setQty('')
     setSubmitError(null)
   }, [])
@@ -86,6 +87,7 @@ export function MovementPage() {
     setDetails([])
     setFromRow(null)
     setToLocationId('')
+    setToLocationSearch('')
     setDetailsLoading(true)
     getInventoryDetails({ product_id: p.product_id, show_zero: false })
       .then((rows) => setDetails(rows))
@@ -96,14 +98,14 @@ export function MovementPage() {
   const toLocationOptions = useMemo(() => {
     if (locationsLoading || !locations.length) return []
     const fromId = fromRow?.location_id
-    if (movementKind === 'expired') {
-      return locations.filter((loc) => loc.zone_type === 'EXPIRED' && loc.id !== fromId)
-    }
-    if (movementKind === 'damaged') {
-      return locations.filter((loc) => loc.zone_type === 'DAMAGED' && loc.id !== fromId)
-    }
     return locations.filter((loc) => loc.id !== fromId)
-  }, [locations, locationsLoading, movementKind, fromRow?.location_id])
+  }, [locations, locationsLoading, fromRow?.location_id])
+
+  const toLocationFiltered = useMemo(() => {
+    const q = toLocationSearch.trim().toLowerCase()
+    if (!q) return toLocationOptions.slice(0, 15)
+    return toLocationOptions.filter((loc) => loc.code.toLowerCase().includes(q)).slice(0, 15)
+  }, [toLocationOptions, toLocationSearch])
 
   const maxQty = fromRow ? Number(fromRow.available) || 0 : 0
   const qtyNum = Math.floor(Number(qty) || 0)
@@ -210,31 +212,35 @@ export function MovementPage() {
         </Link>
       </Card>
 
-      <Card className="p-6">
-        <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
-          {t('admin:movement_page.section_simple_transfer')}
-        </h3>
-
-        <div className="mb-3">
-          <span className="mb-2 block text-sm font-medium text-slate-600 dark:text-slate-400">
-            {t('admin:movement_page.kind_label')}
-          </span>
-          <div className="flex gap-2">
-            {(['expired', 'damaged', 'simple'] as const).map((kind) => (
-              <Button
-                key={kind}
-                variant={movementKind === kind ? 'default' : 'secondary'}
-                onClick={() => {
-                  setMovementKind(kind)
-                  setToLocationId('')
-                }}
-              >
-                {t(`admin:movement_page.type_${kind}`)}
-              </Button>
-            ))}
-          </div>
+      <Card className="overflow-hidden">
+        <div className="flex border-b border-slate-200 dark:border-slate-700">
+          <button
+            type="button"
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'product'
+                ? 'border-b-2 border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'
+            }`}
+            onClick={() => setActiveTab('product')}
+          >
+            {t('admin:movement_page.tab_product')}
+          </button>
+          <button
+            type="button"
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'location'
+                ? 'border-b-2 border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'
+            }`}
+            onClick={() => setActiveTab('location')}
+          >
+            {t('admin:movement_page.section_move_entire_location')}
+          </button>
         </div>
 
+        <div className="p-6">
+          {activeTab === 'product' && (
+            <>
         <div className="mb-3">
           <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-400">
             {t('admin:movement_page.product_search')}
@@ -311,12 +317,14 @@ export function MovementPage() {
                       onClick={() => {
                         setFromRow(row)
                         setToLocationId('')
+                        setToLocationSearch('')
                       }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault()
                           setFromRow(row)
                           setToLocationId('')
+                          setToLocationSearch('')
                         }
                       }}
                     >
@@ -339,29 +347,41 @@ export function MovementPage() {
 
         {fromRow && (
           <>
-            <div className="mb-3">
+            <div className="mb-3 relative">
               <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-400">
                 {t('admin:movement_page.select_to')}
               </label>
-              <select
+              <input
+                type="text"
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                value={toLocationId}
-                onChange={(e) => setToLocationId(e.target.value)}
-              >
-                <option value="">—</option>
-                {toLocationOptions.map((loc) => (
-                  <option key={loc.id} value={loc.id}>
-                    {loc.code} {loc.zone_type ? `(${loc.zone_type})` : ''}
-                  </option>
-                ))}
-              </select>
+                value={toLocationId ? (locations.find((l) => l.id === toLocationId)?.code ?? toLocationSearch) : toLocationSearch}
+                onChange={(e) => {
+                  setToLocationSearch(e.target.value)
+                  setToLocationId('')
+                }}
+                placeholder={t('admin:movement_page.to_location_code_placeholder')}
+              />
+              {toLocationFiltered.length > 0 && !toLocationId && (
+                <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                  {toLocationFiltered.map((loc) => (
+                    <li key={loc.id}>
+                      <button
+                        type="button"
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
+                        onClick={() => {
+                          setToLocationId(loc.id)
+                          setToLocationSearch(loc.code)
+                        }}
+                      >
+                        {loc.code} {loc.zone_type ? `(${loc.zone_type})` : ''}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
               {toLocationOptions.length === 0 && !locationsLoading && (
                 <p className="mt-1 text-xs text-amber-600">
-                  {movementKind === 'expired'
-                    ? t('admin:movement_page.no_expired_zone')
-                    : movementKind === 'damaged'
-                      ? t('admin:movement_page.no_damaged_zone')
-                      : t('admin:movement_page.select_other')}
+                  {t('admin:movement_page.select_other')}
                 </p>
               )}
             </div>
@@ -395,12 +415,11 @@ export function MovementPage() {
             {submitLoading ? '...' : t('admin:movement_page.submit')}
           </Button>
         </div>
-      </Card>
+            </>
+          )}
 
-      <Card className="p-6">
-        <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
-          {t('admin:movement_page.section_move_entire_location')}
-        </h3>
+          {activeTab === 'location' && (
+            <>
         <div className="mb-3">
           <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-400">
             {t('admin:movement_page.move_entire_location_from')}
@@ -463,6 +482,9 @@ export function MovementPage() {
           >
             {bulkLoading ? '...' : t('admin:movement_page.move_entire_location_submit')}
           </Button>
+        </div>
+            </>
+          )}
         </div>
       </Card>
     </AdminLayout>

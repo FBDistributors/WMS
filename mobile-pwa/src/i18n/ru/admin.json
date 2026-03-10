@@ -48,6 +48,8 @@
     "view_history_link": "Посмотреть историю перемещений",
     "section_simple_transfer": "Простое или поштучное перемещение",
     "section_move_entire_location": "Переместить все товары в локации",
+    "tab_product": "Переместить товар",
+    "to_location_code_placeholder": "Введите код локации",
     "search_placeholder": "Поиск по товару, партии, локации или кто выполнил",
     "filter_btn": "Фильтр",
     "filter_by_date": "Фильтр по дате",

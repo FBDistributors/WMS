@@ -48,6 +48,8 @@
     "view_history_link": "Ko'chirishlar tarixini ko'rish",
     "section_simple_transfer": "Oddiy yoki dona ko'chirish",
     "section_move_entire_location": "Lokatsiyadagi barcha mahsulotni ko'chirish",
+    "tab_product": "Mahsulotni ko'chirish",
+    "to_location_code_placeholder": "Lokatsiya kodini yozing",
     "search_placeholder": "Mahsulot, partiya, joylashuv yoki kim qilgani bo'yicha qidirish",
     "filter_btn": "Filter",
     "filter_by_date": "Sana bo'yicha filter",
