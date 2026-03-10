@@ -23,7 +23,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { RootStackParamList } from '../types/navigation';
 import { useLocale } from '../i18n/LocaleContext';
 import { useNetwork } from '../network';
-import { getPickerProductDetail, listPickerLocations, getLocationContents, type PickerProductDetailResponse, type PickerProductLocation, type PickerLocationOption, type LocationContentsItem } from '../api/inventory';
+import { getPickerProductDetail, listPickerLocations, getLocationContents, isNoExpiryRestrictionZone, type PickerProductDetailResponse, type PickerProductLocation, type PickerLocationOption, type LocationContentsItem } from '../api/inventory';
 import { getPickers, type PickerUser } from '../api/picking';
 import { createReceipt, completeReceipt } from '../api/receiving';
 import { createStockMovement } from '../api/movements';
@@ -1064,7 +1064,11 @@ export function KirimFormScreen() {
 
         {lines.length > 0 && (
           <View style={styles.card}>
-            <Text style={styles.ruleNote}>{t('kirimRuleLocationSingleExpiry')}</Text>
+            <Text style={styles.ruleNote}>
+              {isNoExpiryRestrictionZone((flow === 'inventory' ? inventoryLocation : selectedLocation)?.zone_type)
+                ? t('kirimRuleNoRestrictionZone')
+                : t('kirimRuleLocationSingleExpiry')}
+            </Text>
             <Text style={styles.sectionTitle}>{t('returnsLines')} ({lines.length})</Text>
             {lines.map((line) => (
               <View key={line.id} style={styles.lineRow}>

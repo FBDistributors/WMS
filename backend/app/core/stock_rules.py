@@ -9,8 +9,12 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.models.location import Location as LocationModel
 from app.models.stock import StockLot as StockLotModel
 from app.models.stock import StockMovement as StockMovementModel
+
+# Bu zonalarda "bitta lokatsiyada bitta muddat" qoidasi qo'llanmaydi.
+ZONES_NO_EXPIRY_RESTRICTION = ("EXPIRED", "DAMAGED", "QUARANTINE")
 
 # Qoida: bitta lokatsiyaga bir xil mahsulotni ikki xil muddat bilan kirg'azish taqiqlanadi.
 LOCATION_SINGLE_EXPIRY_MSG = (
@@ -42,7 +46,11 @@ def check_location_single_expiry(
     product_id: UUID,
     new_expiry_normalized: Optional[date],
 ) -> None:
-    """Raise HTTP 400 if location already has this product with a different expiry."""
+    """Raise HTTP 400 if location already has this product with a different expiry.
+    EXPIRED, DAMAGED, QUARANTINE zonalarida tekshiruv o'tkazilmaydi."""
+    location = db.query(LocationModel).filter(LocationModel.id == location_id).one_or_none()
+    if location and location.zone_type in ZONES_NO_EXPIRY_RESTRICTION:
+        return
     existing = existing_expiry_dates_for_location_product(db, location_id, product_id)
     if not existing:
         return

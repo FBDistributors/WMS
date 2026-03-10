@@ -77,6 +77,7 @@ class PickerLocationOption(BaseModel):
     id: UUID
     code: str
     name: str
+    zone_type: str = "NORMAL"
 
 
 class ByBarcodeLocationInfo(BaseModel):
@@ -349,12 +350,20 @@ async def list_picker_locations(
     _guard=Depends(PICKER_INVENTORY_PERMISSION),
 ):
     rows = (
-        db.query(LocationModel.id, LocationModel.code, LocationModel.name)
+        db.query(LocationModel.id, LocationModel.code, LocationModel.name, LocationModel.zone_type)
         .filter(LocationModel.is_active == True)
         .order_by(LocationModel.code)
         .all()
     )
-    return [PickerLocationOption(id=r.id, code=r.code, name=r.name) for r in rows]
+    return [
+        PickerLocationOption(
+            id=r.id,
+            code=r.code,
+            name=r.name,
+            zone_type=r.zone_type or "NORMAL",
+        )
+        for r in rows
+    ]
 
 
 @router.get(

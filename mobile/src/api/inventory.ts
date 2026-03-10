@@ -52,7 +52,14 @@ export type PickerLocationOption = {
   id: string;
   code: string;
   name: string;
+  zone_type?: string;
 };
+
+const ZONES_NO_EXPIRY_RESTRICTION = ['EXPIRED', 'DAMAGED', 'QUARANTINE'];
+
+export function isNoExpiryRestrictionZone(zoneType?: string): boolean {
+  return !!zoneType && ZONES_NO_EXPIRY_RESTRICTION.includes(zoneType);
+}
 
 type ListParams = {
   q?: string;
