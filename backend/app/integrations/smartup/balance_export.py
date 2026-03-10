@@ -15,14 +15,9 @@ logger = logging.getLogger(__name__)
 DEFAULT_BALANCE_EXPORT_URL = "https://smartup.online/b/anor/mxsx/mkw/balance$export"
 
 
-def fetch_balance_from_smartup(
-    filial_id: str | None = None,
-    begin_modified_on: date | None = None,
-    end_modified_on: date | None = None,
-) -> dict:
+def fetch_balance_from_smartup(filial_id: str | None = None) -> dict:
     """
-    SmartUP balance$export ga POST so'rov yuborib, bugungi kun ma'lumotini oladi.
-    begin_modified_on/end_modified_on berilsa delta (faqat o'zgargan) so'rov sinab ko'riladi (API qo'llab-quvvatlasa).
+    SmartUP balance$export ga POST so'rov yuborib, bugungi kun ma'lumotini oladi (to'liq yuklash).
     Auth: SMARTUP_BASIC_USER, SMARTUP_BASIC_PASS, SMARTUP_PROJECT_CODE, SMARTUP_FILIAL_ID (boshqa API lar bilan bir xil).
     Qaytaradi: to'liq JSON javob (odatda {"balance": [...]}).
     """
@@ -45,9 +40,6 @@ def fetch_balance_from_smartup(
         "begin_date": date_str,
         "end_date": date_str,
     }
-    if begin_modified_on is not None and end_modified_on is not None:
-        payload["begin_modified_on"] = begin_modified_on.strftime("%d.%m.%Y")
-        payload["end_modified_on"] = end_modified_on.strftime("%d.%m.%Y")
     data = json.dumps(payload).encode("utf-8")
     credentials = f"{username}:{password}"
     basic_token = base64.b64encode(credentials.encode("utf-8")).decode("utf-8")
@@ -59,12 +51,7 @@ def fetch_balance_from_smartup(
         "filial_id": header_filial,
     }
 
-    logger.info(
-        "Smartup balance$export: url=%s sana=%s delta=%s",
-        url.split("?")[0],
-        date_str,
-        begin_modified_on is not None and end_modified_on is not None,
-    )
+    logger.info("Smartup balance$export: url=%s sana=%s", url.split("?")[0], date_str)
     request = urllib.request.Request(url, data=data, headers=headers, method="POST")
     try:
         with urllib.request.urlopen(request, timeout=90) as response:

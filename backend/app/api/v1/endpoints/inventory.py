@@ -31,33 +31,9 @@ from app.integrations.smartup import balance_export as smartup_balance_export
 
 router = APIRouter()
 
-# SmartUP balance cache: kuniga bir marta yoki refresh tugmasi; delta merge uchun last_fetched
+# SmartUP balance cache: kuniga bir marta yoki refresh tugmasi (faqat to'liq yuklash)
 _smartup_balance_cache: dict[str, Any] = {}
 _smartup_balance_cache_date: str | None = None
-_smartup_balance_last_fetched_at: date | None = None
-
-
-def _balance_row_key(row: dict[str, Any]) -> tuple[str, str]:
-    """Balance qatori uchun unique kalit (merge uchun)."""
-    pid = str((row.get("product_id") or row.get("product_code") or ""))
-    wid = str((row.get("warehouse_id") or row.get("warehouse_code") or ""))
-    return (pid, wid)
-
-
-def _merge_balance_into_cache(cache: dict[str, Any], delta_balance: list[Any]) -> None:
-    """Delta javobidagi balance ro'yxatini cache dagi balance ga merge qiladi."""
-    existing_list = cache.get("balance")
-    if not isinstance(existing_list, list):
-        cache["balance"] = list(delta_balance) if delta_balance else []
-        return
-    by_key: dict[tuple[str, str], dict[str, Any]] = {}
-    for item in existing_list:
-        if isinstance(item, dict):
-            by_key[_balance_row_key(item)] = item
-    for item in delta_balance:
-        if isinstance(item, dict):
-            by_key[_balance_row_key(item)] = item
-    cache["balance"] = list(by_key.values())
 
 # On-hand only (zone implementation / Variant A); allocate/unallocate not in ledger
 MOVEMENT_TYPES = set(ON_HAND_MOVEMENT_TYPES)
@@ -1426,45 +1402,29 @@ async def fix_duplicate_pick(
 @router.get(
     "/smartup-balance",
     response_model=None,
-    summary="SmartUP balance$export (cache, refresh, delta)",
+    summary="SmartUP balance$export (cache, refresh)",
 )
 async def get_smartup_balance(
     refresh: bool = Query(False, description="Yuklash tugmasi: SmartUP dan yangilash"),
     _user=Depends(require_permission("inventory:read")),
 ) -> Any:
     """
-    SmartUP balance$export: kuniga bir marta yoki refresh bosilganda.
-    refresh=False va bugungi cache bor bo'lsa cache qaytariladi.
-    refresh=True da avval delta sinab ko'riladi (cache bor bo'lsa), xato bo'lsa to'liq yuklash.
+    SmartUP balance$export: kuniga bir marta yoki refresh bosilganda to'liq yuklash.
+    refresh=False va bugungi cache bor bo'lsa cache qaytariladi; yo'q bo'lsa {"balance": []}.
+    refresh=True da SmartUP dan to'liq yuklab cache ga yoziladi.
     """
+    global _smartup_balance_cache, _smartup_balance_cache_date
     today = date.today()
     today_str = today.isoformat()
 
     if _smartup_balance_cache_date and _smartup_balance_cache_date != today_str:
         _smartup_balance_cache.clear()
         _smartup_balance_cache_date = None
-        _smartup_balance_last_fetched_at = None
 
     if not refresh:
         if _smartup_balance_cache_date == today_str and _smartup_balance_cache:
             return _smartup_balance_cache
         return {"balance": []}
-
-    if _smartup_balance_cache_date == today_str and _smartup_balance_cache and _smartup_balance_last_fetched_at:
-        try:
-            delta_result = await asyncio.to_thread(
-                smartup_balance_export.fetch_balance_from_smartup,
-                None,
-                _smartup_balance_last_fetched_at,
-                today,
-            )
-            delta_list = delta_result.get("balance") if isinstance(delta_result, dict) else None
-            if isinstance(delta_list, list):
-                _merge_balance_into_cache(_smartup_balance_cache, delta_list)
-                _smartup_balance_last_fetched_at = today
-                return _smartup_balance_cache
-        except Exception:
-            pass
 
     try:
         result = await asyncio.to_thread(smartup_balance_export.fetch_balance_from_smartup)
@@ -1477,7 +1437,6 @@ async def get_smartup_balance(
         _smartup_balance_cache.clear()
         _smartup_balance_cache.update(result)
         _smartup_balance_cache_date = today_str
-        _smartup_balance_last_fetched_at = today
     return result
 
 
