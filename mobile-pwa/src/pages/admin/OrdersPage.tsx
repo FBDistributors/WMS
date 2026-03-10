@@ -182,7 +182,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     [items]
   )
 
-  const load = useCallback(async (background = false, pageOverride?: number) => {
+  const load = useCallback(async (background = false, pageOverride?: number, forceRefresh?: boolean) => {
     if (!background) {
       setIsLoading(true)
       setError(null)
@@ -199,7 +199,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         const beginStr = dateFrom.trim() || defaultBegin
         const endStr = dateTo.trim() || defaultEnd
         const page = pageOverride ?? movementPage
-        const query: Record<string, string | number> = {
+        const query: Record<string, string | number | boolean> = {
           begin_created_on: beginStr,
           end_created_on: endStr,
           limit: MOVEMENT_PAGE_SIZE,
@@ -207,6 +207,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         }
         const filialId = (import.meta.env.VITE_DEFAULT_FILIAL_ID as string)?.trim()
         if (filialId) query.filial_id = filialId
+        if (forceRefresh) query.refresh = true
         const data = await getMovements(query)
         setMovementsData(data)
         if (pageOverride !== undefined) setMovementPage(pageOverride)
@@ -305,7 +306,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     setSyncResult(null)
     try {
       if (orderSource === 'diller') {
-        await load()
+        await load(false, undefined, true)
         return
       }
       const payload: { order_source?: string; begin_deal_date?: string; end_deal_date?: string } = orderSource

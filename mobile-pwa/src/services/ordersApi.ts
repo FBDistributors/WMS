@@ -29,6 +29,8 @@ export type MovementsQuery = {
   to_warehouse_code?: string
   limit?: number
   offset?: number
+  /** Cache ni bypass qilish, SmartUP dan qayta yuklash */
+  refresh?: boolean
 }
 
 export async function getMovements(query: MovementsQuery = {}) {

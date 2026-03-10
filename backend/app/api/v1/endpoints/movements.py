@@ -108,6 +108,7 @@ async def list_movements(
     filial_id: str | None = Query(None, description="Smartup filial_id (optional)"),
     limit: int = Query(50, ge=1, le=500, description="Max items per page"),
     offset: int = Query(0, ge=0, description="Skip N items"),
+    refresh: bool = Query(False, description="Cache ni bypass qilish, SmartUP dan qayta yuklash"),
     db: Session = Depends(get_db),
     _user=Depends(require_permission("orders:read")),
 ) -> dict[str, Any]:
@@ -142,7 +143,7 @@ async def list_movements(
     key = (begin, end, filial_id, begin_mod, end_mod)
     sent_ids = _get_sent_movement_ids(db)
 
-    if key in _movements_cache:
+    if not refresh and key in _movements_cache:
         full_list, expiry = _movements_cache[key]
         if now < expiry:
             full_list = [m for m in full_list if _movement_id_from_display(m) not in sent_ids]
