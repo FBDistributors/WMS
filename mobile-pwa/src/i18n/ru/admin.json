@@ -45,6 +45,7 @@
     "reason_overage": "Приход (в назначение)",
     "detail_title": "Детали перемещения",
     "detail_reason": "Действие",
+    "view_history_link": "Посмотреть историю перемещений",
     "search_placeholder": "Поиск по товару, партии, локации или кто выполнил",
     "filter_btn": "Фильтр",
     "filter_by_date": "Фильтр по дате",

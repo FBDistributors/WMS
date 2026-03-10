@@ -45,6 +45,7 @@
     "reason_overage": "In (to destination)",
     "detail_title": "Transfer detail",
     "detail_reason": "Action",
+    "view_history_link": "View transfer history",
     "search_placeholder": "Search by product, batch, location or who did it",
     "filter_btn": "Filter",
     "filter_by_date": "Filter by date",

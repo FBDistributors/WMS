@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { FileText, MinusCircle, Package } from 'lucide-react'
+import { FileText, Filter, MinusCircle, X } from 'lucide-react'
 
 import { useAuth } from '../../rbac/AuthProvider'
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -11,125 +11,72 @@ import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { TableSkeleton } from '../../components/ui/TableSkeleton'
-import { listAuditLogs } from '../../services/auditApi'
-import type { AuditLogRecord } from '../../services/auditApi'
-import { getProduct } from '../../services/productsApi'
-import { getLocation } from '../../services/locationsApi'
-import { listStockLots } from '../../services/inventoryApi'
+import { getInventoryMovements, type InventoryMovement } from '../../services/inventoryApi'
 
 const PAGE_SIZE = 50
 
-type DetailResolved = {
-  productName: string
-  productCode: string
-  barcode: string
-  locationCode: string
-  lotBatch: string
-  qtyChange: number
-  movementType: string
-}
-
-/** Inventarizatsiya tarixi: faqat stock_movement (mahsulot qo'shish/yo'q qilish va mobil inventar o'zgarishlari). */
+/** Inventarizatsiya (Hujjatlar tarixi): barcha ombor harakatlari — Ko'chirish jadvali formatida. */
 export function KamomatlarPage() {
-  const { t } = useTranslation(['kamomat', 'common'])
+  const { t } = useTranslation(['kamomat', 'common', 'admin', 'inventory'])
   const { has } = useAuth()
   const canWriteOff = has('inventory:adjust')
-  const [items, setItems] = useState<AuditLogRecord[]>([])
-  const [total, setTotal] = useState(0)
+  const [items, setItems] = useState<InventoryMovement[]>([])
   const [offset, setOffset] = useState(0)
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+  const [filterDateFrom, setFilterDateFrom] = useState('')
+  const [filterDateTo, setFilterDateTo] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [detailRow, setDetailRow] = useState<AuditLogRecord | null>(null)
-  const [detailResolved, setDetailResolved] = useState<DetailResolved | null>(null)
-  const [detailResolveLoading, setDetailResolveLoading] = useState(false)
+  const [detailRow, setDetailRow] = useState<InventoryMovement | null>(null)
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async () => {
     setIsLoading(true)
     setError(null)
     try {
-      const data = await listAuditLogs({
-        entity_type: 'stock_movement',
-        date_from: dateFrom || undefined,
-        date_to: dateTo || undefined,
+      const data = await getInventoryMovements({
+        date_from: filterDateFrom.trim() || undefined,
+        date_to: filterDateTo.trim() || undefined,
         limit: PAGE_SIZE,
         offset,
       })
-      setItems(data.items)
-      setTotal(data.total)
+      setItems(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('kamomat:load_error'))
     } finally {
       setIsLoading(false)
     }
-  }, [dateFrom, dateTo, offset, t])
+  }, [filterDateFrom, filterDateTo, offset, t])
 
   useEffect(() => {
     void load()
   }, [load])
 
-  useEffect(() => {
-    if (!detailRow || detailRow.entity_type !== 'stock_movement') {
-      setDetailResolved(null)
-      return
-    }
-    const data = detailRow.new_data ?? detailRow.old_data
-    const productId = data?.product_id as string | undefined
-    const lotId = data?.lot_id as string | undefined
-    const locationId = data?.location_id as string | undefined
-    const qtyChange = data?.qty_change != null ? Number(data.qty_change) : 0
-    const movementType = (data?.movement_type as string) ?? '—'
-    if (!productId || !locationId) {
-      setDetailResolved(null)
-      return
-    }
-    setDetailResolveLoading(true)
-    setDetailResolved(null)
-    Promise.all([
-      getProduct(productId).catch(() => null),
-      getLocation(locationId).then((l) => l.code ?? locationId).catch(() => locationId),
-      listStockLots(productId)
-        .then((lots) => lots.find((l) => l.id === lotId)?.batch ?? (lotId ? lotId.slice(0, 8) : '—'))
-        .catch(() => lotId ? lotId.slice(0, 8) : '—'),
-    ])
-      .then(([product, locationCode, lotBatch]) => {
-        const productName = product?.name ?? product?.sku ?? productId
-        const productCode = product?.sku ?? '—'
-        const barcode = product?.barcode ?? product?.barcodes?.[0] ?? '—'
-        setDetailResolved({
-          productName: String(productName),
-          productCode: String(productCode),
-          barcode: String(barcode),
-          locationCode: String(locationCode),
-          lotBatch: String(lotBatch),
-          qtyChange,
-          movementType,
-        })
-      })
-      .finally(() => setDetailResolveLoading(false))
-  }, [detailRow])
+  const filteredItems = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return items
+    return items.filter((row) => {
+      const product = [row.product_code, row.product_name].filter(Boolean).join(' ').toLowerCase()
+      const batch = (row.batch ?? row.lot_id ?? '').toString().toLowerCase()
+      const location = (row.location_code ?? row.location_id ?? '').toString().toLowerCase()
+      const who = (row.created_by_username ?? row.created_by_user_id ?? '').toString().toLowerCase()
+      return product.includes(q) || batch.includes(q) || location.includes(q) || who.includes(q)
+    })
+  }, [items, searchQuery])
+
+  const hasNextPage = items.length >= PAGE_SIZE
+  const pageStart = offset + 1
+  const pageEnd = offset + items.length
 
   const handleApply = () => {
     setOffset(0)
     void load()
   }
 
-  const formatJson = (obj: Record<string, unknown> | null) => {
-    if (!obj || Object.keys(obj).length === 0) return '—'
-    try {
-      return JSON.stringify(obj, null, 2)
-    } catch {
-      return String(obj)
-    }
-  }
-
-  /** Harakat ID (stock_movement) qisqacha ko'rsatish */
-  const movementLabel = (entityId: string) => entityId.slice(0, 8)
-
   const content = () => {
     if (isLoading) {
-      return <TableSkeleton rows={6} columns={5} />
+      return <TableSkeleton rows={6} columns={7} />
     }
     if (error) {
       return <EmptyState title={error} actionLabel={t('common:buttons.retry')} onAction={load} />
@@ -145,45 +92,64 @@ export function KamomatlarPage() {
         />
       )
     }
+    if (filteredItems.length === 0) {
+      return (
+        <p className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+          {t('admin:movement_page.search_no_results')}
+        </p>
+      )
+    }
     return (
       <TableScrollArea>
-        <table className="w-full min-w-[560px] text-sm">
+        <table className="min-w-full text-sm">
           <thead className="text-xs uppercase text-slate-500">
             <tr className="border-b border-slate-200 dark:border-slate-800">
-              <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('kamomat:columns.date')}</th>
-              <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('kamomat:columns.user')}</th>
-              <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('kamomat:columns.action')}</th>
-              <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('kamomat:columns.movement')}</th>
+              <th className="px-4 py-3 text-left">{t('inventory:columns.movement_type')}</th>
+              <th className="px-4 py-3 text-left">{t('inventory:columns.qty')}</th>
+              <th className="px-4 py-3 text-left">{t('inventory:columns.product')}</th>
+              <th className="px-4 py-3 text-left">{t('inventory:columns.lot')}</th>
+              <th className="px-4 py-3 text-left">{t('inventory:columns.location')}</th>
+              <th className="px-4 py-3 text-left">{t('inventory:columns.created_by')}</th>
+              <th className="px-4 py-3 text-left">{t('inventory:columns.created_at')}</th>
             </tr>
           </thead>
           <tbody>
-            {items.map((row) => (
+            {filteredItems.map((row) => (
               <tr
                 key={row.id}
                 className="cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
                 onClick={() => setDetailRow(row)}
               >
-                <td className="whitespace-nowrap px-3 py-3 text-slate-600 dark:text-slate-300 sm:px-4">
+                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
+                  {row.reason_code === 'inventory_overage'
+                    ? t('admin:movement_page.reason_overage')
+                    : row.reason_code === 'inventory_shortage'
+                      ? t('admin:movement_page.reason_shortage')
+                      : t(`inventory:movement_types.${row.movement_type}`, row.movement_type)}
+                </td>
+                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
+                  {row.qty_change > 0 ? '+' : ''}{Math.round(Number(row.qty_change))}
+                </td>
+                <td className="max-w-[200px] px-4 py-3 text-slate-700 dark:text-slate-200">
+                  {row.product_code != null || row.product_name != null ? (
+                    <span className="block truncate" title={row.product_name ?? undefined}>
+                      {[row.product_code, row.product_name].filter(Boolean).join(' — ')}
+                    </span>
+                  ) : (
+                    row.product_id
+                  )}
+                </td>
+                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
+                  {row.batch ?? row.lot_id}
+                </td>
+                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
+                  {row.location_code ?? row.location_id}
+                </td>
+                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
+                  {row.created_by_username ?? row.created_by_user_id ?? '—'}
+                </td>
+                <td className="px-4 py-3 text-slate-500">
                   {new Date(row.created_at).toLocaleString()}
-                </td>
-                <td className="whitespace-nowrap px-3 py-3 text-slate-700 dark:text-slate-200 sm:px-4">
-                  {row.username ?? row.user_id ?? '—'}
-                </td>
-                <td className="whitespace-nowrap px-3 py-3 sm:px-4">
-                  <span
-                    className={
-                      row.action === 'CREATE'
-                        ? 'rounded bg-green-100 px-1.5 py-0.5 text-green-800 dark:bg-green-900/50 dark:text-green-200'
-                        : row.action === 'DELETE'
-                          ? 'rounded bg-red-100 px-1.5 py-0.5 text-red-800 dark:bg-red-900/50 dark:text-red-200'
-                          : 'rounded bg-blue-100 px-1.5 py-0.5 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200'
-                    }
-                  >
-                    {row.action}
-                  </span>
-                </td>
-                <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-800 dark:text-slate-200 sm:px-4">
-                  {movementLabel(row.entity_id)}
                 </td>
               </tr>
             ))}
@@ -204,60 +170,122 @@ export function KamomatlarPage() {
             <MinusCircle size={18} />
             {t('kamomat:write_off_button')}
           </Link>
-          <Link
-            to="/admin/kamomat/opening-balance"
-            className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-800 transition-colors hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-200 dark:hover:bg-blue-900/50"
-          >
-            <Package size={18} />
-            {t('kamomat:opening_balance_button')}
-          </Link>
         </div>
       )}
-      <Card className="mb-4 space-y-3">
-        <div className="grid gap-3 md:grid-cols-3">
-          <label className="text-sm text-slate-600 dark:text-slate-300">
-            {t('kamomat:filters.date_from')}
-            <DateInput
-              value={dateFrom}
-              onChange={setDateFrom}
-              className="mt-1 w-full"
-              aria-label={t('kamomat:filters.date_from')}
+      <Card className="space-y-4">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <label className="flex-1 min-w-[180px] max-w-md text-sm text-slate-600 dark:text-slate-300">
+            <span className="sr-only">{t('admin:movement_page.search_placeholder')}</span>
+            <input
+              type="search"
+              className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t('admin:movement_page.search_placeholder')}
             />
           </label>
-          <label className="text-sm text-slate-600 dark:text-slate-300">
-            {t('kamomat:filters.date_to')}
-            <DateInput
-              value={dateTo}
-              onChange={setDateTo}
-              className="mt-1 w-full"
-              aria-label={t('kamomat:filters.date_to')}
-            />
-          </label>
-          <div className="flex items-end">
-            <Button onClick={handleApply}>{t('kamomat:filters.apply')}</Button>
+          <div className="relative" ref={filterPanelRef}>
+            <Button
+              variant="outline"
+              onClick={() => setFilterPanelOpen((o) => !o)}
+              className="gap-2"
+              aria-label={t('admin:movement_page.filter_btn')}
+              aria-expanded={filterPanelOpen}
+            >
+              <Filter size={18} />
+              {t('admin:movement_page.filter_btn')}
+            </Button>
+            {filterPanelOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  aria-hidden
+                  onClick={() => setFilterPanelOpen(false)}
+                />
+                <div className="absolute right-0 top-full z-50 mt-2 w-full min-w-[280px] max-w-sm rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="font-semibold text-slate-900 dark:text-slate-100">
+                      {t('admin:movement_page.filter_by_date')}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setFilterPanelOpen(false)}
+                      className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 dark:hover:text-slate-400 dark:hover:bg-slate-800"
+                      aria-label={t('common:close')}
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    <label className="block text-sm text-slate-600 dark:text-slate-400">
+                      {t('inventory:filters.date_from')}
+                      <DateInput
+                        value={filterDateFrom}
+                        onChange={setFilterDateFrom}
+                        className="mt-1 w-full"
+                        aria-label={t('inventory:filters.date_from')}
+                      />
+                    </label>
+                    <label className="block text-sm text-slate-600 dark:text-slate-400">
+                      {t('inventory:filters.date_to')}
+                      <DateInput
+                        value={filterDateTo}
+                        onChange={setFilterDateTo}
+                        className="mt-1 w-full"
+                        aria-label={t('inventory:filters.date_to')}
+                      />
+                    </label>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setFilterDateFrom('')
+                        setFilterDateTo('')
+                        setOffset(0)
+                        setFilterPanelOpen(false)
+                      }}
+                    >
+                      {t('orders:filters.filter_clear')}
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setOffset(0)
+                        setFilterPanelOpen(false)
+                      }}
+                    >
+                      {t('inventory:filters.apply')}
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
+        {content()}
+        {items.length > 0 && (
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <span className="mr-auto text-sm text-slate-600 dark:text-slate-400">
+              {pageStart}–{pageEnd}
+              {hasNextPage ? '+' : ''}
+            </span>
+            <Button
+              variant="secondary"
+              disabled={offset === 0}
+              onClick={() => setOffset((p) => Math.max(0, p - PAGE_SIZE))}
+            >
+              {t('common:buttons.back')}
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={!hasNextPage}
+              onClick={() => setOffset((p) => p + PAGE_SIZE)}
+            >
+              {t('common:buttons.next')}
+            </Button>
+          </div>
+        )}
       </Card>
-      <Card className="space-y-4">{content()}</Card>
-      <div className="mt-4 flex items-center justify-between text-sm text-slate-600 dark:text-slate-300">
-        <span>{t('kamomat:total', { count: total })}</span>
-        <div className="flex gap-2">
-          <Button
-            variant="secondary"
-            disabled={offset === 0}
-            onClick={() => setOffset((p) => Math.max(0, p - PAGE_SIZE))}
-          >
-            {t('common:buttons.back')}
-          </Button>
-          <Button
-            variant="secondary"
-            disabled={offset + PAGE_SIZE >= total}
-            onClick={() => setOffset((p) => p + PAGE_SIZE)}
-          >
-            {t('common:buttons.next')}
-          </Button>
-        </div>
-      </div>
 
       {detailRow && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
@@ -269,12 +297,50 @@ export function KamomatlarPage() {
           />
           <div className="relative max-h-[90vh] w-full max-w-2xl overflow-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
             <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
-              {detailRow.action} • {movementLabel(detailRow.entity_id)}
+              {t('kamomat:detail.summary')} • {detailRow.id.slice(0, 8)}
             </h3>
-            <dl className="mb-4 space-y-2 text-sm">
+            <dl className="space-y-2 text-sm">
+              <div className="flex flex-wrap gap-x-2">
+                <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.product')}:</span>
+                <span className="text-slate-800 dark:text-slate-200">
+                  {[detailRow.product_code, detailRow.product_name].filter(Boolean).join(' — ') || detailRow.product_id}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-x-2">
+                <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.batch')}:</span>
+                <span className="text-slate-800 dark:text-slate-200">{detailRow.batch ?? detailRow.lot_id}</span>
+              </div>
+              <div className="flex flex-wrap gap-x-2">
+                <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.location')}:</span>
+                <span className="text-slate-800 dark:text-slate-200">{detailRow.location_code ?? detailRow.location_id}</span>
+              </div>
+              <div className="flex flex-wrap gap-x-2">
+                <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.qty_change')}:</span>
+                <span
+                  className={
+                    Number(detailRow.qty_change) < 0
+                      ? 'font-medium text-amber-600 dark:text-amber-400'
+                      : 'text-slate-800 dark:text-slate-200'
+                  }
+                >
+                  {Number(detailRow.qty_change) > 0 ? '+' : ''}{Math.round(Number(detailRow.qty_change))}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-x-2">
+                <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.action_type')}:</span>
+                <span className="text-slate-800 dark:text-slate-200">
+                  {detailRow.reason_code === 'inventory_overage'
+                    ? t('admin:movement_page.reason_overage')
+                    : detailRow.reason_code === 'inventory_shortage'
+                      ? t('admin:movement_page.reason_shortage')
+                      : t(`inventory:movement_types.${detailRow.movement_type}`, detailRow.movement_type)}
+                </span>
+              </div>
               <div className="flex flex-wrap gap-x-2">
                 <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.who')}:</span>
-                <span className="text-slate-800 dark:text-slate-200">{detailRow.username ?? '—'}</span>
+                <span className="text-slate-800 dark:text-slate-200">
+                  {detailRow.created_by_username ?? detailRow.created_by_user_id ?? '—'}
+                </span>
               </div>
               <div className="flex flex-wrap gap-x-2">
                 <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.when')}:</span>
@@ -282,84 +348,7 @@ export function KamomatlarPage() {
                   {new Date(detailRow.created_at).toLocaleString()}
                 </span>
               </div>
-              {detailRow.ip_address && (
-                <div className="flex flex-wrap gap-x-2">
-                  <span className="font-medium text-slate-500 dark:text-slate-400">IP:</span>
-                  <span className="font-mono text-slate-700 dark:text-slate-300">{detailRow.ip_address}</span>
-                </div>
-              )}
             </dl>
-            {detailResolveLoading && (
-              <p className="mb-4 text-sm text-slate-500">{t('kamomat:detail.loading')}</p>
-            )}
-            {detailResolved && !detailResolveLoading && (
-              <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/50">
-                <h4 className="mb-3 text-sm font-medium text-slate-600 dark:text-slate-400">
-                  {t('kamomat:detail.summary')}
-                </h4>
-                <dl className="space-y-2 text-sm">
-                  <div>
-                    <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.product')}: </span>
-                    <span className="text-slate-800 dark:text-slate-200">{detailResolved.productName}</span>
-                  </div>
-                  <div>
-                    <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.product_code')}: </span>
-                    <span className="font-mono text-slate-800 dark:text-slate-200">{detailResolved.productCode}</span>
-                  </div>
-                  <div>
-                    <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.barcode')}: </span>
-                    <span className="font-mono text-slate-800 dark:text-slate-200">{detailResolved.barcode}</span>
-                  </div>
-                  <div>
-                    <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.batch')}: </span>
-                    <span className="text-slate-800 dark:text-slate-200">{detailResolved.lotBatch}</span>
-                  </div>
-                  <div>
-                    <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.location')}: </span>
-                    <span className="text-slate-800 dark:text-slate-200">{detailResolved.locationCode}</span>
-                  </div>
-                  <div>
-                    <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.qty_change')}: </span>
-                    <span
-                      className={
-                        detailResolved.qtyChange < 0
-                          ? 'font-medium text-amber-600 dark:text-amber-400'
-                          : 'text-slate-800 dark:text-slate-200'
-                      }
-                    >
-                      {detailResolved.qtyChange > 0 ? '+' : ''}{detailResolved.qtyChange}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.action_type')}: </span>
-                    <span className="text-slate-800 dark:text-slate-200">{detailResolved.movementType}</span>
-                  </div>
-                </dl>
-              </div>
-            )}
-            <details className="mb-4">
-              <summary className="cursor-pointer text-sm font-medium text-slate-600 dark:text-slate-400">
-                {t('kamomat:detail.raw_data')}
-              </summary>
-              <div className="mt-2 grid gap-4 md:grid-cols-2">
-                <div>
-                  <h4 className="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-                    {t('kamomat:detail.old_data')}
-                  </h4>
-                  <pre className="max-h-48 overflow-auto rounded-xl bg-slate-100 p-3 font-mono text-xs text-slate-800 dark:bg-slate-900 dark:text-slate-200">
-                    {formatJson(detailRow.old_data)}
-                  </pre>
-                </div>
-                <div>
-                  <h4 className="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-                    {t('kamomat:detail.new_data')}
-                  </h4>
-                  <pre className="max-h-48 overflow-auto rounded-xl bg-slate-100 p-3 font-mono text-xs text-slate-800 dark:bg-slate-900 dark:text-slate-200">
-                    {formatJson(detailRow.new_data)}
-                  </pre>
-                </div>
-              </div>
-            </details>
             <Button className="mt-4" variant="secondary" onClick={() => setDetailRow(null)}>
               {t('common:buttons.close')}
             </Button>
