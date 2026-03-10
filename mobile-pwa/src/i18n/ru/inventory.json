@@ -44,7 +44,7 @@
     "created_by": "Кто выполнил",
     "created_at": "Создано",
     "smartup_qoldiq": "Остаток SmartUP",
-    "smartup_bron": "Smartup Bron"
+    "smartup_bron": "Разница"
   },
   "filters": {
     "apply": "Применить",
