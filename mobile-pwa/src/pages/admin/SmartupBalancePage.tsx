@@ -61,7 +61,9 @@ function getCellDisplay(col: string, value: unknown): string {
 const INITIAL_PAGE_SIZE = 50
 const LOAD_MORE_SIZE = 50
 
-export function SmartupBalancePage() {
+type SmartupBalanceViewProps = { warehouseCode: string }
+
+export function SmartupBalanceView({ warehouseCode }: SmartupBalanceViewProps) {
   const { t } = useTranslation(['inventory', 'common'])
   const [searchParams, setSearchParams] = useSearchParams()
   const searchQuery = searchParams.get('q') ?? ''
@@ -79,14 +81,14 @@ export function SmartupBalancePage() {
     setError(null)
     if (forceRefresh) setVisibleCount(INITIAL_PAGE_SIZE)
     try {
-      const res = await getSmartupBalance({ refresh: forceRefresh })
+      const res = await getSmartupBalance({ refresh: forceRefresh, warehouse_code: warehouseCode })
       setData(res)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('inventory:load_failed'))
     } finally {
       setIsLoading(false)
     }
-  }, [t])
+  }, [t, warehouseCode])
 
   useEffect(() => {
     void load(false)
@@ -234,4 +236,8 @@ export function SmartupBalancePage() {
       </Card>
     </AdminLayout>
   )
+}
+
+export function SmartupBalancePage() {
+  return <SmartupBalanceView warehouseCode="001" />
 }

@@ -259,11 +259,18 @@ export async function bulkOpeningBalance(payload: BulkOpeningBalancePayload) {
   })
 }
 
-/** SmartUP balance$export — cache yoki refresh=1 da SmartUP dan yangilash. */
-export async function getSmartupBalance(options?: { signal?: AbortSignal; refresh?: boolean }) {
+/** SmartUP balance$export — cache yoki refresh=1 da SmartUP dan yangilash. warehouse_code: 001 = qoldiq, 002 = bron */
+export async function getSmartupBalance(options?: {
+  signal?: AbortSignal
+  refresh?: boolean
+  warehouse_code?: string
+}) {
   const refresh = options?.refresh === true
+  const warehouse_code = options?.warehouse_code?.trim() || '001'
+  const query: Record<string, string> = { warehouse_code }
+  if (refresh) query.refresh = '1'
   return fetchJSON<unknown>('/api/v1/inventory/smartup-balance', {
     signal: options?.signal,
-    query: refresh ? { refresh: '1' } : undefined,
+    query,
   })
 }

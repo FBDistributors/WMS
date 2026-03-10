@@ -31,9 +31,8 @@ from app.integrations.smartup import balance_export as smartup_balance_export
 
 router = APIRouter()
 
-# SmartUP balance cache: kuniga bir marta yoki refresh tugmasi (faqat to'liq yuklash)
-_smartup_balance_cache: dict[str, Any] = {}
-_smartup_balance_cache_date: str | None = None
+# SmartUP balance cache: (today_str, warehouse_code) -> result
+_smartup_balance_cache: dict[tuple[str, str], Any] = {}
 
 # On-hand only (zone implementation / Variant A); allocate/unallocate not in ledger
 MOVEMENT_TYPES = set(ON_HAND_MOVEMENT_TYPES)
@@ -1402,41 +1401,45 @@ async def fix_duplicate_pick(
 @router.get(
     "/smartup-balance",
     response_model=None,
-    summary="SmartUP balance$export (cache, refresh)",
+    summary="SmartUP balance$export (cache, refresh, warehouse_code)",
 )
 async def get_smartup_balance(
     refresh: bool = Query(False, description="Yuklash tugmasi: SmartUP dan yangilash"),
+    warehouse_code: str = Query("001", description="001 = qoldiq, 002 = bron"),
     _user=Depends(require_permission("inventory:read")),
 ) -> Any:
     """
-    SmartUP balance$export: kuniga bir marta yoki refresh bosilganda to'liq yuklash.
+    SmartUP balance$export: warehouse_code bo'yicha (001 qoldiq, 002 bron).
     refresh=False va bugungi cache bor bo'lsa cache qaytariladi; yo'q bo'lsa {"balance": []}.
-    refresh=True da SmartUP dan to'liq yuklab cache ga yoziladi.
+    refresh=True da SmartUP dan yuklab cache ga yoziladi.
     """
-    global _smartup_balance_cache, _smartup_balance_cache_date
+    global _smartup_balance_cache
     today = date.today()
     today_str = today.isoformat()
+    wh = (warehouse_code or "001").strip() or "001"
+    cache_key = (today_str, wh)
 
-    if _smartup_balance_cache_date and _smartup_balance_cache_date != today_str:
-        _smartup_balance_cache.clear()
-        _smartup_balance_cache_date = None
+    # Eski kunlar uchun cache ni tozalash
+    to_remove = [k for k in _smartup_balance_cache if k[0] != today_str]
+    for k in to_remove:
+        del _smartup_balance_cache[k]
 
     if not refresh:
-        if _smartup_balance_cache_date == today_str and _smartup_balance_cache:
-            return _smartup_balance_cache
+        if cache_key in _smartup_balance_cache:
+            return _smartup_balance_cache[cache_key]
         return {"balance": []}
 
     try:
-        result = await asyncio.to_thread(smartup_balance_export.fetch_balance_from_smartup)
+        result = await asyncio.to_thread(
+            smartup_balance_export.fetch_balance_from_smartup, None, wh
+        )
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     if isinstance(result, dict):
-        _smartup_balance_cache.clear()
-        _smartup_balance_cache.update(result)
-        _smartup_balance_cache_date = today_str
+        _smartup_balance_cache[cache_key] = result
     return result
 
 

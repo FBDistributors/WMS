@@ -12,6 +12,7 @@
   "smartup_balance_title": "Остаток (SmartUP)",
   "smartup_balance_table_hint": "Данные из SmartUP за сегодня.",
   "smartup_balance_short": "Остаток SmartUP",
+  "smartup_bron_short": "Smartup Bron",
   "smartup_balance_empty_title": "Данные за сегодня ещё не загружены",
   "smartup_balance_empty_desc": "Нажмите кнопку «Загрузить».",
   "smartup_balance_load_btn": "Загрузить",

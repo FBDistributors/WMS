@@ -22,6 +22,7 @@ import { ReceivingPage } from '../pages/admin/ReceivingPage'
 import { ReceivingDetailPage } from '../pages/admin/ReceivingDetailPage'
 import { InventorySummaryPage } from '../pages/admin/InventorySummaryPage'
 import { SmartupBalancePage } from '../pages/admin/SmartupBalancePage'
+import { SmartupBronPage } from '../pages/admin/SmartupBronPage'
 import { InventoryDetailsPage } from '../pages/admin/InventoryDetailsPage'
 import { InventoryMovementsPage } from '../pages/admin/InventoryMovementsPage'
 import { MovementPage } from '../pages/admin/MovementPage'
@@ -391,6 +392,16 @@ export function App() {
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">
               <RequirePermission permission="inventory:read">
                 <SmartupBalancePage />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/inventory/smartup-bron"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="inventory:read">
+                <SmartupBronPage />
               </RequirePermission>
             </RequirePermission>
           }

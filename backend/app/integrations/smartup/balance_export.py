@@ -15,9 +15,13 @@ logger = logging.getLogger(__name__)
 DEFAULT_BALANCE_EXPORT_URL = "https://smartup.online/b/anor/mxsx/mkw/balance$export"
 
 
-def fetch_balance_from_smartup(filial_id: str | None = None) -> dict:
+def fetch_balance_from_smartup(
+    filial_id: str | None = None,
+    warehouse_code: str | None = None,
+) -> dict:
     """
     SmartUP balance$export ga POST so'rov yuborib, bugungi kun ma'lumotini oladi (to'liq yuklash).
+    warehouse_code: "001" (qoldiq) yoki "002" (bron) — body da yuboriladi.
     Auth: SMARTUP_BASIC_USER, SMARTUP_BASIC_PASS, SMARTUP_PROJECT_CODE, SMARTUP_FILIAL_ID (boshqa API lar bilan bir xil).
     Qaytaradi: to'liq JSON javob (odatda {"balance": [...]}).
     """
@@ -33,10 +37,10 @@ def fetch_balance_from_smartup(filial_id: str | None = None) -> dict:
 
     today = date.today()
     date_str = today.strftime("%d.%m.%Y")
-    warehouse_code = (os.getenv("SMARTUP_BALANCE_WAREHOUSE_CODE") or "001").strip()
+    wh_code = (warehouse_code or os.getenv("SMARTUP_BALANCE_WAREHOUSE_CODE") or "001").strip()
 
     payload = {
-        "warehouse_codes": [{"warehouse_code": warehouse_code}],
+        "warehouse_codes": [{"warehouse_code": wh_code}],
         "filial_code": "",
         "begin_date": date_str,
         "end_date": date_str,
@@ -52,7 +56,7 @@ def fetch_balance_from_smartup(filial_id: str | None = None) -> dict:
         "filial_id": header_filial,
     }
 
-    logger.info("Smartup balance$export: url=%s sana=%s warehouse_code=%s", url.split("?")[0], date_str, warehouse_code)
+    logger.info("Smartup balance$export: url=%s sana=%s warehouse_code=%s", url.split("?")[0], date_str, wh_code)
     request = urllib.request.Request(url, data=data, headers=headers, method="POST")
     try:
         with urllib.request.urlopen(request, timeout=90) as response:

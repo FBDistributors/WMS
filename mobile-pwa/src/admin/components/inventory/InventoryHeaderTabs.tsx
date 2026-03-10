@@ -31,6 +31,15 @@ export function InventoryHeaderTabs() {
       >
         {t('smartup_balance_short')}
       </NavLink>
+      <NavLink
+        to="/admin/inventory/smartup-bron"
+        end
+        className={({ isActive }) =>
+          [base, isActive ? active : inactive].join(' ')
+        }
+      >
+        {t('smartup_bron_short')}
+      </NavLink>
     </div>
   )
 }
