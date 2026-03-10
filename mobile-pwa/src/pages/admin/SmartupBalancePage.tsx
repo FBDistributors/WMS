@@ -75,15 +75,15 @@ export function SmartupBalancePage() {
   const { t } = useTranslation(['inventory', 'common', 'orders'])
   const [searchParams, setSearchParams] = useSearchParams()
   const searchQuery = searchParams.get('q') ?? ''
-  const dateFrom = searchParams.get('date_from') ?? daysAgoISO(30)
-  const dateTo = searchParams.get('date_to') ?? todayISO()
+  const dateFrom = searchParams.get('date_from') ?? ''
+  const dateTo = searchParams.get('date_to') ?? ''
   const [data, setData] = useState<unknown>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [visibleCount, setVisibleCount] = useState(INITIAL_PAGE_SIZE)
   const [filterPanelOpen, setFilterPanelOpen] = useState(false)
-  const [filterDateFrom, setFilterDateFrom] = useState(dateFrom)
-  const [filterDateTo, setFilterDateTo] = useState(dateTo)
+  const [filterDateFrom, setFilterDateFrom] = useState(dateFrom || daysAgoISO(30))
+  const [filterDateTo, setFilterDateTo] = useState(dateTo || todayISO())
   const filterPanelRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async (forceRefresh = false) => {
@@ -110,6 +110,15 @@ export function SmartupBalancePage() {
 
   const rawRows = useMemo(() => normalizeToRows(data), [data])
 
+  function rowDateToYYYYMMDD(cell: unknown): string | null {
+    if (cell == null) return null
+    const str = String(cell).trim()
+    if (str.length >= 10 && str[4] === '-' && str[7] === '-') return str.slice(0, 10)
+    const d = new Date(str)
+    if (Number.isNaN(d.getTime())) return null
+    return d.toISOString().slice(0, 10)
+  }
+
   const filteredRows = useMemo(() => {
     let list = rawRows
     const q = searchQuery.trim().toLowerCase()
@@ -118,16 +127,18 @@ export function SmartupBalancePage() {
         Object.values(row).some((v) => v != null && String(v).toLowerCase().includes(q))
       )
     }
-    const fromStr = dateFrom.trim() || daysAgoISO(30)
-    const toStr = dateTo.trim() || todayISO()
-    const dateKey = Object.keys(list[0] ?? {}).find((k) => k.toLowerCase() === 'date')
-    if (dateKey) {
-      list = list.filter((row) => {
-        const cell = row[dateKey]
-        if (cell == null) return true
-        const str = String(cell).slice(0, 10)
-        return str >= fromStr && str <= toStr
-      })
+    // Sana filtri faqat jadval uchun (yuklangan qatorlarni filtrlash), SmartUP API ga yuborilmaydi
+    const fromStr = dateFrom.trim()
+    const toStr = dateTo.trim()
+    if (fromStr && toStr) {
+      const dateKey = Object.keys(list[0] ?? {}).find((k) => k.toLowerCase() === 'date')
+      if (dateKey) {
+        list = list.filter((row) => {
+          const ymd = rowDateToYYYYMMDD(row[dateKey])
+          if (ymd == null) return true
+          return ymd >= fromStr && ymd <= toStr
+        })
+      }
     }
     return list
   }, [rawRows, searchQuery, dateFrom, dateTo])
@@ -248,8 +259,10 @@ export function SmartupBalancePage() {
                 variant="outline"
                 onClick={() => setFilterPanelOpen((o) => !o)}
                 className="gap-2"
+                disabled={rawRows.length === 0}
                 aria-label={t('orders:filters.filter_btn')}
                 aria-expanded={filterPanelOpen}
+                title={rawRows.length === 0 ? t('inventory:smartup_balance_filter_after_load') : undefined}
               >
                 <Filter size={18} />
                 {t('orders:filters.filter_btn')}

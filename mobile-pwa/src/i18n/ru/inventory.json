@@ -18,6 +18,7 @@
   "smartup_balance_load_more": "Загрузить ещё",
   "smartup_balance_search_placeholder": "Поиск по коду, штрихкоду, складу, дате",
   "smartup_balance_no_results": "Нет записей по фильтру",
+  "smartup_balance_filter_after_load": "Фильтр доступен после загрузки данных",
   "export_excel": "Скачать в Excel",
   "export_with_expiry": "Остаток со сроком",
   "export_qty_only": "Только остаток",

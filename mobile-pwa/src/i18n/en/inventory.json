@@ -8,6 +8,7 @@
   "smartup_balance_load_more":"Load more",
   "smartup_balance_search_placeholder":"Search by code, barcode, warehouse, date",
   "smartup_balance_no_results":"No records match the filter",
+  "smartup_balance_filter_after_load":"Filter is available after data is loaded",
   "export_excel":"Export to Excel",
   "export_with_expiry":"Stock with expiry",
   "export_qty_only":"Stock only",
