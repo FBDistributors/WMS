@@ -72,14 +72,17 @@ async def login(payload: LoginRequest, request: Request, db: Session = Depends(g
     user.last_login_at = datetime.utcnow()
     user.last_device_info = user_agent
 
-    # Session limits: admin 3 devices, others 1 device
+    # Session limits: admin 3 devices, others 2; Test user — cheklov yo'q (load test uchun)
     existing = (
         db.query(UserSession)
         .filter(UserSession.user_id == user.id)
         .order_by(UserSession.created_at.asc())
         .all()
     )
-    max_sessions = MAX_ADMIN_SESSIONS if user.role == ADMIN_ROLE else MAX_OTHER_SESSIONS
+    if user.username and user.username.strip().lower() == "test":
+        max_sessions = 999  # Test user uchun sessiya chegarasi yo'q
+    else:
+        max_sessions = MAX_ADMIN_SESSIONS if user.role == ADMIN_ROLE else MAX_OTHER_SESSIONS
 
     # Keep up to max_sessions; remove oldest when at limit (admin 3, others 2)
     while len(existing) >= max_sessions and existing:
