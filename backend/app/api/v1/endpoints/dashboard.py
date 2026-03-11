@@ -98,7 +98,9 @@ async def get_dashboard_summary(
                     )
                 )
             ).label("new_orders_today"),
-        ).join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
+        )
+        .select_from(OrderModel)
+        .join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
     ).one()
 
     total_orders = order_counts.total_orders or 0
