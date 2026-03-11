@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 
 from dotenv import load_dotenv
 
@@ -7,10 +8,30 @@ load_dotenv()
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 from sqlalchemy import text
 from sqlalchemy.engine.url import make_url
 
 from app.db import get_engine, get_database_url
+
+logger = logging.getLogger(__name__)
+
+
+class RequestTimeLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        start = time.perf_counter()
+        response = await call_next(request)
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        logger.info(
+            "%s %s %s - %.0fms",
+            request.method,
+            request.scope.get("path", ""),
+            response.status_code,
+            elapsed_ms,
+        )
+        return response
+
 
 app = FastAPI(
     title="WMS Backend",
@@ -51,6 +72,7 @@ app.add_middleware(
     allow_headers=["*"],
     max_age=600,
 )
+app.add_middleware(RequestTimeLoggingMiddleware)
 
 @app.get("/")
 async def root():

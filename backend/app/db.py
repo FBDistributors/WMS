@@ -24,15 +24,17 @@ def get_database_url() -> str:
 
 def create_engine_from_env() -> Engine:
     url = get_database_url()
-    # Render free Postgres ~20 connections. Web + Worker share DB. Poolni oshirdik (QueuePool timeout kamayishi uchun).
-    # connect_timeout: tez muvaffaqiyatsizlik (ulanish bo'lmasa). pool_timeout: pooldan connection kutish.
+    pool_size = int(os.getenv("POOL_SIZE", "20"))
+    max_overflow = int(os.getenv("MAX_OVERFLOW", "30"))
+    pool_timeout = int(os.getenv("POOL_TIMEOUT", "30"))
+    pool_recycle = int(os.getenv("POOL_RECYCLE", "1800"))
     return create_engine(
         url,
         pool_pre_ping=True,
-        pool_size=6,
-        max_overflow=4,
-        pool_recycle=300,
-        pool_timeout=15,
+        pool_size=pool_size,
+        max_overflow=max_overflow,
+        pool_timeout=pool_timeout,
+        pool_recycle=pool_recycle,
         connect_args={"connect_timeout": 10},
     )
 

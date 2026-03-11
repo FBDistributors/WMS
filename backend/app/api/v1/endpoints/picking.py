@@ -5,7 +5,7 @@ from uuid import UUID
 
 import logging
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from pydantic import BaseModel, field_validator
 from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
@@ -333,8 +333,8 @@ async def get_picking_document(
 @router.get("/documents", response_model=List[PickingListItem], summary="Picking documents")
 @router.get("/documents/", response_model=List[PickingListItem], summary="Picking documents")
 async def list_picking_documents(
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     include_cancelled: bool = False,
     db: Session = Depends(get_db),
     user=Depends(require_permission("picking:read")),
@@ -375,8 +375,12 @@ async def list_picking_documents(
         )
     if not include_cancelled:
         query = query.filter(DocumentModel.status != "cancelled")
-    docs = query.order_by(DocumentModel.created_at.desc()).offset(offset).limit(limit).all()
-    return [_to_picking_list_item(doc) for doc in docs]
+    try:
+        docs = query.order_by(DocumentModel.created_at.desc()).offset(offset).limit(limit).all()
+        return [_to_picking_list_item(doc) for doc in docs]
+    except Exception as e:
+        logger.exception("list_picking_documents error")
+        raise HTTPException(status_code=500, detail="Internal error") from e
 
 
 @router.get(

@@ -1,5 +1,6 @@
-from typing import Optional
+import logging
 from datetime import datetime
+from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -16,6 +17,7 @@ from app.db import get_db
 from app.models.user import User
 from app.models.user_session import UserSession
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 ADMIN_ROLE = "warehouse_admin"
@@ -63,34 +65,38 @@ def _get_user_by_username(db: Session, username: str) -> Optional[User]:
 
 @router.post("/login", response_model=TokenResponse, summary="Login")
 async def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
-    user = _get_user_by_username(db, payload.username)
-    if not user or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    try:
+        user = _get_user_by_username(db, payload.username)
+        if not user or not verify_password(payload.password, user.password_hash):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
-    token = create_access_token({"sub": str(user.id), "role": user.role})
-    user_agent = (request.headers.get("user-agent") or "Unknown")[:500]
-    user.last_login_at = datetime.utcnow()
-    user.last_device_info = user_agent
+        token = create_access_token({"sub": str(user.id), "role": user.role})
+        user_agent = (request.headers.get("user-agent") or "Unknown")[:500]
+        user.last_login_at = datetime.utcnow()
+        user.last_device_info = user_agent
 
-    # Session limits: admin 3 devices, others 2; Test user — cheklov yo'q (load test uchun)
-    existing = (
-        db.query(UserSession)
-        .filter(UserSession.user_id == user.id)
-        .order_by(UserSession.created_at.asc())
-        .all()
-    )
-    if user.username and user.username.strip().lower() == "test":
-        max_sessions = 999  # Test user uchun sessiya chegarasi yo'q
-    else:
-        max_sessions = MAX_ADMIN_SESSIONS if user.role == ADMIN_ROLE else MAX_OTHER_SESSIONS
+        existing = (
+            db.query(UserSession)
+            .filter(UserSession.user_id == user.id)
+            .order_by(UserSession.created_at.asc())
+            .all()
+        )
+        if user.username and user.username.strip().lower() == "test":
+            max_sessions = 999
+        else:
+            max_sessions = MAX_ADMIN_SESSIONS if user.role == ADMIN_ROLE else MAX_OTHER_SESSIONS
 
-    # Keep up to max_sessions; remove oldest when at limit (admin 3, others 2)
-    while len(existing) >= max_sessions and existing:
-        db.delete(existing.pop(0))
+        while len(existing) >= max_sessions and existing:
+            db.delete(existing.pop(0))
 
-    db.add(UserSession(user_id=user.id, token=token, device_info=user_agent))
-    db.commit()
-    return TokenResponse(access_token=token)
+        db.add(UserSession(user_id=user.id, token=token, device_info=user_agent))
+        db.commit()
+        return TokenResponse(access_token=token)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("login endpoint error")
+        raise HTTPException(status_code=500, detail="Internal error") from e
 
 
 @router.post("/logout", summary="Logout")

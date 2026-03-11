@@ -5,10 +5,14 @@ from datetime import date, datetime, timezone
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import func
+from sqlalchemy import and_, case, func
 from sqlalchemy.orm import Session, selectinload
+
+logger = logging.getLogger(__name__)
 
 from app.auth.deps import require_any_permission, require_permission
 from app.db import get_db
@@ -68,65 +72,55 @@ async def get_dashboard_summary(
     def _order_base(q):
         return q.filter(OrderModel.filial_id == DEFAULT_FILIAL_ID) if DEFAULT_FILIAL_ID else q
 
-    # Total orders: B#S only (matches orders page default view)
-    total_orders = (
-        _order_base(
-            db.query(func.count(OrderModel.id)).join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
-        )
-        .filter(OrderWmsStateModel.status == "B#S")
-        .scalar()
-        or 0
-    )
+    # Bitta query: total_orders (B#S), completed_today (packed/shipped today), new_orders_today (B#S + created today)
+    order_counts = _order_base(
+        db.query(
+            func.count(case((OrderWmsStateModel.status == "B#S", 1))).label("total_orders"),
+            func.count(
+                case(
+                    (
+                        and_(
+                            OrderWmsStateModel.status.in_(("packed", "shipped")),
+                            func.date(OrderWmsStateModel.updated_at) == today,
+                        ),
+                        1,
+                    )
+                )
+            ).label("completed_today"),
+            func.count(
+                case(
+                    (
+                        and_(
+                            OrderWmsStateModel.status == "B#S",
+                            func.date(OrderModel.created_at) == today,
+                        ),
+                        1,
+                    )
+                )
+            ).label("new_orders_today"),
+        ).join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
+    ).one()
 
-    # Orders completed (shipped/packed) today
-    completed_today = (
-        _order_base(
-            db.query(func.count(OrderModel.id)).join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
-        )
-        .filter(
-            OrderWmsStateModel.status.in_(("packed", "shipped")),
-            func.date(OrderWmsStateModel.updated_at) == today,
-        )
-        .scalar()
-        or 0
-    )
+    total_orders = order_counts.total_orders or 0
+    completed_today = order_counts.completed_today or 0
+    new_orders_today = order_counts.new_orders_today or 0
 
-    # Pick documents in progress (new, partial, in_progress) + picked (tekshirish kutilmoqda)
-    in_picking = (
-        db.query(func.count(DocumentModel.id))
+    # Bitta query: in_picking (barcha hujjatlar), active_pickers (distinct assignee; NULL hisoblanmaydi)
+    doc_counts = (
+        db.query(
+            func.count(DocumentModel.id).label("in_picking"),
+            func.count(func.distinct(DocumentModel.assigned_to_user_id)).label("active_pickers"),
+        )
         .filter(
             DocumentModel.doc_type == "SO",
             DocumentModel.status.in_(("new", "partial", "in_progress", "picked")),
         )
-        .scalar()
-        or 0
-    )
+    ).one()
+    in_picking = doc_counts.in_picking or 0
+    active_pickers = doc_counts.active_pickers or 0
 
-    # Distinct pickers assigned to active pick documents (new, partial, in_progress, picked)
-    active_pickers = (
-        db.query(func.count(func.distinct(DocumentModel.assigned_to_user_id)))
-        .filter(
-            DocumentModel.doc_type == "SO",
-            DocumentModel.status.in_(("new", "partial", "in_progress", "picked")),
-            DocumentModel.assigned_to_user_id.isnot(None),
-        )
-        .scalar()
-        or 0
-    )
-
-    # Placeholders - no exception/low_stock models yet
     exceptions = 0
     low_stock = 0
-
-    # Deltas: new B#S orders today
-    new_orders_today = (
-        _order_base(
-            db.query(func.count(OrderModel.id)).join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
-        )
-        .filter(OrderWmsStateModel.status == "B#S", func.date(OrderModel.created_at) == today)
-        .scalar()
-        or 0
-    )
     deltas = {}
     if new_orders_today > 0:
         deltas["total_orders"] = f"+{new_orders_today}"
@@ -165,21 +159,23 @@ async def get_orders_by_status(
     db: Session = Depends(get_db),
     _user=Depends(require_any_permission(["reports:read", "audit:read", "admin:access"])),
 ):
-    # Barcha buyurtmalar bo'yicha status hisobi (dashboard kartalarida ko'rsatish uchun)
-    rows = (
-        db.query(OrderWmsStateModel.status, func.count(OrderModel.id))
-        .join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
-        .filter(OrderWmsStateModel.status.in_(ORDER_STATUSES_FOR_COUNTS))
-        .group_by(OrderWmsStateModel.status)
-        .all()
-    )
-    # Include zero counts for statuses that have no orders
-    by_status = {r[0]: r[1] for r in rows}
-    items = [
-        OrdersByStatusRow(status=s, count=by_status.get(s, 0))
-        for s in ORDER_STATUSES_FOR_COUNTS
-    ]
-    return OrdersByStatusResponse(items=items)
+    try:
+        rows = (
+            db.query(OrderWmsStateModel.status, func.count(OrderModel.id))
+            .join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
+            .filter(OrderWmsStateModel.status.in_(ORDER_STATUSES_FOR_COUNTS))
+            .group_by(OrderWmsStateModel.status)
+            .all()
+        )
+        by_status = {r[0]: r[1] for r in rows}
+        items = [
+            OrdersByStatusRow(status=s, count=by_status.get(s, 0))
+            for s in ORDER_STATUSES_FOR_COUNTS
+        ]
+        return OrdersByStatusResponse(items=items)
+    except Exception as e:
+        logger.exception("get_orders_by_status error")
+        raise HTTPException(status_code=500, detail="Internal error") from e
 
 
 @router.get(

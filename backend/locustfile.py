@@ -1,17 +1,19 @@
 """
 Locust load test for WMS Backend API.
 
-Ishga tushirish:
+Ishga tushirish (Render — lokal backend kerak emas):
   cd backend
+  locust -f locustfile.py --host=https://wms-ngdm.onrender.com
+
+Lokal backend uchun:
   locust -f locustfile.py --host=http://localhost:8000
 
 Web UI: http://localhost:8089 (Number of users, Spawn rate, Start)
 
 Headless:
-  locust -f locustfile.py --host=http://localhost:8000 --headless -u 20 -r 4 -t 2m
+  locust -f locustfile.py --host=https://wms-ngdm.onrender.com --headless -u 20 -r 4 -t 2m
 
-Login uchun: LOCUST_USER va LOCUST_PASSWORD env o'rnating yoki default (Test / 123456).
-Backend ishlashi kerak: uvicorn app.main:app --host 0.0.0.0 --port 8000
+Login: LOCUST_USER, LOCUST_PASSWORD (default Test / 123456). Render da Test user bo'lishi kerak.
 """
 import os
 from locust import HttpUser, task, between
@@ -30,7 +32,12 @@ class WMSUser(HttpUser):
             name="/api/v1/auth/login",
         )
         if r.status_code != 200:
-            raise Exception(f"Login failed: {r.status_code} {r.text}")
+            msg = (
+                "Connection failed (host ga ulanib bo'lmayapti — Render yoki lokal backend ishlayaptimi?)"
+                if getattr(r, "status_code", None) == 0
+                else f"Login failed: {r.status_code} {r.text}"
+            )
+            raise Exception(msg)
         self.client.headers["Authorization"] = f"Bearer {r.json()['access_token']}"
 
     @task(4)

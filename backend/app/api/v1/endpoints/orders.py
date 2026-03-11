@@ -361,15 +361,13 @@ async def list_orders(
     brand_ids: Optional[str] = Query(None, description="Filter by brands: comma-separated UUIDs (orders that contain products of any of these brands)"),
     order_source: Optional[str] = Query(None, description="diller, orikzor va h.k. — Order.source bo'yicha filtrlash"),
     search_fields: Optional[str] = Query(None),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     _user=Depends(require_permission("orders:read")),
 ):
-    query = db.query(OrderModel).options(
-        selectinload(OrderModel.lines),
-        selectinload(OrderModel.wms_state),
-    )
+    # List uchun lines yuklanmaydi; faqat wms_state. lines_total keyin alohida count querydan olinadi.
+    query = db.query(OrderModel).options(selectinload(OrderModel.wms_state))
 
     if order_source and order_source.strip():
         query = query.filter(OrderModel.source == order_source.strip())
@@ -465,6 +463,16 @@ async def list_orders(
         orders = query.order_by(OrderModel.created_at.desc()).offset(offset).limit(limit).all()
 
     order_ids = [o.id for o in orders]
+    # Ro'yxat uchun lines_total: bitta GROUP BY query (lines list yuklanmagan)
+    lines_by_order: dict[UUID, int] = {}
+    if order_ids:
+        lines_rows = (
+            db.query(OrderLineModel.order_id, func.count(OrderLineModel.id))
+            .filter(OrderLineModel.order_id.in_(order_ids))
+            .group_by(OrderLineModel.order_id)
+            .all()
+        )
+        lines_by_order = {r[0]: r[1] for r in lines_rows}
     doc_by_order: dict[UUID, DocumentModel] = {}
     if order_ids:
         docs = (
@@ -507,7 +515,7 @@ async def list_orders(
                 agent_name=order.agent_name,
                 total_amount=order.total_amount,
                 created_at=order.created_at.date(),
-                lines_total=len(order.lines),
+                lines_total=lines_by_order.get(order.id, 0),
                 from_warehouse_code=getattr(order, "from_warehouse_code", None),
                 to_warehouse_code=getattr(order, "to_warehouse_code", None),
                 movement_note=getattr(order, "movement_note", None),
