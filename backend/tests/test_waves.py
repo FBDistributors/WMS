@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.models.location import Location
-from app.models.order import Order, OrderLine
+from app.models.order import Order, OrderLine, OrderWmsState
 from app.models.product import Product
 from app.models.stock import StockLot, StockMovement
 from app.models.user import User
@@ -97,13 +97,12 @@ def test_order_with_line(
         source="test",
         source_external_id="ord-wave-001",
         order_number="ORD-WAVE-001",
-        status="B#S",
     )
+    order.wms_state = OrderWmsState(status="B#S")
     db_session.add(order)
     db_session.flush()
     line = OrderLine(
         order_id=order.id,
-        product_id=test_product_with_barcode.id,
         sku=test_product_with_barcode.sku,
         barcode=test_product_with_barcode.barcode,
         name=test_product_with_barcode.name,

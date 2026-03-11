@@ -14,6 +14,7 @@ from app.auth.deps import require_any_permission, require_permission
 from app.db import get_db
 from app.models.document import Document as DocumentModel
 from app.models.order import Order as OrderModel
+from app.models.order import OrderWmsState as OrderWmsStateModel
 
 router = APIRouter()
 DEFAULT_FILIAL_ID = os.getenv("WMS_DEFAULT_FILIAL_ID", "3788131").strip()
@@ -69,18 +70,22 @@ async def get_dashboard_summary(
 
     # Total orders: B#S only (matches orders page default view)
     total_orders = (
-        _order_base(db.query(func.count(OrderModel.id)))
-        .filter(OrderModel.status == "B#S")
+        _order_base(
+            db.query(func.count(OrderModel.id)).join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
+        )
+        .filter(OrderWmsStateModel.status == "B#S")
         .scalar()
         or 0
     )
 
     # Orders completed (shipped/packed) today
     completed_today = (
-        _order_base(db.query(func.count(OrderModel.id)))
+        _order_base(
+            db.query(func.count(OrderModel.id)).join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
+        )
         .filter(
-            OrderModel.status.in_(("packed", "shipped")),
-            func.date(OrderModel.updated_at) == today,
+            OrderWmsStateModel.status.in_(("packed", "shipped")),
+            func.date(OrderWmsStateModel.updated_at) == today,
         )
         .scalar()
         or 0
@@ -115,8 +120,10 @@ async def get_dashboard_summary(
 
     # Deltas: new B#S orders today
     new_orders_today = (
-        _order_base(db.query(func.count(OrderModel.id)))
-        .filter(OrderModel.status == "B#S", func.date(OrderModel.created_at) == today)
+        _order_base(
+            db.query(func.count(OrderModel.id)).join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
+        )
+        .filter(OrderWmsStateModel.status == "B#S", func.date(OrderModel.created_at) == today)
         .scalar()
         or 0
     )
@@ -160,13 +167,14 @@ async def get_orders_by_status(
 ):
     # Barcha buyurtmalar bo'yicha status hisobi (dashboard kartalarida ko'rsatish uchun)
     rows = (
-        db.query(OrderModel.status, func.count(OrderModel.id))
-        .filter(OrderModel.status.in_(ORDER_STATUSES_FOR_COUNTS))
-        .group_by(OrderModel.status)
+        db.query(OrderWmsStateModel.status, func.count(OrderModel.id))
+        .join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
+        .filter(OrderWmsStateModel.status.in_(ORDER_STATUSES_FOR_COUNTS))
+        .group_by(OrderWmsStateModel.status)
         .all()
     )
     # Include zero counts for statuses that have no orders
-    by_status = {r.status: r[1] for r in rows}
+    by_status = {r[0]: r[1] for r in rows}
     items = [
         OrdersByStatusRow(status=s, count=by_status.get(s, 0))
         for s in ORDER_STATUSES_FOR_COUNTS

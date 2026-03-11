@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.integrations.smartup.mapper import OrderLinePayload, _resolve_external_id, map_order_to_wms_order
 from app.integrations.smartup.schemas import SmartupOrder
-from app.models.order import Order, OrderLine
+from app.models.order import Order, OrderLine, OrderWmsState
 from app.models.product import Product as ProductModel
 
 logger = logging.getLogger(__name__)
@@ -109,7 +109,7 @@ def import_orders(
                 existing.agent_id = payload.agent_id
                 existing.agent_name = payload.agent_name
                 existing.total_amount = payload.total_amount
-                existing.status = payload.status
+                # WMS status order_wms_state da; sync mavjud buyurtma statusini o'zgartirmaydi
                 if getattr(payload, "from_warehouse_code", None) is not None:
                     existing.from_warehouse_code = payload.from_warehouse_code
                 if getattr(payload, "to_warehouse_code", None) is not None:
@@ -134,12 +134,12 @@ def import_orders(
                 agent_id=payload.agent_id,
                 agent_name=payload.agent_name,
                 total_amount=payload.total_amount,
-                status=payload.status,
                 from_warehouse_code=getattr(payload, "from_warehouse_code", None),
                 to_warehouse_code=getattr(payload, "to_warehouse_code", None),
                 movement_note=getattr(payload, "movement_note", None),
                 delivery_date=getattr(payload, "delivery_date", None),
             )
+            record.wms_state = OrderWmsState(status=payload.status)
             record.lines = [
                 OrderLine(
                     sku=line.sku,

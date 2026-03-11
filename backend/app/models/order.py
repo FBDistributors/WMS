@@ -21,6 +21,23 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 
+class OrderWmsState(Base):
+    """WMS workflow holati: status va boshqa WMS o'zgartirishlar. Sync bu jadvalni faqat yangi order uchun to'ldiradi."""
+    __tablename__ = "order_wms_state"
+
+    order_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("orders.id", ondelete="CASCADE"), primary_key=True
+    )
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="imported")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    order: Mapped["Order"] = relationship("Order", back_populates="wms_state")
+
+    __table_args__ = (Index("ix_order_wms_state_status", "status"),)
+
+
 class Order(Base):
     __tablename__ = "orders"
 
@@ -34,7 +51,6 @@ class Order(Base):
     agent_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     agent_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     total_amount: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
-    status: Mapped[str] = mapped_column(String(32), nullable=False, default="imported")
     # Tashkiliy harakat (mfm movement): skladdan skladga
     from_warehouse_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
     to_warehouse_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -49,6 +65,12 @@ class Order(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
+    wms_state: Mapped[OrderWmsState] = relationship(
+        "OrderWmsState",
+        uselist=False,
+        back_populates="order",
+        cascade="all, delete-orphan",
+    )
     lines: Mapped[list[OrderLine]] = relationship(
         "OrderLine",
         back_populates="order",
@@ -57,7 +79,6 @@ class Order(Base):
 
     __table_args__ = (
         UniqueConstraint("source_external_id", name="uq_orders_source_external_id"),
-        Index("ix_orders_status", "status"),
         Index("ix_orders_order_number", "order_number"),
         Index("ix_orders_source", "source"),
         Index("ix_orders_filial_id", "filial_id"),

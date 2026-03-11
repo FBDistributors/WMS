@@ -27,6 +27,7 @@ from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
 from app.models.order import Order as OrderModel
 from app.models.order import OrderLine as OrderLineModel
+from app.models.order import OrderWmsState as OrderWmsStateModel
 from app.models.product import Product as ProductModel
 from app.models.product import ProductBarcode
 from app.models.location import Location as LocationModel
@@ -236,7 +237,7 @@ def _to_order_details(order: OrderModel) -> OrderDetails:
         id=order.id,
         order_number=order.order_number,
         source_external_id=order.source_external_id,
-        status=order.status,
+        status=order.wms_state.status,
         filial_id=order.filial_id,
         customer_id=order.customer_id,
         customer_name=order.customer_name,
@@ -365,7 +366,10 @@ async def list_orders(
     db: Session = Depends(get_db),
     _user=Depends(require_permission("orders:read")),
 ):
-    query = db.query(OrderModel).options(selectinload(OrderModel.lines))
+    query = db.query(OrderModel).options(
+        selectinload(OrderModel.lines),
+        selectinload(OrderModel.wms_state),
+    )
 
     if order_source and order_source.strip():
         query = query.filter(OrderModel.source == order_source.strip())
@@ -375,8 +379,9 @@ async def list_orders(
         valid = [s for s in statuses if s in ORDER_STATUSES]
         if not valid:
             raise HTTPException(status_code=400, detail="Invalid status")
+        query = query.join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
         if len(valid) == 1:
-            query = query.filter(OrderModel.status == valid[0])
+            query = query.filter(OrderWmsStateModel.status == valid[0])
             if valid[0] == "B#S":
                 # Yig'ishga yuborilgan buyurtmalar (terish documenti bor) asosiy ro'yxatda ko'rinmasin
                 has_picking_doc = exists().where(
@@ -387,7 +392,7 @@ async def list_orders(
                 )
                 query = query.filter(~has_picking_doc)
         else:
-            query = query.filter(OrderModel.status.in_(valid))
+            query = query.filter(OrderWmsStateModel.status.in_(valid))
 
     if q:
         allowed_fields = {
@@ -494,7 +499,7 @@ async def list_orders(
                 id=order.id,
                 order_number=order.order_number,
                 source_external_id=order.source_external_id,
-                status=order.status,
+                status=order.wms_state.status,
                 filial_id=order.filial_id,
                 customer_id=order.customer_id,
                 customer_name=order.customer_name,
@@ -552,7 +557,7 @@ async def get_order(
 ):
     order = (
         db.query(OrderModel)
-        .options(selectinload(OrderModel.lines))
+        .options(selectinload(OrderModel.lines), selectinload(OrderModel.wms_state))
         .filter(OrderModel.id == order_id)
         .one_or_none()
     )
@@ -576,14 +581,14 @@ async def update_order_status(
         )
     order = (
         db.query(OrderModel)
-        .options(selectinload(OrderModel.lines))
+        .options(selectinload(OrderModel.lines), selectinload(OrderModel.wms_state))
         .filter(OrderModel.id == order_id)
         .one_or_none()
     )
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    old_status = order.status
-    order.status = payload.status
+    old_status = order.wms_state.status
+    order.wms_state.status = payload.status
 
     if payload.status == "picked" and payload.controller_user_id is not None:
         doc = (
@@ -717,11 +722,11 @@ def _get_or_create_order_from_movement(
         source=source.strip(),
         source_external_id=external_id,
         order_number=movement_id[:64],
-        status="B#S",
         from_warehouse_code=(movement.from_warehouse_code or "")[:64] or None,
         to_warehouse_code=(movement.to_warehouse_code or "")[:64] or None,
         movement_note=(movement.note or "")[:512] or None,
     )
+    order.wms_state = OrderWmsStateModel(status="B#S")
     db.add(order)
     db.flush()
     for item in movement.movement_items:
@@ -775,7 +780,7 @@ async def send_movement_to_picking(
     if existing:
         raise HTTPException(status_code=409, detail="Picking task already created")
 
-    if order.status not in {"imported", "B#S", "ready_for_picking", "allocated"}:
+    if order.wms_state.status not in {"imported", "B#S", "ready_for_picking", "allocated"}:
         raise HTTPException(status_code=409, detail="Order cannot be sent to picking")
 
     document_lines, shortages = _allocate_order(db, order, user.id)
@@ -794,8 +799,8 @@ async def send_movement_to_picking(
     document.lines = document_lines
 
     db.add(document)
-    old_status = order.status
-    order.status = "allocated"
+    old_status = order.wms_state.status
+    order.wms_state.status = "allocated"
     log_action(
         db,
         user_id=user.id,
@@ -835,14 +840,14 @@ async def send_order_to_picking(
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     order = (
         db.query(OrderModel)
-        .options(selectinload(OrderModel.lines))
+        .options(selectinload(OrderModel.lines), selectinload(OrderModel.wms_state))
         .filter(OrderModel.id == order_id)
         .one_or_none()
     )
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    if order.status not in {"imported", "B#S", "ready_for_picking", "allocated"}:
+    if order.wms_state.status not in {"imported", "B#S", "ready_for_picking", "allocated"}:
         raise HTTPException(status_code=409, detail="Order cannot be sent to picking")
 
     if not order.lines:
@@ -872,8 +877,8 @@ async def send_order_to_picking(
     document.lines = document_lines
 
     db.add(document)
-    old_status = order.status
-    order.status = "allocated"
+    old_status = order.wms_state.status
+    order.wms_state.status = "allocated"
     log_action(
         db,
         user_id=user.id,
@@ -910,13 +915,13 @@ async def pack_order(
 ):
     order = (
         db.query(OrderModel)
-        .options(selectinload(OrderModel.lines))
+        .options(selectinload(OrderModel.lines), selectinload(OrderModel.wms_state))
         .filter(OrderModel.id == order_id)
         .one_or_none()
     )
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    if order.status not in ("picked", "completed"):
+    if order.wms_state.status not in ("picked", "completed"):
         raise HTTPException(status_code=409, detail="Order must be picked or completed before packing")
 
     document = (
@@ -927,8 +932,8 @@ async def pack_order(
     if document and document.status not in ("picked", "completed"):
         raise HTTPException(status_code=409, detail="Picking document must be picked or completed")
 
-    old_status = order.status
-    order.status = "packed"
+    old_status = order.wms_state.status
+    order.wms_state.status = "packed"
     log_action(
         db,
         user_id=user.id,
@@ -953,13 +958,13 @@ async def ship_order(
 ):
     order = (
         db.query(OrderModel)
-        .options(selectinload(OrderModel.lines))
+        .options(selectinload(OrderModel.lines), selectinload(OrderModel.wms_state))
         .filter(OrderModel.id == order_id)
         .one_or_none()
     )
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    if order.status != "packed":
+    if order.wms_state.status != "packed":
         raise HTTPException(status_code=409, detail="Order must be packed before shipping")
 
     document = (
@@ -1006,8 +1011,8 @@ async def ship_order(
     if not shipped_any:
         raise HTTPException(status_code=409, detail="No picked quantities to ship")
 
-    old_status = order.status
-    order.status = "shipped"
+    old_status = order.wms_state.status
+    order.wms_state.status = "shipped"
     log_action(
         db,
         user_id=user.id,

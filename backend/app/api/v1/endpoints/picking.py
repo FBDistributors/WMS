@@ -19,6 +19,7 @@ from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
 from app.models.location import Location as LocationModel
 from app.models.order import Order as OrderModel
+from app.models.order import OrderWmsState as OrderWmsStateModel
 from app.models.picking import PickRequest
 from app.models.stock import StockMovement as StockMovementModel
 from app.models.product import Product as ProductModel
@@ -345,13 +346,14 @@ async def list_picking_documents(
         .options(
             selectinload(DocumentModel.lines),
             selectinload(DocumentModel.assigned_to_user),
-            selectinload(DocumentModel.order),
+            selectinload(DocumentModel.order).selectinload(OrderModel.wms_state),
         )
         .outerjoin(OrderModel, DocumentModel.order_id == OrderModel.id)
+        .outerjoin(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
         .filter(
             or_(
                 OrderModel.id.is_(None),
-                OrderModel.status.notin_(ORDER_HIDDEN_STATUSES),
+                OrderWmsStateModel.status.notin_(ORDER_HIDDEN_STATUSES),
             )
         )
     )
@@ -394,11 +396,12 @@ async def get_consolidated(
     docs_id_query = (
         db.query(DocumentModel.id)
         .outerjoin(OrderModel, DocumentModel.order_id == OrderModel.id)
+        .outerjoin(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
         .filter(
             DocumentModel.assigned_to_user_id == user.id,
             or_(
                 OrderModel.id.is_(None),
-                OrderModel.status.notin_(ORDER_HIDDEN_STATUSES),
+                OrderWmsStateModel.status.notin_(ORDER_HIDDEN_STATUSES),
             ),
             or_(
                 DocumentModel.status != "picked",
@@ -565,11 +568,12 @@ async def consolidated_pick(
     docs_query = (
         db.query(DocumentModel.id)
         .outerjoin(OrderModel, DocumentModel.order_id == OrderModel.id)
+        .outerjoin(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
         .filter(
             DocumentModel.assigned_to_user_id == user.id,
             or_(
                 OrderModel.id.is_(None),
-                OrderModel.status.notin_(ORDER_HIDDEN_STATUSES),
+                OrderWmsStateModel.status.notin_(ORDER_HIDDEN_STATUSES),
             ),
             or_(
                 DocumentModel.status != "picked",
@@ -678,12 +682,13 @@ async def consolidated_pick(
                 if document.order_id:
                     order = (
                         db.query(OrderModel)
+                        .options(selectinload(OrderModel.wms_state))
                         .filter(OrderModel.id == document.order_id)
                         .with_for_update()
                         .one_or_none()
                     )
-                    if order and order.status in {"allocated", "ready_for_picking"}:
-                        order.status = "picking"
+                    if order and order.wms_state and order.wms_state.status in {"allocated", "ready_for_picking"}:
+                        order.wms_state.status = "picking"
         if first_picked_line_id is not None:
             db.add(PickRequest(request_id=payload.request_id, line_id=first_picked_line_id))
         db.commit()
@@ -1017,12 +1022,13 @@ def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
         if document.order_id:
             order = (
                 db.query(OrderModel)
+                .options(selectinload(OrderModel.wms_state))
                 .filter(OrderModel.id == document.order_id)
                 .with_for_update()
                 .one_or_none()
             )
-            if order and order.status in {"allocated", "ready_for_picking"}:
-                order.status = "picking"
+            if order and order.wms_state and order.wms_state.status in {"allocated", "ready_for_picking"}:
+                order.wms_state.status = "picking"
         db.add(PickRequest(request_id=payload.request_id, line_id=line.id))
         db.flush()
     except IntegrityError as e:
@@ -1224,12 +1230,13 @@ async def complete_picking_document(
         if document.order_id:
             order = (
                 db.query(OrderModel)
+                .options(selectinload(OrderModel.wms_state))
                 .filter(OrderModel.id == document.order_id)
                 .with_for_update()
                 .one_or_none()
             )
-            if order and order.status in {"picked", "picking", "allocated"}:
-                order.status = "completed"
+            if order and order.wms_state and order.wms_state.status in {"picked", "picking", "allocated"}:
+                order.wms_state.status = "completed"
     else:
         if document.assigned_to_user_id != user.id:
             raise HTTPException(status_code=403, detail="Document not assigned to you")
@@ -1237,12 +1244,13 @@ async def complete_picking_document(
         if document.order_id:
             order = (
                 db.query(OrderModel)
+                .options(selectinload(OrderModel.wms_state))
                 .filter(OrderModel.id == document.order_id)
                 .with_for_update()
                 .one_or_none()
             )
-            if order and order.status in {"picking", "allocated"}:
-                order.status = "picked"
+            if order and order.wms_state and order.wms_state.status in {"picking", "allocated"}:
+                order.wms_state.status = "picked"
     # Javobni commit dan oldin yig‘ib olamiz (commit dan keyin session expired bo‘ladi)
     response = _to_picking_document_with_lines(document, lines)
     db.commit()
