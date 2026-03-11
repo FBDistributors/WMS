@@ -499,7 +499,7 @@ export function PickTaskDetails() {
               onReportReason={!isController && isOnline ? openLineReasonModal : undefined}
               isOnline={isOnline}
               t={t}
-              readOnly={isController && Number(virtualLine.qty_picked) < Number(virtualLine.qty_required)}
+              readOnly={false}
               isController={isController}
               controllerVerified={isController && allGroupVerified}
               isDark={isDark}
