@@ -1094,7 +1094,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         {syncError ? (
           <div className="flex items-center justify-between gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-900/30">
             <span className="text-sm text-amber-800 dark:text-amber-200 break-words flex-1">{syncError}</span>
-            <Button variant="ghost" size="sm" onClick={() => setSyncError(null)} aria-label={t('common:buttons.close')}>
+            <Button variant="ghost" className="shrink-0 p-2" onClick={() => setSyncError(null)} aria-label={t('common:buttons.close')}>
               <X className="h-4 w-4" />
             </Button>
           </div>
