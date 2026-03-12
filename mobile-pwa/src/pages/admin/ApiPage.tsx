@@ -79,7 +79,7 @@ export function ApiPage() {
               rows={3}
               className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 font-mono text-sm placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
             />
-            <Button type="button" variant="outline" size="sm" onClick={clearInput} className="shrink-0">
+            <Button type="button" variant="outline" onClick={clearInput} className="shrink-0 px-3 py-2 text-sm">
               {t('common:buttons.clear', 'Tozalash')}
             </Button>
           </div>
