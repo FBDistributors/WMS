@@ -169,11 +169,14 @@ export type SmartupOrderExportResponse = {
   total: number
 }
 
-export async function getSmartupOrderExportRaw(query: {
+export type SmartupOrderExportQuery = {
   begin_deal_date?: string
   end_deal_date?: string
   filial_code?: string
-} = {}) {
+  filial_id?: string
+}
+
+export async function getSmartupOrderExportRaw(query: SmartupOrderExportQuery = {}) {
   return fetchJSON<SmartupOrderExportResponse>('/api/v1/integrations/smartup/order-export', {
     query: query as Record<string, string | undefined>,
   })

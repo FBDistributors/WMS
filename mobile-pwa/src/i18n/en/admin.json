@@ -125,9 +125,15 @@
     "preset_apis": "Quick requests",
     "order_api_btn": "Order API (B#S, all)",
     "order_api_smartup_btn": "Order API from SmartUp (B#S)",
+    "smartup_params_hint": "Same as Sync: if date and filial are empty, last 7 days are used.",
+    "begin_deal_date": "Start date",
+    "end_deal_date": "End date",
+    "filial_code": "Filial code",
+    "filial_id": "Filial ID",
     "loading": "Loading...",
     "loaded_count": "Loaded: {{count}} orders (B#S)",
-    "loaded_from_smartup": "Loaded from SmartUp: {{count}} orders (B#S)"
+    "loaded_from_smartup": "Loaded from SmartUp: {{count}} orders (B#S)",
+    "loaded_from_smartup_total": "Loaded from SmartUp: {{count}} / {{total}} orders (B#S)"
   },
   "header": {
     "menu": "Menu"

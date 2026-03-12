@@ -112,16 +112,17 @@ async def import_smartup_orders(
 async def smartup_order_export_raw(
     begin_deal_date: Optional[date] = Query(None, description="YYYY-MM-DD (default: 7 days ago)"),
     end_deal_date: Optional[date] = Query(None, description="YYYY-MM-DD (default: today)"),
-    filial_code: Optional[str] = Query(None, description="Filial code filter"),
+    filial_code: Optional[str] = Query(None, description="Filial code filter (Sync bilan bir xil)"),
+    filial_id: Optional[str] = Query(None, description="Filial ID (Sync bilan bir xil)"),
     _user=Depends(require_permission("integrations:write")),
 ) -> dict[str, Any]:
-    """SmartUp order$export dan to'g'ridan-to'g'ri javobni qaytaradi (bazaga yozmaydi). API bo'limida natijani ko'rish uchun."""
+    """SmartUp order$export dan to'g'ridan-to'g'ri javobni qaytaradi (bazaga yozmaydi). Sync bilan bir xil parametrlar."""
     today = date.today()
     end = end_deal_date or today
     begin = begin_deal_date or (today - timedelta(days=7))
     if begin > end:
         raise HTTPException(status_code=400, detail="begin_deal_date must be <= end_deal_date")
-    client = SmartupClient()
+    client = SmartupClient(filial_id=(filial_id or "").strip() or None)
     response = client.export_orders(
         begin_deal_date=begin.strftime("%d.%m.%Y"),
         end_deal_date=end.strftime("%d.%m.%Y"),

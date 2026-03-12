@@ -18,23 +18,38 @@ export function ApiPage() {
   const [inputValue, setInputValue] = useState('')
   const [orderApiLoading, setOrderApiLoading] = useState(false)
   const [orderApiError, setOrderApiError] = useState<string | null>(null)
-  /** B#S tezkor so'rov yuklaganida: nechta buyurtma yuklangan (tekshirish uchun). */
   const [orderApiLoadedCount, setOrderApiLoadedCount] = useState<number | null>(null)
+  const [orderApiTotal, setOrderApiTotal] = useState<number | null>(null)
+  /** Sync bilan bir xil parametrlar: sana oralig'i va filial. */
+  const [smartupBeginDate, setSmartupBeginDate] = useState('')
+  const [smartupEndDate, setSmartupEndDate] = useState('')
+  const [smartupFilialCode, setSmartupFilialCode] = useState('')
+  const [smartupFilialId, setSmartupFilialId] = useState('')
 
   const fetchOrderApi = useCallback(async () => {
     setOrderApiLoading(true)
     setOrderApiError(null)
     setOrderApiLoadedCount(null)
+    setOrderApiTotal(null)
     try {
-      const data = await getSmartupOrderExportRaw()
+      const begin = smartupBeginDate.trim() || undefined
+      const end = smartupEndDate.trim() || undefined
+      const data = await getSmartupOrderExportRaw({
+        begin_deal_date: begin,
+        end_deal_date: end,
+        filial_code: smartupFilialCode.trim() || undefined,
+        filial_id: smartupFilialId.trim() || undefined,
+      })
       setInputValue(JSON.stringify(data, null, 2))
-      setOrderApiLoadedCount(data.order?.length ?? 0)
+      const count = data.order?.length ?? 0
+      setOrderApiLoadedCount(count)
+      setOrderApiTotal(data.total ?? count)
     } catch (err) {
       setOrderApiError(err instanceof Error ? err.message : String(err))
     } finally {
       setOrderApiLoading(false)
     }
-  }, [])
+  }, [smartupBeginDate, smartupEndDate, smartupFilialCode, smartupFilialId])
 
   const { parsed, parseError } = useMemo(() => {
     const s = inputValue.trim()
@@ -66,6 +81,61 @@ export function ApiPage() {
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
             {t('admin:api.preset_apis', 'Tezkor so‘rovlar')}
           </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+            {t('admin:api.smartup_params_hint', "Sync bilan bir xil: sana va filial bo'sh qolsa oxirgi 7 kun ishlatiladi.")}
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-3">
+            <div>
+              <label htmlFor="smartup-begin" className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                {t('admin:api.begin_deal_date', 'Boshlanish sanasi')}
+              </label>
+              <input
+                id="smartup-begin"
+                type="date"
+                value={smartupBeginDate}
+                onChange={(e) => setSmartupBeginDate(e.target.value)}
+                className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              />
+            </div>
+            <div>
+              <label htmlFor="smartup-end" className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                {t('admin:api.end_deal_date', 'Tugash sanasi')}
+              </label>
+              <input
+                id="smartup-end"
+                type="date"
+                value={smartupEndDate}
+                onChange={(e) => setSmartupEndDate(e.target.value)}
+                className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              />
+            </div>
+            <div>
+              <label htmlFor="smartup-filial-code" className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                {t('admin:api.filial_code', 'Filial kodi')}
+              </label>
+              <input
+                id="smartup-filial-code"
+                type="text"
+                value={smartupFilialCode}
+                onChange={(e) => setSmartupFilialCode(e.target.value)}
+                placeholder=""
+                className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              />
+            </div>
+            <div>
+              <label htmlFor="smartup-filial-id" className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                {t('admin:api.filial_id', 'Filial ID')}
+              </label>
+              <input
+                id="smartup-filial-id"
+                type="text"
+                value={smartupFilialId}
+                onChange={(e) => setSmartupFilialId(e.target.value)}
+                placeholder=""
+                className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              />
+            </div>
+          </div>
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
@@ -87,7 +157,14 @@ export function ApiPage() {
           )}
           {orderApiLoadedCount !== null && !orderApiError && (
             <p className="mt-2 text-sm text-green-600 dark:text-green-400" role="status">
-              {t('admin:api.loaded_from_smartup', 'SmartUp dan yuklandi: {{count}} ta buyurtma (B#S)', { count: orderApiLoadedCount })}
+              {orderApiTotal !== null && orderApiTotal !== orderApiLoadedCount
+                ? t('admin:api.loaded_from_smartup_total', 'SmartUp dan yuklandi: {{count}} / {{total}} ta buyurtma (B#S)', {
+                    count: orderApiLoadedCount,
+                    total: orderApiTotal,
+                  })
+                : t('admin:api.loaded_from_smartup', 'SmartUp dan yuklandi: {{count}} ta buyurtma (B#S)', {
+                    count: orderApiLoadedCount,
+                  })}
             </p>
           )}
         </Card>
