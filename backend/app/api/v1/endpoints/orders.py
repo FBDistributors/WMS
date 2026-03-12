@@ -20,7 +20,7 @@ from app.db import get_db
 from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_ip, log_action
 from app.services.push_notifications import send_push_to_user
 from app.integrations.smartup.client import SmartupClient
-from app.integrations.smartup.importer import filter_orders_b_s, import_orders
+from app.integrations.smartup.importer import delete_stale_orders, filter_orders_b_s, import_orders
 from app.integrations.smartup.mfm_movement import export_mfm_movements
 from app.integrations.smartup.sync_lock import smartup_sync_lock
 from app.models.document import Document as DocumentModel
@@ -801,6 +801,8 @@ async def sync_orders_from_smartup(
             created, updated, skipped, import_errors, _ = import_orders(
                 db, items_to_import, order_source=payload.order_source, filial_id_override=filial_override
             )
+            if payload.order_source != "diller":
+                delete_stale_orders(db, list(items_to_import))
             detail = import_errors[0].reason if import_errors else None
             errors_count = len(import_errors) if import_errors else None
             return SmartupSyncResponse(
