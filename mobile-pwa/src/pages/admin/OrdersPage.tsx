@@ -576,7 +576,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                 <Button
                   type="button"
                   variant="outline"
-                  size="sm"
                   disabled={checkLoading}
                   onClick={runCheck}
                   className="self-center"
