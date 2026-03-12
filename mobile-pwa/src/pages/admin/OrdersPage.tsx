@@ -20,6 +20,8 @@ import { useAuth } from '../../rbac/AuthProvider'
 
 const PAGE_SIZE = 50
 const MOVEMENT_PAGE_SIZE = 50
+/** B#S barchasini yuklashda API dan har safar olinadigan maksimum (backend max 500) */
+const BULK_PAGE_SIZE = 500
 const COLUMN_OPTIONS = [
   { id: 'select', labelKey: 'orders:columns.select' },
   { id: 'order_number', labelKey: 'orders:columns.order_number' },
@@ -232,26 +234,59 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         setTotal(0)
         return
       }
-      const query: Record<string, string | number | undefined> = {
-        status: statusParam,
-        q: searchQuery.trim() || undefined,
-        brand_ids: brandFilter.trim() ? brandFilter.trim() : undefined,
-        date_from: dateFrom.trim() || undefined,
-        date_to: dateTo.trim() || undefined,
-        search_fields:
-          config.searchFields.length > 0 ? config.searchFields.join(',') : undefined,
-        limit: PAGE_SIZE,
-        offset,
-        ...(orderSource ? { order_source: orderSource } : {}),
+      const loadAllB#S =
+        !orderSource &&
+        (statusParam === 'B#S' || statusParam === 'imported,B#S') &&
+        mode === 'default'
+
+      if (loadAllB#S) {
+        const allItems: OrderListItem[] = []
+        let off = 0
+        let hasMore = true
+        while (hasMore) {
+          const data = await getOrders({
+            status: statusParam,
+            q: searchQuery.trim() || undefined,
+            brand_ids: brandFilter.trim() ? brandFilter.trim() : undefined,
+            date_from: dateFrom.trim() || undefined,
+            date_to: dateTo.trim() || undefined,
+            search_fields:
+              config.searchFields.length > 0 ? config.searchFields.join(',') : undefined,
+            limit: BULK_PAGE_SIZE,
+            offset: off,
+            filial_id: 'all',
+          })
+          allItems.push(...data.items)
+          hasMore = data.items.length >= BULK_PAGE_SIZE && allItems.length < data.total
+          off += BULK_PAGE_SIZE
+        }
+        const list = onlyNotSentToPicking
+          ? allItems.filter((o) => !SENT_TO_PICKING_STATUSES.has(o.status))
+          : allItems
+        setItems(list)
+        setTotal(list.length)
+      } else {
+        const query: Record<string, string | number | undefined> = {
+          status: statusParam,
+          q: searchQuery.trim() || undefined,
+          brand_ids: brandFilter.trim() ? brandFilter.trim() : undefined,
+          date_from: dateFrom.trim() || undefined,
+          date_to: dateTo.trim() || undefined,
+          search_fields:
+            config.searchFields.length > 0 ? config.searchFields.join(',') : undefined,
+          limit: PAGE_SIZE,
+          offset,
+          ...(orderSource ? { order_source: orderSource } : {}),
         // Buyurtma statuslari sahifasida filial filtrini qo‘llamaymiz (dashboard bilan bir xil)
         ...(mode === 'statuses' ? { filial_id: 'all' } : {}),
+        }
+        const data = await getOrders(query)
+        const list = onlyNotSentToPicking
+          ? data.items.filter((o) => !SENT_TO_PICKING_STATUSES.has(o.status))
+          : data.items
+        setItems(list)
+        setTotal(data.total)
       }
-      const data = await getOrders(query)
-      const list = onlyNotSentToPicking
-        ? data.items.filter((o) => !SENT_TO_PICKING_STATUSES.has(o.status))
-        : data.items
-      setItems(list)
-      setTotal(data.total)
     } catch (err) {
       if (!background) {
         const message = err instanceof Error ? err.message : t('orders:load_failed')
@@ -1181,33 +1216,50 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             </>
           ) : (
             <>
-              <Button
-                variant="secondary"
-                disabled={offset === 0}
-                onClick={() => {
-                  const newOffset = Math.max(0, offset - PAGE_SIZE)
-                  setSearchParams((prev) => {
-                    const next = new URLSearchParams(prev)
-                    next.set('offset', String(newOffset))
-                    return next
-                  })
-                }}
-              >
-                {t('common:buttons.back')}
-              </Button>
-              <Button
-                variant="secondary"
-                disabled={offset + PAGE_SIZE >= total}
-                onClick={() => {
-                  setSearchParams((prev) => {
-                    const next = new URLSearchParams(prev)
-                    next.set('offset', String(offset + PAGE_SIZE))
-                    return next
-                  })
-                }}
-              >
-                {t('common:buttons.next')}
-              </Button>
+              {(() => {
+                const isAllB#SLoaded =
+                  !orderSource &&
+                  mode === 'default' &&
+                  (statusParam === 'B#S' || statusParam === 'imported,B#S')
+                if (isAllB#SLoaded) {
+                  return (
+                    <span className="text-sm text-slate-600 dark:text-slate-400">
+                      {total > 0 ? `1–${total} / ${total}` : '0 / 0'}
+                    </span>
+                  )
+                }
+                return (
+                  <>
+                    <Button
+                      variant="secondary"
+                      disabled={offset === 0}
+                      onClick={() => {
+                        const newOffset = Math.max(0, offset - PAGE_SIZE)
+                        setSearchParams((prev) => {
+                          const next = new URLSearchParams(prev)
+                          next.set('offset', String(newOffset))
+                          return next
+                        })
+                      }}
+                    >
+                      {t('common:buttons.back')}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      disabled={offset + PAGE_SIZE >= total}
+                      onClick={() => {
+                        setSearchParams((prev) => {
+                          const next = new URLSearchParams(prev)
+                          next.set('offset', String(offset + PAGE_SIZE))
+                          return next
+                        })
+                      }}
+                    >
+                      {t('common:buttons.next')}
+                    </Button>
+                  </>
+                )
+              })()}
             </>
           )}
         </div>
