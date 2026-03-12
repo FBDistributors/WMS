@@ -543,6 +543,91 @@ async def list_orders(
     return OrdersListResponse(items=items, total=total, limit=limit, offset=offset)
 
 
+class OrderCheckMatch(BaseModel):
+    id: UUID
+    order_number: str
+    source_external_id: Optional[str] = None
+    filial_id: Optional[str] = None
+
+
+class OrderCheckResponse(BaseModel):
+    total_b_s: int
+    total_b_s_all_filial: int
+    match_by_order_number: List[OrderCheckMatch]
+    match_by_source_external_id: List[OrderCheckMatch]
+    match_by_so_doc_no: List[dict]
+
+
+@router.get("/check", response_model=OrderCheckResponse, summary="Baza va jadval yuklashni tekshirish (qidiruv natijasi)")
+async def orders_check(
+    q: Optional[str] = Query(None, description="Qidiruv so'zi (masalan 86918 yoki 233898517)"),
+    filial_id: Optional[str] = Query(None, description="Filial ID (bo'sh = default 3788131, 'all' = barcha)"),
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("orders:read")),
+):
+    """Bazada B#S soni va q bo'yicha topiladigan buyurtmalarni ko'rsatadi. Jadval ro'yxati bilan solishtirish uchun."""
+    default_filial = os.getenv("WMS_DEFAULT_FILIAL_ID", "3788131").strip()
+    filial = (filial_id or "").strip() or default_filial
+    base = db.query(OrderModel).join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
+    total_b_s_all_filial = base.filter(OrderWmsStateModel.status == "B#S").count()
+    total_b_s = (
+        base.filter(OrderWmsStateModel.status == "B#S")
+        .filter(OrderModel.filial_id == filial)
+        .count()
+    )
+    if filial_id and str(filial_id).strip().lower() == "all":
+        total_b_s = total_b_s_all_filial
+
+    def to_match(o: OrderModel) -> OrderCheckMatch:
+        return OrderCheckMatch(
+            id=o.id,
+            order_number=o.order_number,
+            source_external_id=o.source_external_id,
+            filial_id=o.filial_id,
+        )
+
+    match_by_order_number: List[OrderCheckMatch] = []
+    match_by_source_external_id: List[OrderCheckMatch] = []
+    match_by_so_doc_no: List[dict] = []
+
+    if q and q.strip():
+        term = f"%{q.strip()}%"
+        by_order = (
+            db.query(OrderModel)
+            .join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
+            .filter(OrderWmsStateModel.status == "B#S", OrderModel.order_number.ilike(term))
+            .limit(10)
+            .all()
+        )
+        match_by_order_number = [to_match(o) for o in by_order]
+        by_ext = (
+            db.query(OrderModel)
+            .join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
+            .filter(OrderWmsStateModel.status == "B#S", OrderModel.source_external_id.ilike(term))
+            .limit(10)
+            .all()
+        )
+        match_by_source_external_id = [to_match(o) for o in by_ext]
+        so_docs = (
+            db.query(DocumentModel.order_id, DocumentModel.doc_no, OrderModel.order_number)
+            .join(OrderModel, DocumentModel.order_id == OrderModel.id)
+            .filter(DocumentModel.doc_type == "SO", DocumentModel.doc_no.ilike(term))
+            .limit(10)
+            .all()
+        )
+        match_by_so_doc_no = [
+            {"order_id": str(r[0]), "doc_no": r[1], "order_number": r[2]} for r in so_docs
+        ]
+
+    return OrderCheckResponse(
+        total_b_s=total_b_s,
+        total_b_s_all_filial=total_b_s_all_filial,
+        match_by_order_number=match_by_order_number,
+        match_by_source_external_id=match_by_source_external_id,
+        match_by_so_doc_no=match_by_so_doc_no,
+    )
+
+
 @router.get("/pickers", response_model=List[PickerUser], summary="List picker users")
 async def list_picker_users(
     db: Session = Depends(get_db),

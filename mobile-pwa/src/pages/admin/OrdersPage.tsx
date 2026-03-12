@@ -14,7 +14,7 @@ import { Card } from '../../components/ui/card'
 import { DateInput } from '../../components/DateInput'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { TableSkeleton } from '../../components/ui/TableSkeleton'
-import { getMovements, getOrders, syncSmartupOrders, updateOrderStatus, getControllerUsers, type MovementItem, type OrderListItem, type MovementsResponse, type ControllerUser } from '../../services/ordersApi'
+import { getMovements, getOrders, getOrdersCheck, syncSmartupOrders, updateOrderStatus, getControllerUsers, type MovementItem, type OrderListItem, type MovementsResponse, type ControllerUser, type OrderCheckResponse } from '../../services/ordersApi'
 import { getBrands, type Brand } from '../../services/brandsApi'
 import { useAuth } from '../../rbac/AuthProvider'
 
@@ -187,6 +187,8 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const [sendMovementDialogOpen, setSendMovementDialogOpen] = useState(false)
   const [controllerModalOrder, setControllerModalOrder] = useState<OrderListItem | null>(null)
   const [controllers, setControllers] = useState<ControllerUser[]>([])
+  const [checkResult, setCheckResult] = useState<OrderCheckResponse | null>(null)
+  const [checkLoading, setCheckLoading] = useState(false)
   const [controllerModalLoading, setControllerModalLoading] = useState(false)
   const [selectedControllerId, setSelectedControllerId] = useState('')
   const [controllerModalSubmitting, setControllerModalSubmitting] = useState(false)
@@ -334,6 +336,10 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       setFilterDateTo(dateTo)
     }
   }, [filterPanelOpen, brandFilter, dateFrom, dateTo])
+
+  useEffect(() => {
+    setCheckResult(null)
+  }, [searchQuery])
 
   // Avto sync: har 5 daqiqada, sahifa aktiv — diller: load(..., true); buyurtmalar: sync 7 kun + load
   useEffect(() => {
@@ -538,6 +544,19 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       }
       if (movementList.length === 0) {
         const isSearch = searchQuery.trim().length > 0
+        const runCheck = async () => {
+          if (!searchQuery.trim()) return
+          setCheckLoading(true)
+          setCheckResult(null)
+          try {
+            const res = await getOrdersCheck({ q: searchQuery.trim() })
+            setCheckResult(res)
+          } catch {
+            setCheckResult(null)
+          } finally {
+            setCheckLoading(false)
+          }
+        }
         return (
           <div className="space-y-3">
             <EmptyState
@@ -552,6 +571,49 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
               actionLabel={t('common:buttons.refresh')}
               onAction={load}
             />
+            {isSearch && (
+              <div className="flex flex-col gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={checkLoading}
+                  onClick={runCheck}
+                  className="self-center"
+                >
+                  {checkLoading ? t('orders:check_loading', 'Tekshirilmoqda...') : t('orders:check_db_button', 'Bazani tekshirish')}
+                </Button>
+                {checkResult && (
+                  <Card className="p-4 text-sm">
+                    <p className="font-medium text-slate-700 dark:text-slate-200 mb-2">
+                      {t('orders:check_result_title', 'Baza natijasi')}
+                    </p>
+                    <p className="text-slate-600 dark:text-slate-300">
+                      {t('orders:check_total_b_s', 'B#S bazada (filial bo\'yicha): {{count}} ta', { count: checkResult.total_b_s })}
+                      {' · '}
+                      {t('orders:check_total_all', 'Barcha filial: {{count}} ta', { count: checkResult.total_b_s_all_filial })}
+                    </p>
+                    {(checkResult.match_by_order_number.length > 0 ||
+                      checkResult.match_by_source_external_id.length > 0 ||
+                      checkResult.match_by_so_doc_no.length > 0) ? (
+                      <p className="mt-2 text-green-600 dark:text-green-400">
+                        {t('orders:check_found', "«{{q}}» topildi:", { q: searchQuery.trim() })}
+                        {checkResult.match_by_order_number.length > 0 &&
+                          ` order_number: ${checkResult.match_by_order_number.map((m) => m.order_number).join(', ')}`}
+                        {checkResult.match_by_source_external_id.length > 0 &&
+                          ` source_external_id: ${checkResult.match_by_source_external_id.map((m) => m.source_external_id || m.order_number).join(', ')}`}
+                        {checkResult.match_by_so_doc_no.length > 0 &&
+                          ` SO doc_no: ${checkResult.match_by_so_doc_no.map((m) => m.doc_no).join(', ')}`}
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-amber-600 dark:text-amber-400">
+                        {t('orders:check_not_found', "«{{q}}» bazada B#S buyurtmalar orasida topilmadi.", { q: searchQuery.trim() })}
+                      </p>
+                    )}
+                  </Card>
+                )}
+              </div>
+            )}
           </div>
         )
       }

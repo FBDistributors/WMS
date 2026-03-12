@@ -119,6 +119,20 @@ export async function getOrders(query: OrdersQuery = {}) {
   return fetchJSON<OrdersListResponse>('/api/v1/orders', { query })
 }
 
+/** Baza va jadval yuklashni tekshirish: B#S soni va q bo'yicha topiladigan buyurtmalar */
+export type OrderCheckMatch = { id: string; order_number: string; source_external_id?: string | null; filial_id?: string | null }
+export type OrderCheckResponse = {
+  total_b_s: number
+  total_b_s_all_filial: number
+  match_by_order_number: OrderCheckMatch[]
+  match_by_source_external_id: OrderCheckMatch[]
+  match_by_so_doc_no: Array<{ order_id: string; doc_no: string; order_number: string }>
+}
+
+export async function getOrdersCheck(query: { q?: string; filial_id?: string } = {}) {
+  return fetchJSON<OrderCheckResponse>('/api/v1/orders/check', { query: query as Record<string, string | undefined> })
+}
+
 export async function getOrder(id: string) {
   return fetchJSON<OrderDetails>(`/api/v1/orders/${id}`)
 }
