@@ -234,12 +234,12 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         setTotal(0)
         return
       }
-      const loadAllB#S =
+      const loadAllBS =
         !orderSource &&
         (statusParam === 'B#S' || statusParam === 'imported,B#S') &&
         mode === 'default'
 
-      if (loadAllB#S) {
+      if (loadAllBS) {
         const allItems: OrderListItem[] = []
         let off = 0
         let hasMore = true
@@ -1217,11 +1217,11 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
           ) : (
             <>
               {(() => {
-                const isAllB#SLoaded =
+                const isAllBSLoaded =
                   !orderSource &&
                   mode === 'default' &&
                   (statusParam === 'B#S' || statusParam === 'imported,B#S')
-                if (isAllB#SLoaded) {
+                if (isAllBSLoaded) {
                   return (
                     <span className="text-sm text-slate-600 dark:text-slate-400">
                       {total > 0 ? `1–${total} / ${total}` : '0 / 0'}
