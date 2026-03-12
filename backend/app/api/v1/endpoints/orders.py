@@ -362,8 +362,8 @@ async def list_orders(
     brand_ids: Optional[str] = Query(None, description="Filter by brands: comma-separated UUIDs (orders that contain products of any of these brands)"),
     order_source: Optional[str] = Query(None, description="diller, orikzor va h.k. — Order.source bo'yicha filtrlash"),
     search_fields: Optional[str] = Query(None),
-    limit: int = Query(20, ge=1, le=100),
-    offset: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=500, description="Max items per page (tashkiliy harakat API bilan bir xil)"),
+    offset: int = Query(0, ge=0, description="Skip N items"),
     db: Session = Depends(get_db),
     _user=Depends(require_permission("orders:read")),
 ):
