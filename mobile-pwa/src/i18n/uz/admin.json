@@ -122,7 +122,7 @@
     "input_label": "API ma'lumotlari (JSON)",
     "placeholder": "Yuqoridagi maydonga JSON yozing yoki API javobini joylashtiring — jadval shu yerda ko'rinadi.",
     "preset_apis": "Tezkor so'rovlar",
-    "order_api_btn": "Order API (B#S, 50 ta)",
+    "order_api_btn": "Order API (B#S, barchasi)",
     "loading": "Yuklanmoqda..."
   },
   "header": {

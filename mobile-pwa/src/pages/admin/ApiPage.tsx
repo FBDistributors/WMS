@@ -43,13 +43,22 @@ export function ApiPage() {
   const fetchOrderApi = useCallback(async () => {
     setOrderApiLoading(true)
     setOrderApiError(null)
+    const PAGE_SIZE = 500
+    const allItems: Record<string, unknown>[] = []
     try {
-      const data = await getOrders({
-        status: 'B#S',
-        limit: 50,
-        offset: 0,
-      })
-      setInputValue(JSON.stringify(data.items, null, 2))
+      let offset = 0
+      let hasMore = true
+      while (hasMore) {
+        const data = await getOrders({
+          status: 'B#S',
+          limit: PAGE_SIZE,
+          offset,
+        })
+        allItems.push(...(data.items as Record<string, unknown>[]))
+        hasMore = data.items.length >= PAGE_SIZE && allItems.length < data.total
+        offset += PAGE_SIZE
+      }
+      setInputValue(JSON.stringify(allItems, null, 2))
     } catch (err) {
       setOrderApiError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -101,7 +110,7 @@ export function ApiPage() {
               <ClipboardList size={16} className="mr-1.5 shrink-0" />
               {orderApiLoading
                 ? t('admin:api.loading', 'Yuklanmoqda...')
-                : t('admin:api.order_api_btn', 'Order API (B#S, 50 ta)')}
+                : t('admin:api.order_api_btn', 'Order API (B#S, barchasi)')}
             </Button>
           </div>
           {orderApiError && (
