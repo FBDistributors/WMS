@@ -15,6 +15,7 @@
     "users": "Пользователи и доступ",
     "audit": "Журнал аудита",
     "kamomat": "Инвентаризация",
+    "api": "API",
     "integrations": "Интеграции",
     "smartup_orders": "Заказы Smartup",
     "profile": "Профиль"
@@ -116,6 +117,10 @@
       "open": "Открыто",
       "resolved": "Решено"
     }
+  },
+  "api": {
+    "input_label": "Данные API (JSON)",
+    "placeholder": "Вставьте JSON или ответ API в поле выше — таблица отобразится здесь."
   },
   "header": {
     "menu": "Меню"

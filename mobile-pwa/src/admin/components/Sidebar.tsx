@@ -15,6 +15,7 @@ import {
   ArrowLeftRight,
   ChevronLeft,
   ChevronRight,
+  Code2,
 } from 'lucide-react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -42,6 +43,7 @@ const MENU_ITEMS: Array<MenuItem & { key: string }> = [
   { key: 'users', label: 'Users & Access', path: '/admin/users', icon: Users, required: 'users:manage' },
   { key: 'audit', label: 'Audit Logs', path: '/admin/audit', icon: FileText, required: 'audit:read' },
   { key: 'kamomat', label: 'Inventarizatsiya', path: '/admin/kamomat', icon: FileText, required: 'movements:read' },
+  { key: 'api', label: 'API', path: '/admin/api', icon: Code2, required: 'admin:access' },
 ]
 
 type SidebarProps = {

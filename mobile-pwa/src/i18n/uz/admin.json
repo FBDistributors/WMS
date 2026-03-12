@@ -15,6 +15,7 @@
     "users": "Users & Access",
     "audit": "Audit log",
     "kamomat": "Inventarizatsiya",
+    "api": "API",
     "integrations": "Integratsiyalar",
     "smartup_orders": "Smartup buyurtmalar",
     "profile": "Profil"
@@ -116,6 +117,10 @@
       "open": "Ochiq",
       "resolved": "Yechilgan"
     }
+  },
+  "api": {
+    "input_label": "API ma'lumotlari (JSON)",
+    "placeholder": "Yuqoridagi maydonga JSON yozing yoki API javobini joylashtiring — jadval shu yerda ko'rinadi."
   },
   "header": {
     "menu": "Menyu"
