@@ -121,9 +121,11 @@
   "api": {
     "input_label": "Данные API (JSON)",
     "placeholder": "Вставьте JSON или ответ API в поле выше — таблица отобразится здесь.",
+    "placeholder_json_only": "Введите JSON в поле выше или загрузите ответ API через быстрые запросы.",
     "preset_apis": "Быстрые запросы",
     "order_api_btn": "Order API (B#S, все)",
-    "loading": "Загрузка..."
+    "loading": "Загрузка...",
+    "loaded_count": "Загружено: {{count}} заказов (B#S)"
   },
   "header": {
     "menu": "Меню"
