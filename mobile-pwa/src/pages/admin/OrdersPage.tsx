@@ -171,6 +171,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set())
   const [sendDialogOrderIds, setSendDialogOrderIds] = useState<string[] | null>(null)
+  const [syncError, setSyncError] = useState<string | null>(null)
   const [syncResult, setSyncResult] = useState<{
     created: number
     updated: number
@@ -335,7 +336,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
 
   const handleSync = async () => {
     setIsSyncing(true)
-    setError(null)
+    setSyncError(null)
     setSyncResult(null)
     try {
       if (orderSource === 'diller') {
@@ -352,7 +353,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         : { begin_deal_date: beginDealStr, end_deal_date: endDeal }
       const result = await syncSmartupOrders(payload)
       setSyncResult(result)
-      await load()
+      await load(true)
     } catch (err) {
       const message =
         (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string')
@@ -360,7 +361,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
           : err instanceof Error
             ? err.message
             : t('orders:sync_failed')
-      setError(message)
+      setSyncError(message)
     } finally {
       setIsSyncing(false)
     }
@@ -1090,6 +1091,14 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
           </div>
         </div>
 
+        {syncError ? (
+          <div className="flex items-center justify-between gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-900/30">
+            <span className="text-sm text-amber-800 dark:text-amber-200 break-words flex-1">{syncError}</span>
+            <Button variant="ghost" size="sm" onClick={() => setSyncError(null)} aria-label={t('common:buttons.close')}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : null}
         {(group && group !== 'all') || isRefreshing || (orderSource === 'diller' && movementsData != null) || syncResult ? (
           <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
             {group && group !== 'all' ? (
