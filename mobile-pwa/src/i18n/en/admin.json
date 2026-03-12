@@ -120,7 +120,10 @@
   },
   "api": {
     "input_label": "API data (JSON)",
-    "placeholder": "Paste JSON or API response in the field above — the table will appear here."
+    "placeholder": "Paste JSON or API response in the field above — the table will appear here.",
+    "preset_apis": "Quick requests",
+    "order_api_btn": "Order API (B#S, 50)",
+    "loading": "Loading..."
   },
   "header": {
     "menu": "Menu"

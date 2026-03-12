@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Code2 } from 'lucide-react'
+import { Code2, ClipboardList } from 'lucide-react'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
+import { getOrders } from '../../services/ordersApi'
 
 type JsonValue = unknown
 
@@ -36,6 +37,25 @@ function cellValue(v: unknown): string {
 export function ApiPage() {
   const { t } = useTranslation(['admin', 'common'])
   const [inputValue, setInputValue] = useState('')
+  const [orderApiLoading, setOrderApiLoading] = useState(false)
+  const [orderApiError, setOrderApiError] = useState<string | null>(null)
+
+  const fetchOrderApi = useCallback(async () => {
+    setOrderApiLoading(true)
+    setOrderApiError(null)
+    try {
+      const data = await getOrders({
+        status: 'B#S',
+        limit: 50,
+        offset: 0,
+      })
+      setInputValue(JSON.stringify(data.items, null, 2))
+    } catch (err) {
+      setOrderApiError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setOrderApiLoading(false)
+    }
+  }, [])
 
   const { parsed, parseError } = useMemo(() => {
     const s = inputValue.trim()
@@ -66,6 +86,31 @@ export function ApiPage() {
   return (
     <AdminLayout title={t('admin:menu.api', 'API')}>
       <div className="space-y-4">
+        <Card className="p-4">
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            {t('admin:api.preset_apis', 'Tezkor so‘rovlar')}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={fetchOrderApi}
+              disabled={orderApiLoading}
+              className="shrink-0 px-3 py-2 text-sm"
+            >
+              <ClipboardList size={16} className="mr-1.5 shrink-0" />
+              {orderApiLoading
+                ? t('admin:api.loading', 'Yuklanmoqda...')
+                : t('admin:api.order_api_btn', 'Order API (B#S, 50 ta)')}
+            </Button>
+          </div>
+          {orderApiError && (
+            <p className="mt-2 text-sm text-red-600 dark:text-red-400" role="alert">
+              {orderApiError}
+            </p>
+          )}
+        </Card>
+
         <Card className="p-4">
           <label htmlFor="api-input" className="text-sm font-medium text-slate-700 dark:text-slate-300">
             {t('admin:api.input_label', "API ma'lumotlari (JSON)")}

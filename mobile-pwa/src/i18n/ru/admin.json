@@ -120,7 +120,10 @@
   },
   "api": {
     "input_label": "Данные API (JSON)",
-    "placeholder": "Вставьте JSON или ответ API в поле выше — таблица отобразится здесь."
+    "placeholder": "Вставьте JSON или ответ API в поле выше — таблица отобразится здесь.",
+    "preset_apis": "Быстрые запросы",
+    "order_api_btn": "Order API (B#S, 50)",
+    "loading": "Загрузка..."
   },
   "header": {
     "menu": "Меню"
