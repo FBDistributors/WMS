@@ -1,5 +1,13 @@
 """
-WMS Backend — Mixed-load test: oddiy user traffic + SmartUp orders sync.
+WMS Backend — Mixed-load test: oddiy user traffic + ixtiyoriy SmartUp orders sync.
+
+Tashkiliy harakat vs Buyurtmalar (Order) sync farqi:
+- Tashkiliy harakat: UI da "Smartupni sinxronlash" = faqat GET /api/v1/movements (refresh).
+  Lock ishlatilmaydi, Smartup proxy + cache — yuklanadi.
+- Buyurtmalar: "Smartupni sinxronlash" = POST /api/v1/orders/sync-smartup.
+  Global advisory lock (bitta sync bir vaqtda). Worker yoki boshqa so‘rov lock olganida 409.
+
+Sync task Locust da default OCHIQ (LOCUST_ENABLE_SYNC_USER=0). Yoqish: LOCUST_ENABLE_SYNC_USER=1.
 
 Ishga tushirish:
   cd backend
@@ -9,17 +17,12 @@ Web UI: http://localhost:8089
 Headless: locust -f locustfile.py --host=... --headless -u 21 -r 4 -t 5m
 
 ENV (ixtiyoriy):
-  LOCUST_HOST / BASE_URL     — host (--host ustun qoladi)
   REGULAR_USERNAME           — oddiy user (default: Test)
   REGULAR_PASSWORD           — oddiy user parol (default: 123456)
-  SYNC_USERNAME              — sync endpoint user, orders:sync kerak (default: Admin)
+  SYNC_USERNAME              — sync user (default: Admin)
   SYNC_PASSWORD              — sync user parol
-  LOCUST_ENABLE_SYNC_USER    — 1 yoki true = sync task yoq, 0 = faqat GET (default: 1)
-  LOCUST_SYNC_INTERVAL_MIN   — sync task oralig‘i (sekund), kamroq = tezroq (default: 120)
-
-Auth: Variant A — har user on_start da login qiladi, token saqlanadi (xavfsizroq, token muddati yangilanadi).
-Products sync bu scriptda yo‘q — faqat orders sync.
-Worker bilan bir vaqtda sync bo‘lsa 409 qaytadi (advisory lock); testni to‘xtatish shart emas.
+  LOCUST_ENABLE_SYNC_USER    — 1/true = POST sync-smartup yoq, 0 = faqat GET (default: 0)
+  LOCUST_SYNC_INTERVAL_MIN   — sync oralig‘i sekund (default: 120)
 """
 import os
 import logging
@@ -27,9 +30,9 @@ from locust import HttpUser, task, between
 
 logger = logging.getLogger(__name__)
 
-# Sync user yoqish/o‘chirish: 1 yoki "true" = sync task ishlaydi, 0 = faqat GET
+# Sync task default OCHIQ — order sync global lock ishlatadi, testda 409 sabab bo‘lmasin
 def _sync_enabled() -> bool:
-    v = (os.getenv("LOCUST_ENABLE_SYNC_USER") or "1").strip().lower()
+    v = (os.getenv("LOCUST_ENABLE_SYNC_USER") or "0").strip().lower()
     return v in ("1", "true", "yes")
 
 # Sync task qancha sekundda bir chaqirilsin (minimal interval)
@@ -89,15 +92,21 @@ class RegularWMSUser(HttpUser):
 
     @task(1)
     def auth_me(self):
-        self.client.get("/api/v1/auth/me", name="/api/v1/auth/me")
+        self.client.get("/api/v1/auth/me")
+
+    @task(1)
+    def list_movements(self):
+        """GET /api/v1/movements — tashkiliy harakatlar (lock yo‘q, cache)."""
+        self.client.get(
+            "/api/v1/movements?limit=50&offset=0",
+            name="/api/v1/movements [list]",
+        )
 
 
 class SmartupSyncUser(HttpUser):
     """
-    Sync user: orders:sync permission kerak (masalan Admin).
-    Asosan oddiy GET’lar, past chastotada POST /api/v1/orders/sync-smartup.
-    LOCUST_ENABLE_SYNC_USER=0 bo‘lsa sync task o‘tkazilmaydi (faqat GET).
-    Worker bilan bir vaqtda sync bo‘lsa 409 (lock) — success hisoblanadi, test davom etadi.
+    Admin-style user: GET'lar + ixtiyoriy POST /orders/sync-smartup.
+    LOCUST_ENABLE_SYNC_USER=0 (default) bo'lsa sync chaqirilmaydi — faqat GET.
     """
     weight = 1  # 5% sync user
     wait_time = between(1, 3)  # sync user biroz sekinroq tasklar orasida
@@ -136,6 +145,10 @@ class SmartupSyncUser(HttpUser):
     @task(1)
     def auth_me(self):
         self.client.get("/api/v1/auth/me", name="/api/v1/auth/me [sync]")
+
+    @task(1)
+    def list_movements(self):
+        self.client.get("/api/v1/movements?limit=50&offset=0", name="/api/v1/movements [sync]")
 
     @task(1)
     def sync_smartup_orders(self):
