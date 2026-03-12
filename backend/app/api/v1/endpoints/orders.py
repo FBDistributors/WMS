@@ -23,7 +23,7 @@ from app.services.push_notifications import send_push_to_user
 from app.integrations.smartup.client import SmartupClient
 from app.integrations.smartup.importer import import_orders
 from app.integrations.smartup.mfm_movement import export_mfm_movements
-from app.integrations.smartup.sync_lock import try_acquire_sync_lock
+from app.integrations.smartup.sync_lock import smartup_sync_lock
 from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
 from app.models.order import Order as OrderModel
@@ -672,47 +672,47 @@ async def sync_orders_from_smartup(
     if begin_date > end_date:
         raise HTTPException(status_code=400, detail="begin_deal_date must be <= end_deal_date")
 
-    if not try_acquire_sync_lock(db):
-        raise HTTPException(
-            status_code=409,
-            detail="SmartUp sync already in progress (worker or another request). Try again later.",
-        )
-
-    try:
-        if payload.order_source == "diller":
-            # Tashkiliy harakat: cross-organizational movement (mfm movement$export), order'dan emas
-            response = export_mfm_movements(
-                begin_date=begin_date,
-                end_date=end_date,
-                filial_id=(payload.filial_id or "").strip() or None,
+    with smartup_sync_lock(db) as acquired:
+        if not acquired:
+            raise HTTPException(
+                status_code=409,
+                detail="SmartUp sync already in progress (worker or another request). Try again later.",
             )
-            filial_override = (payload.filial_id or "").strip() or None
-        else:
-            # Oddiy buyurtmalar: order$export (savdo buyurtmalari). Oxirgi 7 kun o'zgartirilganlari (modified_on).
-            client = SmartupClient(filial_id=(payload.filial_id or "").strip() or None)
-            response = client.export_orders(
-                begin_deal_date=begin_date.strftime("%d.%m.%Y"),
-                end_deal_date=end_date.strftime("%d.%m.%Y"),
-                filial_code=payload.filial_code,
-                begin_modified_on=begin_date.strftime("%d.%m.%Y"),
-                end_modified_on=end_date.strftime("%d.%m.%Y"),
+        try:
+            if payload.order_source == "diller":
+                # Tashkiliy harakat: cross-organizational movement (mfm movement$export), order'dan emas
+                response = export_mfm_movements(
+                    begin_date=begin_date,
+                    end_date=end_date,
+                    filial_id=(payload.filial_id or "").strip() or None,
+                )
+                filial_override = (payload.filial_id or "").strip() or None
+            else:
+                # Oddiy buyurtmalar: order$export (savdo buyurtmalari). Oxirgi 7 kun o'zgartirilganlari (modified_on).
+                client = SmartupClient(filial_id=(payload.filial_id or "").strip() or None)
+                response = client.export_orders(
+                    begin_deal_date=begin_date.strftime("%d.%m.%Y"),
+                    end_deal_date=end_date.strftime("%d.%m.%Y"),
+                    filial_code=payload.filial_code,
+                    begin_modified_on=begin_date.strftime("%d.%m.%Y"),
+                    end_modified_on=end_date.strftime("%d.%m.%Y"),
+                )
+                filial_override = (payload.filial_id or "").strip() or None
+            created, updated, skipped, import_errors, _ = import_orders(
+                db, response.items, order_source=payload.order_source, filial_id_override=filial_override
             )
-            filial_override = (payload.filial_id or "").strip() or None
-        created, updated, skipped, import_errors, _ = import_orders(
-            db, response.items, order_source=payload.order_source, filial_id_override=filial_override
-        )
-        detail = import_errors[0].reason if import_errors else None
-        errors_count = len(import_errors) if import_errors else None
-        return SmartupSyncResponse(
-            created=created, updated=updated, skipped=skipped, detail=detail, errors_count=errors_count
-        )
-    except RuntimeError as exc:
-        msg = str(exc)
-        if "400" in msg or "не найдена" in msg or "organization" in msg.lower():
-            raise HTTPException(status_code=400, detail=msg) from exc
-        raise HTTPException(status_code=500, detail=msg) from exc
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail=f"Smartup export failed: {exc}") from exc
+            detail = import_errors[0].reason if import_errors else None
+            errors_count = len(import_errors) if import_errors else None
+            return SmartupSyncResponse(
+                created=created, updated=updated, skipped=skipped, detail=detail, errors_count=errors_count
+            )
+        except RuntimeError as exc:
+            msg = str(exc)
+            if "400" in msg or "не найдена" in msg or "organization" in msg.lower():
+                raise HTTPException(status_code=400, detail=msg) from exc
+            raise HTTPException(status_code=500, detail=msg) from exc
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=500, detail=f"Smartup export failed: {exc}") from exc
 
 
 def _get_or_create_order_from_movement(

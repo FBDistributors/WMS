@@ -11,7 +11,7 @@ from app.auth.deps import require_permission
 from app.db import get_db
 from app.integrations.smartup.client import SmartupClient
 from app.integrations.smartup.importer import import_orders
-from app.integrations.smartup.sync_lock import try_acquire_sync_lock
+from app.integrations.smartup.sync_lock import smartup_sync_lock
 from app.models.smartup_sync import SmartupSyncRun
 
 router = APIRouter()
@@ -39,66 +39,66 @@ async def import_smartup_orders(
     if payload.begin_deal_date > payload.end_deal_date:
         raise HTTPException(status_code=400, detail="begin_deal_date must be <= end_deal_date")
 
-    if not try_acquire_sync_lock(db):
-        raise HTTPException(
-            status_code=409,
-            detail="SmartUp sync already in progress. Try again later.",
+    with smartup_sync_lock(db) as acquired:
+        if not acquired:
+            raise HTTPException(
+                status_code=409,
+                detail="SmartUp sync already in progress. Try again later.",
+            )
+        run = SmartupSyncRun(
+            run_type="orders",
+            request_payload={
+                "begin_deal_date": payload.begin_deal_date.isoformat(),
+                "end_deal_date": payload.end_deal_date.isoformat(),
+                "filial_code": payload.filial_code,
+            },
+            params_json={
+                "begin_deal_date": payload.begin_deal_date.isoformat(),
+                "end_deal_date": payload.end_deal_date.isoformat(),
+                "filial_code": payload.filial_code,
+            },
+            status="running",
         )
-
-    run = SmartupSyncRun(
-        run_type="orders",
-        request_payload={
-            "begin_deal_date": payload.begin_deal_date.isoformat(),
-            "end_deal_date": payload.end_deal_date.isoformat(),
-            "filial_code": payload.filial_code,
-        },
-        params_json={
-            "begin_deal_date": payload.begin_deal_date.isoformat(),
-            "end_deal_date": payload.end_deal_date.isoformat(),
-            "filial_code": payload.filial_code,
-        },
-        status="running",
-    )
-    db.add(run)
-    db.commit()
-    db.refresh(run)
-
-    try:
-        client = SmartupClient()
-        response = client.export_orders(
-            begin_deal_date=payload.begin_deal_date.strftime("%d.%m.%Y"),
-            end_deal_date=payload.end_deal_date.strftime("%d.%m.%Y"),
-            filial_code=payload.filial_code,
-        )
-        created, updated, skipped, errors, _ = import_orders(db, response.items)
-    except Exception as exc:  # noqa: BLE001
-        run.finished_at = datetime.utcnow()
-        run.success_count = 0
-        run.error_count = 1
-        run.errors_json = [{"external_id": "smartup", "reason": str(exc)}]
-        run.status = "failed"
-        run.error_message = str(exc)
         db.add(run)
         db.commit()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Smartup import failed: {exc}",
-        ) from exc
+        db.refresh(run)
 
-    run.finished_at = datetime.utcnow()
-    run.success_count = created + updated
-    run.error_count = len(errors)
-    run.errors_json = [error.__dict__ for error in errors]
-    run.inserted_count = created
-    run.updated_count = updated
-    run.skipped_count = skipped
-    run.status = "success"
-    db.add(run)
-    db.commit()
+        try:
+            client = SmartupClient()
+            response = client.export_orders(
+                begin_deal_date=payload.begin_deal_date.strftime("%d.%m.%Y"),
+                end_deal_date=payload.end_deal_date.strftime("%d.%m.%Y"),
+                filial_code=payload.filial_code,
+            )
+            created, updated, skipped, errors, _ = import_orders(db, response.items)
+        except Exception as exc:  # noqa: BLE001
+            run.finished_at = datetime.utcnow()
+            run.success_count = 0
+            run.error_count = 1
+            run.errors_json = [{"external_id": "smartup", "reason": str(exc)}]
+            run.status = "failed"
+            run.error_message = str(exc)
+            db.add(run)
+            db.commit()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Smartup import failed: {exc}",
+            ) from exc
 
-    return SmartupImportResponse(
-        created=created,
-        updated=updated,
-        skipped=skipped,
-        errors=[error.__dict__ for error in errors],
-    )
+        run.finished_at = datetime.utcnow()
+        run.success_count = created + updated
+        run.error_count = len(errors)
+        run.errors_json = [error.__dict__ for error in errors]
+        run.inserted_count = created
+        run.updated_count = updated
+        run.skipped_count = skipped
+        run.status = "success"
+        db.add(run)
+        db.commit()
+
+        return SmartupImportResponse(
+            created=created,
+            updated=updated,
+            skipped=skipped,
+            errors=[error.__dict__ for error in errors],
+        )
