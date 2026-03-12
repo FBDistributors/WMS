@@ -5,7 +5,7 @@ import { Code2, ClipboardList } from 'lucide-react'
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
-import { getOrders } from '../../services/ordersApi'
+import { getSmartupOrderExportRaw } from '../../services/ordersApi'
 
 type JsonValue = unknown
 
@@ -25,23 +25,10 @@ export function ApiPage() {
     setOrderApiLoading(true)
     setOrderApiError(null)
     setOrderApiLoadedCount(null)
-    const PAGE_SIZE = 500
-    const allItems: Record<string, unknown>[] = []
     try {
-      let offset = 0
-      let hasMore = true
-      while (hasMore) {
-        const data = await getOrders({
-          status: 'B#S',
-          limit: PAGE_SIZE,
-          offset,
-        })
-        allItems.push(...(data.items as Record<string, unknown>[]))
-        hasMore = data.items.length >= PAGE_SIZE && allItems.length < data.total
-        offset += PAGE_SIZE
-      }
-      setInputValue(JSON.stringify(allItems, null, 2))
-      setOrderApiLoadedCount(allItems.length)
+      const data = await getSmartupOrderExportRaw()
+      setInputValue(JSON.stringify(data, null, 2))
+      setOrderApiLoadedCount(data.order?.length ?? 0)
     } catch (err) {
       setOrderApiError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -90,7 +77,7 @@ export function ApiPage() {
               <ClipboardList size={16} className="mr-1.5 shrink-0" />
               {orderApiLoading
                 ? t('admin:api.loading', 'Yuklanmoqda...')
-                : t('admin:api.order_api_btn', 'Order API (B#S, barchasi)')}
+                : t('admin:api.order_api_smartup_btn', 'SmartUp dan Order API (B#S)')}
             </Button>
           </div>
           {orderApiError && (
@@ -100,7 +87,7 @@ export function ApiPage() {
           )}
           {orderApiLoadedCount !== null && !orderApiError && (
             <p className="mt-2 text-sm text-green-600 dark:text-green-400" role="status">
-              {t('admin:api.loaded_count', 'Yuklandi: {{count}} ta buyurtma (B#S)', { count: orderApiLoadedCount })}
+              {t('admin:api.loaded_from_smartup', 'SmartUp dan yuklandi: {{count}} ta buyurtma (B#S)', { count: orderApiLoadedCount })}
             </p>
           )}
         </Card>

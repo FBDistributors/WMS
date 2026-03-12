@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import date, datetime
-from typing import Optional
+from datetime import date, datetime, timedelta
+from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -102,3 +102,35 @@ async def import_smartup_orders(
             skipped=skipped,
             errors=[error.__dict__ for error in errors],
         )
+
+
+@router.get(
+    "/smartup/order-export",
+    summary="Export orders from SmartUp (raw response, no import)",
+    response_model=None,
+)
+async def smartup_order_export_raw(
+    begin_deal_date: Optional[date] = Query(None, description="YYYY-MM-DD (default: 7 days ago)"),
+    end_deal_date: Optional[date] = Query(None, description="YYYY-MM-DD (default: today)"),
+    filial_code: Optional[str] = Query(None, description="Filial code filter"),
+    _user=Depends(require_permission("integrations:write")),
+) -> dict[str, Any]:
+    """SmartUp order$export dan to'g'ridan-to'g'ri javobni qaytaradi (bazaga yozmaydi). API bo'limida natijani ko'rish uchun."""
+    today = date.today()
+    end = end_deal_date or today
+    begin = begin_deal_date or (today - timedelta(days=7))
+    if begin > end:
+        raise HTTPException(status_code=400, detail="begin_deal_date must be <= end_deal_date")
+    client = SmartupClient()
+    response = client.export_orders(
+        begin_deal_date=begin.strftime("%d.%m.%Y"),
+        end_deal_date=end.strftime("%d.%m.%Y"),
+        filial_code=filial_code,
+        begin_modified_on=begin.strftime("%d.%m.%Y"),
+        end_modified_on=end.strftime("%d.%m.%Y"),
+    )
+    orders_json = [o.model_dump(mode="json") for o in response.items]
+    total = getattr(response, "total", None)
+    if total is None:
+        total = len(orders_json)
+    return {"order": orders_json, "total": total}

@@ -124,8 +124,10 @@
     "placeholder_json_only": "Yuqoridagi maydonga JSON yozing yoki «Tezkor so'rovlar» orqali API javobini yuklang.",
     "preset_apis": "Tezkor so'rovlar",
     "order_api_btn": "Order API (B#S, barchasi)",
+    "order_api_smartup_btn": "SmartUp dan Order API (B#S)",
     "loading": "Yuklanmoqda...",
-    "loaded_count": "Yuklandi: {{count}} ta buyurtma (B#S)"
+    "loaded_count": "Yuklandi: {{count}} ta buyurtma (B#S)",
+    "loaded_from_smartup": "SmartUp dan yuklandi: {{count}} ta buyurtma (B#S)"
   },
   "header": {
     "menu": "Menyu"

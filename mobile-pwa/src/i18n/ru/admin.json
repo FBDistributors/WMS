@@ -124,8 +124,10 @@
     "placeholder_json_only": "Введите JSON в поле выше или загрузите ответ API через быстрые запросы.",
     "preset_apis": "Быстрые запросы",
     "order_api_btn": "Order API (B#S, все)",
+    "order_api_smartup_btn": "Order API из SmartUp (B#S)",
     "loading": "Загрузка...",
-    "loaded_count": "Загружено: {{count}} заказов (B#S)"
+    "loaded_count": "Загружено: {{count}} заказов (B#S)",
+    "loaded_from_smartup": "Загружено из SmartUp: {{count}} заказов (B#S)"
   },
   "header": {
     "menu": "Меню"

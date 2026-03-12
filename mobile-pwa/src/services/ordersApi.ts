@@ -163,6 +163,22 @@ export async function syncSmartupOrders(payload: SmartupSyncInput = {}) {
   })
 }
 
+/** SmartUp order$export dan to'g'ridan-to'g'ri javob (bazaga yozilmaydi). API bo'limida ko'rsatish uchun. */
+export type SmartupOrderExportResponse = {
+  order: Record<string, unknown>[]
+  total: number
+}
+
+export async function getSmartupOrderExportRaw(query: {
+  begin_deal_date?: string
+  end_deal_date?: string
+  filial_code?: string
+} = {}) {
+  return fetchJSON<SmartupOrderExportResponse>('/api/v1/integrations/smartup/order-export', {
+    query: query as Record<string, string | undefined>,
+  })
+}
+
 export type PickerUser = {
   id: string
   name: string

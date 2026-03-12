@@ -124,8 +124,10 @@
     "placeholder_json_only": "Enter JSON in the field above or load API response via Quick queries.",
     "preset_apis": "Quick requests",
     "order_api_btn": "Order API (B#S, all)",
+    "order_api_smartup_btn": "Order API from SmartUp (B#S)",
     "loading": "Loading...",
-    "loaded_count": "Loaded: {{count}} orders (B#S)"
+    "loaded_count": "Loaded: {{count}} orders (B#S)",
+    "loaded_from_smartup": "Loaded from SmartUp: {{count}} orders (B#S)"
   },
   "header": {
     "menu": "Menu"
