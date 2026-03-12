@@ -111,6 +111,7 @@
     "cancelled": "Cancelled"
   },
   "incomplete_badge": "Incomplete",
+  "so_order_badge": "SO order",
   "status_simple": {
     "yigishda": "In picking",
     "tekshiruvda": "Under verification",

@@ -761,8 +761,13 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         case 'status':
           return (
             <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-              <span className="inline-flex items-center gap-1.5">
+              <span className="inline-flex flex-wrap items-center gap-1.5">
                 {t(`orders:status.${order.status === 'B#S' ? 'b#s' : order.status}`, order.status)}
+                {order.has_so && (
+                  <span className="rounded bg-slate-200 px-1.5 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-600 dark:text-slate-200">
+                    {t('orders:so_order_badge', 'SO buyurtma')}
+                  </span>
+                )}
                 {order.is_incomplete && (
                   <span className="rounded bg-red-200 px-1.5 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/60 dark:text-red-200">
                     {t('orders:incomplete_badge', 'To\'liq emas')}

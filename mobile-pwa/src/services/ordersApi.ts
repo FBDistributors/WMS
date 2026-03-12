@@ -60,6 +60,7 @@ export type OrderListItem = {
   picker_name?: string | null
   controller_name?: string | null
   is_incomplete?: boolean
+  has_so?: boolean
   from_warehouse_code?: string | null
   to_warehouse_code?: string | null
   movement_note?: string | null

@@ -14,7 +14,6 @@ from pydantic import BaseModel, Field
 from decimal import Decimal
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy.sql import exists
 
 from app.auth.deps import get_current_user, require_any_permission, require_permission
 from app.db import get_db
@@ -69,6 +68,7 @@ class OrderListItem(BaseModel):
     picker_name: Optional[str] = None
     controller_name: Optional[str] = None
     is_incomplete: bool = False
+    has_so: bool = False
     from_warehouse_code: Optional[str] = None
     to_warehouse_code: Optional[str] = None
     movement_note: Optional[str] = None
@@ -381,15 +381,7 @@ async def list_orders(
         query = query.join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
         if len(valid) == 1:
             query = query.filter(OrderWmsStateModel.status == valid[0])
-            if valid[0] == "B#S":
-                # Yig'ishga yuborilgan buyurtmalar (terish documenti bor) asosiy ro'yxatda ko'rinmasin
-                has_picking_doc = exists().where(
-                    and_(
-                        DocumentModel.order_id == OrderModel.id,
-                        DocumentModel.doc_type == "SO",
-                    )
-                )
-                query = query.filter(~has_picking_doc)
+            # B#S: barcha buyurtmalar ko'rinsin (SO bor bo'lganlar ham); has_so orqali aniqlanadi
         else:
             query = query.filter(OrderWmsStateModel.status.in_(valid))
 
@@ -503,6 +495,7 @@ async def list_orders(
     for order in orders:
         doc = doc_by_order.get(order.id)
         is_incomplete = doc is not None and doc.incomplete_reason is not None
+        has_so = doc is not None
         items.append(
             OrderListItem(
                 id=order.id,
@@ -523,6 +516,7 @@ async def list_orders(
                 picker_name=_picker_name(doc),
                 controller_name=_controller_name(doc),
                 is_incomplete=is_incomplete,
+                has_so=has_so,
                 delivery_date=order.delivery_date.date() if getattr(order, "delivery_date", None) else None,
             )
         )

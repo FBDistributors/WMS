@@ -109,6 +109,7 @@
     "cancelled": "Отменено"
   },
   "incomplete_badge": "Не полностью",
+  "so_order_badge": "Заказ SO",
   "status_simple": {
     "yigishda": "В подборе",
     "tekshiruvda": "На проверке",
