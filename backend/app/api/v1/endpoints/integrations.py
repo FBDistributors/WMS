@@ -11,6 +11,7 @@ from app.auth.deps import require_permission
 from app.db import get_db
 from app.integrations.smartup.client import SmartupClient
 from app.integrations.smartup.importer import import_orders
+from app.integrations.smartup.sync_lock import try_acquire_sync_lock
 from app.models.smartup_sync import SmartupSyncRun
 
 router = APIRouter()
@@ -37,6 +38,12 @@ async def import_smartup_orders(
 ):
     if payload.begin_deal_date > payload.end_deal_date:
         raise HTTPException(status_code=400, detail="begin_deal_date must be <= end_deal_date")
+
+    if not try_acquire_sync_lock(db):
+        raise HTTPException(
+            status_code=409,
+            detail="SmartUp sync already in progress. Try again later.",
+        )
 
     run = SmartupSyncRun(
         run_type="orders",

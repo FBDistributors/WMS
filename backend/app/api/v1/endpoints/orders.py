@@ -23,6 +23,7 @@ from app.services.push_notifications import send_push_to_user
 from app.integrations.smartup.client import SmartupClient
 from app.integrations.smartup.importer import import_orders
 from app.integrations.smartup.mfm_movement import export_mfm_movements
+from app.integrations.smartup.sync_lock import try_acquire_sync_lock
 from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
 from app.models.order import Order as OrderModel
@@ -670,6 +671,12 @@ async def sync_orders_from_smartup(
         end_date = payload.end_deal_date or today
     if begin_date > end_date:
         raise HTTPException(status_code=400, detail="begin_deal_date must be <= end_deal_date")
+
+    if not try_acquire_sync_lock(db):
+        raise HTTPException(
+            status_code=409,
+            detail="SmartUp sync already in progress (worker or another request). Try again later.",
+        )
 
     try:
         if payload.order_source == "diller":
