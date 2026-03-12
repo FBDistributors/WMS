@@ -68,7 +68,7 @@ def _process_one_order(
         external_id = f"{order.deal_id}:{override}"
     existing = (
         db.query(Order)
-        .options(selectinload(Order.lines))
+        .options(selectinload(Order.lines), selectinload(Order.wms_state))
         .filter(Order.source_external_id == external_id)
         .one_or_none()
     )
@@ -98,6 +98,8 @@ def _process_one_order(
                 existing.movement_note = payload.movement_note
             if getattr(payload, "delivery_date", None) is not None:
                 existing.delivery_date = payload.delivery_date
+            if existing.wms_state:
+                existing.wms_state.status = payload.status
             if payload.lines:
                 _upsert_lines(existing, payload.lines)
             if do_commit:
@@ -149,6 +151,14 @@ def _process_one_order(
         )
         errors.append(ImportError(external_id=payload.source_external_id, reason=str(exc)))
         return 0, 0, 1
+
+
+ORDER_STATUS_BS = "B#S"
+
+
+def filter_orders_b_s(orders: Iterable[SmartupOrder]) -> List[SmartupOrder]:
+    """SmartUp dan kelgan ro'yxatdan faqat B#S statusdagilarini qaytaradi (API da importdan oldin filter)."""
+    return [o for o in orders if (o.status or "").strip() == ORDER_STATUS_BS]
 
 
 def import_orders(
