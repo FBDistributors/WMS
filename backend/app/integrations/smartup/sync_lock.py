@@ -1,6 +1,11 @@
 """
 PostgreSQL advisory lock for SmartUp sync: only one full/orders sync at a time.
 Prevents race between background worker and HTTP-triggered sync.
+
+HTTP endpoints (orders.py, integrations.py) use smartup_sync_lock() so the lock
+is released when the request ends. If 409 persists: (1) worker may be syncing
+(SYNC_INTERVAL_SECONDS, often 600s) — wait; (2) after deploying the release fix,
+restart the web service once to close old connections that may still hold a lock.
 """
 from __future__ import annotations
 
@@ -26,7 +31,10 @@ def try_acquire_sync_lock(db: Session) -> bool:
 def release_sync_lock(db: Session) -> bool:
     """Release advisory lock. Returns True if released."""
     row = db.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": SMARTUP_SYNC_LOCK_ID}).scalar()
-    return row is True
+    released = row is True
+    if released:
+        logger.info("SmartUp sync lock released")
+    return released
 
 
 @contextmanager
@@ -43,4 +51,5 @@ def smartup_sync_lock(db: Session) -> Generator[bool, None, None]:
     try:
         yield True
     finally:
+        # Always release so the same connection does not hold the lock after request ends
         release_sync_lock(db)
