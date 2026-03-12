@@ -542,7 +542,13 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
           <div className="space-y-3">
             <EmptyState
               title={isSearch ? t('orders:search_no_results', "Qidiruv bo'yicha natija topilmadi") : t('orders:empty')}
-              description={isSearch ? t('orders:search_no_results_hint', "Boshqa so'z yoki filterni sinab ko'ring.") : t('orders:empty_desc')}
+              description={
+                isSearch
+                  ? t('orders:search_no_results_hint', "Boshqa so'z yoki filterni sinab ko'ring.") +
+                    ' ' +
+                    t('orders:search_try_deal_id', "Agar buyurtma SmartUp da delivery_number bo'lsa, deal_id (masalan 233898517) orqali ham qidirib ko'ring.")
+                  : t('orders:empty_desc')
+              }
               actionLabel={t('common:buttons.refresh')}
               onAction={load}
             />

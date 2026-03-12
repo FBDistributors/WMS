@@ -406,7 +406,26 @@ async def list_orders(
                 OrderModel.customer_name,
             ]
         term = f"%{q.strip()}%"
-        query = query.filter(or_(*[field.ilike(term) for field in fields]))
+        order_id_from_so = (
+            db.query(DocumentModel.order_id)
+            .filter(
+                DocumentModel.doc_type == "SO",
+                DocumentModel.order_id.isnot(None),
+                DocumentModel.doc_no.ilike(term),
+            )
+            .distinct()
+            .all()
+        )
+        order_ids_so = [r[0] for r in order_id_from_so if r[0]]
+        if order_ids_so:
+            query = query.filter(
+                or_(
+                    *[field.ilike(term) for field in fields],
+                    OrderModel.id.in_(order_ids_so),
+                )
+            )
+        else:
+            query = query.filter(or_(*[field.ilike(term) for field in fields]))
 
     # Filial filter: order_source berilganda filial default qo‘llanmaydi (manba bo‘yicha filtr yetarli)
     if filial_id and filial_id.strip() and filial_id.strip().lower() == "all":
