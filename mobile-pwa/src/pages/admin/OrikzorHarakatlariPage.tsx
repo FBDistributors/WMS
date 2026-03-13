@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { FileText, Filter, Settings, X } from 'lucide-react'
+import { FileText, Filter, Loader2, Settings, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -318,21 +318,6 @@ export function OrikzorHarakatlariPage() {
   return (
     <AdminLayout title={pageTitle}>
       <Card className="space-y-4">
-        {(isRefreshing || movementTotal > 0) ? (
-          <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-            {isRefreshing ? (
-              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
-                {t('orders:refreshing')}
-              </span>
-            ) : null}
-            {movementTotal > 0 ? (
-              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
-                {t('orders:movements_loaded', { count: movementTotal })}
-              </span>
-            ) : null}
-          </div>
-        ) : null}
-
         <div className="flex flex-nowrap items-end gap-3">
           <label className="min-w-[180px] flex-1 max-w-md text-sm text-slate-600 dark:text-slate-300">
             <span className="sr-only">{t('orders:filters.search')}</span>
@@ -461,6 +446,22 @@ export function OrikzorHarakatlariPage() {
             {isRefreshing ? t('orders:syncing') : t('orders:sync')}
           </Button>
         </div>
+
+        {(isRefreshing || movementTotal > 0) ? (
+          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+            {isRefreshing ? (
+              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+                {t('orders:refreshing')}
+              </span>
+            ) : null}
+            {movementTotal > 0 ? (
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
+                {t('orders:movements_loaded', { count: movementTotal })}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
         {canSendToPicking && selectedMovementIds.size > 0 ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/50">
             <span className="text-sm text-slate-600 dark:text-slate-300">
@@ -476,7 +477,17 @@ export function OrikzorHarakatlariPage() {
             </div>
           </div>
         ) : null}
-        {content}
+        <div className="relative max-h-[calc(100vh-320px)] min-h-0 overflow-auto">
+          {content}
+          {isRefreshing && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 dark:bg-slate-900/60 backdrop-blur-[2px]">
+              <div className="inline-flex items-center gap-2 rounded-full bg-blue-100 px-4 py-2.5 text-sm font-medium text-blue-800 dark:bg-blue-900/50 dark:text-blue-200">
+                <Loader2 size={20} className="animate-spin shrink-0" />
+                {t('orders:syncing')}
+              </div>
+            </div>
+          )}
+        </div>
 
         <SendToPickingDialog
           open={sendDialogOpen}
