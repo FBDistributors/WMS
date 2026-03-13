@@ -23,7 +23,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { RootStackParamList } from '../types/navigation';
 import { useLocale } from '../i18n/LocaleContext';
 import { useNetwork } from '../network';
-import { getPickerProductDetail, listPickerLocations, getLocationContents, isNoExpiryRestrictionZone, type PickerProductDetailResponse, type PickerProductLocation, type PickerLocationOption, type LocationContentsItem } from '../api/inventory';
+import { getPickerProductDetail, listPickerLocations, getLocationContents, isNoExpiryRestrictionZone, type PickerProductDetailResponse, type PickerProductLocation, type PickerLocationOption, type PickerWarehouseFilter, type LocationContentsItem } from '../api/inventory';
 import { getPickers, type PickerUser } from '../api/picking';
 import { createReceipt, completeReceipt } from '../api/receiving';
 import { createStockMovement } from '../api/movements';
@@ -88,6 +88,7 @@ export function KirimFormScreen() {
   const [currentExpiry, setCurrentExpiry] = useState('');
   const [selectedLocation, setSelectedLocation] = useState<PickerLocationOption | null>(null);
   const [allLocations, setAllLocations] = useState<PickerLocationOption[]>([]);
+  const [receivingWarehouse, setReceivingWarehouse] = useState<PickerWarehouseFilter>('main');
   const [locationSearch, setLocationSearch] = useState('');
   const [loadingProduct, setLoadingProduct] = useState(false);
   const [productError, setProductError] = useState<string | null>(null);
@@ -239,9 +240,16 @@ export function KirimFormScreen() {
 
   useEffect(() => {
     if (isOnline) {
-      listPickerLocations().then(setAllLocations).catch(() => setAllLocations([]));
+      listPickerLocations(receivingWarehouse).then(setAllLocations).catch(() => setAllLocations([]));
     }
-  }, [isOnline]);
+  }, [isOnline, receivingWarehouse]);
+
+  useEffect(() => {
+    setSelectedLocation(null);
+    setLocationSearch('');
+    setInventoryLocation(null);
+    setInventoryLocationSearch('');
+  }, [receivingWarehouse]);
 
   useEffect(() => {
     if (flow !== 'inventory' || inventorySubMode !== 'byLocation' || inventoryStep !== 2 || !inventoryLocation?.code) return;
@@ -619,6 +627,22 @@ export function KirimFormScreen() {
         {flow === 'inventory' && inventorySubMode === 'byLocation' && inventoryStep === 1 && (
           <>
             <View style={styles.inventoryLocationBlock}>
+              <View style={styles.warehouseSegmentRow}>
+                <TouchableOpacity
+                  style={[styles.warehouseSegmentBtn, receivingWarehouse === 'main' && styles.warehouseSegmentBtnActive]}
+                  onPress={() => setReceivingWarehouse('main')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.warehouseSegmentText, receivingWarehouse === 'main' && styles.warehouseSegmentTextActive]}>{t('kirimWarehouseMain')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.warehouseSegmentBtn, receivingWarehouse === 'showroom' && styles.warehouseSegmentBtnActive]}
+                  onPress={() => setReceivingWarehouse('showroom')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.warehouseSegmentText, receivingWarehouse === 'showroom' && styles.warehouseSegmentTextActive]}>{t('kirimWarehouseShowroom')}</Text>
+                </TouchableOpacity>
+              </View>
               <Text style={styles.inventoryLocationLabel}>{t('inventorySelectLocationFirst')}</Text>
               <View style={styles.locationWrap}>
                 <TextInput
@@ -959,6 +983,22 @@ export function KirimFormScreen() {
               </View>
             ) : (
               <>
+                <View style={styles.warehouseSegmentRow}>
+                  <TouchableOpacity
+                    style={[styles.warehouseSegmentBtn, receivingWarehouse === 'main' && styles.warehouseSegmentBtnActive]}
+                    onPress={() => setReceivingWarehouse('main')}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.warehouseSegmentText, receivingWarehouse === 'main' && styles.warehouseSegmentTextActive]}>{t('kirimWarehouseMain')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.warehouseSegmentBtn, receivingWarehouse === 'showroom' && styles.warehouseSegmentBtnActive]}
+                    onPress={() => setReceivingWarehouse('showroom')}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.warehouseSegmentText, receivingWarehouse === 'showroom' && styles.warehouseSegmentTextActive]}>{t('kirimWarehouseShowroom')}</Text>
+                  </TouchableOpacity>
+                </View>
                 <Text style={styles.label}>{t('locationLabel')}</Text>
                 <View style={styles.locationWrap}>
                   <TextInput
@@ -1240,6 +1280,21 @@ const styles = StyleSheet.create({
   changeProductBtnText: { fontSize: 15, color: '#1976d2', textDecorationLine: 'underline' },
   inventoryScanAnotherBtn: { alignItems: 'center', paddingVertical: 12, marginTop: 8 },
   inventoryScanAnotherBtnText: { fontSize: 15, color: '#1976d2', textDecorationLine: 'underline' },
+  warehouseSegmentRow: { flexDirection: 'row', marginBottom: 12 },
+  warehouseSegmentBtn: {
+    flex: 1,
+    marginHorizontal: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    backgroundColor: '#f5f5f5',
+    alignItems: 'center',
+  },
+  warehouseSegmentBtnActive: { borderColor: '#1a237e', backgroundColor: '#e8eaf6' },
+  warehouseSegmentText: { fontSize: 15, color: '#666', fontWeight: '500' },
+  warehouseSegmentTextActive: { color: '#1a237e', fontWeight: '600' },
   locationWrap: { marginBottom: 12 },
   locationInputFull: {
     borderWidth: 1,

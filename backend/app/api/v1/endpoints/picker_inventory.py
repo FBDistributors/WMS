@@ -30,6 +30,16 @@ router = APIRouter()
 PICKER_INVENTORY_PERMISSION = require_any_permission(["picking:read", "inventory:read"])
 
 
+def _get_showroom_root_id(db: Session) -> Optional[UUID]:
+    """Return the id of the Showroom warehouse root location, or None if not found."""
+    row = (
+        db.query(LocationModel.id)
+        .filter(LocationModel.code == "SHOWROOM", LocationModel.type == "warehouse")
+        .one_or_none()
+    )
+    return row[0] if row else None
+
+
 class PickerLotInfo(BaseModel):
     location_code: str
     batch_no: str
@@ -345,16 +355,25 @@ async def get_location_contents(
     summary="List locations for picker filter",
 )
 async def list_picker_locations(
+    warehouse: Optional[str] = Query(None, description="main | showroom — filter by warehouse for receiving"),
     db: Session = Depends(get_db),
     _user: UserModel = Depends(get_current_user),
     _guard=Depends(PICKER_INVENTORY_PERMISSION),
 ):
-    rows = (
+    # Exclude warehouse root (e.g. SHOWROOM) so only concrete putaway locations appear (main + showroom racks like S-01-02).
+    query = (
         db.query(LocationModel.id, LocationModel.code, LocationModel.name, LocationModel.zone_type)
         .filter(LocationModel.is_active == True)
-        .order_by(LocationModel.code)
-        .all()
+        .filter(LocationModel.type != "warehouse")
     )
+    if warehouse == "main":
+        query = query.filter(LocationModel.warehouse_id.is_(None))
+    elif warehouse == "showroom":
+        showroom_id = _get_showroom_root_id(db)
+        if showroom_id is None:
+            return []
+        query = query.filter(LocationModel.warehouse_id == showroom_id)
+    rows = query.order_by(LocationModel.code).all()
     return [
         PickerLocationOption(
             id=r.id,

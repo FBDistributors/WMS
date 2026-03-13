@@ -77,8 +77,12 @@ export async function listPickerInventory(
   return data;
 }
 
-export async function listPickerLocations(): Promise<PickerLocationOption[]> {
-  const { data } = await apiClient.get<PickerLocationOption[]>(`${INV}/picker/locations`);
+/** main = asosiy ombor, showroom = showroom ombori — kirimda filter. */
+export type PickerWarehouseFilter = 'main' | 'showroom';
+
+export async function listPickerLocations(warehouse?: PickerWarehouseFilter): Promise<PickerLocationOption[]> {
+  const params = warehouse ? { warehouse } : {};
+  const { data } = await apiClient.get<PickerLocationOption[]>(`${INV}/picker/locations`, { params });
   return data;
 }
 
