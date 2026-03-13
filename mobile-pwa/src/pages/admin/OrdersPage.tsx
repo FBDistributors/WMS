@@ -409,19 +409,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   }
 
   const content = useMemo(() => {
-    if (isSyncing) {
-      return (
-        <TableScrollArea>
-          <div className="flex flex-col items-center justify-center gap-4 py-12">
-            <div className="inline-flex items-center gap-2 rounded-full bg-blue-100 px-4 py-2.5 text-sm font-medium text-blue-800 dark:bg-blue-900/50 dark:text-blue-200">
-              <Loader2 size={20} className="animate-spin shrink-0" />
-              {t('orders:syncing')}
-            </div>
-            <TableSkeleton rows={5} columns={5} className="w-full max-w-2xl" />
-          </div>
-        </TableScrollArea>
-      )
-    }
     if (isLoading) {
       return <TableSkeleton rows={6} columns={5} />
     }
@@ -1024,7 +1011,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         </table>
       </TableScrollArea>
     )
-  }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, dillerTableConfig.config, eligibleItems, error, isSyncing, isLoading, items, load, location.pathname, location.search, mode, movementPage, movementsData, navigate, orderSource, searchQuery, selectedMovementIds, selectedOrderIds, t, updatingOrderId])
+  }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, dillerTableConfig.config, eligibleItems, error, isLoading, items, load, location.pathname, location.search, mode, movementPage, movementsData, navigate, orderSource, searchQuery, selectedMovementIds, selectedOrderIds, t, updatingOrderId])
 
   const showOrderTabs = mode === 'default' && !orderSource
 
@@ -1272,8 +1259,16 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
           </div>
         ) : null}
 
-        <div className="max-h-[calc(100vh-320px)] min-h-0 overflow-auto">
+        <div className="relative max-h-[calc(100vh-320px)] min-h-0 overflow-auto">
           {content}
+          {isSyncing && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 dark:bg-slate-900/60 backdrop-blur-[2px]">
+              <div className="inline-flex items-center gap-2 rounded-full bg-blue-100 px-4 py-2.5 text-sm font-medium text-blue-800 dark:bg-blue-900/50 dark:text-blue-200">
+                <Loader2 size={20} className="animate-spin shrink-0" />
+                {t('orders:syncing')}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-end gap-2">
