@@ -22,6 +22,7 @@ export type RootStackParamList = {
     returnToKirimForm?: boolean;
     returnToMovement?: boolean;
     flow?: 'new' | 'return' | 'inventory';
+    warehouse?: 'main' | 'showroom';
     taskId?: string;
     lineId?: string;
     profileType?: 'picker' | 'controller';
@@ -39,6 +40,7 @@ export type RootStackParamList = {
   KirimForm:
     | {
         flow: 'new' | 'return' | 'inventory';
+        warehouse?: 'main' | 'showroom';
         scannedProductId?: string;
         scannedBarcode?: string;
         inventoryStep?: 0 | 1 | 2 | 3;

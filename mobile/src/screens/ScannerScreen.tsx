@@ -136,6 +136,7 @@ export function ScannerScreen() {
     if (params.returnToKirimForm) {
       (navigation as any).navigate('KirimForm', {
         flow: params.flow ?? 'return',
+        warehouse: params.warehouse,
         scannedProductId: product.product_id,
         scannedBarcode: product.barcode ?? undefined,
         inventoryStep: params.inventoryStep,

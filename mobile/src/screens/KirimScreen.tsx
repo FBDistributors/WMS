@@ -33,14 +33,29 @@ export function KirimScreen() {
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         <TouchableOpacity
           style={[styles.card, isDark && styles.cardDark]}
-          onPress={() => navigation.navigate('KirimForm', { flow: 'new' })}
+          onPress={() => navigation.navigate('KirimForm', { flow: 'new', warehouse: 'main' })}
           activeOpacity={0.7}
         >
           <View style={[styles.cardIconWrap, isDark && styles.cardIconWrapDark]}>
-            <Icon name="package-variant" size={CARD_ICON_SIZE} color={isDark ? '#93c5fd' : HEADER_ACCENT} />
+            <Icon name="warehouse" size={CARD_ICON_SIZE} color={isDark ? '#93c5fd' : HEADER_ACCENT} />
           </View>
           <View style={styles.cardBody}>
-            <Text style={[styles.cardTitle, isDark && styles.cardTitleDark]}>{t('kirimNewProducts')}</Text>
+            <Text style={[styles.cardTitle, isDark && styles.cardTitleDark]}>{t('kirimWarehouseMain')}</Text>
+            <Text style={[styles.cardSubtitle, isDark && styles.cardSubtitleDark]}>{t('kirimNewProductsDesc')}</Text>
+          </View>
+          <Icon name="chevron-right" size={24} color={isDark ? '#94a3b8' : '#777'} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.card, isDark && styles.cardDark]}
+          onPress={() => navigation.navigate('KirimForm', { flow: 'new', warehouse: 'showroom' })}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.cardIconWrap, isDark && styles.cardIconWrapDark]}>
+            <Icon name="storefront" size={CARD_ICON_SIZE} color={isDark ? '#93c5fd' : HEADER_ACCENT} />
+          </View>
+          <View style={styles.cardBody}>
+            <Text style={[styles.cardTitle, isDark && styles.cardTitleDark]}>{t('kirimWarehouseShowroom')}</Text>
             <Text style={[styles.cardSubtitle, isDark && styles.cardSubtitleDark]}>{t('kirimNewProductsDesc')}</Text>
           </View>
           <Icon name="chevron-right" size={24} color={isDark ? '#94a3b8' : '#777'} />

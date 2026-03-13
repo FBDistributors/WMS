@@ -73,6 +73,7 @@ export function KirimFormScreen() {
   const flow = route.params?.flow ?? 'return';
   const params = route.params as {
     flow: 'new' | 'return' | 'inventory';
+    warehouse?: 'main' | 'showroom';
     scannedProductId?: string;
     scannedBarcode?: string;
     inventoryStep?: 1 | 2;
@@ -80,6 +81,9 @@ export function KirimFormScreen() {
     inventoryLocationCode?: string;
   } | undefined;
   const isDirectSubmit = flow === 'new' || flow === 'inventory';
+
+  /** flow === 'new' da ombor params dan (o'zgartirilmaydi); inventarizatsiya da segment orqali. */
+  const effectiveWarehouse: PickerWarehouseFilter = flow === 'new' ? (params?.warehouse ?? 'main') : receivingWarehouse;
 
   const [lines, setLines] = useState<FormLine[]>([]);
   const [finished, setFinished] = useState(false);
@@ -116,7 +120,7 @@ export function KirimFormScreen() {
   const [inventoryScannedExpiry, setInventoryScannedExpiry] = useState('');
   const [submittingScannedAdjust, setSubmittingScannedAdjust] = useState(false);
 
-  const title = flow === 'new' ? t('kirimNewProducts') : flow === 'inventory' ? t('kirimInventory') : t('kirimCustomerReturns');
+  const title = flow === 'new' ? (effectiveWarehouse === 'showroom' ? t('kirimWarehouseShowroom') : t('kirimWarehouseMain')) : flow === 'inventory' ? t('kirimInventory') : t('kirimCustomerReturns');
 
   const loadProductById = useCallback(async (productId: string) => {
     const trimmed = (productId ?? '').trim();
@@ -240,16 +244,16 @@ export function KirimFormScreen() {
 
   useEffect(() => {
     if (isOnline) {
-      listPickerLocations(receivingWarehouse).then(setAllLocations).catch(() => setAllLocations([]));
+      listPickerLocations(effectiveWarehouse).then(setAllLocations).catch(() => setAllLocations([]));
     }
-  }, [isOnline, receivingWarehouse]);
+  }, [isOnline, effectiveWarehouse]);
 
   useEffect(() => {
     setSelectedLocation(null);
     setLocationSearch('');
     setInventoryLocation(null);
     setInventoryLocationSearch('');
-  }, [receivingWarehouse]);
+  }, [effectiveWarehouse]);
 
   useEffect(() => {
     if (flow !== 'inventory' || inventorySubMode !== 'byLocation' || inventoryStep !== 2 || !inventoryLocation?.code) return;
@@ -288,7 +292,7 @@ export function KirimFormScreen() {
 
   const handleInventoryBack = useCallback(() => {
     if (flow !== 'inventory') {
-      navigation.goBack();
+      navigation.navigate('Kirim');
       return;
     }
     if (inventoryStep === 0) {
@@ -317,26 +321,26 @@ export function KirimFormScreen() {
   }, [flow, inventoryStep, inventorySubMode, navigation]);
 
   useEffect(() => {
-    if (flow !== 'inventory') return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       handleInventoryBack();
       return true;
     });
     return () => sub.remove();
-  }, [flow, handleInventoryBack]);
+  }, [handleInventoryBack]);
 
   const handleScan = useCallback(() => {
-    const scanParams: { returnToKirimForm: true; flow: typeof flow; inventoryStep?: 1 | 2 | 3; inventoryLocationId?: string; inventoryLocationCode?: string } = {
+    const scanParams: { returnToKirimForm: true; flow: typeof flow; warehouse?: PickerWarehouseFilter; inventoryStep?: 1 | 2 | 3; inventoryLocationId?: string; inventoryLocationCode?: string } = {
       returnToKirimForm: true,
       flow,
     };
+    if (flow === 'new') scanParams.warehouse = effectiveWarehouse;
     if (flow === 'inventory' && inventorySubMode === 'byLocation' && inventoryLocation) {
       scanParams.inventoryStep = Math.min(inventoryStep ?? 2, 2);
       scanParams.inventoryLocationId = inventoryLocation.id;
       scanParams.inventoryLocationCode = inventoryLocation.code;
     }
     navigation.navigate('Scanner', scanParams);
-  }, [navigation, flow, inventoryStep, inventorySubMode, inventoryLocation]);
+  }, [navigation, flow, effectiveWarehouse, inventoryStep, inventorySubMode, inventoryLocation]);
 
   const handleSubmitAdjust = useCallback(async () => {
     if (!locationContents?.items?.length) return;
@@ -983,22 +987,6 @@ export function KirimFormScreen() {
               </View>
             ) : (
               <>
-                <View style={styles.warehouseSegmentRow}>
-                  <TouchableOpacity
-                    style={[styles.warehouseSegmentBtn, receivingWarehouse === 'main' && styles.warehouseSegmentBtnActive]}
-                    onPress={() => setReceivingWarehouse('main')}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.warehouseSegmentText, receivingWarehouse === 'main' && styles.warehouseSegmentTextActive]}>{t('kirimWarehouseMain')}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.warehouseSegmentBtn, receivingWarehouse === 'showroom' && styles.warehouseSegmentBtnActive]}
-                    onPress={() => setReceivingWarehouse('showroom')}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.warehouseSegmentText, receivingWarehouse === 'showroom' && styles.warehouseSegmentTextActive]}>{t('kirimWarehouseShowroom')}</Text>
-                  </TouchableOpacity>
-                </View>
                 <Text style={styles.label}>{t('locationLabel')}</Text>
                 <View style={styles.locationWrap}>
                   <TextInput
