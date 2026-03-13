@@ -479,6 +479,7 @@ async def list_picker_inventory(
 )
 async def get_picker_product_detail(
     product_id: UUID,
+    warehouse: Optional[str] = Query(None, description="main | showroom — filter locations by warehouse"),
     db: Session = Depends(get_db),
     _user: UserModel = Depends(get_current_user),
     _guard=Depends(PICKER_INVENTORY_PERMISSION),
@@ -486,7 +487,8 @@ async def get_picker_product_detail(
     product = db.query(ProductModel).filter(ProductModel.id == product_id).one_or_none()
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    lot_data = _get_lot_level_balances(db, [product_id])
+    loc_ids = _location_ids_for_warehouse(db, warehouse) if warehouse else None
+    lot_data = _get_lot_level_balances(db, [product_id], location_ids=loc_ids)
     main_barcode = _get_product_main_barcode(db, product)
     locations = [
         PickerProductLocation(

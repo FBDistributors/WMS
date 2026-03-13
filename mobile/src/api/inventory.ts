@@ -89,10 +89,13 @@ export async function listPickerLocations(warehouse?: PickerWarehouseFilter): Pr
 }
 
 export async function getPickerProductDetail(
-  productId: string
+  productId: string,
+  warehouse?: PickerWarehouseFilter
 ): Promise<PickerProductDetailResponse> {
+  const params = warehouse ? { warehouse } : {};
   const { data } = await apiClient.get<PickerProductDetailResponse>(
-    `${INV}/picker/${productId}`
+    `${INV}/picker/${productId}`,
+    { params }
   );
   if (
     data == null ||

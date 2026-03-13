@@ -19,11 +19,47 @@ import { useTheme } from '../theme/ThemeContext';
 import {
   getPickerProductDetail,
   type PickerProductDetailResponse,
+  type PickerProductLocation,
 } from '../api/inventory';
 import { formatExpiryDisplay } from '../components/ExpiryDatePicker';
 
 type Nav = StackNavigationProp<RootStackParamList, 'InventoryDetail'>;
 type DetailRoute = RouteProp<RootStackParamList, 'InventoryDetail'>;
+
+function LocationBlock({
+  title,
+  locations,
+  t,
+  locale,
+  isDark,
+}: {
+  title: string;
+  locations: PickerProductLocation[];
+  t: (key: string) => string;
+  locale: string;
+  isDark: boolean;
+}) {
+  return (
+    <>
+      <Text style={[styles.sectionLabel, isDark && styles.sectionLabelDark]}>{title}</Text>
+      {locations.length === 0 ? (
+        <Text style={[styles.emptyLocations, isDark && styles.emptyLocationsDark]}>{t('invNoResults')}</Text>
+      ) : (
+        locations.map((loc) => (
+          <View key={`${loc.location_id}-${loc.lot_id}`} style={[styles.locCard, isDark && styles.locCardDark]}>
+            <View style={styles.locRow}>
+              <Text style={[styles.locCode, isDark && styles.locCodeDark]}>{loc.location_code}</Text>
+              <Text style={[styles.locExpiry, isDark && styles.locExpiryDark]}>{formatExpiryDisplay(loc.expiry_date, locale)}</Text>
+            </View>
+            <Text style={[styles.locMeta, isDark && styles.locMetaDark]}>
+              {t('invQoldiq')}: {Math.round(Number(loc.available_qty))}
+            </Text>
+          </View>
+        ))
+      )}
+    </>
+  );
+}
 
 export function InventoryDetailScreen() {
   const navigation = useNavigation<Nav>();
@@ -32,7 +68,8 @@ export function InventoryDetailScreen() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const productId = route.params?.productId;
-  const [data, setData] = useState<PickerProductDetailResponse | null>(null);
+  const [dataMain, setDataMain] = useState<PickerProductDetailResponse | null>(null);
+  const [dataShowroom, setDataShowroom] = useState<PickerProductDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,8 +78,12 @@ export function InventoryDetailScreen() {
     setLoading(true);
     setError(null);
     try {
-      const res = await getPickerProductDetail(productId);
-      setData(res);
+      const [resMain, resShowroom] = await Promise.all([
+        getPickerProductDetail(productId, 'main'),
+        getPickerProductDetail(productId, 'showroom'),
+      ]);
+      setDataMain(resMain);
+      setDataShowroom(resShowroom);
     } catch {
       setError(t('invLoadError'));
     } finally {
@@ -75,7 +116,7 @@ export function InventoryDetailScreen() {
     );
   }
 
-  if (error || !data) {
+  if (error || (!dataMain && !dataShowroom)) {
     return (
       <View style={[styles.container, isDark && styles.containerDark]}>
         <View style={[styles.header, isDark && styles.headerDark]}>
@@ -105,28 +146,19 @@ export function InventoryDetailScreen() {
         >
           <Icon name="arrow-left" size={24} color={isDark ? '#93c5fd' : '#1a237e'} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, isDark && styles.headerTitleDark]} numberOfLines={1}>{data.name}</Text>
+        <Text style={[styles.headerTitle, isDark && styles.headerTitleDark]} numberOfLines={1}>{dataMain?.name ?? dataShowroom?.name ?? ''}</Text>
       </View>
       <ScrollView style={[styles.scroll, isDark && styles.scrollDark]} contentContainerStyle={styles.scrollContent}>
         <View style={[styles.card, isDark && styles.cardDark]}>
-          <Text style={[styles.productName, isDark && styles.productNameDark]}>{data.name}</Text>
-          {data.main_barcode ? (
-            <Text style={[styles.barcode, isDark && styles.barcodeDark]}>{t('invShtrixKod')}: {data.main_barcode}</Text>
+          <Text style={[styles.productName, isDark && styles.productNameDark]}>{dataMain?.name ?? dataShowroom?.name ?? ''}</Text>
+          {(dataMain?.main_barcode ?? dataShowroom?.main_barcode) ? (
+            <Text style={[styles.barcode, isDark && styles.barcodeDark]}>{t('invShtrixKod')}: {dataMain?.main_barcode ?? dataShowroom?.main_barcode ?? ''}</Text>
           ) : null}
-          <Text style={[styles.productCode, isDark && styles.productCodeDark]}>{t('invKod')}: {data.code}</Text>
+          <Text style={[styles.productCode, isDark && styles.productCodeDark]}>{t('invKod')}: {dataMain?.code ?? dataShowroom?.code ?? ''}</Text>
         </View>
-        <Text style={[styles.sectionLabel, isDark && styles.sectionLabelDark]}>{t('invMoreLocations')}</Text>
-        {data.locations.map((loc) => (
-          <View key={`${loc.location_id}-${loc.lot_id}`} style={[styles.locCard, isDark && styles.locCardDark]}>
-            <View style={styles.locRow}>
-              <Text style={[styles.locCode, isDark && styles.locCodeDark]}>{loc.location_code}</Text>
-              <Text style={[styles.locExpiry, isDark && styles.locExpiryDark]}>{formatExpiryDisplay(loc.expiry_date, locale)}</Text>
-            </View>
-            <Text style={[styles.locMeta, isDark && styles.locMetaDark]}>
-              {t('invQoldiq')}: {Math.round(loc.available_qty)}
-            </Text>
-          </View>
-        ))}
+
+        <LocationBlock title={t('kirimWarehouseMain')} locations={dataMain?.locations ?? []} t={t} locale={locale} isDark={isDark} />
+        <LocationBlock title={t('kirimWarehouseShowroom')} locations={dataShowroom?.locations ?? []} t={t} locale={locale} isDark={isDark} />
       </ScrollView>
     </View>
   );
@@ -190,7 +222,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#666',
     marginBottom: 10,
+    marginTop: 8,
   },
+  emptyLocations: {
+    fontSize: 14,
+    color: '#999',
+    fontStyle: 'italic',
+    marginBottom: 12,
+  },
+  emptyLocationsDark: { color: '#64748b' },
   locCard: {
     backgroundColor: '#fff',
     borderRadius: 10,
