@@ -1,6 +1,12 @@
 {
   "title": "Locations",
   "subtitle": "Manage warehouse locations (RACK: S-sector-level-row, FLOOR: P-sector-pallet).",
+  "tabs": {
+    "main": "Main",
+    "showroom": "Showroom"
+  },
+  "stelaj": "Stelaj (S)",
+  "etaj": "Floor (level)",
   "add": "Add location",
   "edit": "Edit",
   "deactivate": "Deactivate",
@@ -59,6 +65,7 @@
   "validation": {
     "required": "Code and name are required.",
     "sector_required": "Sector is required.",
+    "etaj_required": "Floor (level) is required for Showroom.",
     "level_row_required": "Level and row are required for RACK.",
     "level_row_range": "Level and row must be 0–99.",
     "pallet_required": "Pallet number is required for FLOOR.",
@@ -79,7 +86,8 @@
   },
   "types_enum": {
     "RACK": "Rack (S-sector-level-row)",
-    "FLOOR": "Floor (P-sector-pallet)"
+    "FLOOR": "Floor (P-sector-pallet)",
+    "SHOWROOM_RACK": "Showroom (S-stelaj-level)"
   },
   "zone_enum": {
     "NORMAL": "Normal",

@@ -1,5 +1,6 @@
 {
   "title": "Остатки",
+  "tabs": { "main": "Основной остаток", "showroom": "Остаток шоурума" },
   "details_title": "Детали остатков",
   "movements_title": "Движения остатков",
   "back_to_summary": "Назад к сводке",

@@ -60,11 +60,14 @@ export type InventoryMovement = {
   created_by_username?: string | null
 }
 
+export type WarehouseFilter = 'main' | 'showroom'
+
 export type InventorySummaryQuery = {
   search?: string
   product_ids?: string[]
   only_available?: boolean
   low_stock_threshold?: number
+  warehouse?: WarehouseFilter
 }
 
 export async function getInventorySummary(
@@ -77,6 +80,7 @@ export async function getInventorySummary(
       product_ids: query.product_ids?.join(','),
       only_available: query.only_available,
       low_stock_threshold: query.low_stock_threshold,
+      warehouse: query.warehouse,
     },
     signal,
   })
@@ -87,11 +91,18 @@ export type InventoryDetailsQuery = {
   location_id?: string
   expiry_before?: string
   show_zero?: boolean
+  warehouse?: WarehouseFilter
 }
 
 export async function getInventoryDetails(query: InventoryDetailsQuery = {}) {
   return fetchJSON<InventoryDetailRow[]>('/api/v1/inventory/details', {
-    query,
+    query: {
+      product_id: query.product_id,
+      location_id: query.location_id,
+      expiry_before: query.expiry_before,
+      show_zero: query.show_zero,
+      warehouse: query.warehouse,
+    },
   })
 }
 
@@ -101,6 +112,7 @@ export type InventorySummaryByLocationQuery = {
   only_available?: boolean
   /** Include Smartup products with zero stock (barcha mahsulotlar, qoldiq kiritish uchun) */
   include_all_products?: boolean
+  warehouse?: WarehouseFilter
 }
 
 export async function getInventorySummaryByLocation(query: InventorySummaryByLocationQuery = {}) {
@@ -110,6 +122,7 @@ export async function getInventorySummaryByLocation(query: InventorySummaryByLoc
       product_ids: query.product_ids?.join(','),
       only_available: query.only_available,
       include_all_products: query.include_all_products,
+      warehouse: query.warehouse,
     },
   })
 }
@@ -121,6 +134,8 @@ export type InventorySummaryLightQuery = {
   include_locations?: boolean
   limit?: number
   offset?: number
+  /** main | showroom — separate balance (showroom not added to main) */
+  warehouse?: WarehouseFilter
 }
 
 export type InventorySummaryLightResponse = {
@@ -156,6 +171,7 @@ export async function getInventorySummaryLight(query: InventorySummaryLightQuery
       include_locations: query.include_locations ?? true,
       limit: query.limit ?? 50,
       offset: query.offset ?? 0,
+      warehouse: query.warehouse,
     },
   })
 }
@@ -170,8 +186,10 @@ export type InventoryByProductRow = {
   expiry_date?: string | null
 }
 
-export async function getInventoryByProduct(productId: string) {
-  return fetchJSON<InventoryByProductRow[]>(`/api/v1/inventory/by-product/${productId}`)
+export async function getInventoryByProduct(productId: string, warehouse?: WarehouseFilter) {
+  return fetchJSON<InventoryByProductRow[]>(`/api/v1/inventory/by-product/${productId}`, {
+    query: warehouse ? { warehouse } : {},
+  })
 }
 
 /** Inventory at a single location (for location detail page): product code, barcode, brand, expiry, qty */

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { Search, PackagePlus, Settings, FileSpreadsheet, ChevronDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import * as XLSX from 'xlsx'
@@ -17,6 +17,7 @@ import {
   getInventorySummaryLight,
   type InventorySummaryLightRow,
   getSmartupBalance,
+  type WarehouseFilter,
 } from '../../services/inventoryApi'
 
 const COLUMN_OPTIONS = [
@@ -45,6 +46,8 @@ function formatInt(value: unknown): string {
 
 export function InventorySummaryPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const warehouse: WarehouseFilter = (searchParams.get('warehouse') as WarehouseFilter) || 'main'
   const { t } = useTranslation(['inventory', 'common'])
   const { config, updateConfig, resetConfig } = useInventoryTableConfig()
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -80,6 +83,7 @@ export function InventorySummaryPage() {
           include_locations: true,
           limit: PAGE_SIZE,
           offset,
+          warehouse,
         }),
         getSmartupBalance({ warehouse_code: '001' }),
         getSmartupBalance({ warehouse_code: '002' }),
@@ -135,17 +139,23 @@ export function InventorySummaryPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [debouncedSearch, onlyAvailable, offset, t])
+  }, [debouncedSearch, onlyAvailable, offset, warehouse, t])
 
   const prevSearchRef = useRef(debouncedSearch)
   const prevOnlyRef = useRef(onlyAvailable)
+  const prevWarehouseRef = useRef(warehouse)
   useEffect(() => {
-    if (prevSearchRef.current !== debouncedSearch || prevOnlyRef.current !== onlyAvailable) {
+    if (
+      prevSearchRef.current !== debouncedSearch ||
+      prevOnlyRef.current !== onlyAvailable ||
+      prevWarehouseRef.current !== warehouse
+    ) {
       prevSearchRef.current = debouncedSearch
       prevOnlyRef.current = onlyAvailable
+      prevWarehouseRef.current = warehouse
       setOffset(0)
     }
-  }, [debouncedSearch, onlyAvailable])
+  }, [debouncedSearch, onlyAvailable, warehouse])
 
   useEffect(() => {
     void load()
@@ -186,6 +196,7 @@ export function InventorySummaryPage() {
           include_locations: true,
           limit: EXPORT_LIMIT,
           offset: 0,
+          warehouse,
         })
         const sheetName = (t('inventory:title') || 'Qoldiq').slice(0, 31)
         const fileName = withExpiry
@@ -258,7 +269,7 @@ export function InventorySummaryPage() {
         setIsExporting(false)
       }
     },
-    [debouncedSearch, onlyAvailable, t, smartupQoldiqByCode, smartupBronByCode]
+    [debouncedSearch, onlyAvailable, warehouse, t, smartupQoldiqByCode, smartupBronByCode]
   )
 
   const content = useMemo(() => {
@@ -423,6 +434,38 @@ export function InventorySummaryPage() {
   return (
     <AdminLayout titleSlot={<InventoryHeaderTabs />}>
       <Card className="space-y-4">
+        <div className="flex gap-1 border-b border-slate-200 dark:border-slate-700">
+          <button
+            type="button"
+            onClick={() => {
+              const next = new URLSearchParams(searchParams)
+              next.set('warehouse', 'main')
+              setSearchParams(next)
+            }}
+            className={`border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+              warehouse === 'main'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'
+            }`}
+          >
+            {t('inventory:tabs.main')}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const next = new URLSearchParams(searchParams)
+              next.set('warehouse', 'showroom')
+              setSearchParams(next)
+            }}
+            className={`border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+              warehouse === 'showroom'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'
+            }`}
+          >
+            {t('inventory:tabs.showroom')}
+          </button>
+        </div>
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex flex-1 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
             <Search size={18} className="text-slate-400" />

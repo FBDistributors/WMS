@@ -27,7 +27,17 @@ from app.models.location import (
 
 router = APIRouter()
 
-LOCATION_TYPE_ENUM = {"RACK", "FLOOR"}
+LOCATION_TYPE_ENUM = {"RACK", "FLOOR", "SHOWROOM_RACK"}
+
+
+def _get_showroom_root_id(db: Session) -> Optional[UUID]:
+    """Return the id of the Showroom warehouse root location, or None if not found."""
+    row = (
+        db.query(LocationModel.id)
+        .filter(LocationModel.code == "SHOWROOM", LocationModel.type == "warehouse")
+        .one_or_none()
+    )
+    return row[0] if row else None
 
 
 class LocationOut(BaseModel):
@@ -43,6 +53,7 @@ class LocationOut(BaseModel):
     row_no: Optional[int] = None
     pallet_no: Optional[int] = None
     parent_id: Optional[UUID] = None
+    warehouse_id: Optional[UUID] = None
     is_active: bool
     pick_sequence: Optional[int] = None
     created_at: Optional[str] = None
@@ -51,12 +62,13 @@ class LocationOut(BaseModel):
 class LocationCreate(BaseModel):
     """Create location by type. Code is generated server-side."""
 
-    location_type: str = Field(..., description="RACK or FLOOR")
+    location_type: str = Field(..., description="RACK, FLOOR or SHOWROOM_RACK")
     sector: str = Field(..., min_length=1, max_length=64)
     level_no: Optional[int] = Field(default=None, ge=0, le=99)
     row_no: Optional[int] = Field(default=None, ge=0, le=99)
     pallet_no: Optional[int] = Field(default=None, ge=0, le=99)
     is_active: bool = True
+    warehouse_id: Optional[UUID] = Field(default=None, description="Set for showroom locations (showroom root id)")
 
 
 class LocationUpdate(BaseModel):
@@ -85,6 +97,7 @@ def _to_location(location: LocationModel) -> LocationOut:
         row_no=location.row_no,
         pallet_no=location.pallet_no,
         parent_id=location.parent_id,
+        warehouse_id=location.warehouse_id,
         is_active=location.is_active,
         pick_sequence=location.pick_sequence,
         created_at=location.created_at.isoformat() if location.created_at else None,
@@ -95,12 +108,22 @@ def _to_location(location: LocationModel) -> LocationOut:
 @router.get("/", response_model=List[LocationOut], summary="List locations")
 async def list_locations(
     include_inactive: bool = Query(False),
+    warehouse: Optional[str] = Query(None, description="main (warehouse_id IS NULL) or showroom"),
     db: Session = Depends(get_db),
     _user=Depends(require_any_permission(["locations:read", "locations:manage"])),
 ):
     query = db.query(LocationModel)
     if not include_inactive:
         query = query.filter(LocationModel.is_active.is_(True))
+    if warehouse == "main":
+        query = query.filter(LocationModel.warehouse_id.is_(None))
+    elif warehouse == "showroom":
+        showroom_id = _get_showroom_root_id(db)
+        if showroom_id is None:
+            return []
+        query = query.filter(LocationModel.warehouse_id == showroom_id)
+    # Exclude the Showroom root itself from list (it has type=warehouse, we list only actual locations)
+    query = query.filter(LocationModel.type != "warehouse")
     locations = (
         query.order_by(
             LocationModel.pick_sequence.asc().nulls_last(),
@@ -132,7 +155,16 @@ async def create_location(
     user=Depends(require_any_permission(["locations:write", "locations:manage"])),
 ):
     if payload.location_type not in LOCATION_TYPE_ENUM:
-        raise HTTPException(status_code=400, detail="location_type must be RACK or FLOOR")
+        raise HTTPException(status_code=400, detail="location_type must be RACK, FLOOR or SHOWROOM_RACK")
+    warehouse_id = payload.warehouse_id
+    if payload.location_type == "SHOWROOM_RACK":
+        showroom_id = _get_showroom_root_id(db)
+        if showroom_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Showroom warehouse not found. Run seed to create SHOWROOM root location.",
+            )
+        warehouse_id = showroom_id
     try:
         code = generate_location_code(
             location_type=payload.location_type,
@@ -146,7 +178,12 @@ async def create_location(
     existing = db.query(LocationModel).filter(LocationModel.code == code).one_or_none()
     if existing:
         raise HTTPException(status_code=400, detail="Location code already exists")
-    type_normalized = "rack" if payload.location_type == "RACK" else "floor"
+    if payload.location_type == "RACK":
+        type_normalized = "rack"
+    elif payload.location_type == "SHOWROOM_RACK":
+        type_normalized = "showroom_rack"
+    else:
+        type_normalized = "floor"
     location = LocationModel(
         code=code,
         barcode_value=code,
@@ -158,6 +195,7 @@ async def create_location(
         row_no=payload.row_no,
         pallet_no=payload.pallet_no,
         parent_id=None,
+        warehouse_id=warehouse_id,
         is_active=payload.is_active,
     )
     db.add(location)
@@ -206,6 +244,9 @@ async def update_location(
         level_no = payload.level_no if payload.level_no is not None else location.level
         row_no = payload.row_no if payload.row_no is not None else location.row_no
         pallet_no = payload.pallet_no if payload.pallet_no is not None else location.pallet_no
+        if location.location_type == "SHOWROOM_RACK":
+            row_no = None
+            pallet_no = None
         try:
             new_code = generate_location_code(
                 location_type=location.location_type,

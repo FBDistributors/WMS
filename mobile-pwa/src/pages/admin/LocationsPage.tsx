@@ -19,6 +19,7 @@ import {
   updateLocation,
   type Location,
   type LocationTypeEnum,
+  type WarehouseFilter,
 } from '../../services/locationsApi'
 
 /** Live preview of code from structured fields (same formula as backend). */
@@ -35,6 +36,10 @@ function previewCode(
     if (levelNo == null || rowNo == null) return '—'
     return `S-${s}-${String(levelNo).padStart(2, '0')}-${String(rowNo).padStart(2, '0')}`
   }
+  if (locationType === 'SHOWROOM_RACK') {
+    if (levelNo == null) return '—'
+    return `S-${s}-${String(levelNo).padStart(2, '0')}`
+  }
   if (locationType === 'FLOOR') {
     if (palletNo == null) return '—'
     return `P-${s}-${String(palletNo).padStart(2, '0')}`
@@ -46,6 +51,7 @@ type DialogState = {
   open: boolean
   mode: 'create' | 'edit'
   target?: Location
+  isShowroom?: boolean
 }
 
 export function LocationsPage() {
@@ -60,6 +66,7 @@ export function LocationsPage() {
   const [includeInactive, setIncludeInactive] = useState(false)
   const [filterQuery, setFilterQuery] = useState('')
   const [searchParams, setSearchParams] = useSearchParams()
+  const warehouse = (searchParams.get('warehouse') as WarehouseFilter) || 'main'
   const PAGE_SIZE = 50
   const locationPage = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10) / PAGE_SIZE)
 
@@ -67,7 +74,7 @@ export function LocationsPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const data = await getLocations(includeInactive)
+      const data = await getLocations(includeInactive, warehouse)
       setItems(data)
     } catch (err) {
       const message = err instanceof Error ? err.message : t('locations:load_failed')
@@ -75,7 +82,7 @@ export function LocationsPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [includeInactive, t])
+  }, [includeInactive, warehouse, t])
 
   useEffect(() => {
     void load()
@@ -226,7 +233,12 @@ export function LocationsPage() {
                       className="shrink-0 py-1.5 px-1.5 text-xs sm:px-2"
                       onClick={(e) => {
                         e.stopPropagation()
-                        setDialog({ open: true, mode: 'edit', target: loc })
+                        setDialog({
+                          open: true,
+                          mode: 'edit',
+                          target: loc,
+                          isShowroom: (loc as Location & { warehouse_id?: string }).warehouse_id != null,
+                        })
                       }}
                       aria-label={t('locations:edit')}
                     >
@@ -258,6 +270,36 @@ export function LocationsPage() {
   return (
     <AdminLayout title={t('locations:title')}>
       <Card className="min-w-0 space-y-4 overflow-hidden">
+        <div className="flex border-b border-slate-200 dark:border-slate-700 gap-0 overflow-x-auto">
+          {[
+            { value: 'main' as const, labelKey: 'locations:tabs.main' },
+            { value: 'showroom' as const, labelKey: 'locations:tabs.showroom' },
+          ].map((tab) => {
+            const isActive = warehouse === tab.value
+            return (
+              <button
+                key={tab.value}
+                type="button"
+                onClick={() => {
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev)
+                    next.set('warehouse', tab.value)
+                    next.delete('offset')
+                    return next
+                  })
+                }}
+                className={`shrink-0 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+                  isActive
+                    ? 'border-sky-500 text-sky-600 dark:text-sky-400 dark:border-sky-400'
+                    : 'border-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
+                }`}
+                aria-current={isActive ? 'page' : undefined}
+              >
+                {t(tab.labelKey)}
+              </button>
+            )
+          })}
+        </div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3 min-w-0 flex-1">
             <div className="relative">
@@ -288,7 +330,10 @@ export function LocationsPage() {
               {t('locations:show_inactive')}
             </label>
           </div>
-          <Button onClick={() => setDialog({ open: true, mode: 'create' })} className="shrink-0">
+          <Button
+            onClick={() => setDialog({ open: true, mode: 'create', isShowroom: warehouse === 'showroom' })}
+            className="shrink-0"
+          >
             <Plus size={16} />
             <span className="hidden sm:inline">{t('locations:add')}</span>
           </Button>
@@ -341,6 +386,7 @@ export function LocationsPage() {
         <LocationDialog
           mode={dialog.mode}
           target={dialog.target}
+          isShowroom={dialog.isShowroom}
           onClose={() => setDialog({ open: false, mode: 'create' })}
           onSaved={load}
           onCreated={(loc) => {
@@ -369,15 +415,17 @@ export function LocationsPage() {
 type DialogProps = {
   mode: 'create' | 'edit'
   target?: Location
+  isShowroom?: boolean
   onClose: () => void
   onSaved: () => void
   onCreated?: (location: Location) => void
 }
 
-function LocationDialog({ mode, target, onClose, onSaved, onCreated }: DialogProps) {
+function LocationDialog({ mode, target, isShowroom = false, onClose, onSaved, onCreated }: DialogProps) {
   const { t } = useTranslation(['locations', 'common'])
+  const isShowroomForm = isShowroom || (target?.location_type as string) === 'SHOWROOM_RACK'
   const [locationType, setLocationType] = useState<LocationTypeEnum>(
-    (target?.location_type as LocationTypeEnum) ?? 'RACK'
+    (target?.location_type as LocationTypeEnum) ?? (isShowroom ? 'SHOWROOM_RACK' : 'RACK')
   )
   const [zoneType, setZoneType] = useState<string>(target?.zone_type ?? 'NORMAL')
   const [sector, setSector] = useState(target?.sector ?? '')
@@ -404,13 +452,24 @@ function LocationDialog({ mode, target, onClose, onSaved, onCreated }: DialogPro
     [locationType, sector, levelNo, rowNo, palletNo]
   )
 
+  const effectiveType = isShowroomForm ? 'SHOWROOM_RACK' : locationType
+
   const handleSubmit = async () => {
     const s = sector.trim()
     if (!s) {
       setError(t('locations:validation.sector_required'))
       return
     }
-    if (locationType === 'RACK') {
+    if (effectiveType === 'SHOWROOM_RACK') {
+      if (levelNo === '') {
+        setError(t('locations:validation.etaj_required'))
+        return
+      }
+      if (Number(levelNo) < 0 || Number(levelNo) > 99) {
+        setError(t('locations:validation.level_row_range'))
+        return
+      }
+    } else if (locationType === 'RACK') {
       if (levelNo === '' || rowNo === '') {
         setError(t('locations:validation.level_row_required'))
         return
@@ -419,8 +478,7 @@ function LocationDialog({ mode, target, onClose, onSaved, onCreated }: DialogPro
         setError(t('locations:validation.level_row_range'))
         return
       }
-    }
-    if (locationType === 'FLOOR') {
+    } else if (locationType === 'FLOOR') {
       if (palletNo === '') {
         setError(t('locations:validation.pallet_required'))
         return
@@ -435,20 +493,24 @@ function LocationDialog({ mode, target, onClose, onSaved, onCreated }: DialogPro
     try {
       if (mode === 'create') {
         const created = await createLocation({
-          location_type: locationType,
+          location_type: effectiveType,
           sector: s,
-          ...(locationType === 'RACK'
-            ? { level_no: Number(levelNo), row_no: Number(rowNo) }
-            : { pallet_no: Number(palletNo) }),
+          ...(effectiveType === 'SHOWROOM_RACK'
+            ? { level_no: Number(levelNo) }
+            : locationType === 'RACK'
+              ? { level_no: Number(levelNo), row_no: Number(rowNo) }
+              : { pallet_no: Number(palletNo) }),
           is_active: true,
         })
         onCreated?.(created)
       } else if (target) {
         await updateLocation(target.id, {
           sector: s,
-          ...(locationType === 'RACK'
-            ? { level_no: Number(levelNo), row_no: Number(rowNo), pallet_no: undefined }
-            : { pallet_no: Number(palletNo), level_no: undefined, row_no: undefined }),
+          ...(effectiveType === 'SHOWROOM_RACK'
+            ? { level_no: Number(levelNo), row_no: undefined, pallet_no: undefined }
+            : locationType === 'RACK'
+              ? { level_no: Number(levelNo), row_no: Number(rowNo), pallet_no: undefined }
+              : { pallet_no: Number(palletNo), level_no: undefined, row_no: undefined }),
           is_active: target.is_active,
           pick_sequence: pickSequence === '' ? null : Number(pickSequence),
           zone_type: zoneType,
@@ -488,18 +550,20 @@ function LocationDialog({ mode, target, onClose, onSaved, onCreated }: DialogPro
             </div>
           ) : null}
 
-          <label className="text-sm text-slate-600 dark:text-slate-300">
-            {t('locations:type_label')}
-            <select
-              className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-              value={locationType}
-              onChange={(e) => setLocationType(e.target.value as LocationTypeEnum)}
-              disabled={mode === 'edit'}
-            >
-              <option value="RACK">{t('locations:types_enum.RACK')}</option>
-              <option value="FLOOR">{t('locations:types_enum.FLOOR')}</option>
-            </select>
-          </label>
+          {!isShowroomForm && (
+            <label className="text-sm text-slate-600 dark:text-slate-300">
+              {t('locations:type_label')}
+              <select
+                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                value={locationType}
+                onChange={(e) => setLocationType(e.target.value as LocationTypeEnum)}
+                disabled={mode === 'edit'}
+              >
+                <option value="RACK">{t('locations:types_enum.RACK')}</option>
+                <option value="FLOOR">{t('locations:types_enum.FLOOR')}</option>
+              </select>
+            </label>
+          )}
 
           {mode === 'edit' && (
             <label className="text-sm text-slate-600 dark:text-slate-300">
@@ -517,16 +581,28 @@ function LocationDialog({ mode, target, onClose, onSaved, onCreated }: DialogPro
           )}
 
           <label className="text-sm text-slate-600 dark:text-slate-300">
-            {t('locations:sector')} *
+            {isShowroomForm ? t('locations:stelaj') : `${t('locations:sector')} *`}
             <input
               className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
               value={sector}
               onChange={(e) => setSector(e.target.value)}
-              placeholder="e.g. 15 or AS"
+              placeholder={isShowroomForm ? 'e.g. 01' : 'e.g. 15 or AS'}
             />
           </label>
 
-          {locationType === 'RACK' ? (
+          {isShowroomForm ? (
+            <label className="text-sm text-slate-600 dark:text-slate-300">
+              {t('locations:etaj')} *
+              <input
+                type="number"
+                min={0}
+                max={99}
+                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                value={levelNo === '' ? '' : levelNo}
+                onChange={(e) => setLevelNo(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+              />
+            </label>
+          ) : locationType === 'RACK' ? (
             <>
               <label className="text-sm text-slate-600 dark:text-slate-300">
                 {t('locations:level_no')} *

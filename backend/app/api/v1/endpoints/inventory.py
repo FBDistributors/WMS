@@ -34,6 +34,34 @@ router = APIRouter()
 # SmartUP balance cache: (today_str, warehouse_code) -> result
 _smartup_balance_cache: dict[tuple[str, str], Any] = {}
 
+
+def _get_showroom_root_id(db: Session) -> Optional[UUID]:
+    """Return the id of the Showroom warehouse root location, or None if not found."""
+    row = (
+        db.query(LocationModel.id)
+        .filter(LocationModel.code == "SHOWROOM", LocationModel.type == "warehouse")
+        .one_or_none()
+    )
+    return row[0] if row else None
+
+
+def _location_ids_for_warehouse(db: Session, warehouse: Optional[str]) -> Optional[List[UUID]]:
+    """Return list of location ids for the given warehouse (main or showroom), or None for no filter."""
+    if not warehouse or warehouse not in ("main", "showroom"):
+        return None
+    if warehouse == "main":
+        rows = (
+            db.query(LocationModel.id)
+            .filter(LocationModel.warehouse_id.is_(None), LocationModel.type != "warehouse")
+            .all()
+        )
+        return [r[0] for r in rows]
+    showroom_id = _get_showroom_root_id(db)
+    if showroom_id is None:
+        return []
+    rows = db.query(LocationModel.id).filter(LocationModel.warehouse_id == showroom_id).all()
+    return [r[0] for r in rows]
+
 # On-hand only (zone implementation / Variant A); allocate/unallocate not in ledger
 MOVEMENT_TYPES = set(ON_HAND_MOVEMENT_TYPES)
 
@@ -607,6 +635,7 @@ async def inventory_summary(
     product_ids: Optional[str] = Query(default=None, description="Comma-separated product UUIDs"),
     only_available: bool = Query(False),
     low_stock_threshold: Optional[Decimal] = Query(default=None, ge=0),
+    warehouse: Optional[str] = Query(None, description="main or showroom — filter by warehouse (separate balance)"),
     db: Session = Depends(get_db),
     _user=Depends(require_permission("inventory:read")),
 ):
@@ -640,6 +669,9 @@ async def inventory_summary(
         .group_by(ProductModel.id, ProductModel.sku, ProductModel.name)
     )
 
+    loc_ids = _location_ids_for_warehouse(db, warehouse)
+    if loc_ids is not None:
+        query = query.filter(StockMovementModel.location_id.in_(loc_ids))
     if search:
         query = _apply_product_search(query, search)
     if product_ids:
@@ -655,10 +687,13 @@ async def inventory_summary(
     return [InventorySummaryRow(**row._asdict()) for row in rows]
 
 
-def _fetch_locations_by_products(db: Session, product_ids: list[UUID]) -> dict[UUID, list]:
+def _fetch_locations_by_products(
+    db: Session, product_ids: list[UUID], warehouse: Optional[str] = None
+) -> dict[UUID, list]:
     """Fetch per-location breakdown for given product_ids. Returns {product_id: [rows]}."""
     if not product_ids:
         return {}
+    loc_ids = _location_ids_for_warehouse(db, warehouse)
     on_hand_expr = func.sum(
         case(
             (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
@@ -675,7 +710,7 @@ def _fetch_locations_by_products(db: Session, product_ids: list[UUID]) -> dict[U
         )
     )
     available_expr = on_hand_expr - reserved_expr
-    rows = (
+    q = (
         db.query(
             StockLotModel.product_id,
             LocationModel.code.label("location_code"),
@@ -686,7 +721,11 @@ def _fetch_locations_by_products(db: Session, product_ids: list[UUID]) -> dict[U
         .join(StockMovementModel, StockMovementModel.lot_id == StockLotModel.id)
         .join(LocationModel, LocationModel.id == StockMovementModel.location_id)
         .filter(StockLotModel.product_id.in_(product_ids))
-        .group_by(
+    )
+    if loc_ids is not None:
+        q = q.filter(StockMovementModel.location_id.in_(loc_ids))
+    rows = (
+        q.group_by(
             StockLotModel.product_id,
             StockMovementModel.location_id,
             LocationModel.code,
@@ -718,10 +757,12 @@ async def inventory_summary_light(
     include_locations: bool = Query(True, description="Include location breakdown per product"),
     limit: int = Query(50, ge=1, le=10000),
     offset: int = Query(0, ge=0),
+    warehouse: Optional[str] = Query(None, description="main or showroom — separate balance"),
     db: Session = Depends(get_db),
     _user=Depends(require_permission("inventory:read")),
 ):
     """Lightweight summary: product_id, name, brand, totals. Optional location breakdown. Paginated."""
+    loc_ids = _location_ids_for_warehouse(db, warehouse)
     on_hand_expr = func.sum(
         case(
             (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
@@ -758,6 +799,8 @@ async def inventory_summary_light(
         .join(StockMovementModel, StockMovementModel.lot_id == StockLotModel.id)
         .group_by(ProductModel.id, ProductModel.name, ProductModel.sku, ProductModel.barcode, ProductModel.brand)
     )
+    if loc_ids is not None:
+        base_query = base_query.filter(StockMovementModel.location_id.in_(loc_ids))
     if search:
         base_query = _apply_product_search(base_query, search)
     if only_available:
@@ -775,7 +818,7 @@ async def inventory_summary_light(
     product_ids = [row.product_id for row in rows]
     locs_map: dict[UUID, list] = {}
     if include_locations and product_ids:
-        locs_map = _fetch_locations_by_products(db, product_ids)
+        locs_map = _fetch_locations_by_products(db, product_ids, warehouse)
     items = [
         InventorySummaryLightRow(
             product_id=row.product_id,
@@ -805,10 +848,12 @@ async def inventory_summary_light(
 @router.get("/by-product/{product_id}", response_model=List[InventoryByProductRow], summary="Location breakdown for one product")
 async def inventory_by_product(
     product_id: UUID,
+    warehouse: Optional[str] = Query(None, description="main or showroom"),
     db: Session = Depends(get_db),
     _user=Depends(require_permission("inventory:read")),
 ):
     """Per-location details for one product. Call when user expands row."""
+    loc_ids = _location_ids_for_warehouse(db, warehouse)
     on_hand_expr = func.sum(
         case(
             (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
@@ -823,7 +868,7 @@ async def inventory_by_product(
     )
     available_expr = on_hand_expr - reserved_expr
 
-    rows = (
+    q = (
         db.query(
             LocationModel.code.label("location_code"),
             LocationModel.location_type.label("location_type"),
@@ -837,6 +882,11 @@ async def inventory_by_product(
         .join(StockMovementModel, StockMovementModel.lot_id == StockLotModel.id)
         .join(LocationModel, LocationModel.id == StockMovementModel.location_id)
         .filter(ProductModel.id == product_id)
+    )
+    if loc_ids is not None:
+        q = q.filter(StockMovementModel.location_id.in_(loc_ids))
+    rows = (
+        q
         .group_by(
             StockMovementModel.location_id,
             LocationModel.code,
@@ -868,9 +918,11 @@ async def inventory_details(
     location_id: Optional[UUID] = None,
     expiry_before: Optional[date] = None,
     show_zero: bool = Query(False),
+    warehouse: Optional[str] = Query(None, description="main or showroom — separate balance"),
     db: Session = Depends(get_db),
     _user=Depends(require_permission("inventory:read")),
 ):
+    loc_ids = _location_ids_for_warehouse(db, warehouse)
     on_hand_expr = func.sum(
         case(
             (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
@@ -911,7 +963,8 @@ async def inventory_details(
             LocationModel.sector,
         )
     )
-
+    if loc_ids is not None:
+        query = query.filter(StockMovementModel.location_id.in_(loc_ids))
     if product_id:
         query = query.filter(StockLotModel.product_id == product_id)
     if location_id:
@@ -1037,9 +1090,11 @@ async def inventory_summary_by_location(
         False,
         description="Include Smartup products with zero stock (for entering qoldiq/location)",
     ),
+    warehouse: Optional[str] = Query(None, description="main or showroom — separate balance"),
     db: Session = Depends(get_db),
     _user=Depends(require_permission("inventory:read")),
 ):
+    loc_ids = _location_ids_for_warehouse(db, warehouse)
     on_hand_expr = func.sum(
         case(
             (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
@@ -1083,6 +1138,8 @@ async def inventory_summary_by_location(
         )
         .having(available_expr != 0)
     )
+    if loc_ids is not None:
+        query = query.filter(StockMovementModel.location_id.in_(loc_ids))
     if search:
         query = _apply_product_search(query, search)
     if product_ids:
@@ -1155,9 +1212,11 @@ async def list_stock_balances(
     lot_id: Optional[UUID] = None,
     location_id: Optional[UUID] = None,
     include_zero: bool = Query(False),
+    warehouse: Optional[str] = Query(None, description="main or showroom — separate balance"),
     db: Session = Depends(get_db),
     _user=Depends(require_permission("inventory:read")),
 ):
+    loc_ids = _location_ids_for_warehouse(db, warehouse)
     qty_expr = func.sum(
         case(
             (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
@@ -1182,6 +1241,8 @@ async def list_stock_balances(
             StockLotModel.expiry_date,
         )
     )
+    if loc_ids is not None:
+        query = query.filter(StockMovementModel.location_id.in_(loc_ids))
     if product_id:
         query = query.filter(StockLotModel.product_id == product_id)
     if lot_id:

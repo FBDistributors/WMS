@@ -5,6 +5,7 @@ import os
 from app.auth.security import get_password_hash
 from app.db import SessionLocal
 from app.models.document import Document, DocumentLine
+from app.models.location import Location
 from app.models.product import Product, ProductBarcode
 from app.models.user import User
 
@@ -102,8 +103,37 @@ def _ensure_admin_user() -> User | None:
         db.close()
 
 
+def _ensure_showroom_root() -> Location | None:
+    """Ensure Showroom warehouse root location exists. Used as warehouse_id for showroom locations."""
+    db = SessionLocal()
+    try:
+        existing = (
+            db.query(Location)
+            .filter(Location.code == "SHOWROOM", Location.type == "warehouse")
+            .one_or_none()
+        )
+        if existing:
+            return existing
+        loc = Location(
+            code="SHOWROOM",
+            barcode_value="SHOWROOM",
+            name="Showroom",
+            type="warehouse",
+            location_type=None,
+            sector=None,
+            is_active=True,
+        )
+        db.add(loc)
+        db.commit()
+        db.refresh(loc)
+        return loc
+    finally:
+        db.close()
+
+
 def seed() -> None:
     _ensure_admin_user()
+    _ensure_showroom_root()
     _ensure_product(
         name="Shampun 250ml",
         sku="SKU-0001",

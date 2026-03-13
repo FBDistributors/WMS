@@ -1,4 +1,4 @@
-{"title":"Qoldiq","details_title":"Qoldiq tafsilotlari","movements_title":"Qoldiq harakatlari","back_to_summary":"Umumiyga qaytish","view_movements":"Harakatlarni ko'rish","search_placeholder":"SKU, nom yoki barcode bo'yicha qidirish","load_failed":"Qoldiq ma'lumotlari yuklanmadi.","empty":"Qoldiq topilmadi","empty_desc":"Qabul qilingandan keyin qoldiq paydo bo'ladi.","enter_stock":"Qoldiq kiritish",
+{"title":"Qoldiq","tabs":{"main":"Asosiy qoldiq","showroom":"Showroom qoldiqi"},"details_title":"Qoldiq tafsilotlari","movements_title":"Qoldiq harakatlari","back_to_summary":"Umumiyga qaytish","view_movements":"Harakatlarni ko'rish","search_placeholder":"SKU, nom yoki barcode bo'yicha qidirish","load_failed":"Qoldiq ma'lumotlari yuklanmadi.","empty":"Qoldiq topilmadi","empty_desc":"Qabul qilingandan keyin qoldiq paydo bo'ladi.","enter_stock":"Qoldiq kiritish",
   "smartup_balance_title":"Qoldiq (SmartUP)",
   "smartup_balance_table_hint":"SmartUP dan bugungi kun ma'lumotlari.",
   "smartup_balance_short":"SmartUP qoldiq",

@@ -14,8 +14,10 @@ ZONE_TYPES = ("NORMAL", "EXPIRED", "DAMAGED", "QUARANTINE")
 
 # Rack: S-{sector}-{level}-{row} e.g. S-15-01-02
 # Floor: P-{sector}-{palletNo} e.g. P-AS-02
+# Showroom rack: S-{sector}-{level} only (Stelaj + Etaj) e.g. S-01-02
 RACK_PATTERN = re.compile(r"^S-([^-]+)-(\d+)-(\d+)$", re.IGNORECASE)
 FLOOR_PATTERN = re.compile(r"^P-([^-]+)-(\d+)$", re.IGNORECASE)
+SHOWROOM_RACK_PATTERN = re.compile(r"^S-([^-]+)-(\d+)$", re.IGNORECASE)
 
 
 def parse_location_code(code: str) -> tuple[str | None, str | None, int | None, int | None, int | None]:
@@ -24,6 +26,9 @@ def parse_location_code(code: str) -> tuple[str | None, str | None, int | None, 
     m = RACK_PATTERN.match(code)
     if m:
         return ("RACK", m.group(1), int(m.group(2)), int(m.group(3)), None)
+    m = SHOWROOM_RACK_PATTERN.match(code)
+    if m:
+        return ("SHOWROOM_RACK", m.group(1), int(m.group(2)), None, None)
     m = FLOOR_PATTERN.match(code)
     if m:
         return ("FLOOR", m.group(1), None, None, int(m.group(2)))
@@ -36,6 +41,9 @@ def validate_location_code_format(code: str, location_type: str | None) -> None:
     if location_type == "RACK":
         if not RACK_PATTERN.match(code):
             raise ValueError("RACK code must match S-{sector}-{level}-{row}, e.g. S-15-01-02")
+    elif location_type == "SHOWROOM_RACK":
+        if not SHOWROOM_RACK_PATTERN.match(code):
+            raise ValueError("SHOWROOM_RACK code must match S-{sector}-{level}, e.g. S-01-02")
     elif location_type == "FLOOR":
         if not FLOOR_PATTERN.match(code):
             raise ValueError("FLOOR code must match P-{sector}-{palletNo}, e.g. P-AS-02")
@@ -58,11 +66,15 @@ def generate_location_code(
         if level_no is None or row_no is None:
             raise ValueError("level_no and row_no are required for RACK")
         return f"S-{sector}-{level_no:02d}-{row_no:02d}"
+    if location_type == "SHOWROOM_RACK":
+        if level_no is None:
+            raise ValueError("level_no is required for SHOWROOM_RACK")
+        return f"S-{sector}-{level_no:02d}"
     if location_type == "FLOOR":
         if pallet_no is None:
             raise ValueError("pallet_no is required for FLOOR")
         return f"P-{sector}-{pallet_no:02d}"
-    raise ValueError("location_type must be RACK or FLOOR")
+    raise ValueError("location_type must be RACK, SHOWROOM_RACK or FLOOR")
 
 
 class Location(Base):

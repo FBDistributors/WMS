@@ -1,6 +1,12 @@
 {
   "title": "Joylashuvlar",
   "subtitle": "Ombor joylashuvlari (RACK: S-sektor-bosqich-qator, FLOOR: P-sektor-pallet).",
+  "tabs": {
+    "main": "Asosiy",
+    "showroom": "Showroom"
+  },
+  "stelaj": "Stelaj (S)",
+  "etaj": "Etaj",
   "add": "Joylashuv qo'shish",
   "edit": "Tahrirlash",
   "deactivate": "Faolsizlantirish",
@@ -58,6 +64,7 @@
   "validation": {
     "required": "Kod va nom majburiy.",
     "sector_required": "Sektor majburiy.",
+    "etaj_required": "Showroom uchun etaj kerak.",
     "level_row_required": "RACK uchun bosqich va qator kerak.",
     "level_row_range": "Bosqich va qator 0–99 oralig'ida.",
     "pallet_required": "FLOOR uchun pallet raqami kerak.",
@@ -78,7 +85,8 @@
   },
   "types_enum": {
     "RACK": "Stellaj (S-sektor-bosqich-qator)",
-    "FLOOR": "Pol (P-sektor-pallet)"
+    "FLOOR": "Pol (P-sektor-pallet)",
+    "SHOWROOM_RACK": "Showroom (S-stelaj-etaj)"
   },
   "zone_enum": {
     "NORMAL": "Normal",

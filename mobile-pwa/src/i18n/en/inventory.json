@@ -1,4 +1,4 @@
-{"title":"Inventory","details_title":"Inventory details","movements_title":"Inventory movements","back_to_summary":"Back to summary","view_movements":"View movements","search_placeholder":"Search by SKU, name or barcode","load_failed":"Failed to load inventory.","empty":"No inventory records","empty_desc":"Inventory will appear after receiving.","enter_stock":"Enter stock",
+{"title":"Inventory","tabs":{"main":"Main inventory","showroom":"Showroom inventory"},"details_title":"Inventory details","movements_title":"Inventory movements","back_to_summary":"Back to summary","view_movements":"View movements","search_placeholder":"Search by SKU, name or barcode","load_failed":"Failed to load inventory.","empty":"No inventory records","empty_desc":"Inventory will appear after receiving.","enter_stock":"Enter stock",
   "smartup_balance_title":"Balance (SmartUP)",
   "smartup_balance_table_hint":"Data from SmartUP for today.",
   "smartup_balance_short":"SmartUP balance",
