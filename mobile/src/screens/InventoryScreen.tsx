@@ -24,6 +24,7 @@ import {
   listPickerLocations,
   type PickerInventoryItem,
   type PickerLocationOption,
+  type PickerWarehouseFilter,
 } from '../api/inventory';
 import { BRAND } from '../config/branding';
 import { AppHeader } from '../components/AppHeader';
@@ -70,6 +71,7 @@ export function InventoryScreen() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const [query, setQuery] = useState('');
+  const [warehouse, setWarehouse] = useState<PickerWarehouseFilter>('main');
   const [locationId, setLocationId] = useState('');
   const [locations, setLocations] = useState<PickerLocationOption[]>([]);
   const [items, setItems] = useState<PickerInventoryItem[]>([]);
@@ -90,6 +92,7 @@ export function InventoryScreen() {
       const res = await listPickerInventory({
         q: query || undefined,
         location_id: locationId || undefined,
+        warehouse,
         limit: PAGE_SIZE,
       });
       setItems(res.items);
@@ -99,7 +102,7 @@ export function InventoryScreen() {
     } finally {
       setLoading(false);
     }
-  }, [query, locationId, t]);
+  }, [query, locationId, warehouse, t]);
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadingMore) return;
@@ -108,6 +111,7 @@ export function InventoryScreen() {
       const res = await listPickerInventory({
         q: query || undefined,
         location_id: locationId || undefined,
+        warehouse,
         limit: PAGE_SIZE,
         cursor: nextCursor,
       });
@@ -118,16 +122,16 @@ export function InventoryScreen() {
     } finally {
       setLoadingMore(false);
     }
-  }, [nextCursor, loadingMore, query, locationId]);
+  }, [nextCursor, loadingMore, query, locationId, warehouse]);
 
   const loadLocations = useCallback(async () => {
     try {
-      const locs = await listPickerLocations();
+      const locs = await listPickerLocations(warehouse);
       setLocations(locs);
     } catch {
       // ignore
     }
-  }, []);
+  }, [warehouse]);
 
   useEffect(() => {
     load();
@@ -163,6 +167,28 @@ export function InventoryScreen() {
         onRefresh={onHeaderRefresh}
         refreshing={refreshing}
       />
+
+      {/* Asosiy / Showroom */}
+      <View style={[styles.warehouseSegmentRow, isDark && styles.warehouseSegmentRowDark]}>
+        <TouchableOpacity
+          style={[styles.warehouseSegmentBtn, warehouse === 'main' && styles.warehouseSegmentBtnActive]}
+          onPress={() => { setWarehouse('main'); setLocationId(''); }}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.warehouseSegmentText, warehouse === 'main' && styles.warehouseSegmentTextActive]}>
+            {t('kirimWarehouseMain')}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.warehouseSegmentBtn, warehouse === 'showroom' && styles.warehouseSegmentBtnActive]}
+          onPress={() => { setWarehouse('showroom'); setLocationId(''); }}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.warehouseSegmentText, warehouse === 'showroom' && styles.warehouseSegmentTextActive]}>
+            {t('kirimWarehouseShowroom')}
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Search + location */}
       <View style={[styles.toolbar, isDark && styles.toolbarDark]}>
@@ -286,6 +312,27 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
+  warehouseSegmentRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#fff',
+  },
+  warehouseSegmentRowDark: { backgroundColor: '#1e293b' },
+  warehouseSegmentBtn: {
+    flex: 1,
+    marginHorizontal: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    backgroundColor: '#f5f5f5',
+    alignItems: 'center',
+  },
+  warehouseSegmentBtnActive: { borderColor: '#1a237e', backgroundColor: '#e8eaf6' },
+  warehouseSegmentText: { fontSize: 15, color: '#666', fontWeight: '500' },
+  warehouseSegmentTextActive: { color: '#1a237e', fontWeight: '600' },
   toolbar: {
     flexDirection: 'row',
     alignItems: 'center',

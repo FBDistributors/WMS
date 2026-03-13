@@ -40,6 +40,24 @@ def _get_showroom_root_id(db: Session) -> Optional[UUID]:
     return row[0] if row else None
 
 
+def _location_ids_for_warehouse(db: Session, warehouse: Optional[str]) -> Optional[list[UUID]]:
+    """Return list of location ids for main or showroom, or None for no filter."""
+    if not warehouse or warehouse not in ("main", "showroom"):
+        return None
+    if warehouse == "main":
+        rows = (
+            db.query(LocationModel.id)
+            .filter(LocationModel.warehouse_id.is_(None), LocationModel.type != "warehouse")
+            .all()
+        )
+        return [r[0] for r in rows]
+    showroom_id = _get_showroom_root_id(db)
+    if showroom_id is None:
+        return []
+    rows = db.query(LocationModel.id).filter(LocationModel.warehouse_id == showroom_id).all()
+    return [r[0] for r in rows]
+
+
 class PickerLotInfo(BaseModel):
     location_code: str
     batch_no: str
@@ -122,6 +140,7 @@ def _get_lot_level_balances(
     db: Session,
     product_ids: list[UUID] | None,
     location_id: Optional[UUID] = None,
+    location_ids: Optional[list[UUID]] = None,
 ) -> list[dict[str, Any]]:
     on_hand_expr = func.sum(
         case(
@@ -166,6 +185,8 @@ def _get_lot_level_balances(
         query = query.filter(StockLotModel.product_id.in_(product_ids))
     if location_id:
         query = query.filter(StockMovementModel.location_id == location_id)
+    elif location_ids is not None:
+        query = query.filter(StockMovementModel.location_id.in_(location_ids))
     rows = (
         query.order_by(StockLotModel.expiry_date.asc().nullslast(), StockLotModel.batch.asc())
         .all()
@@ -399,6 +420,7 @@ async def list_picker_inventory(
     q: Optional[str] = Query(None, description="Search by product name or SKU"),
     barcode: Optional[str] = Query(None, description="Exact barcode match"),
     location_id: Optional[UUID] = Query(None),
+    warehouse: Optional[str] = Query(None, description="main | showroom — filter by warehouse (qoldiq qayerda)"),
     limit: int = Query(20, ge=1, le=100),
     cursor: Optional[str] = Query(None),
     db: Session = Depends(get_db),
@@ -444,7 +466,8 @@ async def list_picker_inventory(
     if not products:
         return PickerInventoryListResponse(items=[], next_cursor=None)
     product_ids = [p.id for p in products]
-    lot_data = _get_lot_level_balances(db, product_ids, location_id)
+    loc_ids = _location_ids_for_warehouse(db, warehouse) if not location_id else None
+    lot_data = _get_lot_level_balances(db, product_ids, location_id, location_ids=loc_ids)
     items = _build_picker_items(db, products, lot_data, top_n=3)
     return PickerInventoryListResponse(items=items, next_cursor=next_cursor)
 

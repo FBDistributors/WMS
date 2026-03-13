@@ -64,6 +64,8 @@ export function isNoExpiryRestrictionZone(zoneType?: string): boolean {
 type ListParams = {
   q?: string;
   location_id?: string;
+  /** main | showroom — qoldiq qayerda (asosiy yoki showroom) */
+  warehouse?: PickerWarehouseFilter;
   limit?: number;
   cursor?: string;
 };
