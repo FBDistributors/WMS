@@ -11,6 +11,11 @@ import urllib.request
 
 logger = logging.getLogger(__name__)
 
+# Retry config for transient connection/HTTP errors (e.g. 608, 5xx)
+MAX_ATTEMPTS = 4
+BACKOFF_BASE_SEC = 2
+MAX_DETAIL_LEN = 300
+
 
 class SmartupInventoryExportClient:
     def __init__(
@@ -50,7 +55,8 @@ class SmartupInventoryExportClient:
 
         last_error: Exception | None = None
         last_detail: str | None = None
-        for attempt in range(1, 3):
+        last_code: int | None = None
+        for attempt in range(1, MAX_ATTEMPTS + 1):
             request = urllib.request.Request(self.url, data=data, headers=headers, method="POST")
             try:
                 with urllib.request.urlopen(request, timeout=90) as response:
@@ -58,12 +64,37 @@ class SmartupInventoryExportClient:
                 return json.loads(body)
             except urllib.error.HTTPError as exc:
                 last_error = exc
-                response_text = exc.read().decode("utf-8")
+                last_code = exc.code
+                try:
+                    response_text = exc.read().decode("utf-8")
+                except Exception:
+                    response_text = str(exc)
                 last_detail = response_text
-                logger.error("Smartup inventory export failed (HTTP %s): %s", exc.code, response_text)
+                logger.warning(
+                    "Smartup inventory export attempt %d/%d failed (HTTP %s): %s",
+                    attempt, MAX_ATTEMPTS, exc.code,
+                    response_text[:MAX_DETAIL_LEN] + ("..." if len(response_text) > MAX_DETAIL_LEN else ""),
+                )
+            except (urllib.error.URLError, OSError, ConnectionError) as exc:
+                last_error = exc
+                logger.warning(
+                    "Smartup inventory export attempt %d/%d connection error: %s",
+                    attempt, MAX_ATTEMPTS, exc,
+                )
             except Exception as exc:  # noqa: BLE001
                 last_error = exc
-                logger.error("Smartup inventory export failed: %s", exc)
-            time.sleep(0.5 * attempt)
-        detail = f": {last_detail}" if last_detail else ""
-        raise RuntimeError(f"Smartup inventory export failed{detail}") from last_error
+                logger.warning("Smartup inventory export attempt %d/%d failed: %s", attempt, MAX_ATTEMPTS, exc)
+            if attempt < MAX_ATTEMPTS:
+                delay = BACKOFF_BASE_SEC ** attempt
+                logger.info("Retrying in %s sec...", delay)
+                time.sleep(delay)
+        # Short message for run.error_message and logs (avoid huge payloads)
+        if last_detail:
+            if "Failed to get a connection" in last_detail or last_code == 608:
+                detail = " Connection failed (HTTP 608 or Smartup unavailable)."
+            else:
+                detail = " " + (last_detail[:MAX_DETAIL_LEN] + "..." if len(last_detail) > MAX_DETAIL_LEN else last_detail)
+        else:
+            detail = f" (last error: {last_error})" if last_error else ""
+        logger.error("Smartup export failed after %d attempts.%s", MAX_ATTEMPTS, detail)
+        raise RuntimeError(f"Smartup inventory export failed after {MAX_ATTEMPTS} attempts.{detail}") from last_error
