@@ -37,6 +37,7 @@ export type RootStackParamList = {
   QueueScreen: undefined;
   Returns: { scannedProductId?: string; scannedBarcode?: string } | undefined;
   Kirim: undefined;
+  KirimNew: undefined;
   KirimForm:
     | {
         flow: 'new' | 'return' | 'inventory';

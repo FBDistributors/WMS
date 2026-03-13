@@ -1,5 +1,5 @@
 /**
- * Kirim — ikki yo'nalish: Yangi mahsulotlar, Mijozdan qaytgan mahsulotlar.
+ * Kirim > Yangi mahsulotlar — Asosiy yoki Showroom tanlash, keyin KirimForm ga.
  */
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -12,13 +12,13 @@ import { useLocale } from '../i18n/LocaleContext';
 import { useTheme } from '../theme/ThemeContext';
 import { AppHeader } from '../components/AppHeader';
 
-type Nav = StackNavigationProp<RootStackParamList, 'Kirim'>;
+type Nav = StackNavigationProp<RootStackParamList, 'KirimNew'>;
 
 const CARD_BG = '#f0f0f0';
 const HEADER_ACCENT = '#1a237e';
 const CARD_ICON_SIZE = 28;
 
-export function KirimScreen() {
+export function KirimNewScreen() {
   const navigation = useNavigation<Nav>();
   const { t } = useLocale();
   const { theme } = useTheme();
@@ -27,20 +27,22 @@ export function KirimScreen() {
   return (
     <SafeAreaView style={[styles.container, isDark && styles.containerDark]} edges={['top']}>
       <AppHeader
-        title={t('kirimTitle')}
+        title={t('kirimNewProducts')}
         showLogo={false}
+        showBack={true}
+        onBack={() => navigation.goBack()}
       />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         <TouchableOpacity
           style={[styles.card, isDark && styles.cardDark]}
-          onPress={() => navigation.navigate('KirimNew')}
+          onPress={() => navigation.navigate('KirimForm', { flow: 'new', warehouse: 'main' })}
           activeOpacity={0.7}
         >
           <View style={[styles.cardIconWrap, isDark && styles.cardIconWrapDark]}>
-            <Icon name="package-variant" size={CARD_ICON_SIZE} color={isDark ? '#93c5fd' : HEADER_ACCENT} />
+            <Icon name="warehouse" size={CARD_ICON_SIZE} color={isDark ? '#93c5fd' : HEADER_ACCENT} />
           </View>
           <View style={styles.cardBody}>
-            <Text style={[styles.cardTitle, isDark && styles.cardTitleDark]}>{t('kirimNewProducts')}</Text>
+            <Text style={[styles.cardTitle, isDark && styles.cardTitleDark]}>{t('kirimWarehouseMain')}</Text>
             <Text style={[styles.cardSubtitle, isDark && styles.cardSubtitleDark]}>{t('kirimNewProductsDesc')}</Text>
           </View>
           <Icon name="chevron-right" size={24} color={isDark ? '#94a3b8' : '#777'} />
@@ -48,45 +50,15 @@ export function KirimScreen() {
 
         <TouchableOpacity
           style={[styles.card, isDark && styles.cardDark]}
-          onPress={() => navigation.navigate('KirimForm', { flow: 'return' })}
+          onPress={() => navigation.navigate('KirimForm', { flow: 'new', warehouse: 'showroom' })}
           activeOpacity={0.7}
         >
           <View style={[styles.cardIconWrap, isDark && styles.cardIconWrapDark]}>
-            <Icon name="undo" size={CARD_ICON_SIZE} color={isDark ? '#93c5fd' : HEADER_ACCENT} />
+            <Icon name="storefront" size={CARD_ICON_SIZE} color={isDark ? '#93c5fd' : HEADER_ACCENT} />
           </View>
           <View style={styles.cardBody}>
-            <Text style={[styles.cardTitle, isDark && styles.cardTitleDark]}>{t('kirimCustomerReturns')}</Text>
-            <Text style={[styles.cardSubtitle, isDark && styles.cardSubtitleDark]}>{t('kirimCustomerReturnsDesc')}</Text>
-          </View>
-          <Icon name="chevron-right" size={24} color={isDark ? '#94a3b8' : '#777'} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.card, isDark && styles.cardDark]}
-          onPress={() => navigation.navigate('KirimForm', { flow: 'inventory' })}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.cardIconWrap, isDark && styles.cardIconWrapDark]}>
-            <Icon name="clipboard-list-outline" size={CARD_ICON_SIZE} color={isDark ? '#93c5fd' : HEADER_ACCENT} />
-          </View>
-          <View style={styles.cardBody}>
-            <Text style={[styles.cardTitle, isDark && styles.cardTitleDark]}>{t('kirimInventory')}</Text>
-            <Text style={[styles.cardSubtitle, isDark && styles.cardSubtitleDark]}>{t('kirimInventoryDesc')}</Text>
-          </View>
-          <Icon name="chevron-right" size={24} color={isDark ? '#94a3b8' : '#777'} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.card, isDark && styles.cardDark]}
-          onPress={() => navigation.navigate('Movement')}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.cardIconWrap, isDark && styles.cardIconWrapDark]}>
-            <Icon name="swap-horizontal" size={CARD_ICON_SIZE} color={isDark ? '#93c5fd' : HEADER_ACCENT} />
-          </View>
-          <View style={styles.cardBody}>
-            <Text style={[styles.cardTitle, isDark && styles.cardTitleDark]}>{t('movementTitle')}</Text>
-            <Text style={[styles.cardSubtitle, isDark && styles.cardSubtitleDark]}>{t('movementDesc')}</Text>
+            <Text style={[styles.cardTitle, isDark && styles.cardTitleDark]}>{t('kirimWarehouseShowroom')}</Text>
+            <Text style={[styles.cardSubtitle, isDark && styles.cardSubtitleDark]}>{t('kirimNewProductsDesc')}</Text>
           </View>
           <Icon name="chevron-right" size={24} color={isDark ? '#94a3b8' : '#777'} />
         </TouchableOpacity>
@@ -127,7 +99,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#777',
   },
-  // Dark
   containerDark: { backgroundColor: '#0f172a' },
   cardDark: { backgroundColor: '#1e293b' },
   cardIconWrapDark: { backgroundColor: '#334155' },

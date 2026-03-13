@@ -292,7 +292,7 @@ export function KirimFormScreen() {
 
   const handleInventoryBack = useCallback(() => {
     if (flow !== 'inventory') {
-      navigation.navigate('Kirim');
+      navigation.goBack();
       return;
     }
     if (inventoryStep === 0) {

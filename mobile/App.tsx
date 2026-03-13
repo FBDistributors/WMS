@@ -26,6 +26,7 @@ import { InventoryDetailScreen } from './src/screens/InventoryDetailScreen';
 import { QueueScreen } from './src/screens/QueueScreen';
 import { ReturnsRedirectScreen } from './src/screens/ReturnsRedirectScreen';
 import { KirimScreen } from './src/screens/KirimScreen';
+import { KirimNewScreen } from './src/screens/KirimNewScreen';
 import { KirimFormScreen } from './src/screens/KirimFormScreen';
 import { MovementScreen } from './src/screens/MovementScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -95,6 +96,7 @@ export default function App() {
         <Stack.Screen name="QueueScreen" component={QueueScreen} />
         <Stack.Screen name="Returns" component={ReturnsRedirectScreen} />
         <Stack.Screen name="Kirim" component={KirimWithFooter} />
+        <Stack.Screen name="KirimNew" component={KirimNewScreen} />
         <Stack.Screen name="KirimForm" component={KirimFormScreen} />
         <Stack.Screen name="Movement" component={MovementScreen} />
       </Stack.Navigator>
