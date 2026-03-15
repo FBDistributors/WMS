@@ -8,7 +8,7 @@ import { PickLineRow } from '../components/picking/PickLineRow'
 import { PickScanModal } from '../picking/components/PickScanModal'
 import { Button } from '../components/ui/button'
 import { EmptyState } from '../components/ui/EmptyState'
-import { PageSpinner } from '../components/ui/PageSpinner'
+import { LoadingOverlay } from '../components/ui/LoadingOverlay'
 import { Progress } from '../components/ui/progress'
 import { Separator } from '../components/ui/separator'
 import {
@@ -77,9 +77,9 @@ export function PickDetailsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 px-4">
+      <div className="relative min-h-screen bg-slate-50 px-4">
         <AppHeader title={t('details_title')} onBack={() => navigate(-1)} hideUserMenu />
-        <PageSpinner label={t('common:messages.loading')} className="min-h-[200px] py-12" />
+        <LoadingOverlay fullScreen label={t('common:messages.loading')} />
       </div>
     )
   }

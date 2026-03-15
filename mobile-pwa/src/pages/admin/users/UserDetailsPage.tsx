@@ -7,7 +7,7 @@ import { Info } from 'lucide-react'
 import { AdminLayout } from '../../../admin/components/AdminLayout'
 import { Button } from '../../../components/ui/button'
 import { Card } from '../../../components/ui/card'
-import { PageSpinner } from '../../../components/ui/PageSpinner'
+import { LoadingOverlay } from '../../../components/ui/LoadingOverlay'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../../components/ui/tooltip'
 import { useAuth } from '../../../rbac/AuthProvider'
 import { getUser, resetPassword, updateUser } from '../../../services/usersApi'
@@ -126,7 +126,9 @@ export function UserDetailsPage() {
   if (isLoading) {
     return (
       <AdminLayout title={t('users:form.details_title')}>
-        <PageSpinner label={t('common:messages.loading')} className="min-h-[200px]" />
+        <div className="relative min-h-[200px]">
+          <LoadingOverlay label={t('common:messages.loading')} />
+        </div>
       </AdminLayout>
     )
   }

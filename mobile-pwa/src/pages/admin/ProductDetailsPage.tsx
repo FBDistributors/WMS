@@ -7,7 +7,7 @@ import { AdminLayout } from '../../admin/components/AdminLayout'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { PageSpinner } from '../../components/ui/PageSpinner'
+import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import {
   getProduct,
   getProductHistory,
@@ -101,7 +101,9 @@ export function ProductDetailsPage() {
   if (isLoading) {
     return (
       <AdminLayout title={t('products:details_title')}>
-        <PageSpinner label={t('common:messages.loading')} className="min-h-[200px]" />
+        <div className="relative min-h-[200px]">
+          <LoadingOverlay label={t('common:messages.loading')} />
+        </div>
       </AdminLayout>
     )
   }

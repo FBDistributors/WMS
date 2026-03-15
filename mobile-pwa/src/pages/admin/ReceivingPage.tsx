@@ -11,7 +11,7 @@ import { Card } from '../../components/ui/card'
 import { DateInput } from '../../components/DateInput'
 import { MonthYearInput } from '../../components/MonthYearInput'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { PageSpinner } from '../../components/ui/PageSpinner'
+import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { TableSkeleton } from '../../components/ui/TableSkeleton'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { getProducts, type Product } from '../../services/productsApi'
@@ -665,9 +665,8 @@ export function ReceivingPage() {
           </div>
         </div>
         {isLoading ? (
-          <div className="flex flex-col items-center gap-3 py-6">
-            <PageSpinner label={t('common:messages.loading')} />
-            <TableSkeleton rows={5} columns={4} />
+          <div className="relative flex-1 min-h-[200px]">
+            <LoadingOverlay label={t('common:messages.loading')} />
           </div>
         ) : receipts.length === 0 ? (
           <EmptyState title={t('receiving:empty')} description={t('receiving:empty_desc')} />

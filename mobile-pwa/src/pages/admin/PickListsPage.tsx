@@ -7,7 +7,7 @@ import { AdminLayout } from '../../admin/components/AdminLayout'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { PageSpinner } from '../../components/ui/PageSpinner'
+import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { TableSkeleton } from '../../components/ui/TableSkeleton'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { listPickLists, cancelPickList, type PickList } from '../../services/pickingApi'
@@ -77,9 +77,8 @@ export function PickListsPage() {
   const content = useMemo(() => {
     if (isLoading) {
       return (
-        <div className="flex flex-col items-center gap-3 py-6">
-          <PageSpinner label={t('common:messages.loading')} />
-          <TableSkeleton rows={6} columns={4} />
+        <div className="relative flex-1 min-h-[200px]">
+          <LoadingOverlay label={t('common:messages.loading')} />
         </div>
       )
     }

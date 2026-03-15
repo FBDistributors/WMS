@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
-import { PageSpinner } from '../../components/ui/PageSpinner'
+import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { listPickLists, type PickList } from '../../services/pickingApi'
 import type { ApiError } from '../../services/apiClient'
 
@@ -52,8 +52,8 @@ export function PickListPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <PageSpinner label={t('common:messages.loading')} />
+      <div className="relative min-h-screen">
+        <LoadingOverlay fullScreen label={t('common:messages.loading')} />
       </div>
     )
   }

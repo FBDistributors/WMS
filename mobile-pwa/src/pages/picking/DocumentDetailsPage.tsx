@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
-import { PageSpinner } from '../../components/ui/PageSpinner'
+import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import {
   completePickingDocument,
   getPickingDocument,
@@ -83,8 +83,8 @@ export function DocumentDetailsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <PageSpinner label={t('common:messages.loading')} />
+      <div className="relative min-h-screen">
+        <LoadingOverlay fullScreen label={t('common:messages.loading')} />
       </div>
     )
   }

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 
-import { PageSpinner } from '../components/ui/PageSpinner'
+import { LoadingOverlay } from '../components/ui/LoadingOverlay'
 import { useAuth } from './AuthProvider'
 import type { PermissionKey } from './permissions'
 
@@ -17,8 +17,8 @@ export function RequirePermission({ permission, redirectTo, children }: RequireP
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
-        <PageSpinner />
+      <div className="relative min-h-screen">
+        <LoadingOverlay fullScreen />
       </div>
     )
   }

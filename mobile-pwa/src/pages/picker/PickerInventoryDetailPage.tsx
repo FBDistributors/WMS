@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { AppHeader } from '../../components/layout/AppHeader'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { PageSpinner } from '../../components/ui/PageSpinner'
+import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { getPickerProductDetail, type PickerProductDetailResponse } from '../../services/pickerInventoryApi'
 import { formatExpiryDate, getExpiryColorClass } from '../../utils/expiry'
 
@@ -43,9 +43,9 @@ export function PickerInventoryDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 px-4">
+      <div className="relative min-h-screen bg-slate-50 px-4">
         <AppHeader title={t('inventory.title')} onBack={() => navigate(-1)} hideUserMenu />
-        <PageSpinner label={t('common:messages.loading')} className="min-h-[200px] py-12" />
+        <LoadingOverlay fullScreen label={t('common:messages.loading')} />
       </div>
     )
   }

@@ -8,7 +8,7 @@ import { ScanModal } from '../../components/picker/ScanModal'
 import { Card } from '../../components/ui/card'
 import { Button } from '../../components/ui/button'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { PageSpinner } from '../../components/ui/PageSpinner'
+import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import {
   listPickerInventory,
   listPickerLocations,
@@ -169,7 +169,9 @@ export function PickerInventoryPage() {
         </div>
       )}
       {isLoading ? (
-        <PageSpinner label={t('common:messages.loading')} className="min-h-[200px] py-12" />
+        <div className="relative min-h-[200px]">
+          <LoadingOverlay label={t('common:messages.loading')} />
+        </div>
       ) : error ? (
         <EmptyState
           icon={<Boxes size={32} />}

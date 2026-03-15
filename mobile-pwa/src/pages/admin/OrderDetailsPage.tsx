@@ -8,7 +8,7 @@ import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { PageSpinner } from '../../components/ui/PageSpinner'
+import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { getOrder, type OrderDetails } from '../../services/ordersApi'
 
 export function OrderDetailsPage() {
@@ -61,7 +61,9 @@ export function OrderDetailsPage() {
   if (isLoading) {
     return (
       <AdminLayout title={t('orders:details_title')}>
-        <PageSpinner label={t('common:messages.loading')} className="min-h-[200px]" />
+        <div className="relative min-h-[200px]">
+          <LoadingOverlay label={t('common:messages.loading')} />
+        </div>
       </AdminLayout>
     )
   }

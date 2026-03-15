@@ -7,7 +7,7 @@ import { AdminLayout } from '../../admin/components/AdminLayout'
 import { KpiCard } from '../../admin/components/KpiCard'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { PageSpinner } from '../../components/ui/PageSpinner'
+import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { getOrdersByStatus, getPickerPerformance, type PickerPerformanceRow } from '../../services/dashboardApi'
 
 // Yangi = Smartupdan kelgan, admin yig'uvchiga yubormagan
@@ -119,7 +119,9 @@ export function DashboardPage() {
             </div>
             <div className="mt-3 overflow-x-auto">
               {isLoading ? (
-                <PageSpinner label={t('common:messages.loading')} className="min-h-[6rem] py-6" />
+                <div className="relative min-h-[6rem]">
+                  <LoadingOverlay label={t('common:messages.loading')} />
+                </div>
               ) : (
                 <table className="min-w-full text-sm">
                   <thead>
@@ -188,7 +190,9 @@ export function DashboardPage() {
             </div>
             <div className="mt-3 overflow-x-auto">
               {isLoading ? (
-                <PageSpinner label={t('common:messages.loading')} className="min-h-[6rem] py-6" />
+                <div className="relative min-h-[6rem]">
+                  <LoadingOverlay label={t('common:messages.loading')} />
+                </div>
               ) : pickerPerformance.length === 0 ? (
                 <p className="text-sm text-slate-500 dark:text-slate-400">
                   {t('admin:dashboard.pickers_empty')}

@@ -4,7 +4,7 @@ import { ClipboardList } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AppHeader } from '../../components/layout/AppHeader'
-import { PageSpinner } from '../../components/ui/PageSpinner'
+import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { listPickLists, type PickList } from '../../services/pickingApi'
 
 export function ControllerDocumentsPage() {
@@ -46,7 +46,9 @@ export function ControllerDocumentsPage() {
       <AppHeader title={t('documents.title')} onRefresh={() => window.location.reload()} hideUserMenu />
       <div className="w-full max-w-xl mx-auto px-4 sm:px-6 min-w-0 pb-nav">
         {loading ? (
-          <PageSpinner label={t('common:messages.loading')} className="min-h-[200px] py-12" />
+          <div className="relative min-h-[200px]">
+            <LoadingOverlay label={t('common:messages.loading')} />
+          </div>
         ) : error ? (
           <div className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950">
             <p className="text-red-800 dark:text-red-200">{error}</p>
