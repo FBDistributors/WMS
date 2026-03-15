@@ -29,6 +29,8 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      // Desktop (Tauri) da service worker cache eski buildni saqlab qoladi — o'chirib qo'yamiz
+      disable: !!process.env.TAURI_ENV_PLATFORM,
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon-180x180.png', 'logo-icon.png', 'pwa-192x192.png', 'pwa-512x512.png'],
       manifest: {
