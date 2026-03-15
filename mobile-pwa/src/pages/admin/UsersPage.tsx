@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { PageSpinner } from '../../components/ui/PageSpinner'
 import { TableSkeleton } from '../../components/ui/TableSkeleton'
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
@@ -101,7 +102,10 @@ export function UsersPage() {
       </div>
 
       {isLoading ? (
-        <TableSkeleton rows={6} columns={4} rowHeight="h-14" />
+        <div className="flex flex-col items-center gap-3 py-6">
+          <PageSpinner label={t('common:messages.loading')} />
+          <TableSkeleton rows={6} columns={4} rowHeight="h-14" />
+        </div>
       ) : error ? (
         <EmptyState
           icon={<Users size={32} />}

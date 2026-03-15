@@ -8,6 +8,7 @@ import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { PageSpinner } from '../../components/ui/PageSpinner'
 import { getOrder, type OrderDetails } from '../../services/ordersApi'
 
 export function OrderDetailsPage() {
@@ -60,7 +61,7 @@ export function OrderDetailsPage() {
   if (isLoading) {
     return (
       <AdminLayout title={t('orders:details_title')}>
-        <div className="h-32 w-full animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800" />
+        <PageSpinner label={t('common:messages.loading')} className="min-h-[200px]" />
       </AdminLayout>
     )
   }

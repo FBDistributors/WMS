@@ -54,12 +54,17 @@ import { ControllerSettingsPage } from '../pages/controller/ControllerSettingsPa
 import { ControllerProfilePage } from '../pages/controller/ControllerProfilePage'
 import { LoginPage } from '../pages/LoginPage'
 import { NotAuthorizedPage as AppNotAuthorizedPage } from '../pages/NotAuthorizedPage'
+import { PageSpinner } from '../components/ui/PageSpinner'
 
 function SmartRedirect() {
   const { user, isLoading } = useAuth()
 
   if (isLoading) {
-    return null
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <PageSpinner />
+      </div>
+    )
   }
 
   if (!user) {

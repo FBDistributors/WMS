@@ -6,13 +6,14 @@ import { useTranslation } from 'react-i18next'
 import { AppHeader } from '../../components/layout/AppHeader'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { PageSpinner } from '../../components/ui/PageSpinner'
 import { getPickerProductDetail, type PickerProductDetailResponse } from '../../services/pickerInventoryApi'
 import { formatExpiryDate, getExpiryColorClass } from '../../utils/expiry'
 
 export function PickerInventoryDetailPage() {
   const { productId } = useParams<{ productId: string }>()
   const navigate = useNavigate()
-  const { t } = useTranslation('picker')
+  const { t } = useTranslation(['picker', 'common'])
   const [data, setData] = useState<PickerProductDetailResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -44,10 +45,7 @@ export function PickerInventoryDetailPage() {
     return (
       <div className="min-h-screen bg-slate-50 px-4">
         <AppHeader title={t('inventory.title')} onBack={() => navigate(-1)} hideUserMenu />
-        <div className="space-y-4">
-          <div className="h-32 animate-pulse rounded-2xl bg-slate-200" />
-          <div className="h-24 animate-pulse rounded-2xl bg-slate-200" />
-        </div>
+        <PageSpinner label={t('common:messages.loading')} className="min-h-[200px] py-12" />
       </div>
     )
   }

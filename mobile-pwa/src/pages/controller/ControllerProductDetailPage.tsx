@@ -4,11 +4,12 @@ import { ArrowLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AppHeader } from '../../components/layout/AppHeader'
+import { PageSpinner } from '../../components/ui/PageSpinner'
 import { getProduct, type Product } from '../../services/productsApi'
 
 export function ControllerProductDetailPage() {
   const { productId } = useParams<{ productId: string }>()
-  const { t } = useTranslation('controller')
+  const { t } = useTranslation(['controller', 'common'])
   const navigate = useNavigate()
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
@@ -45,7 +46,7 @@ export function ControllerProductDetailPage() {
       />
       <div className="w-full max-w-xl mx-auto px-4 sm:px-6 min-w-0 pb-8">
         {loading ? (
-          <div className="h-40 animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-700" />
+          <PageSpinner label={t('common:messages.loading')} className="min-h-[200px] py-12" />
         ) : !product ? (
           <div className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950">
             <p className="text-red-800 dark:text-red-200">{t('products.load_error')}</p>

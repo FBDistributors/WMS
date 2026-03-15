@@ -8,6 +8,7 @@ import { PickLineRow } from '../components/picking/PickLineRow'
 import { PickScanModal } from '../picking/components/PickScanModal'
 import { Button } from '../components/ui/button'
 import { EmptyState } from '../components/ui/EmptyState'
+import { PageSpinner } from '../components/ui/PageSpinner'
 import { Progress } from '../components/ui/progress'
 import { Separator } from '../components/ui/separator'
 import {
@@ -20,7 +21,7 @@ import {
 export function PickDetailsPage() {
   const { documentId } = useParams()
   const navigate = useNavigate()
-  const { t } = useTranslation('picking')
+  const { t } = useTranslation(['picking', 'common'])
   const [data, setData] = useState<PickListDetails | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -78,11 +79,7 @@ export function PickDetailsPage() {
     return (
       <div className="min-h-screen bg-slate-50 px-4">
         <AppHeader title={t('details_title')} onBack={() => navigate(-1)} hideUserMenu />
-        <div className="space-y-4">
-          <div className="h-20 w-full animate-pulse rounded-2xl bg-slate-200" />
-          <div className="h-24 w-full animate-pulse rounded-2xl bg-slate-200" />
-          <div className="h-24 w-full animate-pulse rounded-2xl bg-slate-200" />
-        </div>
+        <PageSpinner label={t('common:messages.loading')} className="min-h-[200px] py-12" />
       </div>
     )
   }

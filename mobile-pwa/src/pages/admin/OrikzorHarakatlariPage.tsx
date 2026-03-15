@@ -12,6 +12,7 @@ import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { DateInput } from '../../components/DateInput'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { PageSpinner } from '../../components/ui/PageSpinner'
 import { TableSkeleton } from '../../components/ui/TableSkeleton'
 import { getOrikzorMovements, type MovementItem } from '../../services/ordersApi'
 import { useAuth } from '../../rbac/AuthProvider'
@@ -226,7 +227,12 @@ export function OrikzorHarakatlariPage() {
 
   const content = useMemo(() => {
     if (isLoading) {
-      return <TableSkeleton rows={6} columns={5} />
+      return (
+        <div className="flex flex-col items-center gap-3 py-6">
+          <PageSpinner label={t('common:messages.loading')} />
+          <TableSkeleton rows={6} columns={5} />
+        </div>
+      )
     }
     if (error) {
       return (

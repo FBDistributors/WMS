@@ -12,6 +12,7 @@ import { useTableConfig } from '../../admin/hooks/useTableConfig'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { PageSpinner } from '../../components/ui/PageSpinner'
 import { TableSkeleton } from '../../components/ui/TableSkeleton'
 import {
   getProducts,
@@ -158,7 +159,12 @@ export function ProductsPage() {
 
   const content = useMemo(() => {
     if (isLoading) {
-      return <TableSkeleton rows={6} columns={5} rowHeight="h-20" />
+      return (
+        <div className="flex flex-col items-center gap-3 py-6">
+          <PageSpinner label={t('common:messages.loading')} />
+          <TableSkeleton rows={6} columns={5} rowHeight="h-20" />
+        </div>
+      )
     }
 
     if (error) {

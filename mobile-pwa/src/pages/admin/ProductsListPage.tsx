@@ -8,6 +8,7 @@ import { Card } from '../../components/ui/card'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { PageSpinner } from '../../components/ui/PageSpinner'
 import { TableSkeleton } from '../../components/ui/TableSkeleton'
 import { getProducts, type Product } from '../../services/productsApi'
 
@@ -50,7 +51,12 @@ export function ProductsListPage() {
 
   const content = useMemo(() => {
     if (isLoading) {
-      return <TableSkeleton rows={5} columns={4} rowHeight="h-16" />
+      return (
+        <div className="flex flex-col items-center gap-3 py-6">
+          <PageSpinner label={t('common:messages.loading')} />
+          <TableSkeleton rows={5} columns={4} rowHeight="h-16" />
+        </div>
+      )
     }
 
     if (error) {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
+import { PageSpinner } from '../../components/ui/PageSpinner'
 import { listPickLists, type PickList } from '../../services/pickingApi'
 import type { ApiError } from '../../services/apiClient'
 
@@ -50,7 +51,11 @@ export function PickListPage() {
   }, [loadDocuments])
 
   if (isLoading) {
-    return <div>{t('common:messages.loading')}</div>
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <PageSpinner label={t('common:messages.loading')} />
+      </div>
+    )
   }
 
   if (errorMessage) {

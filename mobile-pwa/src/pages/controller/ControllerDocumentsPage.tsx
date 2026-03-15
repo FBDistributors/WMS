@@ -4,10 +4,11 @@ import { ClipboardList } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AppHeader } from '../../components/layout/AppHeader'
+import { PageSpinner } from '../../components/ui/PageSpinner'
 import { listPickLists, type PickList } from '../../services/pickingApi'
 
 export function ControllerDocumentsPage() {
-  const { t, i18n } = useTranslation('controller')
+  const { t, i18n } = useTranslation(['controller', 'common'])
   const navigate = useNavigate()
   const [docs, setDocs] = useState<PickList[]>([])
   const [loading, setLoading] = useState(true)
@@ -45,14 +46,7 @@ export function ControllerDocumentsPage() {
       <AppHeader title={t('documents.title')} onRefresh={() => window.location.reload()} hideUserMenu />
       <div className="w-full max-w-xl mx-auto px-4 sm:px-6 min-w-0 pb-nav">
         {loading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="h-20 animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-700"
-              />
-            ))}
-          </div>
+          <PageSpinner label={t('common:messages.loading')} className="min-h-[200px] py-12" />
         ) : error ? (
           <div className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950">
             <p className="text-red-800 dark:text-red-200">{error}</p>

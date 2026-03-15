@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
+import { PageSpinner } from '../../components/ui/PageSpinner'
 import {
   completePickingDocument,
   getPickingDocument,
@@ -81,7 +82,11 @@ export function DocumentDetailsPage() {
   }, [isLoading, document])
 
   if (isLoading) {
-    return <div>{t('common:messages.loading')}</div>
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <PageSpinner label={t('common:messages.loading')} />
+      </div>
+    )
   }
 
   if (errorMessage) {

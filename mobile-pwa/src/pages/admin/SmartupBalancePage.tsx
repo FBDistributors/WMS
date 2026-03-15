@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { Loader2 } from 'lucide-react'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { InventoryHeaderTabs } from '../../admin/components/inventory/InventoryHeaderTabs'
@@ -8,6 +9,7 @@ import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { PageSpinner } from '../../components/ui/PageSpinner'
 import { TableSkeleton } from '../../components/ui/TableSkeleton'
 import { getSmartupBalance } from '../../services/inventoryApi'
 
@@ -122,7 +124,12 @@ export function SmartupBalanceView({ warehouseCode }: SmartupBalanceViewProps) {
 
   const content = useMemo(() => {
     if (isLoading) {
-      return <TableSkeleton rows={6} columns={5} />
+      return (
+        <div className="flex flex-col items-center gap-3 py-6">
+          <PageSpinner label={t('common:messages.loading')} />
+          <TableSkeleton rows={6} columns={5} />
+        </div>
+      )
     }
     if (error) {
       return (
@@ -227,7 +234,8 @@ export function SmartupBalanceView({ warehouseCode }: SmartupBalanceViewProps) {
             <Link to="/admin/inventory">
               <Button variant="secondary">{t('inventory:back_to_summary')}</Button>
             </Link>
-            <Button variant="secondary" onClick={() => load(true)} disabled={isLoading}>
+            <Button variant="secondary" onClick={() => load(true)} disabled={isLoading} className="inline-flex items-center gap-2">
+              {isLoading ? <Loader2 size={16} className="animate-spin shrink-0" /> : null}
               {t('common:buttons.refresh')}
             </Button>
           </div>

@@ -7,6 +7,7 @@ import { AdminLayout } from '../../admin/components/AdminLayout'
 import { KpiCard } from '../../admin/components/KpiCard'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { PageSpinner } from '../../components/ui/PageSpinner'
 import { getOrdersByStatus, getPickerPerformance, type PickerPerformanceRow } from '../../services/dashboardApi'
 
 // Yangi = Smartupdan kelgan, admin yig'uvchiga yubormagan
@@ -118,7 +119,7 @@ export function DashboardPage() {
             </div>
             <div className="mt-3 overflow-x-auto">
               {isLoading ? (
-                <div className="h-24 animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-700" />
+                <PageSpinner label={t('common:messages.loading')} className="min-h-[6rem] py-6" />
               ) : (
                 <table className="min-w-full text-sm">
                   <thead>
@@ -187,7 +188,7 @@ export function DashboardPage() {
             </div>
             <div className="mt-3 overflow-x-auto">
               {isLoading ? (
-                <div className="h-24 animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-700" />
+                <PageSpinner label={t('common:messages.loading')} className="min-h-[6rem] py-6" />
               ) : pickerPerformance.length === 0 ? (
                 <p className="text-sm text-slate-500 dark:text-slate-400">
                   {t('admin:dashboard.pickers_empty')}

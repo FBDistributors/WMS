@@ -4,10 +4,11 @@ import { Package, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AppHeader } from '../../components/layout/AppHeader'
+import { PageSpinner } from '../../components/ui/PageSpinner'
 import { getProducts, type Product } from '../../services/productsApi'
 
 export function ControllerProductsPage() {
-  const { t } = useTranslation('controller')
+  const { t } = useTranslation(['controller', 'common'])
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const locationFilter = searchParams.get('location')
@@ -61,14 +62,7 @@ export function ControllerProductsPage() {
           />
         </div>
         {loading ? (
-          <div className="space-y-3">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div
-                key={i}
-                className="h-16 animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-700"
-              />
-            ))}
-          </div>
+          <PageSpinner label={t('common:messages.loading')} className="min-h-[200px] py-12" />
         ) : products.length === 0 ? (
           <div className="flex flex-col items-center gap-4 rounded-2xl border border-slate-200 bg-white p-8 dark:border-slate-700 dark:bg-slate-800">
             <Package size={48} className="text-slate-400" />

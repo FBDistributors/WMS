@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 
+import { PageSpinner } from '../components/ui/PageSpinner'
 import { useAuth } from './AuthProvider'
 import type { PermissionKey, Role } from './permissions'
 
@@ -23,7 +24,11 @@ export function RequireRoleOrPermission({
   const location = useLocation()
 
   if (isLoading) {
-    return null
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <PageSpinner />
+      </div>
+    )
   }
 
   if (!user) {

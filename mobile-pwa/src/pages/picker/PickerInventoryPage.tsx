@@ -8,6 +8,7 @@ import { ScanModal } from '../../components/picker/ScanModal'
 import { Card } from '../../components/ui/card'
 import { Button } from '../../components/ui/button'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { PageSpinner } from '../../components/ui/PageSpinner'
 import {
   listPickerInventory,
   listPickerLocations,
@@ -28,7 +29,7 @@ function formatError(err: unknown): string {
 }
 
 export function PickerInventoryPage() {
-  const { t } = useTranslation('picker')
+  const { t } = useTranslation(['picker', 'common'])
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const locationFromUrl = searchParams.get('location')
@@ -168,11 +169,7 @@ export function PickerInventoryPage() {
         </div>
       )}
       {isLoading ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-24 animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800" />
-          ))}
-        </div>
+        <PageSpinner label={t('common:messages.loading')} className="min-h-[200px] py-12" />
       ) : error ? (
         <EmptyState
           icon={<Boxes size={32} />}
