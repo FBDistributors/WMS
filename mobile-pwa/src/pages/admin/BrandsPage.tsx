@@ -9,7 +9,6 @@ import { Card } from '../../components/ui/card'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
-import { TableSkeleton } from '../../components/ui/TableSkeleton'
 import {
   createBrand,
   deactivateBrand,

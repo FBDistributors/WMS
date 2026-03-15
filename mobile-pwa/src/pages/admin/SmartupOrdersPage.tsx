@@ -7,7 +7,6 @@ import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
-import { TableSkeleton } from '../../components/ui/TableSkeleton'
 import { getOrders, type OrderListItem } from '../../services/ordersApi'
 
 const PAGE_SIZE = 50

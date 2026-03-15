@@ -10,7 +10,6 @@ import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
-import { TableSkeleton } from '../../components/ui/TableSkeleton'
 import { getSmartupBalance } from '../../services/inventoryApi'
 
 const HIDDEN_COLUMNS = new Set(['inventory_kind', 'product_id', 'batch_number', 'groups', 'warehouse_code', 'date'])

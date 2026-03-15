@@ -13,7 +13,6 @@ import { Card } from '../../components/ui/card'
 import { DateInput } from '../../components/DateInput'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
-import { TableSkeleton } from '../../components/ui/TableSkeleton'
 import { getOrikzorMovements, type MovementItem } from '../../services/ordersApi'
 import { useAuth } from '../../rbac/AuthProvider'
 

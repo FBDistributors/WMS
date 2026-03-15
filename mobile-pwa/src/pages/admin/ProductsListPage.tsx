@@ -9,7 +9,6 @@ import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
-import { TableSkeleton } from '../../components/ui/TableSkeleton'
 import { getProducts, type Product } from '../../services/productsApi'
 
 const statusVariant = (isActive: boolean) => (isActive ? 'success' : 'neutral')
