@@ -166,6 +166,7 @@
     "external_id": "Tashqi ID",
     "from_warehouse_code": "Qayerdan (sklad)",
     "to_warehouse_code": "Qayerga (sklad)",
+    "to_filial": "Filial",
     "movement_note": "Izoh",
     "total_amount": "Summa",
     "status": "Holat",

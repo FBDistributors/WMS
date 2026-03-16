@@ -70,6 +70,7 @@ export function useDillerTableConfig() {
     'external_id',
     'from_warehouse_code',
     'to_warehouse_code',
+    'to_filial',
     'movement_note',
     'total_amount',
     'status',
@@ -82,6 +83,7 @@ export function useDillerTableConfig() {
     'external_id',
     'from_warehouse_code',
     'to_warehouse_code',
+    'to_filial',
     'movement_note',
     'status',
   ]

@@ -148,6 +148,7 @@
     "external_id": "Внешний ID",
     "from_warehouse_code": "Со склада",
     "to_warehouse_code": "На склад",
+    "to_filial": "Филиал",
     "movement_note": "Примечание",
     "total_amount": "Сумма",
     "status": "Статус",

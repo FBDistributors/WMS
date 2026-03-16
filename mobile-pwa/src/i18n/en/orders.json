@@ -151,6 +151,7 @@
     "external_id": "External ID",
     "from_warehouse_code": "From warehouse",
     "to_warehouse_code": "To warehouse",
+    "to_filial": "Filial",
     "movement_note": "Note",
     "total_amount": "Amount",
     "status": "Status",
