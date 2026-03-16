@@ -77,12 +77,9 @@ const COLUMN_OPTIONS_DILLER = [
   { id: 'select', labelKey: 'orders:columns.select' },
   { id: 'order_number', labelKey: 'orders:columns_diller.order_number' },
   { id: 'external_id', labelKey: 'orders:columns_diller.external_id' },
-  { id: 'from_warehouse_code', labelKey: 'orders:columns_diller.from_warehouse_code' },
-  { id: 'to_warehouse_code', labelKey: 'orders:columns_diller.to_warehouse_code' },
   { id: 'to_filial', labelKey: 'orders:columns_diller.to_filial' },
   { id: 'movement_note', labelKey: 'orders:columns_diller.movement_note' },
   { id: 'total_amount', labelKey: 'orders:columns_diller.total_amount' },
-  { id: 'status', labelKey: 'orders:columns_diller.status' },
   { id: 'lines', labelKey: 'orders:columns_diller.lines' },
   { id: 'delivery_date', labelKey: 'orders:columns_diller.delivery_date' },
   { id: 'view_details', labelKey: 'orders:columns_diller.view_details' },
@@ -91,11 +88,8 @@ const COLUMN_OPTIONS_DILLER = [
 const DILLER_SEARCH_FIELD_OPTIONS = [
   { id: 'order_number', labelKey: 'orders:columns_diller.order_number' },
   { id: 'external_id', labelKey: 'orders:columns_diller.external_id' },
-  { id: 'from_warehouse_code', labelKey: 'orders:columns_diller.from_warehouse_code' },
-  { id: 'to_warehouse_code', labelKey: 'orders:columns_diller.to_warehouse_code' },
   { id: 'to_filial', labelKey: 'orders:columns_diller.to_filial' },
   { id: 'movement_note', labelKey: 'orders:columns_diller.movement_note' },
-  { id: 'status', labelKey: 'orders:columns_diller.status' },
 ]
 
 const SEARCH_FIELD_OPTIONS = [
@@ -431,13 +425,10 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         ? movementListRaw.filter((m: MovementItem) => {
             const mid = String((m.movement_id as string) ?? '').toLowerCase()
             const deliveryNo = String((m.delivery_number as string) ?? '').toLowerCase()
-            const fromWh = String((m.from_warehouse_code as string) ?? '').toLowerCase()
-            const toWh = String((m.to_warehouse_code as string) ?? '').toLowerCase()
             const toFilialCode = String((m.to_filial_code as string) ?? '').toLowerCase()
             const toFilialName = getFilialNameByCode(m.to_filial_code as string).toLowerCase()
             const note = String((m.note as string) ?? '').toLowerCase()
-            const status = String((m.status as string) ?? '').toLowerCase()
-            return mid.includes(q) || deliveryNo.includes(q) || fromWh.includes(q) || toWh.includes(q) || toFilialCode.includes(q) || toFilialName.includes(q) || note.includes(q) || status.includes(q)
+            return mid.includes(q) || deliveryNo.includes(q) || toFilialCode.includes(q) || toFilialName.includes(q) || note.includes(q)
           })
         : movementListRaw
       const columnLabelsDiller = new Map(
@@ -446,11 +437,8 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       const renderMovementCell = (columnId: string, m: MovementItem) => {
         const mid = (m.movement_id as string) ?? '—'
         const deliveryNo = (m.delivery_number as string) ?? '—'
-        const fromWh = (m.from_warehouse_code as string) ?? '—'
-        const toWh = (m.to_warehouse_code as string) ?? '—'
         const note = (m.note as string) ?? '—'
         const amount = m.amount != null ? String(m.amount) : '—'
-        const status = (m.status as string) ?? '—'
         const items = (m.movement_items as unknown[]) ?? []
         const fromTime = (m.from_time as string) ?? '—'
         switch (columnId) {
@@ -489,18 +477,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                 {deliveryNo}
               </td>
             )
-          case 'from_warehouse_code':
-            return (
-              <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                {fromWh}
-              </td>
-            )
-          case 'to_warehouse_code':
-            return (
-              <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                {toWh}
-              </td>
-            )
           case 'to_filial':
             return (
               <td className="px-4 py-3 text-slate-600 dark:text-slate-300" title={getFilialNameByCode(m.to_filial_code as string)}>
@@ -517,12 +493,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             return (
               <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                 {amount === '—' ? '—' : Number(amount).toLocaleString()}
-              </td>
-            )
-          case 'status':
-            return (
-              <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                {status}
               </td>
             )
           case 'lines':

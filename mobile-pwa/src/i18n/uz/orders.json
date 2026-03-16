@@ -163,7 +163,7 @@
   "columns_diller": {
     "order_number": "Harakat ID",
     "movement_number": "Harakat raqami",
-    "external_id": "Tashqi ID",
+    "external_id": "Yetkazib berish raqami",
     "from_warehouse_code": "Qayerdan (sklad)",
     "to_warehouse_code": "Qayerga (sklad)",
     "to_filial": "Filial",

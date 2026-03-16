@@ -145,7 +145,7 @@
   "columns_diller": {
     "order_number": "ID движения",
     "movement_number": "Номер движения",
-    "external_id": "Внешний ID",
+    "external_id": "Номер доставки",
     "from_warehouse_code": "Со склада",
     "to_warehouse_code": "На склад",
     "to_filial": "Филиал",

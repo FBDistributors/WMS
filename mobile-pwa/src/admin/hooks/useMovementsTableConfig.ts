@@ -68,12 +68,9 @@ export function useDillerTableConfig() {
     'select',
     'order_number',
     'external_id',
-    'from_warehouse_code',
-    'to_warehouse_code',
     'to_filial',
     'movement_note',
     'total_amount',
-    'status',
     'lines',
     'delivery_date',
     'view_details',
@@ -81,11 +78,8 @@ export function useDillerTableConfig() {
   const DILLER_SEARCH_FIELDS = [
     'order_number',
     'external_id',
-    'from_warehouse_code',
-    'to_warehouse_code',
     'to_filial',
     'movement_note',
-    'status',
   ]
   const { defaultConfig, normalizeConfig, loadConfig } = createMovementsTableConfig(
     'wms_diller_table_config',

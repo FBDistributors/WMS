@@ -148,7 +148,7 @@
   "columns_diller": {
     "order_number": "Movement ID",
     "movement_number": "Movement number",
-    "external_id": "External ID",
+    "external_id": "Delivery number",
     "from_warehouse_code": "From warehouse",
     "to_warehouse_code": "To warehouse",
     "to_filial": "Filial",
