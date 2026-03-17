@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Loader2 } from 'lucide-react'
+import { FileSpreadsheet, Loader2 } from 'lucide-react'
+import * as XLSX from 'xlsx'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { InventoryHeaderTabs } from '../../admin/components/inventory/InventoryHeaderTabs'
@@ -76,6 +77,7 @@ export function SmartupBalanceView({ warehouseCode }: SmartupBalanceViewProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [visibleCount, setVisibleCount] = useState(INITIAL_PAGE_SIZE)
+  const [isExporting, setIsExporting] = useState(false)
 
   const load = useCallback(async (forceRefresh = false) => {
     setIsLoading(true)
@@ -120,6 +122,30 @@ export function SmartupBalanceView({ warehouseCode }: SmartupBalanceViewProps) {
   }, [allRows.length])
 
   const columns = useMemo(() => getColumns(rawRows.length > 0 ? rawRows : rows), [rawRows, rows])
+
+  const handleExportExcel = useCallback(() => {
+    const exportColumns = getColumns(allRows.length > 0 ? allRows : rawRows)
+    if (exportColumns.length === 0 || allRows.length === 0) return
+    setIsExporting(true)
+    try {
+      const headers = exportColumns
+      const sheetRows = allRows.map((row) =>
+        exportColumns.map((col) => getCellDisplay(col, row[col]))
+      )
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...sheetRows])
+      const wb = XLSX.utils.book_new()
+      const sheetName = warehouseCode === '002' ? 'Smartup bron' : 'SmartUP qoldiq'
+      XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0, 31))
+      const dateStr = new Date().toISOString().slice(0, 10)
+      const fileName =
+        warehouseCode === '002'
+          ? `smartup_bron_${dateStr}.xlsx`
+          : `smartup_qoldiq_${dateStr}.xlsx`
+      XLSX.writeFile(wb, fileName)
+    } finally {
+      setIsExporting(false)
+    }
+  }, [allRows, rawRows, warehouseCode])
 
   const content = useMemo(() => {
     if (isLoading) {
@@ -232,6 +258,15 @@ export function SmartupBalanceView({ warehouseCode }: SmartupBalanceViewProps) {
             <Link to="/admin/inventory">
               <Button variant="secondary">{t('inventory:back_to_summary')}</Button>
             </Link>
+            <Button
+              variant="secondary"
+              onClick={handleExportExcel}
+              disabled={isExporting || allRows.length === 0}
+              title={t('inventory:export_excel')}
+              aria-label={t('inventory:export_excel')}
+            >
+              <FileSpreadsheet size={18} />
+            </Button>
             <Button variant="secondary" onClick={() => load(true)} disabled={isLoading} className="inline-flex items-center gap-2">
               {isLoading ? <Loader2 size={16} className="animate-spin shrink-0" /> : null}
               {t('common:buttons.refresh')}
