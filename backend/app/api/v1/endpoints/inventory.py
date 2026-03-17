@@ -28,11 +28,12 @@ from app.models.stock import StockLot as StockLotModel
 from app.models.stock import StockMovement as StockMovementModel
 from app.models.user import User as UserModel
 from app.integrations.smartup import balance_export as smartup_balance_export
+from app.integrations.smartup.filial_list import FILIAL_LIST, get_filial_ids
 
 router = APIRouter()
 
-# SmartUP balance cache: (today_str, warehouse_code) -> result
-_smartup_balance_cache: dict[tuple[str, str], Any] = {}
+# SmartUP balance cache: (today_str, warehouse_code, filial_id) -> result
+_smartup_balance_cache: dict[tuple[str, str, str], Any] = {}
 
 
 def _get_showroom_root_id(db: Session) -> Optional[UUID]:
@@ -1462,23 +1463,25 @@ async def fix_duplicate_pick(
 @router.get(
     "/smartup-balance",
     response_model=None,
-    summary="SmartUP balance$export (cache, refresh, warehouse_code)",
+    summary="SmartUP balance$export (cache, refresh, warehouse_code, filial_id)",
 )
 async def get_smartup_balance(
     refresh: bool = Query(False, description="Yuklash tugmasi: SmartUP dan yangilash"),
     warehouse_code: str = Query("001", description="001 = qoldiq, 002 = bron"),
+    filial_id: str | None = Query(None, description="Filial ID (header). all = barcha filiallar birlashtirilgan"),
     _user=Depends(require_permission("inventory:read")),
 ) -> Any:
     """
-    SmartUP balance$export: warehouse_code bo'yicha (001 qoldiq, 002 bron).
-    refresh=False va bugungi cache bor bo'lsa cache qaytariladi; yo'q bo'lsa {"balance": []}.
-    refresh=True da SmartUP dan yuklab cache ga yoziladi.
+    SmartUP balance$export: warehouse_code va ixtiyoriy filial_id.
+    refresh=False va bugungi cache bor bo'lsa cache qaytariladi.
+    filial_id=all da barcha filiallar uchun so'rov va balance massivlari birlashtiriladi.
     """
     global _smartup_balance_cache
     today = date.today()
     today_str = today.isoformat()
     wh = (warehouse_code or "001").strip() or "001"
-    cache_key = (today_str, wh)
+    fid_param = (filial_id or "").strip() or ""
+    cache_key = (today_str, wh, fid_param)
 
     # Eski kunlar uchun cache ni tozalash
     to_remove = [k for k in _smartup_balance_cache if k[0] != today_str]
@@ -1491,9 +1494,21 @@ async def get_smartup_balance(
         return {"balance": []}
 
     try:
-        result = await asyncio.to_thread(
-            smartup_balance_export.fetch_balance_from_smartup, None, wh
-        )
+        if fid_param.lower() == "all":
+            all_balances: list[Any] = []
+            for fid in get_filial_ids():
+                part = await asyncio.to_thread(
+                    smartup_balance_export.fetch_balance_from_smartup, fid, wh
+                )
+                if isinstance(part, dict) and "balance" in part and isinstance(part["balance"], list):
+                    all_balances.extend(part["balance"])
+            result = {"balance": all_balances}
+        else:
+            result = await asyncio.to_thread(
+                smartup_balance_export.fetch_balance_from_smartup,
+                fid_param if fid_param else None,
+                wh,
+            )
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except Exception as exc:

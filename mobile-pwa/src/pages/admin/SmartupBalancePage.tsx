@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { FileSpreadsheet, Loader2 } from 'lucide-react'
+import { FileSpreadsheet, Loader2, Check } from 'lucide-react'
 import * as XLSX from 'xlsx'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -12,6 +12,7 @@ import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { getSmartupBalance } from '../../services/inventoryApi'
+import { writeExcelFile } from '../../utils/exportExcel'
 
 const HIDDEN_COLUMNS = new Set(['inventory_kind', 'product_id', 'batch_number', 'groups', 'warehouse_code', 'date'])
 const NUMBER_COLUMNS = new Set(['quantity', 'input_price'])
@@ -63,9 +64,15 @@ function getCellDisplay(col: string, value: unknown): string {
 const INITIAL_PAGE_SIZE = 50
 const LOAD_MORE_SIZE = 50
 
-type SmartupBalanceViewProps = { warehouseCode: string }
+type SmartupBalanceViewProps = {
+  warehouseCode: string
+  /** Filial ID (Custom tab). all = barcha filiallar. */
+  filialId?: string | null
+  /** Optional slot for Custom tab: filial dropdown */
+  customHeaderSlot?: React.ReactNode
+}
 
-export function SmartupBalanceView({ warehouseCode }: SmartupBalanceViewProps) {
+export function SmartupBalanceView({ warehouseCode, filialId, customHeaderSlot }: SmartupBalanceViewProps) {
   const { t } = useTranslation(['inventory', 'common'])
   const [searchParams, setSearchParams] = useSearchParams()
   const searchQuery = searchParams.get('q') ?? ''
@@ -78,20 +85,26 @@ export function SmartupBalanceView({ warehouseCode }: SmartupBalanceViewProps) {
   const [error, setError] = useState<string | null>(null)
   const [visibleCount, setVisibleCount] = useState(INITIAL_PAGE_SIZE)
   const [isExporting, setIsExporting] = useState(false)
+  const [exportSuccessAt, setExportSuccessAt] = useState<number | null>(null)
+  const [exportSavedPath, setExportSavedPath] = useState<string | null>(null)
 
   const load = useCallback(async (forceRefresh = false) => {
     setIsLoading(true)
     setError(null)
     if (forceRefresh) setVisibleCount(INITIAL_PAGE_SIZE)
     try {
-      const res = await getSmartupBalance({ refresh: forceRefresh, warehouse_code: warehouseCode })
+      const res = await getSmartupBalance({
+        refresh: forceRefresh,
+        warehouse_code: warehouseCode,
+        filial_id: filialId ?? undefined,
+      })
       setData(res)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('inventory:load_failed'))
     } finally {
       setIsLoading(false)
     }
-  }, [t, warehouseCode])
+  }, [t, warehouseCode, filialId])
 
   useEffect(() => {
     void load(false)
@@ -123,7 +136,7 @@ export function SmartupBalanceView({ warehouseCode }: SmartupBalanceViewProps) {
 
   const columns = useMemo(() => getColumns(rawRows.length > 0 ? rawRows : rows), [rawRows, rows])
 
-  const handleExportExcel = useCallback(() => {
+  const handleExportExcel = useCallback(async () => {
     const exportColumns = getColumns(allRows.length > 0 ? allRows : rawRows)
     if (exportColumns.length === 0 || allRows.length === 0) return
     setIsExporting(true)
@@ -141,11 +154,22 @@ export function SmartupBalanceView({ warehouseCode }: SmartupBalanceViewProps) {
         warehouseCode === '002'
           ? `smartup_bron_${dateStr}.xlsx`
           : `smartup_qoldiq_${dateStr}.xlsx`
-      XLSX.writeFile(wb, fileName)
+      const savedPath = await writeExcelFile(wb, fileName)
+      setExportSavedPath(savedPath)
+      setExportSuccessAt(Date.now())
     } finally {
       setIsExporting(false)
     }
   }, [allRows, rawRows, warehouseCode])
+
+  useEffect(() => {
+    if (exportSuccessAt == null) return
+    const t = setTimeout(() => {
+      setExportSuccessAt(null)
+      setExportSavedPath(null)
+    }, 2500)
+    return () => clearTimeout(t)
+  }, [exportSuccessAt])
 
   const content = useMemo(() => {
     if (isLoading) {
@@ -231,6 +255,7 @@ export function SmartupBalanceView({ warehouseCode }: SmartupBalanceViewProps) {
     <AdminLayout titleSlot={<InventoryHeaderTabs />}>
       <Card className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
+          {customHeaderSlot}
           <div className="flex flex-col gap-1 text-sm text-slate-800 dark:text-slate-100">
             <span className="font-semibold">Основной склад - НОВЫЙ</span>
             <span className="text-xs text-slate-500 dark:text-slate-400">{todayLabel}</span>
@@ -273,6 +298,34 @@ export function SmartupBalanceView({ warehouseCode }: SmartupBalanceViewProps) {
             </Button>
           </div>
         </div>
+        {exportSuccessAt !== null && (
+          <div
+            role="status"
+            className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
+          >
+            <Check size={18} className="shrink-0" />
+            <span>{t('inventory:export_success')}</span>
+            <span className="text-emerald-600 dark:text-emerald-300">·</span>
+            <span>{t('inventory:export_success_hint')}</span>
+            {exportSavedPath && (
+              <>
+                <span className="text-emerald-600 dark:text-emerald-300">·</span>
+                <button
+                  type="button"
+                  className="font-medium underline hover:no-underline"
+                  onClick={() => {
+                    if (!exportSavedPath) return
+                    import('@tauri-apps/plugin-shell')
+                      .then(({ open }) => open(exportSavedPath))
+                      .catch(() => {})
+                  }}
+                >
+                  {t('inventory:export_open_file')}
+                </button>
+              </>
+            )}
+          </div>
+        )}
         <div className="min-h-[min(70vh,600px)] max-h-[calc(100vh-220px)] flex flex-col overflow-auto">{content}</div>
       </Card>
     </AdminLayout>

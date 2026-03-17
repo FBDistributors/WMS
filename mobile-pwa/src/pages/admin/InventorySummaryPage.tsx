@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
-import { Search, PackagePlus, Settings, FileSpreadsheet, ChevronDown, Loader2 } from 'lucide-react'
+import { Search, PackagePlus, Settings, FileSpreadsheet, ChevronDown, Loader2, Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import * as XLSX from 'xlsx'
 
@@ -19,6 +19,7 @@ import {
   getSmartupBalance,
   type WarehouseFilter,
 } from '../../services/inventoryApi'
+import { writeExcelFile } from '../../utils/exportExcel'
 
 const COLUMN_OPTIONS = [
   { id: 'code', labelKey: 'inventory:columns.code' },
@@ -66,6 +67,8 @@ export function InventorySummaryPage() {
   const excelMenuRef = useRef<HTMLDivElement>(null)
   const [smartupQoldiqByCode, setSmartupQoldiqByCode] = useState<Map<string, number>>(new Map())
   const [smartupBronByCode, setSmartupBronByCode] = useState<Map<string, number>>(new Map())
+  const [exportSuccessAt, setExportSuccessAt] = useState<number | null>(null)
+  const [exportSavedPath, setExportSavedPath] = useState<string | null>(null)
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), DEBOUNCE_MS)
@@ -185,6 +188,15 @@ export function InventorySummaryPage() {
     return () => document.removeEventListener('click', handleClickOutside)
   }, [excelMenuOpen])
 
+  useEffect(() => {
+    if (exportSuccessAt == null) return
+    const t = setTimeout(() => {
+      setExportSuccessAt(null)
+      setExportSavedPath(null)
+    }, 2500)
+    return () => clearTimeout(t)
+  }, [exportSuccessAt])
+
   const handleExportExcel = useCallback(
     async (withExpiry: boolean) => {
       setExcelMenuOpen(false)
@@ -229,7 +241,9 @@ export function InventorySummaryPage() {
           const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
           const wb = XLSX.utils.book_new()
           XLSX.utils.book_append_sheet(wb, ws, sheetName)
-          XLSX.writeFile(wb, fileName)
+          const savedPath = await writeExcelFile(wb, fileName)
+          setExportSavedPath(savedPath)
+          setExportSuccessAt(Date.now())
         } else {
           const headers = [
             t('inventory:columns.code'),
@@ -259,7 +273,9 @@ export function InventorySummaryPage() {
           const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
           const wb = XLSX.utils.book_new()
           XLSX.utils.book_append_sheet(wb, ws, sheetName)
-          XLSX.writeFile(wb, fileName)
+          const savedPath = await writeExcelFile(wb, fileName)
+          setExportSavedPath(savedPath)
+          setExportSuccessAt(Date.now())
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : t('inventory:load_failed')
@@ -542,6 +558,34 @@ export function InventorySummaryPage() {
           </Button>
         </div>
 
+        {exportSuccessAt !== null && (
+          <div
+            role="status"
+            className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
+          >
+            <Check size={18} className="shrink-0" />
+            <span>{t('inventory:export_success')}</span>
+            <span className="text-emerald-600 dark:text-emerald-300">·</span>
+            <span>{t('inventory:export_success_hint')}</span>
+            {exportSavedPath && (
+              <>
+                <span className="text-emerald-600 dark:text-emerald-300">·</span>
+                <button
+                  type="button"
+                  className="font-medium underline hover:no-underline"
+                  onClick={() => {
+                    if (!exportSavedPath) return
+                    import('@tauri-apps/plugin-shell')
+                      .then(({ open }) => open(exportSavedPath))
+                      .catch(() => {})
+                  }}
+                >
+                  {t('inventory:export_open_file')}
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
         <div className="max-h-[calc(100vh-240px)] min-h-0 overflow-auto">
           {content}

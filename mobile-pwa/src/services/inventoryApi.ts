@@ -258,16 +258,19 @@ export async function createMovement(payload: CreateMovementPayload) {
   })
 }
 
-/** SmartUP balance$export — cache yoki refresh=1 da SmartUP dan yangilash. warehouse_code: 001 = qoldiq, 002 = bron */
+/** SmartUP balance$export — cache yoki refresh=1 da SmartUP dan yangilash. warehouse_code: 001 = qoldiq, 002 = bron. filial_id: header (all = barcha filiallar). */
 export async function getSmartupBalance(options?: {
   signal?: AbortSignal
   refresh?: boolean
   warehouse_code?: string
+  filial_id?: string | null
 }) {
   const refresh = options?.refresh === true
   const warehouse_code = options?.warehouse_code?.trim() || '001'
   const query: Record<string, string> = { warehouse_code }
   if (refresh) query.refresh = '1'
+  const fid = options?.filial_id?.trim()
+  if (fid) query.filial_id = fid
   return fetchJSON<unknown>('/api/v1/inventory/smartup-balance', {
     signal: options?.signal,
     query,
