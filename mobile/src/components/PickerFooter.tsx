@@ -94,7 +94,7 @@ function PickerFooterInner({ currentRoute, profileType = 'picker' }: PickerFoote
         <View style={footerStyles.scanWrap}>
           <TouchableOpacity
             style={footerStyles.scanBtn}
-            onPress={() => navigation.navigate('Scanner', { profileType })}
+            onPress={() => navigation.navigate('Scanner', { profileType, returnToInventoryDetail: true })}
             activeOpacity={0.8}
           >
             <Icon name="barcode-scan" size={32} color="#fff" />

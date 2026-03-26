@@ -25,6 +25,8 @@ export type RootStackParamList = {
     returnToMovementPallet?: boolean;
     /** Kirim (yangi mahsulot): faqat lokatsiya kodi skan */
     returnToKirimLocation?: boolean;
+    /** Footer/global scan: product detail via Inventory stack */
+    returnToInventoryDetail?: boolean;
     flow?: 'new' | 'return' | 'inventory';
     newMode?: 'byScan' | 'byLocation';
     warehouse?: 'main' | 'showroom';

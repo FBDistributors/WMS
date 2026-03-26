@@ -343,7 +343,7 @@ export function KirimFormScreen() {
   const handleInventoryBack = useCallback(() => {
     if (flow === 'new') {
       if (newMode == null) {
-        navigation.navigate('KirimNew');
+        (navigation as any).replace('KirimNew');
         return;
       }
       setNewMode(null);
@@ -405,11 +405,11 @@ export function KirimFormScreen() {
       scanParams.inventoryLocationId = inventoryLocation.id;
       scanParams.inventoryLocationCode = inventoryLocation.code;
     }
-    navigation.navigate('Scanner', scanParams);
+    (navigation as any).replace('Scanner', scanParams);
   }, [navigation, flow, newMode, effectiveWarehouse, inventoryStep, inventorySubMode, inventoryLocation]);
 
   const handleScanReceivingLocation = useCallback(() => {
-    navigation.navigate('Scanner', {
+    (navigation as any).replace('Scanner', {
       returnToKirimLocation: true,
       flow: 'new',
       newMode: 'byLocation',

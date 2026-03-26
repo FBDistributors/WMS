@@ -163,11 +163,11 @@ export function MovementScreen() {
   }, [phase, navigation, resetPalletFlow]);
 
   const handleScanProduct = useCallback(() => {
-    navigation.navigate('Scanner', { returnToMovement: true });
+    (navigation as any).replace('Scanner', { returnToMovement: true });
   }, [navigation]);
 
   const handleScanPallet = useCallback(() => {
-    navigation.navigate('Scanner', { returnToMovementPallet: true });
+    (navigation as any).replace('Scanner', { returnToMovementPallet: true });
   }, [navigation]);
 
   const maxQty = fromLocation ? Number(fromLocation.available_qty) || 0 : 0;

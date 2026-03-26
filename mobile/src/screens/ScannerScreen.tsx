@@ -52,6 +52,79 @@ export function ScannerScreen() {
   const [isScanning, setIsScanning] = useState(true);
   const [torchOn, setTorchOn] = useState(false);
 
+  const resetToMovement = useCallback(
+    (movementParams?: { scannedProductId?: string; scannedBarcode?: string; scannedLocationCode?: string }) => {
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 2,
+          routes: [
+            { name: 'PickerHome', params: { profileType: contextProfileType ?? 'picker' } },
+            { name: 'Kirim' },
+            { name: 'Movement', params: movementParams },
+          ],
+        })
+      );
+    },
+    [navigation, contextProfileType]
+  );
+
+  const resetToKirimForm = useCallback(
+    (kirimParams: {
+      flow: 'new' | 'return' | 'inventory';
+      newMode?: 'byScan' | 'byLocation';
+      warehouse?: 'main' | 'showroom';
+      scannedProductId?: string;
+      scannedBarcode?: string;
+      inventoryStep?: 1 | 2 | 3;
+      inventoryLocationId?: string;
+      inventoryLocationCode?: string;
+      receivingLocationId?: string;
+      receivingLocationCode?: string;
+    }) => {
+      const routes: Array<{ name: keyof RootStackParamList; params?: any }> = [
+        { name: 'PickerHome', params: { profileType: contextProfileType ?? 'picker' } },
+        { name: 'Kirim' },
+      ];
+      if (kirimParams.flow === 'new') routes.push({ name: 'KirimNew' });
+      routes.push({ name: 'KirimForm', params: kirimParams });
+      navigation.dispatch(
+        CommonActions.reset({
+          index: routes.length - 1,
+          routes,
+        })
+      );
+    },
+    [navigation, contextProfileType]
+  );
+
+  const resetToInventoryDetail = useCallback(
+    (productId?: string) => {
+      if (!productId) {
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 1,
+            routes: [
+              { name: 'PickerHome', params: { profileType: contextProfileType ?? 'picker' } },
+              { name: 'Inventory' },
+            ],
+          })
+        );
+        return;
+      }
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 2,
+          routes: [
+            { name: 'PickerHome', params: { profileType: contextProfileType ?? 'picker' } },
+            { name: 'Inventory' },
+            { name: 'InventoryDetail', params: { productId } },
+          ],
+        })
+      );
+    },
+    [navigation, contextProfileType]
+  );
+
   const onCodeScanned = useCallback(
     (codes: { value?: string }[]) => {
       const value = codes[0]?.value?.trim();
@@ -109,7 +182,7 @@ export function ScannerScreen() {
         resolveScannerBarcode(value)
           .then((out) => {
             if (out.type === 'LOCATION' && out.location) {
-              (navigation as any).replace('Movement', { scannedLocationCode: out.location.code });
+              resetToMovement({ scannedLocationCode: out.location.code });
             } else if (out.type === 'PRODUCT') {
               Alert.alert(t('error'), t('movementPalletScanWantLocation'));
               lastScannedRef.current = null;
@@ -134,7 +207,7 @@ export function ScannerScreen() {
         resolveScannerBarcode(value)
           .then((out) => {
             if (out.type === 'LOCATION' && out.location) {
-              (navigation as any).replace('KirimForm', {
+              resetToKirimForm({
                 flow: 'new',
                 newMode: 'byLocation',
                 warehouse: params.warehouse ?? 'main',
@@ -169,6 +242,8 @@ export function ScannerScreen() {
       params.returnToConsolidated,
       params.returnToMovementPallet,
       params.returnToKirimLocation,
+      resetToMovement,
+      resetToKirimForm,
       params.flow,
       params.newMode,
       params.warehouse,
@@ -209,7 +284,7 @@ export function ScannerScreen() {
     if (params.returnToMovementPallet) return;
     if (params.returnToKirimLocation) return;
     if (params.returnToKirimForm) {
-      (navigation as any).replace('KirimForm', {
+      resetToKirimForm({
         flow: params.flow ?? 'return',
         newMode: params.newMode,
         warehouse: params.warehouse,
@@ -222,23 +297,21 @@ export function ScannerScreen() {
       return;
     }
     if (params.returnToMovement) {
-      (navigation as any).replace('Movement', {
+      resetToMovement({
         scannedProductId: product.product_id,
         scannedBarcode: product.barcode ?? undefined,
       });
       return;
     }
     if (params.returnToReturns) {
-      (navigation as any).replace('KirimForm', {
+      resetToKirimForm({
         flow: 'return',
         scannedProductId: product.product_id,
         scannedBarcode: product.barcode ?? undefined,
       });
       return;
     }
-    (navigation as any).replace('InventoryDetail', {
-      productId: product.product_id,
-    });
+    resetToInventoryDetail(product.product_id);
   }, [
     fetchStatus,
     product,
@@ -248,9 +321,59 @@ export function ScannerScreen() {
     params.returnToMovement,
     params.returnToMovementPallet,
     params.returnToKirimLocation,
+    params.returnToInventoryDetail,
     params.flow,
     params.newMode,
     params.warehouse,
+    resetToMovement,
+    resetToKirimForm,
+    resetToInventoryDetail,
+    navigation,
+  ]);
+
+  const handleScannerBack = useCallback(() => {
+    if (params.returnToMovement || params.returnToMovementPallet) {
+      resetToMovement();
+      return;
+    }
+    if (params.returnToKirimLocation && params.flow === 'new') {
+      resetToKirimForm({
+        flow: 'new',
+        newMode: 'byLocation',
+        warehouse: params.warehouse ?? 'main',
+      });
+      return;
+    }
+    if (params.returnToKirimForm) {
+      resetToKirimForm({
+        flow: params.flow ?? 'return',
+        newMode: params.newMode,
+        warehouse: params.warehouse,
+      });
+      return;
+    }
+    if (params.returnToReturns) {
+      resetToKirimForm({ flow: 'return' });
+      return;
+    }
+    if (params.returnToInventoryDetail) {
+      resetToInventoryDetail();
+      return;
+    }
+    navigation.goBack();
+  }, [
+    params.returnToMovement,
+    params.returnToMovementPallet,
+    params.returnToKirimLocation,
+    params.returnToKirimForm,
+    params.returnToReturns,
+    params.returnToInventoryDetail,
+    params.flow,
+    params.newMode,
+    params.warehouse,
+    resetToMovement,
+    resetToKirimForm,
+    resetToInventoryDetail,
     navigation,
   ]);
 
@@ -298,7 +421,7 @@ export function ScannerScreen() {
       <View style={styles.topBar}>
         <TouchableOpacity
           style={styles.iconBtn}
-          onPress={() => navigation.goBack()}
+          onPress={handleScannerBack}
         >
           <Icon name="arrow-left" size={26} color="#fff" />
         </TouchableOpacity>
