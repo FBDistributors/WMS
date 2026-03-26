@@ -26,6 +26,7 @@ export type RootStackParamList = {
     /** Kirim (yangi mahsulot): faqat lokatsiya kodi skan */
     returnToKirimLocation?: boolean;
     flow?: 'new' | 'return' | 'inventory';
+    newMode?: 'byScan' | 'byLocation';
     warehouse?: 'main' | 'showroom';
     taskId?: string;
     lineId?: string;
@@ -45,6 +46,7 @@ export type RootStackParamList = {
   KirimForm:
     | {
         flow: 'new' | 'return' | 'inventory';
+        newMode?: 'byScan' | 'byLocation';
         warehouse?: 'main' | 'showroom';
         scannedProductId?: string;
         scannedBarcode?: string;

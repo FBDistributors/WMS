@@ -134,8 +134,9 @@ export function ScannerScreen() {
         resolveScannerBarcode(value)
           .then((out) => {
             if (out.type === 'LOCATION' && out.location) {
-              (navigation as any).navigate('KirimForm', {
+              (navigation as any).replace('KirimForm', {
                 flow: 'new',
+                newMode: 'byLocation',
                 warehouse: params.warehouse ?? 'main',
                 receivingLocationId: out.location.id,
                 receivingLocationCode: out.location.code,
@@ -169,6 +170,7 @@ export function ScannerScreen() {
       params.returnToMovementPallet,
       params.returnToKirimLocation,
       params.flow,
+      params.newMode,
       params.warehouse,
       params.taskId,
       params.profileType,
@@ -207,8 +209,9 @@ export function ScannerScreen() {
     if (params.returnToMovementPallet) return;
     if (params.returnToKirimLocation) return;
     if (params.returnToKirimForm) {
-      (navigation as any).navigate('KirimForm', {
+      (navigation as any).replace('KirimForm', {
         flow: params.flow ?? 'return',
+        newMode: params.newMode,
         warehouse: params.warehouse,
         scannedProductId: product.product_id,
         scannedBarcode: product.barcode ?? undefined,
@@ -246,6 +249,7 @@ export function ScannerScreen() {
     params.returnToMovementPallet,
     params.returnToKirimLocation,
     params.flow,
+    params.newMode,
     params.warehouse,
     navigation,
   ]);
@@ -321,7 +325,7 @@ export function ScannerScreen() {
           {error === UNAUTHORIZED_MSG ? (
             <TouchableOpacity
               style={styles.buttonSmall}
-              onPress={() => navigation.replace('Login')}
+              onPress={() => (navigation as any).replace('Login')}
             >
               <Text style={styles.buttonText}>{t('loginButton')}</Text>
             </TouchableOpacity>
