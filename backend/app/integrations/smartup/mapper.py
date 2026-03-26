@@ -64,7 +64,7 @@ def map_order_to_wms_order(order: SmartupOrder) -> OrderPayload:
         agent_id=order.agent_id,
         agent_name=order.agent_name,
         total_amount=order.total_amount,
-        status=(order.status or "B#S").strip() or "B#S",
+        status=(order.status or "B#W").strip() or "B#W",
         lines=lines,
         from_warehouse_code=getattr(order, "from_warehouse_code", None) or None,
         to_warehouse_code=getattr(order, "to_warehouse_code", None) or None,

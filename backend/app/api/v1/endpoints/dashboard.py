@@ -72,10 +72,10 @@ async def get_dashboard_summary(
     def _order_base(q):
         return q.filter(OrderModel.filial_id == DEFAULT_FILIAL_ID) if DEFAULT_FILIAL_ID else q
 
-    # Bitta query: total_orders (B#S), completed_today (packed/shipped today), new_orders_today (B#S + created today)
+    # Bitta query: total_orders (B#W), completed_today (packed/shipped today), new_orders_today (B#W + created today)
     order_counts = _order_base(
         db.query(
-            func.count(case((OrderWmsStateModel.status == "B#S", 1))).label("total_orders"),
+            func.count(case((OrderWmsStateModel.status == "B#W", 1))).label("total_orders"),
             func.count(
                 case(
                     (
@@ -91,7 +91,7 @@ async def get_dashboard_summary(
                 case(
                     (
                         and_(
-                            OrderWmsStateModel.status == "B#S",
+                            OrderWmsStateModel.status == "B#W",
                             func.date(OrderModel.created_at) == today,
                         ),
                         1,
@@ -140,7 +140,7 @@ async def get_dashboard_summary(
 
 ORDER_STATUSES_FOR_COUNTS = (
     "imported",
-    "B#S",
+    "B#W",
     "allocated",
     "ready_for_picking",
     "picking",

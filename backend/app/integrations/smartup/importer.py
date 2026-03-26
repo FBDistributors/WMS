@@ -153,15 +153,15 @@ def _process_one_order(
         return 0, 0, 1
 
 
-ORDER_STATUS_BS = "B#S"
+ORDER_STATUS_BS = "B#W"
 
 
 def filter_orders_b_s(orders: Iterable[SmartupOrder]) -> List[SmartupOrder]:
-    """SmartUp dan kelgan ro'yxatdan faqat B#S statusdagilarini qaytaradi (API da importdan oldin filter)."""
+    """SmartUp dan kelgan ro'yxatdan faqat B#W statusdagilarini qaytaradi (API da importdan oldin filter)."""
     return [o for o in orders if (o.status or "").strip() == ORDER_STATUS_BS]
 
 
-STALE_ORDER_STATUSES = ("imported", "B#S")
+STALE_ORDER_STATUSES = ("imported", "B#W")
 
 
 def delete_stale_orders(
@@ -169,7 +169,7 @@ def delete_stale_orders(
     orders_from_smartup: List[SmartupOrder],
 ) -> int:
     """
-    7 kunlik modified_on javobida kelmagan va hali workflow da bo'lmagan (imported/B#S) buyurtmalarni o'chiradi.
+    7 kunlik modified_on javobida kelmagan va hali workflow da bo'lmagan (imported/B#W) buyurtmalarni o'chiradi.
     Picking, allocated, picked, completed va boshqa statusdagilar o'chirilmaydi.
     """
     external_ids_to_keep = {_resolve_external_id(o) for o in orders_from_smartup}
@@ -189,7 +189,7 @@ def delete_stale_orders(
         return 0
     deleted = db.query(Order).filter(Order.id.in_(ids_to_delete)).delete(synchronize_session=False)
     db.commit()
-    logger.info("delete_stale_orders: %d ta eski buyurtma o'chirildi (faqat imported/B#S)", deleted)
+    logger.info("delete_stale_orders: %d ta eski buyurtma o'chirildi (faqat imported/B#W)", deleted)
     return deleted
 
 

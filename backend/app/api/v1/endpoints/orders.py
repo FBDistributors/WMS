@@ -40,7 +40,7 @@ router = APIRouter()
 
 ORDER_STATUSES = {
     "imported",
-    "B#S",
+    "B#W",
     "allocated",
     "ready_for_picking",
     "picking",
@@ -164,7 +164,7 @@ class OrderStatusUpdateRequest(BaseModel):
     controller_user_id: Optional[UUID] = Field(None, description="Tekshiruvda: controllerga yuborish uchun controller user id")
 
 
-ALLOWED_ADMIN_ORDER_STATUSES = {"imported", "B#S", "allocated", "ready_for_picking", "picking", "picked", "completed", "packed", "shipped", "cancelled"}
+ALLOWED_ADMIN_ORDER_STATUSES = {"imported", "B#W", "allocated", "ready_for_picking", "picking", "picked", "completed", "packed", "shipped", "cancelled"}
 
 
 class PickerUser(BaseModel):
@@ -381,7 +381,7 @@ async def list_orders(
         query = query.join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
         if len(valid) == 1:
             query = query.filter(OrderWmsStateModel.status == valid[0])
-            # B#S: barcha buyurtmalar ko'rinsin (SO bor bo'lganlar ham); has_so orqali aniqlanadi
+            # B#W: barcha buyurtmalar ko'rinsin (SO bor bo'lganlar ham); has_so orqali aniqlanadi
         else:
             query = query.filter(OrderWmsStateModel.status.in_(valid))
 
@@ -565,13 +565,13 @@ async def orders_check(
     db: Session = Depends(get_db),
     _user=Depends(require_permission("orders:read")),
 ):
-    """Bazada B#S soni va q bo'yicha topiladigan buyurtmalarni ko'rsatadi. Jadval ro'yxati bilan solishtirish uchun."""
+    """Bazada B#W soni va q bo'yicha topiladigan buyurtmalarni ko'rsatadi. Jadval ro'yxati bilan solishtirish uchun."""
     default_filial = os.getenv("WMS_DEFAULT_FILIAL_ID", "3788131").strip()
     filial = (filial_id or "").strip() or default_filial
     base = db.query(OrderModel).join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
-    total_b_s_all_filial = base.filter(OrderWmsStateModel.status == "B#S").count()
+    total_b_s_all_filial = base.filter(OrderWmsStateModel.status == "B#W").count()
     total_b_s = (
-        base.filter(OrderWmsStateModel.status == "B#S")
+        base.filter(OrderWmsStateModel.status == "B#W")
         .filter(OrderModel.filial_id == filial)
         .count()
     )
@@ -595,7 +595,7 @@ async def orders_check(
         by_order = (
             db.query(OrderModel)
             .join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
-            .filter(OrderWmsStateModel.status == "B#S", OrderModel.order_number.ilike(term))
+            .filter(OrderWmsStateModel.status == "B#W", OrderModel.order_number.ilike(term))
             .limit(10)
             .all()
         )
@@ -603,7 +603,7 @@ async def orders_check(
         by_ext = (
             db.query(OrderModel)
             .join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
-            .filter(OrderWmsStateModel.status == "B#S", OrderModel.source_external_id.ilike(term))
+            .filter(OrderWmsStateModel.status == "B#W", OrderModel.source_external_id.ilike(term))
             .limit(10)
             .all()
         )
@@ -843,7 +843,7 @@ def _get_or_create_order_from_movement(
         to_warehouse_code=(movement.to_warehouse_code or "")[:64] or None,
         movement_note=(movement.note or "")[:512] or None,
     )
-    order.wms_state = OrderWmsStateModel(status="B#S")
+    order.wms_state = OrderWmsStateModel(status="B#W")
     db.add(order)
     db.flush()
     for item in movement.movement_items:
@@ -897,7 +897,7 @@ async def send_movement_to_picking(
     if existing:
         raise HTTPException(status_code=409, detail="Picking task already created")
 
-    if order.wms_state.status not in {"imported", "B#S", "ready_for_picking", "allocated"}:
+    if order.wms_state.status not in {"imported", "B#W", "ready_for_picking", "allocated"}:
         raise HTTPException(status_code=409, detail="Order cannot be sent to picking")
 
     document_lines, shortages = _allocate_order(db, order, user.id)
@@ -964,7 +964,7 @@ async def send_order_to_picking(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    if order.wms_state.status not in {"imported", "B#S", "ready_for_picking", "allocated"}:
+    if order.wms_state.status not in {"imported", "B#W", "ready_for_picking", "allocated"}:
         raise HTTPException(status_code=409, detail="Order cannot be sent to picking")
 
     if not order.lines:

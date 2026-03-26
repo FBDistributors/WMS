@@ -21,7 +21,7 @@ import { getFilialNameByCode } from '../../constants/filialCodes'
 
 const PAGE_SIZE = 50
 const MOVEMENT_PAGE_SIZE = 50
-/** B#S barchasini yuklashda API dan har safar olinadigan maksimum (backend max 500) */
+/** B#W barchasini yuklashda API dan har safar olinadigan maksimum (backend max 500) */
 const BULK_PAGE_SIZE = 500
 const COLUMN_OPTIONS = [
   { id: 'select', labelKey: 'orders:columns.select' },
@@ -50,7 +50,7 @@ const SIMPLE_STATUS_OPTIONS = [
 ] as const
 
 function backendStatusToSimple(status: string): string {
-  if (['imported', 'B#S', 'allocated', 'ready_for_picking', 'picking'].includes(status)) return 'picking'
+  if (['imported', 'B#W', 'allocated', 'ready_for_picking', 'picking'].includes(status)) return 'picking'
   if (status === 'picked') return 'picked'
   return 'completed' // completed, packed, shipped, cancelled
 }
@@ -101,7 +101,7 @@ const SEARCH_FIELD_OPTIONS = [
 ]
 
 const GROUP_TO_STATUS: Record<string, string | undefined> = {
-  xom: 'imported,B#S', // Yangi: Smartupdan kelgan, admin yig'uvchiga yubormagan
+  xom: 'imported,B#W', // Yangi: Smartupdan kelgan, admin yig'uvchiga yubormagan
   yigishda: 'allocated,ready_for_picking,picking', // Yig'uvchi yig'ishda / controllerga yubormagan
   tekshiruvda: 'picked', // Controllerga yuborilgan, controller yakunlamagan
   yakunlangan: 'completed,packed,shipped', // Controller yakunlagan yoki qadoqlangan
@@ -134,17 +134,17 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     : mode === 'statuses'
       ? t('admin:dashboard.order_statuses_title')
       : t('orders:title')
-  // Asosiy Buyurtmalar sahifasida faqat yig'ishga yuborilmagan (B#S); yig'ishga yuborilganlar bu ro'yxatda ko'rinmasin
+  // Asosiy Buyurtmalar sahifasida faqat yig'ishga yuborilmagan (B#W); yig'ishga yuborilganlar bu ro'yxatda ko'rinmasin
   // Buyurtma statuslari sahifasida group=all bo'lsa — yig'ishda + tekshiruvda + yakunlangan barcha statuslar
   const statusParam = orderSource
     ? (GROUP_TO_STATUS[group] ?? undefined)
     : mode === 'default' && (group === 'all' || !searchParams.get('group'))
-      ? 'B#S'
+      ? 'B#W'
       : mode === 'statuses' && (group === 'all' || !searchParams.get('group'))
         ? 'allocated,ready_for_picking,picking,picked,completed,packed,shipped'
         : (GROUP_TO_STATUS[group] ?? GROUP_TO_STATUS.all)
 
-  const onlyNotSentToPicking = mode === 'default' && !orderSource && (statusParam === 'B#S' || statusParam === 'imported,B#S')
+  const onlyNotSentToPicking = mode === 'default' && !orderSource && (statusParam === 'B#W' || statusParam === 'imported,B#W')
   const SENT_TO_PICKING_STATUSES = new Set(['allocated', 'ready_for_picking', 'picking'])
   const { has } = useAuth()
   const canSync = has('orders:write')
@@ -190,7 +190,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const [selectedControllerId, setSelectedControllerId] = useState('')
   const [controllerModalSubmitting, setControllerModalSubmitting] = useState(false)
 
-  const ELIGIBLE_PICKING_STATUSES = new Set(['imported', 'B#S', 'ready_for_picking', 'allocated'])
+  const ELIGIBLE_PICKING_STATUSES = new Set(['imported', 'B#W', 'ready_for_picking', 'allocated'])
   const canBeSentToPicking = (order: OrderListItem) =>
     canSend && ELIGIBLE_PICKING_STATUSES.has(order.status)
   const eligibleItems = useMemo(
@@ -235,7 +235,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       }
       const loadAllBS =
         !orderSource &&
-        (statusParam === 'B#S' || statusParam === 'imported,B#S') &&
+        (statusParam === 'B#W' || statusParam === 'imported,B#W') &&
         mode === 'default'
 
       if (loadAllBS) {
@@ -573,7 +573,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                       {t('orders:check_result_title', 'Baza natijasi')}
                     </p>
                     <p className="text-slate-600 dark:text-slate-300">
-                      {t('orders:check_total_b_s', 'B#S bazada (filial bo\'yicha): {{count}} ta', { count: checkResult.total_b_s })}
+                      {t('orders:check_total_b_s', 'B#W bazada (filial bo\'yicha): {{count}} ta', { count: checkResult.total_b_s })}
                       {' · '}
                       {t('orders:check_total_all', 'Barcha filial: {{count}} ta', { count: checkResult.total_b_s_all_filial })}
                     </p>
@@ -591,7 +591,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                       </p>
                     ) : (
                       <p className="mt-2 text-amber-600 dark:text-amber-400">
-                        {t('orders:check_not_found', "«{{q}}» bazada B#S buyurtmalar orasida topilmadi.", { q: searchQuery.trim() })}
+                        {t('orders:check_not_found', "«{{q}}» bazada B#W buyurtmalar orasida topilmadi.", { q: searchQuery.trim() })}
                       </p>
                     )}
                   </Card>
@@ -814,7 +814,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
           return (
             <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
               <span className="inline-flex flex-wrap items-center gap-1.5">
-                {t(`orders:status.${order.status === 'B#S' ? 'b#s' : order.status}`, order.status)}
+                {t(`orders:status.${order.status === 'B#W' ? 'b#w' : order.status}`, order.status)}
                 {order.has_so && (
                   <span className="rounded bg-slate-200 px-1.5 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-600 dark:text-slate-200">
                     {t('orders:so_order_badge', 'SO buyurtma')}
@@ -1285,7 +1285,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                 const isAllBSLoaded =
                   !orderSource &&
                   mode === 'default' &&
-                  (statusParam === 'B#S' || statusParam === 'imported,B#S')
+                  (statusParam === 'B#W' || statusParam === 'imported,B#W')
                 if (isAllBSLoaded) {
                   return (
                     <span className="text-sm text-slate-600 dark:text-slate-400">

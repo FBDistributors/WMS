@@ -45,7 +45,7 @@ def _structure_summary(obj, depth: int = 0, max_depth: int = 4):
 
 
 # Smartup movement statuslari. Env bo'sh/berilmagan bo'lsa barcha statuslar qabul qilinadi (filtr o'chiq).
-# SMARTUP_ORIKZOR_ALLOWED_STATUSES=N,C,B#S,D,P,O,S (vergul bilan) — faqat shu statuslar import qilinadi.
+# SMARTUP_ORIKZOR_ALLOWED_STATUSES=N,C,B#W,D,P,O,S (vergul bilan) — faqat shu statuslar import qilinadi.
 _env_statuses = (os.getenv("SMARTUP_ORIKZOR_ALLOWED_STATUSES") or "").strip()
 ALLOWED_MOVEMENT_STATUSES: set[str] = (
     {s.strip().upper() for s in _env_statuses.split(",") if s.strip()} if _env_statuses else set()
@@ -455,7 +455,7 @@ def _parse_movement_response(
             "external_id": external_key,
             "deal_id": movement_id,
             "order_no": movement_number,
-            "status": "B#S",
+            "status": "B#W",
             "filial_id": filial,
             "filial_code": filial,
             "lines": lines,

@@ -147,7 +147,7 @@ export function ApiPage() {
               <ClipboardList size={16} className="mr-1.5 shrink-0" />
               {orderApiLoading
                 ? t('admin:api.loading', 'Yuklanmoqda...')
-                : t('admin:api.order_api_smartup_btn', 'SmartUp dan Order API (B#S)')}
+                : t('admin:api.order_api_smartup_btn', 'SmartUp dan Order API (B#W)')}
             </Button>
           </div>
           {orderApiError && (
@@ -158,11 +158,11 @@ export function ApiPage() {
           {orderApiLoadedCount !== null && !orderApiError && (
             <p className="mt-2 text-sm text-green-600 dark:text-green-400" role="status">
               {orderApiTotal !== null && orderApiTotal !== orderApiLoadedCount
-                ? t('admin:api.loaded_from_smartup_total', 'SmartUp dan yuklandi: {{count}} / {{total}} ta buyurtma (B#S)', {
+                ? t('admin:api.loaded_from_smartup_total', 'SmartUp dan yuklandi: {{count}} / {{total}} ta buyurtma (B#W)', {
                     count: orderApiLoadedCount,
                     total: orderApiTotal,
                   })
-                : t('admin:api.loaded_from_smartup', 'SmartUp dan yuklandi: {{count}} ta buyurtma (B#S)', {
+                : t('admin:api.loaded_from_smartup', 'SmartUp dan yuklandi: {{count}} ta buyurtma (B#W)', {
                     count: orderApiLoadedCount,
                   })}
             </p>

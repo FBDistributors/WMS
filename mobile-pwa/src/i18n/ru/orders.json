@@ -30,10 +30,10 @@
   "check_db_button": "Проверить базу",
   "check_loading": "Проверка...",
   "check_result_title": "Результат базы",
-  "check_total_b_s": "B#S в базе (по филиалу): {{count}}",
+  "check_total_b_s": "B#W в базе (по филиалу): {{count}}",
   "check_total_all": "Все филиалы: {{count}}",
   "check_found": "«{{q}}» найдено:",
-  "check_not_found": "«{{q}}» не найдено среди заказов B#S в базе.",
+  "check_not_found": "«{{q}}» не найдено среди заказов B#W в базе.",
   "view_details": "Посмотреть детали",
   "details_title": "Детали заказа",
   "not_found": "Заказ не найден.",
@@ -107,7 +107,7 @@
     "agent": "Агент"
   },
   "status": {
-    "b#s": "B#S",
+    "b#w": "B#W",
     "imported": "Импортировано",
     "allocated": "Резервировано",
     "ready_for_picking": "Готово к подбору",

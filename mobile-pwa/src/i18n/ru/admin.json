@@ -123,17 +123,17 @@
     "placeholder": "Вставьте JSON или ответ API в поле выше — таблица отобразится здесь.",
     "placeholder_json_only": "Введите JSON в поле выше или загрузите ответ API через быстрые запросы.",
     "preset_apis": "Быстрые запросы",
-    "order_api_btn": "Order API (B#S, все)",
-    "order_api_smartup_btn": "Order API из SmartUp (B#S)",
+    "order_api_btn": "Order API (B#W, все)",
+    "order_api_smartup_btn": "Order API из SmartUp (B#W)",
     "smartup_params_hint": "Как при синхронизации: если дата и филиал пусты, используются последние 7 дней.",
     "begin_deal_date": "Дата начала",
     "end_deal_date": "Дата окончания",
     "filial_code": "Код филиала",
     "filial_id": "ID филиала",
     "loading": "Загрузка...",
-    "loaded_count": "Загружено: {{count}} заказов (B#S)",
-    "loaded_from_smartup": "Загружено из SmartUp: {{count}} заказов (B#S)",
-    "loaded_from_smartup_total": "Загружено из SmartUp: {{count}} / {{total}} заказов (B#S)"
+    "loaded_count": "Загружено: {{count}} заказов (B#W)",
+    "loaded_from_smartup": "Загружено из SmartUp: {{count}} заказов (B#W)",
+    "loaded_from_smartup_total": "Загружено из SmartUp: {{count}} / {{total}} заказов (B#W)"
   },
   "header": {
     "menu": "Меню"

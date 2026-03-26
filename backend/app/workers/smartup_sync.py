@@ -95,7 +95,7 @@ def sync_orders() -> Tuple[int, str | None, list]:
         all_items = response.items
         items_b_s = filter_orders_b_s(all_items)
         logger.info(
-            "Orders sync: %s..%s -> %d buyurtma (modified_on), %d B#S",
+            "Orders sync: %s..%s -> %d buyurtma (modified_on), %d B#W",
             begin_str, end_str, len(all_items), len(items_b_s),
         )
 

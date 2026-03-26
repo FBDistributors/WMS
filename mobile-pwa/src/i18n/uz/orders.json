@@ -30,10 +30,10 @@
   "check_db_button": "Bazani tekshirish",
   "check_loading": "Tekshirilmoqda...",
   "check_result_title": "Baza natijasi",
-  "check_total_b_s": "B#S bazada (filial bo'yicha): {{count}} ta",
+  "check_total_b_s": "B#W bazada (filial bo'yicha): {{count}} ta",
   "check_total_all": "Barcha filial: {{count}} ta",
   "check_found": "«{{q}}» topildi:",
-  "check_not_found": "«{{q}}» bazada B#S buyurtmalar orasida topilmadi.",
+  "check_not_found": "«{{q}}» bazada B#W buyurtmalar orasida topilmadi.",
   "view_details": "Tafsilotlarni ko‘rish",
   "details_title": "Buyurtma tafsilotlari",
   "not_found": "Buyurtma topilmadi.",
@@ -109,7 +109,7 @@
     "agent": "Agent"
   },
   "status": {
-    "b#s": "B#S",
+    "b#w": "B#W",
     "imported": "Import qilingan",
     "allocated": "Ajratilgan",
     "ready_for_picking": "Yig'ishga tayyor",

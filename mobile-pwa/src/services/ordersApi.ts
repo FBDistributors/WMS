@@ -119,7 +119,7 @@ export async function getOrders(query: OrdersQuery = {}) {
   return fetchJSON<OrdersListResponse>('/api/v1/orders', { query })
 }
 
-/** Baza va jadval yuklashni tekshirish: B#S soni va q bo'yicha topiladigan buyurtmalar */
+/** Baza va jadval yuklashni tekshirish: B#W soni va q bo'yicha topiladigan buyurtmalar */
 export type OrderCheckMatch = { id: string; order_number: string; source_external_id?: string | null; filial_id?: string | null }
 export type OrderCheckResponse = {
   total_b_s: number

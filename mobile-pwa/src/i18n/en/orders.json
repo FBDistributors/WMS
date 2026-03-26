@@ -30,10 +30,10 @@
   "check_db_button": "Check database",
   "check_loading": "Checking...",
   "check_result_title": "Database result",
-  "check_total_b_s": "B#S in DB (by filial): {{count}}",
+  "check_total_b_s": "B#W in DB (by filial): {{count}}",
   "check_total_all": "All filials: {{count}}",
   "check_found": "«{{q}}» found:",
-  "check_not_found": "«{{q}}» not found among B#S orders in DB.",
+  "check_not_found": "«{{q}}» not found among B#W orders in DB.",
   "view_details": "View details",
   "details_title": "Order details",
   "not_found": "Order not found.",
@@ -109,7 +109,7 @@
     "agent": "Agent"
   },
   "status": {
-    "b#s": "B#S",
+    "b#w": "B#W",
     "imported": "Imported",
     "allocated": "Allocated",
     "ready_for_picking": "Ready for picking",

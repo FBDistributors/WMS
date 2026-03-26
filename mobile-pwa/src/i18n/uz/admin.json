@@ -123,17 +123,17 @@
     "placeholder": "Yuqoridagi maydonga JSON yozing yoki API javobini joylashtiring — jadval shu yerda ko'rinadi.",
     "placeholder_json_only": "Yuqoridagi maydonga JSON yozing yoki «Tezkor so'rovlar» orqali API javobini yuklang.",
     "preset_apis": "Tezkor so'rovlar",
-    "order_api_btn": "Order API (B#S, barchasi)",
-    "order_api_smartup_btn": "SmartUp dan Order API (B#S)",
+    "order_api_btn": "Order API (B#W, barchasi)",
+    "order_api_smartup_btn": "SmartUp dan Order API (B#W)",
     "smartup_params_hint": "Sync bilan bir xil: sana va filial bo'sh qolsa oxirgi 7 kun ishlatiladi.",
     "begin_deal_date": "Boshlanish sanasi",
     "end_deal_date": "Tugash sanasi",
     "filial_code": "Filial kodi",
     "filial_id": "Filial ID",
     "loading": "Yuklanmoqda...",
-    "loaded_count": "Yuklandi: {{count}} ta buyurtma (B#S)",
-    "loaded_from_smartup": "SmartUp dan yuklandi: {{count}} ta buyurtma (B#S)",
-    "loaded_from_smartup_total": "SmartUp dan yuklandi: {{count}} / {{total}} ta buyurtma (B#S)"
+    "loaded_count": "Yuklandi: {{count}} ta buyurtma (B#W)",
+    "loaded_from_smartup": "SmartUp dan yuklandi: {{count}} ta buyurtma (B#W)",
+    "loaded_from_smartup_total": "SmartUp dan yuklandi: {{count}} / {{total}} ta buyurtma (B#W)"
   },
   "header": {
     "menu": "Menyu"

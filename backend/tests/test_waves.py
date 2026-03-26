@@ -98,7 +98,7 @@ def test_order_with_line(
         source_external_id="ord-wave-001",
         order_number="ORD-WAVE-001",
     )
-    order.wms_state = OrderWmsState(status="B#S")
+    order.wms_state = OrderWmsState(status="B#W")
     db_session.add(order)
     db_session.flush()
     line = OrderLine(
