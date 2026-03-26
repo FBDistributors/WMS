@@ -60,6 +60,12 @@ function todayISO(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function generateClientReceiptDocNo(): string {
+  const ts = Date.now().toString(36).toUpperCase();
+  const rnd = Math.random().toString(36).slice(2, 8).toUpperCase();
+  return `MOB-${ts}-${rnd}`;
+}
+
 /** Lokatsiya qidiruvda: chiziqchasiz solishtirish (S-9-3-1 va S931 bir xil). */
 function normalizeLocationForSearch(s: string): string {
   return (s || '').replace(/[\s\-_]/g, '').toLowerCase();
@@ -105,6 +111,8 @@ export function KirimFormScreen() {
   const [pickers, setPickers] = useState<PickerUser[]>([]);
   const [selectedPickerId, setSelectedPickerId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const sendingRef = useRef(false);
+  const [submitDocNo, setSubmitDocNo] = useState<string | null>(null);
   const [expiryCalendarOpen, setExpiryCalendarOpen] = useState(false);
   const [expiryCalendarOpenScanned, setExpiryCalendarOpenScanned] = useState(false);
   const [inventoryLocation, setInventoryLocation] = useState<PickerLocationOption | null>(null);
@@ -577,6 +585,7 @@ export function KirimFormScreen() {
         expiryDate: expiryVal,
       },
     ]);
+    setSubmitDocNo(null);
     setCurrentProduct(null);
     setCurrentQty('');
     setCurrentExpiry('');
@@ -584,6 +593,7 @@ export function KirimFormScreen() {
 
   const removeLine = useCallback((id: string) => {
     setLines((prev) => prev.filter((l) => l.id !== id));
+    setSubmitDocNo(null);
   }, []);
 
   const handleYakunlash = useCallback(() => {
@@ -595,18 +605,23 @@ export function KirimFormScreen() {
   }, [lines.length, t]);
 
   const handleSendToPicker = useCallback(async () => {
+    if (sendingRef.current) return;
+    sendingRef.current = true;
     if (flow === 'return') {
       if (!selectedPickerId) {
+        sendingRef.current = false;
         Alert.alert(t('error'), t('returnsSelectPicker'));
         return;
       }
       setSending(true);
       setTimeout(() => {
         setSending(false);
+        sendingRef.current = false;
         setPickerModalVisible(false);
         setSelectedPickerId(null);
         setLines([]);
         setFinished(false);
+        setSubmitDocNo(null);
         Alert.alert(t('success'), t('returnsSentToPicker'));
       }, 500);
       return;
@@ -614,7 +629,10 @@ export function KirimFormScreen() {
     // flow === 'new': backend receiving API orqali omborga kirim va qoldiq yangilash
     setSending(true);
     try {
+      const docNo = submitDocNo ?? generateClientReceiptDocNo();
+      if (!submitDocNo) setSubmitDocNo(docNo);
       const payload = {
+        doc_no: docNo,
         lines: lines.map((l) => ({
           product_id: l.productId,
           qty: l.qty,
@@ -627,6 +645,7 @@ export function KirimFormScreen() {
       await completeReceipt(receipt.id);
       setLines([]);
       setFinished(false);
+      setSubmitDocNo(null);
       Alert.alert(t('success'), t('kirimSubmitDone'));
     } catch (e: unknown) {
       let msg: string = e instanceof Error ? e.message : t('kirimSubmitError');
@@ -640,8 +659,9 @@ export function KirimFormScreen() {
       Alert.alert(t('error'), msg);
     } finally {
       setSending(false);
+      sendingRef.current = false;
     }
-  }, [flow, selectedPickerId, lines, t]);
+  }, [flow, selectedPickerId, lines, t, submitDocNo]);
 
   const searchTrim = locationSearch.trim();
   const searchNorm = normalizeLocationForSearch(searchTrim);
