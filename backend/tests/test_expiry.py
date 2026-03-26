@@ -275,3 +275,81 @@ def test_receiving_without_expiry_allowed(client, test_product, test_location, a
     assert response.status_code == 201
     data = response.json()
     assert data["lines"][0]["expiry_date"] is None
+
+
+def test_single_expiry_rule_ignores_zeroed_out_old_expiry(
+    client, db_session, test_product, test_location, test_user, admin_token
+):
+    """If old expiry stock at location is adjusted to zero, new expiry should be allowed."""
+    from app.core.expiry import normalize_expiry_to_first_of_month
+    from app.models.stock import StockLot
+
+    # 1) Receive first expiry and complete.
+    expiry1_raw = date.today() + timedelta(days=60)
+    expiry1 = normalize_expiry_to_first_of_month(expiry1_raw)
+    r1 = client.post(
+        "/api/v1/receiving/receipts",
+        json={
+            "lines": [
+                {
+                    "product_id": str(test_product.id),
+                    "qty": 10,
+                    "batch": "EXP-OLD",
+                    "expiry_date": expiry1_raw.isoformat(),
+                    "location_id": str(test_location.id),
+                }
+            ]
+        },
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert r1.status_code == 201
+    rid1 = r1.json()["id"]
+    c1 = client.post(
+        f"/api/v1/receiving/receipts/{rid1}/complete",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert c1.status_code == 200
+
+    lot1 = (
+        db_session.query(StockLot)
+        .filter(
+            StockLot.product_id == test_product.id,
+            StockLot.batch == "EXP-OLD",
+            StockLot.expiry_date == expiry1,
+        )
+        .one()
+    )
+
+    # 2) Inventory adjust to zero at same location (qty -10).
+    adj = client.post(
+        "/api/v1/inventory/movements",
+        json={
+            "product_id": str(test_product.id),
+            "lot_id": str(lot1.id),
+            "location_id": str(test_location.id),
+            "qty_change": -10,
+            "movement_type": "adjust",
+            "reason_code": "inventory_shortage",
+        },
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert adj.status_code == 201
+
+    # 3) Receive same product with different expiry at same location.
+    expiry2_raw = date.today() + timedelta(days=120)
+    r2 = client.post(
+        "/api/v1/receiving/receipts",
+        json={
+            "lines": [
+                {
+                    "product_id": str(test_product.id),
+                    "qty": 5,
+                    "batch": "EXP-NEW",
+                    "expiry_date": expiry2_raw.isoformat(),
+                    "location_id": str(test_location.id),
+                }
+            ]
+        },
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert r2.status_code == 201, r2.text

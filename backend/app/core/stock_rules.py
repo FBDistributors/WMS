@@ -7,6 +7,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.location import Location as LocationModel
@@ -26,7 +27,11 @@ LOCATION_SINGLE_EXPIRY_MSG = (
 def existing_expiry_dates_for_location_product(
     db: Session, location_id: UUID, product_id: UUID
 ) -> set:
-    """Return set of distinct expiry_date (date | None) for this location + product."""
+    """Return expiry dates that currently have positive balance at location+product.
+
+    Old behavior looked at historical movements only, which kept blocking even after
+    inventory adjustment reduced old expiry stock to zero.
+    """
     rows = (
         db.query(StockLotModel.expiry_date)
         .join(StockMovementModel, StockMovementModel.lot_id == StockLotModel.id)
@@ -34,7 +39,8 @@ def existing_expiry_dates_for_location_product(
             StockMovementModel.location_id == location_id,
             StockLotModel.product_id == product_id,
         )
-        .distinct()
+        .group_by(StockLotModel.expiry_date)
+        .having(func.sum(StockMovementModel.qty_change) > 0)
         .all()
     )
     return {r[0] for r in rows}
