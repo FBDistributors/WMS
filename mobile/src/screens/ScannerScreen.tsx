@@ -130,6 +130,36 @@ export function ScannerScreen() {
           });
         return;
       }
+      if (params.returnToKirimLocation && params.flow === 'new') {
+        resolveScannerBarcode(value)
+          .then((out) => {
+            if (out.type === 'LOCATION' && out.location) {
+              (navigation as any).navigate('KirimForm', {
+                flow: 'new',
+                warehouse: params.warehouse ?? 'main',
+                receivingLocationId: out.location.id,
+                receivingLocationCode: out.location.code,
+              });
+            } else if (out.type === 'PRODUCT') {
+              Alert.alert(t('error'), t('kirimScanWantLocation'));
+              lastScannedRef.current = null;
+              lastScannedAtRef.current = 0;
+              setIsScanning(true);
+            } else {
+              Alert.alert(t('error'), out.message || t('kirimLocationUnknown'));
+              lastScannedRef.current = null;
+              lastScannedAtRef.current = 0;
+              setIsScanning(true);
+            }
+          })
+          .catch((e) => {
+            Alert.alert(t('error'), e instanceof Error ? e.message : String(e));
+            lastScannedRef.current = null;
+            lastScannedAtRef.current = 0;
+            setIsScanning(true);
+          });
+        return;
+      }
       fetchByBarcode(value);
     },
     [
@@ -137,6 +167,9 @@ export function ScannerScreen() {
       params.returnToPick,
       params.returnToConsolidated,
       params.returnToMovementPallet,
+      params.returnToKirimLocation,
+      params.flow,
+      params.warehouse,
       params.taskId,
       params.profileType,
       params.selectedProductKey,
@@ -172,6 +205,7 @@ export function ScannerScreen() {
     if (fetchStatus !== 'success' || !product) return;
     if (params.returnToPick) return;
     if (params.returnToMovementPallet) return;
+    if (params.returnToKirimLocation) return;
     if (params.returnToKirimForm) {
       (navigation as any).navigate('KirimForm', {
         flow: params.flow ?? 'return',
@@ -210,7 +244,9 @@ export function ScannerScreen() {
     params.returnToKirimForm,
     params.returnToMovement,
     params.returnToMovementPallet,
+    params.returnToKirimLocation,
     params.flow,
+    params.warehouse,
     navigation,
   ]);
 

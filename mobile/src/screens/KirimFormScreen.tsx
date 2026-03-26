@@ -79,8 +79,11 @@ export function KirimFormScreen() {
     inventoryStep?: 1 | 2;
     inventoryLocationId?: string;
     inventoryLocationCode?: string;
+    receivingLocationId?: string;
+    receivingLocationCode?: string;
   } | undefined;
   const isDirectSubmit = flow === 'new' || flow === 'inventory';
+  const [receivingWarehouse, setReceivingWarehouse] = useState<PickerWarehouseFilter>('main');
 
   /** flow === 'new' da ombor params dan (o'zgartirilmaydi); inventarizatsiya da segment orqali. */
   const effectiveWarehouse: PickerWarehouseFilter = flow === 'new' ? (params?.warehouse ?? 'main') : receivingWarehouse;
@@ -92,7 +95,6 @@ export function KirimFormScreen() {
   const [currentExpiry, setCurrentExpiry] = useState('');
   const [selectedLocation, setSelectedLocation] = useState<PickerLocationOption | null>(null);
   const [allLocations, setAllLocations] = useState<PickerLocationOption[]>([]);
-  const [receivingWarehouse, setReceivingWarehouse] = useState<PickerWarehouseFilter>('main');
   const [locationSearch, setLocationSearch] = useState('');
   const [loadingProduct, setLoadingProduct] = useState(false);
   const [productError, setProductError] = useState<string | null>(null);
@@ -180,6 +182,22 @@ export function KirimFormScreen() {
       const pid = params?.scannedProductId;
       const invLocId = params?.inventoryLocationId;
       const invLocCode = params?.inventoryLocationCode;
+      const recvLocId = params?.receivingLocationId;
+      const recvLocCode = params?.receivingLocationCode;
+      if (flow === 'new' && recvLocId && recvLocCode) {
+        setSelectedLocation({
+          id: recvLocId,
+          code: recvLocCode,
+          name: recvLocCode,
+        });
+        setLocationSearch(recvLocCode);
+        navigation.setParams({
+          ...route.params,
+          receivingLocationId: undefined,
+          receivingLocationCode: undefined,
+        } as any);
+        return;
+      }
       if (flow === 'inventory' && pid) {
         if (invLocId && invLocCode) {
           setInventorySubMode((m) => m ?? 'byLocation');
@@ -239,7 +257,18 @@ export function KirimFormScreen() {
           scannedBarcode: undefined,
         } as any);
       }
-    }, [flow, params?.scannedProductId, params?.inventoryLocationId, params?.inventoryLocationCode, params?.inventoryStep, loadProductById, navigation, route.params])
+    }, [
+      flow,
+      params?.scannedProductId,
+      params?.inventoryLocationId,
+      params?.inventoryLocationCode,
+      params?.inventoryStep,
+      params?.receivingLocationId,
+      params?.receivingLocationCode,
+      loadProductById,
+      navigation,
+      route.params,
+    ])
   );
 
   useEffect(() => {
@@ -272,11 +301,12 @@ export function KirimFormScreen() {
   }, [flow, inventorySubMode, inventoryStep, inventoryLocation?.code, t]);
 
   useEffect(() => {
+    if (flow === 'new') return;
     if (currentProduct) {
       setSelectedLocation(null);
       setLocationSearch('');
     }
-  }, [currentProduct?.product_id]);
+  }, [currentProduct?.product_id, flow]);
 
   useEffect(() => {
     if (flow === 'inventory' && inventorySubMode === 'byScan' && inventoryStep === 1 && currentProduct && !loadingProduct) {
@@ -335,12 +365,38 @@ export function KirimFormScreen() {
     };
     if (flow === 'new') scanParams.warehouse = effectiveWarehouse;
     if (flow === 'inventory' && inventorySubMode === 'byLocation' && inventoryLocation) {
-      scanParams.inventoryStep = Math.min(inventoryStep ?? 2, 2);
+      scanParams.inventoryStep = Math.min(inventoryStep ?? 2, 2) as 1 | 2 | 3;
       scanParams.inventoryLocationId = inventoryLocation.id;
       scanParams.inventoryLocationCode = inventoryLocation.code;
     }
     navigation.navigate('Scanner', scanParams);
   }, [navigation, flow, effectiveWarehouse, inventoryStep, inventorySubMode, inventoryLocation]);
+
+  const handleScanReceivingLocation = useCallback(() => {
+    navigation.navigate('Scanner', {
+      returnToKirimLocation: true,
+      flow: 'new',
+      warehouse: effectiveWarehouse,
+    });
+  }, [navigation, effectiveWarehouse]);
+
+  const handleChangeReceivingLocation = useCallback(() => {
+    if (lines.length > 0) {
+      Alert.alert(t('kirimChangeLocationTitle'), t('kirimChangeLocationMessage'), [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: t('kirimChangeLocationContinue'),
+          onPress: () => {
+            setSelectedLocation(null);
+            setLocationSearch('');
+          },
+        },
+      ]);
+      return;
+    }
+    setSelectedLocation(null);
+    setLocationSearch('');
+  }, [lines.length, t]);
 
   const handleSubmitAdjust = useCallback(async () => {
     if (!locationContents?.items?.length) return;
@@ -593,6 +649,78 @@ export function KirimFormScreen() {
       />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        {/* Yangi mahsulotlar: bitta qabul joyi — keyin ko'p mahsulot */}
+        {flow === 'new' && (
+          <>
+            {selectedLocation ? (
+              <View style={styles.inventoryLocationChosenBar}>
+                <Text style={styles.inventoryLocationChosenText} numberOfLines={1}>
+                  {t('locationLabel')}: {selectedLocation.code}
+                </Text>
+                <TouchableOpacity onPress={handleChangeReceivingLocation} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                  <Text style={styles.inventoryLocationChangeLink}>{t('inventoryChangeLocation')}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                <Text style={styles.manualEntryLabel}>{t('kirimSelectLocationFirst')}</Text>
+                <Text style={styles.kirimLocationHint}>{t('kirimPickLocationBeforeProducts')}</Text>
+                <View style={styles.locationWrap}>
+                  <TextInput
+                    style={styles.locationInputFull}
+                    value={locationSearch}
+                    onChangeText={(text) => {
+                      setLocationSearch(text);
+                      setSelectedLocation(null);
+                    }}
+                    placeholder={t('kirimLocationSearchPlaceholder')}
+                    placeholderTextColor="#999"
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                  />
+                  {showLocationDropdown && (
+                    <View style={styles.locationDropdownInline}>
+                      <ScrollView
+                        style={styles.locationDropdownScroll}
+                        contentContainerStyle={styles.locationDropdownScrollContent}
+                        keyboardShouldPersistTaps="handled"
+                        nestedScrollEnabled
+                        showsVerticalScrollIndicator
+                      >
+                        {filteredLocations.length === 0 ? (
+                          <View style={styles.locationDropdownEmpty}>
+                            <Text style={styles.locationDropdownEmptyText}>{t('kirimLocationNoResults')}</Text>
+                          </View>
+                        ) : (
+                          filteredLocations.map((loc) => (
+                            <TouchableOpacity
+                              key={loc.id}
+                              style={styles.locationDropdownItem}
+                              onPress={() => {
+                                setSelectedLocation(loc);
+                                setLocationSearch(loc.code);
+                              }}
+                            >
+                              <Text style={styles.locationDropdownItemCode} numberOfLines={1}>{loc.code}</Text>
+                              {loc.name && loc.name !== loc.code ? (
+                                <Text style={styles.locationDropdownItemName} numberOfLines={1}>{loc.name}</Text>
+                              ) : null}
+                            </TouchableOpacity>
+                          ))
+                        )}
+                      </ScrollView>
+                    </View>
+                  )}
+                </View>
+                <TouchableOpacity style={styles.scanBtnTop} onPress={handleScanReceivingLocation} activeOpacity={0.8}>
+                  <Icon name="barcode-scan" size={28} color="#fff" />
+                  <Text style={styles.scanBtnText}>{t('kirimScanLocation')}</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </>
+        )}
+
         {/* Inventarizatsiya: 0-qadam — 2 bo'lim tanlovi */}
         {flow === 'inventory' && inventoryStep === 0 && (
           <>
@@ -928,8 +1056,8 @@ export function KirimFormScreen() {
           </>
         )}
 
-        {/* New / Return flow: barcode/skaner (inventarizatsiyada mahsulot qo'shish yo'q) */}
-        {flow !== 'inventory' && (
+        {/* New / Return flow: barcode/skaner (yangi mahsulot: lokatsiyadan keyin) */}
+        {flow !== 'inventory' && (flow !== 'new' || selectedLocation) && (
           <>
             <View style={styles.barcodeBlockTop}>
               <Text style={styles.manualEntryLabel}>{t('kirimManualEntry')}</Text>
@@ -965,7 +1093,7 @@ export function KirimFormScreen() {
           </View>
         )}
 
-        {!(flow === 'inventory' && (inventoryStep === 0 || (inventorySubMode === 'byLocation' && (inventoryStep === 1 || inventoryStep === 2)) || (inventorySubMode === 'byScan' && (inventoryStep === 2 || inventoryStep === 3)))) && (flow !== 'inventory' && currentProduct) && !loadingProduct && (() => {
+        {!(flow === 'inventory' && (inventoryStep === 0 || (inventorySubMode === 'byLocation' && (inventoryStep === 1 || inventoryStep === 2)) || (inventorySubMode === 'byScan' && (inventoryStep === 2 || inventoryStep === 3)))) && (flow !== 'inventory' && currentProduct && (flow !== 'new' || selectedLocation)) && !loadingProduct && (() => {
           console.warn('[KirimCrash] render product card', currentProduct?.product_id, 'locale', locale);
           return true;
         })() && (
@@ -980,12 +1108,7 @@ export function KirimFormScreen() {
               placeholder="0"
               placeholderTextColor="#999"
             />
-            {flow === 'inventory' ? (
-              <View style={styles.inventoryLocationReadOnly}>
-                <Text style={styles.label}>{t('inventorySelectedLocation')}</Text>
-                <Text style={styles.inventoryLocationCode}>{inventoryLocation?.code}</Text>
-              </View>
-            ) : (
+            {flow === 'new' ? null : (
               <>
                 <Text style={styles.label}>{t('locationLabel')}</Text>
                 <View style={styles.locationWrap}>
@@ -1231,6 +1354,7 @@ const styles = StyleSheet.create({
   scanBtnTextSecondary: { color: '#1a237e', fontSize: 16, fontWeight: '600' },
   inventoryStep1Buttons: { gap: 12, marginBottom: 20 },
   manualEntryLabel: { fontSize: 13, color: '#666', marginBottom: 6 },
+  kirimLocationHint: { fontSize: 12, color: '#888', marginBottom: 10, lineHeight: 17 },
   inventoryLocationBlock: { marginBottom: 16 },
   inventoryLocationLabel: { fontSize: 13, color: '#666', marginBottom: 6 },
   inventoryLocationReadOnly: { marginBottom: 12 },

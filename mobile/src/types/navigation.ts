@@ -23,6 +23,8 @@ export type RootStackParamList = {
     returnToMovement?: boolean;
     /** Ko'chirish: manba palet/lokatsiya kodi */
     returnToMovementPallet?: boolean;
+    /** Kirim (yangi mahsulot): faqat lokatsiya kodi skan */
+    returnToKirimLocation?: boolean;
     flow?: 'new' | 'return' | 'inventory';
     warehouse?: 'main' | 'showroom';
     taskId?: string;
@@ -50,6 +52,8 @@ export type RootStackParamList = {
         inventorySubMode?: 'byLocation' | 'byScan';
         inventoryLocationId?: string;
         inventoryLocationCode?: string;
+        receivingLocationId?: string;
+        receivingLocationCode?: string;
       }
     | undefined;
   Movement:
