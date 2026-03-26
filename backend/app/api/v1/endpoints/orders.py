@@ -41,6 +41,7 @@ router = APIRouter()
 ORDER_STATUSES = {
     "imported",
     "B#W",
+    "B#S",
     "allocated",
     "ready_for_picking",
     "picking",
@@ -164,7 +165,22 @@ class OrderStatusUpdateRequest(BaseModel):
     controller_user_id: Optional[UUID] = Field(None, description="Tekshiruvda: controllerga yuborish uchun controller user id")
 
 
-ALLOWED_ADMIN_ORDER_STATUSES = {"imported", "B#W", "allocated", "ready_for_picking", "picking", "picked", "completed", "packed", "shipped", "cancelled"}
+ALLOWED_ADMIN_ORDER_STATUSES = {"imported", "B#W", "B#S", "allocated", "ready_for_picking", "picking", "picked", "completed", "packed", "shipped", "cancelled"}
+
+
+def _normalize_status_for_write(status_value: str) -> str:
+    v = (status_value or "").strip()
+    return "B#W" if v == "B#S" else v
+
+
+def _expand_status_filters(status_values: list[str]) -> list[str]:
+    expanded: set[str] = set()
+    for s in status_values:
+        if s in {"B#W", "B#S"}:
+            expanded.update({"B#W", "B#S"})
+        else:
+            expanded.add(s)
+    return list(expanded)
 
 
 class PickerUser(BaseModel):
@@ -378,6 +394,7 @@ async def list_orders(
         valid = [s for s in statuses if s in ORDER_STATUSES]
         if not valid:
             raise HTTPException(status_code=400, detail="Invalid status")
+        valid = _expand_status_filters(valid)
         query = query.join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
         if len(valid) == 1:
             query = query.filter(OrderWmsStateModel.status == valid[0])
@@ -569,9 +586,9 @@ async def orders_check(
     default_filial = os.getenv("WMS_DEFAULT_FILIAL_ID", "3788131").strip()
     filial = (filial_id or "").strip() or default_filial
     base = db.query(OrderModel).join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
-    total_b_s_all_filial = base.filter(OrderWmsStateModel.status == "B#W").count()
+    total_b_s_all_filial = base.filter(OrderWmsStateModel.status.in_(("B#W", "B#S"))).count()
     total_b_s = (
-        base.filter(OrderWmsStateModel.status == "B#W")
+        base.filter(OrderWmsStateModel.status.in_(("B#W", "B#S")))
         .filter(OrderModel.filial_id == filial)
         .count()
     )
@@ -595,7 +612,7 @@ async def orders_check(
         by_order = (
             db.query(OrderModel)
             .join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
-            .filter(OrderWmsStateModel.status == "B#W", OrderModel.order_number.ilike(term))
+            .filter(OrderWmsStateModel.status.in_(("B#W", "B#S")), OrderModel.order_number.ilike(term))
             .limit(10)
             .all()
         )
@@ -603,7 +620,7 @@ async def orders_check(
         by_ext = (
             db.query(OrderModel)
             .join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
-            .filter(OrderWmsStateModel.status == "B#W", OrderModel.source_external_id.ilike(term))
+            .filter(OrderWmsStateModel.status.in_(("B#W", "B#S")), OrderModel.source_external_id.ilike(term))
             .limit(10)
             .all()
         )
@@ -686,6 +703,7 @@ async def update_order_status(
             status_code=400,
             detail=f"Status must be one of: {', '.join(sorted(ALLOWED_ADMIN_ORDER_STATUSES))}",
         )
+    normalized_status = _normalize_status_for_write(payload.status)
     order = (
         db.query(OrderModel)
         .options(selectinload(OrderModel.lines), selectinload(OrderModel.wms_state))
@@ -695,9 +713,9 @@ async def update_order_status(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     old_status = order.wms_state.status
-    order.wms_state.status = payload.status
+    order.wms_state.status = normalized_status
 
-    if payload.status == "picked" and payload.controller_user_id is not None:
+    if normalized_status == "picked" and payload.controller_user_id is not None:
         doc = (
             db.query(DocumentModel)
             .filter(DocumentModel.order_id == order.id, DocumentModel.doc_type == "SO")
@@ -717,7 +735,7 @@ async def update_order_status(
                 raise HTTPException(status_code=400, detail="Invalid controller")
             doc.controlled_by_user_id = payload.controller_user_id
 
-    if payload.status == "completed":
+    if normalized_status == "completed":
         doc = (
             db.query(DocumentModel)
             .filter(DocumentModel.order_id == order.id, DocumentModel.doc_type == "SO")
@@ -733,7 +751,7 @@ async def update_order_status(
         entity_type="order",
         entity_id=str(order_id),
         old_data={"status": old_status},
-        new_data={"status": payload.status},
+        new_data={"status": normalized_status},
         ip_address=get_client_ip(request),
     )
     db.commit()
@@ -897,7 +915,7 @@ async def send_movement_to_picking(
     if existing:
         raise HTTPException(status_code=409, detail="Picking task already created")
 
-    if order.wms_state.status not in {"imported", "B#W", "ready_for_picking", "allocated"}:
+    if order.wms_state.status not in {"imported", "B#W", "B#S", "ready_for_picking", "allocated"}:
         raise HTTPException(status_code=409, detail="Order cannot be sent to picking")
 
     document_lines, shortages = _allocate_order(db, order, user.id)
@@ -964,7 +982,7 @@ async def send_order_to_picking(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    if order.wms_state.status not in {"imported", "B#W", "ready_for_picking", "allocated"}:
+    if order.wms_state.status not in {"imported", "B#W", "B#S", "ready_for_picking", "allocated"}:
         raise HTTPException(status_code=409, detail="Order cannot be sent to picking")
 
     if not order.lines:

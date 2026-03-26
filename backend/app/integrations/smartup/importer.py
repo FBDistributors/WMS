@@ -154,11 +154,16 @@ def _process_one_order(
 
 
 ORDER_STATUS_BS = "B#W"
+ORDER_STATUS_LEGACY_BS = "B#S"
 
 
 def filter_orders_b_s(orders: Iterable[SmartupOrder]) -> List[SmartupOrder]:
-    """SmartUp dan kelgan ro'yxatdan faqat B#W statusdagilarini qaytaradi (API da importdan oldin filter)."""
-    return [o for o in orders if (o.status or "").strip() == ORDER_STATUS_BS]
+    """SmartUp dan kelgan ro'yxatdan B#W (va legacy B#S) statusdagilarini qaytaradi."""
+    return [
+        o
+        for o in orders
+        if (o.status or "").strip() in {ORDER_STATUS_BS, ORDER_STATUS_LEGACY_BS}
+    ]
 
 
 STALE_ORDER_STATUSES = ("imported", "B#W")
