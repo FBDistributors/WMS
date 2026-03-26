@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 ADMIN_ROLE = "warehouse_admin"
-MAX_ADMIN_SESSIONS = 3
+MAX_ADMIN_SESSIONS = 5
 # Picker/controller: 2 sessiya (mobil + bitta boshqa), shunda buyurtmaga kirganda avtomat chiqmasin
 MAX_OTHER_SESSIONS = 2
 

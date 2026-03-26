@@ -79,13 +79,13 @@ def test_non_admin_two_sessions_then_third_invalidates_oldest(
     assert resp_new.status_code == 200
 
 
-def test_admin_can_have_three_sessions(
+def test_admin_can_have_five_sessions(
     client: TestClient, db_session: Session, test_user: User
 ):
-    """Admin (warehouse_admin) can have up to 3 concurrent sessions."""
+    """Admin (warehouse_admin) can have up to 5 concurrent sessions."""
     # test_user is warehouse_admin
     tokens = []
-    for i in range(3):
+    for i in range(5):
         r = client.post(
             "/api/v1/auth/login",
             json={"username": test_user.username, "password": "testpass123"},
@@ -93,31 +93,31 @@ def test_admin_can_have_three_sessions(
         )
         assert r.status_code == 200
         tokens.append(r.json()["access_token"])
-    assert len(set(tokens)) == 3
+    assert len(set(tokens)) == 5
     sessions = (
         db_session.query(UserSession).filter(UserSession.user_id == test_user.id).all()
     )
-    assert len(sessions) == 3
-    # All three tokens work
+    assert len(sessions) == 5
+    # All five tokens work
     for token in tokens:
         resp = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
         assert resp.status_code == 200
 
-    # 4th login: oldest session removed, first token invalid
-    r4 = client.post(
+    # 6th login: oldest session removed, first token invalid
+    r6 = client.post(
         "/api/v1/auth/login",
         json={"username": test_user.username, "password": "testpass123"},
-        headers={"User-Agent": "Device-4"},
+        headers={"User-Agent": "Device-6"},
     )
-    assert r4.status_code == 200
-    token4 = r4.json()["access_token"]
+    assert r6.status_code == 200
+    token6 = r6.json()["access_token"]
     sessions_after = (
         db_session.query(UserSession).filter(UserSession.user_id == test_user.id).all()
     )
-    assert len(sessions_after) == 3
+    assert len(sessions_after) == 5
     resp_old = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {tokens[0]}"})
     assert resp_old.status_code == 401
-    resp_new = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token4}"})
+    resp_new = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token6}"})
     assert resp_new.status_code == 200
 
 
