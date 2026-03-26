@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -19,6 +20,7 @@ import { useCameraPermission } from '../hooks/useCameraPermission';
 import { useProductByBarcode } from '../hooks/useProductByBarcode';
 import { ProductCard } from '../components/ProductCard';
 import { UNAUTHORIZED_MSG } from '../api/client';
+import { resolveScannerBarcode } from '../api/scanner';
 import { useLocale } from '../i18n/LocaleContext';
 import { useTheme } from '../theme/ThemeContext';
 import { useProfileType } from '../context/ProfileTypeContext';
@@ -103,9 +105,45 @@ export function ScannerScreen() {
         );
         return;
       }
+      if (params.returnToMovementPallet) {
+        resolveScannerBarcode(value)
+          .then((out) => {
+            if (out.type === 'LOCATION' && out.location) {
+              (navigation as any).replace('Movement', { scannedLocationCode: out.location.code });
+            } else if (out.type === 'PRODUCT') {
+              Alert.alert(t('error'), t('movementPalletScanWantLocation'));
+              lastScannedRef.current = null;
+              lastScannedAtRef.current = 0;
+              setIsScanning(true);
+            } else {
+              Alert.alert(t('error'), out.message || t('movementPalletLocationUnknown'));
+              lastScannedRef.current = null;
+              lastScannedAtRef.current = 0;
+              setIsScanning(true);
+            }
+          })
+          .catch((e) => {
+            Alert.alert(t('error'), e instanceof Error ? e.message : String(e));
+            lastScannedRef.current = null;
+            lastScannedAtRef.current = 0;
+            setIsScanning(true);
+          });
+        return;
+      }
       fetchByBarcode(value);
     },
-    [fetchByBarcode, params.returnToPick, params.returnToConsolidated, params.taskId, params.profileType, params.selectedProductKey, contextProfileType, navigation]
+    [
+      fetchByBarcode,
+      params.returnToPick,
+      params.returnToConsolidated,
+      params.returnToMovementPallet,
+      params.taskId,
+      params.profileType,
+      params.selectedProductKey,
+      contextProfileType,
+      navigation,
+      t,
+    ]
   );
 
   const codeScanner = useCodeScanner({
@@ -133,6 +171,7 @@ export function ScannerScreen() {
   useEffect(() => {
     if (fetchStatus !== 'success' || !product) return;
     if (params.returnToPick) return;
+    if (params.returnToMovementPallet) return;
     if (params.returnToKirimForm) {
       (navigation as any).navigate('KirimForm', {
         flow: params.flow ?? 'return',
@@ -163,7 +202,17 @@ export function ScannerScreen() {
     (navigation as any).replace('InventoryDetail', {
       productId: product.product_id,
     });
-  }, [fetchStatus, product, params.returnToPick, params.returnToReturns, params.returnToKirimForm, params.returnToMovement, params.flow, navigation]);
+  }, [
+    fetchStatus,
+    product,
+    params.returnToPick,
+    params.returnToReturns,
+    params.returnToKirimForm,
+    params.returnToMovement,
+    params.returnToMovementPallet,
+    params.flow,
+    navigation,
+  ]);
 
   // Loading or no device: show visible UI (not black)
   if (permStatus === 'loading' || !device) {

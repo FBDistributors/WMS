@@ -17,6 +17,7 @@ from app.core.stock_rules import check_location_single_expiry
 from app.services.audit_service import ACTION_CREATE, get_client_ip, log_action
 
 from app.api.v1.endpoints import picker_inventory
+from app.api.v1.endpoints.picker_inventory import _get_lot_level_balances
 from app.db import get_db
 from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
@@ -124,6 +125,16 @@ class StockMovementCreate(BaseModel):
     source_document_type: Optional[str] = Field(default=None, max_length=32)
     source_document_id: Optional[UUID] = None
     reason_code: Optional[str] = Field(default=None, max_length=64)
+
+
+class LocationTransferIn(BaseModel):
+    from_location_id: UUID
+    to_location_id: UUID
+
+
+class LocationTransferOut(BaseModel):
+    lines_transferred: int
+    movements_created: int
 
 
 class StockBalanceOut(BaseModel):
@@ -627,6 +638,139 @@ async def create_stock_movement(
         or "—"
     )
     return _to_movement(movement, created_by_username=display_name)
+
+
+@router.post(
+    "/movements/transfer-location",
+    response_model=LocationTransferOut,
+    status_code=status.HTTP_200_OK,
+    summary="Move all available stock from one location to another (atomic)",
+)
+@router.post(
+    "/movements/transfer-location/",
+    response_model=LocationTransferOut,
+    status_code=status.HTTP_200_OK,
+    summary="Move all available stock from one location to another (atomic)",
+)
+async def transfer_location_stock(
+    request: Request,
+    payload: LocationTransferIn,
+    db: Session = Depends(get_db),
+    user: UserModel = Depends(get_current_user),
+    _guard=Depends(require_permission("inventory:adjust")),
+):
+    if payload.from_location_id == payload.to_location_id:
+        raise HTTPException(status_code=400, detail="Source and destination locations must differ")
+
+    from_loc = (
+        db.query(LocationModel)
+        .filter(LocationModel.id == payload.from_location_id, LocationModel.is_active == True)
+        .one_or_none()
+    )
+    to_loc = (
+        db.query(LocationModel)
+        .filter(LocationModel.id == payload.to_location_id, LocationModel.is_active == True)
+        .one_or_none()
+    )
+    if not from_loc:
+        raise HTTPException(status_code=400, detail="Source location not found or inactive")
+    if not to_loc:
+        raise HTTPException(status_code=400, detail="Destination location not found or inactive")
+
+    check_controller_adjust_reason(user, "inventory_shortage")
+    check_controller_adjust_reason(user, "inventory_overage")
+
+    raw_rows = _get_lot_level_balances(db, product_ids=None, location_id=payload.from_location_id)
+    rows = [r for r in raw_rows if Decimal(str(r["available"])) > 0]
+    if not rows:
+        raise HTTPException(
+            status_code=400,
+            detail="No available quantity to transfer at the source location",
+        )
+
+    client_ip = get_client_ip(request)
+    movements_created = 0
+    try:
+        for r in rows:
+            qty = Decimal(str(r["available"]))
+            if qty <= 0:
+                continue
+            product_id = r["product_id"]
+            lot_id = r["lot_id"]
+            lot = db.query(StockLotModel).filter(StockLotModel.id == lot_id).one_or_none()
+            if not lot or lot.product_id != product_id:
+                raise HTTPException(status_code=400, detail="Stock lot not found or mismatch")
+
+            check_location_single_expiry(db, payload.to_location_id, product_id, lot.expiry_date)
+
+            mov_out = StockMovementModel(
+                product_id=product_id,
+                lot_id=lot_id,
+                location_id=payload.from_location_id,
+                qty_change=-qty,
+                movement_type="adjust",
+                created_by_user_id=user.id,
+                reason_code="inventory_shortage",
+            )
+            mov_in = StockMovementModel(
+                product_id=product_id,
+                lot_id=lot_id,
+                location_id=payload.to_location_id,
+                qty_change=qty,
+                movement_type="adjust",
+                created_by_user_id=user.id,
+                reason_code="inventory_overage",
+            )
+            db.add(mov_out)
+            db.add(mov_in)
+            db.flush()
+
+            log_action(
+                db,
+                user_id=user.id,
+                action=ACTION_CREATE,
+                entity_type="stock_movement",
+                entity_id=str(mov_out.id),
+                new_data={
+                    "product_id": str(product_id),
+                    "lot_id": str(lot_id),
+                    "location_id": str(payload.from_location_id),
+                    "qty_change": str(-qty),
+                    "movement_type": "adjust",
+                    "transfer_location_bulk": True,
+                },
+                ip_address=client_ip,
+            )
+            log_action(
+                db,
+                user_id=user.id,
+                action=ACTION_CREATE,
+                entity_type="stock_movement",
+                entity_id=str(mov_in.id),
+                new_data={
+                    "product_id": str(product_id),
+                    "lot_id": str(lot_id),
+                    "location_id": str(payload.to_location_id),
+                    "qty_change": str(qty),
+                    "movement_type": "adjust",
+                    "transfer_location_bulk": True,
+                },
+                ip_address=client_ip,
+            )
+            movements_created += 2
+
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        raise
+
+    return LocationTransferOut(
+        lines_transferred=len(rows),
+        movements_created=movements_created,
+    )
 
 
 @router.get("/summary", response_model=List[InventorySummaryRow], summary="Inventory summary")

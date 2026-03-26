@@ -20,3 +20,23 @@ export async function createStockMovement(payload: CreateMovementPayload): Promi
   });
   return data;
 }
+
+export type TransferLocationPayload = {
+  from_location_id: string;
+  to_location_id: string;
+};
+
+export type TransferLocationResponse = {
+  lines_transferred: number;
+  movements_created: number;
+};
+
+export async function transferLocationStock(
+  payload: TransferLocationPayload
+): Promise<TransferLocationResponse> {
+  const { data } = await apiClient.post<TransferLocationResponse>(
+    '/inventory/movements/transfer-location',
+    payload
+  );
+  return data;
+}
