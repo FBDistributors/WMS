@@ -2,6 +2,7 @@ from app.models.audit_log import AuditLog
 from app.models.base import Base
 from app.models.brand import Brand
 from app.models.document import Document, DocumentLine
+from app.models.expired_zone_display_labels import ExpiredZoneDisplayLabels
 from app.models.location import Location
 from app.models.order import Order, OrderLine, OrderWmsState
 from app.models.picking import PickRequest
@@ -29,6 +30,7 @@ __all__ = [
     "Brand",
     "Document",
     "DocumentLine",
+    "ExpiredZoneDisplayLabels",
     "Location",
     "Order",
     "OrderLine",

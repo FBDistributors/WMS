@@ -23,7 +23,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { RootStackParamList } from '../types/navigation';
 import { useLocale } from '../i18n/LocaleContext';
 import { useNetwork } from '../network';
-import { getPickerProductDetail, listPickerLocations, getLocationContents, isNoExpiryRestrictionZone, type PickerProductDetailResponse, type PickerProductLocation, type PickerLocationOption, type PickerWarehouseFilter, type LocationContentsItem } from '../api/inventory';
+import { getPickerProductDetail, listPickerLocations, getLocationContents, isNoExpiryRestrictionZone, formatPickerLocationOptionLine, type PickerProductDetailResponse, type PickerProductLocation, type PickerLocationOption, type PickerWarehouseFilter, type LocationContentsItem } from '../api/inventory';
 import { getPickers, type PickerUser } from '../api/picking';
 import { createReceipt, completeReceipt } from '../api/receiving';
 import { createStockMovement } from '../api/movements';
@@ -798,7 +798,9 @@ export function KirimFormScreen() {
                                 setLocationSearch(loc.code);
                               }}
                             >
-                              <Text style={styles.locationDropdownItemCode} numberOfLines={1}>{loc.code}</Text>
+                              <Text style={styles.locationDropdownItemCode} numberOfLines={2}>
+                                {formatPickerLocationOptionLine(loc)}
+                              </Text>
                               {loc.name && loc.name !== loc.code ? (
                                 <Text style={styles.locationDropdownItemName} numberOfLines={1}>{loc.name}</Text>
                               ) : null}
@@ -914,7 +916,9 @@ export function KirimFormScreen() {
                               setInventoryLocationSearch(loc.code);
                             }}
                           >
-                            <Text style={styles.locationDropdownItemCode} numberOfLines={1}>{loc.code}</Text>
+                            <Text style={styles.locationDropdownItemCode} numberOfLines={2}>
+                              {formatPickerLocationOptionLine(loc)}
+                            </Text>
                             {loc.name && loc.name !== loc.code ? (
                               <Text style={styles.locationDropdownItemName} numberOfLines={1}>{loc.name}</Text>
                             ) : null}
@@ -1249,7 +1253,9 @@ export function KirimFormScreen() {
                             setLocationSearch(loc.code);
                           }}
                         >
-                          <Text style={styles.locationDropdownItemCode} numberOfLines={1}>{loc.code}</Text>
+                          <Text style={styles.locationDropdownItemCode} numberOfLines={2}>
+                            {formatPickerLocationOptionLine(loc)}
+                          </Text>
                           {loc.name && loc.name !== loc.code ? (
                             <Text style={styles.locationDropdownItemName} numberOfLines={1}>{loc.name}</Text>
                           ) : null}

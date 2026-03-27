@@ -6,6 +6,12 @@ export type LocationTypeEnum = 'RACK' | 'FLOOR' | 'SHOWROOM_RACK'
 /** Zone: NORMAL (default), EXPIRED, DAMAGED, QUARANTINE. FEFO/picking only from NORMAL. */
 export type ZoneType = 'NORMAL' | 'EXPIRED' | 'DAMAGED' | 'QUARANTINE'
 
+export type ExpiredZoneLabels = {
+  label_for_slot_a: number | null
+  label_for_slot_b: number | null
+  updated_at?: string | null
+}
+
 export type Location = {
   id: string
   code: string
@@ -16,6 +22,10 @@ export type Location = {
   location_type?: LocationTypeEnum | null
   /** Zona turi: FEFO va terish faqat NORMAL dan. */
   zone_type?: ZoneType | string
+  /** EXPIRED zona ichida barqaror slot: A yoki B. */
+  expired_slot?: string | null
+  /** Global sozlamadagi ko‘rsatkich (A/B uchun qo‘lda yangilanadi). */
+  expired_display_label?: number | null
   sector?: string | null
   level_no?: number | null
   row_no?: number | null
@@ -47,6 +57,7 @@ export type LocationUpdateInput = {
   is_active?: boolean
   pick_sequence?: number | null
   zone_type?: ZoneType | string
+  expired_slot?: string | null
 }
 
 export type WarehouseFilter = 'main' | 'showroom'
@@ -74,4 +85,15 @@ export async function updateLocation(id: string, payload: LocationUpdateInput) {
 
 export async function deactivateLocation(id: string) {
   return fetchJSON<Location>(`/api/v1/locations/${id}`, { method: 'DELETE' })
+}
+
+export async function getExpiredDisplayLabels() {
+  return fetchJSON<ExpiredZoneLabels>('/api/v1/locations/expired-display-labels')
+}
+
+export async function patchExpiredDisplayLabels(payload: { label_for_slot_a: number; label_for_slot_b: number }) {
+  return fetchJSON<ExpiredZoneLabels>('/api/v1/locations/expired-display-labels', {
+    method: 'PATCH',
+    body: payload,
+  })
 }

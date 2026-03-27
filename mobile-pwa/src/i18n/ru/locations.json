@@ -93,5 +93,16 @@
     "NORMAL": "Нормальная",
     "EXPIRED": "Просроченная",
     "DAMAGED": "Непригодная"
-  }
+  },
+  "expired_slot_col": "Слот EXPIRED",
+  "expired_slot_field": "Слот EXPIRED (A или B)",
+  "expired_slot_none": "Не выбрано",
+  "expired_labels_title": "Отображаемые номера EXPIRED (A и B)",
+  "expired_labels_hint": "Коды ячеек не меняются; номера только для разделения/отображения (например 6 и 7, затем 8 и 9).",
+  "expired_labels_slot_a": "Номер для A",
+  "expired_labels_slot_b": "Номер для B",
+  "expired_labels_save": "Сохранить номера",
+  "expired_labels_load_failed": "Не удалось загрузить номера.",
+  "expired_labels_save_failed": "Не удалось сохранить.",
+  "expired_labels_validation": "Заполните оба поля."
 }

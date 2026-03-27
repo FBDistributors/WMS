@@ -53,7 +53,20 @@ export type PickerLocationOption = {
   code: string;
   name: string;
   zone_type?: string;
+  expired_slot?: string | null;
+  expired_display_label?: number | null;
 };
+
+/** Second line hint for EXPIRED A/B manual display numbers (code stays primary). */
+export function formatPickerLocationOptionLine(loc: PickerLocationOption): string {
+  if (loc.zone_type !== 'EXPIRED' || !loc.expired_slot) {
+    return loc.code;
+  }
+  if (loc.expired_display_label != null) {
+    return `${loc.code} · ${loc.expired_slot} (${loc.expired_display_label})`;
+  }
+  return `${loc.code} · ${loc.expired_slot}`;
+}
 
 const ZONES_NO_EXPIRY_RESTRICTION = ['EXPIRED', 'DAMAGED', 'QUARANTINE'];
 

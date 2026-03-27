@@ -93,5 +93,16 @@
     "NORMAL": "Normal",
     "EXPIRED": "Expired",
     "DAMAGED": "Damaged"
-  }
+  },
+  "expired_slot_col": "EXPIRED slot",
+  "expired_slot_field": "EXPIRED slot (A or B)",
+  "expired_slot_none": "Not set",
+  "expired_labels_title": "EXPIRED display numbers (A and B)",
+  "expired_labels_hint": "Location codes stay fixed; these numbers are only for separation/display (e.g. 6 and 7, then 8 and 9).",
+  "expired_labels_slot_a": "Number above A",
+  "expired_labels_slot_b": "Number above B",
+  "expired_labels_save": "Save numbers",
+  "expired_labels_load_failed": "Could not load display labels.",
+  "expired_labels_save_failed": "Could not save.",
+  "expired_labels_validation": "Fill in both fields."
 }

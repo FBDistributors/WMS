@@ -9,7 +9,7 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.auth.deps import require_any_permission, require_permission
+from app.auth.deps import require_any_permission
 from app.db import get_db
 from app.models.stock import StockMovement as StockMovementModel
 from app.models.stock import ON_HAND_MOVEMENT_TYPES
@@ -23,6 +23,12 @@ from app.services.audit_service import (
 from app.models.location import (
     Location as LocationModel,
     generate_location_code,
+)
+from app.models.expired_zone_display_labels import ExpiredZoneDisplayLabels
+from app.services.expired_zone_labels import (
+    assert_expired_slot_unique_for_warehouse,
+    get_labels_row,
+    resolve_expired_display_label,
 )
 
 router = APIRouter()
@@ -57,6 +63,19 @@ class LocationOut(BaseModel):
     is_active: bool
     pick_sequence: Optional[int] = None
     created_at: Optional[str] = None
+    expired_slot: Optional[str] = None
+    expired_display_label: Optional[int] = None
+
+
+class ExpiredZoneLabelsOut(BaseModel):
+    label_for_slot_a: Optional[int] = None
+    label_for_slot_b: Optional[int] = None
+    updated_at: Optional[str] = None
+
+
+class ExpiredZoneLabelsPatch(BaseModel):
+    label_for_slot_a: int = Field(..., ge=-999_999, le=999_999)
+    label_for_slot_b: int = Field(..., ge=-999_999, le=999_999)
 
 
 class LocationCreate(BaseModel):
@@ -81,9 +100,14 @@ class LocationUpdate(BaseModel):
     is_active: Optional[bool] = None
     pick_sequence: Optional[int] = Field(default=None, ge=0, description="Terish ketma-ketligi (yo'nalish)")
     zone_type: Optional[str] = Field(default=None, description="NORMAL, EXPIRED, DAMAGED, QUARANTINE")
+    expired_slot: Optional[str] = Field(
+        default=None, description="A or B when zone_type is EXPIRED; omit to leave unchanged"
+    )
 
 
-def _to_location(location: LocationModel) -> LocationOut:
+def _to_location(location: LocationModel, labels_row: ExpiredZoneDisplayLabels | None) -> LocationOut:
+    zt = location.zone_type or "NORMAL"
+    slot = location.expired_slot
     return LocationOut(
         id=location.id,
         code=location.code,
@@ -91,7 +115,7 @@ def _to_location(location: LocationModel) -> LocationOut:
         name=location.name,
         type=location.type,
         location_type=location.location_type,
-        zone_type=location.zone_type or "NORMAL",
+        zone_type=zt,
         sector=location.sector,
         level_no=location.level,
         row_no=location.row_no,
@@ -101,6 +125,8 @@ def _to_location(location: LocationModel) -> LocationOut:
         is_active=location.is_active,
         pick_sequence=location.pick_sequence,
         created_at=location.created_at.isoformat() if location.created_at else None,
+        expired_slot=slot,
+        expired_display_label=resolve_expired_display_label(zt, slot, labels_row),
     )
 
 
@@ -131,7 +157,70 @@ async def list_locations(
         )
         .all()
     )
-    return [_to_location(location) for location in locations]
+    labels_row = get_labels_row(db)
+    return [_to_location(location, labels_row) for location in locations]
+
+
+@router.get(
+    "/expired-display-labels",
+    response_model=ExpiredZoneLabelsOut,
+    summary="EXPIRED A/B display numbers (manual)",
+)
+async def get_expired_display_labels(
+    db: Session = Depends(get_db),
+    _user=Depends(require_any_permission(["locations:read", "locations:manage"])),
+):
+    row = get_labels_row(db)
+    if not row:
+        return ExpiredZoneLabelsOut()
+    return ExpiredZoneLabelsOut(
+        label_for_slot_a=row.label_for_slot_a,
+        label_for_slot_b=row.label_for_slot_b,
+        updated_at=row.updated_at.isoformat() if row.updated_at else None,
+    )
+
+
+@router.patch(
+    "/expired-display-labels",
+    response_model=ExpiredZoneLabelsOut,
+    summary="Update EXPIRED A/B display numbers",
+)
+async def patch_expired_display_labels(
+    request: Request,
+    payload: ExpiredZoneLabelsPatch,
+    db: Session = Depends(get_db),
+    user=Depends(require_any_permission(["locations:manage"])),
+):
+    row = get_labels_row(db)
+    if not row:
+        row = ExpiredZoneDisplayLabels(
+            id=1,
+            label_for_slot_a=payload.label_for_slot_a,
+            label_for_slot_b=payload.label_for_slot_b,
+        )
+        db.add(row)
+    else:
+        row.label_for_slot_a = payload.label_for_slot_a
+        row.label_for_slot_b = payload.label_for_slot_b
+    log_action(
+        db,
+        user_id=user.id,
+        action=ACTION_UPDATE,
+        entity_type="expired_zone_display_labels",
+        entity_id="1",
+        new_data={
+            "label_for_slot_a": payload.label_for_slot_a,
+            "label_for_slot_b": payload.label_for_slot_b,
+        },
+        ip_address=get_client_ip(request),
+    )
+    db.commit()
+    db.refresh(row)
+    return ExpiredZoneLabelsOut(
+        label_for_slot_a=row.label_for_slot_a,
+        label_for_slot_b=row.label_for_slot_b,
+        updated_at=row.updated_at.isoformat() if row.updated_at else None,
+    )
 
 
 @router.get("/{location_id}", response_model=LocationOut, summary="Get location by id")
@@ -143,7 +232,7 @@ async def get_location(
     location = db.query(LocationModel).filter(LocationModel.id == location_id).one_or_none()
     if not location:
         raise HTTPException(status_code=404, detail="Location not found")
-    return _to_location(location)
+    return _to_location(location, get_labels_row(db))
 
 
 @router.post("", response_model=LocationOut, status_code=status.HTTP_201_CREATED, summary="Create location")
@@ -210,7 +299,7 @@ async def create_location(
     )
     db.commit()
     db.refresh(location)
-    return _to_location(location)
+    return _to_location(location, get_labels_row(db))
 
 
 @router.put("/{location_id}", response_model=LocationOut, summary="Update location")
@@ -235,6 +324,13 @@ async def update_location(
         if payload.zone_type not in ZONE_TYPES:
             raise HTTPException(status_code=400, detail=f"zone_type must be one of {ZONE_TYPES}")
         location.zone_type = payload.zone_type
+    if (location.zone_type or "") != "EXPIRED":
+        location.expired_slot = None
+    elif "expired_slot" in payload.model_dump(exclude_unset=True):
+        slot = payload.expired_slot
+        if slot is not None and slot not in ("A", "B"):
+            raise HTTPException(status_code=400, detail="expired_slot must be A, B or null")
+        location.expired_slot = slot
     if "pick_sequence" in payload.model_dump(exclude_unset=True):
         location.pick_sequence = payload.pick_sequence
     if location.location_type in LOCATION_TYPE_ENUM and (
@@ -268,9 +364,19 @@ async def update_location(
             location.level = level_no
             location.row_no = row_no
             location.pallet_no = pallet_no
+    assert_expired_slot_unique_for_warehouse(
+        db,
+        location_id=location_id,
+        warehouse_id=location.warehouse_id,
+        expired_slot=location.expired_slot,
+        zone_type=location.zone_type or "NORMAL",
+        is_active=location.is_active,
+    )
     new_data = {"code": location.code, "is_active": location.is_active}
     if payload.zone_type is not None:
         new_data["zone_type"] = location.zone_type
+    if "expired_slot" in payload.model_dump(exclude_unset=True):
+        new_data["expired_slot"] = location.expired_slot
     log_action(
         db,
         user_id=user.id,
@@ -283,7 +389,7 @@ async def update_location(
     )
     db.commit()
     db.refresh(location)
-    return _to_location(location)
+    return _to_location(location, get_labels_row(db))
 
 
 @router.delete("/{location_id}", response_model=LocationOut, summary="Deactivate or delete location")
@@ -296,7 +402,8 @@ async def deactivate_location(
     location = db.query(LocationModel).filter(LocationModel.id == location_id).one_or_none()
     if not location:
         raise HTTPException(status_code=404, detail="Location not found")
-    out = _to_location(location)
+    labels_row = get_labels_row(db)
+    out = _to_location(location, labels_row)
     old_data = {"code": location.code, "is_active": location.is_active, "name": location.name}
     if location.is_active:
         # Joyda qoldiq (on_hand) bo'lsa faolsizlantirishni taqiqlash
@@ -326,7 +433,7 @@ async def deactivate_location(
         )
         db.commit()
         db.refresh(location)
-        return _to_location(location)
+        return _to_location(location, get_labels_row(db))
     # Faol emas: bazadan butunlay o'chirish (hard delete)
     try:
         log_action(

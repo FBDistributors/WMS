@@ -98,6 +98,7 @@ class Location(Base):
     zone_type: Mapped[str] = mapped_column(
         String(32), nullable=False, default="NORMAL", server_default="NORMAL"
     )
+    expired_slot: Mapped[str | None] = mapped_column(String(1), nullable=True)
     warehouse_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("locations.id", ondelete="SET NULL"), nullable=True
     )

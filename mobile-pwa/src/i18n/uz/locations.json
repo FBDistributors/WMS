@@ -92,5 +92,16 @@
     "NORMAL": "Normal",
     "EXPIRED": "Muddati o'tkan",
     "DAMAGED": "Yaroqsiz"
-  }
+  },
+  "expired_slot_col": "EXPIRED slot",
+  "expired_slot_field": "EXPIRED slot (A yoki B)",
+  "expired_slot_none": "Tanlanmagan",
+  "expired_labels_title": "EXPIRED ko‘rsatkichlari (A va B)",
+  "expired_labels_hint": "Joy kodlari o‘zgarmaydi; bu raqamlar faqat ajratish va ko‘rsatish uchun (masalan 6 va 7, keyin 8 va 9).",
+  "expired_labels_slot_a": "A ustidagi raqam",
+  "expired_labels_slot_b": "B ustidagi raqam",
+  "expired_labels_save": "Raqamlarni saqlash",
+  "expired_labels_load_failed": "Ko‘rsatkichlarni yuklab bo‘lmadi.",
+  "expired_labels_save_failed": "Saqlab bo‘lmadi.",
+  "expired_labels_validation": "Ikkala maydonni ham to‘ldiring."
 }

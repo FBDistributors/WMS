@@ -23,6 +23,7 @@ from app.models.stock import ON_HAND_MOVEMENT_TYPES
 from app.models.stock import StockLot as StockLotModel
 from app.models.stock import StockMovement as StockMovementModel
 from app.models.user import User as UserModel
+from app.services.expired_zone_labels import get_labels_row, resolve_expired_display_label
 
 router = APIRouter()
 
@@ -106,6 +107,8 @@ class PickerLocationOption(BaseModel):
     code: str
     name: str
     zone_type: str = "NORMAL"
+    expired_slot: Optional[str] = None
+    expired_display_label: Optional[int] = None
 
 
 class ByBarcodeLocationInfo(BaseModel):
@@ -382,11 +385,7 @@ async def list_picker_locations(
     _guard=Depends(PICKER_INVENTORY_PERMISSION),
 ):
     # Exclude warehouse root (e.g. SHOWROOM) so only concrete putaway locations appear (main + showroom racks like S-01-02).
-    query = (
-        db.query(LocationModel.id, LocationModel.code, LocationModel.name, LocationModel.zone_type)
-        .filter(LocationModel.is_active == True)
-        .filter(LocationModel.type != "warehouse")
-    )
+    query = db.query(LocationModel).filter(LocationModel.is_active == True).filter(LocationModel.type != "warehouse")
     if warehouse == "main":
         query = query.filter(LocationModel.warehouse_id.is_(None))
     elif warehouse == "showroom":
@@ -395,12 +394,15 @@ async def list_picker_locations(
             return []
         query = query.filter(LocationModel.warehouse_id == showroom_id)
     rows = query.order_by(LocationModel.code).all()
+    labels_row = get_labels_row(db)
     return [
         PickerLocationOption(
             id=r.id,
             code=r.code,
             name=r.name,
             zone_type=r.zone_type or "NORMAL",
+            expired_slot=r.expired_slot,
+            expired_display_label=resolve_expired_display_label(r.zone_type, r.expired_slot, labels_row),
         )
         for r in rows
     ]

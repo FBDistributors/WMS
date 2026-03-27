@@ -20,6 +20,7 @@ import type { RootStackParamList } from '../types/navigation';
 import { useLocale } from '../i18n/LocaleContext';
 import { useTheme } from '../theme/ThemeContext';
 import {
+  formatPickerLocationOptionLine,
   listPickerInventory,
   listPickerLocations,
   type PickerInventoryItem,
@@ -230,7 +231,10 @@ export function InventoryScreen() {
                       setLocationModalVisible(false);
                     }}
                   >
-                    <Text style={[styles.modalRowText, isDark && styles.modalRowTextDark]}>{loc.code} — {loc.name}</Text>
+                    <Text style={[styles.modalRowText, isDark && styles.modalRowTextDark]}>
+                      {formatPickerLocationOptionLine(loc)}
+                      {loc.name && loc.name !== loc.code ? ` — ${loc.name}` : ''}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>

@@ -20,6 +20,7 @@ import type { RootStackParamList } from '../types/navigation';
 import { useLocale } from '../i18n/LocaleContext';
 import { useNetwork } from '../network';
 import {
+  formatPickerLocationOptionLine,
   getPickerProductDetail,
   getLocationContents,
   listPickerLocations,
@@ -438,7 +439,9 @@ export function MovementScreen() {
                                 }}
                                 activeOpacity={0.7}
                               >
-                                <Text style={[styles.locCode, isDark && styles.locCodeDark]}>{loc.code}</Text>
+                                <Text style={[styles.locCode, isDark && styles.locCodeDark]} numberOfLines={2}>
+                                  {formatPickerLocationOptionLine(loc)}
+                                </Text>
                                 {loc.name ? (
                                   <Text style={[styles.locBatch, isDark && styles.locBatchDark]}>{loc.name}</Text>
                                 ) : null}
@@ -527,7 +530,9 @@ export function MovementScreen() {
                   onPress={() => loadPalletContents(loc.code)}
                   activeOpacity={0.7}
                 >
-                  <Text style={[styles.locCode, isDark && styles.locCodeDark]}>{loc.code}</Text>
+                  <Text style={[styles.locCode, isDark && styles.locCodeDark]} numberOfLines={2}>
+                    {formatPickerLocationOptionLine(loc)}
+                  </Text>
                   {loc.name ? <Text style={[styles.locBatch, isDark && styles.locBatchDark]}>{loc.name}</Text> : null}
                 </TouchableOpacity>
               ))}
@@ -590,7 +595,9 @@ export function MovementScreen() {
                           }}
                           activeOpacity={0.7}
                         >
-                          <Text style={[styles.locCode, isDark && styles.locCodeDark]}>{loc.code}</Text>
+                          <Text style={[styles.locCode, isDark && styles.locCodeDark]} numberOfLines={2}>
+                            {formatPickerLocationOptionLine(loc)}
+                          </Text>
                           {loc.name ? (
                             <Text style={[styles.locBatch, isDark && styles.locBatchDark]}>{loc.name}</Text>
                           ) : null}
