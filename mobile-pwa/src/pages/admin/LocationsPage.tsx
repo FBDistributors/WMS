@@ -12,13 +12,10 @@ import { Card } from '../../components/ui/card'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
-import { useAuth } from '../../rbac/AuthProvider'
 import {
   createLocation,
   deactivateLocation,
-  getExpiredDisplayLabels,
   getLocations,
-  patchExpiredDisplayLabels,
   updateLocation,
   type Location,
   type LocationTypeEnum,
@@ -61,8 +58,6 @@ type MainZoneFilter = 'normal' | 'expired' | 'damaged'
 
 export function LocationsPage() {
   const { t } = useTranslation(['locations', 'common'])
-  const { has } = useAuth()
-  const canManageLocations = has('locations:manage')
   const navigate = useNavigate()
   const [items, setItems] = useState<Location[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -75,7 +70,6 @@ export function LocationsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const warehouse = (searchParams.get('warehouse') as WarehouseFilter) || 'main'
   const mainZone = (searchParams.get('main_zone') as MainZoneFilter) || 'normal'
-  const showExpiredSlotColumn = !(warehouse === 'main' && mainZone === 'normal')
   const PAGE_SIZE = 50
   const locationPage = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10) / PAGE_SIZE)
 
@@ -163,11 +157,6 @@ export function LocationsPage() {
               <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
                 {t('locations:zone_type')}
               </th>
-              {showExpiredSlotColumn ? (
-                <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
-                  {t('locations:expired_slot_col')}
-                </th>
-              ) : null}
               <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
                 {t('locations:sector')}
               </th>
@@ -194,7 +183,7 @@ export function LocationsPage() {
           <tbody>
             {paginatedItems.length === 0 ? (
               <tr>
-                <td colSpan={showExpiredSlotColumn ? 11 : 10} className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+                <td colSpan={10} className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
                   {filterQuery.trim() ? t('locations:filter_no_results') : t('locations:empty')}
                 </td>
               </tr>
@@ -230,15 +219,6 @@ export function LocationsPage() {
                     {loc.zone_type ?? 'NORMAL'}
                   </span>
                 </td>
-                {showExpiredSlotColumn ? (
-                  <td className="whitespace-nowrap py-2 pr-3 text-slate-600 dark:text-slate-400 sm:pr-4">
-                    {loc.zone_type === 'EXPIRED' && loc.expired_slot
-                      ? `${loc.expired_slot}${
-                          loc.expired_display_label != null ? ` (${loc.expired_display_label})` : ''
-                        }`
-                      : '—'}
-                  </td>
-                ) : null}
                 <td className="whitespace-nowrap py-2 pr-3 text-slate-600 dark:text-slate-400 sm:pr-4">{loc.sector ?? '—'}</td>
                 <td className="whitespace-nowrap py-2 pr-3 text-slate-600 dark:text-slate-400 sm:pr-4">
                   {loc.level_no != null ? loc.level_no : '—'}
@@ -302,10 +282,10 @@ export function LocationsPage() {
         </table>
       </TableScrollArea>
     )
-  }, [error, isLoading, items, filteredItems, paginatedItems, load, navigate, t, filterQuery, showExpiredSlotColumn])
+  }, [error, isLoading, items, filteredItems, paginatedItems, load, navigate, t, filterQuery])
 
   return (
-    <AdminLayout title={t('locations:title')}>
+    <AdminLayout title="">
       <Card className="min-w-0 space-y-4 overflow-hidden">
         <div className="flex border-b border-slate-200 dark:border-slate-700 gap-0 overflow-x-auto">
           {[
@@ -375,9 +355,6 @@ export function LocationsPage() {
               )
             })}
           </div>
-        ) : null}
-        {canManageLocations && warehouse === 'main' && mainZone === 'expired' ? (
-          <ExpiredZoneLabelsPanel onSaved={load} />
         ) : null}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3 min-w-0 flex-1">
@@ -488,94 +465,6 @@ export function LocationsPage() {
         />
       ) : null}
     </AdminLayout>
-  )
-}
-
-function ExpiredZoneLabelsPanel({ onSaved }: { onSaved: () => void }) {
-  const { t } = useTranslation(['locations', 'common'])
-  const [labelA, setLabelA] = useState<number | ''>('')
-  const [labelB, setLabelB] = useState<number | ''>('')
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const loadLabels = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const d = await getExpiredDisplayLabels()
-      setLabelA(d.label_for_slot_a ?? '')
-      setLabelB(d.label_for_slot_b ?? '')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('locations:expired_labels_load_failed'))
-    } finally {
-      setLoading(false)
-    }
-  }, [t])
-
-  useEffect(() => {
-    void loadLabels()
-  }, [loadLabels])
-
-  const handleSave = async () => {
-    if (labelA === '' || labelB === '') {
-      setError(t('locations:expired_labels_validation'))
-      return
-    }
-    setSaving(true)
-    setError(null)
-    try {
-      await patchExpiredDisplayLabels({ label_for_slot_a: Number(labelA), label_for_slot_b: Number(labelB) })
-      await loadLabels()
-      onSaved()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('locations:expired_labels_save_failed'))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="rounded-2xl border border-amber-200/80 bg-amber-50/50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/20">
-      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t('locations:expired_labels_title')}</div>
-      <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">{t('locations:expired_labels_hint')}</p>
-      {loading ? (
-        <div className="mt-2 text-sm text-slate-500">{t('common:messages.loading')}</div>
-      ) : (
-        <div className="mt-3 flex flex-wrap items-end gap-3">
-          <label className="text-sm text-slate-600 dark:text-slate-300">
-            {t('locations:expired_labels_slot_a')}
-            <input
-              type="number"
-              className="mt-1 w-28 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900"
-              value={labelA === '' ? '' : labelA}
-              onChange={(e) =>
-                setLabelA(e.target.value === '' ? '' : parseInt(e.target.value, 10))
-              }
-            />
-          </label>
-          <label className="text-sm text-slate-600 dark:text-slate-300">
-            {t('locations:expired_labels_slot_b')}
-            <input
-              type="number"
-              className="mt-1 w-28 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900"
-              value={labelB === '' ? '' : labelB}
-              onChange={(e) =>
-                setLabelB(e.target.value === '' ? '' : parseInt(e.target.value, 10))
-              }
-            />
-          </label>
-          <Button type="button" onClick={() => void handleSave()} disabled={saving}>
-            {saving ? t('locations:saving') : t('locations:expired_labels_save')}
-          </Button>
-        </div>
-      )}
-      {error ? (
-        <div className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-500/30 dark:bg-red-500/10">
-          {error}
-        </div>
-      ) : null}
-    </div>
   )
 }
 
