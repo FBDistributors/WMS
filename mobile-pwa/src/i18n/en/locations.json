@@ -3,7 +3,9 @@
   "subtitle": "Manage warehouse locations (RACK: S-sector-level-row, FLOOR: P-sector-pallet).",
   "tabs": {
     "main": "Main",
-    "showroom": "Showroom"
+    "showroom": "Showroom",
+    "expired": "Expired",
+    "damaged": "Damaged"
   },
   "stelaj": "Stelaj (S)",
   "etaj": "Floor (level)",

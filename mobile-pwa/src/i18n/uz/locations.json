@@ -3,7 +3,9 @@
   "subtitle": "Ombor joylashuvlari (RACK: S-sektor-bosqich-qator, FLOOR: P-sektor-pallet).",
   "tabs": {
     "main": "Asosiy",
-    "showroom": "Showroom"
+    "showroom": "Showroom",
+    "expired": "Muddati o'tkan",
+    "damaged": "Yaroqsiz"
   },
   "stelaj": "Stelaj (S)",
   "etaj": "Etaj",

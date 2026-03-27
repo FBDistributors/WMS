@@ -57,6 +57,8 @@ type DialogState = {
   isShowroom?: boolean
 }
 
+type MainZoneFilter = 'expired' | 'damaged'
+
 export function LocationsPage() {
   const { t } = useTranslation(['locations', 'common'])
   const { has } = useAuth()
@@ -72,6 +74,7 @@ export function LocationsPage() {
   const [filterQuery, setFilterQuery] = useState('')
   const [searchParams, setSearchParams] = useSearchParams()
   const warehouse = (searchParams.get('warehouse') as WarehouseFilter) || 'main'
+  const mainZone = (searchParams.get('main_zone') as MainZoneFilter) || 'expired'
   const PAGE_SIZE = 50
   const locationPage = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10) / PAGE_SIZE)
 
@@ -94,9 +97,13 @@ export function LocationsPage() {
   }, [load])
 
   const filteredItems = useMemo(() => {
+    const byMainZone =
+      warehouse === 'main'
+        ? items.filter((loc) => loc.zone_type === (mainZone === 'expired' ? 'EXPIRED' : 'DAMAGED'))
+        : items
     const q = filterQuery.trim().toLowerCase()
-    if (!q) return items
-    return items.filter((loc) => {
+    if (!q) return byMainZone
+    return byMainZone.filter((loc) => {
       if (loc.code.toLowerCase().includes(q)) return true
       if (loc.sector && loc.sector.toLowerCase().includes(q)) return true
       if (loc.level_no != null && String(loc.level_no).includes(q)) return true
@@ -105,7 +112,7 @@ export function LocationsPage() {
       if (loc.pick_sequence != null && String(loc.pick_sequence).includes(q)) return true
       return false
     })
-  }, [items, filterQuery])
+  }, [items, filterQuery, warehouse, mainZone])
 
   const paginatedItems = useMemo(() => {
     const start = locationPage * PAGE_SIZE
@@ -284,7 +291,7 @@ export function LocationsPage() {
         </table>
       </TableScrollArea>
     )
-  }, [error, isLoading, items, filteredItems, paginatedItems, load, navigate, t])
+  }, [error, isLoading, items, filteredItems, paginatedItems, load, navigate, t, filterQuery])
 
   return (
     <AdminLayout title={t('locations:title')}>
@@ -304,6 +311,11 @@ export function LocationsPage() {
                     const next = new URLSearchParams(prev)
                     next.set('warehouse', tab.value)
                     next.delete('offset')
+                    if (tab.value === 'main') {
+                      next.set('main_zone', 'expired')
+                    } else {
+                      next.delete('main_zone')
+                    }
                     return next
                   })
                 }}
@@ -319,6 +331,39 @@ export function LocationsPage() {
             )
           })}
         </div>
+        {warehouse === 'main' ? (
+          <div className="flex border-b border-slate-200 dark:border-slate-700 gap-0 overflow-x-auto">
+            {[
+              { value: 'expired' as const, labelKey: 'locations:tabs.expired' },
+              { value: 'damaged' as const, labelKey: 'locations:tabs.damaged' },
+            ].map((tab) => {
+              const isActive = mainZone === tab.value
+              return (
+                <button
+                  key={tab.value}
+                  type="button"
+                  onClick={() => {
+                    setSearchParams((prev) => {
+                      const next = new URLSearchParams(prev)
+                      next.set('warehouse', 'main')
+                      next.set('main_zone', tab.value)
+                      next.delete('offset')
+                      return next
+                    })
+                  }}
+                  className={`shrink-0 border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'border-amber-500 text-amber-700 dark:text-amber-300 dark:border-amber-300'
+                      : 'border-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
+                  }`}
+                  aria-current={isActive ? 'page' : undefined}
+                >
+                  {t(tab.labelKey)}
+                </button>
+              )
+            })}
+          </div>
+        ) : null}
         {canManageLocations ? (
           <ExpiredZoneLabelsPanel onSaved={load} />
         ) : null}
