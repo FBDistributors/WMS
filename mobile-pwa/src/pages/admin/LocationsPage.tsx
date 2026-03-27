@@ -284,44 +284,47 @@ export function LocationsPage() {
     )
   }, [error, isLoading, items, filteredItems, paginatedItems, load, navigate, t, filterQuery])
 
+  const warehouseTabs = (
+    <div className="flex items-center gap-1 overflow-x-auto rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
+      {[
+        { value: 'main' as const, labelKey: 'locations:tabs.main' },
+        { value: 'showroom' as const, labelKey: 'locations:tabs.showroom' },
+      ].map((tab) => {
+        const isActive = warehouse === tab.value
+        return (
+          <button
+            key={tab.value}
+            type="button"
+            onClick={() => {
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev)
+                next.set('warehouse', tab.value)
+                next.delete('offset')
+                if (tab.value === 'main') {
+                  next.set('main_zone', 'normal')
+                } else {
+                  next.delete('main_zone')
+                }
+                return next
+              })
+            }}
+            className={`shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+              isActive
+                ? 'bg-white text-sky-700 shadow-sm dark:bg-slate-900 dark:text-sky-300'
+                : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100'
+            }`}
+            aria-current={isActive ? 'page' : undefined}
+          >
+            {t(tab.labelKey)}
+          </button>
+        )
+      })}
+    </div>
+  )
+
   return (
-    <AdminLayout title="">
+    <AdminLayout titleSlot={warehouseTabs}>
       <Card className="min-w-0 space-y-4 overflow-hidden">
-        <div className="flex border-b border-slate-200 dark:border-slate-700 gap-0 overflow-x-auto">
-          {[
-            { value: 'main' as const, labelKey: 'locations:tabs.main' },
-            { value: 'showroom' as const, labelKey: 'locations:tabs.showroom' },
-          ].map((tab) => {
-            const isActive = warehouse === tab.value
-            return (
-              <button
-                key={tab.value}
-                type="button"
-                onClick={() => {
-                  setSearchParams((prev) => {
-                    const next = new URLSearchParams(prev)
-                    next.set('warehouse', tab.value)
-                    next.delete('offset')
-                    if (tab.value === 'main') {
-                      next.set('main_zone', 'normal')
-                    } else {
-                      next.delete('main_zone')
-                    }
-                    return next
-                  })
-                }}
-                className={`shrink-0 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'border-sky-500 text-sky-600 dark:text-sky-400 dark:border-sky-400'
-                    : 'border-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
-                }`}
-                aria-current={isActive ? 'page' : undefined}
-              >
-                {t(tab.labelKey)}
-              </button>
-            )
-          })}
-        </div>
         {warehouse === 'main' ? (
           <div className="flex border-b border-slate-200 dark:border-slate-700 gap-0 overflow-x-auto">
             {[
@@ -484,7 +487,6 @@ function LocationDialog({ mode, target, isShowroom = false, onClose, onSaved, on
     (target?.location_type as LocationTypeEnum) ?? (isShowroom ? 'SHOWROOM_RACK' : 'RACK')
   )
   const [zoneType, setZoneType] = useState<string>(target?.zone_type ?? 'NORMAL')
-  const [expiredSlot, setExpiredSlot] = useState<string>(target?.expired_slot ?? '')
   const [sector, setSector] = useState(target?.sector ?? '')
   const [levelNo, setLevelNo] = useState<number | ''>(target?.level_no ?? '')
   const [rowNo, setRowNo] = useState<number | ''>(target?.row_no ?? '')
@@ -500,7 +502,6 @@ function LocationDialog({ mode, target, isShowroom = false, onClose, onSaved, on
   useEffect(() => {
     if (!target || mode !== 'edit') return
     setZoneType(target.zone_type ?? 'NORMAL')
-    setExpiredSlot(target.expired_slot ?? '')
   }, [target?.id, mode])
 
   const preview = useMemo(
@@ -577,9 +578,6 @@ function LocationDialog({ mode, target, isShowroom = false, onClose, onSaved, on
           is_active: target.is_active,
           pick_sequence: pickSequence === '' ? null : Number(pickSequence),
           zone_type: zoneType,
-          ...(zoneType === 'EXPIRED'
-            ? { expired_slot: expiredSlot === '' ? null : expiredSlot }
-            : {}),
         })
       }
       onSaved()
@@ -637,30 +635,11 @@ function LocationDialog({ mode, target, isShowroom = false, onClose, onSaved, on
               <select
                 className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
                 value={zoneType}
-                onChange={(e) => {
-                  const v = e.target.value
-                  setZoneType(v)
-                  if (v !== 'EXPIRED') setExpiredSlot('')
-                }}
+                onChange={(e) => setZoneType(e.target.value)}
               >
                 <option value="NORMAL">{t('locations:zone_enum.NORMAL')}</option>
                 <option value="EXPIRED">{t('locations:zone_enum.EXPIRED')}</option>
                 <option value="DAMAGED">{t('locations:zone_enum.DAMAGED')}</option>
-              </select>
-            </label>
-          )}
-
-          {mode === 'edit' && zoneType === 'EXPIRED' && (
-            <label className="text-sm text-slate-600 dark:text-slate-300">
-              {t('locations:expired_slot_field')}
-              <select
-                className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-                value={expiredSlot}
-                onChange={(e) => setExpiredSlot(e.target.value)}
-              >
-                <option value="">{t('locations:expired_slot_none')}</option>
-                <option value="A">A</option>
-                <option value="B">B</option>
               </select>
             </label>
           )}
