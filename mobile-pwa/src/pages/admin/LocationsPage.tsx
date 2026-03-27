@@ -75,6 +75,7 @@ export function LocationsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const warehouse = (searchParams.get('warehouse') as WarehouseFilter) || 'main'
   const mainZone = (searchParams.get('main_zone') as MainZoneFilter) || 'normal'
+  const showExpiredSlotColumn = !(warehouse === 'main' && mainZone === 'normal')
   const PAGE_SIZE = 50
   const locationPage = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10) / PAGE_SIZE)
 
@@ -162,9 +163,11 @@ export function LocationsPage() {
               <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
                 {t('locations:zone_type')}
               </th>
-              <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
-                {t('locations:expired_slot_col')}
-              </th>
+              {showExpiredSlotColumn ? (
+                <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
+                  {t('locations:expired_slot_col')}
+                </th>
+              ) : null}
               <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
                 {t('locations:sector')}
               </th>
@@ -191,7 +194,7 @@ export function LocationsPage() {
           <tbody>
             {paginatedItems.length === 0 ? (
               <tr>
-                <td colSpan={11} className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+                <td colSpan={showExpiredSlotColumn ? 11 : 10} className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
                   {filterQuery.trim() ? t('locations:filter_no_results') : t('locations:empty')}
                 </td>
               </tr>
@@ -227,13 +230,15 @@ export function LocationsPage() {
                     {loc.zone_type ?? 'NORMAL'}
                   </span>
                 </td>
-                <td className="whitespace-nowrap py-2 pr-3 text-slate-600 dark:text-slate-400 sm:pr-4">
-                  {loc.zone_type === 'EXPIRED' && loc.expired_slot
-                    ? `${loc.expired_slot}${
-                        loc.expired_display_label != null ? ` (${loc.expired_display_label})` : ''
-                      }`
-                    : '—'}
-                </td>
+                {showExpiredSlotColumn ? (
+                  <td className="whitespace-nowrap py-2 pr-3 text-slate-600 dark:text-slate-400 sm:pr-4">
+                    {loc.zone_type === 'EXPIRED' && loc.expired_slot
+                      ? `${loc.expired_slot}${
+                          loc.expired_display_label != null ? ` (${loc.expired_display_label})` : ''
+                        }`
+                      : '—'}
+                  </td>
+                ) : null}
                 <td className="whitespace-nowrap py-2 pr-3 text-slate-600 dark:text-slate-400 sm:pr-4">{loc.sector ?? '—'}</td>
                 <td className="whitespace-nowrap py-2 pr-3 text-slate-600 dark:text-slate-400 sm:pr-4">
                   {loc.level_no != null ? loc.level_no : '—'}
@@ -297,10 +302,10 @@ export function LocationsPage() {
         </table>
       </TableScrollArea>
     )
-  }, [error, isLoading, items, filteredItems, paginatedItems, load, navigate, t, filterQuery])
+  }, [error, isLoading, items, filteredItems, paginatedItems, load, navigate, t, filterQuery, showExpiredSlotColumn])
 
   return (
-    <AdminLayout title="">
+    <AdminLayout title={t('locations:title')}>
       <Card className="min-w-0 space-y-4 overflow-hidden">
         <div className="flex border-b border-slate-200 dark:border-slate-700 gap-0 overflow-x-auto">
           {[
@@ -371,7 +376,7 @@ export function LocationsPage() {
             })}
           </div>
         ) : null}
-        {canManageLocations ? (
+        {canManageLocations && warehouse === 'main' && mainZone === 'expired' ? (
           <ExpiredZoneLabelsPanel onSaved={load} />
         ) : null}
         <div className="flex flex-wrap items-center justify-between gap-3">
