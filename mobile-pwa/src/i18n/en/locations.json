@@ -4,6 +4,7 @@
   "tabs": {
     "main": "Main",
     "showroom": "Showroom",
+    "normal": "Normal",
     "expired": "Expired",
     "damaged": "Damaged"
   },

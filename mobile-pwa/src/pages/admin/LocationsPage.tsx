@@ -57,7 +57,7 @@ type DialogState = {
   isShowroom?: boolean
 }
 
-type MainZoneFilter = 'expired' | 'damaged'
+type MainZoneFilter = 'normal' | 'expired' | 'damaged'
 
 export function LocationsPage() {
   const { t } = useTranslation(['locations', 'common'])
@@ -74,7 +74,7 @@ export function LocationsPage() {
   const [filterQuery, setFilterQuery] = useState('')
   const [searchParams, setSearchParams] = useSearchParams()
   const warehouse = (searchParams.get('warehouse') as WarehouseFilter) || 'main'
-  const mainZone = (searchParams.get('main_zone') as MainZoneFilter) || 'expired'
+  const mainZone = (searchParams.get('main_zone') as MainZoneFilter) || 'normal'
   const PAGE_SIZE = 50
   const locationPage = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10) / PAGE_SIZE)
 
@@ -99,7 +99,13 @@ export function LocationsPage() {
   const filteredItems = useMemo(() => {
     const byMainZone =
       warehouse === 'main'
-        ? items.filter((loc) => loc.zone_type === (mainZone === 'expired' ? 'EXPIRED' : 'DAMAGED'))
+        ? items.filter((loc) =>
+            mainZone === 'expired'
+              ? loc.zone_type === 'EXPIRED'
+              : mainZone === 'damaged'
+                ? loc.zone_type === 'DAMAGED'
+                : (loc.zone_type ?? 'NORMAL') === 'NORMAL'
+          )
         : items
     const q = filterQuery.trim().toLowerCase()
     if (!q) return byMainZone
@@ -294,7 +300,7 @@ export function LocationsPage() {
   }, [error, isLoading, items, filteredItems, paginatedItems, load, navigate, t, filterQuery])
 
   return (
-    <AdminLayout title={t('locations:title')}>
+    <AdminLayout title="">
       <Card className="min-w-0 space-y-4 overflow-hidden">
         <div className="flex border-b border-slate-200 dark:border-slate-700 gap-0 overflow-x-auto">
           {[
@@ -312,7 +318,7 @@ export function LocationsPage() {
                     next.set('warehouse', tab.value)
                     next.delete('offset')
                     if (tab.value === 'main') {
-                      next.set('main_zone', 'expired')
+                      next.set('main_zone', 'normal')
                     } else {
                       next.delete('main_zone')
                     }
@@ -334,6 +340,7 @@ export function LocationsPage() {
         {warehouse === 'main' ? (
           <div className="flex border-b border-slate-200 dark:border-slate-700 gap-0 overflow-x-auto">
             {[
+              { value: 'normal' as const, labelKey: 'locations:tabs.normal' },
               { value: 'expired' as const, labelKey: 'locations:tabs.expired' },
               { value: 'damaged' as const, labelKey: 'locations:tabs.damaged' },
             ].map((tab) => {
