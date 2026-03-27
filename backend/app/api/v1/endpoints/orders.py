@@ -20,7 +20,7 @@ from app.db import get_db
 from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_ip, log_action
 from app.services.push_notifications import send_push_to_user
 from app.integrations.smartup.client import SmartupClient
-from app.integrations.smartup.importer import delete_stale_orders, filter_orders_b_s, import_orders
+from app.integrations.smartup.importer import delete_stale_orders, filter_orders_b_w, import_orders
 from app.integrations.smartup.mfm_movement import export_mfm_movements
 from app.integrations.smartup.sync_lock import smartup_sync_lock
 from app.models.document import Document as DocumentModel
@@ -41,7 +41,6 @@ router = APIRouter()
 ORDER_STATUSES = {
     "imported",
     "B#W",
-    "B#S",
     "allocated",
     "ready_for_picking",
     "picking",
@@ -165,22 +164,15 @@ class OrderStatusUpdateRequest(BaseModel):
     controller_user_id: Optional[UUID] = Field(None, description="Tekshiruvda: controllerga yuborish uchun controller user id")
 
 
-ALLOWED_ADMIN_ORDER_STATUSES = {"imported", "B#W", "B#S", "allocated", "ready_for_picking", "picking", "picked", "completed", "packed", "shipped", "cancelled"}
+ALLOWED_ADMIN_ORDER_STATUSES = {"imported", "B#W", "allocated", "ready_for_picking", "picking", "picked", "completed", "packed", "shipped", "cancelled"}
 
 
 def _normalize_status_for_write(status_value: str) -> str:
-    v = (status_value or "").strip()
-    return "B#W" if v == "B#S" else v
+    return (status_value or "").strip()
 
 
 def _expand_status_filters(status_values: list[str]) -> list[str]:
-    expanded: set[str] = set()
-    for s in status_values:
-        if s in {"B#W", "B#S"}:
-            expanded.update({"B#W", "B#S"})
-        else:
-            expanded.add(s)
-    return list(expanded)
+    return list({(s or "").strip() for s in status_values if (s or "").strip()})
 
 
 class PickerUser(BaseModel):
@@ -586,9 +578,9 @@ async def orders_check(
     default_filial = os.getenv("WMS_DEFAULT_FILIAL_ID", "3788131").strip()
     filial = (filial_id or "").strip() or default_filial
     base = db.query(OrderModel).join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
-    total_b_s_all_filial = base.filter(OrderWmsStateModel.status.in_(("B#W", "B#S"))).count()
+    total_b_s_all_filial = base.filter(OrderWmsStateModel.status == "B#W").count()
     total_b_s = (
-        base.filter(OrderWmsStateModel.status.in_(("B#W", "B#S")))
+        base.filter(OrderWmsStateModel.status == "B#W")
         .filter(OrderModel.filial_id == filial)
         .count()
     )
@@ -612,7 +604,7 @@ async def orders_check(
         by_order = (
             db.query(OrderModel)
             .join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
-            .filter(OrderWmsStateModel.status.in_(("B#W", "B#S")), OrderModel.order_number.ilike(term))
+            .filter(OrderWmsStateModel.status == "B#W", OrderModel.order_number.ilike(term))
             .limit(10)
             .all()
         )
@@ -620,7 +612,7 @@ async def orders_check(
         by_ext = (
             db.query(OrderModel)
             .join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
-            .filter(OrderWmsStateModel.status.in_(("B#W", "B#S")), OrderModel.source_external_id.ilike(term))
+            .filter(OrderWmsStateModel.status == "B#W", OrderModel.source_external_id.ilike(term))
             .limit(10)
             .all()
         )
@@ -815,7 +807,7 @@ async def sync_orders_from_smartup(
                     end_modified_on=end_date.strftime("%d.%m.%Y"),
                 )
                 filial_override = (payload.filial_id or "").strip() or None
-                items_to_import = filter_orders_b_s(response.items)
+                items_to_import = filter_orders_b_w(response.items)
             created, updated, skipped, import_errors, _ = import_orders(
                 db, items_to_import, order_source=payload.order_source, filial_id_override=filial_override
             )
@@ -915,7 +907,7 @@ async def send_movement_to_picking(
     if existing:
         raise HTTPException(status_code=409, detail="Picking task already created")
 
-    if order.wms_state.status not in {"imported", "B#W", "B#S", "ready_for_picking", "allocated"}:
+    if order.wms_state.status not in {"imported", "B#W", "ready_for_picking", "allocated"}:
         raise HTTPException(status_code=409, detail="Order cannot be sent to picking")
 
     document_lines, shortages = _allocate_order(db, order, user.id)
@@ -982,7 +974,7 @@ async def send_order_to_picking(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    if order.wms_state.status not in {"imported", "B#W", "B#S", "ready_for_picking", "allocated"}:
+    if order.wms_state.status not in {"imported", "B#W", "ready_for_picking", "allocated"}:
         raise HTTPException(status_code=409, detail="Order cannot be sent to picking")
 
     if not order.lines:

@@ -13,7 +13,7 @@ from typing import Tuple
 
 from app.db import SessionLocal
 from app.integrations.smartup.client import SmartupClient
-from app.integrations.smartup.importer import delete_stale_orders, filter_orders_b_s, import_orders
+from app.integrations.smartup.importer import delete_stale_orders, filter_orders_b_w, import_orders
 from app.integrations.smartup.inventory_client import SmartupInventoryExportClient
 from app.integrations.smartup.products_sync import _sync_products
 from app.integrations.smartup.sync_lock import smartup_sync_lock
@@ -93,16 +93,16 @@ def sync_orders() -> Tuple[int, str | None, list]:
             end_modified_on=end_str,
         )
         all_items = response.items
-        items_b_s = filter_orders_b_s(all_items)
+        items_b_w = filter_orders_b_w(all_items)
         logger.info(
             "Orders sync: %s..%s -> %d buyurtma (modified_on), %d B#W",
-            begin_str, end_str, len(all_items), len(items_b_s),
+            begin_str, end_str, len(all_items), len(items_b_w),
         )
 
         db = SessionLocal()
         try:
-            created, updated, skipped, errors, _ = import_orders(db, items_b_s)
-            stale_deleted = delete_stale_orders(db, items_b_s)
+            created, updated, skipped, errors, _ = import_orders(db, items_b_w)
+            stale_deleted = delete_stale_orders(db, items_b_w)
             count = created + updated
             if errors:
                 logger.warning("Orders sync: %d errors (first: %s)", len(errors), errors[0].reason)

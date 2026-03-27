@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.auth.deps import require_permission
 from app.db import get_db
 from app.integrations.smartup.client import SmartupClient
-from app.integrations.smartup.importer import import_orders
+from app.integrations.smartup.importer import filter_orders_b_w, import_orders
 from app.integrations.smartup.sync_lock import smartup_sync_lock
 from app.models.smartup_sync import SmartupSyncRun
 
@@ -70,7 +70,8 @@ async def import_smartup_orders(
                 end_deal_date=payload.end_deal_date.strftime("%d.%m.%Y"),
                 filial_code=payload.filial_code,
             )
-            created, updated, skipped, errors, _ = import_orders(db, response.items)
+            items_b_w = filter_orders_b_w(response.items)
+            created, updated, skipped, errors, _ = import_orders(db, items_b_w)
         except Exception as exc:  # noqa: BLE001
             run.finished_at = datetime.utcnow()
             run.success_count = 0
@@ -130,8 +131,6 @@ async def smartup_order_export_raw(
         begin_modified_on=begin.strftime("%d.%m.%Y"),
         end_modified_on=end.strftime("%d.%m.%Y"),
     )
-    orders_json = [o.model_dump(mode="json") for o in response.items]
-    total = getattr(response, "total", None)
-    if total is None:
-        total = len(orders_json)
-    return {"order": orders_json, "total": total}
+    items_b_w = filter_orders_b_w(response.items)
+    orders_json = [o.model_dump(mode="json") for o in items_b_w]
+    return {"order": orders_json, "total": len(orders_json)}
