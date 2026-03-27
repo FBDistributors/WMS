@@ -102,6 +102,16 @@ export type OrderDetails = {
   movement_note?: string | null
 }
 
+/** Legacy: B#S → B#W (backend endi faqat B#W ni qo‘llab-quvvatlaydi). */
+function normalizeOrdersStatusQuery(status: string | undefined): string | undefined {
+  if (status == null || status === '') return undefined
+  const parts = status.split(',').map((s) => {
+    const t = s.trim()
+    return t === 'B#S' ? 'B#W' : t
+  })
+  return parts.filter(Boolean).join(',')
+}
+
 export type OrdersQuery = {
   status?: string
   q?: string
@@ -116,7 +126,11 @@ export type OrdersQuery = {
 }
 
 export async function getOrders(query: OrdersQuery = {}) {
-  return fetchJSON<OrdersListResponse>('/api/v1/orders', { query })
+  const q = { ...query }
+  if (q.status != null) {
+    q.status = normalizeOrdersStatusQuery(q.status)
+  }
+  return fetchJSON<OrdersListResponse>('/api/v1/orders', { query: q })
 }
 
 /** Baza va jadval yuklashni tekshirish: B#W soni va q bo'yicha topiladigan buyurtmalar */

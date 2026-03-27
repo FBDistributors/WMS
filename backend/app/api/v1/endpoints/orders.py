@@ -175,6 +175,12 @@ def _expand_status_filters(status_values: list[str]) -> list[str]:
     return list({(s or "").strip() for s in status_values if (s or "").strip()})
 
 
+def _normalize_list_status_token(token: str) -> str:
+    """Legacy clients yoki bookmarklar B#S yuborishi mumkin; filtrda faqat B#W ishlatiladi."""
+    t = (token or "").strip()
+    return "B#W" if t == "B#S" else t
+
+
 class PickerUser(BaseModel):
     id: UUID
     name: str
@@ -382,7 +388,7 @@ async def list_orders(
         query = query.filter(OrderModel.source == order_source.strip())
 
     if status:
-        statuses = [s.strip() for s in status.split(",") if s.strip()]
+        statuses = [_normalize_list_status_token(s) for s in status.split(",") if s.strip()]
         valid = [s for s in statuses if s in ORDER_STATUSES]
         if not valid:
             raise HTTPException(status_code=400, detail="Invalid status")

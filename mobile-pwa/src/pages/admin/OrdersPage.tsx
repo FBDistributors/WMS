@@ -100,6 +100,16 @@ const SEARCH_FIELD_OPTIONS = [
   { id: 'agent', labelKey: 'orders:search_fields.agent' },
 ]
 
+/** Eski bookmark / cache B#S qoldirishi mumkin; API va bulk yuklash B#W bilan ishlashi kerak */
+function normalizeOrderListStatusParam(s: string | undefined): string | undefined {
+  if (s == null || s === '') return undefined
+  return s
+    .split(',')
+    .map((p) => (p.trim() === 'B#S' ? 'B#W' : p.trim()))
+    .filter(Boolean)
+    .join(',')
+}
+
 const GROUP_TO_STATUS: Record<string, string | undefined> = {
   xom: 'imported,B#W', // Yangi: Smartupdan kelgan, admin yig'uvchiga yubormagan
   yigishda: 'allocated,ready_for_picking,picking', // Yig'uvchi yig'ishda / controllerga yubormagan
@@ -136,13 +146,15 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       : t('orders:title')
   // Asosiy Buyurtmalar sahifasida faqat yig'ishga yuborilmagan (B#W); yig'ishga yuborilganlar bu ro'yxatda ko'rinmasin
   // Buyurtma statuslari sahifasida group=all bo'lsa — yig'ishda + tekshiruvda + yakunlangan barcha statuslar
-  const statusParam = orderSource
-    ? (GROUP_TO_STATUS[group] ?? undefined)
-    : mode === 'default' && (group === 'all' || !searchParams.get('group'))
-      ? 'B#W'
-      : mode === 'statuses' && (group === 'all' || !searchParams.get('group'))
-        ? 'allocated,ready_for_picking,picking,picked,completed,packed,shipped'
-        : (GROUP_TO_STATUS[group] ?? GROUP_TO_STATUS.all)
+  const statusParam = normalizeOrderListStatusParam(
+    orderSource
+      ? (GROUP_TO_STATUS[group] ?? undefined)
+      : mode === 'default' && (group === 'all' || !searchParams.get('group'))
+        ? 'B#W'
+        : mode === 'statuses' && (group === 'all' || !searchParams.get('group'))
+          ? 'allocated,ready_for_picking,picking,picked,completed,packed,shipped'
+          : (GROUP_TO_STATUS[group] ?? GROUP_TO_STATUS.all)
+  )
 
   const onlyNotSentToPicking = mode === 'default' && !orderSource && (statusParam === 'B#W' || statusParam === 'imported,B#W')
   const SENT_TO_PICKING_STATUSES = new Set(['allocated', 'ready_for_picking', 'picking'])
