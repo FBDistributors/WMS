@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
-import { Search, PackagePlus, Settings, FileSpreadsheet, ChevronDown, Loader2, Check } from 'lucide-react'
+import {
+  Search,
+  PackagePlus,
+  Settings,
+  FileSpreadsheet,
+  ChevronDown,
+  Loader2,
+  Check,
+  CloudDownload,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import * as XLSX from 'xlsx'
 
@@ -45,6 +54,48 @@ function formatInt(value: unknown): string {
   return NUMBER_FORMATTER.format(Math.round(n))
 }
 
+/** SmartUP balance$export javobidan mahsulot kodi → jami miqdor map. */
+function buildSmartupQtyByProductCode(raw: unknown): Map<string, number> {
+  const result = new Map<string, number>()
+  if (!raw || typeof raw !== 'object') return result
+  const obj = raw as Record<string, unknown>
+  const listSources = ['balance', 'items', 'data', 'movement', 'export']
+  let rows: unknown[] = []
+  if (Array.isArray(raw)) {
+    rows = raw
+  } else {
+    for (const key of listSources) {
+      const val = obj[key]
+      if (Array.isArray(val)) {
+        rows = val
+        break
+      }
+    }
+  }
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue
+    const rec = row as Record<string, unknown>
+    const keys = Object.keys(rec)
+    const productKey =
+      keys.find((k) => k.toLowerCase() === 'product_code') ??
+      keys.find((k) => k.toLowerCase().includes('product') && k.toLowerCase().includes('code'))
+    const qtyKey =
+      keys.find((k) => k.toLowerCase() === 'quantity') ??
+      keys.find((k) => k.toLowerCase().startsWith('qty'))
+    if (!productKey || !qtyKey) continue
+    const codeRaw = rec[productKey]
+    const qtyRaw = rec[qtyKey]
+    if (codeRaw == null || qtyRaw == null) continue
+    const code = String(codeRaw).trim()
+    if (!code) continue
+    const qtyNum = Number(qtyRaw)
+    if (!Number.isFinite(qtyNum)) continue
+    const prev = result.get(code) ?? 0
+    result.set(code, prev + qtyNum)
+  }
+  return result
+}
+
 export function InventorySummaryPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -67,6 +118,8 @@ export function InventorySummaryPage() {
   const excelMenuRef = useRef<HTMLDivElement>(null)
   const [smartupQoldiqByCode, setSmartupQoldiqByCode] = useState<Map<string, number>>(new Map())
   const [smartupBronByCode, setSmartupBronByCode] = useState<Map<string, number>>(new Map())
+  const [isSmartupSyncing, setIsSmartupSyncing] = useState(false)
+  const [smartupSyncError, setSmartupSyncError] = useState<string | null>(null)
   const [exportSuccessAt, setExportSuccessAt] = useState<number | null>(null)
   const [exportSavedPath, setExportSavedPath] = useState<string | null>(null)
 
@@ -79,70 +132,70 @@ export function InventorySummaryPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const [summaryRes, smartupQoldiqRes, smartupBronRes] = await Promise.all([
-        getInventorySummaryLight({
-          search: debouncedSearch.trim() || undefined,
-          only_available: onlyAvailable,
-          include_locations: true,
-          limit: PAGE_SIZE,
-          offset,
-          warehouse,
-        }),
-        getSmartupBalance({ warehouse_code: '001' }),
-        getSmartupBalance({ warehouse_code: '002' }),
-      ])
-
+      const summaryRes = await getInventorySummaryLight({
+        search: debouncedSearch.trim() || undefined,
+        only_available: onlyAvailable,
+        include_locations: true,
+        limit: PAGE_SIZE,
+        offset,
+        warehouse,
+      })
       setData({ items: summaryRes.items, total: summaryRes.total })
-
-      const buildMap = (raw: unknown): Map<string, number> => {
-        const result = new Map<string, number>()
-        if (!raw || typeof raw !== 'object') return result
-        const obj = raw as Record<string, unknown>
-        const listSources = ['balance', 'items', 'data', 'movement', 'export']
-        let rows: unknown[] = []
-        if (Array.isArray(raw)) {
-          rows = raw
-        } else {
-          for (const key of listSources) {
-            const val = obj[key]
-            if (Array.isArray(val)) {
-              rows = val
-              break
-            }
-          }
-        }
-        for (const row of rows) {
-          if (!row || typeof row !== 'object') continue
-          const rec = row as Record<string, unknown>
-          const keys = Object.keys(rec)
-          const productKey =
-            keys.find((k) => k.toLowerCase() === 'product_code') ??
-            keys.find((k) => k.toLowerCase().includes('product') && k.toLowerCase().includes('code'))
-          const qtyKey = keys.find((k) => k.toLowerCase() === 'quantity') ?? keys.find((k) => k.toLowerCase().startsWith('qty'))
-          if (!productKey || !qtyKey) continue
-          const codeRaw = rec[productKey]
-          const qtyRaw = rec[qtyKey]
-          if (codeRaw == null || qtyRaw == null) continue
-          const code = String(codeRaw).trim()
-          if (!code) continue
-          const qtyNum = Number(qtyRaw)
-          if (!Number.isFinite(qtyNum)) continue
-          const prev = result.get(code) ?? 0
-          result.set(code, prev + qtyNum)
-        }
-        return result
-      }
-
-      setSmartupQoldiqByCode(buildMap(smartupQoldiqRes))
-      setSmartupBronByCode(buildMap(smartupBronRes))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('inventory:load_failed'))
+      setData({ items: [], total: 0 })
       setSmartupQoldiqByCode(new Map())
       setSmartupBronByCode(new Map())
-    } finally {
       setIsLoading(false)
+      return
     }
+
+    const settled = await Promise.allSettled([
+      getSmartupBalance({ warehouse_code: '001' }),
+      getSmartupBalance({ warehouse_code: '002' }),
+    ])
+    const q001 = settled[0]
+    const q002 = settled[1]
+    setSmartupQoldiqByCode(
+      q001.status === 'fulfilled' ? buildSmartupQtyByProductCode(q001.value) : new Map()
+    )
+    setSmartupBronByCode(
+      q002.status === 'fulfilled' ? buildSmartupQtyByProductCode(q002.value) : new Map()
+    )
+    setIsLoading(false)
   }, [debouncedSearch, onlyAvailable, offset, warehouse, t])
+
+  const syncSmartupFromSource = useCallback(async () => {
+    setIsSmartupSyncing(true)
+    setSmartupSyncError(null)
+    const settled = await Promise.allSettled([
+      getSmartupBalance({ warehouse_code: '001', refresh: true }),
+      getSmartupBalance({ warehouse_code: '002', refresh: true }),
+    ])
+    const q001 = settled[0]
+    const q002 = settled[1]
+    const errs: string[] = []
+    if (q001.status === 'fulfilled') {
+      setSmartupQoldiqByCode(buildSmartupQtyByProductCode(q001.value))
+    } else {
+      setSmartupQoldiqByCode(new Map())
+      errs.push(
+        q001.reason instanceof Error ? q001.reason.message : String(q001.reason ?? '')
+      )
+    }
+    if (q002.status === 'fulfilled') {
+      setSmartupBronByCode(buildSmartupQtyByProductCode(q002.value))
+    } else {
+      setSmartupBronByCode(new Map())
+      errs.push(
+        q002.reason instanceof Error ? q002.reason.message : String(q002.reason ?? '')
+      )
+    }
+    if (errs.length > 0) {
+      setSmartupSyncError(errs.filter(Boolean).join(' · ') || t('inventory:smartup_sync_failed'))
+    }
+    setIsSmartupSyncing(false)
+  }, [t])
 
   const prevSearchRef = useRef(debouncedSearch)
   const prevOnlyRef = useRef(onlyAvailable)
@@ -552,11 +605,31 @@ export function InventorySummaryPage() {
               </div>
             )}
           </div>
+          <Button
+            variant="secondary"
+            onClick={() => void syncSmartupFromSource()}
+            disabled={isLoading || isSmartupSyncing}
+            className="inline-flex items-center gap-2"
+            title={t('inventory:smartup_sync_hint')}
+          >
+            {isSmartupSyncing ? <Loader2 size={16} className="animate-spin shrink-0" /> : <CloudDownload size={16} className="shrink-0" />}
+            <span className="hidden sm:inline">{t('inventory:smartup_sync_button')}</span>
+            <span className="sm:hidden">{t('inventory:smartup_sync_button_short')}</span>
+          </Button>
           <Button variant="secondary" onClick={load} disabled={isLoading} className="inline-flex items-center gap-2">
             {isLoading ? <Loader2 size={16} className="animate-spin shrink-0" /> : null}
             {t('common:buttons.refresh')}
           </Button>
         </div>
+
+        {smartupSyncError ? (
+          <div
+            role="alert"
+            className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-200"
+          >
+            {smartupSyncError}
+          </div>
+        ) : null}
 
         {exportSuccessAt !== null && (
           <div
