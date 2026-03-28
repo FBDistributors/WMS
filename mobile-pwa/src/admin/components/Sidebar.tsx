@@ -12,7 +12,7 @@ import {
   Tag,
   MapPin,
   History,
-  FileStack,
+  ClipboardCheck,
   ArrowLeftRight,
   ChevronLeft,
   ChevronRight,
@@ -43,7 +43,7 @@ const MENU_ITEMS: Array<MenuItem & { key: string }> = [
   { key: 'receiving', label: 'Receiving', path: '/admin/receiving', icon: Inbox, required: 'receiving:read' },
   { key: 'users', label: 'Users & Access', path: '/admin/users', icon: Users, required: 'users:manage' },
   { key: 'audit', label: 'Audit Logs', path: '/admin/audit', icon: History, required: 'audit:read' },
-  { key: 'kamomat', label: 'Inventarizatsiya', path: '/admin/kamomat', icon: FileStack, required: 'movements:read' },
+  { key: 'kamomat', label: 'Inventarizatsiya', path: '/admin/kamomat', icon: ClipboardCheck, required: 'movements:read' },
   { key: 'api', label: 'API', path: '/admin/api', icon: Code2, required: 'admin:access' },
 ]
 
