@@ -356,12 +356,17 @@ export function InventorySummaryPage() {
     }
     if (data.items.length === 0) {
       return (
-        <EmptyState
-          title={t('inventory:empty')}
-          description={t('inventory:empty_desc')}
-          actionLabel={t('common:buttons.refresh')}
-          onAction={load}
-        />
+        <div className="relative min-h-[min(60vh,480px)]">
+          {isSmartupSyncing ? (
+            <LoadingOverlay label={t('inventory:smartup_sync_loading')} />
+          ) : null}
+          <EmptyState
+            title={t('inventory:empty')}
+            description={t('inventory:empty_desc')}
+            actionLabel={t('common:buttons.refresh')}
+            onAction={load}
+          />
+        </div>
       )
     }
     const visibleColumns = new Set(config.visibleColumns)
@@ -371,7 +376,11 @@ export function InventorySummaryPage() {
     const columnLabels = new Map(COLUMN_OPTIONS.map((c) => [c.id, t(c.labelKey)]))
 
     return (
-      <TableScrollArea inline>
+      <div className="relative min-h-[min(60vh,480px)]">
+        {isSmartupSyncing ? (
+          <LoadingOverlay label={t('inventory:smartup_sync_loading')} />
+        ) : null}
+        <TableScrollArea inline>
         <table className="w-max min-w-full text-sm">
           <thead className="text-xs uppercase text-slate-500">
             <tr className="border-b border-slate-200 dark:border-slate-800">
@@ -490,6 +499,7 @@ export function InventorySummaryPage() {
           </tbody>
         </table>
       </TableScrollArea>
+      </div>
     )
   }, [
     config.columnOrder,
@@ -497,6 +507,7 @@ export function InventorySummaryPage() {
     data.items,
     error,
     isLoading,
+    isSmartupSyncing,
     load,
     navigate,
     smartupQoldiqByCode,
@@ -606,15 +617,18 @@ export function InventorySummaryPage() {
             )}
           </div>
           <Button
-            variant="secondary"
+            variant="ghost"
+            className="shrink-0 rounded-full px-3 py-3"
             onClick={() => void syncSmartupFromSource()}
             disabled={isLoading || isSmartupSyncing}
-            className="inline-flex items-center gap-2"
             title={t('inventory:smartup_sync_hint')}
+            aria-label={t('inventory:smartup_sync_aria')}
           >
-            {isSmartupSyncing ? <Loader2 size={16} className="animate-spin shrink-0" /> : <CloudDownload size={16} className="shrink-0" />}
-            <span className="hidden sm:inline">{t('inventory:smartup_sync_button')}</span>
-            <span className="sm:hidden">{t('inventory:smartup_sync_button_short')}</span>
+            {isSmartupSyncing ? (
+              <Loader2 size={18} className="animate-spin shrink-0" />
+            ) : (
+              <CloudDownload size={18} className="shrink-0" />
+            )}
           </Button>
           <Button variant="secondary" onClick={load} disabled={isLoading} className="inline-flex items-center gap-2">
             {isLoading ? <Loader2 size={16} className="animate-spin shrink-0" /> : null}
