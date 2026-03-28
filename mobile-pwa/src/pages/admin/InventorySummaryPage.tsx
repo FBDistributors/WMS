@@ -342,10 +342,16 @@ export function InventorySummaryPage() {
   )
 
   const content = useMemo(() => {
-    if (isLoading) {
+    if (isLoading || isSmartupSyncing) {
       return (
         <div className="relative min-h-[min(60vh,480px)]">
-          <LoadingOverlay label={t('common:messages.loading')} />
+          <LoadingOverlay
+            label={
+              isLoading
+                ? t('common:messages.loading')
+                : t('inventory:smartup_sync_loading')
+            }
+          />
         </div>
       )
     }
@@ -356,17 +362,12 @@ export function InventorySummaryPage() {
     }
     if (data.items.length === 0) {
       return (
-        <div className="relative min-h-[min(60vh,480px)]">
-          {isSmartupSyncing ? (
-            <LoadingOverlay label={t('inventory:smartup_sync_loading')} />
-          ) : null}
-          <EmptyState
-            title={t('inventory:empty')}
-            description={t('inventory:empty_desc')}
-            actionLabel={t('common:buttons.refresh')}
-            onAction={load}
-          />
-        </div>
+        <EmptyState
+          title={t('inventory:empty')}
+          description={t('inventory:empty_desc')}
+          actionLabel={t('common:buttons.refresh')}
+          onAction={load}
+        />
       )
     }
     const visibleColumns = new Set(config.visibleColumns)
@@ -376,11 +377,7 @@ export function InventorySummaryPage() {
     const columnLabels = new Map(COLUMN_OPTIONS.map((c) => [c.id, t(c.labelKey)]))
 
     return (
-      <div className="relative min-h-[min(60vh,480px)]">
-        {isSmartupSyncing ? (
-          <LoadingOverlay label={t('inventory:smartup_sync_loading')} />
-        ) : null}
-        <TableScrollArea inline>
+      <TableScrollArea inline>
         <table className="w-max min-w-full text-sm">
           <thead className="text-xs uppercase text-slate-500">
             <tr className="border-b border-slate-200 dark:border-slate-800">
@@ -499,7 +496,6 @@ export function InventorySummaryPage() {
           </tbody>
         </table>
       </TableScrollArea>
-      </div>
     )
   }, [
     config.columnOrder,
