@@ -293,6 +293,8 @@ export function ScannerScreen() {
         inventoryStep: params.inventoryStep,
         inventoryLocationId: params.inventoryLocationId,
         inventoryLocationCode: params.inventoryLocationCode,
+        receivingLocationId: params.receivingLocationId,
+        receivingLocationCode: params.receivingLocationCode,
       });
       return;
     }
@@ -325,6 +327,8 @@ export function ScannerScreen() {
     params.flow,
     params.newMode,
     params.warehouse,
+    params.receivingLocationId,
+    params.receivingLocationCode,
     resetToMovement,
     resetToKirimForm,
     resetToInventoryDetail,
@@ -349,6 +353,8 @@ export function ScannerScreen() {
         flow: params.flow ?? 'return',
         newMode: params.newMode,
         warehouse: params.warehouse,
+        receivingLocationId: params.receivingLocationId,
+        receivingLocationCode: params.receivingLocationCode,
       });
       return;
     }
@@ -371,6 +377,8 @@ export function ScannerScreen() {
     params.flow,
     params.newMode,
     params.warehouse,
+    params.receivingLocationId,
+    params.receivingLocationCode,
     resetToMovement,
     resetToKirimForm,
     resetToInventoryDetail,

@@ -37,6 +37,9 @@ export type RootStackParamList = {
     inventoryStep?: 1 | 2 | 3;
     inventoryLocationId?: string;
     inventoryLocationCode?: string;
+    /** Kirim yangi mahsulot byLocation: tanlangan qabul qilish joyi (mahsulot skanidan keyin saqlash) */
+    receivingLocationId?: string;
+    receivingLocationCode?: string;
   };
   Hisob: undefined;
   Inventory: undefined;

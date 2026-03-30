@@ -412,13 +412,27 @@ export function KirimFormScreen() {
   }, [handleInventoryBack]);
 
   const handleScan = useCallback(() => {
-    const scanParams: { returnToKirimForm: true; flow: typeof flow; newMode?: 'byScan' | 'byLocation'; warehouse?: PickerWarehouseFilter; inventoryStep?: 1 | 2 | 3; inventoryLocationId?: string; inventoryLocationCode?: string } = {
+    const scanParams: {
+      returnToKirimForm: true;
+      flow: typeof flow;
+      newMode?: 'byScan' | 'byLocation';
+      warehouse?: PickerWarehouseFilter;
+      inventoryStep?: 1 | 2 | 3;
+      inventoryLocationId?: string;
+      inventoryLocationCode?: string;
+      receivingLocationId?: string;
+      receivingLocationCode?: string;
+    } = {
       returnToKirimForm: true,
       flow,
     };
     if (flow === 'new') {
       scanParams.warehouse = effectiveWarehouse;
       if (newMode) scanParams.newMode = newMode;
+      if (newMode === 'byLocation' && selectedLocation) {
+        scanParams.receivingLocationId = selectedLocation.id;
+        scanParams.receivingLocationCode = selectedLocation.code;
+      }
     }
     if (flow === 'inventory' && inventorySubMode === 'byLocation' && inventoryLocation) {
       scanParams.inventoryStep = Math.min(inventoryStep ?? 2, 2) as 1 | 2 | 3;
@@ -426,7 +440,7 @@ export function KirimFormScreen() {
       scanParams.inventoryLocationCode = inventoryLocation.code;
     }
     (navigation as any).replace('Scanner', scanParams);
-  }, [navigation, flow, newMode, effectiveWarehouse, inventoryStep, inventorySubMode, inventoryLocation]);
+  }, [navigation, flow, newMode, effectiveWarehouse, inventoryStep, inventorySubMode, inventoryLocation, selectedLocation]);
 
   const handleScanReceivingLocation = useCallback(() => {
     (navigation as any).replace('Scanner', {
