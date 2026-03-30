@@ -1,6 +1,16 @@
 /**
  * Backend picking API response types (PickingListItem, PickingDocument, PickingLine).
  */
+export type PickingAlternateLocation = {
+  location_id: string;
+  location_code: string;
+  lot_id: string;
+  available_qty: number;
+  batch?: string | null;
+  expiry_date?: string | null;
+  is_primary: boolean;
+};
+
 export interface PickingLine {
   id: string;
   product_name: string;
@@ -12,6 +22,8 @@ export interface PickingLine {
   qty_required: number;
   qty_picked: number;
   skip_reason?: string | null;
+  product_id?: string | null;
+  alternate_locations?: PickingAlternateLocation[];
 }
 
 export interface PickingProgress {
@@ -68,9 +80,11 @@ export interface ConsolidatedProduct {
   barcode?: string | null;
   sku?: string | null;
   product_name: string;
+  product_id?: string | null;
   total_required: number;
   total_picked: number;
   expiry_date?: string | null;
+  alternate_locations?: PickingAlternateLocation[];
   lines: ConsolidatedLineItem[];
 }
 

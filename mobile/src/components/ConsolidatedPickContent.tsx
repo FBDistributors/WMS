@@ -20,7 +20,11 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../types/navigation';
 import { useLocale } from '../i18n/LocaleContext';
 import { useNetwork } from '../network';
-import type { ConsolidatedViewResponse, ConsolidatedProduct } from '../api/picking.types';
+import type {
+  ConsolidatedViewResponse,
+  ConsolidatedProduct,
+  PickingAlternateLocation,
+} from '../api/picking.types';
 import { getConsolidatedView, consolidatedPick } from '../api/picking';
 import { ScanInput } from '../components/ScanInput';
 import { UNAUTHORIZED_MSG } from '../api/client';
@@ -78,7 +82,13 @@ export function ConsolidatedPickContent({
     setError(null);
     try {
       const res = await getConsolidatedView();
-      setData(res);
+      setData({
+        ...res,
+        products: (res.products ?? []).map((p) => ({
+          ...p,
+          alternate_locations: Array.isArray(p.alternate_locations) ? p.alternate_locations : [],
+        })),
+      });
     } catch (e) {
       const msg = e instanceof Error ? e.message : t('listLoadError');
       setError(msg);
@@ -189,7 +199,13 @@ export function ConsolidatedPickContent({
     try {
       const requestId = `cons-product-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const updated = await consolidatedPick(scannedBarcodeForQty.trim(), qty, requestId);
-      setData(updated);
+      setData({
+        ...updated,
+        products: (updated.products ?? []).map((p) => ({
+          ...p,
+          alternate_locations: Array.isArray(p.alternate_locations) ? p.alternate_locations : [],
+        })),
+      });
       playSuccessBeep();
       closeProductModal();
     } catch (e) {
@@ -203,11 +219,11 @@ export function ConsolidatedPickContent({
     if (!selectedProduct) return;
     hideModalForScanner();
     const nav = navigation.getParent?.() || navigation;
-    nav.navigate('Scanner', {
+    (nav as { navigate: (name: string, params?: object) => void }).navigate('Scanner', {
       returnToConsolidated: true,
       profileType: 'picker',
       selectedProductKey: consolidatedProductKey(selectedProduct),
-    } as any);
+    });
   }, [selectedProduct, navigation, hideModalForScanner]);
 
   if (loading) {
@@ -278,6 +294,10 @@ export function ConsolidatedPickContent({
                     <Text style={styles.modalClose}>✕</Text>
                   </TouchableOpacity>
                 </View>
+                <AlternateLocationsReadOnly
+                  locations={selectedProduct.alternate_locations ?? []}
+                  t={t}
+                />
                 {!scannedBarcodeForQty ? (
                   <>
                     <Text style={styles.modalHint}>{t('modalScanHint')}</Text>
@@ -335,6 +355,33 @@ export function ConsolidatedPickContent({
   );
 }
 
+function AlternateLocationsReadOnly({
+  locations,
+  t,
+}: {
+  locations: PickingAlternateLocation[];
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  if (!locations.length) return null;
+  return (
+    <View style={styles.altBlock}>
+      <Text style={styles.altBlockTitle}>{t('pickAlternateLocations')}</Text>
+      <Text style={styles.altBlockHint}>{t('consolidatedAlternateHint')}</Text>
+      <ScrollView style={styles.altBlockScroll} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+        {locations.map((alt) => {
+          const qty = Math.round(Number(alt.available_qty) || 0);
+          const line = `${alt.location_code}${alt.expiry_date ? ` · ${alt.expiry_date}` : ''} · ${t('pickAlternateQty', { qty })}`;
+          return (
+            <Text key={`${alt.location_id}-${alt.lot_id}`} style={styles.altBlockRow} numberOfLines={2}>
+              {alt.is_primary ? `★ ${line}` : line}
+            </Text>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
 function ProductRow({
   product,
   t,
@@ -352,6 +399,15 @@ function ProductRow({
   const locations = product.lines.length > 0
     ? [...new Set(product.lines.map((l) => l.location_code).filter(Boolean))].join(', ')
     : '';
+  const alts = product.alternate_locations ?? [];
+  const altCodes = alts
+    .map((a) => a.location_code)
+    .filter(Boolean)
+    .slice(0, 3);
+  const altSummary =
+    alts.length > 0
+      ? `${t('pickAlternateLocations')}: ${altCodes.join(', ')}${alts.length > 3 ? '…' : ''}`
+      : null;
   const cardStyle = [
     styles.productCard,
     isDone ? styles.productCardDone : styles.productCardIncomplete,
@@ -374,6 +430,7 @@ function ProductRow({
           {t('locationLabel')}: {locations}
         </Text>
       ) : null}
+      {altSummary ? <Text style={styles.productMetaMuted}>{altSummary}</Text> : null}
       <View style={styles.productByOrderRow}>
         {product.lines.length > 0 ? (
           <Text style={styles.productByOrder} numberOfLines={2}>
@@ -423,7 +480,18 @@ const styles = StyleSheet.create({
   productCardIncomplete: { backgroundColor: '#ffebee', borderColor: '#ffcdd2' },
   productName: { fontSize: 15, fontWeight: '600', color: '#111', marginBottom: 4 },
   productMeta: { fontSize: 13, color: '#555', marginBottom: 2 },
+  productMetaMuted: { fontSize: 12, color: '#777', marginBottom: 2, fontStyle: 'italic' },
   productTotals: { fontSize: 14, color: '#333' },
+  altBlock: {
+    marginBottom: 12,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  altBlockTitle: { fontSize: 13, fontWeight: '600', color: '#333', marginBottom: 4 },
+  altBlockHint: { fontSize: 12, color: '#666', marginBottom: 6 },
+  altBlockScroll: { maxHeight: 120 },
+  altBlockRow: { fontSize: 12, color: '#444', marginBottom: 4, paddingVertical: 2 },
   productByOrderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

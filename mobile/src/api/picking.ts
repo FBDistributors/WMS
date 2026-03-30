@@ -71,6 +71,17 @@ export async function getTaskById(documentId: string): Promise<PickingDocument> 
   return data;
 }
 
+export async function changePickSource(
+  lineId: string,
+  body: { location_id: string; lot_id: string }
+): Promise<PickLineResponse> {
+  const { data } = await apiClient.post<PickLineResponse>(
+    `${PICKING}/lines/${lineId}/change-pick-source`,
+    body
+  );
+  return data;
+}
+
 /** To'liq yig'maganda sabab kodlari (backend INCOMPLETE_REASON_CODES ga mos). */
 export const INCOMPLETE_REASON_KEYS = [
   'expired',

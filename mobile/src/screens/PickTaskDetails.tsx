@@ -15,7 +15,7 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../types/navigation';
 import type { PickingDocument, PickingLine } from '../api/picking.types';
 import apiClient, { UNAUTHORIZED_MSG } from '../api/client';
-import { completePickDocument, getTaskById, INCOMPLETE_REASON_KEYS, pickLine, skipLine, submitScan } from '../api/picking';
+import { changePickSource, completePickDocument, getTaskById, INCOMPLETE_REASON_KEYS, pickLine, skipLine, submitScan } from '../api/picking';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { ScanInput } from '../components/ScanInput';
 import { useLocale } from '../i18n/LocaleContext';
@@ -58,7 +58,12 @@ function barcodeMatchesLine(value: string, line: PickingLine): boolean {
 /** API dan kelgan documentni xavfsiz ko‘rsatish uchun normalizatsiya (lines/progress bo‘lmasa crash bo‘lmasin). */
 function normalizeDocument(raw: PickingDocument | null): PickingDocument | null {
   if (!raw) return null;
-  const lines = Array.isArray(raw.lines) ? raw.lines : [];
+  const lines = Array.isArray(raw.lines)
+    ? raw.lines.map((l) => ({
+        ...l,
+        alternate_locations: Array.isArray(l.alternate_locations) ? l.alternate_locations : [],
+      }))
+    : [];
   const progress = raw.progress && typeof raw.progress === 'object'
     ? { picked: Number(raw.progress.picked) || 0, required: Number(raw.progress.required) || 0 }
     : { picked: 0, required: lines.reduce((s, l) => s + (l.qty_required ?? 0), 0) };
@@ -307,6 +312,31 @@ export function PickTaskDetails() {
     }
   }, [taskId, doc, selectedLine, scannedBarcodeForQty, qtyInput, closeLineScan, navigation, t, isOnline, isController]);
 
+  const handleChangePickSource = useCallback(
+    async (lineId: string, locationId: string, lotId: string) => {
+      if (!isOnline) {
+        Alert.alert(t('error'), t('pickSwitchSourceOffline'));
+        return;
+      }
+      setSubmitting(true);
+      try {
+        await changePickSource(lineId, { location_id: locationId, lot_id: lotId });
+        Alert.alert(t('success'), t('pickSwitchSourceDone'));
+        await load();
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : t('loadError');
+        if (msg === UNAUTHORIZED_MSG) {
+          navigation.replace('Login');
+          return;
+        }
+        Alert.alert(t('error'), msg);
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [isOnline, load, navigation, t]
+  );
+
   const doComplete = useCallback(
     async (incompleteReason: string | undefined) => {
       if (!taskId) return;
@@ -491,10 +521,13 @@ export function PickTaskDetails() {
           : (doc?.lines ?? []).filter(Boolean).map((line) => ({ virtualLine: line as PickingLine, groupLines: [line as PickingLine] }))
         ).map(({ virtualLine, groupLines }, index) => {
           const allGroupVerified = groupLines.every((l) => controllerVerifiedLineIds.has(String(l.id)));
+          const stockLine = groupLines[0] ?? virtualLine;
+          const allowAlternatePick = !isController && groupLines.length === 1;
           return (
             <LineCard
               key={virtualLine.id ?? `line-${index}`}
               line={virtualLine}
+              stockLine={stockLine}
               onPress={() => openLineScan(virtualLine)}
               onReportReason={!isController && isOnline ? openLineReasonModal : undefined}
               isOnline={isOnline}
@@ -503,6 +536,12 @@ export function PickTaskDetails() {
               isController={isController}
               controllerVerified={isController && allGroupVerified}
               isDark={isDark}
+              allowAlternatePick={allowAlternatePick}
+              onPickAlternate={
+                allowAlternatePick && isOnline
+                  ? (locationId, lotId) => handleChangePickSource(String(stockLine.id), locationId, lotId)
+                  : undefined
+              }
             />
           );
         })}
@@ -737,6 +776,7 @@ export function PickTaskDetails() {
 
 function LineCard({
   line,
+  stockLine,
   onPress,
   onReportReason,
   isOnline,
@@ -745,8 +785,11 @@ function LineCard({
   isController,
   controllerVerified,
   isDark,
+  allowAlternatePick,
+  onPickAlternate,
 }: {
   line: PickingLine;
+  stockLine: PickingLine;
   onPress?: () => void;
   onReportReason?: (line: PickingLine) => void;
   isOnline?: boolean;
@@ -755,6 +798,8 @@ function LineCard({
   isController?: boolean;
   controllerVerified?: boolean;
   isDark?: boolean;
+  allowAlternatePick?: boolean;
+  onPickAlternate?: (locationId: string, lotId: string) => void;
 }) {
   const qtyPicked = Number(line.qty_picked) || 0;
   const qtyRequired = Number(line.qty_required) || 0;
@@ -782,10 +827,15 @@ function LineCard({
   const showReportReasonBtn =
     !isController && isDone && !isRejected && isOnline && onReportReason;
 
-  const content = (
+  const alts = stockLine.alternate_locations ?? [];
+  const canTapAlternates = Boolean(allowAlternatePick && onPickAlternate && !isRejected && !isDone);
+
+  const mainBlock = (
     <>
       <Text style={[styles.lineName, isDark && styles.lineNameDark]}>{line.product_name ?? '—'}</Text>
-      <Text style={[styles.lineMeta, isDark && styles.lineMetaDark]}>{t('locationLabel')}: {line.location_code ?? '—'}</Text>
+      <Text style={[styles.lineMeta, isDark && styles.lineMetaDark]}>
+        {t('pickPrimaryLocation')}: {stockLine.location_code ?? '—'}
+      </Text>
       <Text style={[styles.lineMeta, isDark && styles.lineMetaDark]}>{t('barcodeLabel')}: {line.barcode ?? '—'}</Text>
       <Text style={styles.lineQty}>
         {qtyPicked} / {qtyRequired}
@@ -805,6 +855,75 @@ function LineCard({
           <Text style={styles.doneBadgeText}>{t('verifiedBadge')}</Text>
         </View>
       )}
+    </>
+  );
+
+  return (
+    <View style={cardStyle}>
+      {readOnly ? (
+        mainBlock
+      ) : (
+        <TouchableOpacity onPress={onPress} activeOpacity={0.8} disabled={!onPress}>
+          {mainBlock}
+        </TouchableOpacity>
+      )}
+      {alts.length > 0 ? (
+        <View style={[styles.lineAltSection, isDark && styles.lineAltSectionDark]}>
+          <Text style={[styles.lineAltTitle, isDark && styles.lineAltTitleDark]}>{t('pickAlternateLocations')}</Text>
+          {canTapAlternates ? (
+            <Text style={[styles.lineAltHint, isDark && styles.lineAltHintDark]}>{t('pickTapToSwitchSource')}</Text>
+          ) : null}
+          <ScrollView style={styles.lineAltScroll} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+            {alts.map((alt) => {
+              const label = `${alt.location_code}${alt.expiry_date ? ` · ${alt.expiry_date}` : ''} · ${t('pickAlternateQty', { qty: Math.round(Number(alt.available_qty) || 0) })}`;
+              const isPri = alt.is_primary;
+              if (canTapAlternates && !isPri) {
+                return (
+                  <TouchableOpacity
+                    key={`${alt.location_id}-${alt.lot_id}`}
+                    style={[styles.lineAltRow, isDark && styles.lineAltRowDark]}
+                    onPress={() => {
+                      Alert.alert(t('pickAlternateLocations'), label, [
+                        { text: t('cancel'), style: 'cancel' },
+                        {
+                          text: t('confirmButton'),
+                          onPress: () => onPickAlternate!(alt.location_id, alt.lot_id),
+                        },
+                      ]);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Icon name="map-marker-outline" size={18} color={isDark ? '#93c5fd' : '#1565c0'} />
+                    <Text style={[styles.lineAltRowText, isDark && styles.lineAltRowTextDark]} numberOfLines={2}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              }
+              return (
+                <View
+                  key={`${alt.location_id}-${alt.lot_id}`}
+                  style={[
+                    styles.lineAltRow,
+                    isPri && styles.lineAltRowPrimary,
+                    isDark && styles.lineAltRowDark,
+                    isPri && isDark && styles.lineAltRowPrimaryDark,
+                  ]}
+                >
+                  <Icon
+                    name={isPri ? 'star-circle-outline' : 'map-marker-outline'}
+                    size={18}
+                    color={isDark ? '#94a3b8' : '#666'}
+                  />
+                  <Text style={[styles.lineAltRowText, isDark && styles.lineAltRowTextDark]} numberOfLines={2}>
+                    {isPri ? `★ ${label}` : label}
+                  </Text>
+                </View>
+              );
+            })}
+          </ScrollView>
+        </View>
+      ) : null}
       {showReportReasonBtn && (
         <TouchableOpacity
           style={styles.reportReasonBtn}
@@ -815,15 +934,7 @@ function LineCard({
           <Text style={styles.reportReasonBtnText}>{t('reportReasonBtn')}</Text>
         </TouchableOpacity>
       )}
-    </>
-  );
-  if (readOnly) {
-    return <View style={cardStyle}>{content}</View>;
-  }
-  return (
-    <TouchableOpacity style={cardStyle} onPress={onPress} activeOpacity={0.8}>
-      {content}
-    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -900,6 +1011,23 @@ const styles = StyleSheet.create({
   reportReasonBtnText: { fontSize: 14, color: '#c62828', fontWeight: '600' },
   lineMeta: { fontSize: 14, color: '#666', marginTop: 4 },
   lineQty: { fontSize: 14, fontWeight: '600', marginTop: 6 },
+  lineAltSection: { marginTop: 10, borderTopWidth: 1, borderTopColor: '#eee', paddingTop: 8 },
+  lineAltSectionDark: { borderTopColor: '#334155' },
+  lineAltTitle: { fontSize: 13, fontWeight: '600', color: '#333', marginBottom: 4 },
+  lineAltHint: { fontSize: 12, color: '#666', marginBottom: 6 },
+  lineAltScroll: { maxHeight: 140 },
+  lineAltRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    marginBottom: 4,
+    borderRadius: 8,
+    backgroundColor: '#f9f9f9',
+  },
+  lineAltRowPrimary: { backgroundColor: '#e8f4fd' },
+  lineAltRowText: { fontSize: 13, color: '#333', flex: 1 },
   doneBadge: {
     alignSelf: 'flex-start',
     backgroundColor: '#2e7d32',
@@ -1085,6 +1213,11 @@ const styles = StyleSheet.create({
   lineNameDark: { color: '#f1f5f9' },
   lineMetaDark: { color: '#94a3b8' },
   lineQtyDark: { color: '#f1f5f9' },
+  lineAltTitleDark: { color: '#e2e8f0' },
+  lineAltHintDark: { color: '#94a3b8' },
+  lineAltRowDark: { backgroundColor: '#334155' },
+  lineAltRowPrimaryDark: { backgroundColor: '#1e3a5f' },
+  lineAltRowTextDark: { color: '#e2e8f0' },
   lineSkippedReasonTextDark: { color: '#fca5a5' },
   footerDark: { backgroundColor: '#1e293b', borderTopColor: '#334155' },
   modalContentDark: { backgroundColor: '#1e293b' },

@@ -6,7 +6,7 @@ from uuid import UUID
 import logging
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
@@ -25,8 +25,20 @@ from app.models.stock import StockMovement as StockMovementModel
 from app.models.product import Product as ProductModel
 from app.models.user import User as UserModel
 from app.models.user_fcm_token import UserFCMToken
+from app.models.stock import StockLot as StockLotModel
+from app.api.v1.endpoints.picker_inventory import _get_lot_level_balances, _location_ids_for_warehouse
 
 router = APIRouter()
+
+
+class PickingAlternateLocation(BaseModel):
+    location_id: UUID
+    location_code: str
+    lot_id: UUID
+    available_qty: float
+    batch: Optional[str] = None
+    expiry_date: Optional[str] = None
+    is_primary: bool = False
 
 
 class PickingLine(BaseModel):
@@ -40,6 +52,8 @@ class PickingLine(BaseModel):
     qty_required: float
     qty_picked: float
     skip_reason: Optional[str] = None
+    product_id: Optional[UUID] = None
+    alternate_locations: List[PickingAlternateLocation] = Field(default_factory=list)
 
 
 class PickingProgress(BaseModel):
@@ -88,9 +102,11 @@ class ConsolidatedProduct(BaseModel):
     barcode: Optional[str] = None
     sku: Optional[str] = None
     product_name: str
+    product_id: Optional[UUID] = None
     total_required: float
     total_picked: float
     expiry_date: Optional[str] = None  # representative (e.g. first line's) for display
+    alternate_locations: List[PickingAlternateLocation] = Field(default_factory=list)
     lines: List[ConsolidatedLineItem]
 
 
@@ -125,6 +141,11 @@ class ConsolidatedPickRequest(BaseModel):
         if n <= 0:
             raise ValueError("qty must be positive")
         return n
+
+
+class ChangePickSourceRequest(BaseModel):
+    location_id: UUID
+    lot_id: UUID
 
 
 class PickLineRequest(BaseModel):
@@ -213,7 +234,92 @@ def _safe_expiry_date(expiry_date) -> Optional[str]:
     return str(expiry_date) if expiry_date else None
 
 
-def _to_picking_line(line: DocumentLineModel) -> PickingLine:
+def _picking_warehouse_for_order(order: Optional[OrderModel]) -> Optional[str]:
+    """Return showroom filter when order codes indicate showroom; else None (all locations)."""
+    if not order:
+        return None
+    for code in (order.from_warehouse_code, order.to_warehouse_code):
+        if not code or not str(code).strip():
+            continue
+        u = str(code).strip().upper()
+        if "SHOWROOM" in u or u in ("SR", "SHR", "SHOR"):
+            return "showroom"
+    return None
+
+
+def _balance_rows_by_product(
+    db: Session,
+    product_ids: list[UUID],
+    warehouse: Optional[str],
+) -> dict[UUID, list[dict]]:
+    if not product_ids:
+        return {}
+    loc_ids = _location_ids_for_warehouse(db, warehouse) if warehouse else None
+    rows = _get_lot_level_balances(db, product_ids, location_ids=loc_ids)
+    by_pid: dict[UUID, list[dict]] = {}
+    for r in rows:
+        pid = r["product_id"]
+        by_pid.setdefault(pid, []).append(r)
+    for pid, lst in by_pid.items():
+        lst.sort(
+            key=lambda x: (
+                x["expiry_date"] is None,
+                x["expiry_date"] or date.min,
+                -float(x["available"] or 0),
+            )
+        )
+    return by_pid
+
+
+def _line_alternate_locations(
+    line: DocumentLineModel,
+    rows: list[dict],
+    *,
+    max_rows: int = 24,
+) -> List[PickingAlternateLocation]:
+    if not line.product_id:
+        return []
+    lid, lot_line = line.location_id, line.lot_id
+    out: List[PickingAlternateLocation] = []
+    for r in rows:
+        if len(out) >= max_rows:
+            break
+        is_pri = lid is not None and lot_line is not None and r["location_id"] == lid and r["lot_id"] == lot_line
+        av = float(r["available"] or 0)
+        if av <= 0 and not is_pri:
+            continue
+        out.append(
+            PickingAlternateLocation(
+                location_id=r["location_id"],
+                location_code=r["location_code"] or "",
+                lot_id=r["lot_id"],
+                available_qty=av,
+                batch=r.get("batch"),
+                expiry_date=_safe_expiry_date(r.get("expiry_date")),
+                is_primary=is_pri,
+            )
+        )
+    if lid and lot_line and not any(x.is_primary for x in out):
+        out.insert(
+            0,
+            PickingAlternateLocation(
+                location_id=lid,
+                location_code=line.location_code or "",
+                lot_id=lot_line,
+                available_qty=0.0,
+                batch=line.batch,
+                expiry_date=_safe_expiry_date(getattr(line, "expiry_date", None)),
+                is_primary=True,
+            ),
+        )
+    return out[:max_rows]
+
+
+def _to_picking_line(
+    line: DocumentLineModel,
+    *,
+    alternate_locations: Optional[List[PickingAlternateLocation]] = None,
+) -> PickingLine:
     return PickingLine(
         id=line.id,
         product_name=line.product_name or "",
@@ -225,7 +331,29 @@ def _to_picking_line(line: DocumentLineModel) -> PickingLine:
         qty_required=float(line.required_qty) if line.required_qty is not None else 0,
         qty_picked=float(line.picked_qty) if line.picked_qty is not None else 0,
         skip_reason=getattr(line, "skip_reason", None),
+        product_id=line.product_id,
+        alternate_locations=list(alternate_locations or []),
     )
+
+
+def _picking_lines_with_alternates(
+    db: Session,
+    document: DocumentModel,
+    lines: List[DocumentLineModel],
+) -> List[PickingLine]:
+    order = getattr(document, "order", None)
+    if order is None and document.order_id:
+        order = db.query(OrderModel).filter(OrderModel.id == document.order_id).one_or_none()
+    wh = _picking_warehouse_for_order(order)
+    pids = list({ln.product_id for ln in lines if ln.product_id})
+    by_pid = _balance_rows_by_product(db, pids, wh)
+    return [
+        _to_picking_line(
+            ln,
+            alternate_locations=_line_alternate_locations(ln, by_pid.get(ln.product_id, [])),
+        )
+        for ln in lines
+    ]
 
 
 def _picker_name(doc: DocumentModel) -> Optional[str]:
@@ -250,13 +378,21 @@ def _to_picking_document(doc: DocumentModel) -> PickingDocument:
     )
 
 
-def _to_picking_document_with_lines(doc: DocumentModel, lines: List[DocumentLineModel]) -> PickingDocument:
+def _to_picking_document_with_lines(
+    doc: DocumentModel,
+    lines: List[DocumentLineModel],
+    db: Optional[Session] = None,
+) -> PickingDocument:
     """Commit dan keyin javob qaytarish uchun — doc.lines expired bo‘lishi mumkin."""
+    if db is not None:
+        plines = _picking_lines_with_alternates(db, doc, lines)
+    else:
+        plines = [_to_picking_line(line) for line in lines]
     return PickingDocument(
         id=doc.id,
         reference_number=doc.doc_no,
         status=doc.status,
-        lines=[_to_picking_line(line) for line in lines],
+        lines=plines,
         progress=_calculate_progress(lines),
         incomplete_reason=getattr(doc, "incomplete_reason", None),
         assigned_to_user_id=doc.assigned_to_user_id,
@@ -327,7 +463,7 @@ async def get_picking_document(
         )
         .all()
     )
-    return _to_picking_document_with_lines(document, lines)
+    return _to_picking_document_with_lines(document, lines, db)
 
 
 @router.get("/documents", response_model=List[PickingListItem], summary="Picking documents")
@@ -504,6 +640,8 @@ def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedView
         for row in db.query(ProductModel.id, ProductModel.barcode).filter(ProductModel.id.in_(need_barcode_ids)).all():
             if row.barcode and str(row.barcode).strip():
                 product_barcode_map[row.id] = row.barcode
+    all_pids = list({first_line_attrs[k][2] for k in first_line_attrs if first_line_attrs[k][2]})
+    by_pid_consolidated = _balance_rows_by_product(db, all_pids, None)
     products = []
     for (barcode_or_sku, product_name, sku), _name, _sku, expiry_display in product_order:
         key = (barcode_or_sku, product_name, sku)
@@ -515,14 +653,21 @@ def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedView
             first_barcode if (first_barcode and str(first_barcode).strip()) else
             (product_barcode_map.get(first_product_id) if first_product_id else None)
         )
+        alt = (
+            _product_level_alternates(by_pid_consolidated.get(first_product_id, []))
+            if first_product_id
+            else []
+        )
         products.append(
             ConsolidatedProduct(
                 barcode=barcode if (barcode and str(barcode).strip()) else None,
                 sku=first_sku if (first_sku and str(first_sku).strip()) else sku,
                 product_name=product_name or "",
+                product_id=first_product_id,
                 total_required=total_required,
                 total_picked=total_picked,
                 expiry_date=expiry_display,
+                alternate_locations=alt,
                 lines=lines_list,
             )
         )
@@ -866,6 +1011,156 @@ async def send_to_controller(
     document.controlled_by_user_id = payload.controller_user_id
     db.commit()
     return _to_picking_document(document)
+
+
+def _product_level_alternates(rows: list[dict], *, max_rows: int = 24) -> List[PickingAlternateLocation]:
+    out: List[PickingAlternateLocation] = []
+    for r in rows:
+        if len(out) >= max_rows:
+            break
+        av = float(r["available"] or 0)
+        if av <= 0:
+            continue
+        out.append(
+            PickingAlternateLocation(
+                location_id=r["location_id"],
+                location_code=r["location_code"] or "",
+                lot_id=r["lot_id"],
+                available_qty=av,
+                batch=r.get("batch"),
+                expiry_date=_safe_expiry_date(r.get("expiry_date")),
+                is_primary=False,
+            )
+        )
+    return out
+
+
+@router.post(
+    "/lines/{line_id}/change-pick-source",
+    response_model=PickLineResponse,
+    summary="Qolgan terishni boshqa NORMAL lokatsiya/partiyaga ko‘chirish (zaxira yozuvlari)",
+)
+async def change_pick_source(
+    line_id: UUID,
+    payload: ChangePickSourceRequest,
+    db: Session = Depends(get_db),
+    user: UserModel = Depends(get_current_user),
+    _guard=Depends(require_permission("picking:pick")),
+):
+    line = (
+        db.query(DocumentLineModel)
+        .filter(DocumentLineModel.id == line_id)
+        .with_for_update()
+        .one_or_none()
+    )
+    if not line:
+        raise HTTPException(status_code=404, detail="Line not found")
+    document = (
+        db.query(DocumentModel)
+        .options(selectinload(DocumentModel.order))
+        .filter(DocumentModel.id == line.document_id)
+        .with_for_update()
+        .one_or_none()
+    )
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if user.role == "picker" and document.assigned_to_user_id != user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if line.skip_reason:
+        raise HTTPException(status_code=409, detail="Line is skipped")
+    if not document.order_id:
+        raise HTTPException(
+            status_code=409,
+            detail="Buyurtmasiz hujjat: manbani almashtirib bo‘lmaydi",
+        )
+    if not line.product_id:
+        raise HTTPException(status_code=409, detail="Line missing product_id")
+
+    req = Decimal(str(line.required_qty or 0))
+    picked = Decimal(str(line.picked_qty or 0))
+    rem = req - picked
+    if rem <= 0:
+        raise HTTPException(status_code=400, detail="Line already fully picked")
+
+    if payload.location_id == line.location_id and payload.lot_id == line.lot_id:
+        raise HTTPException(status_code=400, detail="Already using this location and lot")
+
+    new_loc = db.query(LocationModel).filter(LocationModel.id == payload.location_id).one_or_none()
+    if not new_loc or new_loc.zone_type != "NORMAL":
+        raise HTTPException(status_code=400, detail="Pick only from NORMAL zone")
+
+    new_lot = db.query(StockLotModel).filter(StockLotModel.id == payload.lot_id).one_or_none()
+    if not new_lot or new_lot.product_id != line.product_id:
+        raise HTTPException(status_code=400, detail="Invalid lot for this product")
+
+    bals = _get_lot_level_balances(db, [line.product_id], location_id=payload.location_id)
+    match = next((r for r in bals if r["lot_id"] == payload.lot_id), None)
+    if not match or float(match["available"] or 0) < float(rem):
+        raise HTTPException(
+            status_code=409,
+            detail="Tanlangan joyda qolgan terish uchun yetarli qoldiq yo‘q",
+        )
+
+    if line.lot_id and line.location_id:
+        if picked == 0:
+            db.add(
+                StockMovementModel(
+                    product_id=line.product_id,
+                    lot_id=line.lot_id,
+                    location_id=line.location_id,
+                    qty_change=-req,
+                    movement_type="allocate",
+                    source_document_type="order",
+                    source_document_id=document.order_id,
+                    created_by_user_id=user.id,
+                )
+            )
+        else:
+            db.add(
+                StockMovementModel(
+                    product_id=line.product_id,
+                    lot_id=line.lot_id,
+                    location_id=line.location_id,
+                    qty_change=-rem,
+                    movement_type="unallocate",
+                    source_document_type="document",
+                    source_document_id=document.id,
+                    created_by_user_id=user.id,
+                )
+            )
+
+    db.add(
+        StockMovementModel(
+            product_id=line.product_id,
+            lot_id=payload.lot_id,
+            location_id=payload.location_id,
+            qty_change=rem,
+            movement_type="allocate",
+            source_document_type="order",
+            source_document_id=document.order_id,
+            created_by_user_id=user.id,
+        )
+    )
+
+    line.location_id = payload.location_id
+    line.lot_id = payload.lot_id
+    line.location_code = new_loc.code or ""
+    line.batch = new_lot.batch
+    line.expiry_date = new_lot.expiry_date
+
+    db.commit()
+    db.refresh(line)
+    lines_after = (
+        db.query(DocumentLineModel)
+        .filter(DocumentLineModel.document_id == document.id)
+        .all()
+    )
+    pline = _picking_lines_with_alternates(db, document, [line])[0]
+    return PickLineResponse(
+        line=pline,
+        progress=_calculate_progress(lines_after),
+        document_status=document.status,
+    )
 
 
 @router.post(
@@ -1225,7 +1520,7 @@ async def complete_picking_document(
         if document.controlled_by_user_id != user.id:
             raise HTTPException(status_code=403, detail="Document not assigned to you")
         if document.status == "completed":
-            response = _to_picking_document_with_lines(document, lines)
+            response = _to_picking_document_with_lines(document, lines, db)
             db.commit()
             return response
         if document.status != "picked":
@@ -1256,6 +1551,6 @@ async def complete_picking_document(
             if order and order.wms_state and order.wms_state.status in {"picking", "allocated"}:
                 order.wms_state.status = "picked"
     # Javobni commit dan oldin yig‘ib olamiz (commit dan keyin session expired bo‘ladi)
-    response = _to_picking_document_with_lines(document, lines)
+    response = _to_picking_document_with_lines(document, lines, db)
     db.commit()
     return response
