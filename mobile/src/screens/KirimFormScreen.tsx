@@ -189,6 +189,19 @@ export function KirimFormScreen() {
     [loadProductById]
   );
 
+  const clearKirimReturnParams = useCallback(() => {
+    navigation.setParams({
+      ...route.params,
+      scannedProductId: undefined,
+      scannedBarcode: undefined,
+      inventoryStep: undefined,
+      inventoryLocationId: undefined,
+      inventoryLocationCode: undefined,
+      receivingLocationId: undefined,
+      receivingLocationCode: undefined,
+    } as any);
+  }, [navigation, route.params]);
+
   useFocusEffect(
     useCallback(() => {
       const pid = params?.scannedProductId;
@@ -196,6 +209,7 @@ export function KirimFormScreen() {
       const invLocCode = params?.inventoryLocationCode;
       const recvLocId = params?.receivingLocationId;
       const recvLocCode = params?.receivingLocationCode;
+      let consumedReturnParams = false;
       if (flow === 'new' && recvLocId && recvLocCode) {
         setNewMode('byLocation');
         setSelectedLocation({
@@ -204,12 +218,7 @@ export function KirimFormScreen() {
           name: recvLocCode,
         });
         setLocationSearch(recvLocCode);
-        navigation.setParams({
-          ...route.params,
-          receivingLocationId: undefined,
-          receivingLocationCode: undefined,
-        } as any);
-        return;
+        consumedReturnParams = true;
       }
       if (flow === 'inventory' && pid) {
         if (invLocId && invLocCode) {
@@ -221,28 +230,14 @@ export function KirimFormScreen() {
           });
           setInventoryLocationSearch(invLocCode);
           setInventoryStep(2);
-          navigation.setParams({
-            ...route.params,
-            scannedProductId: undefined,
-            scannedBarcode: undefined,
-            inventoryStep: undefined,
-            inventoryLocationId: undefined,
-            inventoryLocationCode: undefined,
-          } as any);
+          clearKirimReturnParams();
           return;
         }
         setInventorySubMode('byScan');
         setInventoryStep(2);
         loadProductById(pid);
         setSelectedScannedLocation(null);
-        navigation.setParams({
-          ...route.params,
-          scannedProductId: undefined,
-          scannedBarcode: undefined,
-          inventoryStep: undefined,
-          inventoryLocationId: undefined,
-          inventoryLocationCode: undefined,
-        } as any);
+        clearKirimReturnParams();
         return;
       }
       if (flow === 'inventory' && invLocId && invLocCode && !pid) {
@@ -254,23 +249,16 @@ export function KirimFormScreen() {
         });
         setInventoryLocationSearch(invLocCode);
         setInventoryStep((params?.inventoryStep as 1 | 2) ?? 2);
-        navigation.setParams({
-          ...route.params,
-          inventoryStep: undefined,
-          inventoryLocationId: undefined,
-          inventoryLocationCode: undefined,
-        } as any);
+        clearKirimReturnParams();
         return;
       }
       if (pid && flow !== 'inventory') {
-        if (flow === 'new') setNewMode((m) => m ?? 'byScan');
+        if (flow === 'new' && !(recvLocId && recvLocCode)) setNewMode((m) => m ?? 'byScan');
         loadProductById(pid);
-        navigation.setParams({
-          flow: route.params?.flow ?? 'return',
-          newMode: params?.newMode,
-          scannedProductId: undefined,
-          scannedBarcode: undefined,
-        } as any);
+        consumedReturnParams = true;
+      }
+      if (consumedReturnParams) {
+        clearKirimReturnParams();
       }
     }, [
       flow,
@@ -282,8 +270,7 @@ export function KirimFormScreen() {
       params?.receivingLocationCode,
       params?.newMode,
       loadProductById,
-      navigation,
-      route.params,
+      clearKirimReturnParams,
     ])
   );
 
