@@ -32,12 +32,12 @@ class SmartupClient:
 
     def export_orders(
         self,
-        begin_deal_date: str,
-        end_deal_date: str,
-        filial_code: str | None,
-        begin_modified_on: str | None = None,
-        end_modified_on: str | None = None,
+        filial_code: str | None = None,
         *,
+        begin_deal_date: str = "",
+        end_deal_date: str = "",
+        begin_modified_on: str = "",
+        end_modified_on: str = "",
         status: str = "B#W",
     ) -> SmartupOrderExportResponse:
         if not self.base_url:
@@ -52,19 +52,24 @@ class SmartupClient:
         normalized_filial_code = (filial_code or "").strip()
         # Faqat shu status bo'yicha SmartUp server filtrlashi kerak (keyin WMS da qayta filtrlash yo'q).
         status_value = (status or "").strip()
+        # Sana maydonlari bo'sh = SmartUp tomonda sana bo'yicha filtr yo'q (Postman bilan sinov uchun).
+        bd = (begin_deal_date or "").strip()
+        ed = (end_deal_date or "").strip()
+        bm = (begin_modified_on or "").strip()
+        em = (end_modified_on or "").strip()
         payload = {
             "filial_codes": [{"filial_code": normalized_filial_code}] if normalized_filial_code else [{"filial_code": ""}],
             "filial_code": normalized_filial_code or "",
             "external_id": "",
             "deal_id": "",
             "status": status_value,
-            "begin_deal_date": begin_deal_date,
-            "end_deal_date": end_deal_date,
+            "begin_deal_date": bd,
+            "end_deal_date": ed,
             "delivery_date": "",
             "begin_created_on": "",
             "end_created_on": "",
-            "begin_modified_on": (begin_modified_on or "").strip() or "",
-            "end_modified_on": (end_modified_on or "").strip() or "",
+            "begin_modified_on": bm,
+            "end_modified_on": em,
         }
         data = json.dumps(payload).encode("utf-8")
         credentials = f"{self.username}:{self.password}"

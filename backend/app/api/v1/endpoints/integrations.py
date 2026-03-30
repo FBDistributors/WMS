@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -18,8 +18,8 @@ router = APIRouter()
 
 
 class SmartupImportRequest(BaseModel):
-    begin_deal_date: date = Field(..., description="YYYY-MM-DD")
-    end_deal_date: date = Field(..., description="YYYY-MM-DD")
+    begin_deal_date: Optional[date] = Field(default=None, description="YYYY-MM-DD (hozircha SmartUp ga yuborilmaydi)")
+    end_deal_date: Optional[date] = Field(default=None, description="YYYY-MM-DD (hozircha SmartUp ga yuborilmaydi)")
     filial_code: Optional[str] = None
 
 
@@ -36,7 +36,11 @@ async def import_smartup_orders(
     db: Session = Depends(get_db),
     _user=Depends(require_permission("integrations:write")),
 ):
-    if payload.begin_deal_date > payload.end_deal_date:
+    if (
+        payload.begin_deal_date is not None
+        and payload.end_deal_date is not None
+        and payload.begin_deal_date > payload.end_deal_date
+    ):
         raise HTTPException(status_code=400, detail="begin_deal_date must be <= end_deal_date")
 
     with smartup_sync_lock(db) as acquired:
@@ -48,13 +52,13 @@ async def import_smartup_orders(
         run = SmartupSyncRun(
             run_type="orders",
             request_payload={
-                "begin_deal_date": payload.begin_deal_date.isoformat(),
-                "end_deal_date": payload.end_deal_date.isoformat(),
+                "begin_deal_date": payload.begin_deal_date.isoformat() if payload.begin_deal_date else None,
+                "end_deal_date": payload.end_deal_date.isoformat() if payload.end_deal_date else None,
                 "filial_code": payload.filial_code,
             },
             params_json={
-                "begin_deal_date": payload.begin_deal_date.isoformat(),
-                "end_deal_date": payload.end_deal_date.isoformat(),
+                "begin_deal_date": payload.begin_deal_date.isoformat() if payload.begin_deal_date else None,
+                "end_deal_date": payload.end_deal_date.isoformat() if payload.end_deal_date else None,
                 "filial_code": payload.filial_code,
             },
             status="running",
@@ -65,11 +69,7 @@ async def import_smartup_orders(
 
         try:
             client = SmartupClient()
-            response = client.export_orders(
-                begin_deal_date=payload.begin_deal_date.strftime("%d.%m.%Y"),
-                end_deal_date=payload.end_deal_date.strftime("%d.%m.%Y"),
-                filial_code=payload.filial_code,
-            )
+            response = client.export_orders(filial_code=payload.filial_code)
             created, updated, skipped, errors, _ = import_orders(db, response.items)
         except Exception as exc:  # noqa: BLE001
             run.finished_at = datetime.utcnow()
@@ -110,25 +110,19 @@ async def import_smartup_orders(
     response_model=None,
 )
 async def smartup_order_export_raw(
-    begin_deal_date: Optional[date] = Query(None, description="YYYY-MM-DD (default: 7 days ago)"),
-    end_deal_date: Optional[date] = Query(None, description="YYYY-MM-DD (default: today)"),
+    begin_deal_date: Optional[date] = Query(
+        None, description="(Rezerv) SmartUp ga hozircha yuborilmaydi"
+    ),
+    end_deal_date: Optional[date] = Query(None, description="(Rezerv) SmartUp ga hozircha yuborilmaydi"),
     filial_code: Optional[str] = Query(None, description="Filial code filter (Sync bilan bir xil)"),
     filial_id: Optional[str] = Query(None, description="Filial ID (Sync bilan bir xil)"),
     _user=Depends(require_permission("integrations:write")),
 ) -> dict[str, Any]:
-    """SmartUp order$export dan to'g'ridan-to'g'ri javobni qaytaradi (bazaga yozmaydi). Sync bilan bir xil parametrlar."""
-    today = date.today()
-    end = end_deal_date or today
-    begin = begin_deal_date or (today - timedelta(days=7))
-    if begin > end:
+    """SmartUp order$export dan to'g'ridan-to'g'ri javob (sana filtrlari yuborilmaydi, status=B#W)."""
+    if begin_deal_date is not None and end_deal_date is not None and begin_deal_date > end_deal_date:
         raise HTTPException(status_code=400, detail="begin_deal_date must be <= end_deal_date")
     client = SmartupClient(filial_id=(filial_id or "").strip() or None)
-    response = client.export_orders(
-        begin_deal_date=begin.strftime("%d.%m.%Y"),
-        end_deal_date=end.strftime("%d.%m.%Y"),
-        filial_code=filial_code,
-        begin_modified_on=begin.strftime("%d.%m.%Y"),
-        end_modified_on=end.strftime("%d.%m.%Y"),
-    )
+    # begin_deal_date / end_deal_date query hozircha SmartUp ga yuborilmaydi (sinov).
+    response = client.export_orders(filial_code=filial_code)
     orders_json = [o.model_dump(mode="json") for o in response.items]
     return {"order": orders_json, "total": len(orders_json)}

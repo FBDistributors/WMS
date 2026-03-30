@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import date, timedelta
+from datetime import date
 from typing import List, Optional
 from uuid import UUID
 
@@ -21,7 +21,6 @@ from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_
 from app.services.push_notifications import send_push_to_user
 from app.integrations.smartup.client import SmartupClient
 from app.integrations.smartup.importer import delete_stale_orders, import_orders
-from app.integrations.smartup.mfm_movement import export_mfm_movements
 from app.integrations.smartup.sync_lock import smartup_sync_lock
 from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
@@ -772,19 +771,6 @@ async def sync_orders_from_smartup(
             status_code=400,
             detail="Tashkiliy harakatlar uchun GET /api/v1/movements dan foydalaning. Sync buyurtmalar jadvaliga yozilmaydi.",
         )
-    today = date.today()
-    if payload.order_source == "diller" and payload.begin_deal_date is None and payload.end_deal_date is None:
-        begin_date = today - timedelta(days=30)
-        end_date = today
-    elif payload.begin_deal_date is None and payload.end_deal_date is None:
-        # SmartUP buyurtmalar: default oxirgi 7 kun
-        begin_date = today - timedelta(days=7)
-        end_date = today
-    else:
-        begin_date = payload.begin_deal_date or today
-        end_date = payload.end_deal_date or today
-    if begin_date > end_date:
-        raise HTTPException(status_code=400, detail="begin_deal_date must be <= end_deal_date")
 
     with smartup_sync_lock(db) as acquired:
         if not acquired:
@@ -793,32 +779,15 @@ async def sync_orders_from_smartup(
                 detail="SmartUp sync already in progress (worker or another request). Try again later.",
             )
         try:
-            if payload.order_source == "diller":
-                # Tashkiliy harakat: cross-organizational movement (mfm movement$export), order'dan emas
-                response = export_mfm_movements(
-                    begin_date=begin_date,
-                    end_date=end_date,
-                    filial_id=(payload.filial_id or "").strip() or None,
-                )
-                filial_override = (payload.filial_id or "").strip() or None
-                items_to_import = response.items
-            else:
-                # Oddiy buyurtmalar: order$export (savdo buyurtmalari). Oxirgi 7 kun o'zgartirilganlari (modified_on).
-                client = SmartupClient(filial_id=(payload.filial_id or "").strip() or None)
-                response = client.export_orders(
-                    begin_deal_date=begin_date.strftime("%d.%m.%Y"),
-                    end_deal_date=end_date.strftime("%d.%m.%Y"),
-                    filial_code=payload.filial_code,
-                    begin_modified_on=begin_date.strftime("%d.%m.%Y"),
-                    end_modified_on=end_date.strftime("%d.%m.%Y"),
-                )
-                filial_override = (payload.filial_id or "").strip() or None
-                items_to_import = response.items
+            # order$export: sana maydonlari yuborilmaydi (SmartUp sinovi); status=B#W client default.
+            client = SmartupClient(filial_id=(payload.filial_id or "").strip() or None)
+            response = client.export_orders(filial_code=payload.filial_code)
+            filial_override = (payload.filial_id or "").strip() or None
+            items_to_import = response.items
             created, updated, skipped, import_errors, _ = import_orders(
                 db, items_to_import, order_source=payload.order_source, filial_id_override=filial_override
             )
-            if payload.order_source != "diller":
-                delete_stale_orders(db, list(items_to_import))
+            delete_stale_orders(db, list(items_to_import))
             detail = import_errors[0].reason if import_errors else None
             errors_count = len(import_errors) if import_errors else None
             return SmartupSyncResponse(

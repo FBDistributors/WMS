@@ -7,8 +7,7 @@ from SmartUp API into PostgreSQL. Idempotent, safe for retries.
 from __future__ import annotations
 
 import logging
-import os
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Tuple
 
 from app.db import SessionLocal
@@ -25,15 +24,6 @@ logger = logging.getLogger(__name__)
 STATUS_SUCCESS = "SUCCESS"
 STATUS_FAILED = "FAILED"
 STATUS_PARTIAL = "PARTIAL"
-
-
-def _get_orders_date_range() -> Tuple[date, date]:
-    """Get date range for order sync (last N days). Default 7 — oxirgi 7 kun o'zgarishlari."""
-    days = int(os.getenv("SYNC_ORDERS_DAYS_BACK", "7"))
-    days = max(1, min(days, 90))
-    end_date = date.today()
-    start_date = end_date - timedelta(days=days)
-    return start_date, end_date
 
 
 def sync_products() -> Tuple[int, str | None, list]:
@@ -78,25 +68,14 @@ def sync_products() -> Tuple[int, str | None, list]:
 def sync_orders() -> Tuple[int, str | None, list]:
     """
     Fetch orders from SmartUp API and upsert into orders table.
-    Oxirgi N kun (SYNC_ORDERS_DAYS_BACK) o'zgartirilgan buyurtmalar — modified_on orqali bitta so'rov.
+    Sana filtrlari yuborilmaydi (barcha sana maydonlari bo'sh); status=B#W.
     """
     try:
-        start_date, end_date = _get_orders_date_range()
         client = SmartupClient()
-        begin_str = start_date.strftime("%d.%m.%Y")
-        end_str = end_date.strftime("%d.%m.%Y")
-        response = client.export_orders(
-            begin_deal_date=begin_str,
-            end_deal_date=end_str,
-            filial_code=None,
-            begin_modified_on=begin_str,
-            end_modified_on=end_str,
-        )
+        response = client.export_orders(filial_code=None)
         items = response.items
         logger.info(
-            "Orders sync: %s..%s -> %d buyurtma (SmartUp order$export, status=B#W)",
-            begin_str,
-            end_str,
+            "Orders sync: %d buyurtma (SmartUp order$export, sana filtri yo'q, status=B#W)",
             len(items),
         )
 

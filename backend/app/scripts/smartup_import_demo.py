@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from datetime import date
 
 from app.db import SessionLocal
 from app.integrations.smartup.client import SmartupClient
@@ -10,14 +9,7 @@ from app.integrations.smartup.importer import import_orders
 
 def main() -> None:
     client = SmartupClient()
-    begin = date.today().replace(day=1)
-    end = date.today()
-
-    response = client.export_orders(
-        begin_deal_date=begin.strftime("%d.%m.%Y"),
-        end_deal_date=end.strftime("%d.%m.%Y"),
-        filial_code=None,
-    )
+    response = client.export_orders(filial_code=None)
 
     items_b_w = response.items
     db = SessionLocal()
