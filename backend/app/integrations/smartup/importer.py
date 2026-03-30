@@ -153,14 +153,6 @@ def _process_one_order(
         return 0, 0, 1
 
 
-ORDER_STATUS_IMPORT = "B#W"
-
-
-def filter_orders_b_w(orders: Iterable[SmartupOrder]) -> List[SmartupOrder]:
-    """SmartUp dan kelgan ro'yxatdan faqat B#W statusdagilarini qaytaradi."""
-    return [o for o in orders if (o.status or "").strip() == ORDER_STATUS_IMPORT]
-
-
 STALE_ORDER_STATUSES = ("imported", "B#W")
 
 

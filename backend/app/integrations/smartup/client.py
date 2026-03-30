@@ -37,6 +37,8 @@ class SmartupClient:
         filial_code: str | None,
         begin_modified_on: str | None = None,
         end_modified_on: str | None = None,
+        *,
+        status: str = "B#W",
     ) -> SmartupOrderExportResponse:
         if not self.base_url:
             raise RuntimeError("SMARTUP_BASE_URL is not configured")
@@ -48,12 +50,14 @@ class SmartupClient:
         else:
             url = urljoin(f"{raw_base}/", "b/trade/txs/tdeal/order$export")
         normalized_filial_code = (filial_code or "").strip()
+        # SmartUp server-side filter: only this status is requested (no extra client-side list filter).
+        status_value = (status or "").strip()
         payload = {
             "filial_codes": [{"filial_code": normalized_filial_code}] if normalized_filial_code else [{"filial_code": ""}],
             "filial_code": normalized_filial_code or "",
             "external_id": "",
             "deal_id": "",
-            "status": "B#S",
+            "status": status_value,
             "begin_deal_date": begin_deal_date,
             "end_deal_date": end_deal_date,
             "delivery_date": "",
