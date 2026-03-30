@@ -8,7 +8,6 @@ import {
   Alert,
   BackHandler,
   FlatList,
-  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -24,7 +23,8 @@ import type { RootStackParamList } from '../types/navigation';
 import { useLocale } from '../i18n/LocaleContext';
 import { useNetwork } from '../network';
 import { getPickerProductDetail, listPickerLocations, getLocationContents, isNoExpiryRestrictionZone, formatPickerLocationOptionLine, type PickerProductDetailResponse, type PickerProductLocation, type PickerLocationOption, type PickerWarehouseFilter, type LocationContentsItem } from '../api/inventory';
-import { getPickers, type PickerUser } from '../api/picking';
+import { getMe } from '../api/auth';
+import { createCustomerReturn } from '../api/customerReturns';
 import { createReceipt, completeReceipt } from '../api/receiving';
 import { createStockMovement } from '../api/movements';
 import { AppHeader } from '../components/AppHeader';
@@ -107,11 +107,11 @@ export function KirimFormScreen() {
   const [loadingProduct, setLoadingProduct] = useState(false);
   const [productError, setProductError] = useState<string | null>(null);
   const [manualBarcode, setManualBarcode] = useState('');
-  const [pickerModalVisible, setPickerModalVisible] = useState(false);
-  const [pickers, setPickers] = useState<PickerUser[]>([]);
-  const [selectedPickerId, setSelectedPickerId] = useState<string | null>(null);
+  const [mePermissions, setMePermissions] = useState<string[]>([]);
+  const [returnStockPick, setReturnStockPick] = useState<PickerProductLocation | null>(null);
   const [sending, setSending] = useState(false);
   const sendingRef = useRef(false);
+  const prevReturnWarehouseRef = useRef<PickerWarehouseFilter | null>(null);
   const [submitDocNo, setSubmitDocNo] = useState<string | null>(null);
   const [expiryCalendarOpen, setExpiryCalendarOpen] = useState(false);
   const [expiryCalendarOpenScanned, setExpiryCalendarOpenScanned] = useState(false);
@@ -145,8 +145,10 @@ export function KirimFormScreen() {
     setProductError(null);
     setCurrentProduct(null);
     setCurrentQty('');
+    setCurrentExpiry('');
+    setReturnStockPick(null);
     try {
-      const res = await getPickerProductDetail(trimmed);
+      const res = await getPickerProductDetail(trimmed, flow === 'return' ? effectiveWarehouse : undefined);
       const valid =
         res != null &&
         typeof res === 'object' &&
@@ -171,7 +173,7 @@ export function KirimFormScreen() {
     } finally {
       setLoadingProduct(false);
     }
-  }, [t]);
+  }, [t, flow, effectiveWarehouse]);
 
   const loadProductByScan = loadProductById;
 
@@ -335,10 +337,28 @@ export function KirimFormScreen() {
   }, [flow, inventorySubMode, inventoryStep, currentProduct, loadingProduct]);
 
   useEffect(() => {
-    if (pickerModalVisible && isOnline && flow === 'return') {
-      getPickers().then(setPickers).catch(() => setPickers([]));
+    if (flow !== 'return') {
+      prevReturnWarehouseRef.current = null;
+      return;
     }
-  }, [pickerModalVisible, isOnline, flow]);
+    if (prevReturnWarehouseRef.current === null) {
+      prevReturnWarehouseRef.current = effectiveWarehouse;
+      return;
+    }
+    if (prevReturnWarehouseRef.current === effectiveWarehouse) return;
+    prevReturnWarehouseRef.current = effectiveWarehouse;
+    const pid = currentProduct?.product_id;
+    if (pid) loadProductById(pid);
+  }, [flow, effectiveWarehouse, currentProduct?.product_id, loadProductById]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (flow !== 'return') return;
+      getMe()
+        .then((m) => setMePermissions(m.permissions ?? []))
+        .catch(() => setMePermissions([]));
+    }, [flow])
+  );
 
   const handleInventoryBack = useCallback(() => {
     if (flow === 'new') {
@@ -579,9 +599,9 @@ export function KirimFormScreen() {
         productName: currentProduct.name,
         locationCode: location.code,
         locationId: location.id,
-        lotId: '',
+        lotId: flow === 'return' && returnStockPick ? returnStockPick.lot_id : '',
         qty,
-        batch: '',
+        batch: flow === 'return' && returnStockPick ? (returnStockPick.batch_no || '').trim() : '',
         expiryDate: expiryVal,
       },
     ]);
@@ -589,7 +609,8 @@ export function KirimFormScreen() {
     setCurrentProduct(null);
     setCurrentQty('');
     setCurrentExpiry('');
-  }, [flow, newMode, currentProduct, selectedLocation, inventoryLocation, currentQty, currentExpiry, t]);
+    setReturnStockPick(null);
+  }, [flow, newMode, currentProduct, selectedLocation, inventoryLocation, currentQty, currentExpiry, returnStockPick, t]);
 
   const removeLine = useCallback((id: string) => {
     setLines((prev) => prev.filter((l) => l.id !== id));
@@ -608,22 +629,47 @@ export function KirimFormScreen() {
     if (sendingRef.current) return;
     sendingRef.current = true;
     if (flow === 'return') {
-      if (!selectedPickerId) {
+      if (!mePermissions.includes('receiving:write')) {
         sendingRef.current = false;
-        Alert.alert(t('error'), t('returnsSelectPicker'));
+        Alert.alert(t('error'), t('returnsNoPermissionSubmit'));
+        return;
+      }
+      if (!isOnline) {
+        sendingRef.current = false;
+        Alert.alert(t('error'), t('returnsOfflineSubmit'));
         return;
       }
       setSending(true);
-      setTimeout(() => {
-        setSending(false);
-        sendingRef.current = false;
-        setPickerModalVisible(false);
-        setSelectedPickerId(null);
+      try {
+        await createCustomerReturn({
+          lines: lines.map((l) => ({
+            product_id: l.productId,
+            location_id: l.locationId,
+            qty: l.qty,
+            product_name: l.productName,
+            location_code: l.locationCode,
+            batch: l.batch?.trim() || null,
+            expiry_date: l.expiryDate || null,
+          })),
+        });
         setLines([]);
         setFinished(false);
         setSubmitDocNo(null);
-        Alert.alert(t('success'), t('returnsSentToPicker'));
-      }, 500);
+        Alert.alert(t('success'), t('returnsSubmittedToController'));
+      } catch (e: unknown) {
+        let msg: string = e instanceof Error ? e.message : t('kirimSubmitError');
+        if (e && typeof e === 'object' && 'response' in e && e.response && typeof e.response === 'object' && 'data' in e.response) {
+          const detail = (e.response as { data?: { detail?: string } }).data?.detail;
+          if (typeof detail === 'string') msg = detail;
+        }
+        if (msg === 'Insufficient permissions' || msg.toLowerCase().includes('insufficient permissions')) {
+          msg = t('kirimInsufficientPermissions');
+        }
+        Alert.alert(t('error'), msg);
+      } finally {
+        setSending(false);
+        sendingRef.current = false;
+      }
       return;
     }
     // flow === 'new': backend receiving API orqali omborga kirim va qoldiq yangilash
@@ -661,7 +707,7 @@ export function KirimFormScreen() {
       setSending(false);
       sendingRef.current = false;
     }
-  }, [flow, selectedPickerId, lines, t, submitDocNo]);
+  }, [flow, lines, t, submitDocNo, mePermissions, isOnline]);
 
   const searchTrim = locationSearch.trim();
   const searchNorm = normalizeLocationForSearch(searchTrim);
@@ -703,6 +749,25 @@ export function KirimFormScreen() {
       />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        {flow === 'return' && (
+          <View style={styles.warehouseSegmentRow}>
+            <TouchableOpacity
+              style={[styles.warehouseSegmentBtn, receivingWarehouse === 'main' && styles.warehouseSegmentBtnActive]}
+              onPress={() => setReceivingWarehouse('main')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.warehouseSegmentText, receivingWarehouse === 'main' && styles.warehouseSegmentTextActive]}>{t('kirimWarehouseMain')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.warehouseSegmentBtn, receivingWarehouse === 'showroom' && styles.warehouseSegmentBtnActive]}
+              onPress={() => setReceivingWarehouse('showroom')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.warehouseSegmentText, receivingWarehouse === 'showroom' && styles.warehouseSegmentTextActive]}>{t('kirimWarehouseShowroom')}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Yangi mahsulotlar: 2 rejim tanlovi */}
         {flow === 'new' && newMode == null && (
           <>
@@ -1200,6 +1265,45 @@ export function KirimFormScreen() {
         })() && (
           <View style={styles.card}>
             <Text style={styles.productName} numberOfLines={2}>{currentProduct?.name ?? ''}</Text>
+            {flow === 'return' && currentProduct?.locations && currentProduct.locations.length > 0 ? (
+              <>
+                <Text style={styles.ruleNote}>{t('returnsReceiptIntoHint')}</Text>
+                <View style={styles.contentsList}>
+                  {sortLocations(currentProduct.locations).map((loc, index) => {
+                    const selected =
+                      returnStockPick != null &&
+                      returnStockPick.lot_id === loc.lot_id &&
+                      returnStockPick.location_id === loc.location_id;
+                    return (
+                      <TouchableOpacity
+                        key={`ret-stock-${index}-${loc.location_id}-${loc.lot_id}`}
+                        style={[styles.contentsRow, selected && styles.contentsRowSelected]}
+                        onPress={() => {
+                          setReturnStockPick(loc);
+                          setSelectedLocation({ id: loc.location_id, code: loc.location_code, name: loc.location_code });
+                          setLocationSearch(loc.location_code);
+                          setCurrentExpiry(loc.expiry_date ? loc.expiry_date.slice(0, 10) : '');
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.contentsRowInfo}>
+                          <Text style={styles.contentsRowName}>{loc.location_code}</Text>
+                          <Text style={styles.contentsRowMeta}>
+                            {loc.batch_no}
+                            {loc.expiry_date ? ` • ${loc.expiry_date}` : ''}
+                            {' · '}
+                            {t('invQoldiq')}: {Math.round(Number(loc.available_qty))}
+                          </Text>
+                        </View>
+                        <Icon name="chevron-right" size={22} color="#666" />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
+            ) : flow === 'return' && currentProduct ? (
+              <Text style={styles.muted}>{t('returnsNoStockInWarehouse')}</Text>
+            ) : null}
             <Text style={styles.label}>{t('quantity')}</Text>
             <TextInput
               style={styles.input}
@@ -1219,6 +1323,7 @@ export function KirimFormScreen() {
                     onChangeText={(text) => {
                       setLocationSearch(text);
                       setSelectedLocation(null);
+                      if (flow === 'return') setReturnStockPick(null);
                     }}
                     placeholder={t('kirimLocationSearchPlaceholder')}
                     placeholderTextColor="#999"
@@ -1362,27 +1467,21 @@ export function KirimFormScreen() {
 
         {finished && lines.length > 0 && flow === 'return' && (
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>{t('returnsAssignPicker')}</Text>
+            <Text style={styles.sectionTitle}>{t('returnsSubmitControllerTitle')}</Text>
+            <Text style={styles.ruleNote}>{t('returnsSubmitControllerHint')}</Text>
             <TouchableOpacity
-              style={styles.secondaryBtn}
-              onPress={() => setPickerModalVisible(true)}
-            >
-              <Text style={styles.secondaryBtnText}>
-                {selectedPickerId
-                  ? pickers.find((p) => p.id === selectedPickerId)?.full_name || pickers.find((p) => p.id === selectedPickerId)?.username
-                  : t('returnsSelectPicker')}
-              </Text>
-              <Icon name="account-outline" size={22} color="#1a237e" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.primaryBtn, styles.primaryBtnSmall, !selectedPickerId && styles.primaryBtnDisabled]}
+              style={[
+                styles.primaryBtn,
+                styles.primaryBtnSmall,
+                (!mePermissions.includes('receiving:write') || !isOnline) && styles.primaryBtnDisabled,
+              ]}
               onPress={handleSendToPicker}
-              disabled={!selectedPickerId || sending}
+              disabled={!mePermissions.includes('receiving:write') || !isOnline || sending}
             >
               {sending ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <Text style={styles.primaryBtnText}>{t('returnsSendToPicker')}</Text>
+                <Text style={styles.primaryBtnText}>{t('returnsSubmitControllerReview')}</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -1390,37 +1489,6 @@ export function KirimFormScreen() {
 
       </ScrollView>
 
-      {flow === 'return' && (
-        <Modal
-          visible={pickerModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setPickerModalVisible(false)}
-        >
-          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setPickerModalVisible(false)}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>{t('returnsSelectPicker')}</Text>
-                <TouchableOpacity onPress={() => setPickerModalVisible(false)}>
-                  <Icon name="close" size={24} color="#333" />
-                </TouchableOpacity>
-              </View>
-              <ScrollView style={styles.modalList}>
-                {pickers.map((p) => (
-                  <TouchableOpacity
-                    key={p.id}
-                    style={[styles.modalItem, selectedPickerId === p.id && styles.modalItemActive]}
-                    onPress={() => setSelectedPickerId(p.id)}
-                  >
-                    <Text style={styles.modalItemText}>{p.full_name || p.username}</Text>
-                    {selectedPickerId === p.id && <Icon name="check-circle" size={22} color="#1a237e" />}
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          </TouchableOpacity>
-        </Modal>
-      )}
     </SafeAreaView>
   );
 }
@@ -1635,6 +1703,10 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 15, fontWeight: '600', color: '#333', marginBottom: 8 },
   muted: { fontSize: 14, color: '#666', marginBottom: 12 },
   contentsList: { marginBottom: 16 },
+  contentsRowSelected: {
+    backgroundColor: '#e8eaf6',
+    borderRadius: 10,
+  },
   contentsRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1,0 +1,412 @@
+"""Mijozdan qaytgan mahsulot: controller tekshiruvi, keyin yig'uvchi joylashtirish (ombor receipt)."""
+from __future__ import annotations
+
+from datetime import datetime
+from decimal import Decimal
+from typing import List, Optional
+from uuid import UUID, uuid4
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field, validator
+from sqlalchemy.orm import Session, selectinload
+
+from app.auth.deps import get_current_user, get_effective_permissions, require_any_permission, require_permission
+from app.core.expiry import first_day_of_current_month, normalize_expiry_to_first_of_month
+from app.core.stock_rules import check_location_single_expiry
+from app.db import get_db
+from app.models.customer_return import (
+    CUSTOMER_RETURN_STATUS_APPROVED,
+    CUSTOMER_RETURN_STATUS_ASSIGNED,
+    CUSTOMER_RETURN_STATUS_COMPLETED,
+    CUSTOMER_RETURN_STATUS_PENDING,
+    CustomerReturn as CustomerReturnModel,
+    CustomerReturnLine as CustomerReturnLineModel,
+)
+from app.models.location import Location as LocationModel
+from app.models.product import Product as ProductModel
+from app.models.stock import StockLot as StockLotModel
+from app.models.stock import StockMovement as StockMovementModel
+from app.models.user import User as UserModel
+
+router = APIRouter()
+
+
+class CustomerReturnLineCreate(BaseModel):
+    product_id: UUID
+    location_id: UUID
+    qty: Decimal = Field(..., gt=0)
+    product_name: str = Field(..., max_length=512)
+    location_code: str = Field(default="", max_length=64)
+    batch: Optional[str] = Field(default=None, max_length=64)
+    expiry_date: Optional[str] = None  # YYYY-MM-DD
+
+    @validator("qty")
+    def qty_int(cls, v: Decimal) -> Decimal:
+        d = Decimal(str(v))
+        if d % 1 != 0:
+            raise ValueError("qty must be an integer")
+        return d.quantize(Decimal("1"))
+
+
+class CustomerReturnCreate(BaseModel):
+    doc_no: Optional[str] = Field(default=None, max_length=64)
+    lines: List[CustomerReturnLineCreate]
+
+
+class CustomerReturnLineOut(BaseModel):
+    id: UUID
+    product_id: UUID
+    location_id: UUID
+    product_name: str
+    location_code: str
+    qty: Decimal
+    batch: str
+    expiry_date: Optional[str] = None
+
+
+class CustomerReturnOut(BaseModel):
+    id: UUID
+    doc_no: str
+    status: str
+    created_by_user_id: Optional[UUID] = None
+    approved_by_user_id: Optional[UUID] = None
+    assigned_picker_user_id: Optional[UUID] = None
+    created_at: datetime
+    updated_at: datetime
+    lines: List[CustomerReturnLineOut]
+
+
+class CustomerReturnListOut(BaseModel):
+    items: List[CustomerReturnOut]
+    total: int
+
+
+class AssignPickerBody(BaseModel):
+    picker_user_id: UUID
+
+
+def _generate_doc_no() -> str:
+    today = datetime.utcnow().strftime("%Y%m%d")
+    token = uuid4().hex[:6].upper()
+    return f"CRET-{today}-{token}"
+
+
+def _line_to_out(line: CustomerReturnLineModel) -> CustomerReturnLineOut:
+    return CustomerReturnLineOut(
+        id=line.id,
+        product_id=line.product_id,
+        location_id=line.location_id,
+        product_name=line.product_name,
+        location_code=line.location_code,
+        qty=line.qty,
+        batch=line.batch,
+        expiry_date=line.expiry_date.isoformat() if line.expiry_date else None,
+    )
+
+
+def _to_out(cr: CustomerReturnModel) -> CustomerReturnOut:
+    return CustomerReturnOut(
+        id=cr.id,
+        doc_no=cr.doc_no,
+        status=cr.status,
+        created_by_user_id=cr.created_by_user_id,
+        approved_by_user_id=cr.approved_by_user_id,
+        assigned_picker_user_id=cr.assigned_picker_user_id,
+        created_at=cr.created_at,
+        updated_at=cr.updated_at,
+        lines=[_line_to_out(l) for l in cr.lines],
+    )
+
+
+def _parse_expiry(s: Optional[str]):
+    if not s or not str(s).strip():
+        return None
+    raw = str(s).strip()[:10]
+    from datetime import date as date_type
+
+    try:
+        return date_type.fromisoformat(raw)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid expiry_date, use YYYY-MM-DD")
+
+
+@router.post("", response_model=CustomerReturnOut, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=CustomerReturnOut, status_code=status.HTTP_201_CREATED)
+async def create_customer_return(
+    payload: CustomerReturnCreate,
+    db: Session = Depends(get_db),
+    user: UserModel = Depends(get_current_user),
+    _guard=Depends(require_any_permission(["receiving:write", "admin:access"])),
+):
+    if not payload.lines:
+        raise HTTPException(status_code=400, detail="Lines must not be empty")
+
+    doc_no = payload.doc_no.strip() if payload.doc_no else _generate_doc_no()
+    if db.query(CustomerReturnModel).filter(CustomerReturnModel.doc_no == doc_no).first():
+        raise HTTPException(status_code=409, detail="doc_no already exists")
+
+    first_of_month = first_day_of_current_month()
+    cr = CustomerReturnModel(
+        doc_no=doc_no,
+        status=CUSTOMER_RETURN_STATUS_PENDING,
+        created_by_user_id=user.id,
+    )
+    for line in payload.lines:
+        product = db.query(ProductModel).filter(ProductModel.id == line.product_id).one_or_none()
+        if not product:
+            raise HTTPException(status_code=400, detail=f"Product not found: {line.product_id}")
+        loc = (
+            db.query(LocationModel)
+            .filter(LocationModel.id == line.location_id, LocationModel.is_active.is_(True))
+            .one_or_none()
+        )
+        if not loc:
+            raise HTTPException(status_code=400, detail="Location not found")
+        exp = _parse_expiry(line.expiry_date)
+        if exp:
+            norm = normalize_expiry_to_first_of_month(exp)
+            if norm and norm < first_of_month:
+                raise HTTPException(status_code=400, detail="Expiry date is in the past for this product")
+        else:
+            norm = None
+        batch_val = (line.batch or "").strip()
+        if not batch_val:
+            batch_val = uuid4().hex[:12]
+        check_location_single_expiry(db, line.location_id, line.product_id, norm)
+        cr.lines.append(
+            CustomerReturnLineModel(
+                product_id=line.product_id,
+                location_id=line.location_id,
+                product_name=(line.product_name or product.name or "")[:512],
+                location_code=(line.location_code or loc.code or "")[:64],
+                qty=line.qty,
+                batch=batch_val,
+                expiry_date=norm,
+            )
+        )
+    db.add(cr)
+    db.commit()
+    db.refresh(cr)
+    cr = (
+        db.query(CustomerReturnModel)
+        .options(selectinload(CustomerReturnModel.lines))
+        .filter(CustomerReturnModel.id == cr.id)
+        .one()
+    )
+    return _to_out(cr)
+
+
+@router.get("", response_model=CustomerReturnListOut)
+@router.get("/", response_model=CustomerReturnListOut)
+async def list_customer_returns(
+    status_filter: Optional[str] = Query(None, alias="status"),
+    mine_as_picker: bool = Query(False, description="Faqat menga biriktirilgan (yig'uvchi)"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    user: UserModel = Depends(get_current_user),
+):
+    perms = get_effective_permissions(user)
+    q = db.query(CustomerReturnModel).options(selectinload(CustomerReturnModel.lines))
+    if mine_as_picker:
+        if "picking:write" not in perms:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        q = q.filter(CustomerReturnModel.assigned_picker_user_id == user.id)
+        if status_filter:
+            q = q.filter(CustomerReturnModel.status == status_filter)
+        elif not status_filter:
+            q = q.filter(CustomerReturnModel.status == CUSTOMER_RETURN_STATUS_ASSIGNED)
+    elif status_filter in (
+        CUSTOMER_RETURN_STATUS_PENDING,
+        CUSTOMER_RETURN_STATUS_APPROVED,
+    ):
+        if "documents:edit_status" not in perms and "admin:access" not in perms:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        q = q.filter(CustomerReturnModel.status == status_filter)
+    elif status_filter == CUSTOMER_RETURN_STATUS_ASSIGNED:
+        if "documents:edit_status" not in perms and "admin:access" not in perms:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        q = q.filter(CustomerReturnModel.status == status_filter)
+    elif status_filter:
+        if "receiving:read" not in perms and "admin:access" not in perms:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        q = q.filter(CustomerReturnModel.status == status_filter)
+        if "admin:access" not in perms and "documents:edit_status" not in perms:
+            q = q.filter(CustomerReturnModel.created_by_user_id == user.id)
+    else:
+        if "receiving:read" not in perms:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        q = q.filter(CustomerReturnModel.created_by_user_id == user.id)
+    total = q.count()
+    rows = q.order_by(CustomerReturnModel.created_at.desc()).offset(offset).limit(limit).all()
+    return CustomerReturnListOut(items=[_to_out(r) for r in rows], total=total)
+
+
+@router.get("/{return_id}", response_model=CustomerReturnOut)
+async def get_customer_return(
+    return_id: UUID,
+    db: Session = Depends(get_db),
+    user: UserModel = Depends(get_current_user),
+):
+    perms = get_effective_permissions(user)
+    cr = (
+        db.query(CustomerReturnModel)
+        .options(selectinload(CustomerReturnModel.lines))
+        .filter(CustomerReturnModel.id == return_id)
+        .one_or_none()
+    )
+    if not cr:
+        raise HTTPException(status_code=404, detail="Not found")
+    if "admin:access" not in perms:
+        if cr.created_by_user_id == user.id:
+            pass
+        elif "documents:edit_status" in perms:
+            pass
+        elif cr.assigned_picker_user_id == user.id and "picking:write" in perms:
+            pass
+        else:
+            raise HTTPException(status_code=404, detail="Not found")
+    return _to_out(cr)
+
+
+@router.post("/{return_id}/controller-approve", response_model=CustomerReturnOut)
+async def controller_approve_customer_return(
+    return_id: UUID,
+    db: Session = Depends(get_db),
+    user: UserModel = Depends(get_current_user),
+    _guard=Depends(require_permission("documents:edit_status")),
+):
+    cr = (
+        db.query(CustomerReturnModel)
+        .options(selectinload(CustomerReturnModel.lines))
+        .filter(CustomerReturnModel.id == return_id)
+        .one_or_none()
+    )
+    if not cr:
+        raise HTTPException(status_code=404, detail="Not found")
+    if cr.status != CUSTOMER_RETURN_STATUS_PENDING:
+        raise HTTPException(status_code=409, detail="Return is not pending controller review")
+    cr.status = CUSTOMER_RETURN_STATUS_APPROVED
+    cr.approved_by_user_id = user.id
+    db.commit()
+    db.refresh(cr)
+    return _to_out(cr)
+
+
+@router.post("/{return_id}/assign-picker", response_model=CustomerReturnOut)
+async def assign_picker_customer_return(
+    return_id: UUID,
+    payload: AssignPickerBody,
+    db: Session = Depends(get_db),
+    _user: UserModel = Depends(get_current_user),
+    _guard=Depends(require_permission("documents:edit_status")),
+):
+    cr = (
+        db.query(CustomerReturnModel)
+        .options(selectinload(CustomerReturnModel.lines))
+        .filter(CustomerReturnModel.id == return_id)
+        .one_or_none()
+    )
+    if not cr:
+        raise HTTPException(status_code=404, detail="Not found")
+    if cr.status != CUSTOMER_RETURN_STATUS_APPROVED:
+        raise HTTPException(status_code=409, detail="Return must be approved before assigning picker")
+    picker = (
+        db.query(UserModel)
+        .filter(
+            UserModel.id == payload.picker_user_id,
+            UserModel.role == "picker",
+            UserModel.is_active.is_(True),
+        )
+        .one_or_none()
+    )
+    if not picker:
+        raise HTTPException(status_code=400, detail="Invalid picker user")
+    cr.assigned_picker_user_id = payload.picker_user_id
+    cr.status = CUSTOMER_RETURN_STATUS_ASSIGNED
+    db.commit()
+    db.refresh(cr)
+    return _to_out(cr)
+
+
+@router.post("/{return_id}/complete", response_model=CustomerReturnOut)
+async def complete_customer_return(
+    return_id: UUID,
+    db: Session = Depends(get_db),
+    user: UserModel = Depends(get_current_user),
+    _guard=Depends(require_any_permission(["receiving:write", "picking:write", "admin:access"])),
+):
+    cr = (
+        db.query(CustomerReturnModel)
+        .options(selectinload(CustomerReturnModel.lines))
+        .filter(CustomerReturnModel.id == return_id)
+        .one_or_none()
+    )
+    if not cr:
+        raise HTTPException(status_code=404, detail="Not found")
+    if cr.status != CUSTOMER_RETURN_STATUS_ASSIGNED:
+        raise HTTPException(status_code=409, detail="Return is not assigned to picker")
+    if cr.assigned_picker_user_id != user.id:
+        perms = get_effective_permissions(user)
+        if not ("receiving:write" in perms and "admin:access" in perms):
+            raise HTTPException(status_code=403, detail="Only assigned picker can complete")
+
+    existing = (
+        db.query(StockMovementModel.id)
+        .filter(
+            StockMovementModel.source_document_type == "customer_return",
+            StockMovementModel.source_document_id == cr.id,
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(status_code=409, detail="Already posted to stock")
+
+    if not cr.lines:
+        raise HTTPException(status_code=400, detail="No lines")
+
+    for line in cr.lines:
+        expiry_normalized = normalize_expiry_to_first_of_month(line.expiry_date)
+        check_location_single_expiry(db, line.location_id, line.product_id, expiry_normalized)
+
+        lot = (
+            db.query(StockLotModel)
+            .filter(
+                StockLotModel.product_id == line.product_id,
+                StockLotModel.batch == line.batch,
+                StockLotModel.expiry_date == line.expiry_date,
+            )
+            .one_or_none()
+        )
+        if not lot:
+            lot = StockLotModel(
+                product_id=line.product_id,
+                batch=line.batch,
+                expiry_date=line.expiry_date,
+            )
+            db.add(lot)
+            db.flush()
+
+        db.add(
+            StockMovementModel(
+                product_id=line.product_id,
+                lot_id=lot.id,
+                location_id=line.location_id,
+                qty_change=line.qty,
+                movement_type="receipt",
+                source_document_type="customer_return",
+                source_document_id=cr.id,
+                created_by_user_id=user.id,
+            )
+        )
+
+    cr.status = CUSTOMER_RETURN_STATUS_COMPLETED
+    db.commit()
+    db.refresh(cr)
+    cr = (
+        db.query(CustomerReturnModel)
+        .options(selectinload(CustomerReturnModel.lines))
+        .filter(CustomerReturnModel.id == return_id)
+        .one()
+    )
+    return _to_out(cr)

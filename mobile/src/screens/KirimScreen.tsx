@@ -63,6 +63,21 @@ export function KirimScreen() {
 
         <TouchableOpacity
           style={[styles.card, isDark && styles.cardDark]}
+          onPress={() => navigation.navigate('CustomerReturnsQueue')}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.cardIconWrap, isDark && styles.cardIconWrapDark]}>
+            <Icon name="clipboard-check-outline" size={CARD_ICON_SIZE} color={isDark ? '#93c5fd' : HEADER_ACCENT} />
+          </View>
+          <View style={styles.cardBody}>
+            <Text style={[styles.cardTitle, isDark && styles.cardTitleDark]}>{t('kirimReturnsQueueCard')}</Text>
+            <Text style={[styles.cardSubtitle, isDark && styles.cardSubtitleDark]}>{t('kirimReturnsQueueCardDesc')}</Text>
+          </View>
+          <Icon name="chevron-right" size={24} color={isDark ? '#94a3b8' : '#777'} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.card, isDark && styles.cardDark]}
           onPress={() => navigation.navigate('KirimForm', { flow: 'inventory' })}
           activeOpacity={0.7}
         >

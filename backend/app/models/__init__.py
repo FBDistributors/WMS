@@ -1,6 +1,7 @@
 from app.models.audit_log import AuditLog
 from app.models.base import Base
 from app.models.brand import Brand
+from app.models.customer_return import CustomerReturn, CustomerReturnLine
 from app.models.document import Document, DocumentLine
 from app.models.expired_zone_display_labels import ExpiredZoneDisplayLabels
 from app.models.location import Location
@@ -28,6 +29,8 @@ __all__ = [
     "AuditLog",
     "Base",
     "Brand",
+    "CustomerReturn",
+    "CustomerReturnLine",
     "Document",
     "DocumentLine",
     "ExpiredZoneDisplayLabels",

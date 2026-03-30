@@ -44,6 +44,8 @@ export type RootStackParamList = {
   QueueScreen: undefined;
   Returns: { scannedProductId?: string; scannedBarcode?: string } | undefined;
   Kirim: undefined;
+  /** Controller / picker: qaytarish navbati */
+  CustomerReturnsQueue: undefined;
   KirimNew: undefined;
   KirimForm:
     | {
