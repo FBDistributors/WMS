@@ -131,6 +131,7 @@ export function KirimFormScreen() {
   const [inventoryScannedActualQty, setInventoryScannedActualQty] = useState('');
   const [inventoryScannedExpiry, setInventoryScannedExpiry] = useState('');
   const [submittingScannedAdjust, setSubmittingScannedAdjust] = useState(false);
+  const prevWarehouseRef = useRef<PickerWarehouseFilter | null>(null);
 
   const title = flow === 'new' ? (effectiveWarehouse === 'showroom' ? t('kirimWarehouseShowroom') : t('kirimWarehouseMain')) : flow === 'inventory' ? t('kirimInventory') : t('kirimCustomerReturns');
 
@@ -287,6 +288,14 @@ export function KirimFormScreen() {
   }, [flow, params?.newMode]);
 
   useEffect(() => {
+    // Faqat ombor haqiqatan o'zgarganda lokatsiya tanlovlarini tozalaymiz.
+    // Mount/Scanner qaytishda (shu ombor) lokatsiya yo'qolib ketmasin.
+    if (prevWarehouseRef.current == null) {
+      prevWarehouseRef.current = effectiveWarehouse;
+      return;
+    }
+    if (prevWarehouseRef.current === effectiveWarehouse) return;
+    prevWarehouseRef.current = effectiveWarehouse;
     setSelectedLocation(null);
     setLocationSearch('');
     setInventoryLocation(null);
