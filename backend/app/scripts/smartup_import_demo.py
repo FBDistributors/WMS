@@ -5,7 +5,7 @@ from datetime import date
 
 from app.db import SessionLocal
 from app.integrations.smartup.client import SmartupClient
-from app.integrations.smartup.importer import filter_orders_b_w, import_orders
+from app.integrations.smartup.importer import import_orders
 
 
 def main() -> None:
@@ -19,7 +19,7 @@ def main() -> None:
         filial_code=None,
     )
 
-    items_b_w = filter_orders_b_w(response.items)
+    items_b_w = response.items
     db = SessionLocal()
     try:
         created, updated, skipped, errors, _ = import_orders(db, items_b_w)
