@@ -235,16 +235,16 @@ def _safe_expiry_date(expiry_date) -> Optional[str]:
 
 
 def _picking_warehouse_for_order(order: Optional[OrderModel]) -> Optional[str]:
-    """Return showroom filter when order codes indicate showroom; else None (all locations)."""
+    """Return picking warehouse filter; default to main to hide showroom in picker flows."""
     if not order:
-        return None
+        return "main"
     for code in (order.from_warehouse_code, order.to_warehouse_code):
         if not code or not str(code).strip():
             continue
         u = str(code).strip().upper()
         if "SHOWROOM" in u or u in ("SR", "SHR", "SHOR"):
             return "showroom"
-    return None
+    return "main"
 
 
 def _balance_rows_by_product(
@@ -641,7 +641,8 @@ def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedView
             if row.barcode and str(row.barcode).strip():
                 product_barcode_map[row.id] = row.barcode
     all_pids = list({first_line_attrs[k][2] for k in first_line_attrs if first_line_attrs[k][2]})
-    by_pid_consolidated = _balance_rows_by_product(db, all_pids, None)
+    # Picker consolidated alternates should never suggest showroom bins by default.
+    by_pid_consolidated = _balance_rows_by_product(db, all_pids, "main")
     products = []
     for (barcode_or_sku, product_name, sku), _name, _sku, expiry_display in product_order:
         key = (barcode_or_sku, product_name, sku)
@@ -1088,6 +1089,9 @@ async def change_pick_source(
     new_loc = db.query(LocationModel).filter(LocationModel.id == payload.location_id).one_or_none()
     if not new_loc or new_loc.zone_type != "NORMAL":
         raise HTTPException(status_code=400, detail="Pick only from NORMAL zone")
+    main_location_ids = set(_location_ids_for_warehouse(db, "main") or [])
+    if payload.location_id not in main_location_ids:
+        raise HTTPException(status_code=400, detail="Showroom location cannot be used for picking source")
 
     new_lot = db.query(StockLotModel).filter(StockLotModel.id == payload.lot_id).one_or_none()
     if not new_lot or new_lot.product_id != line.product_id:
