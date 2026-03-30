@@ -38,7 +38,7 @@ class SmartupClient:
         begin_modified_on: str | None = None,
         end_modified_on: str | None = None,
         *,
-        status: str = "B#W",
+        status: str | None = None,
     ) -> SmartupOrderExportResponse:
         if not self.base_url:
             raise RuntimeError("SMARTUP_BASE_URL is not configured")
@@ -50,8 +50,12 @@ class SmartupClient:
         else:
             url = urljoin(f"{raw_base}/", "b/trade/txs/tdeal/order$export")
         normalized_filial_code = (filial_code or "").strip()
-        # SmartUp server-side filter: only this status is requested (no extra client-side list filter).
-        status_value = (status or "").strip()
+        # SMARTUP_ORDER_EXPORT_STATUS — ixtiyoriy. Ko'p joylarda bo'sh qoldirilganda API barcha statuslarni
+        # qaytaradi; aks holda ko'pincha 0 qator yoki noto'g'ri filtr bo'ladi. Standart: "" + WMS da B#W filtri.
+        if status is None:
+            status_value = (os.getenv("SMARTUP_ORDER_EXPORT_STATUS") or "").strip()
+        else:
+            status_value = (status or "").strip()
         payload = {
             "filial_codes": [{"filial_code": normalized_filial_code}] if normalized_filial_code else [{"filial_code": ""}],
             "filial_code": normalized_filial_code or "",

@@ -20,7 +20,7 @@ from app.db import get_db
 from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_ip, log_action
 from app.services.push_notifications import send_push_to_user
 from app.integrations.smartup.client import SmartupClient
-from app.integrations.smartup.importer import delete_stale_orders, import_orders
+from app.integrations.smartup.importer import delete_stale_orders, filter_orders_b_w, import_orders
 from app.integrations.smartup.mfm_movement import export_mfm_movements
 from app.integrations.smartup.sync_lock import smartup_sync_lock
 from app.models.document import Document as DocumentModel
@@ -813,7 +813,7 @@ async def sync_orders_from_smartup(
                     end_modified_on=end_date.strftime("%d.%m.%Y"),
                 )
                 filial_override = (payload.filial_id or "").strip() or None
-                items_to_import = response.items
+                items_to_import = filter_orders_b_w(response.items)
             created, updated, skipped, import_errors, _ = import_orders(
                 db, items_to_import, order_source=payload.order_source, filial_id_override=filial_override
             )
