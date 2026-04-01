@@ -82,6 +82,7 @@ const COLUMN_OPTIONS_DILLER = [
   { id: 'select', labelKey: 'orders:columns.select' },
   { id: 'order_number', labelKey: 'orders:columns_diller.order_number' },
   { id: 'external_id', labelKey: 'orders:columns_diller.external_id' },
+  { id: 'status', labelKey: 'orders:columns_diller.status' },
   { id: 'to_filial', labelKey: 'orders:columns_diller.to_filial' },
   { id: 'movement_note', labelKey: 'orders:columns_diller.movement_note' },
   { id: 'total_amount', labelKey: 'orders:columns_diller.total_amount' },
@@ -93,6 +94,7 @@ const COLUMN_OPTIONS_DILLER = [
 const DILLER_SEARCH_FIELD_OPTIONS = [
   { id: 'order_number', labelKey: 'orders:columns_diller.order_number' },
   { id: 'external_id', labelKey: 'orders:columns_diller.external_id' },
+  { id: 'status', labelKey: 'orders:columns_diller.status' },
   { id: 'to_filial', labelKey: 'orders:columns_diller.to_filial' },
   { id: 'movement_note', labelKey: 'orders:columns_diller.movement_note' },
 ]
@@ -475,7 +477,27 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             const toFilialCode = String((m.to_filial_code as string) ?? '').toLowerCase()
             const toFilialName = getFilialNameByCode(m.to_filial_code as string).toLowerCase()
             const note = String((m.note as string) ?? '').toLowerCase()
-            return mid.includes(q) || deliveryNo.includes(q) || toFilialCode.includes(q) || toFilialName.includes(q) || note.includes(q)
+            const status = String((m.status as string) ?? '').toLowerCase()
+            const searchFields = dillerTableConfig.config.searchFields
+            const matchField = (id: string) => {
+              if (id === 'order_number') return mid.includes(q)
+              if (id === 'external_id') return deliveryNo.includes(q)
+              if (id === 'status') return status.includes(q)
+              if (id === 'to_filial') return toFilialCode.includes(q) || toFilialName.includes(q)
+              if (id === 'movement_note') return note.includes(q)
+              return false
+            }
+            if (searchFields.length === 0) {
+              return (
+                mid.includes(q) ||
+                deliveryNo.includes(q) ||
+                status.includes(q) ||
+                toFilialCode.includes(q) ||
+                toFilialName.includes(q) ||
+                note.includes(q)
+              )
+            }
+            return searchFields.some(matchField)
           })
         : movementListRaw
       const columnLabelsDiller = new Map(
@@ -524,6 +546,14 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                 {deliveryNo}
               </td>
             )
+          case 'status': {
+            const st = (m.status as string | number | undefined) != null && String(m.status).trim() !== '' ? String(m.status) : '—'
+            return (
+              <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800 dark:text-slate-200" title={st}>
+                {st}
+              </td>
+            )
+          }
           case 'to_filial':
             return (
               <td className="px-4 py-3 text-slate-600 dark:text-slate-300" title={getFilialNameByCode(m.to_filial_code as string)}>

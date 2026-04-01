@@ -68,6 +68,7 @@ export function useDillerTableConfig() {
     'select',
     'order_number',
     'external_id',
+    'status',
     'to_filial',
     'movement_note',
     'total_amount',
@@ -78,11 +79,12 @@ export function useDillerTableConfig() {
   const DILLER_SEARCH_FIELDS = [
     'order_number',
     'external_id',
+    'status',
     'to_filial',
     'movement_note',
   ]
   const { defaultConfig, normalizeConfig, loadConfig } = createMovementsTableConfig(
-    'wms_diller_table_config',
+    'wms_diller_table_config_v2',
     DILLER_COLUMN_IDS,
     DILLER_SEARCH_FIELDS
   )
@@ -90,7 +92,7 @@ export function useDillerTableConfig() {
   const [config, setConfig] = useState<MovementsTableConfig>(() => loadConfig())
 
   useEffect(() => {
-    localStorage.setItem('wms_diller_table_config', JSON.stringify(config))
+    localStorage.setItem('wms_diller_table_config_v2', JSON.stringify(config))
   }, [config])
 
   const updateConfig = useCallback(
