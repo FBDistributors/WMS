@@ -179,6 +179,17 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const canSend = has('orders:write')
   const canEditStatus = isWarehouseAdmin
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null)
+  const toMovementStatusLabel = useCallback(
+    (rawStatus: unknown): string => {
+      const raw = String(rawStatus ?? '').trim().toUpperCase()
+      if (!raw) return '—'
+      if (raw === 'N') return t('orders:movement_status.new')
+      if (raw === 'C') return t('orders:status_simple.yigishda')
+      if (['P', 'PICKED', 'REVIEW', 'CHECK'].includes(raw)) return t('orders:status_simple.tekshiruvda')
+      return raw
+    },
+    [t]
+  )
 
   const { config, updateConfig, resetConfig } = useOrdersTableConfig()
   const dillerTableConfig = useDillerTableConfig()
@@ -477,12 +488,14 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             const toFilialCode = String((m.to_filial_code as string) ?? '').toLowerCase()
             const toFilialName = getFilialNameByCode(m.to_filial_code as string).toLowerCase()
             const note = String((m.note as string) ?? '').toLowerCase()
-            const status = String((m.status as string) ?? '').toLowerCase()
+            const statusRaw = String((m.status as string) ?? '').toLowerCase()
+            const statusLabel = toMovementStatusLabel(m.status).toLowerCase()
+            const statusSearch = `${statusRaw} ${statusLabel}`
             const searchFields = dillerTableConfig.config.searchFields
             const matchField = (id: string) => {
               if (id === 'order_number') return mid.includes(q)
               if (id === 'external_id') return deliveryNo.includes(q)
-              if (id === 'status') return status.includes(q)
+              if (id === 'status') return statusSearch.includes(q)
               if (id === 'to_filial') return toFilialCode.includes(q) || toFilialName.includes(q)
               if (id === 'movement_note') return note.includes(q)
               return false
@@ -491,7 +504,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
               return (
                 mid.includes(q) ||
                 deliveryNo.includes(q) ||
-                status.includes(q) ||
+                statusSearch.includes(q) ||
                 toFilialCode.includes(q) ||
                 toFilialName.includes(q) ||
                 note.includes(q)
@@ -547,7 +560,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
               </td>
             )
           case 'status': {
-            const st = (m.status as string | number | undefined) != null && String(m.status).trim() !== '' ? String(m.status) : '—'
+            const st = toMovementStatusLabel(m.status)
             return (
               <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800 dark:text-slate-200" title={st}>
                 {st}

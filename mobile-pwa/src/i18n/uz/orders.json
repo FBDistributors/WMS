@@ -134,6 +134,9 @@
     "yakunlash": "Yakunlash",
     "cancelled": "Bekor qilish"
   },
+  "movement_status": {
+    "new": "Yangi"
+  },
   "doc_status": {
     "new": "Yangi",
     "smartup_created": "Smartup",

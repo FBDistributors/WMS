@@ -134,6 +134,9 @@
     "yakunlash": "Completed",
     "cancelled": "Cancel"
   },
+  "movement_status": {
+    "new": "New"
+  },
   "doc_status": {
     "new": "New",
     "smartup_created": "Smartup",
