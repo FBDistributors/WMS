@@ -31,6 +31,8 @@ export type MovementsQuery = {
   offset?: number
   /** Cache ni bypass qilish, SmartUP dan qayta yuklash */
   refresh?: boolean
+  /** Smartup harakat statusi: N (default), all, yoki vergul bilan ro'yxat */
+  smartup_status?: string
 }
 
 export async function getMovements(query: MovementsQuery = {}) {
@@ -49,6 +51,8 @@ export type OrderListItem = {
   order_number: string
   source_external_id: string
   status: string
+  /** SO terish hujjati statusi (backend: so_document_status) */
+  so_document_status?: string | null
   filial_id?: string | null
   customer_id?: string | null
   customer_name?: string | null

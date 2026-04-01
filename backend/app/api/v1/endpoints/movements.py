@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 from datetime import date, datetime, timedelta
 from typing import Any
@@ -18,9 +19,11 @@ from app.models.order import Order as OrderModel
 
 router = APIRouter()
 
-# Cache: key = (begin, end, filial_id, begin_mod?, end_mod?), value = (full_list, expiry). TTL 15 min.
+# Cache: key includes smartup_status_key; value = (full_list, expiry). TTL 15 min.
 _movements_cache: dict[tuple, tuple[list[Any], float]] = {}
 _CACHE_TTL_SEC = 900
+_SMARTUP_STATUS_PARAM_MAX = 200
+_SMARTUP_STATUS_TOKEN_RE = re.compile(r"^[A-Z0-9#]{1,32}$")
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -36,15 +39,49 @@ def _parse_date(value: str | None) -> date | None:
     return None
 
 
+def _parse_smartup_status_param(value: str) -> tuple[str, frozenset[str] | None]:
+    """
+    Qaytaradi: (cache_key, allowed_statuses yoki None = filtrsiz).
+    all/* — barcha statuslar; N — default; N,P,B#W — vergul bilan ro'yxat.
+    """
+    s = (value or "N").strip()
+    if not s:
+        return ("N", frozenset({"N"}))
+    if len(s) > _SMARTUP_STATUS_PARAM_MAX:
+        raise HTTPException(
+            status_code=400,
+            detail=f"smartup_status juda uzun (max {_SMARTUP_STATUS_PARAM_MAX})",
+        )
+    low = s.lower()
+    if low in ("all", "*"):
+        return ("all", None)
+    parts = [p.strip().upper() for p in s.split(",") if p.strip()]
+    if not parts:
+        raise HTTPException(
+            status_code=400,
+            detail="smartup_status: bo'sh yoki noto'g'ri format",
+        )
+    for p in parts:
+        if not _SMARTUP_STATUS_TOKEN_RE.match(p):
+            raise HTTPException(
+                status_code=400,
+                detail=f"smartup_status: ruxsat etilmagan token (A-Z, 0-9, #, max 32): {p}",
+            )
+    if len(parts) == 1:
+        return (parts[0], frozenset(parts))
+    cache_key = ",".join(sorted(parts))
+    return (cache_key, frozenset(parts))
+
+
 def _fetch_movements_sync(
     begin: date,
     end: date,
     filial_id: str | None,
     begin_modified_on: date | None = None,
     end_modified_on: date | None = None,
+    status_allowed: frozenset[str] | None = None,
 ) -> list[Any]:
-    """Smartup dan to'liq ro'yxatni oladi (bloklovchi — thread da chaqiriladi). modified_on orqali delta.
-    Faqat status == 'N' (yangi) bo'lgan harakatlar qaytariladi."""
+    """Smartup dan to'liq ro'yxat. status_allowed None bo'lsa status bo'yicha filtr yo'q; aks holda IN jadvali."""
     raw = fetch_mfm_movements_raw(
         begin_date=begin,
         end_date=end,
@@ -53,24 +90,14 @@ def _fetch_movements_sync(
         end_modified_on=end_modified_on,
     )
     movement_list = raw.get("movement") if isinstance(raw.get("movement"), list) else []
+    if status_allowed is None:
+        return [m for m in movement_list if isinstance(m, dict)]
     return [
-        m for m in movement_list
-        if isinstance(m, dict) and (str(m.get("status") or "").strip().upper() == "N")
+        m
+        for m in movement_list
+        if isinstance(m, dict)
+        and (str(m.get("status") or "").strip().upper() in status_allowed)
     ]
-
-
-def _get_cached_movements(begin: date, end: date, filial_id: str | None) -> list[Any]:
-    """Cache yoki Smartup; caller slice qiladi."""
-    now = time.monotonic()
-    key = (begin, end, filial_id)
-    if key in _movements_cache:
-        full_list, expiry = _movements_cache[key]
-        if now < expiry:
-            return full_list
-        del _movements_cache[key]
-    full_list = _fetch_movements_sync(begin, end, filial_id)
-    _movements_cache[key] = (full_list, now + _CACHE_TTL_SEC)
-    return full_list
 
 
 def _get_sent_movement_ids(db: Session) -> set[str]:
@@ -109,6 +136,10 @@ async def list_movements(
     limit: int = Query(50, ge=1, le=500, description="Max items per page"),
     offset: int = Query(0, ge=0, description="Skip N items"),
     refresh: bool = Query(False, description="Cache ni bypass qilish, SmartUP dan qayta yuklash"),
+    smartup_status: str = Query(
+        "N",
+        description="Smartup harakat statusi: N (default), all yoki * (hammasi), yoki vergul bilan: N,P,B#W",
+    ),
     db: Session = Depends(get_db),
     _user=Depends(require_permission("orders:read")),
 ) -> dict[str, Any]:
@@ -116,6 +147,7 @@ async def list_movements(
     Proxy to Smartup mfm movement$export. Returns "movement" (sliced) and "total".
     Yig'uvchiga yuborilgan harakatlar jadvalda ko'rsatilmaydi.
     begin_modified_on/end_modified_on berilsa faqat o'zgarishlar yuklanadi (delta sync).
+    smartup_status bilan Smartup qatorlarini filtrlash (default faqat N).
     """
     today = date.today()
     begin = _parse_date(begin_created_on)
@@ -139,8 +171,10 @@ async def list_movements(
     if begin_mod > end_mod:
         begin_mod, end_mod = end_mod, begin_mod
 
+    status_cache_key, status_allowed = _parse_smartup_status_param(smartup_status)
+
     now = time.monotonic()
-    key = (begin, end, filial_id, begin_mod, end_mod)
+    key = (begin, end, filial_id, begin_mod, end_mod, status_cache_key)
     sent_ids = _get_sent_movement_ids(db)
 
     if not refresh and key in _movements_cache:
@@ -154,7 +188,13 @@ async def list_movements(
 
     try:
         full_list = await asyncio.to_thread(
-            _fetch_movements_sync, begin, end, filial_id, begin_mod, end_mod
+            _fetch_movements_sync,
+            begin,
+            end,
+            filial_id,
+            begin_mod,
+            end_mod,
+            status_allowed,
         )
         _movements_cache[key] = (full_list, now + _CACHE_TTL_SEC)
     except RuntimeError as exc:

@@ -2,6 +2,8 @@
   "title": "Buyurtmalar",
   "tabs": {
     "buyurtmalar": "Buyurtmalar",
+    "yangi_bw": "Yangi (B#W)",
+    "all_statuses": "Barcha holatlar",
     "yigishda": "Yig'ishda",
     "tekshiruvda": "Tekshiruvda",
     "yakunlangan": "Yakunlangan"
@@ -87,6 +89,9 @@
     "filter_all_brands": "Barcha brendlar",
     "filter_clear": "Tozalash",
     "filter_apply": "Qo'llash",
+    "smartup_movement_status": "Smartup harakat holati",
+    "smartup_status_new": "Yangi (N)",
+    "smartup_status_all": "Barcha statuslar",
     "organization": "Organizatsiya",
     "all_dealers": "Barcha dillerlar",
     "brand_search_placeholder": "Brend nomi yoki kodini yozing",
@@ -122,10 +127,23 @@
   },
   "incomplete_badge": "To'liq emas",
   "so_order_badge": "SO buyurtma",
+  "confirm_cancel_order": "Buyurtmani bekor qilasizmi? SO hujjati ham bekor qilinadi.",
   "status_simple": {
     "yigishda": "Yig'ishda",
     "tekshiruvda": "Tekshiruvda",
-    "yakunlash": "Yakunlash"
+    "yakunlash": "Yakunlash",
+    "cancelled": "Bekor qilish"
+  },
+  "doc_status": {
+    "new": "Yangi",
+    "smartup_created": "Smartup",
+    "draft": "Qoralama",
+    "confirmed": "Tasdiqlangan",
+    "in_progress": "Jarayonda",
+    "partial": "Qisman",
+    "picked": "Yig‘ilgan",
+    "completed": "Tugallangan",
+    "cancelled": "Bekor"
   },
   "columns": {
     "select": "",
@@ -137,6 +155,7 @@
     "agent_id": "Agent ID",
     "total_amount": "Summa",
     "status": "Holat",
+    "so_document_status": "SO hujjat",
     "change_status": "Holatni o'zgartirish",
     "lines": "Qatorlar",
     "delivery_date": "Yetkazib berish sanasi",

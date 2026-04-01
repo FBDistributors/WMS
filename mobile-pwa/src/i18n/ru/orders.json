@@ -2,6 +2,8 @@
   "title": "Заказы",
   "tabs": {
     "buyurtmalar": "Заказы",
+    "yangi_bw": "Новые (B#W)",
+    "all_statuses": "Все статусы",
     "yigishda": "В подборе",
     "tekshiruvda": "На проверке",
     "yakunlangan": "Завершённые"
@@ -85,6 +87,9 @@
     "filter_all_brands": "Все бренды",
     "filter_clear": "Сбросить",
     "filter_apply": "Применить",
+    "smartup_movement_status": "Статус движения Smartup",
+    "smartup_status_new": "Новый (N)",
+    "smartup_status_all": "Все статусы",
     "organization": "Организация",
     "all_dealers": "Все дилеры",
     "brand_search_placeholder": "Введите название или код бренда",
@@ -120,10 +125,23 @@
   },
   "incomplete_badge": "Не полностью",
   "so_order_badge": "Заказ SO",
+  "confirm_cancel_order": "Отменить заказ? Документ SO подбора тоже будет отменён.",
   "status_simple": {
     "yigishda": "В подборе",
     "tekshiruvda": "На проверке",
-    "yakunlash": "Завершён"
+    "yakunlash": "Завершён",
+    "cancelled": "Отмена"
+  },
+  "doc_status": {
+    "new": "Новый",
+    "smartup_created": "Smartup",
+    "draft": "Черновик",
+    "confirmed": "Подтверждён",
+    "in_progress": "В работе",
+    "partial": "Частично",
+    "picked": "Собрано",
+    "completed": "Завершён",
+    "cancelled": "Отменён"
   },
   "columns": {
     "order_number": "Заказ",
@@ -134,6 +152,7 @@
     "agent_id": "ID агента",
     "total_amount": "Сумма",
     "status": "Статус",
+    "so_document_status": "Документ SO",
     "change_status": "Изменить статус",
     "lines": "Строки",
     "delivery_date": "Дата доставки",

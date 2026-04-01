@@ -42,17 +42,21 @@ const COLUMN_OPTIONS = [
 
 const COLUMN_OPTIONS_DEFAULT = COLUMN_OPTIONS.filter((c) => c.id !== 'status')
 
-// Dropdown da faqat 3 ta status: Yig'ishda, Tekshiruvda, Yakunlangan (backend ga picking / picked / completed yuboriladi)
+// Dropdown: buyurtma WMS statusi (backend ga to'g'ridan-to'g'ri mos keladigan qiymatlar, faqat warehouse_admin PATCH qila oladi)
 const SIMPLE_STATUS_OPTIONS = [
   { value: 'picking', labelKey: 'orders:status_simple.yigishda' },
   { value: 'picked', labelKey: 'orders:status_simple.tekshiruvda' },
   { value: 'completed', labelKey: 'orders:status_simple.yakunlash' },
+  { value: 'cancelled', labelKey: 'orders:status_simple.cancelled' },
 ] as const
 
-function backendStatusToSimple(status: string): string {
+type SimpleOrderStatus = (typeof SIMPLE_STATUS_OPTIONS)[number]['value']
+
+function backendStatusToSimple(status: string): SimpleOrderStatus {
+  if (status === 'cancelled') return 'cancelled'
   if (['imported', 'B#W', 'allocated', 'ready_for_picking', 'picking'].includes(status)) return 'picking'
   if (status === 'picked') return 'picked'
-  return 'completed' // completed, packed, shipped, cancelled
+  return 'completed' // completed, packed, shipped
 }
 
 // Buyurtma statuslari sahifasi: faqat ma'lumot, yig'ishga yuborish yo'q; yig'uvchi va kontrolyor ustunlari
@@ -64,6 +68,7 @@ const COLUMN_OPTIONS_STATUSES = [
   { id: 'agent', labelKey: 'orders:columns.agent' },
   { id: 'total_amount', labelKey: 'orders:columns.total_amount' },
   { id: 'status', labelKey: 'orders:columns.status' },
+  { id: 'so_document_status', labelKey: 'orders:columns.so_document_status' },
   { id: 'change_status', labelKey: 'orders:columns.change_status' },
   { id: 'lines', labelKey: 'orders:columns.lines' },
   { id: 'delivery_date', labelKey: 'orders:columns.delivery_date' },
@@ -112,15 +117,17 @@ function normalizeOrderListStatusParam(s: string | undefined): string | undefine
 
 const GROUP_TO_STATUS: Record<string, string | undefined> = {
   xom: 'imported,B#W', // Yangi: Smartupdan kelgan, admin yig'uvchiga yubormagan
+  yangi: 'B#W', // Yig'ishga yuborilmagan navbat (bulk yoki filtr)
   yigishda: 'allocated,ready_for_picking,picking', // Yig'uvchi yig'ishda / controllerga yubormagan
   tekshiruvda: 'picked', // Controllerga yuborilgan, controller yakunlamagan
-  yakunlangan: 'completed,packed,shipped', // Controller yakunlagan yoki qadoqlangan
+  yakunlangan: 'completed,packed,shipped,cancelled', // Yakunlangan, jo'natilgan yoki bekor
   all: undefined,
 }
 
 /** Asosiy Buyurtmalar sahifasidagi status tablari (faqat mode=default, orderSource yo'q) */
 const ORDER_TABS = [
-  { value: 'all', labelKey: 'orders:tabs.buyurtmalar' },
+  { value: 'yangi', labelKey: 'orders:tabs.yangi_bw' },
+  { value: 'all', labelKey: 'orders:tabs.all_statuses' },
   { value: 'yigishda', labelKey: 'orders:tabs.yigishda' },
   { value: 'tekshiruvda', labelKey: 'orders:tabs.tekshiruvda' },
   { value: 'yakunlangan', labelKey: 'orders:tabs.yakunlangan' },
@@ -133,35 +140,42 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
-  const group = searchParams.get('group') ?? 'all'
+  const group = searchParams.get('group') ?? (mode === 'statuses' ? 'all' : 'yangi')
   const searchQuery = searchParams.get('q') ?? ''
   const brandFilter = searchParams.get('brand_id') ?? ''
   const dateFrom = searchParams.get('date_from') ?? ''
   const dateTo = searchParams.get('date_to') ?? ''
   const offset = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10))
+  const movementSmartupStatusQuery = useMemo(() => {
+    const s = (searchParams.get('smartup_status') ?? 'N').toLowerCase()
+    return s === 'all' ? 'all' : 'N'
+  }, [searchParams])
   const pageTitle = orderSource
     ? t('admin:menu.orders_diller', 'Tashkiliy harakatlar')
     : mode === 'statuses'
       ? t('admin:dashboard.order_statuses_title')
       : t('orders:title')
-  // Asosiy Buyurtmalar sahifasida faqat yig'ishga yuborilmagan (B#W); yig'ishga yuborilganlar bu ro'yxatda ko'rinmasin
-  // Buyurtma statuslari sahifasida group=all bo'lsa — yig'ishda + tekshiruvda + yakunlangan barcha statuslar
+  // yangi | xom: B#W / imported+B#W + klientda yig'ishga ketganlarni yashirish; all | order-statuses all: status filtrisiz
   const statusParam = normalizeOrderListStatusParam(
     orderSource
       ? (GROUP_TO_STATUS[group] ?? undefined)
-      : mode === 'default' && (group === 'all' || !searchParams.get('group'))
-        ? 'B#W'
-        : mode === 'statuses' && (group === 'all' || !searchParams.get('group'))
-          ? 'allocated,ready_for_picking,picking,picked,completed,packed,shipped'
+      : mode === 'default' && group === 'all'
+        ? undefined
+        : mode === 'statuses' && group === 'all'
+          ? undefined
           : (GROUP_TO_STATUS[group] ?? GROUP_TO_STATUS.all)
   )
 
-  const onlyNotSentToPicking = mode === 'default' && !orderSource && (statusParam === 'B#W' || statusParam === 'imported,B#W')
+  const onlyNotSentToPicking =
+    mode === 'default' &&
+    !orderSource &&
+    (group === 'yangi' || group === 'xom') &&
+    (statusParam === 'B#W' || statusParam === 'imported,B#W')
   const SENT_TO_PICKING_STATUSES = new Set(['allocated', 'ready_for_picking', 'picking'])
-  const { has } = useAuth()
+  const { has, isWarehouseAdmin } = useAuth()
   const canSync = has('orders:write')
   const canSend = has('orders:write')
-  const canEditStatus = has('documents:edit_status')
+  const canEditStatus = isWarehouseAdmin
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null)
 
   const { config, updateConfig, resetConfig } = useOrdersTableConfig()
@@ -173,6 +187,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const [filterBrandId, setFilterBrandId] = useState('')
   const [filterDateFrom, setFilterDateFrom] = useState('')
   const [filterDateTo, setFilterDateTo] = useState('')
+  const [filterSmartupStatus, setFilterSmartupStatus] = useState<'N' | 'all'>('N')
 
   const [items, setItems] = useState<OrderListItem[]>([])
   const [total, setTotal] = useState(0)
@@ -238,6 +253,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         const filialId = (import.meta.env.VITE_DEFAULT_FILIAL_ID as string)?.trim()
         if (filialId) query.filial_id = filialId
         if (forceRefresh) query.refresh = true
+        query.smartup_status = movementSmartupStatusQuery
         const data = await getMovements(query)
         setMovementsData(data)
         if (pageOverride !== undefined) setMovementPage(pageOverride)
@@ -247,8 +263,9 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       }
       const loadAllBS =
         !orderSource &&
-        (statusParam === 'B#W' || statusParam === 'imported,B#W') &&
-        mode === 'default'
+        mode === 'default' &&
+        (group === 'yangi' || group === 'xom') &&
+        (statusParam === 'B#W' || statusParam === 'imported,B#W')
 
       if (loadAllBS) {
         const allItems: OrderListItem[] = []
@@ -278,7 +295,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         setTotal(list.length)
       } else {
         const query: Record<string, string | number | undefined> = {
-          status: statusParam,
           q: searchQuery.trim() || undefined,
           brand_ids: brandFilter.trim() ? brandFilter.trim() : undefined,
           date_from: dateFrom.trim() || undefined,
@@ -287,10 +303,10 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             config.searchFields.length > 0 ? config.searchFields.join(',') : undefined,
           limit: PAGE_SIZE,
           offset,
+          filial_id: 'all',
           ...(orderSource ? { order_source: orderSource } : {}),
-        // Buyurtma statuslari sahifasida filial filtrini qo‘llamaymiz (dashboard bilan bir xil)
-        ...(mode === 'statuses' ? { filial_id: 'all' } : {}),
         }
+        if (statusParam) query.status = statusParam
         const data = await getOrders(query)
         const list = onlyNotSentToPicking
           ? data.items.filter((o) => !SENT_TO_PICKING_STATUSES.has(o.status))
@@ -307,7 +323,22 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       if (!background) setIsLoading(false)
       else setIsRefreshing(false)
     }
-  }, [config.searchFields, movementPage, offset, orderSource, searchQuery, brandFilter, dateFrom, dateTo, statusParam, onlyNotSentToPicking, t])
+  }, [
+    config.searchFields,
+    group,
+    mode,
+    movementPage,
+    offset,
+    orderSource,
+    searchQuery,
+    brandFilter,
+    dateFrom,
+    dateTo,
+    statusParam,
+    onlyNotSentToPicking,
+    movementSmartupStatusQuery,
+    t,
+  ])
 
   const loadBrands = useCallback(async () => {
     try {
@@ -343,8 +374,12 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       setFilterBrandId(brandFilter)
       setFilterDateFrom(dateFrom)
       setFilterDateTo(dateTo)
+      if (orderSource === 'diller') {
+        const s = (searchParams.get('smartup_status') ?? 'N').toLowerCase()
+        setFilterSmartupStatus(s === 'all' ? 'all' : 'N')
+      }
     }
-  }, [filterPanelOpen, brandFilter, dateFrom, dateTo])
+  }, [filterPanelOpen, brandFilter, dateFrom, dateTo, orderSource, searchParams])
 
   useEffect(() => {
     setCheckResult(null)
@@ -696,7 +731,10 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         />
       )
     }
-    const defaultWithStatusTab = mode === 'default' && !orderSource && (group === 'yigishda' || group === 'tekshiruvda' || group === 'yakunlangan')
+    const defaultWithStatusTab =
+      mode === 'default' &&
+      !orderSource &&
+      (group === 'yigishda' || group === 'tekshiruvda' || group === 'yakunlangan' || group === 'all')
     const columnOptionsForMode =
       orderSource === 'diller'
         ? COLUMN_OPTIONS_DILLER
@@ -732,6 +770,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       if (status === 'picked') return 'bg-amber-50 dark:bg-amber-950/30'
       if (status === 'completed' || status === 'packed' || status === 'shipped')
         return 'bg-emerald-50 dark:bg-emerald-950/30'
+      if (status === 'cancelled') return 'bg-slate-100 dark:bg-slate-800/40'
       return ''
     }
     const columnLabels = new Map(
@@ -822,6 +861,14 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
               {order.total_amount == null ? '—' : Number(order.total_amount).toLocaleString()}
             </td>
           )
+        case 'so_document_status':
+          return (
+            <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+              {order.so_document_status
+                ? t(`orders:doc_status.${order.so_document_status}`, order.so_document_status)
+                : '—'}
+            </td>
+          )
         case 'status':
           return (
             <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
@@ -854,9 +901,13 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                   value={simpleValue}
                   disabled={isUpdating}
                   onChange={async (e) => {
-                    const newSimple = e.target.value as 'picking' | 'picked' | 'completed'
+                    const newSimple = e.target.value as SimpleOrderStatus
                     const backendStatus = newSimple
                     if (backendStatus === order.status) return
+                    if (backendStatus === 'cancelled') {
+                      const ok = window.confirm(t('orders:confirm_cancel_order'))
+                      if (!ok) return
+                    }
                     if (backendStatus === 'picked') {
                       setControllerModalOrder(order)
                       setSelectedControllerId('')
@@ -1132,6 +1183,20 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                         />
                       </label>
                     </div>
+                    {orderSource === 'diller' ? (
+                      <label className="block text-sm text-slate-600 dark:text-slate-400">
+                        {t('orders:filters.smartup_movement_status')}
+                        <select
+                          value={filterSmartupStatus}
+                          onChange={(e) => setFilterSmartupStatus(e.target.value === 'all' ? 'all' : 'N')}
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                          aria-label={t('orders:filters.smartup_movement_status')}
+                        >
+                          <option value="N">{t('orders:filters.smartup_status_new')}</option>
+                          <option value="all">{t('orders:filters.smartup_status_all')}</option>
+                        </select>
+                      </label>
+                    ) : null}
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button
@@ -1143,6 +1208,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                           next.delete('date_from')
                           next.delete('date_to')
                           next.delete('offset')
+                          if (orderSource === 'diller') next.delete('smartup_status')
                           return next
                         })
                         setFilterPanelOpen(false)
@@ -1164,6 +1230,10 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                           if (dt) next.set('date_to', dt)
                           else next.delete('date_to')
                           next.delete('offset')
+                          if (orderSource === 'diller') {
+                            if (filterSmartupStatus === 'all') next.set('smartup_status', 'all')
+                            else next.delete('smartup_status')
+                          }
                           return next
                         })
                         setFilterPanelOpen(false)
@@ -1207,7 +1277,11 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
           <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
             {group && group !== 'all' ? (
               <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/50 dark:text-blue-200">
-                {t(`admin:dashboard.status_${group}`)}
+                {group === 'yangi'
+                  ? t('orders:tabs.yangi_bw')
+                  : group === 'xom'
+                    ? t('admin:dashboard.status_xom')
+                    : t(`admin:dashboard.status_${group}`)}
               </span>
             ) : null}
             {isRefreshing ? (
@@ -1293,10 +1367,11 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             </>
           ) : (
             <>
-              {(() => {
+                {(() => {
                 const isAllBSLoaded =
                   !orderSource &&
                   mode === 'default' &&
+                  (group === 'yangi' || group === 'xom') &&
                   (statusParam === 'B#W' || statusParam === 'imported,B#W')
                 if (isAllBSLoaded) {
                   return (
