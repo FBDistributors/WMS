@@ -185,6 +185,8 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       if (!raw) return '—'
       if (raw === 'N') return t('orders:movement_status.new')
       if (raw === 'C') return t('orders:status_simple.yigishda')
+      if (raw === 'L') return t('orders:status_simple.tekshiruvda')
+      if (raw === 'S') return t('orders:status_simple.yakunlash')
       if (['P', 'PICKED', 'REVIEW', 'CHECK'].includes(raw)) return t('orders:status_simple.tekshiruvda')
       return raw
     },
