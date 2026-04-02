@@ -127,14 +127,19 @@ const GROUP_TO_STATUS: Record<string, string | undefined> = {
   all: undefined,
 }
 
-/** Asosiy Buyurtmalar sahifasidagi status tablari (faqat mode=default, orderSource yo'q) */
-const ORDER_TABS = [
+/** Asosiy Buyurtmalar: filter panelidagi buyurtma holati (mode=default, orderSource yo'q) */
+const ORDER_GROUP_FILTER_OPTIONS = [
   { value: 'yangi', labelKey: 'orders:tabs.yangi_bw' },
   { value: 'all', labelKey: 'orders:tabs.all_statuses' },
   { value: 'yigishda', labelKey: 'orders:tabs.yigishda' },
   { value: 'tekshiruvda', labelKey: 'orders:tabs.tekshiruvda' },
   { value: 'yakunlangan', labelKey: 'orders:tabs.yakunlangan' },
+  { value: 'xom', labelKey: 'admin:dashboard.status_xom' },
 ] as const
+
+const ORDER_GROUP_FILTER_VALUES: Set<string> = new Set(
+  ORDER_GROUP_FILTER_OPTIONS.map((o) => o.value)
+)
 
 type OrdersPageProps = { mode?: 'default' | 'statuses'; orderSource?: 'diller' }
 type MovementWmsFilter = 'new' | 'picking' | 'review' | 'completed' | 'cancelled' | 'all'
@@ -214,6 +219,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const [filterBrandId, setFilterBrandId] = useState('')
   const [filterDateFrom, setFilterDateFrom] = useState('')
   const [filterDateTo, setFilterDateTo] = useState('')
+  const [filterOrderGroup, setFilterOrderGroup] = useState('yangi')
   const [filterWmsStatus, setFilterWmsStatus] = useState<MovementWmsFilter>('new')
 
   const [items, setItems] = useState<OrderListItem[]>([])
@@ -401,11 +407,23 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       setFilterBrandId(brandFilter)
       setFilterDateFrom(dateFrom)
       setFilterDateTo(dateTo)
+      if (mode === 'default' && !orderSource) {
+        setFilterOrderGroup(ORDER_GROUP_FILTER_VALUES.has(group) ? group : 'yangi')
+      }
       if (orderSource === 'diller') {
         setFilterWmsStatus(movementWmsStatusQuery)
       }
     }
-  }, [filterPanelOpen, brandFilter, dateFrom, dateTo, orderSource, movementWmsStatusQuery])
+  }, [
+    filterPanelOpen,
+    brandFilter,
+    dateFrom,
+    dateTo,
+    group,
+    mode,
+    orderSource,
+    movementWmsStatusQuery,
+  ])
 
   useEffect(() => {
     setCheckResult(null)
@@ -1117,40 +1135,9 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     )
   }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, dillerTableConfig.config, eligibleItems, error, isLoading, items, load, location.pathname, location.search, mode, movementPage, movementsData, navigate, orderSource, searchQuery, selectedMovementIds, selectedOrderIds, t, updatingOrderId])
 
-  const showOrderTabs = mode === 'default' && !orderSource
-
   return (
     <AdminLayout titleSlot={<OrdersHubTabs />} backTo={mode === 'statuses' ? '/admin' : undefined}>
       <Card className="space-y-4">
-        {showOrderTabs ? (
-          <div className="flex border-b border-slate-200 dark:border-slate-700 gap-0 overflow-x-auto">
-            {ORDER_TABS.map((tab) => {
-              const isActive = group === tab.value
-              return (
-                <button
-                  key={tab.value}
-                  type="button"
-                  onClick={() => {
-                    setSearchParams((prev) => {
-                      const next = new URLSearchParams(prev)
-                      next.set('group', tab.value)
-                      next.delete('offset')
-                      return next
-                    })
-                  }}
-                  className={`shrink-0 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'border-sky-500 text-sky-600 dark:text-sky-400 dark:border-sky-400'
-                      : 'border-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
-                  }`}
-                  aria-current={isActive ? 'page' : undefined}
-                >
-                  {t(tab.labelKey)}
-                </button>
-              )
-            })}
-          </div>
-        ) : null}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <label className="flex-1 min-w-[180px] max-w-md text-sm text-slate-600 dark:text-slate-300">
             <span className="sr-only">{t('orders:filters.search')}</span>
@@ -1239,6 +1226,23 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                         />
                       </label>
                     </div>
+                    {mode === 'default' && !orderSource ? (
+                      <label className="block text-sm text-slate-600 dark:text-slate-400">
+                        {t('orders:filters.order_status_group')}
+                        <select
+                          value={filterOrderGroup}
+                          onChange={(e) => setFilterOrderGroup(e.target.value)}
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                          aria-label={t('orders:filters.order_status_group')}
+                        >
+                          {ORDER_GROUP_FILTER_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {t(opt.labelKey)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
                     {orderSource === 'diller' ? (
                       <label className="block text-sm text-slate-600 dark:text-slate-400">
                         {t('orders:filters.smartup_movement_status')}
@@ -1263,12 +1267,16 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                       variant="secondary"
                       onClick={() => {
                         if (orderSource === 'diller') setFilterWmsStatus('new')
+                        if (mode === 'default' && !orderSource) setFilterOrderGroup('yangi')
                         setSearchParams((prev) => {
                           const next = new URLSearchParams(prev)
                           next.delete('brand_id')
                           next.delete('date_from')
                           next.delete('date_to')
                           next.delete('offset')
+                          if (mode === 'default' && !orderSource) {
+                            next.delete('group')
+                          }
                           if (orderSource === 'diller') {
                             next.delete('wms_status')
                             next.delete('smartup_status')
@@ -1294,6 +1302,10 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                           if (dt) next.set('date_to', dt)
                           else next.delete('date_to')
                           next.delete('offset')
+                          if (mode === 'default' && !orderSource) {
+                            if (filterOrderGroup === 'yangi') next.delete('group')
+                            else next.set('group', filterOrderGroup)
+                          }
                           if (orderSource === 'diller') {
                             next.set('wms_status', filterWmsStatus)
                             next.delete('smartup_status')

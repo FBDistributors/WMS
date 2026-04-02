@@ -11,6 +11,7 @@
     "inventory": "Остаток",
     "movement": "Перемещение",
     "picking": "Подбор",
+    "orders_jarayon": "Процесс",
     "receiving": "Приёмка",
     "users": "Пользователи и доступ",
     "audit": "Журнал аудита",

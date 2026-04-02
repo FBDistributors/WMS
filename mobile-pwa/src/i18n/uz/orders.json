@@ -89,6 +89,7 @@
     "filter_all_brands": "Barcha brendlar",
     "filter_clear": "Tozalash",
     "filter_apply": "Qo'llash",
+    "order_status_group": "Buyurtma holati (WMS)",
     "smartup_movement_status": "Smartup harakat holati",
     "smartup_status_w": "Yangi (W)",
     "smartup_status_new": "Yangi (N)",

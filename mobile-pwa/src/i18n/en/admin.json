@@ -11,6 +11,7 @@
     "inventory": "Balance",
     "movement": "Movement",
     "picking": "Picking",
+    "orders_jarayon": "Process",
     "receiving": "Receiving",
     "users": "Users & Access",
     "audit": "Audit Logs",

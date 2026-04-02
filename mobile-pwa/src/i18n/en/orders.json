@@ -89,6 +89,7 @@
     "filter_all_brands": "All brands",
     "filter_clear": "Clear",
     "filter_apply": "Apply",
+    "order_status_group": "Order status (WMS)",
     "smartup_movement_status": "Smartup movement status",
     "smartup_status_w": "New (W)",
     "smartup_status_new": "New (N)",

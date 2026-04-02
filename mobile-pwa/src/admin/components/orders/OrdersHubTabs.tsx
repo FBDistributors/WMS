@@ -49,7 +49,7 @@ export function OrdersHubTabs() {
           to="/admin/picking"
           className={({ isActive }) => [base, isActive ? active : inactive].join(' ')}
         >
-          {t('admin:menu.picking')}
+          {t('admin:menu.orders_jarayon')}
         </NavLink>
       ) : null}
     </div>

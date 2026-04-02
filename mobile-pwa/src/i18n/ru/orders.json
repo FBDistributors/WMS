@@ -87,6 +87,7 @@
     "filter_all_brands": "Все бренды",
     "filter_clear": "Сбросить",
     "filter_apply": "Применить",
+    "order_status_group": "Статус заказа (WMS)",
     "smartup_movement_status": "Статус движения Smartup",
     "smartup_status_w": "Новый (W)",
     "smartup_status_new": "Новый (N)",
