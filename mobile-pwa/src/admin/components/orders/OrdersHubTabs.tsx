@@ -1,16 +1,21 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
-/** Buyurtmalar segmenti: /admin/orders, /admin/order-statuses, /admin/orders/:id — diller/orikzor emas */
+import { useAuth } from '../../../rbac/AuthProvider'
+
+/** Buyurtmalar segmenti: /admin/orders, /admin/order-statuses, /admin/orders/:id — boshqa hub tablari emas */
 function isOrdersHubOrdersActive(pathname: string): boolean {
   if (pathname.startsWith('/admin/orders-diller')) return false
   if (pathname.startsWith('/admin/orders-orikzor')) return false
+  if (pathname.startsWith('/admin/picking')) return false
   return true
 }
 
 export function OrdersHubTabs() {
   const { t } = useTranslation(['orders', 'admin'])
   const { pathname } = useLocation()
+  const { has } = useAuth()
+  const showPickingTab = has('picking:read')
 
   const base =
     'rounded-full px-4 py-2 text-sm font-semibold transition-colors whitespace-nowrap shrink-0'
@@ -39,6 +44,14 @@ export function OrdersHubTabs() {
       >
         {t('admin:menu.orders_orikzor')}
       </NavLink>
+      {showPickingTab ? (
+        <NavLink
+          to="/admin/picking"
+          className={({ isActive }) => [base, isActive ? active : inactive].join(' ')}
+        >
+          {t('admin:menu.picking')}
+        </NavLink>
+      ) : null}
     </div>
   )
 }

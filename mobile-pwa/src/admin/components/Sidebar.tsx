@@ -5,7 +5,6 @@ import {
   Boxes,
   ClipboardList,
   Crown,
-  Truck,
   Users,
   UserCircle2,
   Inbox,
@@ -35,7 +34,6 @@ const MENU_ITEMS: Array<MenuItem & { key: string }> = [
   { key: 'brands', label: 'Brands', path: '/admin/brands', icon: Tag, required: 'brands:manage' },
   { key: 'orders', label: 'Orders', path: '/admin/orders', icon: ClipboardList, required: 'orders:read' },
   { key: 'vip_customers', label: 'VIP mijozlar', path: '/admin/vip-customers', icon: Crown, required: 'orders:read' },
-  { key: 'picking', label: 'Picking', path: '/admin/picking', icon: Truck, required: 'picking:read' },
   { key: 'locations', label: 'Locations', path: '/admin/locations', icon: MapPin, required: 'locations:manage' },
   { key: 'inventory', label: 'Qoldiq', path: '/admin/inventory', icon: Boxes, required: 'inventory:read' },
   { key: 'movement', label: 'Movement', path: '/admin/movement', icon: ArrowLeftRight, required: 'inventory:adjust' },
@@ -113,7 +111,8 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
                   location.pathname === '/admin/order-statuses' ||
                   location.pathname.startsWith('/admin/orders-diller') ||
                   location.pathname.startsWith('/admin/orders-orikzor') ||
-                  location.pathname.startsWith('/admin/orders/')
+                  location.pathname.startsWith('/admin/orders/') ||
+                  location.pathname.startsWith('/admin/picking')
                 : location.pathname === path || (path !== '/admin' && location.pathname.startsWith(path))
             const content = (
               <Link

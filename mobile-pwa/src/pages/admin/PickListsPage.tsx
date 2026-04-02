@@ -4,6 +4,7 @@ import { FileText, RefreshCw, XCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { OrdersHubTabs } from '../../admin/components/orders/OrdersHubTabs'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -236,7 +237,7 @@ export function PickListsPage() {
   ])
 
   return (
-    <AdminLayout title={t('picking:list_title')}>
+    <AdminLayout titleSlot={<OrdersHubTabs />}>
       <Card className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
