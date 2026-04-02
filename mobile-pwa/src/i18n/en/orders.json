@@ -90,7 +90,7 @@
     "filter_clear": "Clear",
     "filter_apply": "Apply",
     "smartup_movement_status": "Smartup movement status",
-    "smartup_status_w": "Pending (W)",
+    "smartup_status_w": "New (W)",
     "smartup_status_new": "New (N)",
     "smartup_status_all": "All statuses",
     "organization": "Organization",
