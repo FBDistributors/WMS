@@ -1,4 +1,4 @@
-"""Add indexes from PostgreSQL Index Audit Report (POSTGRESQL_INDEX_AUDIT_REPORT.md).
+"""Add indexes from PostgreSQL index audit recommendations (see Hisobot.md).
 
 Revision ID: 20260312_0054
 Revises: 20260311_0053

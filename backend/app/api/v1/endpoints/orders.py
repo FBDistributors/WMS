@@ -15,7 +15,7 @@ from decimal import Decimal
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session, selectinload
 
-from app.auth.deps import get_current_user, require_any_permission, require_permission
+from app.auth.deps import get_current_user, require_any_permission, require_permission, require_role
 from app.db import get_db
 from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_ip, log_action
 from app.services.push_notifications import send_push_to_user
@@ -68,6 +68,7 @@ class OrderListItem(BaseModel):
     controller_name: Optional[str] = None
     is_incomplete: bool = False
     has_so: bool = False
+    so_document_status: Optional[str] = Field(None, description="SO terish hujjati statusi (bo'lsa)")
     from_warehouse_code: Optional[str] = None
     to_warehouse_code: Optional[str] = None
     movement_note: Optional[str] = None
@@ -529,6 +530,7 @@ async def list_orders(
         doc = doc_by_order.get(order.id)
         is_incomplete = doc is not None and doc.incomplete_reason is not None
         has_so = doc is not None
+        so_doc_status = doc.status if doc else None
         items.append(
             OrderListItem(
                 id=order.id,
@@ -550,6 +552,7 @@ async def list_orders(
                 controller_name=_controller_name(doc),
                 is_incomplete=is_incomplete,
                 has_so=has_so,
+                so_document_status=so_doc_status,
                 delivery_date=order.delivery_date.date() if getattr(order, "delivery_date", None) else None,
             )
         )
@@ -693,7 +696,7 @@ async def update_order_status(
     order_id: UUID,
     payload: OrderStatusUpdateRequest,
     db: Session = Depends(get_db),
-    user=Depends(require_permission("documents:edit_status")),
+    user=Depends(require_role(["warehouse_admin"])),
 ):
     if payload.status not in ALLOWED_ADMIN_ORDER_STATUSES:
         raise HTTPException(
@@ -740,6 +743,15 @@ async def update_order_status(
         )
         if doc:
             doc.status = "completed"
+
+    if normalized_status == "cancelled":
+        doc = (
+            db.query(DocumentModel)
+            .filter(DocumentModel.order_id == order.id, DocumentModel.doc_type == "SO")
+            .one_or_none()
+        )
+        if doc:
+            doc.status = "cancelled"
 
     log_action(
         db,
