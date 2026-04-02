@@ -184,6 +184,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       const raw = String(rawStatus ?? '').trim().toUpperCase()
       if (!raw) return '—'
       if (raw === 'N') return t('orders:movement_status.new')
+      if (raw === 'W' || raw === 'B#W') return t('orders:tabs.yangi_bw')
       if (raw === 'C') return t('orders:status_simple.yigishda')
       if (raw === 'L') return t('orders:status_simple.tekshiruvda')
       if (raw === 'S') return t('orders:status_simple.yakunlash')
