@@ -309,8 +309,6 @@ export function OrikzorHarakatlariPage() {
     )
   }, [canSendToPicking, error, isLoading, movementList, movementTotal, load, columnLabels, navigate, orikzorTableConfig.config, searchParams, selectedMovementIds, setSelectedMovementIds, t])
 
-  const pageTitle = t('orders:title')
-
   const handleSmartupSync = useCallback(() => {
     void load(true, 0, true)
     setSearchParams((prev) => {
@@ -321,9 +319,8 @@ export function OrikzorHarakatlariPage() {
   }, [load, setSearchParams])
 
   return (
-    <AdminLayout title={pageTitle}>
+    <AdminLayout titleSlot={<OrdersHubTabs />}>
       <Card className="space-y-4">
-        <OrdersHubTabs />
         <div className="flex flex-nowrap items-end gap-3">
           <label className="min-w-[180px] flex-1 max-w-md text-sm text-slate-600 dark:text-slate-300">
             <span className="sr-only">{t('orders:filters.search')}</span>
