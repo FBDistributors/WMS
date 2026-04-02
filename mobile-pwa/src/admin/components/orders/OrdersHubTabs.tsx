@@ -30,7 +30,7 @@ export function OrdersHubTabs() {
         to="/admin/orders"
         className={() => [base, ordersTabActive ? active : inactive].join(' ')}
       >
-        {t('orders:title')}
+        {t('admin:menu.orders_hub_main')}
       </NavLink>
       <NavLink
         to="/admin/orders-diller"
