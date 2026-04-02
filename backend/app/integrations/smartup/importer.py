@@ -73,7 +73,11 @@ def _process_one_order(
         .one_or_none()
     )
     payload = map_order_to_wms_order(order)
-    payload.status = (order.status or "").strip() or "imported"
+    # Smartup status bo'sh bo'lsa mapper B#W qo'yadi; "imported" ga yozish yangi buyurtmalarni
+    # GET /orders?status=B#W (default "yangi" navbat) dan yashirardi.
+    raw_status = (order.status or "").strip()
+    if raw_status:
+        payload.status = raw_status
     if override and not (payload.filial_id or "").strip():
         payload.filial_id = override
     if override and external_id != payload.source_external_id:
