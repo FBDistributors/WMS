@@ -136,6 +136,7 @@ const ORDER_TABS = [
 ] as const
 
 type OrdersPageProps = { mode?: 'default' | 'statuses'; orderSource?: 'diller' }
+type MovementWmsFilter = 'new' | 'picking' | 'review' | 'completed' | 'cancelled' | 'all'
 
 export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const { t } = useTranslation(['orders', 'common', 'admin'])
@@ -148,22 +149,23 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const dateFrom = searchParams.get('date_from') ?? ''
   const dateTo = searchParams.get('date_to') ?? ''
   const offset = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10))
-  const movementSmartupStatusQuery = useMemo(() => {
-    const raw = searchParams.get('smartup_status')
-    if (raw == null || raw.trim() === '') return 'W'
-    const v = raw.trim()
-    const low = v.toLowerCase()
-    if (low === 'all' || low === '*') return 'all'
-    if (v.includes(',')) {
-      return v
-        .split(',')
-        .map((p) => p.trim().toUpperCase())
-        .filter(Boolean)
-        .join(',')
+  const movementWmsStatusQuery = useMemo<MovementWmsFilter>(() => {
+    const rawWms = searchParams.get('wms_status')
+    if (rawWms && rawWms.trim()) {
+      const v = rawWms.trim().toLowerCase()
+      if (['new', 'picking', 'review', 'completed', 'cancelled', 'all'].includes(v)) {
+        return v as MovementWmsFilter
+      }
     }
-    if (low === 'n') return 'N'
-    if (low === 'w') return 'W'
-    return v.toUpperCase()
+    // Legacy fallback from old smartup_status links.
+    const rawSmartup = searchParams.get('smartup_status')
+    if (rawSmartup && rawSmartup.trim()) {
+      const low = rawSmartup.trim().toLowerCase()
+      if (low === 'w') return 'new'
+      if (low === 'all' || low === '*') return 'all'
+      if (low === 'n') return 'all'
+    }
+    return 'new'
   }, [searchParams])
   const pageTitle = orderSource
     ? t('admin:menu.orders_diller', 'Tashkiliy harakatlar')
@@ -216,7 +218,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const [filterBrandId, setFilterBrandId] = useState('')
   const [filterDateFrom, setFilterDateFrom] = useState('')
   const [filterDateTo, setFilterDateTo] = useState('')
-  const [filterSmartupStatus, setFilterSmartupStatus] = useState<'W' | 'N' | 'all'>('W')
+  const [filterWmsStatus, setFilterWmsStatus] = useState<MovementWmsFilter>('new')
 
   const [items, setItems] = useState<OrderListItem[]>([])
   const [total, setTotal] = useState(0)
@@ -282,7 +284,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         const filialId = (import.meta.env.VITE_DEFAULT_FILIAL_ID as string)?.trim()
         if (filialId) query.filial_id = filialId
         if (forceRefresh) query.refresh = true
-        query.smartup_status = movementSmartupStatusQuery
+        query.wms_status = movementWmsStatusQuery
         const data = await getMovements(query)
         setMovementsData(data)
         if (pageOverride !== undefined) setMovementPage(pageOverride)
@@ -365,7 +367,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     dateTo,
     statusParam,
     onlyNotSentToPicking,
-    movementSmartupStatusQuery,
+    movementWmsStatusQuery,
     t,
   ])
 
@@ -404,20 +406,10 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       setFilterDateFrom(dateFrom)
       setFilterDateTo(dateTo)
       if (orderSource === 'diller') {
-        const raw = searchParams.get('smartup_status')
-        if (!raw || !raw.trim()) {
-          setFilterSmartupStatus('W')
-        } else {
-          const low = raw.trim().toLowerCase()
-          if (low === 'all' || low === '*') setFilterSmartupStatus('all')
-          else if (raw.includes(',')) setFilterSmartupStatus('W')
-          else if (low === 'n') setFilterSmartupStatus('N')
-          else if (low === 'w') setFilterSmartupStatus('W')
-          else setFilterSmartupStatus('W')
-        }
+        setFilterWmsStatus(movementWmsStatusQuery)
       }
     }
-  }, [filterPanelOpen, brandFilter, dateFrom, dateTo, orderSource, searchParams])
+  }, [filterPanelOpen, brandFilter, dateFrom, dateTo, orderSource, movementWmsStatusQuery])
 
   useEffect(() => {
     setCheckResult(null)
@@ -1255,17 +1247,17 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                       <label className="block text-sm text-slate-600 dark:text-slate-400">
                         {t('orders:filters.smartup_movement_status')}
                         <select
-                          value={filterSmartupStatus}
-                          onChange={(e) => {
-                            const v = e.target.value
-                            setFilterSmartupStatus(v === 'all' ? 'all' : v === 'N' ? 'N' : 'W')
-                          }}
+                          value={filterWmsStatus}
+                          onChange={(e) => setFilterWmsStatus(e.target.value as MovementWmsFilter)}
                           className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                           aria-label={t('orders:filters.smartup_movement_status')}
                         >
-                          <option value="W">{t('orders:filters.smartup_status_w')}</option>
-                          <option value="N">{t('orders:filters.smartup_status_new')}</option>
-                          <option value="all">{t('orders:filters.smartup_status_all')}</option>
+                          <option value="new">{t('orders:filters.wms_status_new')}</option>
+                          <option value="picking">{t('orders:filters.wms_status_picking')}</option>
+                          <option value="review">{t('orders:filters.wms_status_review')}</option>
+                          <option value="completed">{t('orders:filters.wms_status_completed')}</option>
+                          <option value="cancelled">{t('orders:filters.wms_status_cancelled')}</option>
+                          <option value="all">{t('orders:filters.wms_status_all')}</option>
                         </select>
                       </label>
                     ) : null}
@@ -1274,14 +1266,17 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                     <Button
                       variant="secondary"
                       onClick={() => {
-                        if (orderSource === 'diller') setFilterSmartupStatus('W')
+                        if (orderSource === 'diller') setFilterWmsStatus('new')
                         setSearchParams((prev) => {
                           const next = new URLSearchParams(prev)
                           next.delete('brand_id')
                           next.delete('date_from')
                           next.delete('date_to')
                           next.delete('offset')
-                          if (orderSource === 'diller') next.delete('smartup_status')
+                          if (orderSource === 'diller') {
+                            next.delete('wms_status')
+                            next.delete('smartup_status')
+                          }
                           return next
                         })
                         setFilterPanelOpen(false)
@@ -1304,9 +1299,8 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                           else next.delete('date_to')
                           next.delete('offset')
                           if (orderSource === 'diller') {
-                            if (filterSmartupStatus === 'all') next.set('smartup_status', 'all')
-                            else if (filterSmartupStatus === 'N') next.set('smartup_status', 'n')
-                            else next.set('smartup_status', 'w')
+                            next.set('wms_status', filterWmsStatus)
+                            next.delete('smartup_status')
                           }
                           return next
                         })

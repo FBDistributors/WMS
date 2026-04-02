@@ -33,6 +33,8 @@ export type MovementsQuery = {
   refresh?: boolean
   /** Smartup harakat statusi: N (default), all, yoki vergul bilan ro'yxat */
   smartup_status?: string
+  /** WMS status filter: new, picking, review, completed, cancelled, all */
+  wms_status?: string
 }
 
 export async function getMovements(query: MovementsQuery = {}) {
