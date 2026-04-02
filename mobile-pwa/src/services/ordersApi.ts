@@ -37,8 +37,8 @@ export type MovementsQuery = {
   wms_status?: string
 }
 
-export async function getMovements(query: MovementsQuery = {}) {
-  return fetchJSON<MovementsResponse>('/api/v1/movements', { query })
+export async function getMovements(query: MovementsQuery = {}, init?: { signal?: AbortSignal }) {
+  return fetchJSON<MovementsResponse>('/api/v1/movements', { query, signal: init?.signal })
 }
 
 /** O'rikzor harakatlari — alohida API (Smartup proxy, Order bilan aloqasi yo'q). */
@@ -131,12 +131,12 @@ export type OrdersQuery = {
   offset?: number
 }
 
-export async function getOrders(query: OrdersQuery = {}) {
+export async function getOrders(query: OrdersQuery = {}, init?: { signal?: AbortSignal }) {
   const q = { ...query }
   if (q.status != null) {
     q.status = normalizeOrdersStatusQuery(q.status)
   }
-  return fetchJSON<OrdersListResponse>('/api/v1/orders', { query: q })
+  return fetchJSON<OrdersListResponse>('/api/v1/orders', { query: q, signal: init?.signal })
 }
 
 /** Baza va jadval yuklashni tekshirish: B#W soni va q bo'yicha topiladigan buyurtmalar */

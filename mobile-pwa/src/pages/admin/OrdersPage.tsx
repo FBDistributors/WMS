@@ -120,7 +120,8 @@ function normalizeOrderListStatusParam(s: string | undefined): string | undefine
 
 const GROUP_TO_STATUS: Record<string, string | undefined> = {
   xom: 'imported,B#W', // Yangi: Smartupdan kelgan, admin yig'uvchiga yubormagan
-  yangi: 'B#W', // Yig'ishga yuborilmagan navbat (bulk yoki filtr)
+  // Default "yangi": imported + B#W — faqat B#W so‘raganda bazada imported qolganlar ko‘rinmasdi
+  yangi: 'imported,B#W',
   yigishda: 'allocated,ready_for_picking,picking', // Yig'uvchi yig'ishda / controllerga yubormagan
   tekshiruvda: 'picked', // Controllerga yuborilgan, controller yakunlamagan
   yakunlangan: 'completed,packed,shipped,cancelled', // Yakunlangan, jo'natilgan yoki bekor
@@ -250,6 +251,9 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const [selectedControllerId, setSelectedControllerId] = useState('')
   const [controllerModalSubmitting, setControllerModalSubmitting] = useState(false)
 
+  const ordersLoadAbortRef = useRef<AbortController | null>(null)
+  const ordersLoadGenRef = useRef(0)
+
   const ELIGIBLE_PICKING_STATUSES = new Set(['imported', 'B#W', 'ready_for_picking', 'allocated'])
   const canBeSentToPicking = (order: OrderListItem) =>
     canSend && ELIGIBLE_PICKING_STATUSES.has(order.status)
@@ -259,6 +263,12 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   )
 
   const load = useCallback(async (background = false, pageOverride?: number, forceRefresh?: boolean) => {
+    ordersLoadAbortRef.current?.abort()
+    const ac = new AbortController()
+    ordersLoadAbortRef.current = ac
+    const signal = ac.signal
+    const gen = ++ordersLoadGenRef.current
+
     if (!background) {
       setIsLoading(true)
       setError(null)
@@ -287,7 +297,8 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         if (filialId) query.filial_id = filialId
         if (forceRefresh) query.refresh = true
         query.wms_status = movementWmsStatusQuery
-        const data = await getMovements(query)
+        const data = await getMovements(query, { signal })
+        if (gen !== ordersLoadGenRef.current) return
         setMovementsData(data)
         if (pageOverride !== undefined) setMovementPage(pageOverride)
         setItems([])
@@ -305,18 +316,22 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         let off = 0
         let hasMore = true
         while (hasMore) {
-          const data = await getOrders({
-            status: statusParam,
-            q: searchQuery.trim() || undefined,
-            brand_ids: brandFilter.trim() ? brandFilter.trim() : undefined,
-            date_from: dateFrom.trim() || undefined,
-            date_to: dateTo.trim() || undefined,
-            search_fields:
-              config.searchFields.length > 0 ? config.searchFields.join(',') : undefined,
-            limit: BULK_PAGE_SIZE,
-            offset: off,
-            filial_id: 'all',
-          })
+          const data = await getOrders(
+            {
+              status: statusParam,
+              q: searchQuery.trim() || undefined,
+              brand_ids: brandFilter.trim() ? brandFilter.trim() : undefined,
+              date_from: dateFrom.trim() || undefined,
+              date_to: dateTo.trim() || undefined,
+              search_fields:
+                config.searchFields.length > 0 ? config.searchFields.join(',') : undefined,
+              limit: BULK_PAGE_SIZE,
+              offset: off,
+              filial_id: 'all',
+            },
+            { signal }
+          )
+          if (gen !== ordersLoadGenRef.current || signal.aborted) return
           allItems.push(...data.items)
           hasMore = data.items.length >= BULK_PAGE_SIZE && allItems.length < data.total
           off += BULK_PAGE_SIZE
@@ -324,6 +339,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         const list = onlyNotSentToPicking
           ? allItems.filter((o) => !SENT_TO_PICKING_STATUSES.has(o.status))
           : allItems
+        if (gen !== ordersLoadGenRef.current) return
         setItems(list)
         setTotal(list.length)
       } else {
@@ -340,7 +356,8 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
           ...(orderSource ? { order_source: orderSource } : {}),
         }
         if (statusParam) query.status = statusParam
-        const data = await getOrders(query)
+        const data = await getOrders(query, { signal })
+        if (gen !== ordersLoadGenRef.current) return
         const list = onlyNotSentToPicking
           ? data.items.filter((o) => !SENT_TO_PICKING_STATUSES.has(o.status))
           : data.items
@@ -348,13 +365,24 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         setTotal(data.total)
       }
     } catch (err) {
+      if (signal.aborted || gen !== ordersLoadGenRef.current) return
       if (!background) {
-        const message = err instanceof Error ? err.message : t('orders:load_failed')
+        const message =
+          err &&
+          typeof err === 'object' &&
+          'message' in err &&
+          typeof (err as { message: unknown }).message === 'string'
+            ? String((err as { message: string }).message)
+            : err instanceof Error
+              ? err.message
+              : t('orders:load_failed')
         setError(message)
       }
     } finally {
-      if (!background) setIsLoading(false)
-      else setIsRefreshing(false)
+      if (gen === ordersLoadGenRef.current) {
+        if (!background) setIsLoading(false)
+        else setIsRefreshing(false)
+      }
     }
   }, [
     config.searchFields,
@@ -482,7 +510,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         : { begin_deal_date: beginDealStr, end_deal_date: endDeal }
       const result = await syncSmartupOrders(payload)
       setSyncResult(result)
-      await load(true)
+      await load(false)
     } catch (err) {
       const message =
         (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string')
