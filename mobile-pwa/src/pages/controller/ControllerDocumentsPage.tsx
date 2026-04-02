@@ -8,7 +8,7 @@ import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { listPickLists, type PickList } from '../../services/pickingApi'
 
 export function ControllerDocumentsPage() {
-  const { t, i18n } = useTranslation(['controller', 'common'])
+  const { t, i18n } = useTranslation(['controller', 'common', 'picking'])
   const navigate = useNavigate()
   const [docs, setDocs] = useState<PickList[]>([])
   const [loading, setLoading] = useState(true)
@@ -35,10 +35,12 @@ export function ControllerDocumentsPage() {
     const map: Record<PickList['status'], string> = {
       NEW: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200',
       IN_PROGRESS: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200',
+      REVIEW: 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200',
       DONE: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200',
       ERROR: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200',
+      UNKNOWN: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
     }
-    return map[status] ?? ''
+    return map[status] ?? map.UNKNOWN
   }
 
   return (
@@ -85,7 +87,9 @@ export function ControllerDocumentsPage() {
                 <span
                   className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${statusBadge(doc.status)}`}
                 >
-                  {doc.status}
+                  {t(`picking:doc_status.${doc.document_status.toLowerCase().replace(/-/g, '_')}`, {
+                    defaultValue: doc.document_status,
+                  })}
                 </span>
                 <span className="text-slate-400">›</span>
               </button>

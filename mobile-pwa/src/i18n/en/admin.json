@@ -96,7 +96,9 @@
     "pickers_orders_title": "Orders picked by worker",
     "worker_column": "Worker",
     "orders_picked_column": "Orders picked",
-    "pickers_empty": "No data yet."
+    "pickers_empty": "No data yet.",
+    "active_pick_documents_title": "Active pick documents",
+    "view_all_picking": "All pick lists"
   },
   "active_picks": {
     "empty": "No active picks right now.",

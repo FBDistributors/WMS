@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { TableScrollArea } from '../../components/TableScrollArea'
+import { OrdersHubTabs } from '../../admin/components/orders/OrdersHubTabs'
 import { SendToPickingDialog } from '../../admin/components/orders/SendToPickingDialog'
 import { OrdersTableSettings } from '../../admin/components/orders/OrdersTableSettings'
 import { useDillerTableConfig } from '../../admin/hooks/useMovementsTableConfig'
@@ -167,11 +168,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     }
     return 'new'
   }, [searchParams])
-  const pageTitle = orderSource
-    ? t('admin:menu.orders_diller', 'Tashkiliy harakatlar')
-    : mode === 'statuses'
-      ? t('admin:dashboard.order_statuses_title')
-      : t('orders:title')
+  const pageTitle = t('orders:title')
   // yangi | xom: B#W / imported+B#W + klientda yig'ishga ketganlarni yashirish; all | order-statuses all: status filtrisiz
   const statusParam = normalizeOrderListStatusParam(
     orderSource
@@ -1126,6 +1123,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   return (
     <AdminLayout title={pageTitle} backTo={mode === 'statuses' ? '/admin' : undefined}>
       <Card className="space-y-4">
+        <OrdersHubTabs />
         {showOrderTabs ? (
           <div className="flex border-b border-slate-200 dark:border-slate-700 gap-0 overflow-x-auto">
             {ORDER_TABS.map((tab) => {

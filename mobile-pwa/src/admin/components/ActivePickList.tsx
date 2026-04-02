@@ -24,7 +24,7 @@ type ActivePickListProps = {
 }
 
 export function ActivePickList({ items, onOpen }: ActivePickListProps) {
-  const { t } = useTranslation(['admin', 'common', 'picking'])
+  const { t, i18n } = useTranslation(['admin', 'common', 'picking'])
   if (items.length === 0) {
     return (
       <Card>
@@ -48,7 +48,7 @@ export function ActivePickList({ items, onOpen }: ActivePickListProps) {
                 : item.document_no}
             </div>
               <Badge variant={variant}>
-                {t(statusKey)}
+                {t(statusKey, { defaultValue: item.status })}
               </Badge>
             </div>
             <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
@@ -69,6 +69,15 @@ export function ActivePickList({ items, onOpen }: ActivePickListProps) {
                     {t('admin:active_picks.controller')}: <strong>{item.controller_name}</strong>
                   </span>
                 )}
+              </div>
+            )}
+            {item.updated_at != null && item.updated_at !== '' && (
+              <div className="text-xs text-slate-500 dark:text-slate-400">
+                {t('picking:last_activity')}:{' '}
+                {new Date(item.updated_at).toLocaleString(i18n.language, {
+                  dateStyle: 'short',
+                  timeStyle: 'short',
+                })}
               </div>
             )}
             <Progress value={percent} />

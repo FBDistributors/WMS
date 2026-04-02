@@ -80,9 +80,11 @@ class PickingListItem(BaseModel):
     lines_total: int
     lines_done: int
     controlled_by_user_id: Optional[UUID] = None
+    controlled_by_user_name: Optional[str] = None
     assigned_to_user_id: Optional[UUID] = None
     assigned_to_user_name: Optional[str] = None
     order_number: Optional[str] = None
+    updated_at: datetime
 
 
 class ConsolidatedLineItem(BaseModel):
@@ -363,6 +365,13 @@ def _picker_name(doc: DocumentModel) -> Optional[str]:
     return getattr(user, "full_name", None) or getattr(user, "username", None)
 
 
+def _controller_name(doc: DocumentModel) -> Optional[str]:
+    user = getattr(doc, "controlled_by_user", None)
+    if user is None:
+        return None
+    return getattr(user, "full_name", None) or getattr(user, "username", None)
+
+
 def _to_picking_document(doc: DocumentModel) -> PickingDocument:
     lines = getattr(doc, "lines", None) or []
     return PickingDocument(
@@ -416,9 +425,11 @@ def _to_picking_list_item(doc: DocumentModel) -> PickingListItem:
         lines_total=lines_total,
         lines_done=lines_done,
         controlled_by_user_id=doc.controlled_by_user_id,
+        controlled_by_user_name=_controller_name(doc),
         assigned_to_user_id=doc.assigned_to_user_id,
         assigned_to_user_name=_picker_name(doc),
         order_number=_order_number(doc),
+        updated_at=doc.updated_at,
     )
 
 
@@ -482,6 +493,7 @@ async def list_picking_documents(
         .options(
             selectinload(DocumentModel.lines),
             selectinload(DocumentModel.assigned_to_user),
+            selectinload(DocumentModel.controlled_by_user),
             selectinload(DocumentModel.order).selectinload(OrderModel.wms_state),
         )
         .outerjoin(OrderModel, DocumentModel.order_id == OrderModel.id)

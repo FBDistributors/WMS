@@ -4,6 +4,7 @@ import { FileText, Filter, Loader2, Settings, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { OrdersHubTabs } from '../../admin/components/orders/OrdersHubTabs'
 import { OrdersTableSettings } from '../../admin/components/orders/OrdersTableSettings'
 import { SendToPickingDialog } from '../../admin/components/orders/SendToPickingDialog'
 import { useOrikzorTableConfig } from '../../admin/hooks/useMovementsTableConfig'
@@ -308,7 +309,7 @@ export function OrikzorHarakatlariPage() {
     )
   }, [canSendToPicking, error, isLoading, movementList, movementTotal, load, columnLabels, navigate, orikzorTableConfig.config, searchParams, selectedMovementIds, setSelectedMovementIds, t])
 
-  const pageTitle = t('admin:menu.orders_orikzor', "O'rikzor harakatlari")
+  const pageTitle = t('orders:title')
 
   const handleSmartupSync = useCallback(() => {
     void load(true, 0, true)
@@ -322,6 +323,7 @@ export function OrikzorHarakatlariPage() {
   return (
     <AdminLayout title={pageTitle}>
       <Card className="space-y-4">
+        <OrdersHubTabs />
         <div className="flex flex-nowrap items-end gap-3">
           <label className="min-w-[180px] flex-1 max-w-md text-sm text-slate-600 dark:text-slate-300">
             <span className="sr-only">{t('orders:filters.search')}</span>

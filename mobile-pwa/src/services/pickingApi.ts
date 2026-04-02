@@ -1,6 +1,6 @@
 import { fetchJSON } from './apiClient'
 
-export type PickListStatus = 'NEW' | 'IN_PROGRESS' | 'DONE' | 'ERROR'
+export type PickListStatus = 'NEW' | 'IN_PROGRESS' | 'REVIEW' | 'DONE' | 'ERROR' | 'UNKNOWN'
 
 export type PickList = {
   id: string
@@ -8,9 +8,14 @@ export type PickList = {
   order_number?: string | null
   created_at?: string
   completed_at?: string | null
+  /** Backend document status string (for labels). */
+  document_status: string
   status: PickListStatus
   total_lines: number
   picked_lines: number
+  picker_name?: string | null
+  controller_name?: string | null
+  updated_at?: string
 }
 
 export type PickLineStatus = 'NEW' | 'IN_PROGRESS' | 'DONE' | 'ERROR'
@@ -40,6 +45,9 @@ type BackendPickingListItem = {
   lines_total: number
   lines_done: number
   completed_at?: string | null
+  assigned_to_user_name?: string | null
+  controlled_by_user_name?: string | null
+  updated_at?: string
 }
 
 type BackendDocumentLine = {
@@ -72,12 +80,15 @@ const STATUS_MAP: Record<string, PickListStatus> = {
   new: 'NEW',
   in_progress: 'IN_PROGRESS',
   partial: 'IN_PROGRESS',
+  picked: 'REVIEW',
   completed: 'DONE',
+  packed: 'DONE',
+  shipped: 'DONE',
   cancelled: 'ERROR',
 }
 
 function mapStatus(status: string): PickListStatus {
-  return STATUS_MAP[status] ?? 'ERROR'
+  return STATUS_MAP[status] ?? 'UNKNOWN'
 }
 
 function mapLineStatus(line: BackendDocumentLine): PickLineStatus {
@@ -102,25 +113,32 @@ function mapPickingLineToPickerViewModel(line: BackendDocumentLine): PickLine {
 }
 
 function mapList(item: BackendPickingListItem): PickList {
+  const raw = item.status
   return {
     id: item.id,
     document_no: item.reference_number,
     order_number: item.order_number ?? undefined,
-    status: mapStatus(item.status),
+    document_status: raw,
+    status: mapStatus(raw),
     total_lines: item.lines_total,
     picked_lines: item.lines_done,
     completed_at: item.completed_at ?? undefined,
+    picker_name: item.assigned_to_user_name ?? undefined,
+    controller_name: item.controlled_by_user_name ?? undefined,
+    updated_at: item.updated_at,
   }
 }
 
 function mapDetails(doc: BackendPickingDetails): PickListDetails {
   const totalLines = doc.lines.length
   const pickedLines = doc.lines.filter((line) => line.qty_picked >= line.qty_required).length
+  const raw = doc.status
   return {
     id: doc.id,
     document_no: doc.reference_number,
     order_number: doc.order_number ?? undefined,
-    status: mapStatus(doc.status),
+    document_status: raw,
+    status: mapStatus(raw),
     total_lines: totalLines,
     picked_lines: pickedLines,
     lines: doc.lines.map(mapPickingLineToPickerViewModel),

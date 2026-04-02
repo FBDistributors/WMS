@@ -24,6 +24,7 @@ export type ActivePick = {
   total: number
   picker_name?: string | null
   controller_name?: string | null
+  updated_at?: string
 }
 
 export type TodayOverviewItem = {

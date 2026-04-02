@@ -10,7 +10,7 @@
     "locations": "Joylashuvlar",
     "inventory": "Qoldiq",
     "movement": "Ko'chirish",
-    "picking": "Picking",
+    "picking": "Yig'ish",
     "receiving": "Qabul",
     "users": "Users & Access",
     "audit": "Audit log",
@@ -96,7 +96,9 @@
     "pickers_orders_title": "Ishchilar bo‘yicha yig‘ilgan buyurtmalar",
     "worker_column": "Ishchi",
     "orders_picked_column": "Yig‘ilgan buyurtmalar",
-    "pickers_empty": "Hozircha ma'lumot yo'q."
+    "pickers_empty": "Hozircha ma'lumot yo'q.",
+    "active_pick_documents_title": "Faol yig'ish hujjatlari",
+    "view_all_picking": "Barcha pick listlar"
   },
   "active_picks": {
     "empty": "Hozircha faol picking yo‘q.",

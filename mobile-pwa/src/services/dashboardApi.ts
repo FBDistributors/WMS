@@ -10,6 +10,7 @@ type ApiPickDocumentItem = {
   lines_total: number
   picker_name: string | null
   controller_name: string | null
+  updated_at?: string
 }
 
 type ApiPickDocumentsResponse = {
@@ -114,5 +115,6 @@ export async function getPickDocuments(params?: {
     total: item.lines_total,
     picker_name: item.picker_name ?? undefined,
     controller_name: item.controller_name ?? undefined,
+    updated_at: item.updated_at,
   }))
 }

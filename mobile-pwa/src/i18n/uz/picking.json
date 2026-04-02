@@ -70,7 +70,24 @@
   "status": {
     "new": "Yangi",
     "in_progress": "Jarayonda",
+    "review": "Tekshiruvda",
     "done": "Bajarildi",
-    "error": "Xato"
-  }
+    "error": "Xato",
+    "unknown": "Noma'lum"
+  },
+  "doc_status": {
+    "new": "Yangi",
+    "draft": "Qoralama",
+    "confirmed": "Tasdiqlangan",
+    "in_progress": "Jarayonda",
+    "partial": "Qisman",
+    "picked": "Tekshiruvda",
+    "completed": "Yakunlangan",
+    "packed": "Qadoqlangan",
+    "shipped": "Jo'natilgan",
+    "cancelled": "Bekor qilingan"
+  },
+  "column_picker": "Yig'uvchi",
+  "column_controller": "Kontrolyor",
+  "last_activity": "Oxirgi faollik"
 }

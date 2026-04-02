@@ -70,7 +70,24 @@
   "status": {
     "new": "New",
     "in_progress": "In progress",
+    "review": "In review",
     "done": "Done",
-    "error": "Error"
-  }
+    "error": "Error",
+    "unknown": "Unknown"
+  },
+  "doc_status": {
+    "new": "New",
+    "draft": "Draft",
+    "confirmed": "Confirmed",
+    "in_progress": "In progress",
+    "partial": "Partial",
+    "picked": "In review",
+    "completed": "Completed",
+    "packed": "Packed",
+    "shipped": "Shipped",
+    "cancelled": "Cancelled"
+  },
+  "column_picker": "Picker",
+  "column_controller": "Controller",
+  "last_activity": "Last activity"
 }

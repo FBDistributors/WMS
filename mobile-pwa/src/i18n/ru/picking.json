@@ -70,7 +70,24 @@
   "status": {
     "new": "Новый",
     "in_progress": "В процессе",
+    "review": "На проверке",
     "done": "Готово",
-    "error": "Ошибка"
-  }
+    "error": "Ошибка",
+    "unknown": "Неизвестно"
+  },
+  "doc_status": {
+    "new": "Новый",
+    "draft": "Черновик",
+    "confirmed": "Подтверждён",
+    "in_progress": "В работе",
+    "partial": "Частично",
+    "picked": "На проверке",
+    "completed": "Завершён",
+    "packed": "Упакован",
+    "shipped": "Отгружен",
+    "cancelled": "Отменён"
+  },
+  "column_picker": "Сборщик",
+  "column_controller": "Контролёр",
+  "last_activity": "Последняя активность"
 }

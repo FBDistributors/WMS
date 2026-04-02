@@ -96,7 +96,9 @@
     "pickers_orders_title": "Собранные заказы по сотрудникам",
     "worker_column": "Сотрудник",
     "orders_picked_column": "Собрано заказов",
-    "pickers_empty": "Пока нет данных."
+    "pickers_empty": "Пока нет данных.",
+    "active_pick_documents_title": "Активные документы подбора",
+    "view_all_picking": "Все списки подбора"
   },
   "active_picks": {
     "empty": "Нет активного подбора.",

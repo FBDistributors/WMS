@@ -5,13 +5,14 @@ import { Button } from '../ui/button'
 import { Card } from '../ui/card'
 import type { PickList } from '../../services/pickingApi'
 
-const statusVariant: Record<PickList['status'], 'neutral' | 'primary' | 'success' | 'danger'> =
-  {
-    NEW: 'neutral',
-    IN_PROGRESS: 'primary',
-    DONE: 'success',
-    ERROR: 'danger',
-  }
+const statusVariant: Record<PickList['status'], 'neutral' | 'primary' | 'success' | 'danger'> = {
+  NEW: 'neutral',
+  IN_PROGRESS: 'primary',
+  REVIEW: 'primary',
+  DONE: 'success',
+  ERROR: 'danger',
+  UNKNOWN: 'neutral',
+}
 
 type PickListCardProps = {
   item: PickList
@@ -23,7 +24,7 @@ type PickListCardProps = {
 export function PickListCard({ item, onClick, onCancel, isCancelling }: PickListCardProps) {
   const { t } = useTranslation('picking')
   const progressText = `${item.picked_lines}/${item.total_lines}`
-  const statusKey = item.status.toLowerCase()
+  const statusKey = item.status.toLowerCase() as 'new' | 'in_progress' | 'review' | 'done' | 'error' | 'unknown'
 
   return (
     <Card

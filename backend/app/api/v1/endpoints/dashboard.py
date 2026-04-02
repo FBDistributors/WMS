@@ -33,6 +33,7 @@ class PickDocumentListItem(BaseModel):
     lines_total: int
     picker_name: Optional[str] = None
     controller_name: Optional[str] = None
+    updated_at: datetime
 
 
 class PickDocumentsListResponse(BaseModel):
@@ -228,6 +229,7 @@ async def get_pick_documents(
                 lines_total=lines_total,
                 picker_name=picker_name,
                 controller_name=controller_name,
+                updated_at=doc.updated_at,
             )
         )
     return PickDocumentsListResponse(items=items)

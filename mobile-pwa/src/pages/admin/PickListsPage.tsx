@@ -9,11 +9,37 @@ import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { TableScrollArea } from '../../components/TableScrollArea'
-import { listPickLists, cancelPickList, type PickList } from '../../services/pickingApi'
+import { listPickLists, cancelPickList, type PickList, type PickListStatus } from '../../services/pickingApi'
 import { useAuth } from '../../rbac/AuthProvider'
 
+function statusBadgeClass(status: PickListStatus): string {
+  switch (status) {
+    case 'DONE':
+      return 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
+    case 'IN_PROGRESS':
+      return 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300'
+    case 'REVIEW':
+      return 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200'
+    case 'ERROR':
+      return 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
+    case 'UNKNOWN':
+    case 'NEW':
+    default:
+      return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+  }
+}
+
+function formatActivity(iso: string | undefined, locale: string): string {
+  if (!iso) return '—'
+  try {
+    return new Date(iso).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' })
+  } catch {
+    return iso
+  }
+}
+
 export function PickListsPage() {
-  const { t } = useTranslation(['picking', 'admin', 'common'])
+  const { t, i18n } = useTranslation(['picking', 'common'])
   const navigate = useNavigate()
   const { has } = useAuth()
 
@@ -51,8 +77,26 @@ export function PickListsPage() {
   const filtered = useMemo(() => {
     if (!query.trim()) return items
     const term = query.toLowerCase()
-    return items.filter((item) => item.document_no.toLowerCase().includes(term))
+    return items.filter((item) => {
+      const parts = [
+        item.document_no,
+        item.order_number ?? '',
+        item.picker_name ?? '',
+        item.controller_name ?? '',
+      ]
+        .join(' ')
+        .toLowerCase()
+      return parts.includes(term)
+    })
   }, [items, query])
+
+  const docStatusLabel = useCallback(
+    (raw: string) => {
+      const k = raw.toLowerCase().replace(/-/g, '_')
+      return t(`picking:doc_status.${k}`, { defaultValue: raw })
+    },
+    [t]
+  )
 
   const handleCancel = useCallback(
     async (item: PickList) => {
@@ -69,9 +113,6 @@ export function PickListsPage() {
     },
     [load, t]
   )
-
-  const statusLabel = (status: string) =>
-    t(`picking:status.${status.toLowerCase()}`, status)
 
   const content = useMemo(() => {
     if (isLoading) {
@@ -108,6 +149,9 @@ export function PickListsPage() {
               <th className="px-4 py-3 text-left">{t('picking:document_label')}</th>
               <th className="px-4 py-3 text-left">{t('picking:status_label')}</th>
               <th className="px-4 py-3 text-left">{t('picking:total_lines')}</th>
+              <th className="px-4 py-3 text-left">{t('picking:column_picker')}</th>
+              <th className="px-4 py-3 text-left">{t('picking:column_controller')}</th>
+              <th className="px-4 py-3 text-left">{t('picking:last_activity')}</th>
               <th className="px-4 py-3"></th>
               {canCancel && <th className="px-4 py-3"></th>}
             </tr>
@@ -126,21 +170,22 @@ export function PickListsPage() {
                 </td>
                 <td className="px-4 py-3">
                   <span
-                    className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                      item.status === 'DONE'
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
-                        : item.status === 'IN_PROGRESS'
-                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300'
-                          : item.status === 'ERROR'
-                            ? 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
-                            : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                    }`}
+                    className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(item.status)}`}
                   >
-                    {statusLabel(item.status)}
+                    {docStatusLabel(item.document_status)}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                   {item.picked_lines}/{item.total_lines}
+                </td>
+                <td className="max-w-[140px] truncate px-4 py-3 text-slate-600 dark:text-slate-300" title={item.picker_name ?? ''}>
+                  {item.picker_name ?? '—'}
+                </td>
+                <td className="max-w-[140px] truncate px-4 py-3 text-slate-600 dark:text-slate-300" title={item.controller_name ?? ''}>
+                  {item.controller_name ?? '—'}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300">
+                  {formatActivity(item.updated_at, i18n.language)}
                 </td>
                 <td className="px-4 py-3">
                   <Button
@@ -176,7 +221,19 @@ export function PickListsPage() {
         </table>
       </TableScrollArea>
     )
-  }, [canCancel, cancellingId, error, filtered, handleCancel, isLoading, load, navigate, t])
+  }, [
+    canCancel,
+    cancellingId,
+    docStatusLabel,
+    error,
+    filtered,
+    handleCancel,
+    i18n.language,
+    isLoading,
+    load,
+    navigate,
+    t,
+  ])
 
   return (
     <AdminLayout title={t('picking:list_title')}>
