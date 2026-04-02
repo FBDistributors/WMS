@@ -149,8 +149,21 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const dateTo = searchParams.get('date_to') ?? ''
   const offset = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10))
   const movementSmartupStatusQuery = useMemo(() => {
-    const s = (searchParams.get('smartup_status') ?? 'N').toLowerCase()
-    return s === 'all' ? 'all' : 'N'
+    const raw = searchParams.get('smartup_status')
+    if (raw == null || raw.trim() === '') return 'W'
+    const v = raw.trim()
+    const low = v.toLowerCase()
+    if (low === 'all' || low === '*') return 'all'
+    if (v.includes(',')) {
+      return v
+        .split(',')
+        .map((p) => p.trim().toUpperCase())
+        .filter(Boolean)
+        .join(',')
+    }
+    if (low === 'n') return 'N'
+    if (low === 'w') return 'W'
+    return v.toUpperCase()
   }, [searchParams])
   const pageTitle = orderSource
     ? t('admin:menu.orders_diller', 'Tashkiliy harakatlar')
@@ -203,7 +216,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const [filterBrandId, setFilterBrandId] = useState('')
   const [filterDateFrom, setFilterDateFrom] = useState('')
   const [filterDateTo, setFilterDateTo] = useState('')
-  const [filterSmartupStatus, setFilterSmartupStatus] = useState<'N' | 'all'>('N')
+  const [filterSmartupStatus, setFilterSmartupStatus] = useState<'W' | 'N' | 'all'>('W')
 
   const [items, setItems] = useState<OrderListItem[]>([])
   const [total, setTotal] = useState(0)
@@ -391,8 +404,17 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       setFilterDateFrom(dateFrom)
       setFilterDateTo(dateTo)
       if (orderSource === 'diller') {
-        const s = (searchParams.get('smartup_status') ?? 'N').toLowerCase()
-        setFilterSmartupStatus(s === 'all' ? 'all' : 'N')
+        const raw = searchParams.get('smartup_status')
+        if (!raw || !raw.trim()) {
+          setFilterSmartupStatus('W')
+        } else {
+          const low = raw.trim().toLowerCase()
+          if (low === 'all' || low === '*') setFilterSmartupStatus('all')
+          else if (raw.includes(',')) setFilterSmartupStatus('W')
+          else if (low === 'n') setFilterSmartupStatus('N')
+          else if (low === 'w') setFilterSmartupStatus('W')
+          else setFilterSmartupStatus('W')
+        }
       }
     }
   }, [filterPanelOpen, brandFilter, dateFrom, dateTo, orderSource, searchParams])
@@ -1234,10 +1256,14 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                         {t('orders:filters.smartup_movement_status')}
                         <select
                           value={filterSmartupStatus}
-                          onChange={(e) => setFilterSmartupStatus(e.target.value === 'all' ? 'all' : 'N')}
+                          onChange={(e) => {
+                            const v = e.target.value
+                            setFilterSmartupStatus(v === 'all' ? 'all' : v === 'N' ? 'N' : 'W')
+                          }}
                           className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                           aria-label={t('orders:filters.smartup_movement_status')}
                         >
+                          <option value="W">{t('orders:filters.smartup_status_w')}</option>
                           <option value="N">{t('orders:filters.smartup_status_new')}</option>
                           <option value="all">{t('orders:filters.smartup_status_all')}</option>
                         </select>
@@ -1248,6 +1274,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                     <Button
                       variant="secondary"
                       onClick={() => {
+                        if (orderSource === 'diller') setFilterSmartupStatus('W')
                         setSearchParams((prev) => {
                           const next = new URLSearchParams(prev)
                           next.delete('brand_id')
@@ -1278,7 +1305,8 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                           next.delete('offset')
                           if (orderSource === 'diller') {
                             if (filterSmartupStatus === 'all') next.set('smartup_status', 'all')
-                            else next.delete('smartup_status')
+                            else if (filterSmartupStatus === 'N') next.set('smartup_status', 'n')
+                            else next.set('smartup_status', 'w')
                           }
                           return next
                         })

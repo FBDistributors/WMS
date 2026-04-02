@@ -42,11 +42,11 @@ def _parse_date(value: str | None) -> date | None:
 def _parse_smartup_status_param(value: str) -> tuple[str, frozenset[str] | None]:
     """
     Qaytaradi: (cache_key, allowed_statuses yoki None = filtrsiz).
-    all/* — barcha statuslar; N — default; N,P,B#W — vergul bilan ro'yxat.
+    all/* — barcha statuslar; W — default; N,W,B#W — vergul bilan ro'yxat.
     """
-    s = (value or "N").strip()
+    s = (value or "W").strip()
     if not s:
-        return ("N", frozenset({"N"}))
+        return ("W", frozenset({"W"}))
     if len(s) > _SMARTUP_STATUS_PARAM_MAX:
         raise HTTPException(
             status_code=400,
@@ -137,8 +137,8 @@ async def list_movements(
     offset: int = Query(0, ge=0, description="Skip N items"),
     refresh: bool = Query(False, description="Cache ni bypass qilish, SmartUP dan qayta yuklash"),
     smartup_status: str = Query(
-        "N",
-        description="Smartup harakat statusi: N (default), all yoki * (hammasi), yoki vergul bilan: N,P,B#W",
+        "W",
+        description="Smartup harakat statusi: W (default), all yoki * (hammasi), yoki vergul bilan: N,W,B#W",
     ),
     db: Session = Depends(get_db),
     _user=Depends(require_permission("orders:read")),
@@ -147,7 +147,7 @@ async def list_movements(
     Proxy to Smartup mfm movement$export. Returns "movement" (sliced) and "total".
     Yig'uvchiga yuborilgan harakatlar jadvalda ko'rsatilmaydi.
     begin_modified_on/end_modified_on berilsa faqat o'zgarishlar yuklanadi (delta sync).
-    smartup_status bilan Smartup qatorlarini filtrlash (default faqat N).
+    smartup_status bilan Smartup qatorlarini filtrlash (default faqat W).
     """
     today = date.today()
     begin = _parse_date(begin_created_on)

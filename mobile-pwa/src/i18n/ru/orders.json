@@ -88,6 +88,7 @@
     "filter_clear": "Сбросить",
     "filter_apply": "Применить",
     "smartup_movement_status": "Статус движения Smartup",
+    "smartup_status_w": "В ожидании (W)",
     "smartup_status_new": "Новый (N)",
     "smartup_status_all": "Все статусы",
     "organization": "Организация",
