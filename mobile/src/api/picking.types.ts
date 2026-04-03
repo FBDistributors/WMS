@@ -56,6 +56,10 @@ export interface PickingListItem {
   assigned_to_user_name?: string | null;
   /** Buyurtma raqami (order dan; admin bilan bir xil). */
   order_number?: string | null;
+  /** Tashkiliy harakat yetkazib berish raqami (backend Order.delivery_number). */
+  delivery_number?: string | null;
+  /** Yig'uvchi controllerga yuborgan vaqt (ISO). */
+  sent_to_controller_at?: string | null;
 }
 
 export interface PickLineResponse {

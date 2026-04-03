@@ -85,6 +85,7 @@ class PickingListItem(BaseModel):
     assigned_to_user_name: Optional[str] = None
     order_number: Optional[str] = None
     delivery_number: Optional[str] = None
+    sent_to_controller_at: Optional[datetime] = None
     updated_at: datetime
 
 
@@ -439,6 +440,7 @@ def _to_picking_list_item(doc: DocumentModel) -> PickingListItem:
         assigned_to_user_name=_picker_name(doc),
         order_number=_order_number(doc),
         delivery_number=_delivery_number(doc),
+        sent_to_controller_at=doc.sent_to_controller_at,
         updated_at=doc.updated_at,
     )
 
@@ -1032,6 +1034,7 @@ async def send_to_controller(
     if not controller:
         raise HTTPException(status_code=400, detail="Invalid controller")
     document.controlled_by_user_id = payload.controller_user_id
+    document.sent_to_controller_at = datetime.now(timezone.utc)
     db.commit()
     return _to_picking_document(document)
 

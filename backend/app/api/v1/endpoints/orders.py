@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import List, Optional
 from uuid import UUID
 
@@ -733,6 +733,7 @@ async def update_order_status(
             if not controller_user:
                 raise HTTPException(status_code=400, detail="Invalid controller")
             doc.controlled_by_user_id = payload.controller_user_id
+            doc.sent_to_controller_at = datetime.now(timezone.utc)
 
     if normalized_status == "completed":
         doc = (

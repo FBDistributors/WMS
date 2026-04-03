@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -16,6 +17,7 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../types/navigation';
 import { useLocale } from '../i18n/LocaleContext';
+import type { LocaleCode } from '../i18n/translations';
 import { useTheme } from '../theme/ThemeContext';
 import type { PickingListItem } from '../api/picking.types';
 import { UNAUTHORIZED_MSG } from '../api/client';
@@ -37,6 +39,17 @@ const STATUS_KEYS: Record<string, string> = {
   cancelled: 'statusCancelled',
 };
 
+function formatSentToControllerAt(iso: string | null | undefined, locale: LocaleCode): string {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    const tag = locale === 'uz' ? 'uz-UZ' : locale === 'ru' ? 'ru-RU' : 'en-US';
+    return d.toLocaleString(tag, { dateStyle: 'short', timeStyle: 'short' });
+  } catch {
+    return iso;
+  }
+}
+
 function TaskRow({
   item,
   profileType,
@@ -44,6 +57,7 @@ function TaskRow({
   onSendToController,
   t,
   isDark,
+  locale,
 }: {
   item: PickingListItem;
   profileType: 'picker' | 'controller';
@@ -51,6 +65,7 @@ function TaskRow({
   onSendToController?: (doc: PickingListItem) => void;
   t: (key: string, params?: Record<string, string | number>) => string;
   isDark?: boolean;
+  locale: LocaleCode;
 }) {
   const statusText =
     profileType === 'controller' && item.status === 'picked'
@@ -86,6 +101,15 @@ function TaskRow({
             {t('pickerNameLabel')}: {item.assigned_to_user_name ?? '—'}
           </Text>
         )}
+        {profileType === 'controller' && (
+          <Text style={[styles.rowSentAt, isDark && styles.rowSentAtDark]} numberOfLines={2}>
+            {t('sentToControllerAt', {
+              datetime: item.sent_to_controller_at
+                ? formatSentToControllerAt(item.sent_to_controller_at, locale)
+                : '—',
+            })}
+          </Text>
+        )}
         <View style={[styles.badge, isDark && styles.badgeDark]}>
           <Text style={[styles.badgeText, isDark && styles.badgeTextDark]}>{statusText}</Text>
         </View>
@@ -109,7 +133,7 @@ function TaskRow({
 export function PickTaskList() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<PickTaskListRoute>();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const { isOnline } = useNetwork();
@@ -129,6 +153,24 @@ export function PickTaskList() {
   const [selectedIncompleteReasonForSend, setSelectedIncompleteReasonForSend] = useState<string | null>(null);
   const [completingForController, setCompletingForController] = useState(false);
   const [consolidatedRefreshKey, setConsolidatedRefreshKey] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const displayedList = useMemo(() => {
+    if (profileType !== 'controller') return list;
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((item) => {
+      const hay = [
+        item.reference_number,
+        item.order_number ?? '',
+        item.delivery_number ?? '',
+        item.assigned_to_user_name ?? '',
+      ]
+        .join(' ')
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [list, searchQuery, profileType]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -293,7 +335,7 @@ export function PickTaskList() {
             {showConsolidated ? t('consolidatedPickTitle') : t('openTasks')}
           </Text>
           <Text style={[styles.count, isDark && styles.countDark]}>
-            {showConsolidated ? t('consolidatedMyTasks') : `${list.length}${t('countTa')}`}
+            {showConsolidated ? t('consolidatedMyTasks') : `${displayedList.length}${t('countTa')}`}
           </Text>
         </View>
         <TouchableOpacity
@@ -305,6 +347,19 @@ export function PickTaskList() {
           <Icon name="refresh" size={24} color={loading ? '#999' : (isDark ? '#93c5fd' : '#1976d2')} />
         </TouchableOpacity>
       </View>
+      {!showConsolidated && profileType === 'controller' ? (
+        <View style={[styles.searchWrap, isDark && styles.searchWrapDark]}>
+          <TextInput
+            style={[styles.searchInput, isDark && styles.searchInputDark]}
+            placeholder={t('controllerTasksSearchPlaceholder')}
+            placeholderTextColor={isDark ? '#64748b' : '#999'}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
+      ) : null}
       <View style={styles.toggleAndContent}>
       {showConsolidated && isPicker ? (
         <ConsolidatedPickContent
@@ -315,13 +370,13 @@ export function PickTaskList() {
           selectedProductKey={selectedProductKey}
           onProductSelect={setSelectedProductKey}
         />
-      ) : list.length === 0 ? (
+      ) : displayedList.length === 0 ? (
         <View style={styles.empty}>
           <Text style={[styles.emptyText, isDark && styles.emptyTextDark]}>{t('openTasksEmpty')}</Text>
         </View>
       ) : (
         <FlatList
-          data={list}
+          data={displayedList}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <TaskRow
@@ -329,6 +384,7 @@ export function PickTaskList() {
               profileType={profileType}
               t={t}
               isDark={isDark}
+              locale={locale}
               onPress={() =>
                 navigation.navigate('PickTaskDetails', { taskId: item.id, profileType })
               }
@@ -542,6 +598,24 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '700', color: '#111' },
   count: { fontSize: 14, color: '#666', marginTop: 4 },
   refreshBtn: { padding: 4 },
+  searchWrap: {
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    paddingTop: 4,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: '#111',
+    backgroundColor: '#fafafa',
+  },
   toggleAndContent: { flex: 1 },
   toggleWrap: {
     flexDirection: 'row',
@@ -611,6 +685,7 @@ const styles = StyleSheet.create({
   rowRef: { fontSize: 18, fontWeight: '600', color: '#111' },
   rowMeta: { fontSize: 14, color: '#666', marginTop: 4 },
   rowPickerName: { fontSize: 12, color: '#555', marginTop: 2 },
+  rowSentAt: { fontSize: 12, color: '#555', marginTop: 6 },
   badge: {
     alignSelf: 'flex-start',
     backgroundColor: '#e3f2fd',
@@ -677,6 +752,12 @@ const styles = StyleSheet.create({
   // Dark
   containerDark: { backgroundColor: '#0f172a' },
   headerDark: { backgroundColor: '#1e293b', borderBottomColor: '#334155' },
+  searchWrapDark: { backgroundColor: '#1e293b', borderBottomColor: '#334155' },
+  searchInputDark: {
+    borderColor: '#334155',
+    color: '#f1f5f9',
+    backgroundColor: '#0f172a',
+  },
   titleDark: { color: '#f1f5f9' },
   countDark: { color: '#94a3b8' },
   toggleWrapDark: { backgroundColor: '#334155' },
@@ -687,6 +768,7 @@ const styles = StyleSheet.create({
   rowRefDark: { color: '#f1f5f9' },
   rowMetaDark: { color: '#94a3b8' },
   rowPickerNameDark: { color: '#94a3b8' },
+  rowSentAtDark: { color: '#94a3b8' },
   badgeDark: { backgroundColor: '#1e3a5f' },
   badgeTextDark: { color: '#93c5fd' },
   sentLabelDark: { color: '#86efac' },
