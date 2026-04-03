@@ -110,20 +110,6 @@ export function OrikzorHarakatlariPage() {
     void load()
   }, [load])
 
-  // Avto sync: har 5 daqiqada, sahifa aktiv bo'lsa — load(true, movementPage, true)
-  useEffect(() => {
-    if (typeof document === 'undefined') return
-    const runAutoSync = () => {
-      if (document.visibilityState === 'visible') void load(true, movementPage, true)
-    }
-    document.addEventListener('visibilitychange', runAutoSync)
-    const interval = setInterval(runAutoSync, 300_000)
-    return () => {
-      document.removeEventListener('visibilitychange', runAutoSync)
-      clearInterval(interval)
-    }
-  }, [load, movementPage])
-
   useEffect(() => {
     if (filterPanelOpen) {
       setFilterDateFrom(dateFrom)

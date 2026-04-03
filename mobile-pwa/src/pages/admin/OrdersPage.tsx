@@ -457,40 +457,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     setCheckResult(null)
   }, [searchQuery])
 
-  // Avto sync: har 5 daqiqada, sahifa aktiv — diller: load(..., true); buyurtmalar: sync 7 kun + load
-  useEffect(() => {
-    if (typeof document === 'undefined') return
-    const runAutoSync = () => {
-      if (document.visibilityState !== 'visible') return
-      if (orderSource === 'diller') {
-        void load(true, undefined, true)
-        return
-      }
-      if (orderSource && orderSource !== 'diller') {
-        const today = new Date()
-        const endDeal = today.toISOString().slice(0, 10)
-        const beginDeal = new Date(today)
-        beginDeal.setDate(beginDeal.getDate() - 7)
-        const beginDealStr = beginDeal.toISOString().slice(0, 10)
-        syncSmartupOrders({ order_source: orderSource, begin_deal_date: beginDealStr, end_deal_date: endDeal })
-          .then(() => void load(true))
-          .catch(() => {})
-        return
-      }
-      void load(true)
-    }
-    const handleVisibility = () => {
-      runAutoSync()
-    }
-    document.addEventListener('visibilitychange', handleVisibility)
-    const interval = setInterval(runAutoSync, 300_000)
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibility)
-      clearInterval(interval)
-    }
-  }, [load, orderSource])
-
-
   const handleSync = async () => {
     setIsSyncing(true)
     setSyncError(null)
