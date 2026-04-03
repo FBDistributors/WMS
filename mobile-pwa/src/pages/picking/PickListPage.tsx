@@ -91,6 +91,11 @@ export function PickListPage() {
                     : doc.document_no}
                 </strong>
                 </div>
+                {doc.delivery_number ? (
+                  <div className="text-sm text-slate-600">
+                    {t('picking:delivery_number_short', { number: doc.delivery_number })}
+                  </div>
+                ) : null}
                 <div>
                   {t('picking:progress_picked', {
                     picked: doc.picked_lines,

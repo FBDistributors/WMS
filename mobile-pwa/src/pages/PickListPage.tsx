@@ -40,7 +40,16 @@ export function PickListPage() {
   const filtered = useMemo(() => {
     if (!query.trim()) return items
     const term = query.toLowerCase()
-    return items.filter((item) => item.document_no.toLowerCase().includes(term))
+    return items.filter((item) => {
+      const hay = [
+        item.document_no,
+        item.order_number ?? '',
+        item.delivery_number ?? '',
+      ]
+        .join(' ')
+        .toLowerCase()
+      return hay.includes(term)
+    })
   }, [items, query])
 
   const handleCancel = useCallback(

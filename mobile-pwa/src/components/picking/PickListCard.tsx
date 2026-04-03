@@ -41,6 +41,11 @@ export function PickListCard({ item, onClick, onCancel, isCancelling }: PickList
               ? t('order_number_display', { number: item.order_number })
               : item.document_no}
           </div>
+          {item.delivery_number ? (
+            <div className="text-sm text-slate-600 dark:text-slate-400">
+              {t('delivery_number_short', { number: item.delivery_number })}
+            </div>
+          ) : null}
           <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
             <CalendarDays size={14} />
             <span>{item.created_at ?? '—'}</span>

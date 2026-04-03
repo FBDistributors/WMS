@@ -149,6 +149,7 @@ class MovementPayload(BaseModel):
     from_warehouse_code: Optional[str] = None
     to_warehouse_code: Optional[str] = None
     note: Optional[str] = None
+    delivery_number: Optional[str] = Field(None, max_length=64)
     movement_items: List[MovementItemLine] = Field(default_factory=list)
 
 
@@ -826,7 +827,10 @@ def _get_or_create_order_from_movement(
         .filter(OrderModel.source_external_id == external_id)
         .one_or_none()
     )
+    dn = (movement.delivery_number or "").strip()[:64] or None
     if order:
+        if dn:
+            order.delivery_number = dn
         return order
     if not movement.movement_items:
         raise HTTPException(status_code=400, detail="movement_items bo'sh bo'lmasligi kerak")
@@ -837,6 +841,7 @@ def _get_or_create_order_from_movement(
         from_warehouse_code=(movement.from_warehouse_code or "")[:64] or None,
         to_warehouse_code=(movement.to_warehouse_code or "")[:64] or None,
         movement_note=(movement.note or "")[:512] or None,
+        delivery_number=dn,
     )
     order.wms_state = OrderWmsStateModel(status="B#W")
     db.add(order)

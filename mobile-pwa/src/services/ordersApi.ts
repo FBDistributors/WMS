@@ -277,6 +277,12 @@ export async function sendMovementToPicking(params: SendMovementToPickingParams)
           from_warehouse_code: movement.from_warehouse_code ?? undefined,
           to_warehouse_code: movement.to_warehouse_code ?? undefined,
           note: movement.note ?? undefined,
+          delivery_number: (() => {
+            const raw = movement.delivery_number
+            if (raw === undefined || raw === null) return undefined
+            const s = String(raw).trim().slice(0, 64)
+            return s || undefined
+          })(),
           movement_items,
         },
         assigned_to_user_id,

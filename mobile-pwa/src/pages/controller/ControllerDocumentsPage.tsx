@@ -75,6 +75,11 @@ export function ControllerDocumentsPage() {
                       ? t('picking:order_number_display', { number: doc.order_number })
                       : doc.document_no}
                   </div>
+                  {doc.delivery_number ? (
+                    <div className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">
+                      {t('picking:delivery_number_short', { number: doc.delivery_number })}
+                    </div>
+                  ) : null}
                   <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                     {doc.picked_lines} / {doc.total_lines} {t('documents.lines')}
                   </div>

@@ -89,5 +89,7 @@
   },
   "column_picker": "Сборщик",
   "column_controller": "Контролёр",
+  "column_delivery_number": "Номер доставки",
+  "delivery_number_short": "Доставка: {{number}}",
   "last_activity": "Последняя активность"
 }

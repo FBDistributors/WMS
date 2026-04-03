@@ -84,6 +84,7 @@ class PickingListItem(BaseModel):
     assigned_to_user_id: Optional[UUID] = None
     assigned_to_user_name: Optional[str] = None
     order_number: Optional[str] = None
+    delivery_number: Optional[str] = None
     updated_at: datetime
 
 
@@ -415,6 +416,14 @@ def _order_number(doc: DocumentModel) -> Optional[str]:
     return order.order_number if order else None
 
 
+def _delivery_number(doc: DocumentModel) -> Optional[str]:
+    order = getattr(doc, "order", None)
+    if not order:
+        return None
+    dn = getattr(order, "delivery_number", None)
+    return (dn or "").strip() or None
+
+
 def _to_picking_list_item(doc: DocumentModel) -> PickingListItem:
     lines_total = len(doc.lines)
     lines_done = sum(1 for line in doc.lines if line.picked_qty >= line.required_qty)
@@ -429,6 +438,7 @@ def _to_picking_list_item(doc: DocumentModel) -> PickingListItem:
         assigned_to_user_id=doc.assigned_to_user_id,
         assigned_to_user_name=_picker_name(doc),
         order_number=_order_number(doc),
+        delivery_number=_delivery_number(doc),
         updated_at=doc.updated_at,
     )
 

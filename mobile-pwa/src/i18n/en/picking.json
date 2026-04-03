@@ -89,5 +89,7 @@
   },
   "column_picker": "Picker",
   "column_controller": "Controller",
+  "column_delivery_number": "Delivery number",
+  "delivery_number_short": "Delivery: {{number}}",
   "last_activity": "Last activity"
 }

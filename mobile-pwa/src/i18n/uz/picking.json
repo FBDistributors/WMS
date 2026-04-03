@@ -89,5 +89,7 @@
   },
   "column_picker": "Yig'uvchi",
   "column_controller": "Kontrolyor",
+  "column_delivery_number": "Yetkazib berish raqami",
+  "delivery_number_short": "Yetkazib: {{number}}",
   "last_activity": "Oxirgi faollik"
 }

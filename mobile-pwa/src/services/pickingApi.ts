@@ -6,6 +6,7 @@ export type PickList = {
   id: string
   document_no: string
   order_number?: string | null
+  delivery_number?: string | null
   created_at?: string
   completed_at?: string | null
   /** Backend document status string (for labels). */
@@ -41,6 +42,7 @@ type BackendPickingListItem = {
   id: string
   reference_number: string
   order_number?: string | null
+  delivery_number?: string | null
   status: string
   lines_total: number
   lines_done: number
@@ -118,6 +120,7 @@ function mapList(item: BackendPickingListItem): PickList {
     id: item.id,
     document_no: item.reference_number,
     order_number: item.order_number ?? undefined,
+    delivery_number: item.delivery_number?.trim() || undefined,
     document_status: raw,
     status: mapStatus(raw),
     total_lines: item.lines_total,

@@ -82,6 +82,7 @@ export function PickListsPage() {
       const parts = [
         item.document_no,
         item.order_number ?? '',
+        item.delivery_number ?? '',
         item.picker_name ?? '',
         item.controller_name ?? '',
       ]
@@ -148,6 +149,7 @@ export function PickListsPage() {
           <thead className="text-xs uppercase text-slate-500">
             <tr className="border-b border-slate-200 dark:border-slate-800">
               <th className="px-4 py-3 text-left">{t('picking:document_label')}</th>
+              <th className="px-4 py-3 text-left">{t('picking:column_delivery_number')}</th>
               <th className="px-4 py-3 text-left">{t('picking:status_label')}</th>
               <th className="px-4 py-3 text-left">{t('picking:total_lines')}</th>
               <th className="px-4 py-3 text-left">{t('picking:column_picker')}</th>
@@ -168,6 +170,9 @@ export function PickListsPage() {
                   {item.order_number
                     ? t('picking:order_number_display', { number: item.order_number })
                     : item.document_no}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300">
+                  {item.delivery_number ?? '—'}
                 </td>
                 <td className="px-4 py-3">
                   <span
