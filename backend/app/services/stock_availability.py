@@ -27,8 +27,9 @@ def lock_lot_location(db: Session, lot_id: UUID, location_id: UUID) -> None:
     if db.get_bind().dialect.name != "postgresql":
         return
     k1, k2 = _advisory_keys(lot_id, location_id)
+    # PostgreSQL: ikki argumentli shakl faqat (integer, integer); (bigint, bigint) yo‘q.
     db.execute(
-        text("SELECT pg_advisory_xact_lock(CAST(:k1 AS BIGINT), CAST(:k2 AS BIGINT))"),
+        text("SELECT pg_advisory_xact_lock(CAST(:k1 AS INTEGER), CAST(:k2 AS INTEGER))"),
         {"k1": k1, "k2": k2},
     )
 
