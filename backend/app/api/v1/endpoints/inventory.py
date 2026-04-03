@@ -15,6 +15,7 @@ from app.auth.deps import get_current_user, require_permission
 from app.auth.guards import check_controller_adjust_reason
 from app.core.stock_rules import check_location_single_expiry
 from app.services.audit_service import ACTION_CREATE, get_client_ip, log_action
+from app.services.stock_availability import require_sufficient_available
 
 from app.api.v1.endpoints import picker_inventory
 from app.api.v1.endpoints.picker_inventory import _get_lot_level_balances
@@ -601,6 +602,17 @@ async def create_stock_movement(
 
     if payload.movement_type == "adjust":
         check_controller_adjust_reason(user, payload.reason_code)
+
+    # allocate/unallocate: ledgerda on_hand va reserved bir xil miqdorda — available o'zgarmaydi.
+    if payload.qty_change < 0 and payload.movement_type not in ("allocate", "unallocate"):
+        require_sufficient_available(
+            db,
+            payload.product_id,
+            payload.lot_id,
+            payload.location_id,
+            abs(Decimal(str(payload.qty_change))),
+            lock=True,
+        )
 
     movement = StockMovementModel(
         product_id=payload.product_id,

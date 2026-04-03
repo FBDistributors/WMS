@@ -40,6 +40,7 @@ from app.services.wave_service import (
     compute_wave_lines,
     get_staging_location_id,
 )
+from app.services.stock_availability import lock_lot_location
 
 router = APIRouter()
 
@@ -363,6 +364,10 @@ async def pick_scan(
         if available <= 0:
             continue
         pick_from_alloc = min(to_pick, available)
+        # Serialise lot+joy (parallel skanlar bir xil ajratishdan ortiq terib qo‘ymasin).
+        # unallocate reservedni kamaytiradi — available o‘zgarmaydi; shuning uchun
+        # require_sufficient_available bu yerda noto‘g‘ri bloklardi (hammasi reserved bo‘lsa).
+        lock_lot_location(db, wa.stock_lot_id, wa.location_id)
         wa.picked_qty += pick_from_alloc
         db.add(StockMovementModel(
             product_id=wl.product_id,

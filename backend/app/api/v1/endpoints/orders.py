@@ -9,6 +9,11 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, Query, status
 
 from app.core.expiry import first_day_of_current_month, min_expiry_date_from_months
+from app.services.stock_availability import (
+    compute_lot_location_available,
+    lock_lot_location,
+    require_sufficient_available,
+)
 from app.services.vip_service import resolve_vip_min_expiry_months
 from pydantic import BaseModel, Field
 from decimal import Decimal
@@ -286,6 +291,9 @@ def _allocate_order(
 ) -> tuple[list[DocumentLineModel], list[AllocationShortage]]:
     shortages: list[AllocationShortage] = []
     document_lines: list[DocumentLineModel] = []
+    # Bir tranzaksiyada xuddi shu lot+joyga ikkinchi marta ajratishda "available" DB formula o‘zgarmasligi mumkin;
+    # scratch bilan joriy ajratishdan keyin qolgan xonani hisoblaymiz.
+    alloc_scratch: dict[tuple[UUID, UUID], Decimal] = {}
 
     for line in order.lines:
         product_id = _resolve_product_id(db, line)
@@ -317,7 +325,15 @@ def _allocate_order(
             available_qty = Decimal(str(lot_row.qty))
             if available_qty <= 0:
                 continue
-            allocate_qty = min(available_qty, remaining)
+            lk = (lot_row.lot_id, lot_row.location_id)
+            lock_lot_location(db, lk[0], lk[1])
+            if lk not in alloc_scratch:
+                alloc_scratch[lk] = compute_lot_location_available(db, lk[0], lk[1])
+            room = alloc_scratch[lk]
+            allocate_qty = min(available_qty, remaining, room)
+            if allocate_qty <= 0:
+                continue
+            alloc_scratch[lk] -= allocate_qty
 
             document_lines.append(
                 DocumentLineModel(
@@ -1113,6 +1129,14 @@ async def ship_order(
         if not line.product_id or not line.lot_id or not line.location_id:
             raise HTTPException(status_code=409, detail="Picking line missing allocation details")
         shipped_any = True
+        require_sufficient_available(
+            db,
+            line.product_id,
+            line.lot_id,
+            line.location_id,
+            Decimal(str(line.picked_qty)),
+            lock=True,
+        )
         db.add(
             StockMovementModel(
                 product_id=line.product_id,

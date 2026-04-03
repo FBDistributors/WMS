@@ -272,12 +272,26 @@ def import_orders(
     return created, updated, skipped, errors, skipped_by_reason
 
 
-def _line_key(line: OrderLine) -> Tuple[str, str, str]:
-    return (line.sku or "", line.barcode or "", line.name or "")
+def _line_key(line: OrderLine) -> Tuple[str, str, str, str]:
+    """
+    Upsert kaliti. SmartUp `product_unit_id` -> SmartupOrderLine.uom -> OrderLine.uom;
+    bir xil SKU/barcode/nomdagi asosiy qator (order_products) va aksiya (order_actions) alohida saqlanadi.
+    """
+    return (
+        (line.sku or "").strip(),
+        (line.barcode or "").strip(),
+        (line.name or "").strip(),
+        (line.uom or "").strip(),
+    )
 
 
-def _payload_key(payload_line) -> Tuple[str, str, str]:
-    return (payload_line.sku or "", payload_line.barcode or "", payload_line.name or "")
+def _payload_key(payload_line: OrderLinePayload) -> Tuple[str, str, str, str]:
+    return (
+        (payload_line.sku or "").strip(),
+        (payload_line.barcode or "").strip(),
+        (payload_line.name or "").strip(),
+        (payload_line.uom or "").strip(),
+    )
 
 
 def _upsert_lines(order: Order, payload_lines) -> None:

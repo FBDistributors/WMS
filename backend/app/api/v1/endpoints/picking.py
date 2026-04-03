@@ -27,6 +27,7 @@ from app.models.user import User as UserModel
 from app.models.user_fcm_token import UserFCMToken
 from app.models.stock import StockLot as StockLotModel
 from app.api.v1.endpoints.picker_inventory import _get_lot_level_balances, _location_ids_for_warehouse
+from app.services.stock_availability import require_sufficient_available
 
 router = APIRouter()
 
@@ -813,6 +814,14 @@ async def consolidated_pick(
                     status_code=400,
                     detail="Pick only from NORMAL zone. Line location is not NORMAL.",
                 )
+            require_sufficient_available(
+                db,
+                line.product_id,
+                line.lot_id,
+                line.location_id,
+                need,
+                lock=True,
+            )
             line.picked_qty = float(Decimal(str(line.picked_qty or 0)) + need)
             docs_to_refresh.add(line.document_id)
             db.add(
@@ -1320,6 +1329,16 @@ def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
         raise HTTPException(
             status_code=400,
             detail="Terish miqdori buyurtma bo'yicha kerak miqdordan oshib ketdi. Ehtimol allaqachon terilgan.",
+        )
+
+    if qty_delta > 0:
+        require_sufficient_available(
+            db,
+            line.product_id,
+            line.lot_id,
+            line.location_id,
+            qty_delta,
+            lock=True,
         )
 
     try:

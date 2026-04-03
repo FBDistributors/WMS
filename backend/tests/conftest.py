@@ -2,7 +2,11 @@
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import sessionmaker, Session
+
+
 from app.main import app
 from app.db import get_db
 from app.models.base import Base
@@ -11,6 +15,12 @@ from app.models.user_session import UserSession
 from app.models.product import Product
 from app.models.location import Location
 from app.auth.security import get_password_hash
+
+
+@compiles(JSONB, "sqlite")
+def _compile_jsonb_sqlite(_type, compiler, **kw):
+    """SQLite test DB: render PostgreSQL JSONB as JSON."""
+    return "JSON"
 
 
 # Use in-memory SQLite for tests
@@ -44,7 +54,10 @@ def db_session():
 
 @pytest.fixture
 def client(db_session: Session):
-    app.dependency_overrides[get_db] = lambda: iter([db_session])
+    def _override_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = _override_db
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
