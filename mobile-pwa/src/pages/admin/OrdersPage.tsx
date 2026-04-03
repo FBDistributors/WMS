@@ -211,6 +211,20 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     [t]
   )
 
+  /** Tashkiliy harakat: WMS buyurtma holati bo'lsa buyurtmalar jadvali bilan bir xil yorliq */
+  const getMovementRowStatusLabel = useCallback(
+    (m: MovementItem): string => {
+      const wms = m.wms_order_status
+      if (wms != null && String(wms).trim() !== '') {
+        const simple = backendStatusToSimple(String(wms).trim())
+        const opt = SIMPLE_STATUS_OPTIONS.find((o) => o.value === simple)
+        return opt ? t(opt.labelKey) : String(wms)
+      }
+      return toMovementStatusLabel(m.status)
+    },
+    [t, toMovementStatusLabel]
+  )
+
   const { config, updateConfig, resetConfig } = useOrdersTableConfig()
   const dillerTableConfig = useDillerTableConfig()
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -514,7 +528,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             const toFilialName = getFilialNameByCode(m.to_filial_code as string).toLowerCase()
             const note = String((m.note as string) ?? '').toLowerCase()
             const statusRaw = String((m.status as string) ?? '').toLowerCase()
-            const statusLabel = toMovementStatusLabel(m.status).toLowerCase()
+            const statusLabel = getMovementRowStatusLabel(m).toLowerCase()
             const statusSearch = `${statusRaw} ${statusLabel}`
             const searchFields = dillerTableConfig.config.searchFields
             const matchField = (id: string) => {
@@ -585,7 +599,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
               </td>
             )
           case 'status': {
-            const st = toMovementStatusLabel(m.status)
+            const st = getMovementRowStatusLabel(m)
             return (
               <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800 dark:text-slate-200" title={st}>
                 {st}
@@ -1127,7 +1141,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         </table>
       </TableScrollArea>
     )
-  }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, dillerTableConfig.config, eligibleItems, error, isLoading, items, load, location.pathname, location.search, mode, movementPage, movementsData, navigate, orderSource, searchQuery, selectedMovementIds, selectedOrderIds, t, updatingOrderId])
+  }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, dillerTableConfig.config, eligibleItems, error, getMovementRowStatusLabel, isLoading, items, load, location.pathname, location.search, mode, movementPage, movementsData, navigate, orderSource, searchQuery, selectedMovementIds, selectedOrderIds, t, updatingOrderId])
 
   return (
     <AdminLayout titleSlot={<OrdersHubTabs />} backTo={mode === 'statuses' ? '/admin' : undefined}>

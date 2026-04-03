@@ -14,6 +14,8 @@ from sqlalchemy.orm import Session
 from app.auth.deps import require_permission
 from app.db import get_db
 from app.integrations.smartup.mfm_movement import fetch_mfm_movements_raw
+from app.models.order import Order as OrderModel
+from app.models.order import OrderWmsState as OrderWmsStateModel
 
 router = APIRouter()
 
@@ -123,6 +125,45 @@ def _fetch_movements_sync(
     ]
 
 
+def _movement_external_id(movement_id: str) -> str:
+    """Order.source_external_id bilan bir xil (max 128)."""
+    return f"movement:{movement_id.strip()}"[:128]
+
+
+def _enrich_movements_chunk_with_wms(db: Session, chunk: list[Any]) -> list[Any]:
+    """
+    Har qator nusxasi: wms_order_status (Order.wms_state.status yoki None).
+    Keshdagi dict larni mutatsiya qilmaydi.
+    """
+    if not chunk:
+        return []
+    ext_ids: set[str] = set()
+    for m in chunk:
+        if isinstance(m, dict):
+            mid = str(m.get("movement_id") or "").strip()
+            if mid:
+                ext_ids.add(_movement_external_id(mid))
+    status_by_ext: dict[str, str] = {}
+    if ext_ids:
+        rows = (
+            db.query(OrderModel.source_external_id, OrderWmsStateModel.status)
+            .join(OrderWmsStateModel, OrderWmsStateModel.order_id == OrderModel.id)
+            .filter(OrderModel.source == "diller", OrderModel.source_external_id.in_(ext_ids))
+            .all()
+        )
+        status_by_ext = {str(r[0]): str(r[1]) for r in rows if r[0] is not None}
+    out: list[Any] = []
+    for m in chunk:
+        if not isinstance(m, dict):
+            out.append(m)
+            continue
+        mid = str(m.get("movement_id") or "").strip()
+        ext = _movement_external_id(mid) if mid else ""
+        wms = status_by_ext.get(ext) if ext else None
+        out.append({**m, "wms_order_status": wms})
+    return out
+
+
 @router.get("", summary="List movements from Smartup (movement$export)")
 @router.get("/", summary="List movements from Smartup (movement$export)")
 async def list_movements(
@@ -186,7 +227,7 @@ async def list_movements(
         if now < expiry:
             total = len(full_list)
             chunk = full_list[offset : offset + limit]
-            return {"movement": chunk, "total": total}
+            return {"movement": _enrich_movements_chunk_with_wms(db, chunk), "total": total}
         del _movements_cache[key]
 
     try:
@@ -210,4 +251,4 @@ async def list_movements(
 
     total = len(full_list)
     chunk = full_list[offset : offset + limit]
-    return {"movement": chunk, "total": total}
+    return {"movement": _enrich_movements_chunk_with_wms(db, chunk), "total": total}

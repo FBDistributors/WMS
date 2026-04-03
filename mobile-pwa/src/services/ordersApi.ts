@@ -1,7 +1,10 @@
 import { fetchJSON } from './apiClient'
 
 /** Smartup movement$export raw item (movement_id, barcode, delivery_number, note, movement_items, ...). */
-export type MovementItem = Record<string, unknown>
+/** Smartup movement qatori; backend WMS boyitishi: yig'ishga yuborilgan buyurtma holati */
+export type MovementItem = Record<string, unknown> & {
+  wms_order_status?: string | null
+}
 
 /** Movement item line (movement_items[]. */
 export type MovementItemLine = {
