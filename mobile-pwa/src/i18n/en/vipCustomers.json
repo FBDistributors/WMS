@@ -17,10 +17,17 @@
     "customer_id_required": "Customer ID is required.",
     "months_range": "Expiry limit must be between 1 and 60 months."
   },
+  "brand_column": "Brand",
+  "brand_limits_heading": "Expiry limit per brand (months)",
+  "brand_limits_hint": "Set months for each brand. Products without a brand or brands not listed use the default below.",
+  "brands_load_failed": "Could not load brands.",
+  "no_active_brands": "No active brands. Add brands in the Brands section.",
+  "brand_overrides_count": "{{count}} brand override(s)",
   "fields": {
     "customer_id": "Customer ID",
     "customer_name": "Customer name",
-    "min_expiry_months": "Expiry limit (months)"
+    "min_expiry_months": "Default expiry limit (months)",
+    "min_expiry_months_create": "Expiry limit (months)"
   },
   "columns": {
     "customer_id": "Customer ID",

@@ -17,10 +17,17 @@
     "customer_id_required": "ID клиента обязателен.",
     "months_range": "Срок годности должен быть от 1 до 60 месяцев."
   },
+  "brand_column": "Бренд",
+  "brand_limits_heading": "Срок по брендам (мес.)",
+  "brand_limits_hint": "Для каждого бренда свой срок. Для остальных брендов и товаров без бренда используется стандарт ниже.",
+  "brands_load_failed": "Не удалось загрузить бренды.",
+  "no_active_brands": "Нет активных брендов. Добавьте бренды в разделе «Бренды».",
+  "brand_overrides_count": "Отдельно: {{count}} бр.",
   "fields": {
     "customer_id": "ID клиента",
     "customer_name": "Имя клиента",
-    "min_expiry_months": "Срок годности (месяцы)"
+    "min_expiry_months": "Стандартный срок (мес.)",
+    "min_expiry_months_create": "Срок годности (месяцы)"
   },
   "columns": {
     "customer_id": "ID клиента",

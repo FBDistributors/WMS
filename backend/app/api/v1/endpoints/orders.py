@@ -9,7 +9,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, Query, status
 
 from app.core.expiry import first_day_of_current_month, min_expiry_date_from_months
-from app.services.vip_service import get_vip_customer_expiry_months
+from app.services.vip_service import resolve_vip_min_expiry_months
 from pydantic import BaseModel, Field
 from decimal import Decimal
 from sqlalchemy import and_, func, or_
@@ -286,11 +286,6 @@ def _allocate_order(
     shortages: list[AllocationShortage] = []
     document_lines: list[DocumentLineModel] = []
 
-    vip_map = get_vip_customer_expiry_months(db)
-    min_expiry_date: date | None = None
-    if order.customer_id and order.customer_id in vip_map:
-        min_expiry_date = min_expiry_date_from_months(vip_map[order.customer_id])
-
     for line in order.lines:
         product_id = _resolve_product_id(db, line)
         if not product_id:
@@ -307,6 +302,9 @@ def _allocate_order(
 
         product = db.get(ProductModel, product_id)
         product_name = (product.name if product else None) or line.name or ""
+        brand_id = product.brand_id if product else None
+        vip_months = resolve_vip_min_expiry_months(db, order.customer_id, brand_id)
+        min_expiry_date = min_expiry_date_from_months(vip_months) if vip_months > 0 else None
 
         remaining = Decimal(str(line.qty))
         allocated_total = Decimal("0")
