@@ -77,7 +77,7 @@ class PickerFooter extends ConsumerWidget {
             children: <Widget>[
               Expanded(
                 child: _tab(
-                  icon: Icons.home_outlined,
+                  icon: Icons.home_rounded,
                   label: StringLookup.t(loc, 'tabMain'),
                   active: current == PickerFooterRoute.pickerHome,
                   activeC: activeC,
@@ -87,7 +87,7 @@ class PickerFooter extends ConsumerWidget {
               ),
               Expanded(
                 child: _tab(
-                  icon: Icons.list_alt_outlined,
+                  icon: Icons.assignment_rounded,
                   label: StringLookup.t(loc, 'tabPickLists'),
                   active: current == PickerFooterRoute.pickTaskList,
                   activeC: activeC,
@@ -105,7 +105,7 @@ class PickerFooter extends ConsumerWidget {
               ),
               Expanded(
                 child: _tab(
-                  icon: Icons.inventory_2_outlined,
+                  icon: Icons.inventory_2_rounded,
                   label: StringLookup.t(loc, 'tabInventory'),
                   active: current == PickerFooterRoute.inventory,
                   activeC: activeC,
@@ -115,7 +115,7 @@ class PickerFooter extends ConsumerWidget {
               ),
               Expanded(
                 child: _tab(
-                  icon: Icons.move_to_inbox_outlined,
+                  icon: Icons.inbox_rounded,
                   label: StringLookup.t(loc, 'kirim'),
                   active: current == PickerFooterRoute.kirim,
                   activeC: activeC,
@@ -155,7 +155,7 @@ class PickerFooter extends ConsumerWidget {
                   clipBehavior: Clip.none,
                   alignment: Alignment.center,
                   children: <Widget>[
-                    Icon(icon, color: c, size: 24),
+                    Icon(icon, color: c, size: 26),
                     if (badge > 0)
                       Positioned(
                         right: -10,
@@ -210,7 +210,7 @@ class PickerFooter extends ConsumerWidget {
           onTap: onTap,
           child: const Padding(
             padding: EdgeInsets.all(14),
-            child: Icon(Icons.qr_code_scanner, color: Colors.white, size: 26),
+            child: Icon(Icons.qr_code_scanner_rounded, color: Colors.white, size: 28),
           ),
         ),
       ),

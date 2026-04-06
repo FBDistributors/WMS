@@ -27,6 +27,31 @@ class PickerHomeScreen extends ConsumerStatefulWidget {
 
 class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
   bool _refreshing = false;
+  String? _consumedCompletedMessage;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final String? msg = GoRouterState.of(context).uri.queryParameters['completedMessage'];
+    if (msg == null || msg.isEmpty || msg == _consumedCompletedMessage) {
+      return;
+    }
+    _consumedCompletedMessage = msg;
+    final String profileQ =
+        GoRouterState.of(context).uri.queryParameters['profile'] ?? 'picker';
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(Uri.decodeComponent(msg))),
+      );
+      context.goNamed(
+        'pickerHome',
+        queryParameters: <String, String>{'profile': profileQ},
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -85,20 +85,23 @@ class _ConsolidatedPickScreenState extends ConsumerState<ConsolidatedPickScreen>
                 Expanded(
                   child: TextField(
                     controller: _barcode,
-                    decoration: const InputDecoration(
-                      labelText: 'Barcode',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: StringLookup.t(loc, 'barcodeOrSku'),
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 SizedBox(
-                  width: 64,
+                  width: 72,
                   child: TextField(
                     controller: _qty,
                     keyboardType: TextInputType.number,
                     inputFormatters: <TextInputFormatter>[FilteringTextInputFormatter.digitsOnly],
-                    decoration: const InputDecoration(labelText: 'Qty', border: OutlineInputBorder()),
+                    decoration: InputDecoration(
+                      labelText: StringLookup.t(loc, 'qtyShort'),
+                      border: const OutlineInputBorder(),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -106,7 +109,7 @@ class _ConsolidatedPickScreenState extends ConsumerState<ConsolidatedPickScreen>
               ],
             ),
           ),
-          const Expanded(child: ConsolidatedPickContent()),
+          const Expanded(child: ConsolidatedPickContent(refreshVersion: 0)),
         ],
       ),
     );
