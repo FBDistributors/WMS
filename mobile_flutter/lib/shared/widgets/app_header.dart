@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/config/brand.dart';
 
 /// ERP-style app bar matching React Native `AppHeader.tsx` (logo, title, refresh).
-class AppHeader extends StatelessWidget implements PreferredSizeWidget {
+/// [SafeArea] (top) bilan status bar ostida kontent — tizim vaqt/batareya bilan ustma-ust tushmaydi.
+class AppHeader extends StatelessWidget {
   const AppHeader({
     super.key,
     required this.title,
@@ -19,8 +20,6 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
     this.trailing,
   });
 
-  static const double _toolbarHeight = kToolbarHeight + 8;
-
   final String title;
   final bool showBack;
   final VoidCallback? onBack;
@@ -34,61 +33,68 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
   final Widget? trailing;
 
   @override
-  Size get preferredSize => const Size.fromHeight(_toolbarHeight);
-
-  @override
   Widget build(BuildContext context) {
     final Color bg = headerBackgroundColor ?? Colors.white;
     final Color fg = titleColor ?? const Color(0xFF333333);
+    final Color border = Theme.of(context).brightness == Brightness.dark
+        ? const Color(0xFF334155)
+        : Colors.grey.shade300;
 
     return Material(
       color: bg,
       elevation: 0,
-      child: Container(
-        decoration: BoxDecoration(
-          color: bg,
-          border: Border(
-            bottom: BorderSide(color: Colors.grey.shade300, width: 1),
-          ),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: <Widget>[
-            if (leading != null) leading!,
-            if (showBack && onBack != null)
-              IconButton(
-                onPressed: onBack,
-                icon: Icon(Icons.arrow_back, color: accentColor),
-                tooltip: 'Orqaga',
-              ),
-            if (showLogo)
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: Icon(Icons.business, size: Brand.headerLogoSize, color: accentColor),
-              ),
-            Expanded(
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: fg,
-                ),
-              ),
+      child: SafeArea(
+        bottom: false,
+        left: false,
+        right: false,
+        top: true,
+        child: Container(
+          decoration: BoxDecoration(
+            color: bg,
+            border: Border(
+              bottom: BorderSide(color: border, width: 1),
             ),
-            if (trailing != null) trailing!,
-            if (onRefresh != null)
-              IconButton(
-                onPressed: refreshing ? null : onRefresh,
-                icon: Icon(
-                  Icons.refresh,
-                  color: refreshing ? Colors.grey.shade400 : accentColor,
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+          child: Row(
+            children: <Widget>[
+              if (leading != null) leading!,
+              if (showBack && onBack != null)
+                IconButton(
+                  onPressed: onBack,
+                  icon: Icon(Icons.arrow_back, color: accentColor),
+                  tooltip: 'Orqaga',
                 ),
-                tooltip: 'Yangilash',
+              if (showLogo)
+                Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: Icon(Icons.business,
+                      size: Brand.headerLogoSize, color: accentColor),
+                ),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: fg,
+                  ),
+                ),
               ),
-          ],
+              if (trailing != null) trailing!,
+              if (onRefresh != null)
+                IconButton(
+                  onPressed: refreshing ? null : onRefresh,
+                  icon: Icon(
+                    Icons.refresh,
+                    color: refreshing ? Colors.grey.shade400 : accentColor,
+                  ),
+                  tooltip: 'Yangilash',
+                ),
+            ],
+          ),
         ),
       ),
     );
