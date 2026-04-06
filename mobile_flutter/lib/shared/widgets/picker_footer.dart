@@ -64,60 +64,73 @@ class PickerFooter extends ConsumerWidget {
 
     return Material(
       color: barBg,
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: borderC)),
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: <Widget>[
-            _tab(
-              context,
-              icon: Icons.home_outlined,
-              label: StringLookup.t(loc, 'tabMain'),
-              active: current == PickerFooterRoute.pickerHome,
-              activeC: activeC,
-              inactiveC: inactiveC,
-              onTap: goHome,
-            ),
-            _tab(
-              context,
-              icon: Icons.list_alt,
-              label: StringLookup.t(loc, 'tabPickLists'),
-              active: current == PickerFooterRoute.pickTaskList,
-              activeC: activeC,
-              inactiveC: inactiveC,
-              badge: taskCount,
-              onTap: goTasks,
-            ),
-            _scanButton(context, goScan),
-            _tab(
-              context,
-              icon: Icons.inventory_2_outlined,
-              label: StringLookup.t(loc, 'tabInventory'),
-              active: current == PickerFooterRoute.inventory,
-              activeC: activeC,
-              inactiveC: inactiveC,
-              onTap: goInv,
-            ),
-            _tab(
-              context,
-              icon: Icons.move_to_inbox,
-              label: StringLookup.t(loc, 'kirim'),
-              active: current == PickerFooterRoute.kirim,
-              activeC: activeC,
-              inactiveC: inactiveC,
-              onTap: goKirim,
-            ),
-          ],
+      child: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.only(bottom: 4),
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border(top: BorderSide(color: borderC)),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: <Widget>[
+              Expanded(
+                child: _tab(
+                  icon: Icons.home_outlined,
+                  label: StringLookup.t(loc, 'tabMain'),
+                  active: current == PickerFooterRoute.pickerHome,
+                  activeC: activeC,
+                  inactiveC: inactiveC,
+                  onTap: goHome,
+                ),
+              ),
+              Expanded(
+                child: _tab(
+                  icon: Icons.list_alt_outlined,
+                  label: StringLookup.t(loc, 'tabPickLists'),
+                  active: current == PickerFooterRoute.pickTaskList,
+                  activeC: activeC,
+                  inactiveC: inactiveC,
+                  badge: taskCount,
+                  onTap: goTasks,
+                ),
+              ),
+              SizedBox(
+                width: 58,
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: _scanButton(goScan),
+                ),
+              ),
+              Expanded(
+                child: _tab(
+                  icon: Icons.inventory_2_outlined,
+                  label: StringLookup.t(loc, 'tabInventory'),
+                  active: current == PickerFooterRoute.inventory,
+                  activeC: activeC,
+                  inactiveC: inactiveC,
+                  onTap: goInv,
+                ),
+              ),
+              Expanded(
+                child: _tab(
+                  icon: Icons.move_to_inbox_outlined,
+                  label: StringLookup.t(loc, 'kirim'),
+                  active: current == PickerFooterRoute.kirim,
+                  activeC: activeC,
+                  inactiveC: inactiveC,
+                  onTap: goKirim,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _tab(
-    BuildContext context, {
+  Widget _tab({
     required IconData icon,
     required String label,
     required bool active,
@@ -127,56 +140,77 @@ class PickerFooter extends ConsumerWidget {
     int badge = 0,
   }) {
     final Color c = active ? activeC : inactiveC;
-    return InkWell(
-      onTap: onTap,
-      child: SizedBox(
-        width: 64,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Stack(
-              clipBehavior: Clip.none,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox(
+          height: 52,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
-                Icon(icon, color: c, size: 24),
-                if (badge > 0)
-                  Positioned(
-                    right: -8,
-                    top: -6,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFE53935),
-                        borderRadius: BorderRadius.all(Radius.circular(8)),
+                Stack(
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.center,
+                  children: <Widget>[
+                    Icon(icon, color: c, size: 24),
+                    if (badge > 0)
+                      Positioned(
+                        right: -10,
+                        top: -8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFE53935),
+                            borderRadius: BorderRadius.all(Radius.circular(8)),
+                          ),
+                          constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                          child: Text(
+                            badge > 99 ? '99+' : '$badge',
+                            style: const TextStyle(color: Colors.white, fontSize: 9),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
                       ),
-                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                      child: Text(
-                        badge > 99 ? '99+' : '$badge',
-                        style: const TextStyle(color: Colors.white, fontSize: 10),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11,
+                    height: 1.1,
+                    color: c,
+                    fontWeight: active ? FontWeight.w600 : FontWeight.w400,
                   ),
+                ),
               ],
             ),
-            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, color: c)),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _scanButton(BuildContext context, VoidCallback onTap) {
+  Widget _scanButton(VoidCallback onTap) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Material(
+        elevation: 6,
+        shadowColor: Colors.black45,
         color: _active,
         shape: const CircleBorder(),
         child: InkWell(
           customBorder: const CircleBorder(),
           onTap: onTap,
           child: const Padding(
-            padding: EdgeInsets.all(12),
-            child: Icon(Icons.qr_code_scanner, color: Colors.white, size: 28),
+            padding: EdgeInsets.all(14),
+            child: Icon(Icons.qr_code_scanner, color: Colors.white, size: 26),
           ),
         ),
       ),

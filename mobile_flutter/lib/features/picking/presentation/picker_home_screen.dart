@@ -99,28 +99,45 @@ class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
               ),
             ),
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(20),
-              children: <Widget>[
-                stats.when(
-                  data: (MyPickerStats s) => _StatsBlock(stats: s, loc: loc, isDark: isDark),
-                  loading: () => const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator())),
-                  error: (_, __) => const SizedBox.shrink(),
-                ),
-                if (profile == PickerProfileParam.picker)
-                  _HomeCard(
-                    icon: Icons.layers,
-                    title: StringLookup.t(loc, 'consolidatedPickTitle'),
-                    subtitle: StringLookup.t(loc, 'myPickTasks'),
-                    isDark: isDark,
-                    onTap: () => context.pushNamed('consolidatedPick'),
+            child: CustomScrollView(
+              slivers: <Widget>[
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate(
+                      <Widget>[
+                        stats.when(
+                          data: (MyPickerStats s) =>
+                              _StatsBlock(stats: s, loc: loc, isDark: isDark),
+                          loading: () => const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 24),
+                            child: Center(child: CircularProgressIndicator()),
+                          ),
+                          error: (_, __) => const SizedBox.shrink(),
+                        ),
+                        if (profile == PickerProfileParam.picker)
+                          _HomeCard(
+                            icon: Icons.layers_outlined,
+                            title: StringLookup.t(loc, 'consolidatedPickTitle'),
+                            subtitle: StringLookup.t(loc, 'myPickTasks'),
+                            isDark: isDark,
+                            onTap: () => context.pushNamed('consolidatedPick'),
+                          ),
+                        _HomeCard(
+                          icon: Icons.cloud_off_outlined,
+                          title:
+                              '${StringLookup.t(loc, 'queue')} (${pendingQ.valueOrNull ?? 0})',
+                          subtitle: StringLookup.t(loc, 'syncPending'),
+                          isDark: isDark,
+                          onTap: () => context.pushNamed('queue'),
+                        ),
+                      ],
+                    ),
                   ),
-                _HomeCard(
-                  icon: Icons.cloud_off,
-                  title: '${StringLookup.t(loc, 'queue')} (${pendingQ.valueOrNull ?? 0})',
-                  subtitle: StringLookup.t(loc, 'syncPending'),
-                  isDark: isDark,
-                  onTap: () => context.pushNamed('queue'),
+                ),
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: SizedBox.shrink(),
                 ),
               ],
             ),
@@ -154,8 +171,8 @@ class _StatsBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color accent = isDark ? const Color(0xFF93C5FD) : const Color(0xFF1A237E);
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF334155) : const Color(0xFFF0F0F0),
         borderRadius: BorderRadius.circular(12),
@@ -177,8 +194,12 @@ class _StatsBlock extends StatelessWidget {
   Widget _statBox(String value, String label, Color accent, bool dark) {
     return Column(
       children: <Widget>[
-        Text(value, style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: accent)),
-        Text(label, style: TextStyle(fontSize: 13, color: dark ? Colors.white70 : Colors.black54), textAlign: TextAlign.center),
+        Text(value, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: accent)),
+        Text(
+          label,
+          style: TextStyle(fontSize: 12, color: dark ? Colors.white70 : Colors.black54),
+          textAlign: TextAlign.center,
+        ),
       ],
     );
   }
@@ -203,12 +224,17 @@ class _HomeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       color: isDark ? const Color(0xFF334155) : const Color(0xFFF0F0F0),
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 10),
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
-        leading: Icon(icon),
-        title: Text(title),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_right),
+        visualDensity: VisualDensity.compact,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        minLeadingWidth: 32,
+        leading: Icon(icon, size: 28, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1A237E)),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+        subtitle: Text(subtitle, style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54)),
+        trailing: Icon(Icons.chevron_right, color: isDark ? Colors.white54 : Colors.black45),
         onTap: onTap,
       ),
     );

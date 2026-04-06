@@ -101,6 +101,10 @@ class _MobileFlutterAppState extends ConsumerState<MobileFlutterApp> {
           foregroundColor: Color(0xFF333333),
           elevation: 0,
         ),
+        listTileTheme: const ListTileThemeData(
+          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          minLeadingWidth: 28,
+        ),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
@@ -115,6 +119,10 @@ class _MobileFlutterAppState extends ConsumerState<MobileFlutterApp> {
           backgroundColor: Color(0xFF1E293B),
           foregroundColor: Color(0xFFF1F5F9),
           elevation: 0,
+        ),
+        listTileTheme: const ListTileThemeData(
+          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          minLeadingWidth: 28,
         ),
       ),
       routerConfig: router,
