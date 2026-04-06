@@ -1,0 +1,475 @@
+// Mirrors mobile/src/api/picking.types.ts
+
+class PickingAlternateLocation {
+  const PickingAlternateLocation({
+    required this.locationId,
+    required this.locationCode,
+    required this.lotId,
+    required this.availableQty,
+    required this.batch,
+    required this.expiryDate,
+    required this.isPrimary,
+  });
+
+  final String locationId;
+  final String locationCode;
+  final String lotId;
+  final double availableQty;
+  final String? batch;
+  final String? expiryDate;
+  final bool isPrimary;
+
+  factory PickingAlternateLocation.fromJson(Map<String, Object?> json) {
+    return PickingAlternateLocation(
+      locationId: json['location_id']! as String,
+      locationCode: json['location_code']! as String,
+      lotId: json['lot_id']! as String,
+      availableQty: _num(json['available_qty']),
+      batch: json['batch'] as String?,
+      expiryDate: json['expiry_date'] as String?,
+      isPrimary: json['is_primary'] == true,
+    );
+  }
+}
+
+class PickingLine {
+  const PickingLine({
+    required this.id,
+    required this.productName,
+    required this.sku,
+    required this.barcode,
+    required this.locationCode,
+    required this.batch,
+    required this.expiryDate,
+    required this.qtyRequired,
+    required this.qtyPicked,
+    required this.skipReason,
+    required this.productId,
+    required this.alternateLocations,
+  });
+
+  final String id;
+  final String productName;
+  final String? sku;
+  final String? barcode;
+  final String locationCode;
+  final String? batch;
+  final String? expiryDate;
+  final int qtyRequired;
+  final int qtyPicked;
+  final String? skipReason;
+  final String? productId;
+  final List<PickingAlternateLocation> alternateLocations;
+
+  factory PickingLine.fromJson(Map<String, Object?> json) {
+    final Object? alts = json['alternate_locations'];
+    final List<PickingAlternateLocation> list = alts is List
+        ? alts
+            .whereType<Map<dynamic, dynamic>>()
+            .map((Map<dynamic, dynamic> m) => PickingAlternateLocation.fromJson(
+                  Map<String, Object?>.from(m),
+                ))
+            .toList(growable: false)
+        : const <PickingAlternateLocation>[];
+    return PickingLine(
+      id: json['id']! as String,
+      productName: json['product_name']! as String,
+      sku: json['sku'] as String?,
+      barcode: json['barcode'] as String?,
+      locationCode: json['location_code']! as String,
+      batch: json['batch'] as String?,
+      expiryDate: json['expiry_date'] as String?,
+      qtyRequired: _int(json['qty_required']),
+      qtyPicked: _int(json['qty_picked']),
+      skipReason: json['skip_reason'] as String?,
+      productId: json['product_id'] as String?,
+      alternateLocations: list,
+    );
+  }
+}
+
+class PickingProgress {
+  const PickingProgress({required this.picked, required this.required});
+
+  final int picked;
+  final int required;
+
+  factory PickingProgress.fromJson(Map<String, Object?> json) {
+    return PickingProgress(
+      picked: _int(json['picked']),
+      required: _int(json['required']),
+    );
+  }
+}
+
+class PickingDocument {
+  const PickingDocument({
+    required this.id,
+    required this.referenceNumber,
+    required this.status,
+    required this.lines,
+    required this.progress,
+    required this.incompleteReason,
+    required this.assignedToUserId,
+    required this.assignedToUserName,
+    required this.orderNumber,
+  });
+
+  final String id;
+  final String referenceNumber;
+  final String status;
+  final List<PickingLine> lines;
+  final PickingProgress progress;
+  final String? incompleteReason;
+  final String? assignedToUserId;
+  final String? assignedToUserName;
+  final String? orderNumber;
+
+  factory PickingDocument.fromJson(Map<String, Object?> json) {
+    final Object? linesRaw = json['lines'];
+    final List<PickingLine> lines = linesRaw is List
+        ? linesRaw
+            .whereType<Map<dynamic, dynamic>>()
+            .map((Map<dynamic, dynamic> m) =>
+                PickingLine.fromJson(Map<String, Object?>.from(m)))
+            .toList(growable: false)
+        : const <PickingLine>[];
+    final Object? prog = json['progress'];
+    return PickingDocument(
+      id: json['id']! as String,
+      referenceNumber: json['reference_number']! as String,
+      status: json['status']! as String,
+      lines: lines,
+      progress: prog is Map
+          ? PickingProgress.fromJson(Map<String, Object?>.from(prog))
+          : const PickingProgress(picked: 0, required: 0),
+      incompleteReason: json['incomplete_reason'] as String?,
+      assignedToUserId: json['assigned_to_user_id'] as String?,
+      assignedToUserName: json['assigned_to_user_name'] as String?,
+      orderNumber: json['order_number'] as String?,
+    );
+  }
+}
+
+class PickingListItem {
+  const PickingListItem({
+    required this.id,
+    required this.referenceNumber,
+    required this.status,
+    required this.linesTotal,
+    required this.linesDone,
+    required this.controlledByUserId,
+    required this.assignedToUserId,
+    required this.assignedToUserName,
+    required this.orderNumber,
+    required this.deliveryNumber,
+    required this.sentToControllerAt,
+  });
+
+  final String id;
+  final String referenceNumber;
+  final String status;
+  final int linesTotal;
+  final int linesDone;
+  final String? controlledByUserId;
+  final String? assignedToUserId;
+  final String? assignedToUserName;
+  final String? orderNumber;
+  final String? deliveryNumber;
+  final String? sentToControllerAt;
+
+  factory PickingListItem.fromJson(Map<String, Object?> json) {
+    return PickingListItem(
+      id: json['id']! as String,
+      referenceNumber: json['reference_number']! as String,
+      status: json['status']! as String,
+      linesTotal: _int(json['lines_total']),
+      linesDone: _int(json['lines_done']),
+      controlledByUserId: json['controlled_by_user_id'] as String?,
+      assignedToUserId: json['assigned_to_user_id'] as String?,
+      assignedToUserName: json['assigned_to_user_name'] as String?,
+      orderNumber: json['order_number'] as String?,
+      deliveryNumber: json['delivery_number'] as String?,
+      sentToControllerAt: json['sent_to_controller_at'] as String?,
+    );
+  }
+}
+
+class PickLineResponse {
+  const PickLineResponse({
+    required this.line,
+    required this.progress,
+    required this.documentStatus,
+  });
+
+  final PickingLine line;
+  final PickingProgress progress;
+  final String documentStatus;
+
+  factory PickLineResponse.fromJson(Map<String, Object?> json) {
+    final Object? line = json['line'];
+    final Object? prog = json['progress'];
+    return PickLineResponse(
+      line: line is Map
+          ? PickingLine.fromJson(Map<String, Object?>.from(line))
+          : throw const FormatException('line'),
+      progress: prog is Map
+          ? PickingProgress.fromJson(Map<String, Object?>.from(prog))
+          : const PickingProgress(picked: 0, required: 0),
+      documentStatus: json['document_status']! as String,
+    );
+  }
+}
+
+class ConsolidatedLineItem {
+  const ConsolidatedLineItem({
+    required this.documentId,
+    required this.lineId,
+    required this.referenceNumber,
+    required this.qtyRequired,
+    required this.qtyPicked,
+    required this.locationCode,
+    required this.pickSequence,
+    required this.expiryDate,
+  });
+
+  final String documentId;
+  final String lineId;
+  final String referenceNumber;
+  final int qtyRequired;
+  final int qtyPicked;
+  final String locationCode;
+  final int? pickSequence;
+  final String? expiryDate;
+
+  factory ConsolidatedLineItem.fromJson(Map<String, Object?> json) {
+    return ConsolidatedLineItem(
+      documentId: json['document_id']! as String,
+      lineId: json['line_id']! as String,
+      referenceNumber: json['reference_number']! as String,
+      qtyRequired: _int(json['qty_required']),
+      qtyPicked: _int(json['qty_picked']),
+      locationCode: json['location_code']! as String,
+      pickSequence: (json['pick_sequence'] as num?)?.toInt(),
+      expiryDate: json['expiry_date'] as String?,
+    );
+  }
+}
+
+class ConsolidatedProduct {
+  const ConsolidatedProduct({
+    required this.barcode,
+    required this.sku,
+    required this.productName,
+    required this.productId,
+    required this.totalRequired,
+    required this.totalPicked,
+    required this.expiryDate,
+    required this.alternateLocations,
+    required this.lines,
+  });
+
+  final String? barcode;
+  final String? sku;
+  final String productName;
+  final String? productId;
+  final int totalRequired;
+  final int totalPicked;
+  final String? expiryDate;
+  final List<PickingAlternateLocation> alternateLocations;
+  final List<ConsolidatedLineItem> lines;
+
+  factory ConsolidatedProduct.fromJson(Map<String, Object?> json) {
+    final Object? alts = json['alternate_locations'];
+    final List<PickingAlternateLocation> al = alts is List
+        ? alts
+            .whereType<Map<dynamic, dynamic>>()
+            .map((Map<dynamic, dynamic> m) => PickingAlternateLocation.fromJson(
+                  Map<String, Object?>.from(m),
+                ))
+            .toList(growable: false)
+        : const <PickingAlternateLocation>[];
+    final Object? linesRaw = json['lines'];
+    final List<ConsolidatedLineItem> lines = linesRaw is List
+        ? linesRaw
+            .whereType<Map<dynamic, dynamic>>()
+            .map((Map<dynamic, dynamic> m) =>
+                ConsolidatedLineItem.fromJson(Map<String, Object?>.from(m)))
+            .toList(growable: false)
+        : const <ConsolidatedLineItem>[];
+    return ConsolidatedProduct(
+      barcode: json['barcode'] as String?,
+      sku: json['sku'] as String?,
+      productName: json['product_name']! as String,
+      productId: json['product_id'] as String?,
+      totalRequired: _int(json['total_required']),
+      totalPicked: _int(json['total_picked']),
+      expiryDate: json['expiry_date'] as String?,
+      alternateLocations: al,
+      lines: lines,
+    );
+  }
+}
+
+class ConsolidatedDocumentSummary {
+  const ConsolidatedDocumentSummary({
+    required this.id,
+    required this.referenceNumber,
+    required this.status,
+    required this.linesTotal,
+    required this.linesDone,
+  });
+
+  final String id;
+  final String referenceNumber;
+  final String status;
+  final int linesTotal;
+  final int linesDone;
+
+  factory ConsolidatedDocumentSummary.fromJson(Map<String, Object?> json) {
+    return ConsolidatedDocumentSummary(
+      id: json['id']! as String,
+      referenceNumber: json['reference_number']! as String,
+      status: json['status']! as String,
+      linesTotal: _int(json['lines_total']),
+      linesDone: _int(json['lines_done']),
+    );
+  }
+}
+
+class ConsolidatedViewResponse {
+  const ConsolidatedViewResponse({
+    required this.documents,
+    required this.products,
+  });
+
+  final List<ConsolidatedDocumentSummary> documents;
+  final List<ConsolidatedProduct> products;
+
+  factory ConsolidatedViewResponse.fromJson(Map<String, Object?> json) {
+    final Object? d = json['documents'];
+    final Object? p = json['products'];
+    return ConsolidatedViewResponse(
+      documents: d is List
+          ? d
+              .whereType<Map<dynamic, dynamic>>()
+              .map((Map<dynamic, dynamic> m) =>
+                  ConsolidatedDocumentSummary.fromJson(
+                    Map<String, Object?>.from(m),
+                  ))
+              .toList(growable: false)
+          : const <ConsolidatedDocumentSummary>[],
+      products: p is List
+          ? p
+              .whereType<Map<dynamic, dynamic>>()
+              .map((Map<dynamic, dynamic> m) =>
+                  ConsolidatedProduct.fromJson(Map<String, Object?>.from(m)))
+              .toList(growable: false)
+          : const <ConsolidatedProduct>[],
+    );
+  }
+}
+
+class MyPickerStatsDay {
+  const MyPickerStatsDay({required this.date, required this.count});
+
+  final String date;
+  final int count;
+
+  factory MyPickerStatsDay.fromJson(Map<String, Object?> json) {
+    return MyPickerStatsDay(
+      date: json['date']! as String,
+      count: _int(json['count']),
+    );
+  }
+}
+
+class MyPickerStats {
+  const MyPickerStats({
+    required this.totalCompleted,
+    required this.completedToday,
+    required this.byDay,
+  });
+
+  final int totalCompleted;
+  final int completedToday;
+  final List<MyPickerStatsDay> byDay;
+
+  factory MyPickerStats.fromJson(Map<String, Object?> json) {
+    final Object? bd = json['by_day'];
+    return MyPickerStats(
+      totalCompleted: _int(json['total_completed']),
+      completedToday: _int(json['completed_today']),
+      byDay: bd is List
+          ? bd
+              .whereType<Map<dynamic, dynamic>>()
+              .map((Map<dynamic, dynamic> m) =>
+                  MyPickerStatsDay.fromJson(Map<String, Object?>.from(m)))
+              .toList(growable: false)
+          : const <MyPickerStatsDay>[],
+    );
+  }
+}
+
+class PickerUser {
+  const PickerUser({
+    required this.id,
+    required this.username,
+    required this.fullName,
+  });
+
+  final String id;
+  final String username;
+  final String? fullName;
+
+  factory PickerUser.fromJson(Map<String, Object?> json) {
+    return PickerUser(
+      id: json['id']! as String,
+      username: json['username']! as String,
+      fullName: json['full_name'] as String?,
+    );
+  }
+}
+
+class ControllerUser {
+  const ControllerUser({
+    required this.id,
+    required this.username,
+    required this.fullName,
+  });
+
+  final String id;
+  final String username;
+  final String? fullName;
+
+  factory ControllerUser.fromJson(Map<String, Object?> json) {
+    return ControllerUser(
+      id: json['id']! as String,
+      username: json['username']! as String,
+      fullName: json['full_name'] as String?,
+    );
+  }
+}
+
+double _num(Object? v) {
+  if (v is num) {
+    return v.toDouble();
+  }
+  if (v is String) {
+    return double.tryParse(v) ?? 0;
+  }
+  return 0;
+}
+
+int _int(Object? v) {
+  if (v is int) {
+    return v;
+  }
+  if (v is num) {
+    return v.toInt();
+  }
+  if (v is String) {
+    return int.tryParse(v) ?? 0;
+  }
+  return 0;
+}

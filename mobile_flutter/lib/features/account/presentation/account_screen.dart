@@ -1,0 +1,91 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../core/app_state/app_locale.dart';
+import '../../../core/app_state/locale_controller.dart';
+import '../../../core/app_state/theme_controller.dart';
+import '../../../l10n/string_lookup.dart';
+import '../../auth/data/auth_models.dart';
+import '../../auth/presentation/auth_providers.dart';
+
+class AccountScreen extends ConsumerWidget {
+  const AccountScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final AppLocale loc = ref.watch(appLocaleProvider);
+    final ThemeMode tm = ref.watch(appThemeModeProvider);
+    final AsyncValue<AuthSession> auth = ref.watch(authControllerProvider);
+    final MeResponse? me = auth.maybeWhen(
+      data: (AuthSession s) => s.me,
+      orElse: () => null,
+    );
+
+    return Scaffold(
+      appBar: AppBar(title: Text(StringLookup.t(loc, 'account'))),
+      body: ListView(
+        children: <Widget>[
+          if (me != null)
+            ListTile(
+              title: Text(me.username),
+              subtitle: Text(me.fullName ?? ''),
+            ),
+          ListTile(
+            title: Text(StringLookup.t(loc, 'language')),
+            subtitle: Text(_langLabel(loc)),
+            onTap: () => _pickLang(context, ref),
+          ),
+          SwitchListTile(
+            title: Text(StringLookup.t(loc, 'theme_label')),
+            subtitle: Text(tm == ThemeMode.dark ? StringLookup.t(loc, 'theme_dark') : StringLookup.t(loc, 'theme_light')),
+            value: tm == ThemeMode.dark,
+            onChanged: (bool v) {
+              ref.read(appThemeModeProvider.notifier).setThemeMode(v ? ThemeMode.dark : ThemeMode.light);
+            },
+          ),
+          ListTile(
+            title: Text(StringLookup.t(loc, 'logout')),
+            onTap: () async {
+              await ref.read(authControllerProvider.notifier).logout();
+              if (context.mounted) {
+                context.goNamed('login');
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _langLabel(AppLocale l) => switch (l) {
+        AppLocale.uz => StringLookup.t(l, 'langUz'),
+        AppLocale.ru => StringLookup.t(l, 'langRu'),
+        AppLocale.en => StringLookup.t(l, 'langEn'),
+      };
+
+  Future<void> _pickLang(BuildContext context, WidgetRef ref) async {
+    final AppLocale? picked = await showDialog<AppLocale>(
+      context: context,
+      builder: (BuildContext ctx) => SimpleDialog(
+        children: <Widget>[
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, AppLocale.uz),
+            child: const Text('O‘zbek'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, AppLocale.ru),
+            child: const Text('Русский'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, AppLocale.en),
+            child: const Text('English'),
+          ),
+        ],
+      ),
+    );
+    if (picked != null) {
+      await ref.read(appLocaleProvider.notifier).setLocale(picked);
+    }
+  }
+}

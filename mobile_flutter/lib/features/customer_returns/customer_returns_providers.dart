@@ -1,0 +1,17 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/network/app_dio.dart';
+import 'data/customer_returns_models.dart';
+import 'data/customer_returns_repository.dart';
+
+final customerReturnsRepositoryProvider = Provider<CustomerReturnsRepository>((Ref ref) {
+  return CustomerReturnsRepository(ref.watch(appDioProvider));
+});
+
+final customerReturnsQueueProvider =
+    FutureProvider.autoDispose<CustomerReturnListResponse>(
+  (Ref ref) => ref.watch(customerReturnsRepositoryProvider).listCustomerReturns(
+        mineAsPicker: true,
+        limit: 50,
+      ),
+);

@@ -1,0 +1,48 @@
+import '../../features/picking/domain/profile_type_param.dart';
+
+/// RN `Scanner` ekrani parametrlarining Dart ekvivalenti (GoRouter `extra`).
+class ScannerArgs {
+  const ScannerArgs({
+    this.returnToPick = false,
+    this.returnToConsolidated = false,
+    this.returnToReturns = false,
+    this.returnToKirimForm = false,
+    this.returnToMovement = false,
+    this.returnToMovementPallet = false,
+    this.returnToKirimLocation = false,
+    this.returnToInventoryDetail = false,
+    this.flow,
+    this.newMode,
+    this.warehouse,
+    this.taskId,
+    this.lineId,
+    this.profileType,
+    this.selectedProductKey,
+    this.inventoryStep,
+    this.inventoryLocationId,
+    this.inventoryLocationCode,
+    this.receivingLocationId,
+    this.receivingLocationCode,
+  });
+
+  final bool returnToPick;
+  final bool returnToConsolidated;
+  final bool returnToReturns;
+  final bool returnToKirimForm;
+  final bool returnToMovement;
+  final bool returnToMovementPallet;
+  final bool returnToKirimLocation;
+  final bool returnToInventoryDetail;
+  final String? flow;
+  final String? newMode;
+  final String? warehouse;
+  final String? taskId;
+  final String? lineId;
+  final PickerProfileParam? profileType;
+  final String? selectedProductKey;
+  final int? inventoryStep;
+  final String? inventoryLocationId;
+  final String? inventoryLocationCode;
+  final String? receivingLocationId;
+  final String? receivingLocationCode;
+}
