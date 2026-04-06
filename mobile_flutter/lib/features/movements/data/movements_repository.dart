@@ -2,6 +2,11 @@ import 'package:dio/dio.dart';
 
 import '../../../core/network/app_dio.dart';
 
+/// HTTP 403 on POST /inventory/movements (inventory adjust permission).
+class StockMovementForbiddenException implements Exception {
+  const StockMovementForbiddenException();
+}
+
 class TransferLocationResponse {
   const TransferLocationResponse({
     required this.linesTransferred,
@@ -51,6 +56,9 @@ class MovementsRepository {
       final Object? id = data['id'];
       return id is String ? id : id?.toString() ?? '';
     } on DioException catch (e) {
+      if (e.response?.statusCode == 403) {
+        throw const StockMovementForbiddenException();
+      }
       throw Exception(mapDioExceptionToMessage(e));
     }
   }

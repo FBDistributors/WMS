@@ -26,19 +26,22 @@ dependencies:
   firebase_messaging: ^15.1.5
   intl: ^0.20.2
   collection: ^1.19.0
+  google_fonts: ^6.2.1
+  flutter_svg: ^2.0.17
+  shimmer: ^3.0.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.3
+  image: ^4.8.0
 
+# RN `mobile/src/assets/logo.png`; legacy mipmaps only (no adaptive) to avoid Material You recoloring.
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: assets/branding/app_icon.png
-  adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: assets/branding/app_icon.png
   remove_alpha_ios: true
 
 flutter:
