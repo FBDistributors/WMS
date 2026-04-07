@@ -133,7 +133,7 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
     String? scannedForQty = verifiedBarcode;
     if (scannedForQty != null) {
       final double rem = product.totalRequired - product.totalPicked;
-      qty.text = '${max(1, rem.floor())}';
+      qty.text = '${max(1, rem.round())}';
     }
 
     await showModalBottomSheet<void>(
@@ -248,7 +248,7 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                           setM(() {
                             scannedForQty = t;
                             final double rem = product.totalRequired - product.totalPicked;
-                            qty.text = '${max(1, rem.floor())}';
+                            qty.text = '${max(1, rem.round())}';
                           });
                         },
                       ),
@@ -273,7 +273,7 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                             setM(() {
                               scannedForQty = t;
                               final double rem = product.totalRequired - product.totalPicked;
-                              qty.text = '${max(1, rem.floor())}';
+                              qty.text = '${max(1, rem.round())}';
                             });
                           },
                         child: Text(StringLookup.t(loc, 'submit')),
@@ -313,7 +313,7 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                             : () async {
                             final int q = int.tryParse(qty.text.trim()) ?? 0;
                             final double rem = product.totalRequired - product.totalPicked;
-                            final int maxPick = max(0, rem.floor());
+                            final int maxPick = max(0, rem.round());
                             if (q < 1 || q > maxPick) {
                               ScaffoldMessenger.of(host).showSnackBar(
                                 SnackBar(

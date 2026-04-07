@@ -189,7 +189,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
         if (profile == PickerProfileParam.picker &&
             lineId != null &&
             lineId.isNotEmpty) {
-          await _submitPickerLineScan(sb, lineId);
+          await _handlePickerRouteScan(sb, lineId);
         } else if (profile == PickerProfileParam.controller) {
           if (lineId != null && lineId.isNotEmpty) {
             await _handleControllerRouteScan(sb, lineId);
@@ -271,40 +271,43 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     await _presentControllerVerifySheet(doc, physical);
   }
 
-  Future<void> _submitPickerLineScan(String barcode, String lineId) async {
-    final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
-    final OfflineDatabase? db = await ref.read(offlineDatabaseProvider.future);
-    setState(() => _busy = true);
-    try {
-      if (online) {
-        await ref.read(pickingRepositoryProvider).submitScan(
-              widget.taskId,
-              barcode: barcode,
-              lineId: lineId,
-            );
-        ref.invalidate(pickTaskDetailProvider(widget.taskId));
-      } else if (db != null) {
-        await db.queueAdd(
-          'q_${DateTime.now().millisecondsSinceEpoch}',
-          'PICK_SCAN',
-          <String, Object?>{
-            'taskId': widget.taskId,
-            'barcode': barcode,
-            'lineId': lineId,
-            'ts': DateTime.now().millisecondsSinceEpoch,
-          },
-          'pending',
-        );
-      }
-    } on Exception catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _busy = false);
+  /// RN `PickTaskDetails` `useFocusEffect`: skan + lineId → modal, `submitScan` yo‘q.
+  Future<void> _handlePickerRouteScan(String barcode, String lineId) async {
+    final PickingDocument doc = await _loadRouteScanDocument();
+    if (!mounted) {
+      return;
+    }
+    final AppLocale loc = ref.read(appLocaleProvider);
+    PickingLine? line;
+    for (final PickingLine l in doc.lines) {
+      if (l.id == lineId) {
+        line = l;
+        break;
       }
     }
+    if (line == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(StringLookup.t(loc, 'notFound'))),
+      );
+      return;
+    }
+    if (!_barcodeMatchesLine(barcode, line)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${StringLookup.t(loc, 'wrongBarcodeMessage')}'
+            '${line.barcode ?? line.sku ?? '—'}',
+          ),
+        ),
+      );
+      return;
+    }
+    await _openLineSheet(
+      doc,
+      _LineGroup(virtual: line, members: <PickingLine>[line]),
+      PickerProfileParam.picker,
+      presetScannedBarcode: barcode.trim(),
+    );
   }
 
   Future<void> _presentControllerVerifySheet(
@@ -652,19 +655,31 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
   Future<void> _openLineSheet(
     PickingDocument doc,
     _LineGroup group,
-    PickerProfileParam profile,
-  ) async {
+    PickerProfileParam profile, {
+    String? presetScannedBarcode,
+  }) async {
     final AppLocale loc = ref.read(appLocaleProvider);
     final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
     final PickingLine stock = group.members.first;
+
+    final String? pickerPreset = presetScannedBarcode != null &&
+            presetScannedBarcode.trim().isNotEmpty &&
+            profile == PickerProfileParam.picker
+        ? presetScannedBarcode.trim()
+        : null;
+    final double remPick = stock.qtyRequired - stock.qtyPicked;
+    final String presetQtyText = pickerPreset != null
+        ? (remPick >= 1 ? formatPickQty(remPick) : '0')
+        : '';
 
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       builder: (BuildContext ctx) {
         final TextEditingController bc = TextEditingController();
-        final TextEditingController qty = TextEditingController();
-        String? scannedForQty;
+        final TextEditingController qty =
+            TextEditingController(text: presetQtyText);
+        String? scannedForQty = pickerPreset;
         bool sheetBusy = false;
         return StatefulBuilder(
           builder: (BuildContext context, void Function(void Function()) setM) {

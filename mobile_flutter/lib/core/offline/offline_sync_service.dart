@@ -19,6 +19,7 @@ class OfflineSyncService {
         final Map<String, Object?> payload =
             Map<String, Object?>.from(jsonDecode(item.payloadJson) as Map);
         switch (item.type) {
+          // Yuqori shtrix maydoni oflayn (`_submitTopScan`); qatorli skan endi modal + PICK_CONFIRM_ITEM.
           case 'PICK_SCAN':
             final String taskId = payload['taskId']! as String;
             final String barcode = payload['barcode']! as String;
