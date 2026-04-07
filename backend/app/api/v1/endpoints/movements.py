@@ -25,7 +25,7 @@ _CACHE_TTL_SEC = 900
 _SMARTUP_STATUS_PARAM_MAX = 200
 _SMARTUP_STATUS_TOKEN_RE = re.compile(r"^[A-Z0-9#]{1,32}$")
 _WMS_STATUS_MAP: dict[str, frozenset[str] | None] = {
-    # "Yangi" faqat Smartup W statusiga teng
+    # SmartUp: yangi harakatlar odatda W; WMS da hali yig'ishga ketmaganlar ro'yxatda qoladi
     "new": frozenset({"W"}),
     "picking": frozenset({"C"}),
     "review": frozenset({"L", "P", "PICKED", "REVIEW", "CHECK"}),
@@ -164,6 +164,45 @@ def _enrich_movements_chunk_with_wms(db: Session, chunk: list[Any]) -> list[Any]
     return out
 
 
+def _movement_is_wms_new(wms_order_status: Any) -> bool:
+    """Yig'ishga yuborilmagan: WMS yozuvi yo'q yoki imported / B#W."""
+    if wms_order_status is None:
+        return True
+    s = str(wms_order_status).strip()
+    if not s:
+        return True
+    low = s.lower()
+    return low in ("imported", "b#w")
+
+
+def _filter_movements_wms_new(enriched: list[Any]) -> list[Any]:
+    """wms_status=new: SmartUp W dan keyin faqat WMS jihatdan 'yangi' qatorlar."""
+    return [
+        m
+        for m in enriched
+        if isinstance(m, dict) and _movement_is_wms_new(m.get("wms_order_status"))
+    ]
+
+
+def _slice_movements_response(
+    db: Session,
+    full_list: list[Any],
+    wms_status_key: str | None,
+    offset: int,
+    limit: int,
+) -> dict[str, Any]:
+    """Paginatsiya; wms:new uchun avval WMS boyitish + filtr."""
+    if wms_status_key == "new":
+        enriched = _enrich_movements_chunk_with_wms(db, full_list)
+        filtered = _filter_movements_wms_new(enriched)
+        total = len(filtered)
+        chunk = filtered[offset : offset + limit]
+        return {"movement": chunk, "total": total}
+    total = len(full_list)
+    chunk = full_list[offset : offset + limit]
+    return {"movement": _enrich_movements_chunk_with_wms(db, chunk), "total": total}
+
+
 @router.get("", summary="List movements from Smartup (movement$export)")
 @router.get("/", summary="List movements from Smartup (movement$export)")
 async def list_movements(
@@ -181,7 +220,7 @@ async def list_movements(
     ),
     wms_status: str | None = Query(
         None,
-        description="WMS status filter: new, picking, review, completed, cancelled, all",
+        description="WMS status filter: new (SmartUp W + WMS imported/B#W/yozuvsiz), picking, ...",
     ),
     db: Session = Depends(get_db),
     _user=Depends(require_permission("orders:read")),
@@ -189,7 +228,8 @@ async def list_movements(
     """
     Proxy to Smartup mfm movement$export. Returns "movement" (sliced) and "total".
     begin_modified_on/end_modified_on berilsa faqat o'zgarishlar yuklanadi (delta sync).
-    wms_status berilsa mapped filter ishlaydi (new faqat W), aks holda smartup_status ishlaydi.
+    wms_status=new: SmartUp dan W, keyin WMS boyicha yig'ishga ketganlar chiqariladi.
+    Boshqa wms_status: SmartUp status xaritasi; wms yo'q bo'lsa smartup_status.
     """
     today = date.today()
     begin = _parse_date(begin_created_on)
@@ -225,9 +265,7 @@ async def list_movements(
     if not refresh and key in _movements_cache:
         full_list, expiry = _movements_cache[key]
         if now < expiry:
-            total = len(full_list)
-            chunk = full_list[offset : offset + limit]
-            return {"movement": _enrich_movements_chunk_with_wms(db, chunk), "total": total}
+            return _slice_movements_response(db, full_list, wms_status_key, offset, limit)
         del _movements_cache[key]
 
     try:
@@ -249,6 +287,4 @@ async def list_movements(
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Smartup movement export failed: {exc}") from exc
 
-    total = len(full_list)
-    chunk = full_list[offset : offset + limit]
-    return {"movement": _enrich_movements_chunk_with_wms(db, chunk), "total": total}
+    return _slice_movements_response(db, full_list, wms_status_key, offset, limit)
