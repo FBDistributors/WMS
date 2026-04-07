@@ -113,7 +113,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
 
   final TextEditingController _topScan = TextEditingController();
   bool _busy = false;
-  String? _appliedRouteScan;
+  String? _appliedRouteScanKey;
   Set<String> _verifiedLineIds = <String>{};
 
   @override
@@ -157,28 +157,204 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final String? sb = GoRouterState.of(context).uri.queryParameters['scannedBarcode'];
-    if (sb == null || sb.isEmpty || _appliedRouteScan == sb) {
+    final Uri uri = GoRouterState.of(context).uri;
+    final String? sb = uri.queryParameters['scannedBarcode'];
+    if (sb == null || sb.isEmpty) {
       return;
     }
-    _appliedRouteScan = sb;
+    final String? lineId = uri.queryParameters['lineId'];
+    final String scanKey = '${sb.trim()}|${lineId ?? ''}';
+    if (_appliedRouteScanKey == scanKey) {
+      return;
+    }
+    _appliedRouteScanKey = scanKey;
+
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) {
-        return;
-      }
-      _topScan.text = sb;
-      await _submitTopScan();
       if (!mounted) {
         return;
       }
       final String? profileQ = GoRouterState.of(context).uri.queryParameters['profile'];
       final PickerProfileParam profile = pickerProfileFromQuery(profileQ);
+
+      try {
+        if (profile == PickerProfileParam.controller &&
+            lineId != null &&
+            lineId.isNotEmpty) {
+          final PickingDocument doc =
+              await ref.read(pickingRepositoryProvider).getTaskById(widget.taskId);
+          if (!mounted) {
+            return;
+          }
+          PickingLine? physical;
+          for (final PickingLine scanLine in doc.lines) {
+            if (scanLine.id == lineId) {
+              physical = scanLine;
+              break;
+            }
+          }
+          final AppLocale loc = ref.read(appLocaleProvider);
+          if (physical == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(StringLookup.t(loc, 'notFound'))),
+            );
+          } else if (!_barcodeMatchesLine(sb, physical)) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  '${StringLookup.t(loc, 'wrongBarcodeMessage')}'
+                  '${physical.barcode ?? physical.sku ?? '—'}',
+                ),
+              ),
+            );
+          } else {
+            await _presentControllerVerifySheet(doc, physical);
+          }
+        } else if (profile == PickerProfileParam.picker &&
+            lineId != null &&
+            lineId.isNotEmpty) {
+          await _submitPickerLineScan(sb, lineId);
+        } else {
+          _topScan.text = sb;
+          await _submitTopScan();
+        }
+      } on Exception catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        }
+      }
+
+      if (!mounted) {
+        return;
+      }
       context.goNamed(
         'pickTaskDetail',
         pathParameters: <String, String>{'taskId': widget.taskId},
         queryParameters: <String, String>{'profile': profileToQuery(profile)},
       );
+      if (mounted) {
+        setState(() => _appliedRouteScanKey = null);
+      }
     });
+  }
+
+  Future<void> _submitPickerLineScan(String barcode, String lineId) async {
+    final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
+    final OfflineDatabase? db = await ref.read(offlineDatabaseProvider.future);
+    setState(() => _busy = true);
+    try {
+      if (online) {
+        await ref.read(pickingRepositoryProvider).submitScan(
+              widget.taskId,
+              barcode: barcode,
+              lineId: lineId,
+            );
+        ref.invalidate(pickTaskDetailProvider(widget.taskId));
+      } else if (db != null) {
+        await db.queueAdd(
+          'q_${DateTime.now().millisecondsSinceEpoch}',
+          'PICK_SCAN',
+          <String, Object?>{
+            'taskId': widget.taskId,
+            'barcode': barcode,
+            'lineId': lineId,
+            'ts': DateTime.now().millisecondsSinceEpoch,
+          },
+          'pending',
+        );
+      }
+    } on Exception catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  Future<void> _presentControllerVerifySheet(
+    PickingDocument doc,
+    PickingLine physical,
+  ) async {
+    final AppLocale loc = ref.read(appLocaleProvider);
+    final BuildContext hostContext = context;
+    final TextEditingController qty =
+        TextEditingController(text: '${physical.qtyPicked}');
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (BuildContext ctx) {
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    physical.productName,
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${physical.locationCode} · ${physical.qtyPicked}/${physical.qtyRequired}',
+                    style: TextStyle(
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: qty,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: StringLookup.t(loc, 'qtyShort'),
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: () async {
+                      final int q = int.tryParse(qty.text.trim()) ?? -1;
+                      if (q != physical.qtyPicked) {
+                        ScaffoldMessenger.of(hostContext).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              '${StringLookup.t(loc, 'qtyMismatch')}: ${physical.productName}',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+                      final Set<String> ids = doc.lines
+                          .where((PickingLine l) => _sameProductGroup(l, physical))
+                          .map((PickingLine l) => l.id)
+                          .toSet();
+                      setState(() {
+                        _verifiedLineIds = {..._verifiedLineIds, ...ids};
+                      });
+                      await _saveVerified();
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                      }
+                    },
+                    child: Text(StringLookup.t(loc, 'confirmButton')),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: Text(StringLookup.t(loc, 'cancel')),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    } finally {
+      qty.dispose();
+    }
   }
 
   Future<void> _submitTopScan() async {
@@ -480,6 +656,23 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                       const SizedBox(height: 8),
                       Text('${StringLookup.t(loc, 'incompleteReasonLabel')} ${stock.skipReason}'),
                     ],
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                        context.pushNamed(
+                          'scanner',
+                          extra: ScannerArgs(
+                            returnToPick: true,
+                            taskId: widget.taskId,
+                            lineId: stock.id,
+                            profileType: profile,
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.qr_code_scanner_rounded),
+                      label: Text(StringLookup.t(loc, 'scanButton')),
+                    ),
                     const SizedBox(height: 16),
                     if (profile == PickerProfileParam.controller) ...<Widget>[
                       TextField(

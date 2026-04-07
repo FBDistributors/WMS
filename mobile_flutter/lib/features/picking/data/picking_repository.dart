@@ -216,26 +216,59 @@ class PickingRepository {
     }
   }
 
+  bool _barcodeMatchesLineStrict(String raw, PickingLine line) {
+    final String q = raw.trim().toLowerCase();
+    if (q.isEmpty) {
+      return false;
+    }
+    if (line.barcode != null && line.barcode!.toLowerCase() == q) {
+      return true;
+    }
+    if (line.sku != null && line.sku!.toLowerCase() == q) {
+      return true;
+    }
+    return false;
+  }
+
   Future<PickLineResponse> submitScan(
     String taskId, {
     required String barcode,
     int qty = 1,
+    String? lineId,
   }) async {
     final PickingDocument doc = await getTaskById(taskId);
     final String q = barcode.trim().toLowerCase();
     PickingLine? line;
-    for (final PickingLine l in doc.lines) {
-      final bool byBarcode =
-          l.barcode != null && l.barcode!.toLowerCase() == q;
-      final bool bySku = l.sku != null && l.sku!.toLowerCase() == q;
-      final bool byName = l.productName.toLowerCase().contains(q);
-      if (byBarcode || bySku || byName) {
-        line = l;
-        break;
+
+    if (lineId != null && lineId.isNotEmpty) {
+      for (final PickingLine l in doc.lines) {
+        if (l.id == lineId) {
+          line = l;
+          break;
+        }
       }
-    }
-    if (line == null) {
-      throw Exception('"$barcode" bo\'yicha pozitsiya topilmadi');
+      if (line == null) {
+        throw Exception('Qator topilmadi');
+      }
+      if (!_barcodeMatchesLineStrict(barcode, line)) {
+        throw Exception(
+          '"$barcode" ushbu pozitsiya uchun mos emas (${line.barcode ?? line.sku ?? "—"})',
+        );
+      }
+    } else {
+      for (final PickingLine l in doc.lines) {
+        final bool byBarcode =
+            l.barcode != null && l.barcode!.toLowerCase() == q;
+        final bool bySku = l.sku != null && l.sku!.toLowerCase() == q;
+        final bool byName = l.productName.toLowerCase().contains(q);
+        if (byBarcode || bySku || byName) {
+          line = l;
+          break;
+        }
+      }
+      if (line == null) {
+        throw Exception('"$barcode" bo\'yicha pozitsiya topilmadi');
+      }
     }
     final int count = qty < 1 ? 1 : qty;
     if (line.qtyPicked + count > line.qtyRequired) {

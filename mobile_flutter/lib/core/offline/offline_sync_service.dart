@@ -22,7 +22,13 @@ class OfflineSyncService {
           case 'PICK_SCAN':
             final String taskId = payload['taskId']! as String;
             final String barcode = payload['barcode']! as String;
-            await _picking.submitScan(taskId, barcode: barcode, qty: 1);
+            final String? lineId = payload['lineId'] as String?;
+            await _picking.submitScan(
+              taskId,
+              barcode: barcode,
+              qty: 1,
+              lineId: lineId,
+            );
             break;
           case 'PICK_SET_QTY':
           case 'PICK_CONFIRM_ITEM':
