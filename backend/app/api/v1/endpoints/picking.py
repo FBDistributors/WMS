@@ -314,6 +314,7 @@ def _balance_rows_by_product(
 
 
 def _line_alternate_locations(
+    db: Session,
     line: DocumentLineModel,
     rows: list[dict],
     *,
@@ -341,19 +342,39 @@ def _line_alternate_locations(
                 is_primary=is_pri,
             )
         )
-    if lid and lot_line and not any(x.is_primary for x in out):
-        out.insert(
-            0,
-            PickingAlternateLocation(
-                location_id=lid,
-                location_code=line.location_code or "",
-                lot_id=lot_line,
-                available_qty=0.0,
-                batch=line.batch,
-                expiry_date=_safe_expiry_date(getattr(line, "expiry_date", None)),
-                is_primary=True,
-            ),
-        )
+    # Asosiy joy+lott — ombor filtri tufayli `rows`da bo‘lmasa ham, joriy lokatsiya bo‘yicha aniq balans.
+    if lid and lot_line and line.product_id:
+        loc_balances = _get_lot_level_balances(db, [line.product_id], location_id=lid)
+        pr = next((r for r in loc_balances if r["lot_id"] == lot_line), None)
+        if pr is not None:
+            out = [x for x in out if not (x.location_id == lid and x.lot_id == lot_line)]
+            out.insert(
+                0,
+                PickingAlternateLocation(
+                    location_id=lid,
+                    location_code=line.location_code or pr.get("location_code") or "",
+                    lot_id=lot_line,
+                    available_qty=float(pr["available"] or 0),
+                    batch=pr.get("batch") or line.batch,
+                    expiry_date=_safe_expiry_date(
+                        pr.get("expiry_date") or getattr(line, "expiry_date", None)
+                    ),
+                    is_primary=True,
+                ),
+            )
+        elif not any(x.is_primary for x in out):
+            out.insert(
+                0,
+                PickingAlternateLocation(
+                    location_id=lid,
+                    location_code=line.location_code or "",
+                    lot_id=lot_line,
+                    available_qty=0.0,
+                    batch=line.batch,
+                    expiry_date=_safe_expiry_date(getattr(line, "expiry_date", None)),
+                    is_primary=True,
+                ),
+            )
     return out[:max_rows]
 
 
@@ -392,7 +413,7 @@ def _picking_lines_with_alternates(
     return [
         _to_picking_line(
             ln,
-            alternate_locations=_line_alternate_locations(ln, by_pid.get(ln.product_id, [])),
+            alternate_locations=_line_alternate_locations(db, ln, by_pid.get(ln.product_id, [])),
         )
         for ln in lines
     ]

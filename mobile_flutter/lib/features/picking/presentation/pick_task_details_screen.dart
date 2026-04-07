@@ -29,18 +29,20 @@ class _LineGroup {
 List<_LineGroup> _groupLinesByProduct(List<PickingLine> lines) {
   final Map<String, List<PickingLine>> map = <String, List<PickingLine>>{};
   for (final PickingLine l in lines) {
-    final String key = '${l.productName}|${l.barcode ?? l.sku ?? ''}';
+    final String key = (l.productId != null && l.productId!.isNotEmpty)
+        ? 'id:${l.productId}'
+        : '${l.productName}|${l.barcode ?? l.sku ?? ''}';
     map.putIfAbsent(key, () => <PickingLine>[]).add(l);
   }
   return map.values.map((List<PickingLine> groupLines) {
     final PickingLine first = groupLines.first;
-    final int required = groupLines.fold<int>(
+    final double required = groupLines.fold<double>(
       0,
-      (int s, PickingLine l) => s + l.qtyRequired,
+      (double s, PickingLine l) => s + l.qtyRequired,
     );
-    final int picked = groupLines.fold<int>(
+    final double picked = groupLines.fold<double>(
       0,
-      (int s, PickingLine l) => s + l.qtyPicked,
+      (double s, PickingLine l) => s + l.qtyPicked,
     );
     final PickingLine virtual = PickingLine(
       id: first.id,
@@ -83,19 +85,19 @@ PickingLine? _findLineByScan(List<PickingLine> lines, String raw) {
   return null;
 }
 
-bool _sameProductGroup(PickingLine a, PickingLine b) {
-  if (a.productName != b.productName) {
+/// RN `handleLineQtySubmit` bilan bir xil: `product_name` va
+/// `(l.barcode === anchor.barcode || l.sku === anchor.sku)`.
+bool _controllerVerifySameGroup(PickingLine l, PickingLine anchor) {
+  if (l.productName != anchor.productName) {
     return false;
   }
-  if (a.barcode != null &&
-      b.barcode != null &&
-      a.barcode == b.barcode) {
-    return true;
-  }
-  if (a.sku != null && b.sku != null && a.sku == b.sku) {
-    return true;
-  }
-  return false;
+  return l.barcode == anchor.barcode || l.sku == anchor.sku;
+}
+
+/// RN `Math.floor(Number(qtyInput))` bilan `qty_picked` solishtirish.
+bool _controllerQtyMismatch(String qtyRaw, num qtyPicked) {
+  final int entered = (double.tryParse(qtyRaw.trim()) ?? 0).floor();
+  return entered != qtyPicked;
 }
 
 class PickTaskDetailsScreen extends ConsumerStatefulWidget {
@@ -188,10 +190,12 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
             lineId != null &&
             lineId.isNotEmpty) {
           await _submitPickerLineScan(sb, lineId);
-        } else if (profile == PickerProfileParam.controller &&
-            lineId != null &&
-            lineId.isNotEmpty) {
-          await _handleControllerRouteScan(sb, lineId);
+        } else if (profile == PickerProfileParam.controller) {
+          if (lineId != null && lineId.isNotEmpty) {
+            await _handleControllerRouteScan(sb, lineId);
+          } else {
+            await _handleControllerBarcodeOnlyScan(sb);
+          }
         } else {
           _topScan.text = sb;
           await _submitTopScan();
@@ -215,6 +219,23 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       return doc;
     }
     return ref.read(pickingRepositoryProvider).getTaskById(widget.taskId);
+  }
+
+  /// Skaner `lineId`siz qaytganida (RN `useFocusEffect` kontroller branch).
+  Future<void> _handleControllerBarcodeOnlyScan(String barcode) async {
+    final PickingDocument doc = await _loadRouteScanDocument();
+    if (!mounted) {
+      return;
+    }
+    final AppLocale loc = ref.read(appLocaleProvider);
+    final PickingLine? line = _findLineByScan(doc.lines, barcode);
+    if (line == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(StringLookup.t(loc, 'productNotInOrder'))),
+      );
+      return;
+    }
+    await _presentControllerVerifySheet(doc, line);
   }
 
   Future<void> _handleControllerRouteScan(String barcode, String lineId) async {
@@ -293,7 +314,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     final AppLocale loc = ref.read(appLocaleProvider);
     final BuildContext hostContext = context;
     final TextEditingController qty =
-        TextEditingController(text: '${physical.qtyPicked}');
+        TextEditingController(text: formatPickQty(physical.qtyPicked));
     try {
       await showModalBottomSheet<void>(
         context: context,
@@ -313,7 +334,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${physical.locationCode} · ${physical.qtyPicked}/${physical.qtyRequired}',
+                    '${physical.locationCode} · ${formatPickQty(physical.qtyPicked)}/${formatPickQty(physical.qtyRequired)}',
                     style: TextStyle(
                       color: Theme.of(ctx).colorScheme.onSurfaceVariant,
                     ),
@@ -330,8 +351,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                   const SizedBox(height: 16),
                   FilledButton(
                     onPressed: () async {
-                      final int q = int.tryParse(qty.text.trim()) ?? -1;
-                      if (q != physical.qtyPicked) {
+                      if (_controllerQtyMismatch(qty.text, physical.qtyPicked)) {
                         ScaffoldMessenger.of(hostContext).showSnackBar(
                           SnackBar(
                             content: Text(
@@ -342,7 +362,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                         return;
                       }
                       final Set<String> ids = doc.lines
-                          .where((PickingLine l) => _sameProductGroup(l, physical))
+                          .where((PickingLine l) => _controllerVerifySameGroup(l, physical))
                           .map((PickingLine l) => l.id)
                           .toSet();
                       setState(() {
@@ -662,7 +682,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${stock.locationCode} · ${group.virtual.qtyPicked}/${group.virtual.qtyRequired}',
+                      '${stock.locationCode} · ${formatPickQty(group.virtual.qtyPicked)}/${formatPickQty(group.virtual.qtyRequired)}',
                       style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                     ),
                     if (stock.skipReason != null && stock.skipReason!.isNotEmpty) ...<Widget>[
@@ -703,7 +723,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                             );
                             return;
                           }
-                          if (!_sameProductGroup(match, stock)) {
+                          if (!_controllerVerifySameGroup(match, stock)) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text(StringLookup.t(loc, 'wrongBarcodeTitle'))),
                             );
@@ -711,7 +731,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                           }
                           setM(() {
                             scannedForQty = t;
-                            qty.text = '${match.qtyPicked}';
+                            qty.text = formatPickQty(match.qtyPicked);
                           });
                         },
                       ),
@@ -733,8 +753,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                             if (physical == null) {
                               return;
                             }
-                            final int q = int.tryParse(qty.text.trim()) ?? -1;
-                            if (q != physical.qtyPicked) {
+                            if (_controllerQtyMismatch(qty.text, physical.qtyPicked)) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
@@ -745,7 +764,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                               return;
                             }
                             final Set<String> ids = doc.lines
-                                .where((PickingLine l) => _sameProductGroup(l, physical))
+                                .where((PickingLine l) => _controllerVerifySameGroup(l, physical))
                                 .map((PickingLine l) => l.id)
                                 .toSet();
                             setState(() {
@@ -770,8 +789,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                           if (_barcodeMatchesLine(v, stock)) {
                             setM(() {
                               scannedForQty = v.trim();
-                              final int rem = stock.qtyRequired - stock.qtyPicked;
-                              qty.text = rem >= 1 ? '$rem' : '0';
+                              final double rem = stock.qtyRequired - stock.qtyPicked;
+                              qty.text = rem >= 1 ? formatPickQty(rem) : '0';
                             });
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -803,7 +822,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                               ? null
                               : () async {
                             final int delta = int.tryParse(qty.text.trim()) ?? 0;
-                            final int rem = stock.qtyRequired - stock.qtyPicked;
+                              final double rem = stock.qtyRequired - stock.qtyPicked;
                             if (delta < 1 || delta > rem) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
@@ -811,7 +830,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                     StringLookup.tParams(
                                       loc,
                                       'qtyRangeError',
-                                      <String, String>{'max': '$rem'},
+                                      <String, String>{'max': formatPickQty(rem)},
                                     ),
                                   ),
                                 ),
@@ -1069,7 +1088,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                           visualDensity: VisualDensity.compact,
                         ),
                         Text(
-                          '${StringLookup.t(loc, 'picked')}: ${d.progress.picked} / ${d.progress.required}',
+                          '${StringLookup.t(loc, 'picked')}: ${formatPickQty(d.progress.picked)} / ${formatPickQty(d.progress.required)}',
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
@@ -1102,30 +1121,31 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                   ],
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: TextField(
-                        controller: _topScan,
-                        decoration: InputDecoration(
-                          labelText: StringLookup.t(loc, 'barcodeOrSku'),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          filled: true,
+              if (profile != PickerProfileParam.controller)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: TextField(
+                          controller: _topScan,
+                          decoration: InputDecoration(
+                            labelText: StringLookup.t(loc, 'barcodeOrSku'),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            filled: true,
+                          ),
+                          onSubmitted: (_) => _submitTopScan(),
                         ),
-                        onSubmitted: (_) => _submitTopScan(),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton(
-                      onPressed: _busy ? null : _submitTopScan,
-                      child: Text(StringLookup.t(loc, 'submit')),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: _busy ? null : _submitTopScan,
+                        child: Text(StringLookup.t(loc, 'submit')),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
+              if (profile != PickerProfileParam.controller) const SizedBox(height: 8),
               Expanded(
                 child: ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
@@ -1167,7 +1187,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      '${g.members.first.locationCode} · ${g.virtual.qtyPicked}/${g.virtual.qtyRequired}',
+                                      '${g.members.first.locationCode} · ${formatPickQty(g.virtual.qtyPicked)}/${formatPickQty(g.virtual.qtyRequired)}',
                                       style: TextStyle(
                                         fontSize: 13,
                                         color: cs.onSurfaceVariant,

@@ -132,7 +132,8 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
     final TextEditingController qty = TextEditingController();
     String? scannedForQty = verifiedBarcode;
     if (scannedForQty != null) {
-      qty.text = '${max(1, product.totalRequired - product.totalPicked)}';
+      final double rem = product.totalRequired - product.totalPicked;
+      qty.text = '${max(1, rem.floor())}';
     }
 
     await showModalBottomSheet<void>(
@@ -246,8 +247,8 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                           }
                           setM(() {
                             scannedForQty = t;
-                            qty.text =
-                                '${max(1, product.totalRequired - product.totalPicked)}';
+                            final double rem = product.totalRequired - product.totalPicked;
+                            qty.text = '${max(1, rem.floor())}';
                           });
                         },
                       ),
@@ -271,8 +272,8 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                             }
                             setM(() {
                               scannedForQty = t;
-                              qty.text =
-                                  '${max(1, product.totalRequired - product.totalPicked)}';
+                              final double rem = product.totalRequired - product.totalPicked;
+                              qty.text = '${max(1, rem.floor())}';
                             });
                           },
                         child: Text(StringLookup.t(loc, 'submit')),
@@ -283,7 +284,9 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                           loc,
                           'quantityRemainingLine',
                           <String, String>{
-                            'n': '${product.totalRequired - product.totalPicked}',
+                            'n': formatPickQty(
+                              product.totalRequired - product.totalPicked,
+                            ),
                           },
                         ),
                         style: TextStyle(
@@ -309,15 +312,16 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                             ? null
                             : () async {
                             final int q = int.tryParse(qty.text.trim()) ?? 0;
-                            final int rem = product.totalRequired - product.totalPicked;
-                            if (q < 1 || q > rem) {
+                            final double rem = product.totalRequired - product.totalPicked;
+                            final int maxPick = max(0, rem.floor());
+                            if (q < 1 || q > maxPick) {
                               ScaffoldMessenger.of(host).showSnackBar(
                                 SnackBar(
                                   content: Text(
                                     StringLookup.tParams(
                                       loc,
                                       'qtyRangeError',
-                                      <String, String>{'max': '$rem'},
+                                      <String, String>{'max': '$maxPick'},
                                     ),
                                   ),
                                 ),
@@ -401,8 +405,8 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
           separatorBuilder: (_, __) => const SizedBox(height: 8),
           itemBuilder: (BuildContext context, int i) {
             final ConsolidatedProduct p = v.products[i];
-            final int req = p.totalRequired;
-            final int done = p.totalPicked;
+            final double req = p.totalRequired;
+            final double done = p.totalPicked;
             final double ratio = req > 0 ? (done / req).clamp(0.0, 1.0) : 0.0;
             final String code = p.barcode ?? p.sku ?? '—';
             return Material(
@@ -448,7 +452,7 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                           ),
                           const SizedBox(width: 10),
                           Text(
-                            '$done / $req',
+                            '${formatPickQty(done)} / ${formatPickQty(req)}',
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               color: cs.primary,

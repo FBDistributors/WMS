@@ -237,9 +237,14 @@ class _PickerWorkScreenState extends ConsumerState<PickerWorkScreen> {
             )
             .toList();
 
-    final int picked = _lines.fold(0, (int s, PickingLine l) => s + l.qtyPicked);
-    final int required =
-        _lines.fold(0, (int s, PickingLine l) => s + l.qtyRequired);
+    final double picked = _lines.fold<double>(
+      0,
+      (double s, PickingLine l) => s + l.qtyPicked,
+    );
+    final double required = _lines.fold<double>(
+      0,
+      (double s, PickingLine l) => s + l.qtyRequired,
+    );
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF5F5F5),
@@ -256,7 +261,7 @@ class _PickerWorkScreenState extends ConsumerState<PickerWorkScreen> {
           Padding(
             padding: const EdgeInsets.all(12),
             child: Text(
-              '$picked / $required · ${d?.status ?? ''}',
+              '${formatPickQty(picked)} / ${formatPickQty(required)} · ${d?.status ?? ''}',
               style: Theme.of(context).textTheme.titleMedium,
             ),
           ),
@@ -308,7 +313,9 @@ class _PickerWorkScreenState extends ConsumerState<PickerWorkScreen> {
                       children: <Widget>[
                         Text(line.productName,
                             style: const TextStyle(fontWeight: FontWeight.w600)),
-                        Text('${line.locationCode} · ${line.qtyPicked}/${line.qtyRequired}'),
+                        Text(
+                          '${line.locationCode} · ${formatPickQty(line.qtyPicked)}/${formatPickQty(line.qtyRequired)}',
+                        ),
                         Row(
                           children: <Widget>[
                             IconButton(

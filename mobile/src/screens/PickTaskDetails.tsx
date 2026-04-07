@@ -15,7 +15,7 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../types/navigation';
 import type { PickingDocument, PickingLine } from '../api/picking.types';
 import apiClient, { UNAUTHORIZED_MSG } from '../api/client';
-import { changePickSource, completePickDocument, getTaskById, INCOMPLETE_REASON_KEYS, pickLine, skipLine, submitScan } from '../api/picking';
+import { changePickSource, completePickDocument, getTaskById, INCOMPLETE_REASON_KEYS, pickLine, skipLine } from '../api/picking';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { ScanInput } from '../components/ScanInput';
 import { useLocale } from '../i18n/LocaleContext';
@@ -74,7 +74,9 @@ function normalizeDocument(raw: PickingDocument | null): PickingDocument | null 
 function groupLinesByProduct(lines: PickingLine[]): { virtualLine: PickingLine; groupLines: PickingLine[] }[] {
   const map = new Map<string, PickingLine[]>();
   for (const l of lines) {
-    const key = (l.product_name ?? '') + '|' + (l.barcode ?? l.sku ?? '');
+    const key = l.product_id?.trim()
+      ? `id:${l.product_id}`
+      : (l.product_name ?? '') + '|' + (l.barcode ?? l.sku ?? '');
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(l);
   }

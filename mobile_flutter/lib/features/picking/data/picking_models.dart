@@ -55,8 +55,8 @@ class PickingLine {
   final String locationCode;
   final String? batch;
   final String? expiryDate;
-  final int qtyRequired;
-  final int qtyPicked;
+  final double qtyRequired;
+  final double qtyPicked;
   final String? skipReason;
   final String? productId;
   final List<PickingAlternateLocation> alternateLocations;
@@ -79,8 +79,8 @@ class PickingLine {
       locationCode: json['location_code']! as String,
       batch: json['batch'] as String?,
       expiryDate: json['expiry_date'] as String?,
-      qtyRequired: _int(json['qty_required']),
-      qtyPicked: _int(json['qty_picked']),
+      qtyRequired: _num(json['qty_required']),
+      qtyPicked: _num(json['qty_picked']),
       skipReason: json['skip_reason'] as String?,
       productId: json['product_id'] as String?,
       alternateLocations: list,
@@ -91,13 +91,13 @@ class PickingLine {
 class PickingProgress {
   const PickingProgress({required this.picked, required this.required});
 
-  final int picked;
-  final int required;
+  final double picked;
+  final double required;
 
   factory PickingProgress.fromJson(Map<String, Object?> json) {
     return PickingProgress(
-      picked: _int(json['picked']),
-      required: _int(json['required']),
+      picked: _num(json['picked']),
+      required: _num(json['required']),
     );
   }
 }
@@ -142,7 +142,7 @@ class PickingDocument {
       lines: lines,
       progress: prog is Map
           ? PickingProgress.fromJson(Map<String, Object?>.from(prog))
-          : const PickingProgress(picked: 0, required: 0),
+          : const PickingProgress(picked: 0.0, required: 0.0),
       incompleteReason: json['incomplete_reason'] as String?,
       assignedToUserId: json['assigned_to_user_id'] as String?,
       assignedToUserName: json['assigned_to_user_name'] as String?,
@@ -215,7 +215,7 @@ class PickLineResponse {
           : throw const FormatException('line'),
       progress: prog is Map
           ? PickingProgress.fromJson(Map<String, Object?>.from(prog))
-          : const PickingProgress(picked: 0, required: 0),
+          : const PickingProgress(picked: 0.0, required: 0.0),
       documentStatus: json['document_status']! as String,
     );
   }
@@ -236,8 +236,8 @@ class ConsolidatedLineItem {
   final String documentId;
   final String lineId;
   final String referenceNumber;
-  final int qtyRequired;
-  final int qtyPicked;
+  final double qtyRequired;
+  final double qtyPicked;
   final String locationCode;
   final int? pickSequence;
   final String? expiryDate;
@@ -247,8 +247,8 @@ class ConsolidatedLineItem {
       documentId: json['document_id']! as String,
       lineId: json['line_id']! as String,
       referenceNumber: json['reference_number']! as String,
-      qtyRequired: _int(json['qty_required']),
-      qtyPicked: _int(json['qty_picked']),
+      qtyRequired: _num(json['qty_required']),
+      qtyPicked: _num(json['qty_picked']),
       locationCode: json['location_code']! as String,
       pickSequence: (json['pick_sequence'] as num?)?.toInt(),
       expiryDate: json['expiry_date'] as String?,
@@ -273,8 +273,8 @@ class ConsolidatedProduct {
   final String? sku;
   final String productName;
   final String? productId;
-  final int totalRequired;
-  final int totalPicked;
+  final double totalRequired;
+  final double totalPicked;
   final String? expiryDate;
   final List<PickingAlternateLocation> alternateLocations;
   final List<ConsolidatedLineItem> lines;
@@ -302,8 +302,8 @@ class ConsolidatedProduct {
       sku: json['sku'] as String?,
       productName: json['product_name']! as String,
       productId: json['product_id'] as String?,
-      totalRequired: _int(json['total_required']),
-      totalPicked: _int(json['total_picked']),
+      totalRequired: _num(json['total_required']),
+      totalPicked: _num(json['total_picked']),
       expiryDate: json['expiry_date'] as String?,
       alternateLocations: al,
       lines: lines,
@@ -474,6 +474,19 @@ double _num(Object? v) {
     return double.tryParse(v) ?? 0;
   }
   return 0;
+}
+
+/// Ro‘yxat/kartochkada miqdorni ko‘rsatish (butun yoki qisqa kasr).
+String formatPickQty(num v) {
+  final double d = v.toDouble();
+  if (d.isNaN || d.isInfinite) {
+    return '0';
+  }
+  if (d == d.roundToDouble()) {
+    return '${d.round()}';
+  }
+  final String s = d.toStringAsFixed(4);
+  return s.replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '');
 }
 
 int _int(Object? v) {
