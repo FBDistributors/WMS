@@ -1,28 +1,237 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/network/app_dio.dart';
+import '../../core/app_state/network_status_provider.dart';
+import '../../core/offline/offline_database.dart';
+import '../../core/offline/offline_providers.dart';
+import '../../core/storage/shared_preferences_provider.dart';
 import 'data/picking_models.dart';
-import 'data/picking_repository.dart';
+import 'picking_repository_provider.dart';
 
-final pickingRepositoryProvider = Provider<PickingRepository>((Ref ref) {
-  return PickingRepository(ref.watch(appDioProvider));
-});
+export 'picking_repository_provider.dart';
 
-final openPickTasksProvider = FutureProvider.autoDispose<List<PickingListItem>>(
-  (Ref ref) => ref.watch(pickingRepositoryProvider).getOpenTasks(),
+class OpenPickTasksNotifier extends AutoDisposeAsyncNotifier<List<PickingListItem>> {
+  Future<List<PickingListItem>> _loadCache(OfflineDatabase? db) async {
+    if (db == null) {
+      return const <PickingListItem>[];
+    }
+    final List<Map<String, Object?>> rows = await db.getCachedPickTasks();
+    return rows
+        .map((Map<String, Object?> m) => PickingListItem.fromJson(m))
+        .toList(growable: false);
+  }
+
+  Future<void> _fetchToCacheBackground() async {
+    try {
+      final List<PickingListItem> list =
+          await ref.read(pickingRepositoryProvider).getOpenTasks();
+      final OfflineDatabase? db = await ref.read(offlineDatabaseProvider.future);
+      await db?.saveCachedPickTasks(
+        list.map((PickingListItem e) => e.toJson()).toList(growable: false),
+      );
+      state = AsyncData<List<PickingListItem>>(list);
+    } on Object catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('OpenPickTasksNotifier background sync: $e\n$st');
+      }
+    }
+  }
+
+  @override
+  Future<List<PickingListItem>> build() async {
+    final bool online = ref.watch(networkOnlineProvider).valueOrNull ?? true;
+    final OfflineDatabase? db = await ref.watch(offlineDatabaseProvider.future);
+    final List<PickingListItem> cached = await _loadCache(db);
+
+    if (!online) {
+      return cached;
+    }
+
+    if (cached.isEmpty) {
+      final List<PickingListItem> list =
+          await ref.read(pickingRepositoryProvider).getOpenTasks();
+      await db?.saveCachedPickTasks(
+        list.map((PickingListItem e) => e.toJson()).toList(growable: false),
+      );
+      return list;
+    }
+
+    unawaited(_fetchToCacheBackground());
+    return cached;
+  }
+
+  Future<void> refreshFromNetwork() async {
+    final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
+    final OfflineDatabase? db = await ref.read(offlineDatabaseProvider.future);
+    if (!online) {
+      state = AsyncData<List<PickingListItem>>(await _loadCache(db));
+      return;
+    }
+    state = await AsyncValue.guard(() async {
+      final List<PickingListItem> list =
+          await ref.read(pickingRepositoryProvider).getOpenTasks();
+      await db?.saveCachedPickTasks(
+        list.map((PickingListItem e) => e.toJson()).toList(growable: false),
+      );
+      return list;
+    });
+  }
+}
+
+final openPickTasksProvider =
+    AsyncNotifierProvider.autoDispose<OpenPickTasksNotifier, List<PickingListItem>>(
+  OpenPickTasksNotifier.new,
+);
+
+class PickTaskDetailNotifier extends AutoDisposeFamilyAsyncNotifier<PickingDocument, String> {
+  Future<void> _silentFetch(String taskId) async {
+    try {
+      final PickingDocument d =
+          await ref.read(pickingRepositoryProvider).getTaskById(taskId);
+      final OfflineDatabase? db = await ref.read(offlineDatabaseProvider.future);
+      await db?.saveCachedPickTaskDetail(taskId, d.toJson());
+      state = AsyncData<PickingDocument>(d);
+    } on Object catch (e) {
+      if (kDebugMode) {
+        debugPrint('PickTaskDetailNotifier silent fetch: $e');
+      }
+    }
+  }
+
+  @override
+  Future<PickingDocument> build(String taskId) async {
+    final bool online = ref.watch(networkOnlineProvider).valueOrNull ?? true;
+    final OfflineDatabase? db = await ref.watch(offlineDatabaseProvider.future);
+    if (db != null) {
+      final Map<String, Object?>? raw = await db.getCachedPickTaskDetail(taskId);
+      if (raw != null && raw.isNotEmpty) {
+        final PickingDocument doc = PickingDocument.fromJson(raw);
+        if (online) {
+          unawaited(_silentFetch(taskId));
+        }
+        return doc;
+      }
+    }
+    if (!online) {
+      throw Exception('Oflayn: vazifa keshda yo‘q');
+    }
+    final PickingDocument d =
+        await ref.read(pickingRepositoryProvider).getTaskById(taskId);
+    await db?.saveCachedPickTaskDetail(taskId, d.toJson());
+    return d;
+  }
+
+  Future<void> applyPickLineResponse(String taskId, PickLineResponse res) async {
+    final PickingDocument? cur = state.valueOrNull;
+    if (cur == null) {
+      return;
+    }
+    final PickingDocument next = cur.applyPickLineResponse(res);
+    final OfflineDatabase? db = await ref.read(offlineDatabaseProvider.future);
+    await db?.saveCachedPickTaskDetail(taskId, next.toJson());
+    state = AsyncData<PickingDocument>(next);
+  }
+}
+
+final pickTaskDetailProvider = AsyncNotifierProvider.autoDispose
+    .family<PickTaskDetailNotifier, PickingDocument, String>(
+  PickTaskDetailNotifier.new,
+);
+
+class ConsolidatedViewNotifier extends AutoDisposeAsyncNotifier<ConsolidatedViewResponse> {
+  static const String _prefsKey = 'cached_consolidated_view_v1';
+
+  Future<ConsolidatedViewResponse?> _readPrefs() async {
+    try {
+      final String? raw = ref.read(sharedPreferencesProvider).getString(_prefsKey);
+      if (raw == null || raw.isEmpty) {
+        return null;
+      }
+      final Object? dec = jsonDecode(raw);
+      if (dec is! Map) {
+        return null;
+      }
+      return ConsolidatedViewResponse.fromJson(
+        Map<String, Object?>.from(dec),
+      );
+    } on Object {
+      return null;
+    }
+  }
+
+  Future<void> _writePrefs(ConsolidatedViewResponse v) async {
+    await ref
+        .read(sharedPreferencesProvider)
+        .setString(_prefsKey, jsonEncode(v.toJson()));
+  }
+
+  Future<void> _fetchBackground() async {
+    try {
+      final ConsolidatedViewResponse v =
+          await ref.read(pickingRepositoryProvider).getConsolidatedView();
+      await _writePrefs(v);
+      state = AsyncData<ConsolidatedViewResponse>(v);
+    } on Object catch (e) {
+      if (kDebugMode) {
+        debugPrint('ConsolidatedViewNotifier background: $e');
+      }
+    }
+  }
+
+  @override
+  Future<ConsolidatedViewResponse> build() async {
+    final bool online = ref.watch(networkOnlineProvider).valueOrNull ?? true;
+    final ConsolidatedViewResponse? cached = await _readPrefs();
+
+    if (!online) {
+      return cached ??
+          const ConsolidatedViewResponse(
+            documents: <ConsolidatedDocumentSummary>[],
+            products: <ConsolidatedProduct>[],
+          );
+    }
+
+    if (cached != null) {
+      unawaited(_fetchBackground());
+      return cached;
+    }
+
+    final ConsolidatedViewResponse v =
+        await ref.read(pickingRepositoryProvider).getConsolidatedView();
+    await _writePrefs(v);
+    return v;
+  }
+
+  Future<void> refreshFromNetwork() async {
+    final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
+    if (!online) {
+      final ConsolidatedViewResponse? cached = await _readPrefs();
+      state = AsyncData<ConsolidatedViewResponse>(
+        cached ??
+            const ConsolidatedViewResponse(
+              documents: <ConsolidatedDocumentSummary>[],
+              products: <ConsolidatedProduct>[],
+            ),
+      );
+      return;
+    }
+    state = await AsyncValue.guard(() async {
+      final ConsolidatedViewResponse v =
+          await ref.read(pickingRepositoryProvider).getConsolidatedView();
+      await _writePrefs(v);
+      return v;
+    });
+  }
+}
+
+final consolidatedViewProvider =
+    AsyncNotifierProvider.autoDispose<ConsolidatedViewNotifier, ConsolidatedViewResponse>(
+  ConsolidatedViewNotifier.new,
 );
 
 final pickerStatsProvider = FutureProvider.autoDispose<MyPickerStats>(
   (Ref ref) => ref.watch(pickingRepositoryProvider).getMyPickerStats(),
-);
-
-final pickTaskDetailProvider =
-    FutureProvider.autoDispose.family<PickingDocument, String>(
-  (Ref ref, String taskId) =>
-      ref.watch(pickingRepositoryProvider).getTaskById(taskId),
-);
-
-final consolidatedViewProvider =
-    FutureProvider.autoDispose<ConsolidatedViewResponse>(
-  (Ref ref) => ref.watch(pickingRepositoryProvider).getConsolidatedView(),
 );

@@ -30,6 +30,16 @@ class PickingAlternateLocation {
       isPrimary: json['is_primary'] == true,
     );
   }
+
+  Map<String, Object?> toJson() => <String, Object?>{
+        'location_id': locationId,
+        'location_code': locationCode,
+        'lot_id': lotId,
+        'available_qty': availableQty,
+        'batch': batch,
+        'expiry_date': expiryDate,
+        'is_primary': isPrimary,
+      };
 }
 
 class PickingLine {
@@ -86,6 +96,22 @@ class PickingLine {
       alternateLocations: list,
     );
   }
+
+  Map<String, Object?> toJson() => <String, Object?>{
+        'id': id,
+        'product_name': productName,
+        'sku': sku,
+        'barcode': barcode,
+        'location_code': locationCode,
+        'batch': batch,
+        'expiry_date': expiryDate,
+        'qty_required': qtyRequired,
+        'qty_picked': qtyPicked,
+        'skip_reason': skipReason,
+        'product_id': productId,
+        'alternate_locations':
+            alternateLocations.map((PickingAlternateLocation a) => a.toJson()).toList(),
+      };
 }
 
 class PickingProgress {
@@ -100,6 +126,11 @@ class PickingProgress {
       required: _num(json['required']),
     );
   }
+
+  Map<String, Object?> toJson() => <String, Object?>{
+        'picked': picked,
+        'required': required,
+      };
 }
 
 class PickingDocument {
@@ -149,6 +180,35 @@ class PickingDocument {
       orderNumber: json['order_number'] as String?,
     );
   }
+
+  Map<String, Object?> toJson() => <String, Object?>{
+        'id': id,
+        'reference_number': referenceNumber,
+        'status': status,
+        'lines': lines.map((PickingLine l) => l.toJson()).toList(),
+        'progress': progress.toJson(),
+        'incomplete_reason': incompleteReason,
+        'assigned_to_user_id': assignedToUserId,
+        'assigned_to_user_name': assignedToUserName,
+        'order_number': orderNumber,
+      };
+
+  PickingDocument applyPickLineResponse(PickLineResponse res) {
+    final List<PickingLine> newLines = lines
+        .map((PickingLine l) => l.id == res.line.id ? res.line : l)
+        .toList(growable: false);
+    return PickingDocument(
+      id: id,
+      referenceNumber: referenceNumber,
+      status: res.documentStatus,
+      lines: newLines,
+      progress: res.progress,
+      incompleteReason: incompleteReason,
+      assignedToUserId: assignedToUserId,
+      assignedToUserName: assignedToUserName,
+      orderNumber: orderNumber,
+    );
+  }
 }
 
 class PickingListItem {
@@ -193,6 +253,20 @@ class PickingListItem {
       sentToControllerAt: json['sent_to_controller_at'] as String?,
     );
   }
+
+  Map<String, Object?> toJson() => <String, Object?>{
+        'id': id,
+        'reference_number': referenceNumber,
+        'status': status,
+        'lines_total': linesTotal,
+        'lines_done': linesDone,
+        'controlled_by_user_id': controlledByUserId,
+        'assigned_to_user_id': assignedToUserId,
+        'assigned_to_user_name': assignedToUserName,
+        'order_number': orderNumber,
+        'delivery_number': deliveryNumber,
+        'sent_to_controller_at': sentToControllerAt,
+      };
 }
 
 class PickLineResponse {
@@ -254,6 +328,17 @@ class ConsolidatedLineItem {
       expiryDate: json['expiry_date'] as String?,
     );
   }
+
+  Map<String, Object?> toJson() => <String, Object?>{
+        'document_id': documentId,
+        'line_id': lineId,
+        'reference_number': referenceNumber,
+        'qty_required': qtyRequired,
+        'qty_picked': qtyPicked,
+        'location_code': locationCode,
+        'pick_sequence': pickSequence,
+        'expiry_date': expiryDate,
+      };
 }
 
 class ConsolidatedProduct {
@@ -309,6 +394,19 @@ class ConsolidatedProduct {
       lines: lines,
     );
   }
+
+  Map<String, Object?> toJson() => <String, Object?>{
+        'barcode': barcode,
+        'sku': sku,
+        'product_name': productName,
+        'product_id': productId,
+        'total_required': totalRequired,
+        'total_picked': totalPicked,
+        'expiry_date': expiryDate,
+        'alternate_locations':
+            alternateLocations.map((PickingAlternateLocation a) => a.toJson()).toList(),
+        'lines': lines.map((ConsolidatedLineItem l) => l.toJson()).toList(),
+      };
 }
 
 class ConsolidatedDocumentSummary {
@@ -335,6 +433,14 @@ class ConsolidatedDocumentSummary {
       linesDone: _int(json['lines_done']),
     );
   }
+
+  Map<String, Object?> toJson() => <String, Object?>{
+        'id': id,
+        'reference_number': referenceNumber,
+        'status': status,
+        'lines_total': linesTotal,
+        'lines_done': linesDone,
+      };
 }
 
 class ConsolidatedViewResponse {
@@ -368,6 +474,12 @@ class ConsolidatedViewResponse {
           : const <ConsolidatedProduct>[],
     );
   }
+
+  Map<String, Object?> toJson() => <String, Object?>{
+        'documents':
+            documents.map((ConsolidatedDocumentSummary d) => d.toJson()).toList(),
+        'products': products.map((ConsolidatedProduct p) => p.toJson()).toList(),
+      };
 }
 
 /// React Native `consolidatedProductKey` bilan bir xil.

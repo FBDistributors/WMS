@@ -62,6 +62,17 @@ List<_LineGroup> _groupLinesByProduct(List<PickingLine> lines) {
   }).toList(growable: false);
 }
 
+/// Noyakuniy qatorlar yuqorida, to‘liq terilganlar pastda (nisbiy tartib saqlanadi).
+List<_LineGroup> _orderedLineGroups(List<_LineGroup> groups) {
+  final List<_LineGroup> incomplete = groups
+      .where((_LineGroup g) => g.virtual.qtyPicked < g.virtual.qtyRequired)
+      .toList();
+  final List<_LineGroup> complete = groups
+      .where((_LineGroup g) => g.virtual.qtyPicked >= g.virtual.qtyRequired)
+      .toList();
+  return <_LineGroup>[...incomplete, ...complete];
+}
+
 bool _barcodeMatchesLine(String raw, PickingLine line) {
   final String q = raw.trim().toLowerCase();
   if (q.isEmpty) {
@@ -403,12 +414,14 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     setState(() => _busy = true);
     try {
       if (online) {
-        await ref.read(pickingRepositoryProvider).submitScan(
+        final PickLineResponse res = await ref.read(pickingRepositoryProvider).submitScan(
               widget.taskId,
               barcode: code,
             );
         _topScan.clear();
-        ref.invalidate(pickTaskDetailProvider(widget.taskId));
+        await ref
+            .read(pickTaskDetailProvider(widget.taskId).notifier)
+            .applyPickLineResponse(widget.taskId, res);
       } else if (db != null) {
         await db.queueAdd(
           'q_${DateTime.now().millisecondsSinceEpoch}',
@@ -855,12 +868,15 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                             setM(() => sheetBusy = true);
                             try {
                               if (online) {
-                                await ref.read(pickingRepositoryProvider).pickLine(
+                                final PickLineResponse res =
+                                    await ref.read(pickingRepositoryProvider).pickLine(
                                       stock.id,
                                       delta,
                                       'scan-${widget.taskId}-${stock.id}-${DateTime.now().millisecondsSinceEpoch}',
                                     );
-                                ref.invalidate(pickTaskDetailProvider(widget.taskId));
+                                await ref
+                                    .read(pickTaskDetailProvider(widget.taskId).notifier)
+                                    .applyPickLineResponse(widget.taskId, res);
                               } else {
                                 final OfflineDatabase? db =
                                     await ref.read(offlineDatabaseProvider.future);
@@ -918,7 +934,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                             subtitle: Text('${a.availableQty}'),
                             onTap: () async {
                               try {
-                                await ref.read(pickingRepositoryProvider).changePickSource(
+                                final PickLineResponse res =
+                                    await ref.read(pickingRepositoryProvider).changePickSource(
                                       stock.id,
                                       locationId: a.locationId,
                                       lotId: a.lotId,
@@ -930,7 +947,9 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                     ),
                                   );
                                 }
-                                ref.invalidate(pickTaskDetailProvider(widget.taskId));
+                                await ref
+                                    .read(pickTaskDetailProvider(widget.taskId).notifier)
+                                    .applyPickLineResponse(widget.taskId, res);
                                 if (ctx.mounted) {
                                   Navigator.of(ctx).pop();
                                 }
@@ -990,8 +1009,11 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                     return;
                   }
                   try {
-                    await ref.read(pickingRepositoryProvider).skipLine(line.id, r);
-                    ref.invalidate(pickTaskDetailProvider(widget.taskId));
+                    final PickLineResponse res =
+                        await ref.read(pickingRepositoryProvider).skipLine(line.id, r);
+                    await ref
+                        .read(pickTaskDetailProvider(widget.taskId).notifier)
+                        .applyPickLineResponse(widget.taskId, res);
                     if (ctx.mounted) {
                       Navigator.of(ctx).pop();
                     }
@@ -1079,6 +1101,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
               : d.lines
                   .map((PickingLine l) => _LineGroup(virtual: l, members: <PickingLine>[l]))
                   .toList(growable: false);
+          final List<_LineGroup> orderedGroups = _orderedLineGroups(groups);
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1164,16 +1187,44 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
               Expanded(
                 child: ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-                  itemCount: groups.length,
+                  itemCount: orderedGroups.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (BuildContext context, int i) {
-                    final _LineGroup g = groups[i];
+                    final _LineGroup g = orderedGroups[i];
                     final bool groupVerified = profile == PickerProfileParam.controller
                         ? g.members.every((PickingLine l) => _verifiedLineIds.contains(l.id))
                         : false;
+                    final bool lineComplete =
+                        g.virtual.qtyPicked >= g.virtual.qtyRequired;
                     final ColorScheme cs = Theme.of(context).colorScheme;
+                    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+                    final Color cardBg = lineComplete
+                        ? Colors.green.withValues(alpha: isDark ? 0.20 : 0.14)
+                        : cs.surfaceContainerHighest.withValues(alpha: 0.35);
+                    final IconData leadingIcon;
+                    final Color iconColor;
+                    if (profile == PickerProfileParam.controller) {
+                      if (groupVerified) {
+                        leadingIcon = Icons.verified_rounded;
+                        iconColor = Colors.green.shade700;
+                      } else if (lineComplete) {
+                        leadingIcon = Icons.check_circle_rounded;
+                        iconColor = Colors.green.shade700;
+                      } else {
+                        leadingIcon = Icons.inventory_2_rounded;
+                        iconColor = cs.primary;
+                      }
+                    } else {
+                      if (lineComplete) {
+                        leadingIcon = Icons.check_circle_rounded;
+                        iconColor = Colors.green.shade700;
+                      } else {
+                        leadingIcon = Icons.inventory_2_rounded;
+                        iconColor = cs.primary;
+                      }
+                    }
                     return Material(
-                      color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+                      color: cardBg,
                       borderRadius: BorderRadius.circular(12),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(12),
@@ -1183,10 +1234,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                           child: Row(
                             children: <Widget>[
                               Icon(
-                                groupVerified
-                                    ? Icons.verified_rounded
-                                    : Icons.inventory_2_rounded,
-                                color: groupVerified ? Colors.green : cs.primary,
+                                leadingIcon,
+                                color: iconColor,
                               ),
                               const SizedBox(width: 12),
                               Expanded(

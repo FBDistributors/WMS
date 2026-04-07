@@ -176,7 +176,7 @@ class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
   Future<void> _onRefresh() async {
     setState(() => _refreshing = true);
     ref.invalidate(pickerStatsProvider);
-    ref.invalidate(openPickTasksProvider);
+    await ref.read(openPickTasksProvider.notifier).refreshFromNetwork();
     ref.invalidate(pendingQueueCountProvider);
     await Future<void>.delayed(const Duration(milliseconds: 400));
     if (mounted) {

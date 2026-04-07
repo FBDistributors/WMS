@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' show max;
 
 import 'package:flutter/material.dart';
@@ -43,7 +44,7 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
   void didUpdateWidget(covariant ConsolidatedPickContent oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.refreshVersion != widget.refreshVersion) {
-      ref.invalidate(consolidatedViewProvider);
+      unawaited(ref.read(consolidatedViewProvider.notifier).refreshFromNetwork());
     }
     if (widget.restoreConsolidatedProductKey == null &&
         widget.pendingScannedBarcode == null) {
@@ -336,7 +337,9 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                                     requestId:
                                         'consolidated-${DateTime.now().millisecondsSinceEpoch}',
                                   );
-                              ref.invalidate(consolidatedViewProvider);
+                              await ref
+                                  .read(consolidatedViewProvider.notifier)
+                                  .refreshFromNetwork();
                               widget.onAfterSuccessfulPick?.call();
                               if (ctx.mounted) {
                                 Navigator.of(ctx).pop();
@@ -399,18 +402,34 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
             ),
           );
         }
+        final List<ConsolidatedProduct> incomplete = v.products
+            .where((ConsolidatedProduct p) => p.totalPicked < p.totalRequired)
+            .toList();
+        final List<ConsolidatedProduct> complete = v.products
+            .where((ConsolidatedProduct p) => p.totalPicked >= p.totalRequired)
+            .toList();
+        final List<ConsolidatedProduct> orderedProducts =
+            <ConsolidatedProduct>[...incomplete, ...complete];
+        final bool isDark = Theme.of(context).brightness == Brightness.dark;
+
         return ListView.separated(
           padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
-          itemCount: v.products.length,
+          itemCount: orderedProducts.length,
           separatorBuilder: (_, __) => const SizedBox(height: 8),
           itemBuilder: (BuildContext context, int i) {
-            final ConsolidatedProduct p = v.products[i];
+            final ConsolidatedProduct p = orderedProducts[i];
             final double req = p.totalRequired;
             final double done = p.totalPicked;
             final double ratio = req > 0 ? (done / req).clamp(0.0, 1.0) : 0.0;
             final String code = p.barcode ?? p.sku ?? '—';
+            final bool rowComplete = done >= req;
+            final Color cardBg = rowComplete
+                ? Colors.green.withValues(alpha: isDark ? 0.20 : 0.14)
+                : cs.surfaceContainerHighest.withValues(alpha: 0.35);
+            final Color qtyColor =
+                rowComplete ? Colors.green.shade700 : cs.primary;
             return Material(
-              color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+              color: cardBg,
               borderRadius: BorderRadius.circular(12),
               child: InkWell(
                 borderRadius: BorderRadius.circular(12),
@@ -420,12 +439,25 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      Text(
-                        p.productName,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
-                        ),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Expanded(
+                            child: Text(
+                              p.productName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ),
+                          if (rowComplete)
+                            Icon(
+                              Icons.check_circle_rounded,
+                              color: Colors.green.shade700,
+                              size: 22,
+                            ),
+                        ],
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -447,6 +479,7 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                                 minHeight: 6,
                                 backgroundColor:
                                     cs.surfaceContainerHighest.withValues(alpha: 0.8),
+                                color: rowComplete ? Colors.green.shade600 : cs.primary,
                               ),
                             ),
                           ),
@@ -455,7 +488,7 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                             '${formatPickQty(done)} / ${formatPickQty(req)}',
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
-                              color: cs.primary,
+                              color: qtyColor,
                               fontSize: 14,
                             ),
                           ),

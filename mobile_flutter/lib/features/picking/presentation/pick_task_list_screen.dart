@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -266,7 +268,7 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
                   if (ctx.mounted) {
                     Navigator.of(ctx).pop();
                   }
-                  ref.invalidate(openPickTasksProvider);
+                  unawaited(ref.read(openPickTasksProvider.notifier).refreshFromNetwork());
                   await _openControllerModal(doc);
                 } on Exception catch (e) {
                   if (ctx.mounted) {
@@ -303,8 +305,8 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
         return;
       }
       setState(() => _consolidatedRefreshKey++);
-      ref.invalidate(openPickTasksProvider);
-      ref.invalidate(consolidatedViewProvider);
+      unawaited(ref.read(openPickTasksProvider.notifier).refreshFromNetwork());
+      unawaited(ref.read(consolidatedViewProvider.notifier).refreshFromNetwork());
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(StringLookup.t(loc, 'sendToControllerDone'))),
       );
@@ -327,7 +329,7 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
         return;
       }
       _consolidatedBarcode.clear();
-      ref.invalidate(consolidatedViewProvider);
+      unawaited(ref.read(consolidatedViewProvider.notifier).refreshFromNetwork());
       setState(() => _consolidatedRefreshKey++);
     } on Exception catch (e) {
       if (mounted) {
@@ -387,9 +389,9 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
             titleColor: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF333333),
             accentColor: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1A237E),
             onRefresh: () {
-              ref.invalidate(openPickTasksProvider);
+              unawaited(ref.read(openPickTasksProvider.notifier).refreshFromNetwork());
               if (_showConsolidated) {
-                ref.invalidate(consolidatedViewProvider);
+                unawaited(ref.read(consolidatedViewProvider.notifier).refreshFromNetwork());
                 setState(() => _consolidatedRefreshKey++);
               }
             },
@@ -558,7 +560,9 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
                         children: <Widget>[
                           Text('$e'),
                           FilledButton(
-                            onPressed: () => ref.invalidate(openPickTasksProvider),
+                            onPressed: () => unawaited(
+                              ref.read(openPickTasksProvider.notifier).refreshFromNetwork(),
+                            ),
                             child: Text(StringLookup.t(loc, 'retry')),
                           ),
                         ],
@@ -587,9 +591,9 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
                   setState(() {
                     _showConsolidated = next.single;
                     if (!_showConsolidated) {
-                      ref.invalidate(openPickTasksProvider);
+                      unawaited(ref.read(openPickTasksProvider.notifier).refreshFromNetwork());
                     } else {
-                      ref.invalidate(consolidatedViewProvider);
+                      unawaited(ref.read(consolidatedViewProvider.notifier).refreshFromNetwork());
                     }
                   });
                 },

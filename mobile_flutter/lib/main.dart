@@ -40,6 +40,7 @@ class MobileFlutterApp extends ConsumerStatefulWidget {
 class _MobileFlutterAppState extends ConsumerState<MobileFlutterApp> {
   static const Color _accent = Color(0xFF1A237E);
   bool _fcmRouterBound = false;
+  bool _pickPushHandlerRegistered = false;
 
   @override
   Widget build(BuildContext context) {
@@ -47,6 +48,18 @@ class _MobileFlutterAppState extends ConsumerState<MobileFlutterApp> {
       _fcmRouterBound = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         FcmService.bindRouter(ref.read(goRouterProvider));
+      });
+    }
+    if (!_pickPushHandlerRegistered) {
+      _pickPushHandlerRegistered = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        FcmService.registerPickTasksPushHandler(({String? taskId}) {
+          ref.read(openPickTasksProvider.notifier).refreshFromNetwork();
+          ref.read(consolidatedViewProvider.notifier).refreshFromNetwork();
+          if (taskId != null && taskId.isNotEmpty) {
+            ref.invalidate(pickTaskDetailProvider(taskId));
+          }
+        });
       });
     }
 

@@ -53,7 +53,7 @@ class _ConsolidatedPickScreenState extends ConsumerState<ConsolidatedPickScreen>
     setState(() => _busy = true);
     try {
       await ref.read(pickingRepositoryProvider).consolidatedPick(barcode: b, qty: q);
-      ref.invalidate(consolidatedViewProvider);
+      await ref.read(consolidatedViewProvider.notifier).refreshFromNetwork();
       if (mounted) {
         setState(() => _consolidatedListRefreshKey++);
       }

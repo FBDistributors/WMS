@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../features/picking/picking_providers.dart';
+import '../../features/picking/picking_repository_provider.dart';
 import 'offline_database.dart';
 import 'offline_sync_service.dart';
 
