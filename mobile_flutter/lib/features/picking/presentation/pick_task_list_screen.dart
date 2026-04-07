@@ -28,6 +28,8 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
   bool _handledRouteExtras = false;
   bool _showConsolidated = false;
   int _consolidatedRefreshKey = 0;
+  String? _pendingConsolidatedBarcode;
+  String? _restoreConsolidatedProductKey;
   final TextEditingController _controllerSearch = TextEditingController();
   final TextEditingController _consolidatedBarcode = TextEditingController();
   final TextEditingController _consolidatedQty = TextEditingController(text: '1');
@@ -46,16 +48,49 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_handledRouteExtras) {
-      return;
-    }
     final Uri uri = GoRouterState.of(context).uri;
+    final String? profileQ = uri.queryParameters['profile'];
+    final PickerProfileParam routeProfile = pickerProfileFromQuery(profileQ);
+
     if (uri.queryParameters['openConsolidated'] == '1') {
-      _handledRouteExtras = true;
-      _showConsolidated = true;
-      final String? b = uri.queryParameters['scannedBarcode'];
-      if (b != null && b.isNotEmpty) {
-        _consolidatedBarcode.text = b;
+      final String? scanB = uri.queryParameters['scannedBarcode'];
+      final String? scanK = uri.queryParameters['selectedProductKey'];
+      final bool hasScanExtras = (scanB != null && scanB.isNotEmpty) ||
+          (scanK != null && scanK.isNotEmpty);
+      if (hasScanExtras) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) {
+            return;
+          }
+          setState(() {
+            _showConsolidated = true;
+            _pendingConsolidatedBarcode =
+                (scanB != null && scanB.isNotEmpty) ? scanB : null;
+            _restoreConsolidatedProductKey =
+                (scanK != null && scanK.isNotEmpty) ? scanK : null;
+            if (_restoreConsolidatedProductKey == null &&
+                _pendingConsolidatedBarcode != null) {
+              _consolidatedBarcode.text = _pendingConsolidatedBarcode!;
+            }
+          });
+          if (!mounted) {
+            return;
+          }
+          context.goNamed(
+            'pickTasks',
+            queryParameters: <String, String>{
+              'profile': profileToQuery(routeProfile),
+              'openConsolidated': '1',
+            },
+          );
+        });
+      } else if (!_handledRouteExtras) {
+        _handledRouteExtras = true;
+        _showConsolidated = true;
+        final String? b = uri.queryParameters['scannedBarcode'];
+        if (b != null && b.isNotEmpty) {
+          _consolidatedBarcode.text = b;
+        }
       }
     }
     final String? done = uri.queryParameters['completedMessage'];
@@ -450,6 +485,22 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
                       Expanded(
                         child: ConsolidatedPickContent(
                           refreshVersion: _consolidatedRefreshKey,
+                          pendingScannedBarcode: _pendingConsolidatedBarcode,
+                          restoreConsolidatedProductKey:
+                              _restoreConsolidatedProductKey,
+                          onClearPendingScan: () {
+                            if (mounted) {
+                              setState(() {
+                                _pendingConsolidatedBarcode = null;
+                                _restoreConsolidatedProductKey = null;
+                              });
+                            }
+                          },
+                          onAfterSuccessfulPick: () {
+                            if (mounted) {
+                              setState(() => _consolidatedRefreshKey++);
+                            }
+                          },
                         ),
                       ),
                     ],

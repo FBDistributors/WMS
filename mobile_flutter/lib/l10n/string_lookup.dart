@@ -123,6 +123,11 @@ abstract final class StringLookup {
     'lineReasonModalTitle': 'Pozitsiyani sabab bilan bekor qilish',
     'consolidatedScanMismatch':
         'Skanlangan mahsulot tanlangan pozitsiyaga mos kelmadi. To‘g‘ri mahsulotni skanlang.',
+    'consolidatedModalScanHint':
+        'Mahsulotni skanerlang yoki shtrix kodni pastga kiriting.',
+    'orEnterManually': 'yoki qo‘lda kiriting',
+    'quantityRemainingLine':
+        'Qolgan: {{n}} dona',
     'consolidatedEmptyRows': 'Hozircha qatorlar yo‘q',
     'productNotInOrder': 'Bu mahsulot ushbu buyurtmada yo‘q.',
     'success': 'Muvaffaqiyat',
@@ -239,6 +244,10 @@ abstract final class StringLookup {
     'lineReasonModalTitle': 'Отменить позицию с указанием причины',
     'consolidatedScanMismatch':
         'Отсканированный товар не совпадает с выбранной позицией. Отсканируйте правильный товар.',
+    'consolidatedModalScanHint':
+        'Отсканируйте товар или введите штрихкод ниже.',
+    'orEnterManually': 'или введите вручную',
+    'quantityRemainingLine': 'Осталось: {{n}} шт.',
     'consolidatedEmptyRows': 'Пока нет строк',
     'productNotInOrder': 'Этого товара нет в данном заказе.',
     'success': 'Успешно',
@@ -355,6 +364,10 @@ abstract final class StringLookup {
     'lineReasonModalTitle': 'Skip position with reason',
     'consolidatedScanMismatch':
         'Scanned product does not match the selected position. Scan the correct product.',
+    'consolidatedModalScanHint':
+        'Scan the product or enter the barcode below.',
+    'orEnterManually': 'or enter manually',
+    'quantityRemainingLine': 'Remaining: {{n}} pcs',
     'consolidatedEmptyRows': 'No lines yet',
     'productNotInOrder': 'This product is not in this order.',
     'success': 'Success',

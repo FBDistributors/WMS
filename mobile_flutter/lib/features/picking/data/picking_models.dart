@@ -370,6 +370,21 @@ class ConsolidatedViewResponse {
   }
 }
 
+/// React Native `consolidatedProductKey` bilan bir xil.
+String consolidatedProductKey(ConsolidatedProduct p) =>
+    '${p.productName}-${p.barcode ?? p.sku ?? ''}';
+
+/// Umumiy yig‘ish: shtrix yoki SKU bilan aniq moslik (trim, RN ConsolidatedPickContent).
+bool consolidatedScanMatchesProduct(String raw, ConsolidatedProduct p) {
+  final String scanned = raw.trim();
+  if (scanned.isEmpty) {
+    return false;
+  }
+  final String b = (p.barcode ?? '').trim();
+  final String s = (p.sku ?? '').trim();
+  return (b.isNotEmpty && scanned == b) || (s.isNotEmpty && scanned == s);
+}
+
 class MyPickerStatsDay {
   const MyPickerStatsDay({required this.date, required this.count});
 

@@ -22,6 +22,7 @@ class _ConsolidatedPickScreenState extends ConsumerState<ConsolidatedPickScreen>
   final TextEditingController _qty = TextEditingController(text: '1');
   bool _busy = false;
   bool _prefilledFromRoute = false;
+  int _consolidatedListRefreshKey = 0;
 
   @override
   void dispose() {
@@ -53,6 +54,9 @@ class _ConsolidatedPickScreenState extends ConsumerState<ConsolidatedPickScreen>
     try {
       await ref.read(pickingRepositoryProvider).consolidatedPick(barcode: b, qty: q);
       ref.invalidate(consolidatedViewProvider);
+      if (mounted) {
+        setState(() => _consolidatedListRefreshKey++);
+      }
       _barcode.clear();
     } on Exception catch (e) {
       if (mounted) {
@@ -109,7 +113,16 @@ class _ConsolidatedPickScreenState extends ConsumerState<ConsolidatedPickScreen>
               ],
             ),
           ),
-          const Expanded(child: ConsolidatedPickContent(refreshVersion: 0)),
+          Expanded(
+            child: ConsolidatedPickContent(
+              refreshVersion: _consolidatedListRefreshKey,
+              onAfterSuccessfulPick: () {
+                if (mounted) {
+                  setState(() => _consolidatedListRefreshKey++);
+                }
+              },
+            ),
+          ),
         ],
       ),
     );
