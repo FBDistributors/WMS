@@ -41,6 +41,59 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     return a?.profileType ?? PickerProfileParam.picker;
   }
 
+  bool _isRouteOnlyFlow(ScannerArgs? a) {
+    if (a == null) {
+      return false;
+    }
+    return (a.returnToPick && (a.taskId?.isNotEmpty ?? false)) || a.returnToConsolidated;
+  }
+
+  void _resetScanGuards() {
+    _lastRaw = null;
+    _lastAt = 0;
+  }
+
+  void _routeToPick(ScannerArgs a, String barcode) {
+    final PickerProfileParam p = _profile(a);
+    GoRouter.of(context).goNamed(
+      'pickTaskDetail',
+      pathParameters: <String, String>{'taskId': a.taskId!},
+      queryParameters: <String, String>{
+        'profile': profileToQuery(p),
+        'scannedBarcode': barcode,
+        if (a.lineId != null) 'lineId': a.lineId!,
+      },
+    );
+  }
+
+  void _routeToConsolidated(ScannerArgs a, String barcode) {
+    final PickerProfileParam p = _profile(a);
+    GoRouter.of(context).goNamed(
+      'pickTasks',
+      queryParameters: <String, String>{
+        'profile': profileToQuery(p),
+        'openConsolidated': '1',
+        'scannedBarcode': barcode,
+        if (a.selectedProductKey != null) 'selectedProductKey': a.selectedProductKey!,
+      },
+    );
+  }
+
+  Future<bool> _dispatchRouteOnlyIfPossible(String barcode, ScannerArgs? a) async {
+    if (a == null) {
+      return false;
+    }
+    if (a.returnToPick && a.taskId != null && a.taskId!.isNotEmpty) {
+      _routeToPick(a, barcode);
+      return true;
+    }
+    if (a.returnToConsolidated) {
+      _routeToConsolidated(a, barcode);
+      return true;
+    }
+    return false;
+  }
+
   Future<void> _onBarcode(String raw) async {
     final String value = raw.trim();
     if (value.isEmpty || _busy || !_scanEnabled) {
@@ -55,38 +108,15 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
     final ScannerArgs? a = widget.args;
     final GoRouter router = GoRouter.of(context);
+    final bool routeOnlyFlow = _isRouteOnlyFlow(a);
 
     setState(() {
-      _busy = true;
       _scanEnabled = false;
+      _busy = !routeOnlyFlow;
     });
 
     try {
-      if (a != null && a.returnToPick && a.taskId != null && a.taskId!.isNotEmpty) {
-        final PickerProfileParam p = _profile(a);
-        router.goNamed(
-          'pickTaskDetail',
-          pathParameters: <String, String>{'taskId': a.taskId!},
-          queryParameters: <String, String>{
-            'profile': profileToQuery(p),
-            'scannedBarcode': value,
-            if (a.lineId != null) 'lineId': a.lineId!,
-          },
-        );
-        return;
-      }
-
-      if (a != null && a.returnToConsolidated) {
-        final PickerProfileParam p = _profile(a);
-        router.goNamed(
-          'pickTasks',
-          queryParameters: <String, String>{
-            'profile': profileToQuery(p),
-            'openConsolidated': '1',
-            'scannedBarcode': value,
-            if (a.selectedProductKey != null) 'selectedProductKey': a.selectedProductKey!,
-          },
-        );
+      if (await _dispatchRouteOnlyIfPossible(value, a)) {
         return;
       }
 
@@ -231,8 +261,58 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-    _lastRaw = null;
-    _lastAt = 0;
+    _resetScanGuards();
+  }
+
+  void _handleBack() {
+    final ScannerArgs? a = widget.args;
+    if (a != null && (a.returnToMovement || a.returnToMovementPallet)) {
+      context.goNamed('movement');
+      return;
+    }
+    if (a != null && a.returnToKirimLocation && a.flow == 'new') {
+      context.goNamed(
+        'kirimForm',
+        queryParameters: <String, String>{
+          'flow': 'new',
+          'newMode': 'byLocation',
+          'warehouse': a.warehouse ?? 'main',
+        },
+      );
+      return;
+    }
+    if (a != null && a.returnToKirimForm) {
+      context.goNamed(
+        'kirimForm',
+        queryParameters: <String, String>{
+          'flow': a.flow ?? 'return',
+          if (a.newMode != null) 'newMode': a.newMode!,
+          if (a.warehouse != null) 'warehouse': a.warehouse!,
+          if (a.inventoryStep != null) 'inventoryStep': '${a.inventoryStep}',
+          if (a.inventoryLocationId != null) 'inventoryLocationId': a.inventoryLocationId!,
+          if (a.inventoryLocationCode != null) 'inventoryLocationCode': a.inventoryLocationCode!,
+          if (a.receivingLocationId != null) 'receivingLocationId': a.receivingLocationId!,
+          if (a.receivingLocationCode != null) 'receivingLocationCode': a.receivingLocationCode!,
+        },
+      );
+      return;
+    }
+    if (a != null && a.returnToReturns) {
+      context.goNamed(
+        'kirimForm',
+        queryParameters: const <String, String>{'flow': 'return'},
+      );
+      return;
+    }
+    if (a != null && a.returnToInventoryDetail) {
+      context.goNamed('inventory');
+      return;
+    }
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.goNamed('pickerHome');
+    }
   }
 
   void _onDetect(BarcodeCapture cap) {
@@ -257,13 +337,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         title: const Text('Scanner'),
         leading: IconButton(
           icon: const Icon(Icons.close),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.goNamed('pickerHome');
-            }
-          },
+          onPressed: _handleBack,
         ),
       ),
       body: Stack(

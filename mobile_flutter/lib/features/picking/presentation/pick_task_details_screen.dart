@@ -175,44 +175,23 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       }
       final String? profileQ = GoRouterState.of(context).uri.queryParameters['profile'];
       final PickerProfileParam profile = pickerProfileFromQuery(profileQ);
+      final GoRouter router = GoRouter.of(context);
+      // Route query ni tez tozalaymiz, scan ishlovi esa alohida davom etadi.
+      router.goNamed(
+        'pickTaskDetail',
+        pathParameters: <String, String>{'taskId': widget.taskId},
+        queryParameters: <String, String>{'profile': profileToQuery(profile)},
+      );
 
       try {
-        if (profile == PickerProfileParam.controller &&
-            lineId != null &&
-            lineId.isNotEmpty) {
-          final PickingDocument doc =
-              await ref.read(pickingRepositoryProvider).getTaskById(widget.taskId);
-          if (!mounted) {
-            return;
-          }
-          PickingLine? physical;
-          for (final PickingLine scanLine in doc.lines) {
-            if (scanLine.id == lineId) {
-              physical = scanLine;
-              break;
-            }
-          }
-          final AppLocale loc = ref.read(appLocaleProvider);
-          if (physical == null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(StringLookup.t(loc, 'notFound'))),
-            );
-          } else if (!_barcodeMatchesLine(sb, physical)) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  '${StringLookup.t(loc, 'wrongBarcodeMessage')}'
-                  '${physical.barcode ?? physical.sku ?? '—'}',
-                ),
-              ),
-            );
-          } else {
-            await _presentControllerVerifySheet(doc, physical);
-          }
-        } else if (profile == PickerProfileParam.picker &&
+        if (profile == PickerProfileParam.picker &&
             lineId != null &&
             lineId.isNotEmpty) {
           await _submitPickerLineScan(sb, lineId);
+        } else if (profile == PickerProfileParam.controller &&
+            lineId != null &&
+            lineId.isNotEmpty) {
+          await _handleControllerRouteScan(sb, lineId);
         } else {
           _topScan.text = sb;
           await _submitTopScan();
@@ -221,20 +200,54 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
         }
-      }
-
-      if (!mounted) {
-        return;
-      }
-      context.goNamed(
-        'pickTaskDetail',
-        pathParameters: <String, String>{'taskId': widget.taskId},
-        queryParameters: <String, String>{'profile': profileToQuery(profile)},
-      );
-      if (mounted) {
-        setState(() => _appliedRouteScanKey = null);
+      } finally {
+        if (mounted) {
+          setState(() => _appliedRouteScanKey = null);
+        }
       }
     });
+  }
+
+  Future<PickingDocument> _loadRouteScanDocument() async {
+    final AsyncValue<PickingDocument> cached = ref.read(pickTaskDetailProvider(widget.taskId));
+    final PickingDocument? doc = cached.valueOrNull;
+    if (doc != null) {
+      return doc;
+    }
+    return ref.read(pickingRepositoryProvider).getTaskById(widget.taskId);
+  }
+
+  Future<void> _handleControllerRouteScan(String barcode, String lineId) async {
+    final PickingDocument doc = await _loadRouteScanDocument();
+    if (!mounted) {
+      return;
+    }
+    PickingLine? physical;
+    for (final PickingLine scanLine in doc.lines) {
+      if (scanLine.id == lineId) {
+        physical = scanLine;
+        break;
+      }
+    }
+    final AppLocale loc = ref.read(appLocaleProvider);
+    if (physical == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(StringLookup.t(loc, 'notFound'))),
+      );
+      return;
+    }
+    if (!_barcodeMatchesLine(barcode, physical)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${StringLookup.t(loc, 'wrongBarcodeMessage')}'
+            '${physical.barcode ?? physical.sku ?? '—'}',
+          ),
+        ),
+      );
+      return;
+    }
+    await _presentControllerVerifySheet(doc, physical);
   }
 
   Future<void> _submitPickerLineScan(String barcode, String lineId) async {
