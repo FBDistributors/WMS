@@ -218,6 +218,7 @@ class PickingListItem {
     required this.status,
     required this.linesTotal,
     required this.linesDone,
+    required this.pickedAny,
     required this.controlledByUserId,
     required this.assignedToUserId,
     required this.assignedToUserName,
@@ -231,6 +232,7 @@ class PickingListItem {
   final String status;
   final int linesTotal;
   final int linesDone;
+  final bool pickedAny;
   final String? controlledByUserId;
   final String? assignedToUserId;
   final String? assignedToUserName;
@@ -245,6 +247,7 @@ class PickingListItem {
       status: json['status']! as String,
       linesTotal: _int(json['lines_total']),
       linesDone: _int(json['lines_done']),
+      pickedAny: json['picked_any'] == true,
       controlledByUserId: json['controlled_by_user_id'] as String?,
       assignedToUserId: json['assigned_to_user_id'] as String?,
       assignedToUserName: json['assigned_to_user_name'] as String?,
@@ -260,6 +263,7 @@ class PickingListItem {
         'status': status,
         'lines_total': linesTotal,
         'lines_done': linesDone,
+        'picked_any': pickedAny,
         'controlled_by_user_id': controlledByUserId,
         'assigned_to_user_id': assignedToUserId,
         'assigned_to_user_name': assignedToUserName,

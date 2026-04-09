@@ -6,7 +6,7 @@ from uuid import UUID
 
 import logging
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import case, func, or_
 from sqlalchemy.exc import IntegrityError
@@ -29,6 +29,7 @@ from app.models.user_fcm_token import UserFCMToken
 from app.models.stock import StockLot as StockLotModel
 from app.api.v1.endpoints.picker_inventory import _get_lot_level_balances, _location_ids_for_warehouse
 from app.services.stock_availability import require_sufficient_available
+from app.services.audit_service import ACTION_UPDATE, get_client_ip, log_action
 
 router = APIRouter()
 
@@ -81,6 +82,7 @@ class PickingListItem(BaseModel):
     status: str
     lines_total: int
     lines_done: int
+    picked_any: bool = False
     controlled_by_user_id: Optional[UUID] = None
     controlled_by_user_name: Optional[str] = None
     assigned_to_user_id: Optional[UUID] = None
@@ -487,12 +489,14 @@ def _delivery_number(doc: DocumentModel) -> Optional[str]:
 def _to_picking_list_item(doc: DocumentModel) -> PickingListItem:
     lines_total = len(doc.lines)
     lines_done = sum(1 for line in doc.lines if line.picked_qty >= line.required_qty)
+    picked_any = any(line.picked_qty > 0 for line in doc.lines)
     return PickingListItem(
         id=doc.id,
         reference_number=doc.doc_no,
         status=doc.status,
         lines_total=lines_total,
         lines_done=lines_done,
+        picked_any=picked_any,
         controlled_by_user_id=doc.controlled_by_user_id,
         controlled_by_user_name=_controller_name(doc),
         assigned_to_user_id=doc.assigned_to_user_id,
@@ -541,6 +545,65 @@ async def get_picking_document(
         .all()
     )
     return _to_picking_document_with_lines(document, lines, db)
+
+
+_PICKER_CANCEL_BLOCKED_STATUSES = frozenset({"cancelled", "completed", "packed", "shipped", "picked"})
+
+
+@router.post(
+    "/documents/{document_id}/cancel",
+    response_model=PickingListItem,
+    summary="Picker cancels assigned document if nothing has been picked yet",
+)
+async def cancel_picker_document(
+    request: Request,
+    document_id: UUID,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("picking:pick")),
+):
+    if user.role != "picker":
+        raise HTTPException(status_code=403, detail="Only pickers can cancel picking tasks")
+    document = (
+        db.query(DocumentModel)
+        .options(
+            selectinload(DocumentModel.lines),
+            selectinload(DocumentModel.assigned_to_user),
+            selectinload(DocumentModel.controlled_by_user),
+            selectinload(DocumentModel.order).selectinload(OrderModel.wms_state),
+        )
+        .filter(DocumentModel.id == document_id)
+        .one_or_none()
+    )
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if document.assigned_to_user_id != user.id:
+        raise HTTPException(status_code=403, detail="Document not assigned to you")
+    if document.controlled_by_user_id is not None:
+        raise HTTPException(status_code=409, detail="Document already sent to controller")
+    if document.status in _PICKER_CANCEL_BLOCKED_STATUSES:
+        raise HTTPException(status_code=409, detail="Cannot cancel document in this status")
+    if any(line.picked_qty > 0 for line in document.lines):
+        raise HTTPException(status_code=409, detail="Cannot cancel after picking has started")
+
+    old_status = document.status
+    document.status = "cancelled"
+    order = document.order
+    if order is not None and order.wms_state is not None:
+        order.wms_state.status = "cancelled"
+
+    log_action(
+        db,
+        user_id=user.id,
+        action=ACTION_UPDATE,
+        entity_type="document",
+        entity_id=str(document_id),
+        old_data={"status": old_status},
+        new_data={"status": "cancelled", "cancelled_by": "picker"},
+        ip_address=get_client_ip(request),
+    )
+    db.commit()
+    db.refresh(document)
+    return _to_picking_list_item(document)
 
 
 @router.get("/documents", response_model=List[PickingListItem], summary="Picking documents")
