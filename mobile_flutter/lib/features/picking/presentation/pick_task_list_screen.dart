@@ -704,7 +704,7 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
           ),
           if (!_showConsolidated && profile == PickerProfileParam.controller)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: TextField(
                 controller: _controllerSearch,
                 onChanged: (_) => setState(() {}),

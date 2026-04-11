@@ -203,6 +203,32 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     HapticFeedback.heavyImpact();
   }
 
+  /// Konsolidatsiya `consolidatedPickSuccess` uslubida — modal yopilgach asosiy sahifada.
+  void _showControllerVerifiedSnackBar() {
+    final AppLocale loc = ref.read(appLocaleProvider);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      final Color iconColor = Colors.green.shade700;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+          content: Row(
+            children: <Widget>[
+              Icon(Icons.check_circle_rounded, color: iconColor, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(StringLookup.t(loc, 'controllerPositionVerified')),
+              ),
+            ],
+          ),
+        ),
+      );
+    });
+  }
+
   Future<void> _runPickTaskRouteScanWorkflow({
     required String sb,
     required String? lineId,
@@ -437,6 +463,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                       if (ctx.mounted) {
                         Navigator.of(ctx).pop();
                       }
+                      _showControllerVerifiedSnackBar();
                     },
                     child: Text(StringLookup.t(loc, 'confirmButton')),
                   ),
@@ -917,6 +944,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                             if (ctx.mounted) {
                               Navigator.of(ctx).pop();
                             }
+                            _showControllerVerifiedSnackBar();
                           },
                           child: Text(StringLookup.t(loc, 'confirmButton')),
                         ),
@@ -1227,21 +1255,6 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                 );
           },
         ),
-        actions: <Widget>[
-          if (profile == PickerProfileParam.controller)
-            IconButton(
-              tooltip: StringLookup.t(loc, 'scanButton'),
-              icon: const Icon(Icons.qr_code_scanner_rounded),
-              onPressed: () => context.pushNamed(
-                'scanner',
-                extra: ScannerArgs(
-                  returnToPick: true,
-                  taskId: widget.taskId,
-                  profileType: profile,
-                ),
-              ),
-            ),
-        ],
       ),
       body: docAsync.when(
         data: (PickingDocument d) {
@@ -1258,7 +1271,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
@@ -1448,22 +1461,61 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       ),
       bottomNavigationBar: docAsync.maybeWhen(
         data: (PickingDocument d) {
+          void onComplete() => _complete(d, profile);
+          void onScan() {
+            context.pushNamed(
+              'scanner',
+              extra: ScannerArgs(
+                returnToPick: true,
+                taskId: widget.taskId,
+                profileType: profile,
+              ),
+            );
+          }
+
           return SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: FilledButton(
-                onPressed: _busy
-                    ? null
-                    : () => _complete(
-                          d,
-                          profile,
+              child: profile == PickerProfileParam.controller
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: _busy ? null : onComplete,
+                            child: Text(
+                              _busy
+                                  ? StringLookup.t(loc, 'submittingProgress')
+                                  : StringLookup.t(loc, 'completePicking'),
+                            ),
+                          ),
                         ),
-                child: Text(
-                  _busy
-                      ? StringLookup.t(loc, 'submittingProgress')
-                      : StringLookup.t(loc, 'completePicking'),
-                ),
-              ),
+                        const SizedBox(width: 8),
+                        Tooltip(
+                          message: StringLookup.t(loc, 'scanButton'),
+                          child: FilledButton.tonal(
+                            onPressed: _busy ? null : onScan,
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              minimumSize: const Size(52, 48),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: Icon(
+                              Icons.qr_code_scanner_rounded,
+                              semanticLabel: StringLookup.t(loc, 'scanButton'),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : FilledButton(
+                      onPressed: _busy ? null : onComplete,
+                      child: Text(
+                        _busy
+                            ? StringLookup.t(loc, 'submittingProgress')
+                            : StringLookup.t(loc, 'completePicking'),
+                      ),
+                    ),
             ),
           );
         },
