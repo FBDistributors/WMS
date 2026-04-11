@@ -126,6 +126,8 @@ abstract final class StringLookup {
     'scanButton': 'Skaner',
     'pickSwitchSourceOffline': 'Manbani almashtirish uchun internet kerak',
     'pickSwitchSourceDone': 'Terish manbai yangilandi',
+    'consolidatedNoOpenLinesForSwitch':
+        'Barcha pozitsiyalar terilgan — manbani almashtirish uchun ochiq qator yo‘q',
     'lineReasonModalTitle': 'Pozitsiyani sabab bilan bekor qilish',
     'consolidatedScanMismatch':
         'Skanlangan mahsulot tanlangan pozitsiyaga mos kelmadi. To‘g‘ri mahsulotni skanlang.',
@@ -144,6 +146,7 @@ abstract final class StringLookup {
     'reportReasonOffline': 'Sabab bildirish faqat onlayn rejimda ishlaydi.',
     'qtyShort': 'Miqdor',
     'alternateLocations': 'Boshqa joylar',
+    'alternateLocationHint': 'Boshqa joyni tanlang',
     'taskCompletedBanner': 'Vazifa yakunlandi',
     'picked': 'Terildi',
     'kirimCardNewProductsSubtitle': 'Qabul / qabul varaqasi',
@@ -308,6 +311,8 @@ abstract final class StringLookup {
     'scanButton': 'Сканер',
     'pickSwitchSourceOffline': 'Нужен интернет для смены источника',
     'pickSwitchSourceDone': 'Источник отбора обновлён',
+    'consolidatedNoOpenLinesForSwitch':
+        'Все позиции собраны — нечего переназначать',
     'lineReasonModalTitle': 'Отменить позицию с указанием причины',
     'consolidatedScanMismatch':
         'Отсканированный товар не совпадает с выбранной позицией. Отсканируйте правильный товар.',
@@ -325,6 +330,7 @@ abstract final class StringLookup {
     'reportReasonOffline': 'Указание причины доступно только в онлайн-режиме.',
     'qtyShort': 'Кол-во',
     'alternateLocations': 'Другие ячейки',
+    'alternateLocationHint': 'Выберите другую ячейку',
     'taskCompletedBanner': 'Задание завершено',
     'picked': 'Собрано',
     'kirimCardNewProductsSubtitle': 'Приёмка / приёмный лист',
@@ -489,6 +495,8 @@ abstract final class StringLookup {
     'scanButton': 'Scan',
     'pickSwitchSourceOffline': 'Internet required to change pick source',
     'pickSwitchSourceDone': 'Pick source updated',
+    'consolidatedNoOpenLinesForSwitch':
+        'All lines are complete — nothing to reassign',
     'lineReasonModalTitle': 'Skip position with reason',
     'consolidatedScanMismatch':
         'Scanned product does not match the selected position. Scan the correct product.',
@@ -506,6 +514,7 @@ abstract final class StringLookup {
     'reportReasonOffline': 'Report reason is only available when online.',
     'qtyShort': 'Qty',
     'alternateLocations': 'Alternate locations',
+    'alternateLocationHint': 'Select alternate location',
     'taskCompletedBanner': 'Task completed',
     'picked': 'Picked',
     'kirimCardNewProductsSubtitle': 'Receiving / receipt',

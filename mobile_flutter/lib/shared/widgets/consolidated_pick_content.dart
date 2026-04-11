@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:math' show max;
+import 'dart:math' show max, min;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -14,6 +14,42 @@ import '../../features/picking/data/picking_models.dart';
 import '../../features/picking/domain/profile_type_param.dart';
 import '../../features/picking/picking_providers.dart';
 import '../../l10n/string_lookup.dart';
+
+/// Takrorlanmas joy kodlari, `lines` tartibida birinchi uchragan tartibda.
+String _consolidatedUniqueLocationsLine(ConsolidatedProduct p) {
+  if (p.lines.isEmpty) {
+    return '—';
+  }
+  final List<String> ordered = <String>[];
+  final Set<String> seen = <String>{};
+  for (final ConsolidatedLineItem l in p.lines) {
+    final String c = l.locationCode.trim();
+    if (c.isEmpty || seen.contains(c)) {
+      continue;
+    }
+    seen.add(c);
+    ordered.add(c);
+  }
+  if (ordered.isEmpty) {
+    return '—';
+  }
+  return ordered.join(', ');
+}
+
+String _alternateLocationDropdownValue(PickingAlternateLocation a) =>
+    '${a.locationId}\u001f${a.lotId}';
+
+PickingAlternateLocation? _alternateLocationForDropdownValue(
+  ConsolidatedProduct product,
+  String value,
+) {
+  for (final PickingAlternateLocation a in product.alternateLocations) {
+    if (_alternateLocationDropdownValue(a) == value) {
+      return a;
+    }
+  }
+  return null;
+}
 
 /// RN `ConsolidatedPickContent` — mahsulotlar ro‘yxati, pozitsiya bosilganda modal + skaner.
 class ConsolidatedPickContent extends ConsumerStatefulWidget {
@@ -106,6 +142,61 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
     });
   }
 
+  Future<void> _switchConsolidatedPickToAlternate({
+    required BuildContext host,
+    required BuildContext modalCtx,
+    required BuildContext sheetBodyContext,
+    required ConsolidatedProduct product,
+    required PickingAlternateLocation alternate,
+    required AppLocale loc,
+    required void Function(bool busy) setSheetBusy,
+  }) async {
+    final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
+    if (!online) {
+      ScaffoldMessenger.of(host).showSnackBar(
+        SnackBar(content: Text(StringLookup.t(loc, 'pickSwitchSourceOffline'))),
+      );
+      return;
+    }
+    final List<ConsolidatedLineItem> targets = product.lines
+        .where((ConsolidatedLineItem l) => l.qtyPicked < l.qtyRequired)
+        .toList();
+    if (targets.isEmpty) {
+      ScaffoldMessenger.of(host).showSnackBar(
+        SnackBar(
+          content: Text(StringLookup.t(loc, 'consolidatedNoOpenLinesForSwitch')),
+        ),
+      );
+      return;
+    }
+    setSheetBusy(true);
+    try {
+      for (final ConsolidatedLineItem l in targets) {
+        await ref.read(pickingRepositoryProvider).changePickSource(
+              l.lineId,
+              locationId: alternate.locationId,
+              lotId: alternate.lotId,
+            );
+      }
+      await ref.read(consolidatedViewProvider.notifier).refreshFromNetwork();
+      widget.onAfterSuccessfulPick?.call();
+      if (modalCtx.mounted) {
+        ScaffoldMessenger.of(host).showSnackBar(
+          SnackBar(content: Text(StringLookup.t(loc, 'pickSwitchSourceDone'))),
+        );
+        Navigator.of(modalCtx).pop();
+      }
+    } on Exception catch (e) {
+      if (modalCtx.mounted) {
+        ScaffoldMessenger.of(host).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    } finally {
+      if (sheetBodyContext.mounted) {
+        setSheetBusy(false);
+      }
+    }
+  }
+
   Future<void> _openPickSheet(
     BuildContext host,
     ConsolidatedProduct product, {
@@ -177,18 +268,50 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                     ),
                     if (product.alternateLocations.isNotEmpty) ...<Widget>[
                       const SizedBox(height: 12),
-                      Text(
-                        StringLookup.t(loc, 'alternateLocations'),
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                      ),
-                      const SizedBox(height: 6),
-                      ...product.alternateLocations.map(
-                        (PickingAlternateLocation a) => ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(a.locationCode),
-                          subtitle: Text('${a.availableQty}'),
+                      DropdownButtonFormField<String>(
+                        isExpanded: true,
+                        initialValue: null,
+                        decoration: InputDecoration(
+                          labelText: StringLookup.t(loc, 'alternateLocations'),
+                          hintText: StringLookup.t(loc, 'alternateLocationHint'),
+                          border: const OutlineInputBorder(),
                         ),
+                        menuMaxHeight: min(
+                          320,
+                          MediaQuery.sizeOf(context).height * 0.45,
+                        ),
+                        items: product.alternateLocations
+                            .map(
+                              (PickingAlternateLocation a) => DropdownMenuItem<String>(
+                                value: _alternateLocationDropdownValue(a),
+                                child: Text(
+                                  '${a.locationCode} — ${a.availableQty}',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: sheetBusy
+                            ? null
+                            : (String? key) async {
+                                if (key == null) {
+                                  return;
+                                }
+                                final PickingAlternateLocation? alt =
+                                    _alternateLocationForDropdownValue(product, key);
+                                if (alt == null) {
+                                  return;
+                                }
+                                await _switchConsolidatedPickToAlternate(
+                                  host: host,
+                                  modalCtx: ctx,
+                                  sheetBodyContext: context,
+                                  product: product,
+                                  alternate: alt,
+                                  loc: loc,
+                                  setSheetBusy: (bool busy) => setM(() => sheetBusy = busy),
+                                );
+                              },
                       ),
                     ],
                     const SizedBox(height: 16),
@@ -421,7 +544,8 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
             final double req = p.totalRequired;
             final double done = p.totalPicked;
             final double ratio = req > 0 ? (done / req).clamp(0.0, 1.0) : 0.0;
-            final String code = p.barcode ?? p.sku ?? '—';
+            final String barcodeSku = '${p.barcode ?? '—'} / ${p.sku ?? '—'}';
+            final String locationsLine = _consolidatedUniqueLocationsLine(p);
             final bool rowComplete = done >= req;
             final Color cardBg = rowComplete
                 ? Colors.green.withValues(alpha: isDark ? 0.20 : 0.14)
@@ -461,12 +585,22 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        code,
+                        barcodeSku,
                         style: TextStyle(
                           fontSize: 13,
                           color: cs.onSurfaceVariant,
                           fontFamily: 'monospace',
                         ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        locationsLine,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: cs.onSurfaceVariant,
+                        ),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 10),
                       Row(
