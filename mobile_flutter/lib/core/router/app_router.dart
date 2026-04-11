@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../features/account/presentation/account_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/presentation/auth_providers.dart';
+import '../../features/inventory/presentation/inventory_barcode_resolve_extra.dart';
+import '../../features/inventory/presentation/inventory_barcode_resolve_screen.dart';
 import '../../features/inventory/presentation/inventory_detail_screen.dart';
 import '../../features/inventory/presentation/inventory_screen.dart';
 import '../../features/customer_returns/presentation/customer_returns_queue_screen.dart';
@@ -108,6 +110,19 @@ final goRouterProvider = Provider<GoRouter>((Ref ref) {
             builder: (BuildContext context, GoRouterState state) {
               final String id = state.pathParameters['productId']!;
               return InventoryDetailScreen(productId: id);
+            },
+          ),
+          GoRoute(
+            path: 'resolve-barcode',
+            name: 'inventoryBarcodeResolve',
+            builder: (BuildContext context, GoRouterState state) {
+              final Object? x = state.extra;
+              if (x is! InventoryBarcodeResolveExtra) {
+                return const Scaffold(
+                  body: Center(child: Text('Invalid navigation')),
+                );
+              }
+              return InventoryBarcodeResolveScreen(extra: x);
             },
           ),
         ],

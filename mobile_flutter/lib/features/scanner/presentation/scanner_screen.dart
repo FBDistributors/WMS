@@ -1,5 +1,6 @@
 import 'dart:async' show unawaited;
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,8 +10,7 @@ import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../core/router/scanner_args.dart';
 import '../../../l10n/string_lookup.dart';
-import '../../inventory/data/models/picker_inventory_models.dart';
-import '../../inventory/presentation/inventory_providers.dart';
+import '../../inventory/presentation/inventory_barcode_resolve_extra.dart';
 import '../../picking/domain/profile_type_param.dart';
 import '../data/scanner_repository.dart';
 import '../scanner_providers.dart';
@@ -29,27 +29,38 @@ class ScannerScreen extends ConsumerStatefulWidget {
 
 class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   final MobileScannerController _controller = MobileScannerController();
+  late final AudioPlayer _scanBeepPlayer;
   String? _lastRaw;
   int _lastAt = 0;
-  /// API kutish (RN dagi pastki "Looking up…" banner); to‘liq ekran overlay emas.
+  /// Faqat `resolveBarcode` (palet / kirim lokatsiyasi) uchun pastki banner.
   bool _lookupInProgress = false;
   bool _scanEnabled = true;
 
   @override
+  void initState() {
+    super.initState();
+    _scanBeepPlayer = AudioPlayer();
+    unawaited(_scanBeepPlayer.setReleaseMode(ReleaseMode.release));
+  }
+
+  @override
   void dispose() {
+    unawaited(_scanBeepPlayer.dispose());
     _controller.dispose();
     super.dispose();
   }
 
-  PickerProfileParam _profile(ScannerArgs? a) {
-    return a?.profileType ?? PickerProfileParam.picker;
+  Future<void> _playScanBeep() async {
+    try {
+      await _scanBeepPlayer.stop();
+      await _scanBeepPlayer.play(AssetSource('sounds/scan_beep.wav'));
+    } on Object {
+      // Ovoz yo‘q bo‘lsa ham skaner ishlasin.
+    }
   }
 
-  bool _isRouteOnlyFlow(ScannerArgs? a) {
-    if (a == null) {
-      return false;
-    }
-    return (a.returnToPick && (a.taskId?.isNotEmpty ?? false)) || a.returnToConsolidated;
+  PickerProfileParam _profile(ScannerArgs? a) {
+    return a?.profileType ?? PickerProfileParam.picker;
   }
 
   void _resetScanGuards() {
@@ -83,12 +94,6 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     router.go(Uri(path: '/pick-tasks', queryParameters: q).toString());
   }
 
-  void _goInventoryDetail(GoRouter router, String productId) {
-    router.go(
-      '/inventory/detail/${Uri.encodeComponent(productId)}',
-    );
-  }
-
   Future<bool> _dispatchRouteOnlyIfPossible(
     GoRouter router,
     String barcode,
@@ -119,22 +124,24 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     }
     _lastRaw = value;
     _lastAt = now;
+    unawaited(_playScanBeep());
 
     final ScannerArgs? a = widget.args;
     final GoRouter router = GoRouter.of(context);
-    final bool routeOnlyFlow = _isRouteOnlyFlow(a);
 
-    setState(() {
-      _scanEnabled = false;
-      _lookupInProgress = !routeOnlyFlow;
-    });
+    if (mounted) {
+      setState(() => _scanEnabled = false);
+    }
 
-    try {
-      if (await _dispatchRouteOnlyIfPossible(router, value, a)) {
-        return;
+    if (await _dispatchRouteOnlyIfPossible(router, value, a)) {
+      return;
+    }
+
+    if (a != null && a.returnToMovementPallet) {
+      if (mounted) {
+        setState(() => _lookupInProgress = true);
       }
-
-      if (a != null && a.returnToMovementPallet) {
+      try {
         final ScannerResolveOut out =
             await ref.read(scannerRepositoryProvider).resolveBarcode(value);
         if (!mounted) {
@@ -152,10 +159,24 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
           _showError(out.message ?? 'Lokatsiya aniqlanmadi');
           _resumeScan();
         }
-        return;
+      } on Exception catch (e) {
+        if (mounted) {
+          _showError('$e');
+          _resumeScan();
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _lookupInProgress = false);
+        }
       }
+      return;
+    }
 
-      if (a != null && a.returnToKirimLocation && a.flow == 'new') {
+    if (a != null && a.returnToKirimLocation && a.flow == 'new') {
+      if (mounted) {
+        setState(() => _lookupInProgress = true);
+      }
+      try {
         final ScannerResolveOut out =
             await ref.read(scannerRepositoryProvider).resolveBarcode(value);
         if (!mounted) {
@@ -181,84 +202,26 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
           _showError(out.message ?? 'Lokatsiya topilmadi');
           _resumeScan();
         }
-        return;
+      } on Exception catch (e) {
+        if (mounted) {
+          _showError('$e');
+          _resumeScan();
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _lookupInProgress = false);
+        }
       }
+      return;
+    }
 
-      final InventoryByBarcodeResponse product =
-          await ref.read(inventoryRepositoryProvider).getInventoryByBarcode(value);
-      if (!mounted) {
-        return;
-      }
-      _routeAfterProductLookup(router, product, a);
-    } on Exception catch (e) {
-      if (mounted) {
-        _showError('$e');
-        _resumeScan();
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _lookupInProgress = false);
-      }
-    }
-  }
-
-  void _routeAfterProductLookup(
-    GoRouter router,
-    InventoryByBarcodeResponse product,
-    ScannerArgs? a,
-  ) {
-    if (a == null) {
-      _goInventoryDetail(router, product.productId);
+    if (!mounted) {
       return;
     }
-    if (a.returnToPick ||
-        a.returnToMovementPallet ||
-        a.returnToKirimLocation) {
-      return;
-    }
-    if (a.returnToKirimForm) {
-      router.goNamed(
-        'kirimForm',
-        queryParameters: <String, String>{
-          'flow': a.flow ?? 'return',
-          if (a.newMode != null) 'newMode': a.newMode!,
-          if (a.warehouse != null) 'warehouse': a.warehouse!,
-          'scannedProductId': product.productId,
-          if (product.barcode != null && product.barcode!.isNotEmpty)
-            'scannedBarcode': product.barcode!,
-          if (a.inventoryStep != null) 'inventoryStep': '${a.inventoryStep}',
-          if (a.inventoryLocationId != null) 'inventoryLocationId': a.inventoryLocationId!,
-          if (a.inventoryLocationCode != null) 'inventoryLocationCode': a.inventoryLocationCode!,
-          if (a.receivingLocationId != null) 'receivingLocationId': a.receivingLocationId!,
-          if (a.receivingLocationCode != null) 'receivingLocationCode': a.receivingLocationCode!,
-        },
-      );
-      return;
-    }
-    if (a.returnToMovement) {
-      router.goNamed(
-        'movement',
-        queryParameters: <String, String>{
-          'scannedProductId': product.productId,
-          if (product.barcode != null && product.barcode!.isNotEmpty)
-            'scannedBarcode': product.barcode!,
-        },
-      );
-      return;
-    }
-    if (a.returnToReturns) {
-      router.goNamed(
-        'kirimForm',
-        queryParameters: <String, String>{
-          'flow': 'return',
-          'scannedProductId': product.productId,
-          if (product.barcode != null && product.barcode!.isNotEmpty)
-            'scannedBarcode': product.barcode!,
-        },
-      );
-      return;
-    }
-    _goInventoryDetail(router, product.productId);
+    router.goNamed(
+      'inventoryBarcodeResolve',
+      extra: InventoryBarcodeResolveExtra(barcode: value, args: a),
+    );
   }
 
   void _resumeScan() {

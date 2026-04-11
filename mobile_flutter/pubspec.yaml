@@ -29,6 +29,7 @@ dependencies:
   google_fonts: ^6.2.1
   flutter_svg: ^2.0.17
   shimmer: ^3.0.0
+  audioplayers: ^6.1.0
 
 dev_dependencies:
   flutter_test:
@@ -49,3 +50,4 @@ flutter:
   generate: true
   assets:
     - assets/branding/logo.png
+    - assets/sounds/scan_beep.wav
