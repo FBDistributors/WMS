@@ -8,6 +8,7 @@ import '../../../core/app_state/locale_controller.dart';
 import '../../../core/app_state/theme_controller.dart';
 import '../../../l10n/string_lookup.dart';
 import '../../../shared/widgets/consolidated_pick_content.dart';
+import '../../../shared/widgets/consolidated_pick_success_snackbar.dart';
 import '../picking_providers.dart';
 
 class ConsolidatedPickScreen extends ConsumerStatefulWidget {
@@ -56,6 +57,10 @@ class _ConsolidatedPickScreenState extends ConsumerState<ConsolidatedPickScreen>
       await ref.read(consolidatedViewProvider.notifier).refreshFromNetwork();
       if (mounted) {
         setState(() => _consolidatedListRefreshKey++);
+        showConsolidatedPickSuccessSnackBar(
+          context,
+          ref.read(appLocaleProvider),
+        );
       }
       _barcode.clear();
     } on Exception catch (e) {

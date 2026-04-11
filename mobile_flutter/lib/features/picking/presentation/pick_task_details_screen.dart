@@ -14,6 +14,7 @@ import '../../../core/offline/offline_database.dart';
 import '../../../core/offline/offline_providers.dart';
 import '../../../core/router/scanner_args.dart';
 import '../../../l10n/string_lookup.dart';
+import '../../../shared/layout/sheet_bottom_inset.dart';
 import '../data/picking_constants.dart';
 import '../data/picking_models.dart';
 import '../domain/profile_type_param.dart';
@@ -72,6 +73,8 @@ List<_LineGroup> _orderedLineGroups(List<_LineGroup> groups) {
       .toList();
   return <_LineGroup>[...incomplete, ...complete];
 }
+
+String _barcodeSkuSubtitle(PickingLine l) => '${l.barcode ?? '—'} / ${l.sku ?? '—'}';
 
 bool _barcodeMatchesLine(String raw, PickingLine line) {
   final String q = raw.trim().toLowerCase();
@@ -335,7 +338,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
         isScrollControlled: true,
         builder: (BuildContext ctx) {
           return Padding(
-            padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+            padding: EdgeInsets.only(bottom: sheetBottomPadding(ctx)),
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -409,6 +412,54 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     if (code.isEmpty) {
       return;
     }
+    final PickerProfileParam profile = pickerProfileFromQuery(
+      GoRouterState.of(context).uri.queryParameters['profile'],
+    );
+
+    if (profile == PickerProfileParam.controller) {
+      final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
+      final AppLocale loc = ref.read(appLocaleProvider);
+      if (!online) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              StringLookup.tParams(
+                loc,
+                'offlineBanner',
+                <String, String>{'count': '0'},
+              ),
+            ),
+          ),
+        );
+        return;
+      }
+      setState(() => _busy = true);
+      try {
+        final PickingDocument doc = await _loadRouteScanDocument();
+        if (!mounted) {
+          return;
+        }
+        final PickingLine? line = _findLineByScan(doc.lines, code);
+        if (line == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(StringLookup.t(loc, 'productNotInOrder'))),
+          );
+          return;
+        }
+        _topScan.clear();
+        await _presentControllerVerifySheet(doc, line);
+      } on Exception catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _busy = false);
+        }
+      }
+      return;
+    }
+
     final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
     final OfflineDatabase? db = await ref.read(offlineDatabaseProvider.future);
     setState(() => _busy = true);
@@ -495,7 +546,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                 builder: (BuildContext context, void Function(void Function()) setM) {
                   return Padding(
                     padding: EdgeInsets.only(
-                      bottom: MediaQuery.viewInsetsOf(context).bottom,
+                      bottom: sheetBottomPadding(context),
                     ),
                     child: _ReasonListSheet(
                       loc: loc,
@@ -551,7 +602,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
               builder: (BuildContext context, void Function(void Function()) setM) {
                 return Padding(
                   padding: EdgeInsets.only(
-                    bottom: MediaQuery.viewInsetsOf(context).bottom,
+                    bottom: sheetBottomPadding(context),
                   ),
                   child: _ReasonListSheet(
                     loc: loc,
@@ -697,7 +748,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
         return StatefulBuilder(
           builder: (BuildContext context, void Function(void Function()) setM) {
             return Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+              padding: EdgeInsets.only(bottom: sheetBottomPadding(context)),
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(20),
                 child: Column(
@@ -707,6 +758,15 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                     Text(
                       group.virtual.productName,
                       style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _barcodeSkuSubtitle(group.virtual),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontFamily: 'monospace',
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -995,7 +1055,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
         return StatefulBuilder(
           builder: (BuildContext context, void Function(void Function()) setM) {
             return Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+              padding: EdgeInsets.only(bottom: sheetBottomPadding(context)),
               child: _ReasonListSheet(
                 loc: loc,
                 title: StringLookup.t(loc, 'lineReasonModalTitle'),
@@ -1159,31 +1219,30 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                   ],
                 ),
               ),
-              if (profile != PickerProfileParam.controller)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: <Widget>[
-                      Expanded(
-                        child: TextField(
-                          controller: _topScan,
-                          decoration: InputDecoration(
-                            labelText: StringLookup.t(loc, 'barcodeOrSku'),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                            filled: true,
-                          ),
-                          onSubmitted: (_) => _submitTopScan(),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: TextField(
+                        controller: _topScan,
+                        decoration: InputDecoration(
+                          labelText: StringLookup.t(loc, 'barcodeOrSku'),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          filled: true,
                         ),
+                        onSubmitted: (_) => _submitTopScan(),
                       ),
-                      const SizedBox(width: 8),
-                      FilledButton(
-                        onPressed: _busy ? null : _submitTopScan,
-                        child: Text(StringLookup.t(loc, 'submit')),
-                      ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: _busy ? null : _submitTopScan,
+                      child: Text(StringLookup.t(loc, 'submit')),
+                    ),
+                  ],
                 ),
-              if (profile != PickerProfileParam.controller) const SizedBox(height: 8),
+              ),
+              const SizedBox(height: 8),
               Expanded(
                 child: ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
@@ -1196,9 +1255,12 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                         : false;
                     final bool lineComplete =
                         g.virtual.qtyPicked >= g.virtual.qtyRequired;
+                    final bool useGreenCard = profile == PickerProfileParam.controller
+                        ? groupVerified
+                        : lineComplete;
                     final ColorScheme cs = Theme.of(context).colorScheme;
                     final bool isDark = Theme.of(context).brightness == Brightness.dark;
-                    final Color cardBg = lineComplete
+                    final Color cardBg = useGreenCard
                         ? Colors.green.withValues(alpha: isDark ? 0.20 : 0.14)
                         : cs.surfaceContainerHighest.withValues(alpha: 0.35);
                     final IconData leadingIcon;
@@ -1208,8 +1270,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                         leadingIcon = Icons.verified_rounded;
                         iconColor = Colors.green.shade700;
                       } else if (lineComplete) {
-                        leadingIcon = Icons.check_circle_rounded;
-                        iconColor = Colors.green.shade700;
+                        leadingIcon = Icons.check_circle_outline_rounded;
+                        iconColor = cs.primary;
                       } else {
                         leadingIcon = Icons.inventory_2_rounded;
                         iconColor = cs.primary;
@@ -1248,6 +1310,17 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                         fontWeight: FontWeight.w600,
                                         fontSize: 15,
                                       ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _barcodeSkuSubtitle(g.virtual),
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: cs.onSurfaceVariant,
+                                        fontFamily: 'monospace',
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                     const SizedBox(height: 4),
                                     Text(

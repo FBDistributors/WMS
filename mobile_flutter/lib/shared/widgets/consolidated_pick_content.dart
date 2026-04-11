@@ -14,6 +14,8 @@ import '../../features/picking/data/picking_models.dart';
 import '../../features/picking/domain/profile_type_param.dart';
 import '../../features/picking/picking_providers.dart';
 import '../../l10n/string_lookup.dart';
+import '../layout/sheet_bottom_inset.dart';
+import 'consolidated_pick_success_snackbar.dart';
 
 /// Takrorlanmas joy kodlari, `lines` tartibida birinchi uchragan tartibda.
 String _consolidatedUniqueLocationsLine(ConsolidatedProduct p) {
@@ -236,7 +238,7 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
         return StatefulBuilder(
           builder: (BuildContext context, void Function(void Function()) setM) {
             return Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+              padding: EdgeInsets.only(bottom: sheetBottomPadding(context)),
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(20),
                 child: Column(
@@ -466,6 +468,9 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                               widget.onAfterSuccessfulPick?.call();
                               if (ctx.mounted) {
                                 Navigator.of(ctx).pop();
+                              }
+                              if (host.mounted) {
+                                showConsolidatedPickSuccessSnackBar(host, loc);
                               }
                             } on Exception catch (e) {
                               if (ctx.mounted) {

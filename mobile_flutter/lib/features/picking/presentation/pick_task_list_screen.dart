@@ -13,6 +13,7 @@ import '../../../core/app_state/theme_controller.dart';
 import '../../../l10n/string_lookup.dart';
 import '../../../shared/widgets/app_header.dart';
 import '../../../shared/widgets/consolidated_pick_content.dart';
+import '../../../shared/widgets/consolidated_pick_success_snackbar.dart';
 import '../../../shared/widgets/picker_footer.dart';
 import '../data/picking_constants.dart';
 import '../data/picking_models.dart';
@@ -386,6 +387,7 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
       _consolidatedBarcode.clear();
       unawaited(ref.read(consolidatedViewProvider.notifier).refreshFromNetwork());
       setState(() => _consolidatedRefreshKey++);
+      showConsolidatedPickSuccessSnackBar(context, ref.read(appLocaleProvider));
     } on Exception catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
@@ -693,6 +695,8 @@ class _TaskCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool fully = item.linesTotal > 0 && item.linesDone >= item.linesTotal;
+    final bool useGreenListStyle =
+        profile != PickerProfileParam.controller && fully;
     final bool showSend = profile == PickerProfileParam.picker &&
         item.linesDone > 0 &&
         item.controlledByUserId == null;
@@ -704,7 +708,9 @@ class _TaskCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         Material(
-          color: fully ? greenBg : cs.surfaceContainerHighest.withValues(alpha: 0.4),
+          color: useGreenListStyle
+              ? greenBg
+              : cs.surfaceContainerHighest.withValues(alpha: 0.4),
           borderRadius: BorderRadius.circular(14),
           child: InkWell(
             borderRadius: BorderRadius.circular(14),
@@ -713,7 +719,9 @@ class _TaskCard extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: fully ? greenBorder : cs.outlineVariant.withValues(alpha: 0.6),
+                  color: useGreenListStyle
+                      ? greenBorder
+                      : cs.outlineVariant.withValues(alpha: 0.6),
                 ),
               ),
               padding: const EdgeInsets.all(14),
