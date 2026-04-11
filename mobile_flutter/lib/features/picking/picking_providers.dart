@@ -235,3 +235,35 @@ final consolidatedViewProvider =
 final pickerStatsProvider = FutureProvider.autoDispose<MyPickerStats>(
   (Ref ref) => ref.watch(pickingRepositoryProvider).getMyPickerStats(),
 );
+
+/// Skaner `router.go` o‘rniga `pop` qilganda vazifa detaliga skan natijasini yetkazish.
+class PickTaskScanFromScanner {
+  const PickTaskScanFromScanner({
+    required this.taskId,
+    required this.barcode,
+    this.lineId,
+    required this.profileQuery,
+  });
+
+  final String taskId;
+  final String barcode;
+  final String? lineId;
+  final String profileQuery;
+}
+
+final pendingPickTaskScanProvider = StateProvider<PickTaskScanFromScanner?>((Ref ref) => null);
+
+/// Skaner `returnToConsolidated` dan `pop` keyin ro‘yxatga skan yetkazish.
+class ConsolidatedScanFromScanner {
+  const ConsolidatedScanFromScanner({
+    required this.profileQuery,
+    required this.barcode,
+    this.selectedProductKey,
+  });
+
+  final String profileQuery;
+  final String barcode;
+  final String? selectedProductKey;
+}
+
+final pendingConsolidatedScanProvider = StateProvider<ConsolidatedScanFromScanner?>((Ref ref) => null);

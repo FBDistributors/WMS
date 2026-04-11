@@ -12,6 +12,7 @@ import '../../../core/router/scanner_args.dart';
 import '../../../l10n/string_lookup.dart';
 import '../../inventory/presentation/inventory_barcode_resolve_extra.dart';
 import '../../picking/domain/profile_type_param.dart';
+import '../../picking/picking_providers.dart';
 import '../data/scanner_repository.dart';
 import '../scan_beep.dart';
 import '../scanner_providers.dart';
@@ -53,28 +54,25 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
   void _routeToPick(GoRouter router, ScannerArgs a, String barcode) {
     final PickerProfileParam p = _profile(a);
-    final Map<String, String> q = <String, String>{
-      'profile': profileToQuery(p),
-      'scannedBarcode': barcode,
-      if (a.lineId != null) 'lineId': a.lineId!,
-    };
-    router.go(
-      Uri(
-        path: '/pick-task/${Uri.encodeComponent(a.taskId!)}',
-        queryParameters: q,
-      ).toString(),
+    ref.read(pendingPickTaskScanProvider.notifier).state = PickTaskScanFromScanner(
+      taskId: a.taskId!,
+      barcode: barcode,
+      lineId: a.lineId,
+      profileQuery: profileToQuery(p),
     );
+    router.pop();
   }
 
   void _routeToConsolidated(GoRouter router, ScannerArgs a, String barcode) {
     final PickerProfileParam p = _profile(a);
-    final Map<String, String> q = <String, String>{
-      'profile': profileToQuery(p),
-      'openConsolidated': '1',
-      'scannedBarcode': barcode,
-      if (a.selectedProductKey != null) 'selectedProductKey': a.selectedProductKey!,
-    };
-    router.go(Uri(path: '/pick-tasks', queryParameters: q).toString());
+    ref.read(pendingConsolidatedScanProvider.notifier).state = ConsolidatedScanFromScanner(
+      profileQuery: profileToQuery(p),
+      barcode: barcode,
+      selectedProductKey: (a.selectedProductKey != null && a.selectedProductKey!.isNotEmpty)
+          ? a.selectedProductKey
+          : null,
+    );
+    router.pop();
   }
 
   Future<bool> _dispatchRouteOnlyIfPossible(

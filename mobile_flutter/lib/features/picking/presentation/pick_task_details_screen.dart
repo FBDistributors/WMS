@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -73,6 +74,33 @@ List<_LineGroup> _orderedLineGroups(List<_LineGroup> groups) {
       .where((_LineGroup g) => g.virtual.qtyPicked >= g.virtual.qtyRequired)
       .toList();
   return <_LineGroup>[...incomplete, ...complete];
+}
+
+bool _groupFullyVerified(_LineGroup g, Set<String> verifiedLineIds) {
+  return g.members.every((PickingLine l) => verifiedLineIds.contains(l.id));
+}
+
+/// Kontroller: tekshirilmaganlar yuqorida (ichida miqdor bo‘yicha), to‘liq tekshirilganlar pastda.
+List<_LineGroup> _orderedLineGroupsController(
+  List<_LineGroup> groups,
+  Set<String> verifiedLineIds,
+) {
+  final List<_LineGroup> pending = <_LineGroup>[];
+  final List<_LineGroup> done = <_LineGroup>[];
+  for (final _LineGroup g in groups) {
+    if (_groupFullyVerified(g, verifiedLineIds)) {
+      done.add(g);
+    } else {
+      pending.add(g);
+    }
+  }
+  final List<_LineGroup> pendingInc = pending
+      .where((_LineGroup g) => g.virtual.qtyPicked < g.virtual.qtyRequired)
+      .toList();
+  final List<_LineGroup> pendingRest = pending
+      .where((_LineGroup g) => g.virtual.qtyPicked >= g.virtual.qtyRequired)
+      .toList();
+  return <_LineGroup>[...pendingInc, ...pendingRest, ...done];
 }
 
 String _barcodeSkuSubtitle(PickingLine l) => '${l.barcode ?? '—'} / ${l.sku ?? '—'}';
@@ -171,6 +199,42 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     super.dispose();
   }
 
+  void _rejectScanHaptic() {
+    HapticFeedback.heavyImpact();
+  }
+
+  Future<void> _runPickTaskRouteScanWorkflow({
+    required String sb,
+    required String? lineId,
+    required PickerProfileParam profile,
+  }) async {
+    try {
+      if (profile == PickerProfileParam.picker &&
+          lineId != null &&
+          lineId.isNotEmpty) {
+        await _handlePickerRouteScan(sb, lineId);
+      } else if (profile == PickerProfileParam.controller) {
+        if (lineId != null && lineId.isNotEmpty) {
+          await _handleControllerRouteScan(sb, lineId);
+        } else {
+          await _handleControllerBarcodeOnlyScan(sb);
+        }
+      } else {
+        _topScan.text = sb;
+        await _submitTopScan();
+      }
+    } on Exception catch (e) {
+      if (mounted) {
+        _rejectScanHaptic();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _appliedRouteScanKey = null);
+      }
+    }
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -200,30 +264,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
         queryParameters: <String, String>{'profile': profileToQuery(profile)},
       );
 
-      try {
-        if (profile == PickerProfileParam.picker &&
-            lineId != null &&
-            lineId.isNotEmpty) {
-          await _handlePickerRouteScan(sb, lineId);
-        } else if (profile == PickerProfileParam.controller) {
-          if (lineId != null && lineId.isNotEmpty) {
-            await _handleControllerRouteScan(sb, lineId);
-          } else {
-            await _handleControllerBarcodeOnlyScan(sb);
-          }
-        } else {
-          _topScan.text = sb;
-          await _submitTopScan();
-        }
-      } on Exception catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-        }
-      } finally {
-        if (mounted) {
-          setState(() => _appliedRouteScanKey = null);
-        }
-      }
+      await _runPickTaskRouteScanWorkflow(sb: sb, lineId: lineId, profile: profile);
     });
   }
 
@@ -245,6 +286,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     final AppLocale loc = ref.read(appLocaleProvider);
     final PickingLine? line = _findLineByScan(doc.lines, barcode);
     if (line == null) {
+      _rejectScanHaptic();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(StringLookup.t(loc, 'productNotInOrder'))),
       );
@@ -267,12 +309,14 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     }
     final AppLocale loc = ref.read(appLocaleProvider);
     if (physical == null) {
+      _rejectScanHaptic();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(StringLookup.t(loc, 'notFound'))),
       );
       return;
     }
     if (!_barcodeMatchesLine(barcode, physical)) {
+      _rejectScanHaptic();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -301,12 +345,14 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       }
     }
     if (line == null) {
+      _rejectScanHaptic();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(StringLookup.t(loc, 'notFound'))),
       );
       return;
     }
     if (!_barcodeMatchesLine(barcode, line)) {
+      _rejectScanHaptic();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -370,6 +416,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                   FilledButton(
                     onPressed: () async {
                       if (_controllerQtyMismatch(qty.text, physical.qtyPicked)) {
+                        _rejectScanHaptic();
                         ScaffoldMessenger.of(hostContext).showSnackBar(
                           SnackBar(
                             content: Text(
@@ -442,6 +489,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
         }
         final PickingLine? line = _findLineByScan(doc.lines, code);
         if (line == null) {
+          _rejectScanHaptic();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(StringLookup.t(loc, 'productNotInOrder'))),
           );
@@ -451,6 +499,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
         await _presentControllerVerifySheet(doc, line);
       } on Exception catch (e) {
         if (mounted) {
+          _rejectScanHaptic();
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
         }
       } finally {
@@ -489,6 +538,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       }
     } on Exception catch (e) {
       if (mounted) {
+        _rejectScanHaptic();
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
       }
     } finally {
@@ -708,6 +758,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       }
     } on Exception catch (e) {
       if (mounted) {
+        _rejectScanHaptic();
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
       }
     } finally {
@@ -807,12 +858,14 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                           final String t = v.trim();
                           final PickingLine? match = _findLineByScan(doc.lines, t);
                           if (match == null) {
+                            _rejectScanHaptic();
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text(StringLookup.t(loc, 'productNotInOrder'))),
                             );
                             return;
                           }
                           if (!_controllerVerifySameGroup(match, stock)) {
+                            _rejectScanHaptic();
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text(StringLookup.t(loc, 'wrongBarcodeTitle'))),
                             );
@@ -843,6 +896,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                               return;
                             }
                             if (_controllerQtyMismatch(qty.text, physical.qtyPicked)) {
+                              _rejectScanHaptic();
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
@@ -882,6 +936,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                               qty.text = rem >= 1 ? formatPickQty(rem) : '0';
                             });
                           } else {
+                            _rejectScanHaptic();
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
@@ -913,6 +968,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                             final int delta = int.tryParse(qty.text.trim()) ?? 0;
                               final double rem = stock.qtyRequired - stock.qtyPicked;
                             if (delta < 1 || delta > rem) {
+                              _rejectScanHaptic();
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
@@ -960,6 +1016,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                               }
                             } on Exception catch (e) {
                               if (mounted) {
+                                _rejectScanHaptic();
                                 ScaffoldMessenger.of(context)
                                     .showSnackBar(SnackBar(content: Text('$e')));
                               }
@@ -1022,6 +1079,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                 }
                               } on Exception catch (e) {
                                 if (mounted) {
+                                  _rejectScanHaptic();
                                   ScaffoldMessenger.of(context)
                                       .showSnackBar(SnackBar(content: Text('$e')));
                                 }
@@ -1086,6 +1144,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                     }
                   } on Exception catch (e) {
                     if (mounted) {
+                      _rejectScanHaptic();
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
                     }
                   }
@@ -1105,6 +1164,29 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     final bool isDark = ref.watch(appThemeModeProvider) == ThemeMode.dark;
     final String? profileQ = GoRouterState.of(context).uri.queryParameters['profile'];
     final PickerProfileParam profile = pickerProfileFromQuery(profileQ);
+
+    ref.listen<PickTaskScanFromScanner?>(
+      pendingPickTaskScanProvider,
+      (PickTaskScanFromScanner? prev, PickTaskScanFromScanner? next) {
+        if (next == null || next.taskId != widget.taskId) {
+          return;
+        }
+        final PickTaskScanFromScanner snap = next;
+        ref.read(pendingPickTaskScanProvider.notifier).state = null;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) {
+            return;
+          }
+          unawaited(
+            _runPickTaskRouteScanWorkflow(
+              sb: snap.barcode,
+              lineId: snap.lineId,
+              profile: pickerProfileFromQuery(snap.profileQuery),
+            ),
+          );
+        });
+      },
+    );
     final AsyncValue<PickingDocument> docAsync =
         ref.watch(pickTaskDetailProvider(widget.taskId));
     final Color bg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF5F5F5);
@@ -1168,7 +1250,9 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
               : d.lines
                   .map((PickingLine l) => _LineGroup(virtual: l, members: <PickingLine>[l]))
                   .toList(growable: false);
-          final List<_LineGroup> orderedGroups = _orderedLineGroups(groups);
+          final List<_LineGroup> orderedGroups = profile == PickerProfileParam.controller
+              ? _orderedLineGroupsController(groups, _verifiedLineIds)
+              : _orderedLineGroups(groups);
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

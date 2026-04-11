@@ -601,6 +601,42 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
     final Color cardBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC);
     final Color border = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
 
+    ref.listen<ConsolidatedScanFromScanner?>(
+      pendingConsolidatedScanProvider,
+      (ConsolidatedScanFromScanner? prev, ConsolidatedScanFromScanner? next) {
+        if (next == null) {
+          return;
+        }
+        final ConsolidatedScanFromScanner snap = next;
+        ref.read(pendingConsolidatedScanProvider.notifier).state = null;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) {
+            return;
+          }
+          setState(() {
+            _showConsolidated = true;
+            _pendingConsolidatedBarcode =
+                snap.barcode.isNotEmpty ? snap.barcode : null;
+            _restoreConsolidatedProductKey =
+                (snap.selectedProductKey != null && snap.selectedProductKey!.isNotEmpty)
+                    ? snap.selectedProductKey
+                    : null;
+            if (_restoreConsolidatedProductKey == null &&
+                _pendingConsolidatedBarcode != null) {
+              _consolidatedBarcode.text = _pendingConsolidatedBarcode!;
+            }
+          });
+          context.goNamed(
+            'pickTasks',
+            queryParameters: <String, String>{
+              'profile': snap.profileQuery,
+              'openConsolidated': '1',
+            },
+          );
+        });
+      },
+    );
+
     final String headerTitle = _showConsolidated && profile == PickerProfileParam.picker
         ? StringLookup.t(loc, 'consolidatedPickTitle')
         : StringLookup.t(loc, 'openTasks');
