@@ -29,12 +29,31 @@ class _LineGroup {
   final List<PickingLine> members;
 }
 
+/// `_groupLinesByProduct` bilan bir xil — aksiya + asosiy qatorlarni bir guruhda sanash.
+String _lineGroupKey(PickingLine l) {
+  if (l.productId != null && l.productId!.isNotEmpty) {
+    return 'id:${l.productId}';
+  }
+  return '${l.productName}|${l.barcode ?? l.sku ?? ''}';
+}
+
+List<PickingLine> _linesInSameProductGroup(PickingDocument doc, PickingLine anchor) {
+  final String k = _lineGroupKey(anchor);
+  return doc.lines.where((PickingLine l) => _lineGroupKey(l) == k).toList(growable: false);
+}
+
+double _aggregateQtyPicked(Iterable<PickingLine> lines) {
+  return lines.fold<double>(0, (double s, PickingLine l) => s + l.qtyPicked);
+}
+
+double _aggregateQtyRequired(Iterable<PickingLine> lines) {
+  return lines.fold<double>(0, (double s, PickingLine l) => s + l.qtyRequired);
+}
+
 List<_LineGroup> _groupLinesByProduct(List<PickingLine> lines) {
   final Map<String, List<PickingLine>> map = <String, List<PickingLine>>{};
   for (final PickingLine l in lines) {
-    final String key = (l.productId != null && l.productId!.isNotEmpty)
-        ? 'id:${l.productId}'
-        : '${l.productName}|${l.barcode ?? l.sku ?? ''}';
+    final String key = _lineGroupKey(l);
     map.putIfAbsent(key, () => <PickingLine>[]).add(l);
   }
   return map.values.map((List<PickingLine> groupLines) {
@@ -126,15 +145,6 @@ PickingLine? _findLineByScan(List<PickingLine> lines, String raw) {
     }
   }
   return null;
-}
-
-/// RN `handleLineQtySubmit` bilan bir xil: `product_name` va
-/// `(l.barcode === anchor.barcode || l.sku === anchor.sku)`.
-bool _controllerVerifySameGroup(PickingLine l, PickingLine anchor) {
-  if (l.productName != anchor.productName) {
-    return false;
-  }
-  return l.barcode == anchor.barcode || l.sku == anchor.sku;
 }
 
 /// RN `Math.floor(Number(qtyInput))` bilan `qty_picked` solishtirish.
@@ -403,8 +413,11 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
   ) async {
     final AppLocale loc = ref.read(appLocaleProvider);
     final BuildContext hostContext = context;
+    final List<PickingLine> groupLines = _linesInSameProductGroup(doc, physical);
+    final double aggPicked = _aggregateQtyPicked(groupLines);
+    final double aggRequired = _aggregateQtyRequired(groupLines);
     final TextEditingController qty =
-        TextEditingController(text: formatPickQty(physical.qtyPicked));
+        TextEditingController(text: formatPickQty(aggPicked));
     try {
       await showModalBottomSheet<void>(
         context: context,
@@ -424,7 +437,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${physical.locationCode} · ${formatPickQty(physical.qtyPicked)}/${formatPickQty(physical.qtyRequired)}',
+                    '${groupLines.first.locationCode} · ${formatPickQty(aggPicked)}/${formatPickQty(aggRequired)}',
                     style: TextStyle(
                       color: Theme.of(ctx).colorScheme.onSurfaceVariant,
                     ),
@@ -441,7 +454,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                   const SizedBox(height: 16),
                   FilledButton(
                     onPressed: () async {
-                      if (_controllerQtyMismatch(qty.text, physical.qtyPicked)) {
+                      if (_controllerQtyMismatch(qty.text, aggPicked)) {
                         _rejectScanHaptic();
                         ScaffoldMessenger.of(hostContext).showSnackBar(
                           SnackBar(
@@ -452,10 +465,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                         );
                         return;
                       }
-                      final Set<String> ids = doc.lines
-                          .where((PickingLine l) => _controllerVerifySameGroup(l, physical))
-                          .map((PickingLine l) => l.id)
-                          .toSet();
+                      final Set<String> ids =
+                          groupLines.map((PickingLine l) => l.id).toSet();
                       setState(() {
                         _verifiedLineIds = {..._verifiedLineIds, ...ids};
                       });
@@ -865,7 +876,10 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                           extra: ScannerArgs(
                             returnToPick: true,
                             taskId: widget.taskId,
-                            lineId: stock.id,
+                            lineId: profile == PickerProfileParam.controller &&
+                                    group.members.length > 1
+                                ? null
+                                : stock.id,
                             profileType: profile,
                           ),
                         );
@@ -891,7 +905,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                             );
                             return;
                           }
-                          if (!_controllerVerifySameGroup(match, stock)) {
+                          if (_lineGroupKey(match) != _lineGroupKey(stock)) {
                             _rejectScanHaptic();
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text(StringLookup.t(loc, 'wrongBarcodeTitle'))),
@@ -900,7 +914,9 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                           }
                           setM(() {
                             scannedForQty = t;
-                            qty.text = formatPickQty(match.qtyPicked);
+                            final List<PickingLine> scanGroup =
+                                _linesInSameProductGroup(doc, match);
+                            qty.text = formatPickQty(_aggregateQtyPicked(scanGroup));
                           });
                         },
                       ),
@@ -922,7 +938,11 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                             if (physical == null) {
                               return;
                             }
-                            if (_controllerQtyMismatch(qty.text, physical.qtyPicked)) {
+                            final List<PickingLine> confirmGroup =
+                                _linesInSameProductGroup(doc, physical);
+                            final double aggPickConfirm =
+                                _aggregateQtyPicked(confirmGroup);
+                            if (_controllerQtyMismatch(qty.text, aggPickConfirm)) {
                               _rejectScanHaptic();
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
@@ -933,10 +953,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                               );
                               return;
                             }
-                            final Set<String> ids = doc.lines
-                                .where((PickingLine l) => _controllerVerifySameGroup(l, physical))
-                                .map((PickingLine l) => l.id)
-                                .toSet();
+                            final Set<String> ids =
+                                confirmGroup.map((PickingLine l) => l.id).toSet();
                             setState(() {
                               _verifiedLineIds = {..._verifiedLineIds, ...ids};
                             });
