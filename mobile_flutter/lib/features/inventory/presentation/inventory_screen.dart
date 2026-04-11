@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
 
+import '../../../core/config/brand.dart';
 import '../../../shared/widgets/picker_footer.dart';
 import '../data/models/picker_inventory_models.dart';
 import '../data/picker_location_format.dart';
@@ -24,7 +25,6 @@ class InventoryScreen extends ConsumerStatefulWidget {
 class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   late final TextEditingController _searchController;
 
-  static const Color _navy = Color(0xFF0D1B2A);
   static const Color _navyLight = Color(0xFF1B263B);
   static const Color _scaffoldGrey = Color(0xFFF0F2F5);
   static const Color _stockOk = Color(0xFF2E7D32);
@@ -94,7 +94,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               Material(
-                color: _navy,
+                color: Brand.pickerHeaderNavy,
                 elevation: 2,
                 shadowColor: Colors.black26,
                 child: SafeArea(
@@ -462,7 +462,7 @@ class _InventoryScrollContent extends ConsumerWidget {
                     const SizedBox(height: 20),
                     FilledButton.icon(
                       style: FilledButton.styleFrom(
-                        backgroundColor: _InventoryScreenState._navy,
+                        backgroundColor: Brand.pickerHeaderNavy,
                         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
@@ -503,7 +503,7 @@ class _InventoryScrollContent extends ConsumerWidget {
                     const SizedBox(height: 20),
                     FilledButton.icon(
                       style: FilledButton.styleFrom(
-                        backgroundColor: _InventoryScreenState._navy,
+                        backgroundColor: Brand.pickerHeaderNavy,
                         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),

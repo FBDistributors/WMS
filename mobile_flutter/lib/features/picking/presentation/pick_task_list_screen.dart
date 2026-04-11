@@ -635,11 +635,14 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
               'pickerHome',
               queryParameters: <String, String>{'profile': profileToQuery(profile)},
             ),
-            headerBackgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-            titleColor: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF333333),
-            accentColor: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1A237E),
+            headerBackgroundColor: isDark ? const Color(0xFF1E293B) : null,
+            titleColor: isDark ? const Color(0xFFF1F5F9) : null,
+            accentColor: isDark ? const Color(0xFF93C5FD) : null,
             trailing: !_showConsolidated && profile == PickerProfileParam.picker
                 ? TextButton(
+                    style: isDark
+                        ? null
+                        : TextButton.styleFrom(foregroundColor: Colors.white.withValues(alpha: 0.92)),
                     onPressed: () {
                       setState(() {
                         _orderSelectionMode = !_orderSelectionMode;

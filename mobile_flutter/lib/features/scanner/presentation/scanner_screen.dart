@@ -5,7 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../../../core/app_state/app_locale.dart';
+import '../../../core/app_state/locale_controller.dart';
 import '../../../core/router/scanner_args.dart';
+import '../../../l10n/string_lookup.dart';
 import '../../inventory/data/models/picker_inventory_models.dart';
 import '../../inventory/presentation/inventory_providers.dart';
 import '../../picking/domain/profile_type_param.dart';
@@ -28,7 +31,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   final MobileScannerController _controller = MobileScannerController();
   String? _lastRaw;
   int _lastAt = 0;
-  bool _busy = false;
+  /// API kutish (RN dagi pastki "Looking up…" banner); to‘liq ekran overlay emas.
+  bool _lookupInProgress = false;
   bool _scanEnabled = true;
 
   @override
@@ -53,42 +57,52 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     _lastAt = 0;
   }
 
-  void _routeToPick(ScannerArgs a, String barcode) {
+  void _routeToPick(GoRouter router, ScannerArgs a, String barcode) {
     final PickerProfileParam p = _profile(a);
-    GoRouter.of(context).goNamed(
-      'pickTaskDetail',
-      pathParameters: <String, String>{'taskId': a.taskId!},
-      queryParameters: <String, String>{
-        'profile': profileToQuery(p),
-        'scannedBarcode': barcode,
-        if (a.lineId != null) 'lineId': a.lineId!,
-      },
+    final Map<String, String> q = <String, String>{
+      'profile': profileToQuery(p),
+      'scannedBarcode': barcode,
+      if (a.lineId != null) 'lineId': a.lineId!,
+    };
+    router.go(
+      Uri(
+        path: '/pick-task/${Uri.encodeComponent(a.taskId!)}',
+        queryParameters: q,
+      ).toString(),
     );
   }
 
-  void _routeToConsolidated(ScannerArgs a, String barcode) {
+  void _routeToConsolidated(GoRouter router, ScannerArgs a, String barcode) {
     final PickerProfileParam p = _profile(a);
-    GoRouter.of(context).goNamed(
-      'pickTasks',
-      queryParameters: <String, String>{
-        'profile': profileToQuery(p),
-        'openConsolidated': '1',
-        'scannedBarcode': barcode,
-        if (a.selectedProductKey != null) 'selectedProductKey': a.selectedProductKey!,
-      },
+    final Map<String, String> q = <String, String>{
+      'profile': profileToQuery(p),
+      'openConsolidated': '1',
+      'scannedBarcode': barcode,
+      if (a.selectedProductKey != null) 'selectedProductKey': a.selectedProductKey!,
+    };
+    router.go(Uri(path: '/pick-tasks', queryParameters: q).toString());
+  }
+
+  void _goInventoryDetail(GoRouter router, String productId) {
+    router.go(
+      '/inventory/detail/${Uri.encodeComponent(productId)}',
     );
   }
 
-  Future<bool> _dispatchRouteOnlyIfPossible(String barcode, ScannerArgs? a) async {
+  Future<bool> _dispatchRouteOnlyIfPossible(
+    GoRouter router,
+    String barcode,
+    ScannerArgs? a,
+  ) async {
     if (a == null) {
       return false;
     }
     if (a.returnToPick && a.taskId != null && a.taskId!.isNotEmpty) {
-      _routeToPick(a, barcode);
+      _routeToPick(router, a, barcode);
       return true;
     }
     if (a.returnToConsolidated) {
-      _routeToConsolidated(a, barcode);
+      _routeToConsolidated(router, a, barcode);
       return true;
     }
     return false;
@@ -96,7 +110,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
   Future<void> _onBarcode(String raw) async {
     final String value = raw.trim();
-    if (value.isEmpty || _busy || !_scanEnabled) {
+    if (value.isEmpty || !_scanEnabled) {
       return;
     }
     final int now = DateTime.now().millisecondsSinceEpoch;
@@ -112,11 +126,11 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
     setState(() {
       _scanEnabled = false;
-      _busy = !routeOnlyFlow;
+      _lookupInProgress = !routeOnlyFlow;
     });
 
     try {
-      if (await _dispatchRouteOnlyIfPossible(value, a)) {
+      if (await _dispatchRouteOnlyIfPossible(router, value, a)) {
         return;
       }
 
@@ -183,7 +197,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       }
     } finally {
       if (mounted) {
-        setState(() => _busy = false);
+        setState(() => _lookupInProgress = false);
       }
     }
   }
@@ -194,10 +208,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     ScannerArgs? a,
   ) {
     if (a == null) {
-      router.goNamed(
-        'inventoryDetail',
-        pathParameters: <String, String>{'productId': product.productId},
-      );
+      _goInventoryDetail(router, product.productId);
       return;
     }
     if (a.returnToPick ||
@@ -247,10 +258,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       );
       return;
     }
-    router.goNamed(
-      'inventoryDetail',
-      pathParameters: <String, String>{'productId': product.productId},
-    );
+    _goInventoryDetail(router, product.productId);
   }
 
   void _resumeScan() {
@@ -316,7 +324,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   }
 
   void _onDetect(BarcodeCapture cap) {
-    if (!_scanEnabled || _busy) {
+    if (!_scanEnabled) {
       return;
     }
     final List<Barcode> list = cap.barcodes;
@@ -332,6 +340,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final AppLocale loc = ref.watch(appLocaleProvider);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Scanner'),
@@ -341,16 +350,48 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         ),
       ),
       body: Stack(
+        fit: StackFit.expand,
         children: <Widget>[
           MobileScanner(
             controller: _controller,
             onDetect: _onDetect,
           ),
-          if (_busy)
-            const Positioned.fill(
-              child: ColoredBox(
-                color: Color(0x66000000),
-                child: Center(child: CircularProgressIndicator()),
+          if (_lookupInProgress)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: SafeArea(
+                top: false,
+                child: Material(
+                  color: const Color(0xE6000000),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    child: Row(
+                      children: <Widget>[
+                        const SizedBox(
+                          width: 26,
+                          height: 26,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Text(
+                            StringLookup.t(loc, 'loading'),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
         ],

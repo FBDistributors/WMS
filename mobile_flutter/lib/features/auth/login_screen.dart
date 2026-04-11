@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -21,7 +23,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final TextEditingController _user = TextEditingController();
   final TextEditingController _pass = TextEditingController();
   bool _showPassword = false;
-  bool _dropdownOpen = false;
   @override
   void initState() {
     super.initState();
@@ -93,6 +94,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return auth.when(
       loading: () => Scaffold(
         backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF5F5F5),
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          elevation: 0,
+          backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF5F5F5),
+          actions: _languageMenuActions(loc, isDark),
+        ),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -122,16 +129,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final bool busy = ref.watch(authControllerProvider).isLoading;
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF5F5F5),
-      body: Stack(
-        children: <Widget>[
-          Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 320),
-                child: Column(
-                  children: <Widget>[
-                    const SizedBox(height: 40),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        elevation: 0,
+        backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF5F5F5),
+        actions: _languageMenuActions(loc, isDark),
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 320),
+            child: Column(
+              children: <Widget>[
+                    const SizedBox(height: 8),
                     Image.asset(
                       'assets/branding/logo.png',
                       width: Brand.loginLogoSize,
@@ -196,75 +207,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ),
             ),
-          ),
-          if (_dropdownOpen)
-            Positioned.fill(
-              child: GestureDetector(
-                onTap: () => setState(() => _dropdownOpen = false),
-                child: Container(color: Colors.black26),
-              ),
-            ),
-          Positioned(
-            top: 48,
-            right: 16,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: <Widget>[
-                Material(
-                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  child: InkWell(
-                    onTap: () => setState(() => _dropdownOpen = !_dropdownOpen),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          Text(_langLabel(loc)),
-                          Icon(_dropdownOpen ? Icons.expand_less : Icons.expand_more),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                if (_dropdownOpen)
-                  Material(
-                    elevation: 4,
-                    borderRadius: BorderRadius.circular(8),
-                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                    child: Column(
-                      children: <Widget>[
-                        _langTile(AppLocale.uz, loc),
-                        _langTile(AppLocale.ru, loc),
-                        _langTile(AppLocale.en, loc),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
 
-  String _langLabel(AppLocale l) {
-    return switch (l) {
-      AppLocale.uz => StringLookup.t(l, 'langUz'),
-      AppLocale.ru => StringLookup.t(l, 'langRu'),
-      AppLocale.en => StringLookup.t(l, 'langEn'),
-    };
+  List<Widget> _languageMenuActions(AppLocale current, bool isDark) {
+    return <Widget>[
+      PopupMenuButton<AppLocale>(
+        tooltip: StringLookup.t(current, 'language'),
+        icon: Icon(Icons.language_rounded, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1A237E)),
+        onSelected: (AppLocale v) {
+          unawaited(ref.read(appLocaleProvider.notifier).setLocale(v));
+        },
+        itemBuilder: (BuildContext ctx) => <PopupMenuEntry<AppLocale>>[
+          CheckedPopupMenuItem<AppLocale>(
+            value: AppLocale.uz,
+            checked: current == AppLocale.uz,
+            child: Text(StringLookup.t(AppLocale.uz, 'langUz')),
+          ),
+          CheckedPopupMenuItem<AppLocale>(
+            value: AppLocale.ru,
+            checked: current == AppLocale.ru,
+            child: Text(StringLookup.t(AppLocale.ru, 'langRu')),
+          ),
+          CheckedPopupMenuItem<AppLocale>(
+            value: AppLocale.en,
+            checked: current == AppLocale.en,
+            child: Text(StringLookup.t(AppLocale.en, 'langEn')),
+          ),
+        ],
+      ),
+    ];
   }
 
-  Widget _langTile(AppLocale code, AppLocale current) {
-    return ListTile(
-      title: Text(_langLabel(code)),
-      trailing: current == code ? const Icon(Icons.check, color: Colors.blue) : null,
-      onTap: () {
-        ref.read(appLocaleProvider.notifier).setLocale(code);
-        setState(() => _dropdownOpen = false);
-      },
-    );
-  }
 }

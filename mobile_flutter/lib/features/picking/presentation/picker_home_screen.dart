@@ -38,7 +38,11 @@ class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
     _consumedCompletedMessage = msg;
     final String profileQ =
         GoRouterState.of(context).uri.queryParameters['profile'] ?? 'picker';
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) {
+        return;
+      }
+      await ref.read(openPickTasksProvider.notifier).refreshFromNetwork();
       if (!mounted) {
         return;
       }
@@ -83,9 +87,9 @@ class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
             title: title,
             onRefresh: _onRefresh,
             refreshing: _refreshing,
-            headerBackgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-            titleColor: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF333333),
-            accentColor: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1A237E),
+            headerBackgroundColor: isDark ? const Color(0xFF1E293B) : null,
+            titleColor: isDark ? const Color(0xFFF1F5F9) : null,
+            accentColor: isDark ? const Color(0xFF93C5FD) : null,
             leading: IconButton(
               icon: const Icon(Icons.person_outline),
               onPressed: () => context.pushNamed('account'),
