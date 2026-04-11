@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { FileText, RefreshCw, XCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -42,6 +42,8 @@ function formatActivity(iso: string | undefined, locale: string): string {
 export function PickListsPage() {
   const { t, i18n } = useTranslation(['picking', 'common'])
   const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const archive = pathname.endsWith('/picking/archive')
   const { has } = useAuth()
 
   const [items, setItems] = useState<PickList[]>([])
@@ -92,6 +94,13 @@ export function PickListsPage() {
     })
   }, [items, query])
 
+  const viewItems = useMemo(() => {
+    if (archive) {
+      return filtered.filter((item) => item.status === 'DONE')
+    }
+    return filtered.filter((item) => item.status !== 'DONE')
+  }, [archive, filtered])
+
   const docStatusLabel = useCallback(
     (raw: string) => {
       const k = raw.toLowerCase().replace(/-/g, '_')
@@ -133,11 +142,31 @@ export function PickListsPage() {
         />
       )
     }
-    if (filtered.length === 0) {
+    if (items.length === 0) {
       return (
         <EmptyState
           title={t('picking:empty_title')}
           description={t('picking:empty_desc')}
+          actionLabel={t('common:buttons.refresh')}
+          onAction={load}
+        />
+      )
+    }
+    if (filtered.length === 0) {
+      return (
+        <EmptyState
+          title={t('picking:search_empty_title')}
+          description={t('picking:search_empty_desc')}
+          actionLabel={t('common:buttons.refresh')}
+          onAction={load}
+        />
+      )
+    }
+    if (viewItems.length === 0) {
+      return (
+        <EmptyState
+          title={archive ? t('picking:empty_archive_title') : t('picking:empty_jarayon_title')}
+          description={archive ? t('picking:empty_archive_desc') : t('picking:empty_jarayon_desc')}
           actionLabel={t('common:buttons.refresh')}
           onAction={load}
         />
@@ -160,7 +189,7 @@ export function PickListsPage() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((item) => (
+            {viewItems.map((item) => (
               <tr
                 key={item.id}
                 className="cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
@@ -228,6 +257,7 @@ export function PickListsPage() {
       </TableScrollArea>
     )
   }, [
+    archive,
     canCancel,
     cancellingId,
     docStatusLabel,
@@ -236,9 +266,11 @@ export function PickListsPage() {
     handleCancel,
     i18n.language,
     isLoading,
+    items.length,
     load,
     navigate,
     t,
+    viewItems,
   ])
 
   return (

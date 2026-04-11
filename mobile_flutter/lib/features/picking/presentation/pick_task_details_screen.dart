@@ -37,11 +37,6 @@ String _lineGroupKey(PickingLine l) {
   return '${l.productName}|${l.barcode ?? l.sku ?? ''}';
 }
 
-List<PickingLine> _linesInSameProductGroup(PickingDocument doc, PickingLine anchor) {
-  final String k = _lineGroupKey(anchor);
-  return doc.lines.where((PickingLine l) => _lineGroupKey(l) == k).toList(growable: false);
-}
-
 double _aggregateQtyPicked(Iterable<PickingLine> lines) {
   return lines.fold<double>(0, (double s, PickingLine l) => s + l.qtyPicked);
 }
@@ -82,6 +77,17 @@ List<_LineGroup> _groupLinesByProduct(List<PickingLine> lines) {
     );
     return _LineGroup(virtual: virtual, members: groupLines);
   }).toList(growable: false);
+}
+
+/// Kartochka yig‘indisi bilan bir xil — `_groupLinesByProduct` a’zolari (kalit farqi bo‘lsa ham).
+List<PickingLine> _membersOfSameCardAs(PickingDocument doc, PickingLine anchor) {
+  final List<_LineGroup> groups = _groupLinesByProduct(doc.lines);
+  for (final _LineGroup g in groups) {
+    if (g.members.any((PickingLine l) => l.id == anchor.id)) {
+      return List<PickingLine>.from(g.members);
+    }
+  }
+  return <PickingLine>[anchor];
 }
 
 /// Noyakuniy qatorlar yuqorida, to‘liq terilganlar pastda (nisbiy tartib saqlanadi).
@@ -413,7 +419,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
   ) async {
     final AppLocale loc = ref.read(appLocaleProvider);
     final BuildContext hostContext = context;
-    final List<PickingLine> groupLines = _linesInSameProductGroup(doc, physical);
+    final List<PickingLine> groupLines = _membersOfSameCardAs(doc, physical);
     final double aggPicked = _aggregateQtyPicked(groupLines);
     final double aggRequired = _aggregateQtyRequired(groupLines);
     final TextEditingController qty =
@@ -905,7 +911,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                             );
                             return;
                           }
-                          if (_lineGroupKey(match) != _lineGroupKey(stock)) {
+                          if (!group.members.any((PickingLine m) => m.id == match.id)) {
                             _rejectScanHaptic();
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text(StringLookup.t(loc, 'wrongBarcodeTitle'))),
@@ -914,9 +920,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                           }
                           setM(() {
                             scannedForQty = t;
-                            final List<PickingLine> scanGroup =
-                                _linesInSameProductGroup(doc, match);
-                            qty.text = formatPickQty(_aggregateQtyPicked(scanGroup));
+                            qty.text =
+                                formatPickQty(_aggregateQtyPicked(group.members));
                           });
                         },
                       ),
@@ -938,10 +943,11 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                             if (physical == null) {
                               return;
                             }
-                            final List<PickingLine> confirmGroup =
-                                _linesInSameProductGroup(doc, physical);
+                            if (!group.members.any((PickingLine m) => m.id == physical.id)) {
+                              return;
+                            }
                             final double aggPickConfirm =
-                                _aggregateQtyPicked(confirmGroup);
+                                _aggregateQtyPicked(group.members);
                             if (_controllerQtyMismatch(qty.text, aggPickConfirm)) {
                               _rejectScanHaptic();
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -954,7 +960,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                               return;
                             }
                             final Set<String> ids =
-                                confirmGroup.map((PickingLine l) => l.id).toSet();
+                                group.members.map((PickingLine l) => l.id).toSet();
                             setState(() {
                               _verifiedLineIds = {..._verifiedLineIds, ...ids};
                             });

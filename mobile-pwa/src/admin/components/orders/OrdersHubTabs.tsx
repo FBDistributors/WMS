@@ -45,12 +45,21 @@ export function OrdersHubTabs() {
         {t('admin:menu.orders_orikzor')}
       </NavLink>
       {showPickingTab ? (
-        <NavLink
-          to="/admin/picking"
-          className={({ isActive }) => [base, isActive ? active : inactive].join(' ')}
-        >
-          {t('admin:menu.orders_jarayon')}
-        </NavLink>
+        <>
+          <NavLink
+            to="/admin/picking"
+            end
+            className={({ isActive }) => [base, isActive ? active : inactive].join(' ')}
+          >
+            {t('admin:menu.orders_jarayon')}
+          </NavLink>
+          <NavLink
+            to="/admin/picking/archive"
+            className={({ isActive }) => [base, isActive ? active : inactive].join(' ')}
+          >
+            {t('admin:menu.orders_archive')}
+          </NavLink>
+        </>
       ) : null}
     </div>
   )
