@@ -17,7 +17,6 @@ class ExpiryDatePickerField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String lang = Localizations.localeOf(context).languageCode;
     return InkWell(
       onTap: () async {
         final DateTime now = DateTime.now();
@@ -38,7 +37,7 @@ class ExpiryDatePickerField extends StatelessWidget {
           labelText: label,
           border: const OutlineInputBorder(),
         ),
-        child: Text(formatExpiryMonthYear(value, lang)),
+        child: Text(formatExpiryMonthYear(value)),
       ),
     );
   }

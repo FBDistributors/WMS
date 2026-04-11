@@ -79,12 +79,6 @@ class InventoryDetailScreen extends ConsumerWidget {
   }
 }
 
-String _inventoryLanguageCode(InventoryLocale l) => switch (l) {
-      InventoryLocale.uz => 'uz',
-      InventoryLocale.ru => 'ru',
-      InventoryLocale.en => 'en',
-    };
-
 /// Bir xil [PickerProductLocation.locationCode] + bir xil [PickerProductLocation.expiryDate] uchun qoldiqlarni yig‘ish.
 List<PickerProductLocation> mergePickerProductLocationsForDisplay(
   List<PickerProductLocation> locations,
@@ -126,7 +120,6 @@ List<Widget> inventoryLocTiles(
       ),
     ];
   }
-  final String lang = _inventoryLanguageCode(loc);
   final List<PickerProductLocation> merged = mergePickerProductLocationsForDisplay(locations);
   return merged.map((PickerProductLocation l) {
     return Card(
@@ -134,7 +127,7 @@ List<Widget> inventoryLocTiles(
       child: ListTile(
         title: Text(l.locationCode, style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
         subtitle: Text(
-          formatExpiryMonthYear(l.expiryDate, lang),
+          formatExpiryMonthYear(l.expiryDate),
           style: TextStyle(color: isDark ? Colors.white54 : Colors.black45),
         ),
         trailing: Text(

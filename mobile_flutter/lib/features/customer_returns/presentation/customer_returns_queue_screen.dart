@@ -28,7 +28,7 @@ class CustomerReturnsQueueScreen extends ConsumerWidget {
       body: async.when(
         data: (CustomerReturnListResponse r) {
           if (r.items.isEmpty) {
-            return const Center(child: Text('Navbat bo‘sh'));
+            return Center(child: Text(StringLookup.t(loc, 'returnsQueueEmpty')));
           }
           return RefreshIndicator(
             onRefresh: () async {
@@ -42,7 +42,12 @@ class CustomerReturnsQueueScreen extends ConsumerWidget {
                 return Card(
                   child: ExpansionTile(
                     title: Text(c.docNo),
-                    subtitle: Text('${c.status} · ${c.lines.length} qator'),
+                    subtitle: Text(
+                      StringLookup.tParams(loc, 'returnsLinesSummary', <String, String>{
+                        'status': c.status,
+                        'count': '${c.lines.length}',
+                      }),
+                    ),
                     children: <Widget>[
                       Padding(
                         padding: const EdgeInsets.all(12),
@@ -53,7 +58,12 @@ class CustomerReturnsQueueScreen extends ConsumerWidget {
                               (CustomerReturnLine l) => ListTile(
                                 dense: true,
                                 title: Text(l.productName),
-                                subtitle: Text('${l.locationCode} · ${l.qty}'),
+                                subtitle: Text(
+                                  StringLookup.tParams(loc, 'returnsLineSubtitle', <String, String>{
+                                    'location': l.locationCode,
+                                    'qty': '${l.qty}',
+                                  }),
+                                ),
                               ),
                             ),
                             FilledButton(
@@ -65,7 +75,9 @@ class CustomerReturnsQueueScreen extends ConsumerWidget {
                                   if (context.mounted) {
                                     ref.invalidate(customerReturnsQueueProvider);
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Yakunlandi')),
+                                      SnackBar(
+                                        content: Text(StringLookup.t(loc, 'returnsCompleted')),
+                                      ),
                                     );
                                   }
                                 } on Exception catch (e) {
@@ -76,7 +88,7 @@ class CustomerReturnsQueueScreen extends ConsumerWidget {
                                   }
                                 }
                               },
-                              child: const Text('Yakunlash (yig‘uvchi)'),
+                              child: Text(StringLookup.t(loc, 'returnsCompletePicker')),
                             ),
                           ],
                         ),
@@ -96,7 +108,7 @@ class CustomerReturnsQueueScreen extends ConsumerWidget {
               Text('$e'),
               FilledButton(
                 onPressed: () => ref.invalidate(customerReturnsQueueProvider),
-                child: const Text('Qayta'),
+                child: Text(StringLookup.t(loc, 'retry')),
               ),
             ],
           ),

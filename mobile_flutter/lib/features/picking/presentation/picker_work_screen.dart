@@ -11,6 +11,17 @@ import '../../../l10n/string_lookup.dart';
 import '../data/picking_models.dart';
 import '../picking_providers.dart';
 
+List<PickingLine> _orderedPickLines(List<PickingLine> lines) {
+  final List<PickingLine> incomplete =
+      lines.where((PickingLine l) => l.qtyPicked < l.qtyRequired).toList();
+  final List<PickingLine> complete =
+      lines.where((PickingLine l) => l.qtyPicked >= l.qtyRequired).toList();
+  return <PickingLine>[...incomplete, ...complete];
+}
+
+String _pickerWorkBarcodeSkuLine(PickingLine line) =>
+    '${line.barcode ?? '—'} / ${line.sku ?? '—'}';
+
 /// RN `PickerScreen` — API orqali `pickLine` / `completePickDocument`.
 class PickerWorkScreen extends ConsumerStatefulWidget {
   const PickerWorkScreen({super.key, this.taskId});
@@ -226,7 +237,7 @@ class _PickerWorkScreenState extends ConsumerState<PickerWorkScreen> {
 
     final PickingDocument? d = _doc;
     final String sq = _search.text.trim().toLowerCase();
-    final List<PickingLine> shown = sq.isEmpty
+    final List<PickingLine> filtered = sq.isEmpty
         ? _lines
         : _lines
             .where(
@@ -236,6 +247,7 @@ class _PickerWorkScreenState extends ConsumerState<PickerWorkScreen> {
                   (l.barcode != null && l.barcode!.toLowerCase().contains(sq)),
             )
             .toList();
+    final List<PickingLine> shown = _orderedPickLines(filtered);
 
     final double picked = _lines.fold<double>(
       0,
@@ -305,16 +317,56 @@ class _PickerWorkScreenState extends ConsumerState<PickerWorkScreen> {
               itemCount: shown.length,
               itemBuilder: (BuildContext context, int i) {
                 final PickingLine line = shown[i];
+                final bool lineComplete =
+                    line.qtyPicked >= line.qtyRequired;
+                final ColorScheme cs = Theme.of(context).colorScheme;
+                final bool buildDark =
+                    Theme.of(context).brightness == Brightness.dark;
+                final Color? cardColor = lineComplete
+                    ? Colors.green.withValues(alpha: buildDark ? 0.20 : 0.14)
+                    : null;
                 return Card(
+                  color: cardColor,
                   child: Padding(
                     padding: const EdgeInsets.all(8),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        Text(line.productName,
-                            style: const TextStyle(fontWeight: FontWeight.w600)),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Expanded(
+                              child: Text(
+                                line.productName,
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                            if (lineComplete)
+                              Icon(
+                                Icons.check_circle_rounded,
+                                color: Colors.green.shade700,
+                                size: 22,
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _pickerWorkBarcodeSkuLine(line),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: cs.onSurfaceVariant,
+                            fontFamily: 'monospace',
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                         Text(
                           '${line.locationCode} · ${formatPickQty(line.qtyPicked)}/${formatPickQty(line.qtyRequired)}',
+                          style: TextStyle(
+                            color: lineComplete
+                                ? Colors.green.shade700
+                                : cs.onSurfaceVariant,
+                          ),
                         ),
                         Row(
                           children: <Widget>[

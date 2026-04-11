@@ -1,7 +1,7 @@
 import 'package:intl/intl.dart';
 
-/// Yaroqlilikni foydalanuvchiga `MMM yyyy` (locale bo‘yicha) ko‘rinishida chiqarish. API qiymati ISO bo‘lishi mumkin.
-String formatExpiryMonthYear(String? rawIso, String languageCode) {
+/// Yaroqlilik: doim ingliz `MMM yyyy` (tarjima yo‘q), bosh harf katta, masalan `Sep 2028`. API qiymati ISO bo‘lishi mumkin.
+String formatExpiryMonthYear(String? rawIso) {
   if (rawIso == null || rawIso.trim().isEmpty) {
     return '—';
   }
@@ -11,9 +11,9 @@ String formatExpiryMonthYear(String? rawIso, String languageCode) {
   if (parsed == null) {
     return s;
   }
-  try {
-    return DateFormat('MMM yyyy', languageCode).format(parsed);
-  } on ArgumentError catch (_) {
-    return DateFormat('MMM yyyy', 'en').format(parsed);
+  final String formatted = DateFormat('MMM yyyy', 'en').format(parsed);
+  if (formatted.isEmpty) {
+    return formatted;
   }
+  return formatted[0].toUpperCase() + formatted.substring(1);
 }

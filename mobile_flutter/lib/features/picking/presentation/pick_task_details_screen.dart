@@ -15,7 +15,7 @@ import '../../../core/offline/offline_providers.dart';
 import '../../../core/router/scanner_args.dart';
 import '../../../l10n/string_lookup.dart';
 import '../../../shared/layout/sheet_bottom_inset.dart';
-import '../alternate_location_menu_label.dart';
+import '../alternate_location_menu_label.dart' show mergeAlternateLocationsForDisplay, MergedAlternateLocationRow;
 import '../data/picking_constants.dart';
 import '../data/picking_models.dart';
 import '../domain/profile_type_param.dart';
@@ -988,16 +988,19 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                           StringLookup.t(loc, 'alternateLocations'),
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
-                        ...stock.alternateLocations.map((PickingAlternateLocation a) {
+                        ...mergeAlternateLocationsForDisplay(stock.alternateLocations).map((
+                          MergedAlternateLocationRow row,
+                        ) {
                           return ListTile(
                             dense: true,
                             title: Text(
-                              alternateLocationMenuLabel(a, stock.alternateLocations, loc.code),
+                              row.menuLabel,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
                             onTap: () async {
                               try {
+                                final PickingAlternateLocation a = row.representative;
                                 final PickLineResponse res =
                                     await ref.read(pickingRepositoryProvider).changePickSource(
                                       stock.id,

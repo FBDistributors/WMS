@@ -1,49 +1,59 @@
+import 'dart:collection';
+
 import '../../core/formatting/expiry_display_format.dart';
 import 'data/picking_models.dart';
 
-String? _alternateDisambiguationSuffix(PickingAlternateLocation a, String languageCode) {
-  final String? b = a.batch?.trim();
-  if (b != null && b.isNotEmpty) {
-    return b.length > 24 ? '${b.substring(0, 21)}…' : b;
-  }
-  final String? e = a.expiryDate?.trim();
-  if (e != null && e.isNotEmpty) {
-    return formatExpiryMonthYear(e, languageCode);
-  }
-  final String lid = a.lotId.trim();
-  if (lid.length > 8) {
-    return lid.substring(lid.length - 8);
-  }
-  if (lid.isNotEmpty) {
-    return lid;
-  }
-  return null;
+/// Birlashtirilgan alternativ joy qatori (UI): bir xil joy + bir xil muddat bo‘yicha qoldiq yig‘indi, `changePickSource` uchun [representative] (eng katta qoldiqli lot).
+class MergedAlternateLocationRow {
+  const MergedAlternateLocationRow({
+    required this.representative,
+    required this.totalQtyRounded,
+    required this.menuLabel,
+  });
+
+  final PickingAlternateLocation representative;
+  final int totalQtyRounded;
+  final String menuLabel;
 }
 
-/// Bir xil [PickingAlternateLocation.locationCode] bir necha lot uchun takrorlansa, partiya/muddat/lot qisqacha qo‘shiladi.
-String alternateLocationMenuLabel(
-  PickingAlternateLocation a,
-  List<PickingAlternateLocation> siblings,
-  String languageCode,
+String _alternateMergeKey(PickingAlternateLocation a) =>
+    '${a.locationCode.trim()}\u001f${(a.expiryDate ?? '').trim()}';
+
+/// Bir xil [PickingAlternateLocation.locationCode] + bir xil muddat bo‘yicha guruhlab, qoldiqlarni yig‘adi; vakil — guruhda [availableQty] eng kattasi.
+List<MergedAlternateLocationRow> mergeAlternateLocationsForDisplay(
+  List<PickingAlternateLocation> raw,
 ) {
-  final String code = a.locationCode.trim();
-  final int dupCount = code.isEmpty
-      ? 0
-      : siblings.where((PickingAlternateLocation x) => x.locationCode.trim() == code).length;
-  final String base = '${a.locationCode} — ${a.availableQty}';
-  if (dupCount <= 1) {
-    return base;
+  if (raw.isEmpty) {
+    return const <MergedAlternateLocationRow>[];
   }
-  final String? suffix = _alternateDisambiguationSuffix(a, languageCode);
-  if (suffix != null && suffix.isNotEmpty) {
-    return '$base · $suffix';
+  final LinkedHashMap<String, List<PickingAlternateLocation>> byKey =
+      LinkedHashMap<String, List<PickingAlternateLocation>>();
+  for (final PickingAlternateLocation a in raw) {
+    final String k = _alternateMergeKey(a);
+    byKey.putIfAbsent(k, () => <PickingAlternateLocation>[]).add(a);
   }
-  final String lid = a.lotId.trim();
-  if (lid.length > 8) {
-    return '$base · ${lid.substring(lid.length - 8)}';
+  final List<MergedAlternateLocationRow> out = <MergedAlternateLocationRow>[];
+  for (final List<PickingAlternateLocation> g in byKey.values) {
+    double sum = 0;
+    PickingAlternateLocation rep = g.first;
+    for (final PickingAlternateLocation a in g) {
+      sum += a.availableQty;
+      if (a.availableQty > rep.availableQty) {
+        rep = a;
+      }
+    }
+    final int total = sum.round();
+    final String? expTrim = rep.expiryDate?.trim();
+    final String suffix = expTrim != null && expTrim.isNotEmpty
+        ? ' · ${formatExpiryMonthYear(rep.expiryDate)}'
+        : '';
+    out.add(
+      MergedAlternateLocationRow(
+        representative: rep,
+        totalQtyRounded: total,
+        menuLabel: '${rep.locationCode} — $total$suffix',
+      ),
+    );
   }
-  if (lid.isNotEmpty) {
-    return '$base · $lid';
-  }
-  return base;
+  return out;
 }

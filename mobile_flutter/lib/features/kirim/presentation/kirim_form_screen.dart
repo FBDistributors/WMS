@@ -762,8 +762,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     if (_invAllLocations.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadInvLocations());
     }
-    final String invLang = ref.watch(appLocaleProvider).code;
-
     return ListView(
       padding: const EdgeInsets.all(16),
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -901,7 +899,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                       Text(
-                        '${item.batchNo}${item.expiryDate != null ? ' • ${formatExpiryMonthYear(item.expiryDate, invLang)}' : ''} • Tizim: ${item.availableQty.round()}',
+                        '${item.batchNo}${item.expiryDate != null ? ' • ${formatExpiryMonthYear(item.expiryDate)}' : ''} • Tizim: ${item.availableQty.round()}',
                         style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
                       ),
                       TextField(
@@ -958,7 +956,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
               return ListTile(
                 title: Text(loc.locationCode),
                 subtitle: Text(
-                  '${loc.batchNo}${loc.expiryDate != null ? ' • ${formatExpiryMonthYear(loc.expiryDate, invLang)}' : ''} • ${loc.availableQty.round()}',
+                  '${loc.batchNo}${loc.expiryDate != null ? ' • ${formatExpiryMonthYear(loc.expiryDate)}' : ''} • ${loc.availableQty.round()}',
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
@@ -1200,7 +1198,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                     return ListTile(
                       title: Text(loc.locationCode),
                       subtitle: Text(
-                        '${loc.batchNo} · ${loc.availableQty.toStringAsFixed(0)} · ${formatExpiryMonthYear(loc.expiryDate, appLoc.code)}',
+                        '${loc.batchNo} · ${loc.availableQty.toStringAsFixed(0)} · ${formatExpiryMonthYear(loc.expiryDate)}',
                       ),
                       tileColor: sel ? Colors.blue.shade50 : null,
                       onTap: () => setState(() => _returnPick = loc),

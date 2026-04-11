@@ -151,8 +151,9 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
     final int n = int.tryParse(_qty.text.trim()) ?? 0;
     final int max = from.availableQty.floor();
     if (n < 1 || n > max || from.locationId == to.id) {
+      final AppLocale loc = ref.read(appLocaleProvider);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Miqdor yoki lokatsiyani tekshiring')),
+        SnackBar(content: Text(StringLookup.t(loc, 'movementQtyOrLocationInvalid'))),
       );
       return;
     }
@@ -174,7 +175,10 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
         reasonCode: 'inventory_overage',
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ko‘chirildi')));
+        final AppLocale loc = ref.read(appLocaleProvider);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(StringLookup.t(loc, 'movementTransferred'))),
+        );
         setState(() {
           _phase = _MovementPhase.choose;
           _product = null;
@@ -207,7 +211,10 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
             toLocationId: to.id,
           );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Palet ko‘chirildi')));
+        final AppLocale loc = ref.read(appLocaleProvider);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(StringLookup.t(loc, 'movementPalletTransferred'))),
+        );
         setState(() {
           _phase = _MovementPhase.choose;
           _palletContents = null;
@@ -292,9 +299,12 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
         padding: const EdgeInsets.all(16),
         children: <Widget>[
           if (!online)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 12),
-              child: Text('Offline — ko‘chirish cheklangan', style: TextStyle(color: Colors.orange)),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                StringLookup.t(loc, 'movementOfflineLimited'),
+                style: const TextStyle(color: Colors.orange),
+              ),
             ),
           if (_phase == _MovementPhase.choose) ...<Widget>[
             Text(
@@ -306,7 +316,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
               child: ListTile(
                 leading: const Icon(Icons.qr_code_scanner),
                 title: Text(StringLookup.t(loc, 'movementProductMode')),
-                subtitle: const Text('Skaner yoki barcode'),
+                subtitle: Text(StringLookup.t(loc, 'movementSubtitleScanOrBarcode')),
                 onTap: () => setState(() => _phase = _MovementPhase.scanProduct),
               ),
             ),
@@ -314,7 +324,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
               child: ListTile(
                 leading: const Icon(Icons.grid_view),
                 title: Text(StringLookup.t(loc, 'movementPalletMode')),
-                subtitle: const Text('Lokatsiya kodini skanerlang'),
+                subtitle: Text(StringLookup.t(loc, 'movementSubtitleScanLocationCode')),
                 onTap: () => setState(() => _phase = _MovementPhase.pallet),
               ),
             ),
@@ -323,7 +333,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
             if (_product == null) ...<Widget>[
               BarcodeSearchInput(
                 onSelectProduct: _loadProduct,
-                label: 'Barcode',
+                label: StringLookup.t(loc, 'barcodeOrSku'),
               ),
               const SizedBox(height: 12),
               FilledButton.icon(
@@ -332,7 +342,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
                   extra: const ScannerArgs(returnToMovement: true),
                 ),
                 icon: const Icon(Icons.camera_alt),
-                label: const Text('Skaner'),
+                label: Text(StringLookup.t(loc, 'scanButton')),
               ),
               if (_productError != null) Text(_productError!, style: const TextStyle(color: Colors.red)),
             ] else ...<Widget>[
@@ -342,30 +352,35 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
                 barcode: _product!.mainBarcode,
               ),
               const SizedBox(height: 12),
-              const Text('Qayerdan', style: TextStyle(fontWeight: FontWeight.w600)),
+              Text(StringLookup.t(loc, 'movementFrom'),
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
               if (_product!.locations.isEmpty)
-                const Text('Zaxira yo‘q')
+                Text(StringLookup.t(loc, 'movementNoStock'))
               else
-                ..._product!.locations.map((PickerProductLocation loc) {
-                  final bool sel = _fromLocation?.lotId == loc.lotId &&
-                      _fromLocation?.locationId == loc.locationId;
+                ..._product!.locations.map((PickerProductLocation pl) {
+                  final bool sel = _fromLocation?.lotId == pl.lotId &&
+                      _fromLocation?.locationId == pl.locationId;
                   return Card(
                     color: sel ? Colors.blue.shade50 : null,
                     child: ListTile(
-                      title: Text(loc.locationCode),
+                      title: Text(pl.locationCode),
                       subtitle: Text(
-                        'Mavjud: ${loc.availableQty.toStringAsFixed(0)} · ${loc.batchNo}',
+                        StringLookup.tParams(loc, 'movementAvailableInLot', <String, String>{
+                          'qty': pl.availableQty.toStringAsFixed(0),
+                          'batch': pl.batchNo,
+                        }),
                       ),
-                      onTap: () => setState(() => _fromLocation = loc),
+                      onTap: () => setState(() => _fromLocation = pl),
                     ),
                   );
                 }),
               const SizedBox(height: 12),
-              const Text('Qayerga', style: TextStyle(fontWeight: FontWeight.w600)),
+              Text(StringLookup.t(loc, 'movementTo'),
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
               TextField(
-                decoration: const InputDecoration(
-                  labelText: 'Lokatsiya qidiruv',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: StringLookup.t(loc, 'movementLocationSearchLabel'),
+                  border: const OutlineInputBorder(),
                 ),
                 onChanged: (String v) => setState(() => _locationSearch = v),
               ),
@@ -383,9 +398,9 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
               TextField(
                 controller: _qty,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Miqdor',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: StringLookup.t(loc, 'qtyShort'),
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
@@ -397,22 +412,22 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
                         width: 22,
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
-                    : const Text('Ko‘chirish'),
+                    : Text(StringLookup.t(loc, 'movementTransfer')),
               ),
             ],
           ],
           if (_phase == _MovementPhase.pallet) ...<Widget>[
             TextField(
               controller: _palletCode,
-              decoration: const InputDecoration(
-                labelText: 'Lokatsiya kodi',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: StringLookup.t(loc, 'movementLocationCodeLabel'),
+                border: const OutlineInputBorder(),
               ),
               onSubmitted: (_) => _loadPallet(_palletCode.text),
             ),
             FilledButton(
               onPressed: _palletLoading ? null : () => _loadPallet(_palletCode.text),
-              child: const Text('Yuklash'),
+              child: Text(StringLookup.t(loc, 'movementLoad')),
             ),
             const SizedBox(height: 8),
             FilledButton.icon(
@@ -421,16 +436,21 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
                 extra: const ScannerArgs(returnToMovementPallet: true),
               ),
               icon: const Icon(Icons.camera_alt),
-              label: const Text('Skaner (lokatsiya)'),
+              label: Text(StringLookup.t(loc, 'movementScanLocationButton')),
             ),
             if (_palletLoading) const LinearProgressIndicator(),
             if (_palletError != null) Text(_palletError!, style: const TextStyle(color: Colors.red)),
             if (_palletContents != null) ...<Widget>[
-              Text('${_palletContents!.locationCode} · ${_palletContents!.items.length} qator'),
+              Text(
+                StringLookup.tParams(loc, 'movementPalletHeader', <String, String>{
+                  'code': _palletContents!.locationCode,
+                  'count': '${_palletContents!.items.length}',
+                }),
+              ),
               TextField(
-                decoration: const InputDecoration(
-                  labelText: 'Manzil qidiruv',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: StringLookup.t(loc, 'movementDestSearchLabel'),
+                  border: const OutlineInputBorder(),
                 ),
                 onChanged: (String v) => setState(() => _palletDestSearch = v),
               ),
@@ -450,7 +470,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
                         width: 22,
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
-                    : const Text('Paletni ko‘chirish'),
+                    : Text(StringLookup.t(loc, 'movementTransferPallet')),
               ),
             ],
           ],

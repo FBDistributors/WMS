@@ -1,22 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/app_state/app_locale.dart';
+import '../../../core/app_state/locale_controller.dart';
+import '../../../l10n/string_lookup.dart';
+
 /// RN `KirimNewScreen` — asosiy yoki showroom.
-class KirimNewScreen extends StatelessWidget {
+class KirimNewScreen extends ConsumerWidget {
   const KirimNewScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final AppLocale loc = ref.watch(appLocaleProvider);
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Yangi mahsulotlar')),
+      appBar: AppBar(title: Text(StringLookup.t(loc, 'kirimNewProducts'))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: <Widget>[
           Card(
             child: ListTile(
               leading: const Icon(Icons.warehouse, color: Color(0xFF1A237E)),
-              title: const Text('Asosiy ombor'),
-              subtitle: const Text('Yangi mahsulotlar qabuli'),
+              title: Text(StringLookup.t(loc, 'kirimWarehouseMainCardTitle')),
+              subtitle: Text(StringLookup.t(loc, 'kirimWarehouseMainCardSubtitle')),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.pushNamed(
                 'kirimForm',
@@ -30,8 +37,8 @@ class KirimNewScreen extends StatelessWidget {
           Card(
             child: ListTile(
               leading: const Icon(Icons.storefront, color: Color(0xFF1A237E)),
-              title: const Text('Showroom'),
-              subtitle: const Text('Showroom qabuli'),
+              title: Text(StringLookup.t(loc, 'kirimWarehouseShowroomCardTitle')),
+              subtitle: Text(StringLookup.t(loc, 'kirimWarehouseShowroomCardSubtitle')),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.pushNamed(
                 'kirimForm',

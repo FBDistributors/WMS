@@ -10,7 +10,8 @@ import '../../core/app_state/app_locale.dart';
 import '../../core/app_state/locale_controller.dart';
 import '../../core/app_state/network_status_provider.dart';
 import '../../core/router/scanner_args.dart';
-import '../../features/picking/alternate_location_menu_label.dart';
+import '../../features/picking/alternate_location_menu_label.dart'
+    show mergeAlternateLocationsForDisplay, MergedAlternateLocationRow;
 import '../../features/picking/data/picking_models.dart';
 import '../../features/picking/domain/profile_type_param.dart';
 import '../../features/picking/picking_providers.dart';
@@ -283,16 +284,12 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                           320,
                           MediaQuery.sizeOf(context).height * 0.45,
                         ),
-                        items: product.alternateLocations
+                        items: mergeAlternateLocationsForDisplay(product.alternateLocations)
                             .map(
-                              (PickingAlternateLocation a) => DropdownMenuItem<String>(
-                                value: _alternateLocationDropdownValue(a),
+                              (MergedAlternateLocationRow row) => DropdownMenuItem<String>(
+                                value: _alternateLocationDropdownValue(row.representative),
                                 child: Text(
-                                  alternateLocationMenuLabel(
-                                    a,
-                                    product.alternateLocations,
-                                    loc.code,
-                                  ),
+                                  row.menuLabel,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),

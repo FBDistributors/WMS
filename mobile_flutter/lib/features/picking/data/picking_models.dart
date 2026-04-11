@@ -592,17 +592,13 @@ double _num(Object? v) {
   return 0;
 }
 
-/// Ro‘yxat/kartochkada miqdorni ko‘rsatish (butun yoki qisqa kasr).
+/// Ro‘yxat/kartochkada miqdorni butun son sifatida ko‘rsatish.
 String formatPickQty(num v) {
   final double d = v.toDouble();
   if (d.isNaN || d.isInfinite) {
     return '0';
   }
-  if (d == d.roundToDouble()) {
-    return '${d.round()}';
-  }
-  final String s = d.toStringAsFixed(4);
-  return s.replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '');
+  return '${d.round()}';
 }
 
 int _int(Object? v) {
