@@ -1477,36 +1477,39 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
               child: profile == PickerProfileParam.controller
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: <Widget>[
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: _busy ? null : onComplete,
-                            child: Text(
-                              _busy
-                                  ? StringLookup.t(loc, 'submittingProgress')
-                                  : StringLookup.t(loc, 'completePicking'),
+                  ? IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: <Widget>[
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: _busy ? null : onComplete,
+                              child: Text(
+                                _busy
+                                    ? StringLookup.t(loc, 'submittingProgress')
+                                    : StringLookup.t(loc, 'completePicking'),
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Tooltip(
-                          message: StringLookup.t(loc, 'scanButton'),
-                          child: FilledButton.tonal(
-                            onPressed: _busy ? null : onScan,
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              minimumSize: const Size(52, 48),
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            child: Icon(
-                              Icons.qr_code_scanner_rounded,
-                              semanticLabel: StringLookup.t(loc, 'scanButton'),
+                          const SizedBox(width: 8),
+                          Tooltip(
+                            message: StringLookup.t(loc, 'scanButton'),
+                            child: FilledButton.tonal(
+                              onPressed: _busy ? null : onScan,
+                              style: FilledButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 14),
+                                minimumSize: const Size(48, 48),
+                                fixedSize: const Size(48, 48),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: Icon(
+                                Icons.qr_code_scanner_rounded,
+                                semanticLabel: StringLookup.t(loc, 'scanButton'),
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     )
                   : FilledButton(
                       onPressed: _busy ? null : onComplete,
