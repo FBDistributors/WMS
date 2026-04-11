@@ -4,10 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/app_state/profile_type.dart';
 import '../../core/app_state/profile_type_controller.dart';
-import '../../core/app_state/task_count_provider.dart';
 import '../../core/app_state/theme_controller.dart';
 import '../../core/router/scanner_args.dart';
 import '../../features/picking/domain/profile_type_param.dart';
+import '../../features/picking/picking_providers.dart';
 import '../../l10n/string_lookup.dart';
 import '../../core/app_state/locale_controller.dart';
 import '../../core/app_state/app_locale.dart';
@@ -34,7 +34,8 @@ class PickerFooter extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final AppLocale loc = ref.watch(appLocaleProvider);
     final bool isDark = ref.watch(appThemeModeProvider) == ThemeMode.dark;
-    final int taskCount = ref.watch(taskCountProvider);
+    final int taskCount =
+        ref.watch(openPickTasksProvider).valueOrNull?.length ?? 0;
     final ProfileType pt = ref.watch(profileTypeProvider);
     final PickerProfileParam profileParam =
         pt == ProfileType.controller ? PickerProfileParam.controller : PickerProfileParam.picker;

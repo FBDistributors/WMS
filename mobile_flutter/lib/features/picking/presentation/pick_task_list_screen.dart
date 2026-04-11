@@ -20,6 +20,15 @@ import '../data/picking_models.dart';
 import '../domain/profile_type_param.dart';
 import '../picking_providers.dart';
 
+bool _pickerEligibleBulkSend(PickingListItem item, PickerProfileParam profile) {
+  return profile == PickerProfileParam.picker &&
+      item.linesDone > 0 &&
+      item.controlledByUserId == null;
+}
+
+bool _isFullyPickedLines(PickingListItem d) =>
+    d.linesTotal > 0 && d.linesDone >= d.linesTotal;
+
 bool _pickerCanCancelOrderRow(PickingListItem item) {
   if (item.pickedAny) {
     return false;
@@ -56,6 +65,8 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
 
   String? _completedBanner;
   bool _bannerScheduled = false;
+  bool _orderSelectionMode = false;
+  final Set<String> _selectedOrderIds = <String>{};
 
   @override
   void dispose() {
@@ -344,6 +355,189 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
     }
   }
 
+  Future<void> _sendSingleDocumentToControllerForBulk(
+    PickingListItem doc,
+    String controllerUserId, {
+    String? sharedIncompleteReason,
+  }) async {
+    final bool fully = _isFullyPickedLines(doc);
+    if (!fully) {
+      final String? r = sharedIncompleteReason;
+      if (r == null || r.isEmpty) {
+        throw StateError('incomplete_reason');
+      }
+      await ref.read(pickingRepositoryProvider).completePickDocument(
+            doc.id,
+            incompleteReason: r,
+          );
+    } else if (doc.status != 'picked') {
+      await ref.read(pickingRepositoryProvider).completePickDocument(doc.id);
+    }
+    await ref.read(pickingRepositoryProvider).sendToController(
+          doc.id,
+          controllerUserId,
+        );
+  }
+
+  Future<String?> _showIncompleteReasonPickerForBulk() async {
+    return showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (BuildContext ctx) {
+        String? selected;
+        return StatefulBuilder(
+          builder: (BuildContext context, void Function(void Function()) setModal) {
+            return _IncompleteReasonSheet(
+              loc: ref.read(appLocaleProvider),
+              isDark: ref.read(appThemeModeProvider) == ThemeMode.dark,
+              busy: false,
+              selected: selected,
+              onSelect: (String? v) => setModal(() => selected = v),
+              onConfirm: () {
+                if (selected != null && ctx.mounted) {
+                  Navigator.of(ctx).pop<String>(selected);
+                }
+              },
+              onCancel: () => Navigator.of(ctx).pop(),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _openBulkControllerModal(
+    List<PickingListItem> docs, {
+    String? sharedIncompleteReason,
+  }) async {
+    final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
+    List<ControllerUser> controllers = const <ControllerUser>[];
+    try {
+      if (online) {
+        controllers = await ref.read(pickingRepositoryProvider).getControllers();
+      }
+    } on Exception catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (BuildContext ctx) {
+        bool sending = false;
+        return StatefulBuilder(
+          builder: (BuildContext context, void Function(void Function()) setModal) {
+            return _ControllerPickerSheet(
+              loc: ref.read(appLocaleProvider),
+              isDark: ref.read(appThemeModeProvider) == ThemeMode.dark,
+              loading: false,
+              sending: sending,
+              controllers: controllers,
+              onPick: (String controllerId) async {
+                setModal(() => sending = true);
+                try {
+                  int ok = 0;
+                  int fail = 0;
+                  for (final PickingListItem doc in docs) {
+                    try {
+                      await _sendSingleDocumentToControllerForBulk(
+                        doc,
+                        controllerId,
+                        sharedIncompleteReason: sharedIncompleteReason,
+                      );
+                      ok++;
+                    } on Exception catch (e) {
+                      fail++;
+                      debugPrint('bulk send ${doc.id}: $e');
+                    }
+                  }
+                  if (!ctx.mounted) {
+                    return;
+                  }
+                  Navigator.of(ctx).pop();
+                  if (!mounted) {
+                    return;
+                  }
+                  final AppLocale loc = ref.read(appLocaleProvider);
+                  setState(() {
+                    _consolidatedRefreshKey++;
+                    _selectedOrderIds.clear();
+                    _orderSelectionMode = false;
+                  });
+                  unawaited(ref.read(openPickTasksProvider.notifier).refreshFromNetwork());
+                  unawaited(ref.read(consolidatedViewProvider.notifier).refreshFromNetwork());
+                  final String msg;
+                  if (fail == 0) {
+                    msg = StringLookup.tParams(
+                      loc,
+                      'bulkSendResultAllOk',
+                      <String, String>{'count': '$ok'},
+                    );
+                  } else if (ok == 0) {
+                    msg = StringLookup.tParams(
+                      loc,
+                      'bulkSendResultAllFail',
+                      <String, String>{'fail': '$fail'},
+                    );
+                  } else {
+                    msg = StringLookup.tParams(
+                      loc,
+                      'bulkSendResultPartial',
+                      <String, String>{'ok': '$ok', 'fail': '$fail'},
+                    );
+                  }
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+                } finally {
+                  if (context.mounted) {
+                    setModal(() => sending = false);
+                  }
+                }
+              },
+              onCancel: () => Navigator.of(ctx).pop(),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _onBulkSendPressed(List<PickingListItem> shown) async {
+    final List<PickingListItem> docs = shown
+        .where(
+          (PickingListItem e) =>
+              _selectedOrderIds.contains(e.id) &&
+              _pickerEligibleBulkSend(e, PickerProfileParam.picker),
+        )
+        .toList(growable: false);
+    if (docs.isEmpty) {
+      return;
+    }
+    final bool anyIncomplete = docs.any((PickingListItem d) => !_isFullyPickedLines(d));
+    String? sharedIncompleteReason;
+    if (anyIncomplete) {
+      final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
+      if (!online) {
+        final AppLocale loc = ref.read(appLocaleProvider);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(StringLookup.t(loc, 'loadError'))),
+          );
+        }
+        return;
+      }
+      sharedIncompleteReason = await _showIncompleteReasonPickerForBulk();
+      if (!mounted || sharedIncompleteReason == null || sharedIncompleteReason.isEmpty) {
+        return;
+      }
+    }
+    await _openBulkControllerModal(docs, sharedIncompleteReason: sharedIncompleteReason);
+  }
+
   Future<void> _sendToControllerConfirm(
     PickingListItem doc,
     String controllerUserId,
@@ -441,10 +635,26 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
               'pickerHome',
               queryParameters: <String, String>{'profile': profileToQuery(profile)},
             ),
-            showLogo: true,
             headerBackgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
             titleColor: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF333333),
             accentColor: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1A237E),
+            trailing: !_showConsolidated && profile == PickerProfileParam.picker
+                ? TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _orderSelectionMode = !_orderSelectionMode;
+                        if (!_orderSelectionMode) {
+                          _selectedOrderIds.clear();
+                        }
+                      });
+                    },
+                    child: Text(
+                      _orderSelectionMode
+                          ? StringLookup.t(loc, 'orderSelectModeDone')
+                          : StringLookup.t(loc, 'orderSelectMode'),
+                    ),
+                  )
+                : null,
             onRefresh: () {
               unawaited(ref.read(openPickTasksProvider.notifier).refreshFromNetwork());
               if (_showConsolidated) {
@@ -570,48 +780,124 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
                       if (shown.isEmpty) {
                         return Center(child: Text(StringLookup.t(loc, 'openTasksEmpty')));
                       }
-                      return ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                        itemCount: shown.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (BuildContext context, int i) {
-                          final PickingListItem item = shown[i];
-                          return _TaskCard(
-                            item: item,
-                            profile: profile,
-                            loc: loc,
-                            isDark: isDark,
-                            title: _taskTitle(loc, item),
-                            statusText: _statusLabel(loc, profile, item),
-                            sentAt: profile == PickerProfileParam.controller
-                                ? StringLookup.tParams(
-                                    loc,
-                                    'sentToControllerAt',
-                                    <String, String>{
-                                      'datetime': _sentAtLabel(
-                                        loc,
-                                        item.sentToControllerAt,
-                                        loc,
-                                      ),
-                                    },
-                                  )
-                                : null,
-                            onOpen: () => context.pushNamed(
-                              'pickTaskDetail',
-                              pathParameters: <String, String>{'taskId': item.id},
-                              queryParameters: <String, String>{
-                                'profile': profileToQuery(profile),
+                      final Set<String> eligibleIds = shown
+                          .where((PickingListItem e) => _pickerEligibleBulkSend(e, profile))
+                          .map((PickingListItem e) => e.id)
+                          .toSet();
+                      final bool anyEligibleSelected =
+                          eligibleIds.any(_selectedOrderIds.contains);
+                      final bool allEligibleSelected = eligibleIds.isNotEmpty &&
+                          eligibleIds.every(_selectedOrderIds.contains);
+                      bool? selectAllValue;
+                      if (!anyEligibleSelected) {
+                        selectAllValue = false;
+                      } else if (allEligibleSelected) {
+                        selectAllValue = true;
+                      } else {
+                        selectAllValue = null;
+                      }
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: <Widget>[
+                          if (_orderSelectionMode &&
+                              profile == PickerProfileParam.picker &&
+                              eligibleIds.isNotEmpty)
+                            CheckboxListTile(
+                              value: selectAllValue,
+                              tristate: true,
+                              title: Text(StringLookup.t(loc, 'selectAllEligible')),
+                              onChanged: (bool? v) {
+                                setState(() {
+                                  if (v == true) {
+                                    _selectedOrderIds.addAll(eligibleIds);
+                                  } else {
+                                    _selectedOrderIds.removeAll(eligibleIds);
+                                  }
+                                });
                               },
                             ),
-                            onSendToController: profile == PickerProfileParam.picker
-                                ? () => _onSendToControllerPress(item)
-                                : null,
-                            onCancelOrder: profile == PickerProfileParam.picker &&
-                                    _pickerCanCancelOrderRow(item)
-                                ? () => _onCancelOrderPressed(item)
-                                : null,
-                          );
-                        },
+                          Expanded(
+                            child: ListView.separated(
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                              itemCount: shown.length,
+                              separatorBuilder: (_, __) => const SizedBox(height: 10),
+                              itemBuilder: (BuildContext context, int i) {
+                                final PickingListItem item = shown[i];
+                                final bool eligible =
+                                    _pickerEligibleBulkSend(item, profile);
+                                return _TaskCard(
+                                  item: item,
+                                  profile: profile,
+                                  loc: loc,
+                                  isDark: isDark,
+                                  title: _taskTitle(loc, item),
+                                  statusText: _statusLabel(loc, profile, item),
+                                  sentAt: profile == PickerProfileParam.controller
+                                      ? StringLookup.tParams(
+                                          loc,
+                                          'sentToControllerAt',
+                                          <String, String>{
+                                            'datetime': _sentAtLabel(
+                                              loc,
+                                              item.sentToControllerAt,
+                                              loc,
+                                            ),
+                                          },
+                                        )
+                                      : null,
+                                  selectionMode: _orderSelectionMode &&
+                                      profile == PickerProfileParam.picker,
+                                  selected: _selectedOrderIds.contains(item.id),
+                                  eligibleForSelection: eligible,
+                                  onToggleSelected: eligible
+                                      ? () {
+                                          setState(() {
+                                            if (_selectedOrderIds.contains(item.id)) {
+                                              _selectedOrderIds.remove(item.id);
+                                            } else {
+                                              _selectedOrderIds.add(item.id);
+                                            }
+                                          });
+                                        }
+                                      : null,
+                                  onOpen: () => context.pushNamed(
+                                    'pickTaskDetail',
+                                    pathParameters: <String, String>{'taskId': item.id},
+                                    queryParameters: <String, String>{
+                                      'profile': profileToQuery(profile),
+                                    },
+                                  ),
+                                  onSendToController: profile == PickerProfileParam.picker
+                                      ? () => _onSendToControllerPress(item)
+                                      : null,
+                                  onCancelOrder: profile == PickerProfileParam.picker &&
+                                          _pickerCanCancelOrderRow(item)
+                                      ? () => _onCancelOrderPressed(item)
+                                      : null,
+                                );
+                              },
+                            ),
+                          ),
+                          if (_orderSelectionMode &&
+                              profile == PickerProfileParam.picker &&
+                              _selectedOrderIds.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                              child: FilledButton.tonal(
+                                onPressed: () => unawaited(_onBulkSendPressed(shown)),
+                                child: Text(
+                                  StringLookup.tParams(
+                                    loc,
+                                    'bulkSendToController',
+                                    <String, String>{
+                                      'count':
+                                          '${_selectedOrderIds.where(eligibleIds.contains).length}',
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       );
                     },
                     loading: () => const Center(child: CircularProgressIndicator()),
@@ -651,6 +937,8 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
                 onSelectionChanged: (Set<bool> next) {
                   setState(() {
                     _showConsolidated = next.single;
+                    _orderSelectionMode = false;
+                    _selectedOrderIds.clear();
                     if (!_showConsolidated) {
                       unawaited(ref.read(openPickTasksProvider.notifier).refreshFromNetwork());
                     } else {
@@ -677,6 +965,10 @@ class _TaskCard extends StatelessWidget {
     required this.statusText,
     required this.sentAt,
     required this.onOpen,
+    this.selectionMode = false,
+    this.selected = false,
+    this.eligibleForSelection = false,
+    this.onToggleSelected,
     this.onSendToController,
     this.onCancelOrder,
   });
@@ -689,6 +981,10 @@ class _TaskCard extends StatelessWidget {
   final String statusText;
   final String? sentAt;
   final VoidCallback onOpen;
+  final bool selectionMode;
+  final bool selected;
+  final bool eligibleForSelection;
+  final VoidCallback? onToggleSelected;
   final void Function()? onSendToController;
   final VoidCallback? onCancelOrder;
 
@@ -725,9 +1021,23 @@ class _TaskCard extends StatelessWidget {
                 ),
               ),
               padding: const EdgeInsets.all(14),
-              child: Column(
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
+                  if (selectionMode) ...<Widget>[
+                    Checkbox(
+                      value: selected && eligibleForSelection,
+                      tristate: false,
+                      onChanged: eligibleForSelection && onToggleSelected != null
+                          ? (_) => onToggleSelected!()
+                          : null,
+                    ),
+                    const SizedBox(width: 4),
+                  ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
                   Text(
                     title,
                     style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
@@ -790,6 +1100,9 @@ class _TaskCard extends StatelessWidget {
                       ),
                     ),
                   ],
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),

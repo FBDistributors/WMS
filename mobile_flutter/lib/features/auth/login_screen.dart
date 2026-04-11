@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/app_state/app_locale.dart';
 import '../../core/app_state/locale_controller.dart';
+import '../../core/config/brand.dart';
 import '../../core/app_state/prefs_keys.dart';
 import '../../core/storage/shared_preferences_provider.dart';
 import '../../l10n/string_lookup.dart';
@@ -123,53 +124,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF5F5F5),
       body: Stack(
         children: <Widget>[
-          if (_dropdownOpen)
-            Positioned.fill(
-              child: GestureDetector(
-                onTap: () => setState(() => _dropdownOpen = false),
-                child: Container(color: Colors.black26),
-              ),
-            ),
-          Positioned(
-            top: 48,
-            right: 16,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: <Widget>[
-                Material(
-                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  child: InkWell(
-                    onTap: () => setState(() => _dropdownOpen = !_dropdownOpen),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          Text(_langLabel(loc)),
-                          Icon(_dropdownOpen ? Icons.expand_less : Icons.expand_more),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                if (_dropdownOpen)
-                  Material(
-                    elevation: 4,
-                    borderRadius: BorderRadius.circular(8),
-                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                    child: Column(
-                      children: <Widget>[
-                        _langTile(AppLocale.uz, loc),
-                        _langTile(AppLocale.ru, loc),
-                        _langTile(AppLocale.en, loc),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
           Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
@@ -178,10 +132,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 child: Column(
                   children: <Widget>[
                     const SizedBox(height: 40),
-                    Icon(Icons.business, size: 96, color: isDark ? Colors.white70 : Colors.blue.shade800),
+                    Image.asset(
+                      'assets/branding/logo.png',
+                      width: Brand.loginLogoSize,
+                      height: Brand.loginLogoSize,
+                      fit: BoxFit.contain,
+                    ),
                     const SizedBox(height: 12),
                     Text(
-                      StringLookup.t(loc, 'brand'),
+                      Brand.name,
+                      textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w600,
@@ -232,13 +192,56 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             : Text(StringLookup.t(loc, 'loginButton')),
                       ),
                     ),
-                    TextButton(
-                      onPressed: () => context.goNamed('home'),
-                      child: const Text('Home (scan hub)'),
-                    ),
                   ],
                 ),
               ),
+            ),
+          ),
+          if (_dropdownOpen)
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: () => setState(() => _dropdownOpen = false),
+                child: Container(color: Colors.black26),
+              ),
+            ),
+          Positioned(
+            top: 48,
+            right: 16,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: <Widget>[
+                Material(
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  child: InkWell(
+                    onTap: () => setState(() => _dropdownOpen = !_dropdownOpen),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Text(_langLabel(loc)),
+                          Icon(_dropdownOpen ? Icons.expand_less : Icons.expand_more),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                if (_dropdownOpen)
+                  Material(
+                    elevation: 4,
+                    borderRadius: BorderRadius.circular(8),
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    child: Column(
+                      children: <Widget>[
+                        _langTile(AppLocale.uz, loc),
+                        _langTile(AppLocale.ru, loc),
+                        _langTile(AppLocale.en, loc),
+                      ],
+                    ),
+                  ),
+              ],
             ),
           ),
         ],

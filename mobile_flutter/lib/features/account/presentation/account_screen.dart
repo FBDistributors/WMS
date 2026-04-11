@@ -47,6 +47,26 @@ class AccountScreen extends ConsumerWidget {
           ListTile(
             title: Text(StringLookup.t(loc, 'logout')),
             onTap: () async {
+              final bool? confirm = await showDialog<bool>(
+                context: context,
+                builder: (BuildContext ctx) => AlertDialog(
+                  title: Text(StringLookup.t(loc, 'logoutConfirmTitle')),
+                  content: Text(StringLookup.t(loc, 'logoutConfirmMessage')),
+                  actions: <Widget>[
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(false),
+                      child: Text(StringLookup.t(loc, 'logoutConfirmNo')),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.of(ctx).pop(true),
+                      child: Text(StringLookup.t(loc, 'logoutConfirmYes')),
+                    ),
+                  ],
+                ),
+              );
+              if (confirm != true || !context.mounted) {
+                return;
+              }
               await ref.read(authControllerProvider.notifier).logout();
               if (context.mounted) {
                 context.goNamed('login');

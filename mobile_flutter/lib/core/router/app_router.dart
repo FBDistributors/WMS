@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../features/account/presentation/account_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/presentation/auth_providers.dart';
-import '../../features/home/presentation/home_screen.dart';
 import '../../features/inventory/presentation/inventory_detail_screen.dart';
 import '../../features/inventory/presentation/inventory_screen.dart';
 import '../../features/customer_returns/presentation/customer_returns_queue_screen.dart';
@@ -37,11 +36,10 @@ final goRouterProvider = Provider<GoRouter>((Ref ref) {
         orElse: () => false,
       );
       final bool loggingIn = path == '/login';
-      final bool atHome = path == '/home';
-      if (auth.isLoading && !loggingIn && !atHome) {
+      if (auth.isLoading && !loggingIn) {
         return '/login';
       }
-      if (!authed && !loggingIn && !atHome) {
+      if (!authed && !loggingIn) {
         return '/login';
       }
       if (authed && loggingIn) {
@@ -54,11 +52,6 @@ final goRouterProvider = Provider<GoRouter>((Ref ref) {
         path: '/login',
         name: 'login',
         builder: (BuildContext context, GoRouterState state) => const LoginScreen(),
-      ),
-      GoRoute(
-        path: '/home',
-        name: 'home',
-        builder: (BuildContext context, GoRouterState state) => const HomeScreen(),
       ),
       GoRoute(
         path: '/picker-home',

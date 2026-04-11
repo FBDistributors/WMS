@@ -10,7 +10,7 @@ class AppHeader extends StatelessWidget {
     required this.title,
     this.showBack = false,
     this.onBack,
-    this.showLogo = true,
+    this.showLogo = false,
     this.onRefresh,
     this.refreshing = false,
     this.headerBackgroundColor,

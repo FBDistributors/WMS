@@ -7,7 +7,6 @@ import '../../../core/app_state/locale_controller.dart';
 import '../../../core/app_state/network_status_provider.dart';
 import '../../../core/app_state/profile_type.dart';
 import '../../../core/app_state/profile_type_controller.dart';
-import '../../../core/app_state/task_count_provider.dart';
 import '../../../core/app_state/theme_controller.dart';
 import '../../../core/offline/offline_providers.dart';
 import '../../../l10n/string_lookup.dart';
@@ -75,11 +74,6 @@ class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
         : StringLookup.t(loc, 'pickerTitle');
 
     final AsyncValue<MyPickerStats> stats = ref.watch(pickerStatsProvider);
-    ref.listen(openPickTasksProvider, (_, AsyncValue<List<PickingListItem>> next) {
-      next.whenData((List<PickingListItem> list) {
-        ref.read(taskCountProvider.notifier).state = list.length;
-      });
-    });
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
@@ -87,7 +81,6 @@ class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
         children: <Widget>[
           AppHeader(
             title: title,
-            showLogo: true,
             onRefresh: _onRefresh,
             refreshing: _refreshing,
             headerBackgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
