@@ -1,6 +1,7 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -44,6 +45,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _user.dispose();
     _pass.dispose();
     super.dispose();
+  }
+
+  SystemUiOverlayStyle _loginStatusBarStyle(bool isDark) {
+    if (isDark) {
+      return SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent);
+    }
+    return SystemUiOverlayStyle.dark.copyWith(statusBarColor: Colors.transparent);
   }
 
   Future<void> _submit() async {
@@ -98,6 +106,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           automaticallyImplyLeading: false,
           elevation: 0,
           backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF5F5F5),
+          systemOverlayStyle: _loginStatusBarStyle(isDark),
           actions: _languageMenuActions(loc, isDark),
         ),
         body: Center(
@@ -133,6 +142,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         automaticallyImplyLeading: false,
         elevation: 0,
         backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF5F5F5),
+        systemOverlayStyle: _loginStatusBarStyle(isDark),
         actions: _languageMenuActions(loc, isDark),
       ),
       body: Center(
