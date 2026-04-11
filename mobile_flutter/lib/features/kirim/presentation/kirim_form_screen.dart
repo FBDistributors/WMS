@@ -5,7 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/app_state/app_locale.dart';
+import '../../../core/formatting/expiry_display_format.dart';
+import '../../../core/app_state/locale_controller.dart';
 import '../../../core/router/scanner_args.dart';
+import '../../../l10n/string_lookup.dart';
 import '../../customer_returns/data/customer_returns_models.dart';
 import '../../customer_returns/customer_returns_providers.dart';
 import '../../inventory/data/models/picker_inventory_models.dart';
@@ -79,6 +83,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   List<PickerLocationOption> _allLocations = const <PickerLocationOption>[];
   PickerLocationOption? _destLocation;
   String _receivingLocationCode = '';
+  final TextEditingController _receivingLocManual = TextEditingController();
+  bool _receivingLocBusy = false;
   bool _sending = false;
   String? _handledProductId;
 
@@ -102,6 +108,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   void dispose() {
     _invLocSearch.dispose();
     _invScanActualQty.dispose();
+    _receivingLocManual.dispose();
     _qty.dispose();
     super.dispose();
   }
@@ -112,7 +119,17 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     final Uri u = GoRouterState.of(context).uri;
     _flow = u.queryParameters['flow'] ?? 'return';
     _warehouse = u.queryParameters['warehouse'] ?? 'main';
-    _receivingLocationCode = u.queryParameters['receivingLocationCode'] ?? '';
+    if (_flow == 'new') {
+      final String? qc = u.queryParameters['receivingLocationCode'];
+      if (qc != null && qc.isNotEmpty) {
+        _receivingLocationCode = qc;
+        if (_receivingLocManual.text.trim().isEmpty) {
+          _receivingLocManual.text = qc;
+        }
+      }
+    } else {
+      _receivingLocationCode = '';
+    }
     if (_flow == 'inventory') {
       _inventoryDidChangeDependencies(u);
     } else {
@@ -135,6 +152,94 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     } on Exception {
       if (mounted) {
         setState(() => _allLocations = const <PickerLocationOption>[]);
+      }
+    }
+  }
+
+  PickerLocationOption? _matchLocationInWarehouse(String raw) {
+    final String n = raw.trim().toLowerCase();
+    if (n.isEmpty) {
+      return null;
+    }
+    for (final PickerLocationOption o in _allLocations) {
+      if (o.code.toLowerCase() == n) {
+        return o;
+      }
+    }
+    for (final PickerLocationOption o in _allLocations) {
+      if (o.name.toLowerCase() == n) {
+        return o;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _applyManualReceivingLocation() async {
+    final String raw = _receivingLocManual.text.trim();
+    if (raw.isEmpty) {
+      final AppLocale loc = ref.read(appLocaleProvider);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(StringLookup.t(loc, 'kirimEnterLocationCode'))),
+      );
+      return;
+    }
+    if (_receivingLocBusy) {
+      return;
+    }
+    setState(() => _receivingLocBusy = true);
+    try {
+      if (_allLocations.isEmpty) {
+        await _loadLocations();
+      }
+      PickerLocationOption? match = _matchLocationInWarehouse(raw);
+      if (match == null) {
+        try {
+          final LocationContentsResponse res = await ref
+              .read(inventoryRepositoryProvider)
+              .getLocationContents(raw);
+          for (final PickerLocationOption o in _allLocations) {
+            if (o.id == res.locationId) {
+              match = o;
+              break;
+            }
+          }
+          if (match == null && mounted) {
+            final AppLocale loc = ref.read(appLocaleProvider);
+            final String whLabel = _warehouse == 'showroom'
+                ? StringLookup.t(loc, 'warehouseSegmentShowroom')
+                : StringLookup.t(loc, 'warehouseSegmentMain');
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  StringLookup.tParams(loc, 'kirimReceivingNotInWarehouse', <String, String>{
+                    'code': res.locationCode,
+                    'warehouse': whLabel,
+                  }),
+                ),
+              ),
+            );
+            return;
+          }
+        } on Exception catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('$e')),
+            );
+          }
+          return;
+        }
+      }
+      if (!mounted || match == null) {
+        return;
+      }
+      final PickerLocationOption chosen = match;
+      setState(() {
+        _receivingLocationCode = chosen.code;
+        _receivingLocManual.text = chosen.code;
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _receivingLocBusy = false);
       }
     }
   }
@@ -180,8 +285,9 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       return;
     }
     if (q > pick.availableQty.floor()) {
+      final AppLocale loc = ref.read(appLocaleProvider);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mavjud miqdordan oshmasin')),
+        SnackBar(content: Text(StringLookup.t(loc, 'kirimQtyExceedsStock'))),
       );
       return;
     }
@@ -247,7 +353,10 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                 .toList(),
           );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Yuborildi')));
+        final AppLocale loc = ref.read(appLocaleProvider);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(StringLookup.t(loc, 'kirimSentOk'))),
+        );
         context.pop();
       }
     } on Exception catch (e) {
@@ -282,7 +391,10 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           );
       await ref.read(receivingRepositoryProvider).completeReceipt(receipt.id);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Qabul yakunlandi')));
+        final AppLocale loc = ref.read(appLocaleProvider);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(StringLookup.t(loc, 'kirimReceivingDone'))),
+        );
         context.pop();
       }
     } on Exception catch (e) {
@@ -650,6 +762,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     if (_invAllLocations.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadInvLocations());
     }
+    final String invLang = ref.watch(appLocaleProvider).code;
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -788,7 +901,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                       Text(
-                        '${item.batchNo}${item.expiryDate != null ? ' • ${item.expiryDate}' : ''} • Tizim: ${item.availableQty.round()}',
+                        '${item.batchNo}${item.expiryDate != null ? ' • ${formatExpiryMonthYear(item.expiryDate, invLang)}' : ''} • Tizim: ${item.availableQty.round()}',
                         style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
                       ),
                       TextField(
@@ -845,7 +958,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
               return ListTile(
                 title: Text(loc.locationCode),
                 subtitle: Text(
-                  '${loc.batchNo}${loc.expiryDate != null ? ' • ${loc.expiryDate}' : ''} • ${loc.availableQty.round()}',
+                  '${loc.batchNo}${loc.expiryDate != null ? ' • ${formatExpiryMonthYear(loc.expiryDate, invLang)}' : ''} • ${loc.availableQty.round()}',
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
@@ -929,17 +1042,20 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final AppLocale appLoc = ref.watch(appLocaleProvider);
     if (_flow != 'inventory' && _allLocations.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadLocations());
     }
 
-    String title = 'Kirim';
+    String title = StringLookup.t(appLoc, 'kirimTitle');
     if (_flow == 'new') {
-      title = _warehouse == 'showroom' ? 'Showroom kirim' : 'Asosiy kirim';
+      title = _warehouse == 'showroom'
+          ? StringLookup.t(appLoc, 'kirimFormTitleNewShowroom')
+          : StringLookup.t(appLoc, 'kirimFormTitleNewMain');
     } else if (_flow == 'return') {
-      title = 'Mijoz qaytishi';
+      title = StringLookup.t(appLoc, 'kirimCustomerReturns');
     } else if (_flow == 'inventory') {
-      title = 'Inventarizatsiya';
+      title = StringLookup.t(appLoc, 'kirimInventory');
     }
 
     if (_flow == 'inventory') {
@@ -970,9 +1086,15 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
               children: <Widget>[
                 if (_flow == 'return')
                   SegmentedButton<String>(
-                    segments: const <ButtonSegment<String>>[
-                      ButtonSegment<String>(value: 'main', label: Text('Asosiy')),
-                      ButtonSegment<String>(value: 'showroom', label: Text('Showroom')),
+                    segments: <ButtonSegment<String>>[
+                      ButtonSegment<String>(
+                        value: 'main',
+                        label: Text(StringLookup.t(appLoc, 'warehouseSegmentMain')),
+                      ),
+                      ButtonSegment<String>(
+                        value: 'showroom',
+                        label: Text(StringLookup.t(appLoc, 'warehouseSegmentShowroom')),
+                      ),
                     ],
                     selected: <String>{_warehouse},
                     onSelectionChanged: (Set<String> v) {
@@ -988,7 +1110,13 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                 if (_flow == 'new' && _receivingLocationCode.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
-                    child: Text('Qabul joyi: $_receivingLocationCode'),
+                    child: Text(
+                      StringLookup.tParams(
+                        appLoc,
+                        'kirimReceivingDock',
+                        <String, String>{'code': _receivingLocationCode},
+                      ),
+                    ),
                   ),
                 if (_flow == 'new')
                   FilledButton.icon(
@@ -1001,12 +1129,55 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                       ),
                     ),
                     icon: const Icon(Icons.qr_code_scanner),
-                    label: const Text('Qabul lokatsiyasini skanerlash'),
+                    label: Text(StringLookup.t(appLoc, 'kirimScanReceivingLocation')),
                   ),
+                if (_flow == 'new') ...<Widget>[
+                  const SizedBox(height: 12),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Expanded(
+                        child: TextField(
+                          controller: _receivingLocManual,
+                          textCapitalization: TextCapitalization.characters,
+                          decoration: InputDecoration(
+                            labelText: StringLookup.t(appLoc, 'kirimLocationManualLabel'),
+                            hintText: StringLookup.t(appLoc, 'kirimLocationManualHint'),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                          ),
+                          onSubmitted: (_) =>
+                              unawaited(_applyManualReceivingLocation()),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: FilledButton(
+                          onPressed: _receivingLocBusy
+                              ? null
+                              : () => unawaited(_applyManualReceivingLocation()),
+                          child: _receivingLocBusy
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Text(StringLookup.t(appLoc, 'kirimApplyButton')),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 12),
                 BarcodeSearchInput(
                   onSelectProduct: _loadProduct,
-                  label: 'Mahsulot barcode',
+                  label: StringLookup.t(appLoc, 'barcodeOrSku'),
                 ),
                 if (_loadingProduct) const LinearProgressIndicator(),
                 if (_productError != null) Text(_productError!, style: const TextStyle(color: Colors.red)),
@@ -1019,14 +1190,17 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                   ),
                 ],
                 if (_flow == 'return' && _product != null) ...<Widget>[
-                  const Text('Partiya (FEFO)', style: TextStyle(fontWeight: FontWeight.w600)),
+                  Text(
+                    StringLookup.t(appLoc, 'kirimBatchFefo'),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
                   ..._sortFefo(_product!.locations).map((PickerProductLocation loc) {
                     final bool sel =
                         _returnPick?.lotId == loc.lotId && _returnPick?.locationId == loc.locationId;
                     return ListTile(
                       title: Text(loc.locationCode),
                       subtitle: Text(
-                        '${loc.batchNo} · ${loc.availableQty.toStringAsFixed(0)} · ${loc.expiryDate ?? '—'}',
+                        '${loc.batchNo} · ${loc.availableQty.toStringAsFixed(0)} · ${formatExpiryMonthYear(loc.expiryDate, appLoc.code)}',
                       ),
                       tileColor: sel ? Colors.blue.shade50 : null,
                       onTap: () => setState(() => _returnPick = loc),
@@ -1035,15 +1209,21 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                   TextField(
                     controller: _qty,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Miqdor',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: StringLookup.t(appLoc, 'qtyShort'),
+                      border: const OutlineInputBorder(),
                     ),
                   ),
-                  FilledButton(onPressed: _addLineReturn, child: const Text('Qator qo‘shish')),
+                  FilledButton(
+                    onPressed: _addLineReturn,
+                    child: Text(StringLookup.t(appLoc, 'kirimAddLine')),
+                  ),
                 ],
                 if (_flow == 'new' && _product != null) ...<Widget>[
-                  const Text('Saqlash joyi', style: TextStyle(fontWeight: FontWeight.w600)),
+                  Text(
+                    StringLookup.t(appLoc, 'kirimStorageLocation'),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
                   ..._allLocations.take(40).map((PickerLocationOption o) {
                     final bool sel = _destLocation?.id == o.id;
                     return ListTile(
@@ -1056,19 +1236,28 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                   TextField(
                     controller: _qty,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Miqdor',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: StringLookup.t(appLoc, 'qtyShort'),
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                   ExpiryDatePickerField(
                     value: _expiry,
                     onChanged: (String? v) => setState(() => _expiry = v),
                   ),
-                  FilledButton(onPressed: _addLineNew, child: const Text('Qator qo‘shish')),
+                  FilledButton(
+                    onPressed: _addLineNew,
+                    child: Text(StringLookup.t(appLoc, 'kirimAddLine')),
+                  ),
                 ],
                 const Divider(height: 24),
-                Text('Qatorlar: ${_lines.length}'),
+                Text(
+                  StringLookup.tParams(
+                    appLoc,
+                    'kirimLinesHeading',
+                    <String, String>{'count': '${_lines.length}'},
+                  ),
+                ),
                 ..._lines.map(
                   (_FormLine l) => ListTile(
                     title: Text(l.productName),
@@ -1096,7 +1285,11 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                           width: 22,
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
-                      : Text(_flow == 'return' ? 'Yuborish' : 'Qabulni yakunlash'),
+                      : Text(
+                          _flow == 'return'
+                              ? StringLookup.t(appLoc, 'submit')
+                              : StringLookup.t(appLoc, 'kirimCompleteReceiving'),
+                        ),
                 ),
               ],
             ),

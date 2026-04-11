@@ -10,6 +10,7 @@ import '../../core/app_state/app_locale.dart';
 import '../../core/app_state/locale_controller.dart';
 import '../../core/app_state/network_status_provider.dart';
 import '../../core/router/scanner_args.dart';
+import '../../features/picking/alternate_location_menu_label.dart';
 import '../../features/picking/data/picking_models.dart';
 import '../../features/picking/domain/profile_type_param.dart';
 import '../../features/picking/picking_providers.dart';
@@ -287,7 +288,12 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                               (PickingAlternateLocation a) => DropdownMenuItem<String>(
                                 value: _alternateLocationDropdownValue(a),
                                 child: Text(
-                                  '${a.locationCode} — ${a.availableQty}',
+                                  alternateLocationMenuLabel(
+                                    a,
+                                    product.alternateLocations,
+                                    loc.code,
+                                  ),
+                                  maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),

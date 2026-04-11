@@ -15,6 +15,7 @@ import '../../../core/offline/offline_providers.dart';
 import '../../../core/router/scanner_args.dart';
 import '../../../l10n/string_lookup.dart';
 import '../../../shared/layout/sheet_bottom_inset.dart';
+import '../alternate_location_menu_label.dart';
 import '../data/picking_constants.dart';
 import '../data/picking_models.dart';
 import '../domain/profile_type_param.dart';
@@ -990,8 +991,11 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                         ...stock.alternateLocations.map((PickingAlternateLocation a) {
                           return ListTile(
                             dense: true,
-                            title: Text(a.locationCode),
-                            subtitle: Text('${a.availableQty}'),
+                            title: Text(
+                              alternateLocationMenuLabel(a, stock.alternateLocations, loc.code),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                             onTap: () async {
                               try {
                                 final PickLineResponse res =

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/formatting/expiry_display_format.dart';
+
 /// RN `ExpiryDatePicker` — sana tanlash + `YYYY-MM-DD` qaytarish.
 class ExpiryDatePickerField extends StatelessWidget {
   const ExpiryDatePickerField({
@@ -13,15 +15,9 @@ class ExpiryDatePickerField extends StatelessWidget {
   final void Function(String? isoDate) onChanged;
   final String label;
 
-  static String formatDisplay(String? iso) {
-    if (iso == null || iso.isEmpty) {
-      return '—';
-    }
-    return iso;
-  }
-
   @override
   Widget build(BuildContext context) {
+    final String lang = Localizations.localeOf(context).languageCode;
     return InkWell(
       onTap: () async {
         final DateTime now = DateTime.now();
@@ -42,7 +38,7 @@ class ExpiryDatePickerField extends StatelessWidget {
           labelText: label,
           border: const OutlineInputBorder(),
         ),
-        child: Text(formatDisplay(value)),
+        child: Text(formatExpiryMonthYear(value, lang)),
       ),
     );
   }

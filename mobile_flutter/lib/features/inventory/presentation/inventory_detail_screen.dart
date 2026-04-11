@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/formatting/expiry_display_format.dart';
 import '../data/models/picker_inventory_models.dart';
 import 'inventory_locale.dart';
 import 'inventory_providers.dart';
@@ -78,6 +79,40 @@ class InventoryDetailScreen extends ConsumerWidget {
   }
 }
 
+String _inventoryLanguageCode(InventoryLocale l) => switch (l) {
+      InventoryLocale.uz => 'uz',
+      InventoryLocale.ru => 'ru',
+      InventoryLocale.en => 'en',
+    };
+
+/// Bir xil [PickerProductLocation.locationCode] + bir xil [PickerProductLocation.expiryDate] uchun qoldiqlarni yig‘ish.
+List<PickerProductLocation> mergePickerProductLocationsForDisplay(
+  List<PickerProductLocation> locations,
+) {
+  final Map<String, PickerProductLocation> byKey = <String, PickerProductLocation>{};
+  for (final PickerProductLocation p in locations) {
+    final String locCode = p.locationCode.trim();
+    final String exp = (p.expiryDate ?? '').trim();
+    final String key = '$locCode\u0000$exp';
+    final PickerProductLocation? ex = byKey[key];
+    if (ex == null) {
+      byKey[key] = p;
+    } else {
+      byKey[key] = PickerProductLocation(
+        locationId: ex.locationId,
+        locationCode: ex.locationCode,
+        lotId: ex.lotId,
+        batchNo: ex.batchNo,
+        expiryDate: ex.expiryDate,
+        onHandQty: ex.onHandQty + p.onHandQty,
+        reservedQty: ex.reservedQty + p.reservedQty,
+        availableQty: ex.availableQty + p.availableQty,
+      );
+    }
+  }
+  return byKey.values.toList();
+}
+
 List<Widget> inventoryLocTiles(
   List<PickerProductLocation> locations,
   InventoryLocale loc,
@@ -91,13 +126,15 @@ List<Widget> inventoryLocTiles(
       ),
     ];
   }
-  return locations.map((PickerProductLocation l) {
+  final String lang = _inventoryLanguageCode(loc);
+  final List<PickerProductLocation> merged = mergePickerProductLocationsForDisplay(locations);
+  return merged.map((PickerProductLocation l) {
     return Card(
       color: isDark ? const Color(0xFF1E293B) : Colors.white,
       child: ListTile(
         title: Text(l.locationCode, style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
         subtitle: Text(
-          l.expiryDate ?? '—',
+          formatExpiryMonthYear(l.expiryDate, lang),
           style: TextStyle(color: isDark ? Colors.white54 : Colors.black45),
         ),
         trailing: Text(
