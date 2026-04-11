@@ -1,6 +1,5 @@
 import 'dart:async' show unawaited;
 
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -13,6 +12,7 @@ import '../../../l10n/string_lookup.dart';
 import '../../inventory/presentation/inventory_barcode_resolve_extra.dart';
 import '../../picking/domain/profile_type_param.dart';
 import '../data/scanner_repository.dart';
+import '../scan_beep.dart';
 import '../scanner_providers.dart';
 
 const int _kDebounceMs = 1500;
@@ -29,7 +29,6 @@ class ScannerScreen extends ConsumerStatefulWidget {
 
 class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   final MobileScannerController _controller = MobileScannerController();
-  late final AudioPlayer _scanBeepPlayer;
   String? _lastRaw;
   int _lastAt = 0;
   /// Faqat `resolveBarcode` (palet / kirim lokatsiyasi) uchun pastki banner.
@@ -37,26 +36,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   bool _scanEnabled = true;
 
   @override
-  void initState() {
-    super.initState();
-    _scanBeepPlayer = AudioPlayer();
-    unawaited(_scanBeepPlayer.setReleaseMode(ReleaseMode.release));
-  }
-
-  @override
   void dispose() {
-    unawaited(_scanBeepPlayer.dispose());
     _controller.dispose();
     super.dispose();
-  }
-
-  Future<void> _playScanBeep() async {
-    try {
-      await _scanBeepPlayer.stop();
-      await _scanBeepPlayer.play(AssetSource('sounds/scan_beep.wav'));
-    } on Object {
-      // Ovoz yo‘q bo‘lsa ham skaner ishlasin.
-    }
   }
 
   PickerProfileParam _profile(ScannerArgs? a) {
@@ -124,7 +106,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     }
     _lastRaw = value;
     _lastAt = now;
-    unawaited(_playScanBeep());
+    unawaited(ScanBeep.play());
 
     final ScannerArgs? a = widget.args;
     final GoRouter router = GoRouter.of(context);
