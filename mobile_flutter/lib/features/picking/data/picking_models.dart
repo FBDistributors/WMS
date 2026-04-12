@@ -512,6 +512,19 @@ int? consolidatedOpenPickQtyForBarcode(String raw, List<ConsolidatedProduct> pro
   return null;
 }
 
+/// Mos mahsulotning birinchisi (shtrix/SKU mosligi bo‘yicha) yoki `null`.
+ConsolidatedProduct? consolidatedProductForBarcode(
+  String raw,
+  List<ConsolidatedProduct> products,
+) {
+  for (final ConsolidatedProduct p in products) {
+    if (consolidatedScanMatchesProduct(raw, p)) {
+      return p;
+    }
+  }
+  return null;
+}
+
 class MyPickerStatsDay {
   const MyPickerStatsDay({required this.date, required this.count});
 

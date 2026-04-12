@@ -7,7 +7,7 @@ import '../../../core/app_state/locale_controller.dart';
 import '../../../core/app_state/theme_controller.dart';
 import '../../../l10n/string_lookup.dart';
 import '../../../shared/widgets/consolidated_pick_content.dart';
-import '../../../shared/widgets/consolidated_pick_success_snackbar.dart';
+import '../../../shared/widgets/consolidated_top_pick_qty_sheet.dart';
 import '../data/picking_models.dart';
 import '../picking_providers.dart';
 
@@ -20,7 +20,6 @@ class ConsolidatedPickScreen extends ConsumerStatefulWidget {
 
 class _ConsolidatedPickScreenState extends ConsumerState<ConsolidatedPickScreen> {
   final TextEditingController _barcode = TextEditingController();
-  bool _busy = false;
   bool _prefilledFromRoute = false;
   int _consolidatedListRefreshKey = 0;
 
@@ -79,27 +78,33 @@ class _ConsolidatedPickScreenState extends ConsumerState<ConsolidatedPickScreen>
       }
       return;
     }
-    setState(() => _busy = true);
-    try {
-      await ref.read(pickingRepositoryProvider).consolidatedPick(barcode: b, qty: openQty);
-      await ref.read(consolidatedViewProvider.notifier).refreshFromNetwork();
+    final ConsolidatedProduct? product =
+        consolidatedProductForBarcode(b, view.requireValue.products);
+    if (product == null) {
       if (mounted) {
-        setState(() => _consolidatedListRefreshKey++);
-        showConsolidatedPickSuccessSnackBar(
-          context,
-          ref.read(appLocaleProvider),
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(StringLookup.t(loc, 'productNotInOrder'))),
         );
       }
-      _barcode.clear();
-    } on Exception catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _busy = false);
-      }
+      return;
     }
+    if (!mounted) {
+      return;
+    }
+    await showConsolidatedTopPickQtySheet(
+      context: context,
+      ref: ref,
+      loc: loc,
+      product: product,
+      pickBarcode: b,
+      onSuccess: () {
+        if (!mounted) {
+          return;
+        }
+        setState(() => _consolidatedListRefreshKey++);
+        _barcode.clear();
+      },
+    );
   }
 
   @override
@@ -129,7 +134,7 @@ class _ConsolidatedPickScreenState extends ConsumerState<ConsolidatedPickScreen>
                   ),
                 ),
                 const SizedBox(width: 8),
-                FilledButton(onPressed: _busy ? null : _pick, child: Text(StringLookup.t(loc, 'submit'))),
+                FilledButton(onPressed: _pick, child: Text(StringLookup.t(loc, 'submit'))),
               ],
             ),
           ),

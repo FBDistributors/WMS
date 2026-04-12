@@ -12,7 +12,7 @@ import '../../../core/app_state/theme_controller.dart';
 import '../../../l10n/string_lookup.dart';
 import '../../../shared/widgets/app_header.dart';
 import '../../../shared/widgets/consolidated_pick_content.dart';
-import '../../../shared/widgets/consolidated_pick_success_snackbar.dart';
+import '../../../shared/widgets/consolidated_top_pick_qty_sheet.dart';
 import '../../../shared/widgets/picker_footer.dart';
 import '../data/picking_constants.dart';
 import '../data/picking_models.dart';
@@ -600,20 +600,33 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
       }
       return;
     }
-    try {
-      await ref.read(pickingRepositoryProvider).consolidatedPick(barcode: b, qty: openQty);
-      if (!mounted) {
-        return;
-      }
-      _consolidatedBarcode.clear();
-      unawaited(ref.read(consolidatedViewProvider.notifier).refreshFromNetwork());
-      setState(() => _consolidatedRefreshKey++);
-      showConsolidatedPickSuccessSnackBar(context, ref.read(appLocaleProvider));
-    } on Exception catch (e) {
+    final ConsolidatedProduct? product =
+        consolidatedProductForBarcode(b, view.requireValue.products);
+    if (product == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(StringLookup.t(loc, 'productNotInOrder'))),
+        );
       }
+      return;
     }
+    if (!mounted) {
+      return;
+    }
+    await showConsolidatedTopPickQtySheet(
+      context: context,
+      ref: ref,
+      loc: loc,
+      product: product,
+      pickBarcode: b,
+      onSuccess: () {
+        if (!mounted) {
+          return;
+        }
+        _consolidatedBarcode.clear();
+        setState(() => _consolidatedRefreshKey++);
+      },
+    );
   }
 
   @override
