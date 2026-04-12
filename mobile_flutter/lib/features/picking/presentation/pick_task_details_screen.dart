@@ -1386,11 +1386,17 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                     final bool useGreenCard = profile == PickerProfileParam.controller
                         ? groupVerified
                         : lineComplete;
+                    final bool controllerIncomplete =
+                        profile == PickerProfileParam.controller && !lineComplete;
                     final ColorScheme cs = Theme.of(context).colorScheme;
                     final bool isDark = Theme.of(context).brightness == Brightness.dark;
                     final Color cardBg = useGreenCard
                         ? Colors.green.withValues(alpha: isDark ? 0.20 : 0.14)
-                        : cs.surfaceContainerHighest.withValues(alpha: 0.35);
+                        : controllerIncomplete
+                            ? (isDark
+                                ? Colors.red.withValues(alpha: 0.16)
+                                : const Color(0xFFFFEBEE))
+                            : cs.surfaceContainerHighest.withValues(alpha: 0.35);
                     final IconData leadingIcon;
                     final Color iconColor;
                     if (profile == PickerProfileParam.controller) {

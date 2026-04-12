@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/config/brand.dart';
 
@@ -47,61 +48,68 @@ class AppHeader extends StatelessWidget {
             ? Colors.white.withValues(alpha: 0.18)
             : Colors.grey.shade300);
 
-    return Material(
-      color: bg,
-      elevation: 0,
-      child: SafeArea(
-        bottom: false,
-        left: false,
-        right: false,
-        top: true,
-        child: Container(
-          decoration: BoxDecoration(
-            color: bg,
-            border: Border(
-              bottom: BorderSide(color: border, width: 1),
+    final SystemUiOverlayStyle statusBarStyle = bg.computeLuminance() > 0.5
+        ? SystemUiOverlayStyle.dark.copyWith(statusBarColor: Colors.transparent)
+        : SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent);
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: statusBarStyle,
+      child: Material(
+        color: bg,
+        elevation: 0,
+        child: SafeArea(
+          bottom: false,
+          left: false,
+          right: false,
+          top: true,
+          child: Container(
+            decoration: BoxDecoration(
+              color: bg,
+              border: Border(
+                bottom: BorderSide(color: border, width: 1),
+              ),
             ),
-          ),
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-          child: IconTheme(
-            data: IconThemeData(color: accent),
-            child: Row(
-              children: <Widget>[
-                if (leading != null) leading!,
-                if (showBack && onBack != null)
-                  IconButton(
-                    onPressed: onBack,
-                    icon: const Icon(Icons.arrow_back),
-                    tooltip: 'Orqaga',
-                  ),
-                if (showLogo)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: Icon(Icons.business, size: Brand.headerLogoSize),
-                  ),
-                Expanded(
-                  child: Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: fg,
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+            child: IconTheme(
+              data: IconThemeData(color: accent),
+              child: Row(
+                children: <Widget>[
+                  if (leading != null) leading!,
+                  if (showBack && onBack != null)
+                    IconButton(
+                      onPressed: onBack,
+                      icon: const Icon(Icons.arrow_back),
+                      tooltip: 'Orqaga',
+                    ),
+                  if (showLogo)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: Icon(Icons.business, size: Brand.headerLogoSize),
+                    ),
+                  Expanded(
+                    child: Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: fg,
+                      ),
                     ),
                   ),
-                ),
-                if (trailing != null) trailing!,
-                if (onRefresh != null)
-                  IconButton(
-                    onPressed: refreshing ? null : onRefresh,
-                    icon: Icon(
-                      Icons.refresh,
-                      color: refreshing ? Colors.grey.shade400 : accent,
+                  if (trailing != null) trailing!,
+                  if (onRefresh != null)
+                    IconButton(
+                      onPressed: refreshing ? null : onRefresh,
+                      icon: Icon(
+                        Icons.refresh,
+                        color: refreshing ? Colors.grey.shade400 : accent,
+                      ),
+                      tooltip: 'Yangilash',
                     ),
-                    tooltip: 'Yangilash',
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
