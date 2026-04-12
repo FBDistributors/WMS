@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -61,7 +60,6 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
   String? _restoreConsolidatedProductKey;
   final TextEditingController _controllerSearch = TextEditingController();
   final TextEditingController _consolidatedBarcode = TextEditingController();
-  final TextEditingController _consolidatedQty = TextEditingController(text: '1');
 
   String? _completedBanner;
   bool _bannerScheduled = false;
@@ -72,7 +70,6 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
   void dispose() {
     _controllerSearch.dispose();
     _consolidatedBarcode.dispose();
-    _consolidatedQty.dispose();
     super.dispose();
   }
 
@@ -568,13 +565,43 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
   }
 
   Future<void> _submitConsolidatedPick() async {
+    final AppLocale loc = ref.read(appLocaleProvider);
     final String b = _consolidatedBarcode.text.trim();
-    final int q = int.tryParse(_consolidatedQty.text.trim()) ?? 1;
     if (b.isEmpty) {
       return;
     }
+    AsyncValue<ConsolidatedViewResponse> view = ref.read(consolidatedViewProvider);
+    if (!view.hasValue) {
+      await ref.read(consolidatedViewProvider.notifier).refreshFromNetwork();
+      view = ref.read(consolidatedViewProvider);
+    }
+    if (!view.hasValue) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(StringLookup.t(loc, 'loading'))),
+        );
+      }
+      return;
+    }
+    final int? openQty = consolidatedOpenPickQtyForBarcode(b, view.requireValue.products);
+    if (openQty == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(StringLookup.t(loc, 'productNotInOrder'))),
+        );
+      }
+      return;
+    }
+    if (openQty < 1) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(StringLookup.t(loc, 'consolidatedNothingToPick'))),
+        );
+      }
+      return;
+    }
     try {
-      await ref.read(pickingRepositoryProvider).consolidatedPick(barcode: b, qty: q);
+      await ref.read(pickingRepositoryProvider).consolidatedPick(barcode: b, qty: openQty);
       if (!mounted) {
         return;
       }
@@ -725,7 +752,7 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
                 ? Column(
                     children: <Widget>[
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                         child: Row(
                           children: <Widget>[
                             Expanded(
@@ -733,23 +760,6 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
                                 controller: _consolidatedBarcode,
                                 decoration: InputDecoration(
                                   labelText: StringLookup.t(loc, 'barcodeOrSku'),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            SizedBox(
-                              width: 72,
-                              child: TextField(
-                                controller: _consolidatedQty,
-                                keyboardType: TextInputType.number,
-                                inputFormatters: <TextInputFormatter>[
-                                  FilteringTextInputFormatter.digitsOnly,
-                                ],
-                                decoration: InputDecoration(
-                                  labelText: StringLookup.t(loc, 'qtyShort'),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),

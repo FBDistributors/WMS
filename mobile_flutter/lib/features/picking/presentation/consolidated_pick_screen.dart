@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -9,6 +8,7 @@ import '../../../core/app_state/theme_controller.dart';
 import '../../../l10n/string_lookup.dart';
 import '../../../shared/widgets/consolidated_pick_content.dart';
 import '../../../shared/widgets/consolidated_pick_success_snackbar.dart';
+import '../data/picking_models.dart';
 import '../picking_providers.dart';
 
 class ConsolidatedPickScreen extends ConsumerStatefulWidget {
@@ -20,7 +20,6 @@ class ConsolidatedPickScreen extends ConsumerStatefulWidget {
 
 class _ConsolidatedPickScreenState extends ConsumerState<ConsolidatedPickScreen> {
   final TextEditingController _barcode = TextEditingController();
-  final TextEditingController _qty = TextEditingController(text: '1');
   bool _busy = false;
   bool _prefilledFromRoute = false;
   int _consolidatedListRefreshKey = 0;
@@ -28,7 +27,6 @@ class _ConsolidatedPickScreenState extends ConsumerState<ConsolidatedPickScreen>
   @override
   void dispose() {
     _barcode.dispose();
-    _qty.dispose();
     super.dispose();
   }
 
@@ -46,14 +44,44 @@ class _ConsolidatedPickScreenState extends ConsumerState<ConsolidatedPickScreen>
   }
 
   Future<void> _pick() async {
+    final AppLocale loc = ref.read(appLocaleProvider);
     final String b = _barcode.text.trim();
-    final int q = int.tryParse(_qty.text.trim()) ?? 1;
     if (b.isEmpty) {
+      return;
+    }
+    AsyncValue<ConsolidatedViewResponse> view = ref.read(consolidatedViewProvider);
+    if (!view.hasValue) {
+      await ref.read(consolidatedViewProvider.notifier).refreshFromNetwork();
+      view = ref.read(consolidatedViewProvider);
+    }
+    if (!view.hasValue) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(StringLookup.t(loc, 'loading'))),
+        );
+      }
+      return;
+    }
+    final int? openQty = consolidatedOpenPickQtyForBarcode(b, view.requireValue.products);
+    if (openQty == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(StringLookup.t(loc, 'productNotInOrder'))),
+        );
+      }
+      return;
+    }
+    if (openQty < 1) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(StringLookup.t(loc, 'consolidatedNothingToPick'))),
+        );
+      }
       return;
     }
     setState(() => _busy = true);
     try {
-      await ref.read(pickingRepositoryProvider).consolidatedPick(barcode: b, qty: q);
+      await ref.read(pickingRepositoryProvider).consolidatedPick(barcode: b, qty: openQty);
       await ref.read(consolidatedViewProvider.notifier).refreshFromNetwork();
       if (mounted) {
         setState(() => _consolidatedListRefreshKey++);
@@ -88,7 +116,7 @@ class _ConsolidatedPickScreenState extends ConsumerState<ConsolidatedPickScreen>
       body: Column(
         children: <Widget>[
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
             child: Row(
               children: <Widget>[
                 Expanded(
@@ -96,19 +124,6 @@ class _ConsolidatedPickScreenState extends ConsumerState<ConsolidatedPickScreen>
                     controller: _barcode,
                     decoration: InputDecoration(
                       labelText: StringLookup.t(loc, 'barcodeOrSku'),
-                      border: const OutlineInputBorder(),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 72,
-                  child: TextField(
-                    controller: _qty,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: <TextInputFormatter>[FilteringTextInputFormatter.digitsOnly],
-                    decoration: InputDecoration(
-                      labelText: StringLookup.t(loc, 'qtyShort'),
                       border: const OutlineInputBorder(),
                     ),
                   ),

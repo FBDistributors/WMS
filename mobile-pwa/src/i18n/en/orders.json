@@ -213,6 +213,23 @@
     "price": "Price",
     "amount": "Amount"
   },
+  "line_edit": {
+    "add_line": "Add line",
+    "add_title": "Add order line",
+    "delete": "Remove",
+    "delete_title": "Remove line",
+    "delete_message": "Remove line «{{name}}»?",
+    "hint_catalog": "SKU or barcode should match a product in the catalog.",
+    "save": "Save",
+    "cancel": "Cancel",
+    "actions": "Actions",
+    "failed": "Could not save",
+    "locked": "A picking task exists; lines cannot be edited.",
+    "name_placeholder": "Product name",
+    "qty_placeholder": "Quantity",
+    "name_required": "Enter a product name.",
+    "qty_invalid": "Quantity must be a positive number."
+  },
   "movement_details_title": "Organizational movement details",
   "movement_not_found": "Movement not found. Open from list.",
   "movement_delivery_number": "Delivery number"

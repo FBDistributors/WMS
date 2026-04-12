@@ -501,6 +501,17 @@ bool consolidatedScanMatchesProduct(String raw, ConsolidatedProduct p) {
   return (b.isNotEmpty && scanned == b) || (s.isNotEmpty && scanned == s);
 }
 
+/// Mos mahsulot bo‘lsa — yig‘ish qoldig‘i (rounded); moslik yo‘q bo‘lsa `null`.
+int? consolidatedOpenPickQtyForBarcode(String raw, List<ConsolidatedProduct> products) {
+  for (final ConsolidatedProduct p in products) {
+    if (consolidatedScanMatchesProduct(raw, p)) {
+      final int n = (p.totalRequired - p.totalPicked).round();
+      return n < 0 ? 0 : n;
+    }
+  }
+  return null;
+}
+
 class MyPickerStatsDay {
   const MyPickerStatsDay({required this.date, required this.count});
 

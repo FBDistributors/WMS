@@ -1,29 +1,47 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
-import { getOrder, type OrderDetails } from '../../services/ordersApi'
+import { useAuth } from '../../rbac/AuthProvider'
+import {
+  addOrderLine,
+  deleteOrderLine,
+  getOrder,
+  type OrderDetails,
+  type OrderLine,
+} from '../../services/ordersApi'
 
 export function OrderDetailsPage() {
   const { id } = useParams()
   const location = useLocation()
   const navigate = useNavigate()
   const { t } = useTranslation(['orders', 'common'])
+  const { has } = useAuth()
   const listPath = (location.state as { listPath?: string; listQuery?: string } | null)?.listPath
   const listQuery = (location.state as { listQuery?: string } | null)?.listQuery ?? ''
   const backUrl = listPath ? `${listPath}${listQuery ? `?${listQuery}` : ''}` : '/admin/orders'
   const [order, setOrder] = useState<OrderDetails | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [addOpen, setAddOpen] = useState(false)
+  const [addName, setAddName] = useState('')
+  const [addSku, setAddSku] = useState('')
+  const [addBarcode, setAddBarcode] = useState('')
+  const [addQty, setAddQty] = useState('1')
+  const [addUom, setAddUom] = useState('')
+  const [addSubmitting, setAddSubmitting] = useState(false)
+  const [addError, setAddError] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<OrderLine | null>(null)
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false)
 
-  // Statusni ko'rsatish uchun soddalashtirilgan guruhlar
   const SIMPLIFIED_STATUSES = [
     { value: 'picking', labelKey: 'orders:status_simple.yigishda' },
     { value: 'picked', labelKey: 'orders:status_simple.tekshiruvda' },
@@ -33,7 +51,7 @@ export function OrderDetailsPage() {
   const backendToSimple = (status: string): string => {
     if (['imported', 'B#W', 'allocated', 'ready_for_picking', 'picking'].includes(status)) return 'picking'
     if (status === 'picked') return 'picked'
-    return 'completed' // completed, packed, shipped, cancelled
+    return 'completed'
   }
 
   const load = useCallback(async () => {
@@ -47,7 +65,7 @@ export function OrderDetailsPage() {
     try {
       const data = await getOrder(id)
       setOrder(data)
-    } catch (err) {
+    } catch {
       setLoadError(t('orders:load_failed'))
     } finally {
       setIsLoading(false)
@@ -57,6 +75,61 @@ export function OrderDetailsPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  const canEditLines = Boolean(order?.lines_editable && has('orders:write'))
+
+  const openAddDialog = () => {
+    setAddName('')
+    setAddSku('')
+    setAddBarcode('')
+    setAddQty('1')
+    setAddUom('')
+    setAddError(null)
+    setAddOpen(true)
+  }
+
+  const submitAddLine = async () => {
+    if (!id || !order) return
+    const name = addName.trim()
+    const qty = Number.parseFloat(addQty.replace(',', '.'))
+    if (!name) {
+      setAddError(t('orders:line_edit.name_required'))
+      return
+    }
+    if (!Number.isFinite(qty) || qty <= 0) {
+      setAddError(t('orders:line_edit.qty_invalid'))
+      return
+    }
+    setAddSubmitting(true)
+    setAddError(null)
+    try {
+      const next = await addOrderLine(id, {
+        name,
+        qty,
+        sku: addSku.trim() || null,
+        barcode: addBarcode.trim() || null,
+        uom: addUom.trim() || null,
+      })
+      setOrder(next)
+      setAddOpen(false)
+    } catch (e) {
+      setAddError(e instanceof Error ? e.message : t('orders:line_edit.failed'))
+    } finally {
+      setAddSubmitting(false)
+    }
+  }
+
+  const confirmDelete = async () => {
+    if (!id || !deleteTarget) return
+    setDeleteSubmitting(true)
+    try {
+      const next = await deleteOrderLine(id, deleteTarget.id)
+      setOrder(next)
+      setDeleteTarget(null)
+    } finally {
+      setDeleteSubmitting(false)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -88,7 +161,17 @@ export function OrderDetailsPage() {
             <ArrowLeft size={16} />
             {t('common:buttons.back')}
           </Button>
+          {canEditLines ? (
+            <Button type="button" onClick={openAddDialog}>
+              {t('orders:line_edit.add_line')}
+            </Button>
+          ) : null}
         </div>
+        {order.lines_editable === false && has('orders:write') ? (
+          <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+            {t('orders:line_edit.locked')}
+          </p>
+        ) : null}
         <div className="grid gap-3 md:grid-cols-3">
           <div>
             <div className="text-xs text-slate-500">{t('orders:columns.order_number')}</div>
@@ -163,6 +246,9 @@ export function OrderDetailsPage() {
                 <th className="px-4 py-3 text-left">{t('orders:lines.name')}</th>
                 <th className="px-4 py-3 text-left">{t('orders:lines.qty')}</th>
                 <th className="px-4 py-3 text-left">{t('orders:lines.uom')}</th>
+                {canEditLines ? (
+                  <th className="px-4 py-3 text-right">{t('orders:line_edit.actions')}</th>
+                ) : null}
               </tr>
             </thead>
             <tbody>
@@ -173,12 +259,116 @@ export function OrderDetailsPage() {
                   <td className="px-4 py-3">{line.name}</td>
                   <td className="px-4 py-3">{line.qty}</td>
                   <td className="px-4 py-3">{line.uom ?? '—'}</td>
+                  {canEditLines ? (
+                    <td className="px-4 py-3 text-right">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="text-red-600 hover:text-red-700"
+                        aria-label={t('orders:line_edit.delete')}
+                        onClick={() => setDeleteTarget(line)}
+                      >
+                        <Trash2 size={16} />
+                      </Button>
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>
           </table>
         </TableScrollArea>
       </Card>
+
+      {addOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-950">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                {t('orders:line_edit.add_title')}
+              </h2>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setAddOpen(false)}
+                aria-label={t('orders:line_edit.cancel')}
+              >
+                <X size={20} />
+              </Button>
+            </div>
+            <div className="space-y-3 px-6 py-5">
+              <p className="text-xs text-slate-500 dark:text-slate-400">{t('orders:line_edit.hint_catalog')}</p>
+              <label className="block text-sm text-slate-600 dark:text-slate-300">
+                {t('orders:lines.name')}
+                <input
+                  className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  value={addName}
+                  onChange={(e) => setAddName(e.target.value)}
+                  placeholder={t('orders:line_edit.name_placeholder')}
+                />
+              </label>
+              <label className="block text-sm text-slate-600 dark:text-slate-300">
+                {t('orders:lines.qty')}
+                <input
+                  className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  value={addQty}
+                  onChange={(e) => setAddQty(e.target.value)}
+                  inputMode="decimal"
+                  placeholder={t('orders:line_edit.qty_placeholder')}
+                />
+              </label>
+              <label className="block text-sm text-slate-600 dark:text-slate-300">
+                {t('orders:lines.sku')}
+                <input
+                  className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  value={addSku}
+                  onChange={(e) => setAddSku(e.target.value)}
+                />
+              </label>
+              <label className="block text-sm text-slate-600 dark:text-slate-300">
+                {t('orders:lines.barcode')}
+                <input
+                  className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  value={addBarcode}
+                  onChange={(e) => setAddBarcode(e.target.value)}
+                />
+              </label>
+              <label className="block text-sm text-slate-600 dark:text-slate-300">
+                {t('orders:lines.uom')}
+                <input
+                  className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  value={addUom}
+                  onChange={(e) => setAddUom(e.target.value)}
+                />
+              </label>
+              {addError ? (
+                <p className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
+                  {addError}
+                </p>
+              ) : null}
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-6 py-4 dark:border-slate-800">
+              <Button type="button" variant="ghost" onClick={() => setAddOpen(false)}>
+                {t('orders:line_edit.cancel')}
+              </Button>
+              <Button type="button" onClick={() => void submitAddLine()} disabled={addSubmitting}>
+                {addSubmitting ? t('common:messages.loading') : t('orders:line_edit.save')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title={t('orders:line_edit.delete_title')}
+        message={t('orders:line_edit.delete_message', { name: deleteTarget?.name ?? '' })}
+        confirmLabel={t('orders:line_edit.delete')}
+        cancelLabel={t('common:buttons.cancel')}
+        variant="danger"
+        loading={deleteSubmitting}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </AdminLayout>
   )
 }

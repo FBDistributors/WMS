@@ -213,6 +213,23 @@
     "price": "Narx",
     "amount": "Summa"
   },
+  "line_edit": {
+    "add_line": "Qator qo‘shish",
+    "add_title": "Buyurtmaga qator",
+    "delete": "O‘chirish",
+    "delete_title": "Qatorni o‘chirish",
+    "delete_message": "«{{name}}» qatorini o‘chirishni tasdiqlaysizmi?",
+    "hint_catalog": "SKU yoki barcode katalogdagi mahsulot bilan mos kelishi kerak.",
+    "save": "Saqlash",
+    "cancel": "Bekor qilish",
+    "actions": "Amallar",
+    "failed": "Saqlanmadi",
+    "locked": "Terish vazifasi yaratilgan; qatorlarni tahrirlash mumkin emas.",
+    "name_placeholder": "Mahsulot nomi",
+    "qty_placeholder": "Miqdor",
+    "name_required": "Mahsulot nomini kiriting.",
+    "qty_invalid": "Miqdor musbat son bo‘lishi kerak."
+  },
   "movement_details_title": "Tashkiliy harakat tafsilotlari",
   "movement_not_found": "Harakat topilmadi. Ro'yxatdan oching.",
   "movement_delivery_number": "Yetkazib berish raqami"

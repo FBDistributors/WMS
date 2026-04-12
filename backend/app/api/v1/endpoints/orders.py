@@ -4,6 +4,7 @@ import logging
 import os
 from datetime import date, datetime, timezone
 from typing import List, Optional
+import uuid
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Query, status
@@ -22,7 +23,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.auth.deps import get_current_user, require_any_permission, require_permission, require_role
 from app.db import get_db
-from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_ip, log_action
+from app.services.audit_service import ACTION_CREATE, ACTION_DELETE, ACTION_UPDATE, get_client_ip, log_action
 from app.services.push_notifications import send_push_to_user
 from app.integrations.smartup.client import SmartupClient
 from app.integrations.smartup.importer import delete_stale_orders, import_orders
@@ -106,6 +107,18 @@ class OrderDetails(BaseModel):
     to_warehouse_code: Optional[str] = None
     movement_note: Optional[str] = None
     delivery_date: Optional[date] = None
+    lines_editable: bool = Field(
+        False,
+        description="Terish hujjati yaratilmaguncha qatorlarni tahrirlash mumkin",
+    )
+
+
+class OrderLineCreateBody(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    qty: float = Field(..., gt=0)
+    sku: Optional[str] = Field(None, max_length=64)
+    barcode: Optional[str] = Field(None, max_length=64)
+    uom: Optional[str] = Field(None, max_length=32)
 
 
 class OrdersListResponse(BaseModel):
@@ -253,7 +266,10 @@ def _fefo_available_lots(db: Session, product_id: UUID, min_expiry_date: date | 
     )
 
 
-def _to_order_details(order: OrderModel) -> OrderDetails:
+def _to_order_details(order: OrderModel, db: Session) -> OrderDetails:
+    has_pick_doc = (
+        db.query(DocumentModel.id).filter(DocumentModel.order_id == order.id).limit(1).first() is not None
+    )
     return OrderDetails(
         id=order.id,
         order_number=order.order_number,
@@ -281,6 +297,7 @@ def _to_order_details(order: OrderModel) -> OrderDetails:
         to_warehouse_code=getattr(order, "to_warehouse_code", None),
         movement_note=getattr(order, "movement_note", None),
         delivery_date=order.delivery_date.date() if getattr(order, "delivery_date", None) else None,
+        lines_editable=not has_pick_doc,
     )
 
 
@@ -702,7 +719,122 @@ async def get_order(
     )
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    return _to_order_details(order)
+    return _to_order_details(order, db)
+
+
+def _assert_order_lines_editable(db: Session, order_id: UUID) -> OrderModel:
+    order = (
+        db.query(OrderModel)
+        .options(selectinload(OrderModel.lines), selectinload(OrderModel.wms_state))
+        .filter(OrderModel.id == order_id)
+        .one_or_none()
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    existing_doc = (
+        db.query(DocumentModel.id).filter(DocumentModel.order_id == order.id).limit(1).first()
+    )
+    if existing_doc is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="Terish vazifasi yaratilgan; buyurtma qatorlarini o'zgartirib bo'lmaydi.",
+        )
+    return order
+
+
+@router.post(
+    "/{order_id}/lines",
+    response_model=OrderDetails,
+    summary="Admin: buyurtmaga qator qo'shish (terish hujjati yo'q bo'lsa)",
+)
+async def add_order_line(
+    request: Request,
+    order_id: UUID,
+    payload: OrderLineCreateBody,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("orders:write")),
+):
+    order = _assert_order_lines_editable(db, order_id)
+    sku = (payload.sku or "").strip() or None
+    barcode = (payload.barcode or "").strip() or None
+    name = (payload.name or "").strip()
+    uom = (payload.uom or "").strip() or None
+    if not name:
+        raise HTTPException(status_code=400, detail="name required")
+    new_line = OrderLineModel(
+        id=uuid.uuid4(),
+        order_id=order.id,
+        sku=sku,
+        barcode=barcode,
+        name=name,
+        qty=float(payload.qty),
+        uom=uom,
+        raw_json=None,
+    )
+    db.add(new_line)
+    log_action(
+        db,
+        user_id=user.id,
+        action=ACTION_CREATE,
+        entity_type="order_line",
+        entity_id=str(new_line.id),
+        new_data={
+            "order_id": str(order.id),
+            "name": name,
+            "qty": payload.qty,
+            "sku": sku,
+            "barcode": barcode,
+        },
+        ip_address=get_client_ip(request),
+    )
+    db.commit()
+    order = (
+        db.query(OrderModel)
+        .options(selectinload(OrderModel.lines), selectinload(OrderModel.wms_state))
+        .filter(OrderModel.id == order_id)
+        .one()
+    )
+    return _to_order_details(order, db)
+
+
+@router.delete(
+    "/{order_id}/lines/{line_id}",
+    response_model=OrderDetails,
+    summary="Admin: buyurtma qatorini o'chirish (terish hujjati yo'q bo'lsa)",
+)
+async def delete_order_line(
+    request: Request,
+    order_id: UUID,
+    line_id: UUID,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("orders:write")),
+):
+    order = _assert_order_lines_editable(db, order_id)
+    line = (
+        db.query(OrderLineModel)
+        .filter(OrderLineModel.id == line_id, OrderLineModel.order_id == order.id)
+        .one_or_none()
+    )
+    if not line:
+        raise HTTPException(status_code=404, detail="Line not found")
+    log_action(
+        db,
+        user_id=user.id,
+        action=ACTION_DELETE,
+        entity_type="order_line",
+        entity_id=str(line_id),
+        old_data={"order_id": str(order.id), "name": line.name, "qty": line.qty},
+        ip_address=get_client_ip(request),
+    )
+    db.delete(line)
+    db.commit()
+    order = (
+        db.query(OrderModel)
+        .options(selectinload(OrderModel.lines), selectinload(OrderModel.wms_state))
+        .filter(OrderModel.id == order_id)
+        .one()
+    )
+    return _to_order_details(order, db)
 
 
 @router.patch("/{order_id}/status", response_model=OrderDetails, summary="Admin: buyurtma statusini o'zgartirish")
@@ -780,7 +912,7 @@ async def update_order_status(
         ip_address=get_client_ip(request),
     )
     db.commit()
-    return _to_order_details(order)
+    return _to_order_details(order, db)
 
 
 @router.post("/sync-smartup", response_model=SmartupSyncResponse, summary="Sync orders from Smartup (Cross-organizational movement)")
@@ -1079,7 +1211,7 @@ async def pack_order(
         ip_address=get_client_ip(request),
     )
     db.commit()
-    return _to_order_details(order)
+    return _to_order_details(order, db)
 
 
 @router.post("/{order_id}/ship", response_model=OrderDetails, summary="Ship order")
@@ -1166,4 +1298,4 @@ async def ship_order(
         ip_address=get_client_ip(request),
     )
     db.commit()
-    return _to_order_details(order)
+    return _to_order_details(order, db)

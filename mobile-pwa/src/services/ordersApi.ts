@@ -109,6 +109,16 @@ export type OrderDetails = {
   from_warehouse_code?: string | null
   to_warehouse_code?: string | null
   movement_note?: string | null
+  /** Backend: terish hujjati yo'q bo'lsa true */
+  lines_editable?: boolean
+}
+
+export type OrderLineCreateBody = {
+  name: string
+  qty: number
+  sku?: string | null
+  barcode?: string | null
+  uom?: string | null
 }
 
 /** Legacy: B#S → B#W (backend endi faqat B#W ni qo‘llab-quvvatlaydi). */
@@ -158,6 +168,19 @@ export async function getOrdersCheck(query: { q?: string; filial_id?: string } =
 
 export async function getOrder(id: string) {
   return fetchJSON<OrderDetails>(`/api/v1/orders/${id}`)
+}
+
+export async function addOrderLine(orderId: string, body: OrderLineCreateBody) {
+  return fetchJSON<OrderDetails>(`/api/v1/orders/${orderId}/lines`, {
+    method: 'POST',
+    body,
+  })
+}
+
+export async function deleteOrderLine(orderId: string, lineId: string) {
+  return fetchJSON<OrderDetails>(`/api/v1/orders/${orderId}/lines/${lineId}`, {
+    method: 'DELETE',
+  })
 }
 
 export type SmartupSyncInput = {
