@@ -232,5 +232,7 @@
   },
   "movement_details_title": "Organizational movement details",
   "movement_not_found": "Movement not found. Open from list.",
-  "movement_delivery_number": "Delivery number"
+  "movement_delivery_number": "Delivery number",
+  "movement_ensure_loading": "Linking to order…",
+  "movement_ensure_failed": "Could not create or load the order. Please retry."
 }

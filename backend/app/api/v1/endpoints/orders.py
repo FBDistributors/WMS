@@ -178,6 +178,14 @@ class SendMovementToPickingRequest(BaseModel):
     assigned_to_user_id: UUID
 
 
+class EnsureMovementOrderRequest(BaseModel):
+    """Tashkiliy/O'rikzor harakati uchun DB da Order (movement:{{id}}) yaratish yoki mavjudini qaytarish."""
+
+    source: str = Field(..., description="diller yoki orikzor")
+    movement_id: str = Field(..., min_length=1)
+    movement: MovementPayload
+
+
 class OrderStatusUpdateRequest(BaseModel):
     status: str = Field(..., description="picked, packed, shipped yoki boshqa ruxsat etilgan status")
     controller_user_id: Optional[UUID] = Field(None, description="Tekshiruvda: controllerga yuborish uchun controller user id")
@@ -1013,6 +1021,36 @@ def _get_or_create_order_from_movement(
         .one()
     )
     return order
+
+
+@router.post(
+    "/from-movement/ensure",
+    response_model=OrderDetails,
+    summary="Movement uchun Order yaratish yoki qaytarish (qatorlarni tahrirlash / yig'ishdan oldin)",
+)
+async def ensure_movement_order(
+    payload: EnsureMovementOrderRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("orders:write")),
+):
+    if payload.source.strip().lower() not in ("diller", "orikzor"):
+        raise HTTPException(status_code=400, detail="source diller yoki orikzor bo'lishi kerak")
+    if not payload.movement.movement_items:
+        raise HTTPException(status_code=400, detail="movement_items bo'sh bo'lmasligi kerak")
+    order = _get_or_create_order_from_movement(
+        db,
+        payload.source.strip(),
+        payload.movement_id.strip(),
+        payload.movement,
+    )
+    db.commit()
+    order = (
+        db.query(OrderModel)
+        .options(selectinload(OrderModel.lines), selectinload(OrderModel.wms_state))
+        .filter(OrderModel.id == order.id)
+        .one()
+    )
+    return _to_order_details(order, db)
 
 
 @router.post("/from-movement/send-to-picking", response_model=SendToPickingResponse, summary="Send movement (Tashkiliy/O'rikzor) to picking")

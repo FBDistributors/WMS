@@ -229,5 +229,7 @@
   },
   "movement_details_title": "Детали организационного движения",
   "movement_not_found": "Движение не найдено. Откройте из списка.",
-  "movement_delivery_number": "Номер доставки"
+  "movement_delivery_number": "Номер доставки",
+  "movement_ensure_loading": "Привязка к заказу…",
+  "movement_ensure_failed": "Не удалось создать или загрузить заказ. Повторите попытку."
 }

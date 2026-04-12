@@ -232,5 +232,7 @@
   },
   "movement_details_title": "Tashkiliy harakat tafsilotlari",
   "movement_not_found": "Harakat topilmadi. Ro'yxatdan oching.",
-  "movement_delivery_number": "Yetkazib berish raqami"
+  "movement_delivery_number": "Yetkazib berish raqami",
+  "movement_ensure_loading": "Buyurtmaga bog‘lanmoqda…",
+  "movement_ensure_failed": "Buyurtma yaratilmadi yoki yuklanmadi. Qayta urinib ko‘ring."
 }

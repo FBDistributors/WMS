@@ -271,6 +271,47 @@ export async function sendOrderToPicking(orderId: string, assignedToUserId: stri
   )
 }
 
+/** Backend `MovementPayload` (from-movement API). */
+export function buildMovementApiPayload(movementId: string, movement: MovementItem) {
+  const rawItems = (movement.movement_items as MovementItemLine[] | undefined) ?? []
+  const movement_items = rawItems.map((line) => ({
+    product_code: line.product_code ?? undefined,
+    quantity: typeof line.quantity === 'number' ? line.quantity : Number(line.quantity) || 0,
+    name: line.name ?? (line.product_code as string | undefined),
+  }))
+  return {
+    movement_id: movement.movement_id ?? movementId,
+    barcode: movement.barcode ?? undefined,
+    from_warehouse_code: movement.from_warehouse_code ?? undefined,
+    to_warehouse_code: movement.to_warehouse_code ?? undefined,
+    note: movement.note ?? undefined,
+    delivery_number: (() => {
+      const raw = movement.delivery_number
+      if (raw === undefined || raw === null) return undefined
+      const s = String(raw).trim().slice(0, 64)
+      return s || undefined
+    })(),
+    movement_items,
+  }
+}
+
+/** Movement uchun DB da Order yaratish yoki qaytarish (qatorlarni tahrirlash). */
+export async function ensureMovementOrder(params: {
+  source: 'diller' | 'orikzor'
+  movement_id: string
+  movement: MovementItem
+}) {
+  const { source, movement_id, movement } = params
+  return fetchJSON<OrderDetails>('/api/v1/orders/from-movement/ensure', {
+    method: 'POST',
+    body: {
+      source,
+      movement_id,
+      movement: buildMovementApiPayload(movement_id, movement),
+    },
+  })
+}
+
 /** Movement (Tashkiliy/O'rikzor) dan yig'ishga yuborish — Order get-or-create, keyin send-to-picking. */
 export type SendMovementToPickingParams = {
   source: 'diller' | 'orikzor'
@@ -281,12 +322,6 @@ export type SendMovementToPickingParams = {
 
 export async function sendMovementToPicking(params: SendMovementToPickingParams) {
   const { source, movement_id, movement, assigned_to_user_id } = params
-  const rawItems = (movement.movement_items as MovementItemLine[] | undefined) ?? []
-  const movement_items = rawItems.map((line) => ({
-    product_code: line.product_code ?? undefined,
-    quantity: typeof line.quantity === 'number' ? line.quantity : Number(line.quantity) || 0,
-    name: line.name ?? (line.product_code as string | undefined),
-  }))
   return fetchJSON<{ pick_task_id: string; assigned_to: string }>(
     '/api/v1/orders/from-movement/send-to-picking',
     {
@@ -294,20 +329,7 @@ export async function sendMovementToPicking(params: SendMovementToPickingParams)
       body: {
         source,
         movement_id,
-        movement: {
-          movement_id: movement.movement_id ?? movement_id,
-          barcode: movement.barcode ?? undefined,
-          from_warehouse_code: movement.from_warehouse_code ?? undefined,
-          to_warehouse_code: movement.to_warehouse_code ?? undefined,
-          note: movement.note ?? undefined,
-          delivery_number: (() => {
-            const raw = movement.delivery_number
-            if (raw === undefined || raw === null) return undefined
-            const s = String(raw).trim().slice(0, 64)
-            return s || undefined
-          })(),
-          movement_items,
-        },
+        movement: buildMovementApiPayload(movement_id, movement),
         assigned_to_user_id,
       },
     }
