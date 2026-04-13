@@ -6,9 +6,30 @@ import 'package:go_router/go_router.dart';
 import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../l10n/string_lookup.dart';
+import '../data/models/picker_inventory_models.dart';
 import 'inventory_barcode_resolve_extra.dart';
 import 'inventory_barcode_resolve_routing.dart';
 import 'inventory_providers.dart';
+
+InventoryByBarcodeResponse _byBarcodeFromPickerItem(PickerInventoryItem it) {
+  final List<InventoryByBarcodeLocation> locs = it.topLocations
+      .take(3)
+      .map(
+        (PickerLotInfo l) => InventoryByBarcodeLocation(
+          locationCode: l.locationCode,
+          availableQty: l.availableQty,
+        ),
+      )
+      .toList(growable: false);
+  return InventoryByBarcodeResponse(
+    productId: it.productId,
+    name: it.name,
+    barcode: it.mainBarcode,
+    brand: null,
+    bestLocations: locs,
+    totalAvailable: it.availableQty,
+  );
+}
 
 class InventoryBarcodeResolveScreen extends ConsumerStatefulWidget {
   const InventoryBarcodeResolveScreen({super.key, required this.extra});
@@ -37,7 +58,7 @@ class _InventoryBarcodeResolveScreenState extends ConsumerState<InventoryBarcode
     final String barcode = widget.extra.barcode;
     final GoRouter router = GoRouter.of(context);
     try {
-      final product =
+      final InventoryByBarcodeResponse product =
           await ref.read(inventoryRepositoryProvider).getInventoryByBarcode(barcode);
       if (!mounted) {
         return;
@@ -47,8 +68,34 @@ class _InventoryBarcodeResolveScreenState extends ConsumerState<InventoryBarcode
       if (!mounted) {
         return;
       }
+      final String msg = '$e';
+      final bool notFound = msg.contains('404') ||
+          msg.toLowerCase().contains('product not found') ||
+          msg.toLowerCase().contains('not found');
+      if (notFound) {
+        try {
+          final PickerInventoryListResponse pick =
+              await ref.read(inventoryRepositoryProvider).listPickerInventory(
+                    q: barcode.trim(),
+                    limit: 20,
+                  );
+          if (!mounted) {
+            return;
+          }
+          if (pick.items.length == 1) {
+            routeAfterInventoryBarcodeLookup(
+              router,
+              _byBarcodeFromPickerItem(pick.items.first),
+              widget.extra.args,
+            );
+            return;
+          }
+        } on Object {
+          // fall through to error UI
+        }
+      }
       HapticFeedback.heavyImpact();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       router.goNamed('scanner', extra: widget.extra.args);
     }
   }

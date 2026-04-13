@@ -11,7 +11,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import case, func
+from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user, require_any_permission
@@ -249,14 +249,19 @@ def _get_product_by_barcode(db: Session, barcode: str) -> ProductModel | None:
     barcode = (barcode or "").strip()
     if not barcode:
         return None
+    key = barcode.casefold()
     product = (
         db.query(ProductModel)
         .filter(
-            (ProductModel.barcode == barcode)
-            | (ProductModel.sku == barcode)
-            | (ProductModel.smartup_code == barcode)
-            | ProductModel.id.in_(
-                db.query(ProductBarcode.product_id).filter(ProductBarcode.barcode == barcode)
+            or_(
+                func.lower(ProductModel.barcode) == key,
+                func.lower(ProductModel.sku) == key,
+                func.lower(ProductModel.smartup_code) == key,
+                ProductModel.id.in_(
+                    db.query(ProductBarcode.product_id).filter(
+                        func.lower(ProductBarcode.barcode) == key
+                    )
+                ),
             )
         )
         .filter(ProductModel.is_active == True)
@@ -432,7 +437,6 @@ async def list_picker_inventory(
     query = db.query(ProductModel).filter(ProductModel.is_active == True)
     if q:
         term = f"%{q.strip()}%"
-        from sqlalchemy import or_
 
         barcode_subq = (
             db.query(ProductBarcode.product_id)
@@ -443,6 +447,7 @@ async def list_picker_inventory(
                 func.lower(ProductModel.name).ilike(func.lower(term)),
                 func.lower(ProductModel.sku).ilike(func.lower(term)),
                 ProductModel.barcode.ilike(term),
+                func.lower(ProductModel.smartup_code).ilike(func.lower(term)),
                 ProductModel.id.in_(barcode_subq),
             )
         )
