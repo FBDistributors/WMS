@@ -32,41 +32,48 @@ class ExpiryDatePickerField extends StatelessWidget {
   final void Function(String? isoDate) onChanged;
   final String label;
 
+  static const int _firstYear = 2020;
+
   static Future<int?> _pickYear(BuildContext context) async {
     final DateTime now = DateTime.now();
-    final int first = 2000;
     final int last = now.year + 10;
     final Locale locale = Localizations.localeOf(context);
     return showDialog<int>(
       context: context,
       builder: (BuildContext ctx) {
         return AlertDialog(
-          title: Text(_yearPickerTitle(locale.languageCode)),
+          title: Text(
+            _yearPickerTitle(locale.languageCode),
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+          ),
           content: SizedBox(
             width: double.maxFinite,
-            height: 340,
+            height: 400,
             child: GridView.builder(
-              padding: const EdgeInsets.all(4),
+              padding: const EdgeInsets.all(12),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                mainAxisSpacing: 8,
-                crossAxisSpacing: 8,
-                childAspectRatio: 1.35,
+                crossAxisCount: 3,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio: 1.08,
               ),
-              itemCount: last - first + 1,
+              itemCount: last - _firstYear + 1,
               itemBuilder: (BuildContext _, int i) {
-                final int year = first + i;
+                final int year = _firstYear + i;
                 return Material(
-                  elevation: 1,
-                  borderRadius: BorderRadius.circular(8),
+                  elevation: 2,
+                  borderRadius: BorderRadius.circular(12),
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(12),
                     onTap: () => Navigator.pop(ctx, year),
                     child: Center(
                       child: Text(
                         '$year',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontWeight: FontWeight.w500),
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
@@ -92,17 +99,20 @@ class ExpiryDatePickerField extends StatelessWidget {
       context: context,
       builder: (BuildContext ctx) {
         return AlertDialog(
-          title: Text('$year · ${_monthPickerTitle(lang)}'),
+          title: Text(
+            '$year · ${_monthPickerTitle(lang)}',
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+          ),
           content: SizedBox(
             width: double.maxFinite,
-            height: 280,
+            height: 320,
             child: GridView.builder(
-              padding: const EdgeInsets.all(4),
+              padding: const EdgeInsets.all(12),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                mainAxisSpacing: 8,
-                crossAxisSpacing: 8,
-                childAspectRatio: 1.5,
+                crossAxisCount: 2,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio: 1.35,
               ),
               itemCount: 12,
               itemBuilder: (BuildContext _, int i) {
@@ -110,16 +120,24 @@ class ExpiryDatePickerField extends StatelessWidget {
                 final String labelMonth =
                     DateFormat.MMM(lang).format(DateTime(year, month, 1));
                 return Material(
-                  elevation: 1,
-                  borderRadius: BorderRadius.circular(8),
+                  elevation: 2,
+                  borderRadius: BorderRadius.circular(12),
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(12),
                     onTap: () => Navigator.pop(ctx, month),
                     child: Center(
-                      child: Text(
-                        labelMonth,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          labelMonth,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ),
                   ),

@@ -77,7 +77,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   final List<_FormLine> _lines = <_FormLine>[];
   PickerProductDetailResponse? _product;
   PickerProductLocation? _returnPick;
-  final TextEditingController _qty = TextEditingController(text: '1');
+  final TextEditingController _qty = TextEditingController();
   String? _expiry;
   bool _loadingProduct = false;
   String? _productError;
@@ -167,6 +167,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       _expiry = null;
       _batchNew.clear();
       _kirimPutawaySearch.clear();
+      _qty.clear();
     });
     try {
       final PickerProductDetailResponse res = await ref
@@ -203,7 +204,16 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     final PickerProductDetailResponse? p = _product;
     final PickerProductLocation? pick = _returnPick;
     final int q = int.tryParse(_qty.text.trim()) ?? 0;
-    if (p == null || pick == null || q < 1) {
+    if (p == null || pick == null) {
+      return;
+    }
+    if (q < 1) {
+      if (mounted) {
+        final AppLocale loc = ref.read(appLocaleProvider);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(StringLookup.t(loc, 'kirimNewReceiveFillAll'))),
+        );
+      }
       return;
     }
     if (q > pick.availableQty.floor()) {
@@ -334,22 +344,39 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     if (_sending) {
       return;
     }
+    final AppLocale locMsg = ref.read(appLocaleProvider);
+    void showFillAll() {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(StringLookup.t(locMsg, 'kirimNewReceiveFillAll'))),
+        );
+      }
+    }
+
     final PickerProductDetailResponse? p = _product;
     final PickerLocationOption? loc = _destLocation;
     final int q = int.tryParse(_qty.text.trim()) ?? 0;
     final String batchTrim = _batchNew.text.trim();
-    final String batch = batchTrim.isNotEmpty
-        ? batchTrim
-        : 'MOB-${DateTime.now().millisecondsSinceEpoch}';
-    if (p == null || loc == null || q < 1) {
-      if (mounted) {
-        final AppLocale locMsg = ref.read(appLocaleProvider);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(StringLookup.t(locMsg, 'movementQtyOrLocationInvalid'))),
-        );
-      }
+    final String? exp = _expiry?.trim();
+
+    if (p == null || loc == null) {
+      showFillAll();
       return;
     }
+    if (exp == null || exp.isEmpty) {
+      showFillAll();
+      return;
+    }
+    if (batchTrim.isEmpty) {
+      showFillAll();
+      return;
+    }
+    if (_qty.text.trim().isEmpty || q < 1) {
+      showFillAll();
+      return;
+    }
+
+    final String batch = batchTrim;
     setState(() => _sending = true);
     try {
       final receipt = await ref.read(receivingRepositoryProvider).createReceipt(
@@ -388,7 +415,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             _expiry = null;
             _batchNew.clear();
             _kirimPutawaySearch.clear();
-            _qty.text = '1';
+            _qty.clear();
             _handledProductId = null;
           });
         }

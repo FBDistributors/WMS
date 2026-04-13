@@ -219,6 +219,7 @@ abstract final class StringLookup {
     'kirimSentOk': 'Yuborildi',
     'kirimReceivingDone': 'Qabul yakunlandi',
     'kirimSingleReceiveSuccess': 'Qabul muvaffaqiyatli yakunlandi',
+    'kirimNewReceiveFillAll': 'Barcha maydonlarni to‘ldiring',
   };
 
   static const Map<String, String> _ru = <String, String>{
@@ -418,6 +419,7 @@ abstract final class StringLookup {
     'kirimSentOk': 'Отправлено',
     'kirimReceivingDone': 'Приёмка завершена',
     'kirimSingleReceiveSuccess': 'Приёмка успешно завершена',
+    'kirimNewReceiveFillAll': 'Заполните все поля',
   };
 
   static const Map<String, String> _en = <String, String>{
@@ -617,5 +619,6 @@ abstract final class StringLookup {
     'kirimSentOk': 'Sent',
     'kirimReceivingDone': 'Receiving completed',
     'kirimSingleReceiveSuccess': 'Receiving completed successfully',
+    'kirimNewReceiveFillAll': 'Fill in all fields',
   };
 }
