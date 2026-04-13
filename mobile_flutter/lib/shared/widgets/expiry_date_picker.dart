@@ -25,6 +25,7 @@ class ExpiryDatePickerField extends StatelessWidget {
           initialDate: now,
           firstDate: DateTime(2000),
           lastDate: DateTime(now.year + 10),
+          initialDatePickerMode: DatePickerMode.year,
         );
         if (picked != null) {
           final String s =

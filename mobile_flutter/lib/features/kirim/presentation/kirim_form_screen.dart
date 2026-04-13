@@ -86,6 +86,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   String _receivingLocationCode = '';
   String? _receivingLocationId;
   final TextEditingController _batchNew = TextEditingController();
+  final TextEditingController _kirimPutawaySearch = TextEditingController();
   bool _sending = false;
   String? _handledProductId;
 
@@ -110,6 +111,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     _invLocSearch.dispose();
     _invScanActualQty.dispose();
     _batchNew.dispose();
+    _kirimPutawaySearch.dispose();
     _qty.dispose();
     super.dispose();
   }
@@ -164,6 +166,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       _destLocation = null;
       _expiry = null;
       _batchNew.clear();
+      _kirimPutawaySearch.clear();
     });
     try {
       final PickerProductDetailResponse res = await ref
@@ -260,9 +263,67 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       _destLocation = null;
       _expiry = null;
       _batchNew.clear();
+      _kirimPutawaySearch.clear();
       _qty.text = '1';
       _handledProductId = null;
     });
+  }
+
+  List<PickerLocationOption> _filterKirimPutaway(String q, {int cap = 40}) {
+    final String s = q.trim().toLowerCase();
+    if (s.isEmpty) {
+      return const <PickerLocationOption>[];
+    }
+    return _allLocations
+        .where(
+          (PickerLocationOption l) =>
+              l.code.toLowerCase().contains(s) || l.name.toLowerCase().contains(s),
+        )
+        .take(cap)
+        .toList();
+  }
+
+  Widget _kirimPutawayResultsList() {
+    final List<PickerLocationOption> filtered = _filterKirimPutaway(_kirimPutawaySearch.text);
+    if (filtered.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Material(
+        elevation: 1,
+        borderRadius: BorderRadius.circular(8),
+        clipBehavior: Clip.antiAlias,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 220),
+          child: ListView.builder(
+            shrinkWrap: true,
+            padding: EdgeInsets.zero,
+            itemCount: filtered.length,
+            itemBuilder: (BuildContext _, int i) {
+              final PickerLocationOption o = filtered[i];
+              final bool sel = _destLocation?.id == o.id;
+              final String n = o.name.trim();
+              final bool showSubtitle =
+                  n.isNotEmpty && n.toLowerCase() != o.code.toLowerCase();
+              return ListTile(
+                dense: true,
+                title: Text(o.code),
+                subtitle: showSubtitle ? Text(o.name) : null,
+                tileColor: sel ? Colors.green.shade50 : null,
+                onTap: () {
+                  FocusManager.instance.primaryFocus?.unfocus();
+                  setState(() {
+                    _destLocation = o;
+                    _kirimPutawaySearch.text = o.code;
+                  });
+                },
+              );
+            },
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _submitReturn() async {
@@ -1152,40 +1213,54 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                                 StringLookup.t(appLoc, 'kirimStorageLocation'),
                                 style: const TextStyle(fontWeight: FontWeight.w600),
                               ),
-                              ..._allLocations.take(40).map((PickerLocationOption o) {
-                                final bool sel = _destLocation?.id == o.id;
-                                return ListTile(
-                                  title: Text(o.code),
-                                  subtitle: Text(o.name),
-                                  tileColor: sel ? Colors.green.shade50 : null,
-                                  onTap: () {
-                                    FocusManager.instance.primaryFocus?.unfocus();
-                                    setState(() => _destLocation = o);
-                                  },
-                                );
-                              }),
-                              ExpiryDatePickerField(
-                                value: _expiry,
-                                onChanged: (String? v) => setState(() => _expiry = v),
-                              ),
-                              TextField(
-                                controller: _batchNew,
-                                textCapitalization: TextCapitalization.characters,
-                                decoration: InputDecoration(
-                                  labelText: StringLookup.t(appLoc, 'kirimBatchLabel'),
-                                  border: const OutlineInputBorder(),
-                                ),
-                              ),
                               const SizedBox(height: 8),
                               TextField(
-                                controller: _qty,
-                                keyboardType: kStockQtyKeyboardType,
-                                inputFormatters: kStockQtyInputFormatters,
+                                controller: _kirimPutawaySearch,
+                                textCapitalization: TextCapitalization.characters,
                                 decoration: InputDecoration(
-                                  labelText: StringLookup.t(appLoc, 'qtyShort'),
+                                  labelText: StringLookup.t(appLoc, 'kirimPutawaySearchLabel'),
                                   border: const OutlineInputBorder(),
                                 ),
+                                onChanged: (_) => setState(() {}),
                               ),
+                              _kirimPutawayResultsList(),
+                              const SizedBox(height: 16),
+                              const Divider(height: 1),
+                              const SizedBox(height: 16),
+                              Card(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: <Widget>[
+                                      ExpiryDatePickerField(
+                                        value: _expiry,
+                                        onChanged: (String? v) => setState(() => _expiry = v),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      TextField(
+                                        controller: _batchNew,
+                                        textCapitalization: TextCapitalization.characters,
+                                        decoration: InputDecoration(
+                                          labelText: StringLookup.t(appLoc, 'kirimBatchLabel'),
+                                          border: const OutlineInputBorder(),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      TextField(
+                                        controller: _qty,
+                                        keyboardType: kStockQtyKeyboardType,
+                                        inputFormatters: kStockQtyInputFormatters,
+                                        decoration: InputDecoration(
+                                          labelText: StringLookup.t(appLoc, 'qtyShort'),
+                                          border: const OutlineInputBorder(),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
                               FilledButton(
                                 onPressed: _addLineNew,
                                 child: Text(StringLookup.t(appLoc, 'kirimAddLine')),
