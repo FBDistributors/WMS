@@ -33,7 +33,9 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
   PickerProductLocation? _fromLocation;
   PickerLocationOption? _toLocation;
   final TextEditingController _qty = TextEditingController();
+  final TextEditingController _locationSearchCtrl = TextEditingController();
   String _locationSearch = '';
+  final TextEditingController _palletDestCtrl = TextEditingController();
   String _palletDestSearch = '';
   bool _submitting = false;
 
@@ -49,6 +51,8 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
   @override
   void dispose() {
     _qty.dispose();
+    _locationSearchCtrl.dispose();
+    _palletDestCtrl.dispose();
     _palletCode.dispose();
     super.dispose();
   }
@@ -95,6 +99,8 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
       _fromLocation = null;
       _toLocation = null;
       _qty.clear();
+      _locationSearch = '';
+      _locationSearchCtrl.clear();
     });
     try {
       final PickerProductDetailResponse res =
@@ -121,6 +127,8 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
       _palletError = null;
       _palletContents = null;
       _palletTo = null;
+      _palletDestSearch = '';
+      _palletDestCtrl.clear();
     });
     try {
       final LocationContentsResponse res =
@@ -186,6 +194,8 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
           _fromLocation = null;
           _toLocation = null;
           _qty.clear();
+          _locationSearch = '';
+          _locationSearchCtrl.clear();
         });
       }
     } on Exception catch (e) {
@@ -221,6 +231,8 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
           _palletContents = null;
           _palletTo = null;
           _palletCode.clear();
+          _palletDestSearch = '';
+          _palletDestCtrl.clear();
         });
       }
     } on Exception catch (e) {
@@ -247,6 +259,8 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
         _toLocation = null;
         _qty.clear();
         _productError = null;
+        _locationSearch = '';
+        _locationSearchCtrl.clear();
       });
       return;
     }
@@ -256,6 +270,8 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
       _palletError = null;
       _palletTo = null;
       _palletCode.clear();
+      _palletDestSearch = '';
+      _palletDestCtrl.clear();
     });
   }
 
@@ -383,6 +399,8 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
               Text(StringLookup.t(loc, 'movementTo'),
                   style: const TextStyle(fontWeight: FontWeight.w600)),
               TextField(
+                controller: _locationSearchCtrl,
+                textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
                   labelText: StringLookup.t(loc, 'movementLocationSearchLabel'),
                   border: const OutlineInputBorder(),
@@ -396,7 +414,14 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
                   title: Text(o.code),
                   subtitle: Text(o.name),
                   tileColor: sel ? Colors.green.shade50 : null,
-                  onTap: () => setState(() => _toLocation = o),
+                  onTap: () {
+                    FocusManager.instance.primaryFocus?.unfocus();
+                    setState(() {
+                      _toLocation = o;
+                      _locationSearch = o.code;
+                      _locationSearchCtrl.text = o.code;
+                    });
+                  },
                 );
               }),
               const SizedBox(height: 8),
@@ -454,6 +479,8 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
                 }),
               ),
               TextField(
+                controller: _palletDestCtrl,
+                textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
                   labelText: StringLookup.t(loc, 'movementDestSearchLabel'),
                   border: const OutlineInputBorder(),
@@ -465,7 +492,14 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
                 return ListTile(
                   title: Text(o.code),
                   tileColor: sel ? Colors.green.shade50 : null,
-                  onTap: () => setState(() => _palletTo = o),
+                  onTap: () {
+                    FocusManager.instance.primaryFocus?.unfocus();
+                    setState(() {
+                      _palletTo = o;
+                      _palletDestSearch = o.code;
+                      _palletDestCtrl.text = o.code;
+                    });
+                  },
                 );
               }),
               FilledButton(
