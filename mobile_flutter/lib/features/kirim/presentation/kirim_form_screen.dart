@@ -284,6 +284,11 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   }
 
   Widget _kirimPutawayResultsList() {
+    final String q = _kirimPutawaySearch.text.trim();
+    final PickerLocationOption? d = _destLocation;
+    if (d != null && q.isNotEmpty && q.toLowerCase() == d.code.trim().toLowerCase()) {
+      return const SizedBox.shrink();
+    }
     final List<PickerLocationOption> filtered = _filterKirimPutaway(_kirimPutawaySearch.text);
     if (filtered.isEmpty) {
       return const SizedBox.shrink();
@@ -1220,8 +1225,27 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                                 decoration: InputDecoration(
                                   labelText: StringLookup.t(appLoc, 'kirimPutawaySearchLabel'),
                                   border: const OutlineInputBorder(),
+                                  suffixIcon: _kirimPutawaySearch.text.trim().isEmpty
+                                      ? null
+                                      : IconButton(
+                                          icon: const Icon(Icons.clear),
+                                          onPressed: () {
+                                            setState(() {
+                                              _kirimPutawaySearch.clear();
+                                              _destLocation = null;
+                                            });
+                                          },
+                                        ),
                                 ),
-                                onChanged: (_) => setState(() {}),
+                                onChanged: (String v) {
+                                  setState(() {
+                                    final PickerLocationOption? sel = _destLocation;
+                                    if (sel != null &&
+                                        v.trim().toLowerCase() != sel.code.trim().toLowerCase()) {
+                                      _destLocation = null;
+                                    }
+                                  });
+                                },
                               ),
                               _kirimPutawayResultsList(),
                               const SizedBox(height: 16),
