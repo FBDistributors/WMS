@@ -13,11 +13,15 @@ class BarcodeSearchInput extends ConsumerStatefulWidget {
     required this.onSelectProduct,
     this.label,
     this.hint,
+    this.onProductScanPressed,
   });
 
   final void Function(String productId) onSelectProduct;
   final String? label;
   final String? hint;
+
+  /// Mahsulot shtrixini skanerlash (masalan kirim `flow=new`).
+  final VoidCallback? onProductScanPressed;
 
   @override
   ConsumerState<BarcodeSearchInput> createState() => _BarcodeSearchInputState();
@@ -206,6 +210,7 @@ class _BarcodeSearchInputState extends ConsumerState<BarcodeSearchInput> {
             labelText: widget.label ?? 'Barcode',
             hintText: widget.hint,
             border: const OutlineInputBorder(),
+            suffixIconConstraints: const BoxConstraints(minWidth: 96, minHeight: 48),
             suffixIcon: _loading
                 ? const Padding(
                     padding: EdgeInsets.all(12),
@@ -215,10 +220,24 @@ class _BarcodeSearchInputState extends ConsumerState<BarcodeSearchInput> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                   )
-                : IconButton(
-                    icon: const Icon(Icons.search),
-                    onPressed: _loading ? null : _resolve,
-                  ),
+                : widget.onProductScanPressed != null
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          IconButton(
+                            icon: const Icon(Icons.qr_code_scanner),
+                            onPressed: widget.onProductScanPressed,
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.search),
+                            onPressed: _resolve,
+                          ),
+                        ],
+                      )
+                    : IconButton(
+                        icon: const Icon(Icons.search),
+                        onPressed: _resolve,
+                      ),
           ),
           onSubmitted: (_) => _resolve(),
         ),

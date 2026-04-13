@@ -84,8 +84,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   List<PickerLocationOption> _allLocations = const <PickerLocationOption>[];
   PickerLocationOption? _destLocation;
   String _receivingLocationCode = '';
-  final TextEditingController _receivingLocManual = TextEditingController();
-  bool _receivingLocBusy = false;
+  String? _receivingLocationId;
+  final TextEditingController _batchNew = TextEditingController();
   bool _sending = false;
   String? _handledProductId;
 
@@ -109,7 +109,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   void dispose() {
     _invLocSearch.dispose();
     _invScanActualQty.dispose();
-    _receivingLocManual.dispose();
+    _batchNew.dispose();
     _qty.dispose();
     super.dispose();
   }
@@ -121,15 +121,13 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     _flow = u.queryParameters['flow'] ?? 'return';
     _warehouse = u.queryParameters['warehouse'] ?? 'main';
     if (_flow == 'new') {
+      final String? rid = u.queryParameters['receivingLocationId'];
+      _receivingLocationId = (rid != null && rid.isNotEmpty) ? rid : null;
       final String? qc = u.queryParameters['receivingLocationCode'];
-      if (qc != null && qc.isNotEmpty) {
-        _receivingLocationCode = qc;
-        if (_receivingLocManual.text.trim().isEmpty) {
-          _receivingLocManual.text = qc;
-        }
-      }
+      _receivingLocationCode = (qc != null && qc.isNotEmpty) ? qc : '';
     } else {
       _receivingLocationCode = '';
+      _receivingLocationId = null;
     }
     if (_flow == 'inventory') {
       _inventoryDidChangeDependencies(u);
@@ -157,94 +155,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     }
   }
 
-  PickerLocationOption? _matchLocationInWarehouse(String raw) {
-    final String n = raw.trim().toLowerCase();
-    if (n.isEmpty) {
-      return null;
-    }
-    for (final PickerLocationOption o in _allLocations) {
-      if (o.code.toLowerCase() == n) {
-        return o;
-      }
-    }
-    for (final PickerLocationOption o in _allLocations) {
-      if (o.name.toLowerCase() == n) {
-        return o;
-      }
-    }
-    return null;
-  }
-
-  Future<void> _applyManualReceivingLocation() async {
-    final String raw = _receivingLocManual.text.trim();
-    if (raw.isEmpty) {
-      final AppLocale loc = ref.read(appLocaleProvider);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(StringLookup.t(loc, 'kirimEnterLocationCode'))),
-      );
-      return;
-    }
-    if (_receivingLocBusy) {
-      return;
-    }
-    setState(() => _receivingLocBusy = true);
-    try {
-      if (_allLocations.isEmpty) {
-        await _loadLocations();
-      }
-      PickerLocationOption? match = _matchLocationInWarehouse(raw);
-      if (match == null) {
-        try {
-          final LocationContentsResponse res = await ref
-              .read(inventoryRepositoryProvider)
-              .getLocationContents(raw);
-          for (final PickerLocationOption o in _allLocations) {
-            if (o.id == res.locationId) {
-              match = o;
-              break;
-            }
-          }
-          if (match == null && mounted) {
-            final AppLocale loc = ref.read(appLocaleProvider);
-            final String whLabel = _warehouse == 'showroom'
-                ? StringLookup.t(loc, 'warehouseSegmentShowroom')
-                : StringLookup.t(loc, 'warehouseSegmentMain');
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  StringLookup.tParams(loc, 'kirimReceivingNotInWarehouse', <String, String>{
-                    'code': res.locationCode,
-                    'warehouse': whLabel,
-                  }),
-                ),
-              ),
-            );
-            return;
-          }
-        } on Exception catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('$e')),
-            );
-          }
-          return;
-        }
-      }
-      if (!mounted || match == null) {
-        return;
-      }
-      final PickerLocationOption chosen = match;
-      setState(() {
-        _receivingLocationCode = chosen.code;
-        _receivingLocManual.text = chosen.code;
-      });
-    } finally {
-      if (mounted) {
-        setState(() => _receivingLocBusy = false);
-      }
-    }
-  }
-
   Future<void> _loadProduct(String productId) async {
     setState(() {
       _loadingProduct = true;
@@ -252,6 +162,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       _product = null;
       _returnPick = null;
       _destLocation = null;
+      _expiry = null;
+      _batchNew.clear();
     });
     try {
       final PickerProductDetailResponse res = await ref
@@ -318,7 +230,10 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     final PickerProductDetailResponse? p = _product;
     final PickerLocationOption? loc = _destLocation;
     final int q = int.tryParse(_qty.text.trim()) ?? 0;
-    final String batch = 'MOB-${DateTime.now().millisecondsSinceEpoch}';
+    final String batchTrim = _batchNew.text.trim();
+    final String batch = batchTrim.isNotEmpty
+        ? batchTrim
+        : 'MOB-${DateTime.now().millisecondsSinceEpoch}';
     if (p == null || loc == null || q < 1) {
       if (mounted) {
         final AppLocale locMsg = ref.read(appLocaleProvider);
@@ -341,6 +256,12 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           expiryDate: _expiry,
         ),
       );
+      _product = null;
+      _destLocation = null;
+      _expiry = null;
+      _batchNew.clear();
+      _qty.text = '1';
+      _handledProductId = null;
     });
   }
 
@@ -1154,77 +1075,24 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                       _loadLocations();
                     },
                   ),
-                if (_flow == 'new' && _receivingLocationCode.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(
-                      StringLookup.tParams(
-                        appLoc,
-                        'kirimReceivingDock',
-                        <String, String>{'code': _receivingLocationCode},
-                      ),
-                    ),
-                  ),
-                if (_flow == 'new')
-                  FilledButton.icon(
-                    onPressed: () => context.pushNamed(
-                      'scanner',
-                      extra: ScannerArgs(
-                        returnToKirimLocation: true,
-                        flow: 'new',
-                        warehouse: _warehouse,
-                      ),
-                    ),
-                    icon: const Icon(Icons.qr_code_scanner),
-                    label: Text(StringLookup.t(appLoc, 'kirimScanReceivingLocation')),
-                  ),
-                if (_flow == 'new') ...<Widget>[
-                  const SizedBox(height: 12),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Expanded(
-                        child: TextField(
-                          controller: _receivingLocManual,
-                          textCapitalization: TextCapitalization.characters,
-                          decoration: InputDecoration(
-                            labelText: StringLookup.t(appLoc, 'kirimLocationManualLabel'),
-                            hintText: StringLookup.t(appLoc, 'kirimLocationManualHint'),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            filled: true,
-                          ),
-                          onSubmitted: (_) =>
-                              unawaited(_applyManualReceivingLocation()),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: FilledButton(
-                          onPressed: _receivingLocBusy
-                              ? null
-                              : () => unawaited(_applyManualReceivingLocation()),
-                          child: _receivingLocBusy
-                              ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : Text(StringLookup.t(appLoc, 'kirimApplyButton')),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
                 const SizedBox(height: 12),
                 BarcodeSearchInput(
                   onSelectProduct: _loadProduct,
                   label: StringLookup.t(appLoc, 'barcodeOrSku'),
+                  onProductScanPressed: _flow == 'new'
+                      ? () => context.pushNamed(
+                            'scanner',
+                            extra: ScannerArgs(
+                              returnToKirimForm: true,
+                              flow: 'new',
+                              warehouse: _warehouse,
+                              receivingLocationId: _receivingLocationId,
+                              receivingLocationCode: _receivingLocationCode.isEmpty
+                                  ? null
+                                  : _receivingLocationCode,
+                            ),
+                          )
+                      : null,
                 ),
                 if (_loadingProduct) const LinearProgressIndicator(),
                 if (_productError != null) Text(_productError!, style: const TextStyle(color: Colors.red)),
@@ -1270,41 +1138,77 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                     child: Text(StringLookup.t(appLoc, 'kirimAddLine')),
                   ),
                 ],
-                if (_flow == 'new' && _product != null) ...<Widget>[
-                  Text(
-                    StringLookup.t(appLoc, 'kirimStorageLocation'),
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+                if (_flow == 'new')
+                  Stack(
+                    children: <Widget>[
+                      AbsorbPointer(
+                        absorbing: _product == null,
+                        child: Opacity(
+                          opacity: _product == null ? 0.45 : 1,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: <Widget>[
+                              Text(
+                                StringLookup.t(appLoc, 'kirimStorageLocation'),
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                              ..._allLocations.take(40).map((PickerLocationOption o) {
+                                final bool sel = _destLocation?.id == o.id;
+                                return ListTile(
+                                  title: Text(o.code),
+                                  subtitle: Text(o.name),
+                                  tileColor: sel ? Colors.green.shade50 : null,
+                                  onTap: () {
+                                    FocusManager.instance.primaryFocus?.unfocus();
+                                    setState(() => _destLocation = o);
+                                  },
+                                );
+                              }),
+                              ExpiryDatePickerField(
+                                value: _expiry,
+                                onChanged: (String? v) => setState(() => _expiry = v),
+                              ),
+                              TextField(
+                                controller: _batchNew,
+                                textCapitalization: TextCapitalization.characters,
+                                decoration: InputDecoration(
+                                  labelText: StringLookup.t(appLoc, 'kirimBatchLabel'),
+                                  border: const OutlineInputBorder(),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: _qty,
+                                keyboardType: kStockQtyKeyboardType,
+                                inputFormatters: kStockQtyInputFormatters,
+                                decoration: InputDecoration(
+                                  labelText: StringLookup.t(appLoc, 'qtyShort'),
+                                  border: const OutlineInputBorder(),
+                                ),
+                              ),
+                              FilledButton(
+                                onPressed: _addLineNew,
+                                child: Text(StringLookup.t(appLoc, 'kirimAddLine')),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (_product == null)
+                        Positioned.fill(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.translucent,
+                            onTap: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(StringLookup.t(appLoc, 'kirimSelectProductFirst')),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                    ],
                   ),
-                  ..._allLocations.take(40).map((PickerLocationOption o) {
-                    final bool sel = _destLocation?.id == o.id;
-                    return ListTile(
-                      title: Text(o.code),
-                      subtitle: Text(o.name),
-                      tileColor: sel ? Colors.green.shade50 : null,
-                      onTap: () {
-                        FocusManager.instance.primaryFocus?.unfocus();
-                        setState(() => _destLocation = o);
-                      },
-                    );
-                  }),
-                  TextField(
-                    controller: _qty,
-                    keyboardType: kStockQtyKeyboardType,
-                    inputFormatters: kStockQtyInputFormatters,
-                    decoration: InputDecoration(
-                      labelText: StringLookup.t(appLoc, 'qtyShort'),
-                      border: const OutlineInputBorder(),
-                    ),
-                  ),
-                  ExpiryDatePickerField(
-                    value: _expiry,
-                    onChanged: (String? v) => setState(() => _expiry = v),
-                  ),
-                  FilledButton(
-                    onPressed: _addLineNew,
-                    child: Text(StringLookup.t(appLoc, 'kirimAddLine')),
-                  ),
-                ],
                 const Divider(height: 24),
                 Text(
                   StringLookup.tParams(
