@@ -20,6 +20,7 @@ import { useFocusEffect, useNavigation, useRoute, RouteProp } from '@react-navig
 import type { StackNavigationProp } from '@react-navigation/stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { RootStackParamList } from '../types/navigation';
+import { sanitizeStockQtyDigits } from '../utils/stockQtyInput';
 import { useLocale } from '../i18n/LocaleContext';
 import { useNetwork } from '../network';
 import { getPickerProductDetail, listPickerLocations, getLocationContents, isNoExpiryRestrictionZone, formatPickerLocationOptionLine, type PickerProductDetailResponse, type PickerProductLocation, type PickerLocationOption, type PickerWarehouseFilter, type LocationContentsItem } from '../api/inventory';
@@ -1061,7 +1062,9 @@ export function KirimFormScreen() {
                           <TextInput
                             style={styles.contentsActualInput}
                             value={actualQtyByKey[key] ?? ''}
-                            onChangeText={(text) => setActualQtyByKey((prev) => ({ ...prev, [key]: text }))}
+                            onChangeText={(text) =>
+                              setActualQtyByKey((prev) => ({ ...prev, [key]: sanitizeStockQtyDigits(text) }))
+                            }
                             placeholder={t('inventoryActualQty')}
                             placeholderTextColor="#999"
                             keyboardType="number-pad"
@@ -1182,7 +1185,7 @@ export function KirimFormScreen() {
               <TextInput
                 style={styles.input}
                 value={inventoryScannedActualQty}
-                onChangeText={setInventoryScannedActualQty}
+                onChangeText={(v) => setInventoryScannedActualQty(sanitizeStockQtyDigits(v))}
                 placeholder={t('inventoryActualQty')}
                 placeholderTextColor="#999"
                 keyboardType="number-pad"
@@ -1318,7 +1321,7 @@ export function KirimFormScreen() {
             <TextInput
               style={styles.input}
               value={currentQty}
-              onChangeText={setCurrentQty}
+              onChangeText={(v) => setCurrentQty(sanitizeStockQtyDigits(v))}
               keyboardType="number-pad"
               placeholder="0"
               placeholderTextColor="#999"

@@ -19,6 +19,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../types/navigation';
 import { useLocale } from '../i18n/LocaleContext';
+import { sanitizeStockQtyDigits } from '../utils/stockQtyInput';
 import { useNetwork } from '../network';
 import type {
   ConsolidatedViewResponse,
@@ -331,7 +332,7 @@ export function ConsolidatedPickContent({
                     <TextInput
                       style={styles.modalQtyInput}
                       value={productQtyInput}
-                      onChangeText={setProductQtyInput}
+                      onChangeText={(v) => setProductQtyInput(sanitizeStockQtyDigits(v))}
                       keyboardType="number-pad"
                       placeholder={t('quantity')}
                       placeholderTextColor="#999"

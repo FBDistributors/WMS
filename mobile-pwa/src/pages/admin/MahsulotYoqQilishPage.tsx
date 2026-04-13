@@ -17,6 +17,7 @@ import {
 } from '../../services/inventoryApi'
 import { getLocations, type Location } from '../../services/locationsApi'
 import { getProducts, type Product } from '../../services/productsApi'
+import { sanitizeStockQtyDigits } from '../../lib/stockQtyInput'
 
 const REASON_WRITE_OFF = 'inventory_shortage'
 
@@ -529,7 +530,10 @@ export function MahsulotYoqQilishPage() {
                                   }`}
                                   value={inputVal}
                                   onChange={(e) =>
-                                    setQty(`${row.product_id}:${row.lot_id}`, e.target.value)
+                                    setQty(
+                                      `${row.product_id}:${row.lot_id}`,
+                                      sanitizeStockQtyDigits(e.target.value),
+                                    )
                                   }
                                   placeholder="0"
                                 />
@@ -627,7 +631,7 @@ export function MahsulotYoqQilishPage() {
                                   }`}
                                   value={inputVal}
                                   onChange={(e) =>
-                                    setQty(detailKey(row), e.target.value)
+                                    setQty(detailKey(row), sanitizeStockQtyDigits(e.target.value))
                                   }
                                   placeholder="0"
                                 />

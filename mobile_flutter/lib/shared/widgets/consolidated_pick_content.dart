@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' show max, min;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -16,6 +15,7 @@ import '../../features/picking/data/picking_models.dart';
 import '../../features/picking/domain/profile_type_param.dart';
 import '../../features/picking/picking_providers.dart';
 import '../../l10n/string_lookup.dart';
+import '../input/stock_quantity_input.dart';
 import '../layout/sheet_bottom_inset.dart';
 import 'consolidated_pick_success_snackbar.dart';
 
@@ -426,10 +426,8 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                       const SizedBox(height: 12),
                       TextField(
                         controller: qty,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: <TextInputFormatter>[
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
+                        keyboardType: kStockQtyKeyboardType,
+                        inputFormatters: kStockQtyInputFormatters,
                         decoration: InputDecoration(
                           labelText: StringLookup.t(loc, 'qtyShort'),
                           border: const OutlineInputBorder(),

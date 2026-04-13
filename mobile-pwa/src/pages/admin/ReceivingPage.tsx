@@ -26,6 +26,7 @@ import {
   type Receiver,
 } from '../../services/receivingApi'
 import { useAuth } from '../../rbac/AuthProvider'
+import { sanitizeStockQtyDigits } from '../../lib/stockQtyInput'
 
 type LineDraft = Omit<ReceiptLineCreate, 'qty'> & { id: string; qty: number | '' }
 
@@ -404,7 +405,7 @@ export function ReceivingPage() {
                   className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
                   value={line.qty === '' ? '' : line.qty}
                   onChange={(event) => {
-                    const raw = event.target.value
+                    const raw = sanitizeStockQtyDigits(event.target.value)
                     if (raw === '') {
                       updateLine(line.id, { qty: '' })
                       return

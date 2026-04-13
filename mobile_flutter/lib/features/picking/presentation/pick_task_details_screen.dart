@@ -15,6 +15,7 @@ import '../../../core/offline/offline_database.dart';
 import '../../../core/offline/offline_providers.dart';
 import '../../../core/router/scanner_args.dart';
 import '../../../l10n/string_lookup.dart';
+import '../../../shared/input/stock_quantity_input.dart';
 import '../../../shared/layout/sheet_bottom_inset.dart';
 import '../alternate_location_menu_label.dart' show mergeAlternateLocationsForDisplay, MergedAlternateLocationRow;
 import '../data/picking_constants.dart';
@@ -451,7 +452,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                   const SizedBox(height: 16),
                   TextField(
                     controller: qty,
-                    keyboardType: TextInputType.number,
+                    keyboardType: kStockQtyKeyboardType,
+                    inputFormatters: kStockQtyInputFormatters,
                     decoration: InputDecoration(
                       labelText: StringLookup.t(loc, 'qtyShort'),
                       border: const OutlineInputBorder(),
@@ -929,7 +931,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                         const SizedBox(height: 12),
                         TextField(
                           controller: qty,
-                          keyboardType: TextInputType.number,
+                          keyboardType: kStockQtyKeyboardType,
+                          inputFormatters: kStockQtyInputFormatters,
                           decoration: InputDecoration(
                             labelText: StringLookup.t(loc, 'qtyShort'),
                             border: const OutlineInputBorder(),
@@ -1003,10 +1006,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                         const SizedBox(height: 12),
                         TextField(
                           controller: qty,
-                          keyboardType: TextInputType.number,
-                          inputFormatters: <TextInputFormatter>[
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
+                          keyboardType: kStockQtyKeyboardType,
+                          inputFormatters: kStockQtyInputFormatters,
                           decoration: InputDecoration(
                             labelText: StringLookup.t(loc, 'qtyShort'),
                             border: const OutlineInputBorder(),

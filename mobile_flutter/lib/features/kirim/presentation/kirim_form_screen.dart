@@ -19,6 +19,7 @@ import '../../movements/data/movements_repository.dart';
 import '../../movements/movements_providers.dart';
 import '../../receiving/data/receiving_models.dart';
 import '../../receiving/receiving_providers.dart';
+import '../../../shared/input/stock_quantity_input.dart';
 import '../../../shared/widgets/barcode_search_input.dart';
 import '../../../shared/widgets/expiry_date_picker.dart';
 import '../../../shared/widgets/product_card.dart';
@@ -903,7 +904,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                         style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
                       ),
                       TextField(
-                        keyboardType: TextInputType.number,
+                        keyboardType: kStockQtyKeyboardType,
+                        inputFormatters: kStockQtyInputFormatters,
                         decoration: const InputDecoration(
                           labelText: 'Haqiqiy miqdor',
                           border: OutlineInputBorder(),
@@ -1007,7 +1009,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
               style: const TextStyle(fontWeight: FontWeight.w500)),
           TextField(
             controller: _invScanActualQty,
-            keyboardType: TextInputType.number,
+            keyboardType: kStockQtyKeyboardType,
+            inputFormatters: kStockQtyInputFormatters,
             decoration: const InputDecoration(
               labelText: 'Haqiqiy miqdor',
               border: OutlineInputBorder(),
@@ -1206,7 +1209,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                   }),
                   TextField(
                     controller: _qty,
-                    keyboardType: TextInputType.number,
+                    keyboardType: kStockQtyKeyboardType,
+                    inputFormatters: kStockQtyInputFormatters,
                     decoration: InputDecoration(
                       labelText: StringLookup.t(appLoc, 'qtyShort'),
                       border: const OutlineInputBorder(),
@@ -1233,7 +1237,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                   }),
                   TextField(
                     controller: _qty,
-                    keyboardType: TextInputType.number,
+                    keyboardType: kStockQtyKeyboardType,
+                    inputFormatters: kStockQtyInputFormatters,
                     decoration: InputDecoration(
                       labelText: StringLookup.t(appLoc, 'qtyShort'),
                       border: const OutlineInputBorder(),

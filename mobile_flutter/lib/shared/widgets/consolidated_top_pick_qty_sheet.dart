@@ -1,13 +1,13 @@
 import 'dart:math' show max;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_state/app_locale.dart';
 import '../../features/picking/data/picking_models.dart';
 import '../../features/picking/picking_providers.dart';
 import '../../l10n/string_lookup.dart';
+import '../input/stock_quantity_input.dart';
 import '../layout/sheet_bottom_inset.dart';
 import 'consolidated_pick_success_snackbar.dart';
 
@@ -171,10 +171,8 @@ class _ConsolidatedTopPickQtySheetState extends State<_ConsolidatedTopPickQtyShe
             const SizedBox(height: 12),
             TextField(
               controller: _qty,
-              keyboardType: TextInputType.number,
-              inputFormatters: <TextInputFormatter>[
-                FilteringTextInputFormatter.digitsOnly,
-              ],
+              keyboardType: kStockQtyKeyboardType,
+              inputFormatters: kStockQtyInputFormatters,
               decoration: InputDecoration(
                 labelText: StringLookup.t(loc, 'qtyShort'),
                 border: const OutlineInputBorder(),

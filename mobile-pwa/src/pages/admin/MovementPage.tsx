@@ -14,6 +14,7 @@ import {
   type InventorySummaryRow,
 } from '../../services/inventoryApi'
 import { getLocations, type Location } from '../../services/locationsApi'
+import { sanitizeStockQtyDigits } from '../../lib/stockQtyInput'
 
 type ActiveTab = 'product' | 'location'
 
@@ -413,7 +414,7 @@ export function MovementPage() {
                 max={maxQty}
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 value={qty}
-                onChange={(e) => setQty(e.target.value)}
+                onChange={(e) => setQty(sanitizeStockQtyDigits(e.target.value))}
               />
             </div>
           </>

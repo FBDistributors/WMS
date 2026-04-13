@@ -9,6 +9,7 @@ import '../../../core/router/scanner_args.dart';
 import '../../../l10n/string_lookup.dart';
 import '../../inventory/data/models/picker_inventory_models.dart';
 import '../../inventory/presentation/inventory_providers.dart';
+import '../../../shared/input/stock_quantity_input.dart';
 import '../../../shared/widgets/barcode_search_input.dart';
 import '../../../shared/widgets/product_card.dart';
 import '../movements_providers.dart';
@@ -258,10 +259,14 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
     });
   }
 
-  List<PickerLocationOption> _filterLocations(String q, {int cap = 40}) {
+  List<PickerLocationOption> _filterLocations(
+    String q, {
+    int cap = 40,
+    bool showAllWhenEmpty = false,
+  }) {
     final String s = q.trim().toLowerCase();
     if (s.isEmpty) {
-      return _allLocations.take(cap).toList();
+      return showAllWhenEmpty ? _allLocations.take(cap).toList() : <PickerLocationOption>[];
     }
     return _allLocations
         .where(
@@ -397,7 +402,8 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
               const SizedBox(height: 8),
               TextField(
                 controller: _qty,
-                keyboardType: TextInputType.number,
+                keyboardType: kStockQtyKeyboardType,
+                inputFormatters: kStockQtyInputFormatters,
                 decoration: InputDecoration(
                   labelText: StringLookup.t(loc, 'qtyShort'),
                   border: const OutlineInputBorder(),

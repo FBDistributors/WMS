@@ -13,6 +13,7 @@ import {
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../types/navigation';
+import { sanitizeStockQtyDigits } from '../utils/stockQtyInput';
 import type { PickingDocument, PickingLine } from '../api/picking.types';
 import apiClient, { UNAUTHORIZED_MSG } from '../api/client';
 import { changePickSource, completePickDocument, getTaskById, INCOMPLETE_REASON_KEYS, pickLine, skipLine } from '../api/picking';
@@ -611,7 +612,7 @@ export function PickTaskDetails() {
                     <TextInput
                       style={[styles.qtyInput, isDark && styles.qtyInputDark]}
                       value={qtyInput}
-                      onChangeText={setQtyInput}
+                      onChangeText={(v) => setQtyInput(sanitizeStockQtyDigits(v))}
                       keyboardType="number-pad"
                       placeholder={t('quantity')}
                       placeholderTextColor={isDark ? '#64748b' : '#999'}

@@ -17,6 +17,7 @@ import { useFocusEffect, useNavigation, useRoute, RouteProp } from '@react-navig
 import type { StackNavigationProp } from '@react-navigation/stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { RootStackParamList } from '../types/navigation';
+import { sanitizeStockQtyDigits } from '../utils/stockQtyInput';
 import { useLocale } from '../i18n/LocaleContext';
 import { useNetwork } from '../network';
 import {
@@ -461,7 +462,7 @@ export function MovementScreen() {
                       placeholder={`1–${maxQty}`}
                       placeholderTextColor={isDark ? '#64748b' : '#999'}
                       value={qty}
-                      onChangeText={setQty}
+                      onChangeText={(v) => setQty(sanitizeStockQtyDigits(v))}
                       keyboardType="number-pad"
                     />
                     <Text style={[styles.muted, isDark && styles.mutedDark]}>{t('movementQtyMax', { max: maxQty })}</Text>
