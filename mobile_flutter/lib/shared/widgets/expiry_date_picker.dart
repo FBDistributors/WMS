@@ -11,6 +11,14 @@ String _yearPickerTitle(String languageCode) {
   };
 }
 
+String _monthPickerTitle(String languageCode) {
+  return switch (languageCode) {
+    'ru' => 'Месяц',
+    'en' => 'Month',
+    _ => 'Oy',
+  };
+}
+
 /// RN `ExpiryDatePicker` — yil + oy (kun doim 01), `YYYY-MM-DD` qaytarish.
 class ExpiryDatePickerField extends StatelessWidget {
   const ExpiryDatePickerField({
@@ -36,14 +44,32 @@ class ExpiryDatePickerField extends StatelessWidget {
           title: Text(_yearPickerTitle(locale.languageCode)),
           content: SizedBox(
             width: double.maxFinite,
-            height: 320,
-            child: ListView.builder(
+            height: 340,
+            child: GridView.builder(
+              padding: const EdgeInsets.all(4),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                childAspectRatio: 1.35,
+              ),
               itemCount: last - first + 1,
               itemBuilder: (BuildContext _, int i) {
                 final int year = first + i;
-                return ListTile(
-                  title: Text('$year'),
-                  onTap: () => Navigator.pop(ctx, year),
+                return Material(
+                  elevation: 1,
+                  borderRadius: BorderRadius.circular(8),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => Navigator.pop(ctx, year),
+                    child: Center(
+                      child: Text(
+                        '$year',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ),
                 );
               },
             ),
@@ -66,19 +92,37 @@ class ExpiryDatePickerField extends StatelessWidget {
       context: context,
       builder: (BuildContext ctx) {
         return AlertDialog(
-          title: Text('$year'),
+          title: Text('$year · ${_monthPickerTitle(lang)}'),
           content: SizedBox(
             width: double.maxFinite,
-            height: 360,
-            child: ListView.builder(
+            height: 280,
+            child: GridView.builder(
+              padding: const EdgeInsets.all(4),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                childAspectRatio: 1.5,
+              ),
               itemCount: 12,
               itemBuilder: (BuildContext _, int i) {
                 final int month = i + 1;
                 final String labelMonth =
-                    DateFormat.MMMM(lang).format(DateTime(year, month, 1));
-                return ListTile(
-                  title: Text(labelMonth),
-                  onTap: () => Navigator.pop(ctx, month),
+                    DateFormat.MMM(lang).format(DateTime(year, month, 1));
+                return Material(
+                  elevation: 1,
+                  borderRadius: BorderRadius.circular(8),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => Navigator.pop(ctx, month),
+                    child: Center(
+                      child: Text(
+                        labelMonth,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ),
                 );
               },
             ),
@@ -106,8 +150,7 @@ class ExpiryDatePickerField extends StatelessWidget {
         if (month == null || !context.mounted) {
           return;
         }
-        final String s =
-            '$year-${month.toString().padLeft(2, '0')}-01';
+        final String s = '$year-${month.toString().padLeft(2, '0')}-01';
         onChanged(s);
       },
       child: InputDecorator(

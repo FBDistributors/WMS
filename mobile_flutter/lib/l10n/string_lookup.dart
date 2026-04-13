@@ -218,6 +218,7 @@ abstract final class StringLookup {
     'kirimQtyExceedsStock': 'Mavjud miqdordan oshmasin',
     'kirimSentOk': 'Yuborildi',
     'kirimReceivingDone': 'Qabul yakunlandi',
+    'kirimSingleReceiveSuccess': 'Qabul muvaffaqiyatli yakunlandi',
   };
 
   static const Map<String, String> _ru = <String, String>{
@@ -416,6 +417,7 @@ abstract final class StringLookup {
     'kirimQtyExceedsStock': 'Не больше доступного количества',
     'kirimSentOk': 'Отправлено',
     'kirimReceivingDone': 'Приёмка завершена',
+    'kirimSingleReceiveSuccess': 'Приёмка успешно завершена',
   };
 
   static const Map<String, String> _en = <String, String>{
@@ -614,5 +616,6 @@ abstract final class StringLookup {
     'kirimQtyExceedsStock': 'Cannot exceed available quantity',
     'kirimSentOk': 'Sent',
     'kirimReceivingDone': 'Receiving completed',
+    'kirimSingleReceiveSuccess': 'Receiving completed successfully',
   };
 }

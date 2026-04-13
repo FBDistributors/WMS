@@ -229,46 +229,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     });
   }
 
-  Future<void> _addLineNew() async {
-    final PickerProductDetailResponse? p = _product;
-    final PickerLocationOption? loc = _destLocation;
-    final int q = int.tryParse(_qty.text.trim()) ?? 0;
-    final String batchTrim = _batchNew.text.trim();
-    final String batch = batchTrim.isNotEmpty
-        ? batchTrim
-        : 'MOB-${DateTime.now().millisecondsSinceEpoch}';
-    if (p == null || loc == null || q < 1) {
-      if (mounted) {
-        final AppLocale locMsg = ref.read(appLocaleProvider);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(StringLookup.t(locMsg, 'movementQtyOrLocationInvalid'))),
-        );
-      }
-      return;
-    }
-    setState(() {
-      _lines.add(
-        _FormLine(
-          id: const Uuid().v4(),
-          productId: p.productId,
-          productName: p.name,
-          locationId: loc.id,
-          locationCode: loc.code,
-          qty: q,
-          batch: batch,
-          expiryDate: _expiry,
-        ),
-      );
-      _product = null;
-      _destLocation = null;
-      _expiry = null;
-      _batchNew.clear();
-      _kirimPutawaySearch.clear();
-      _qty.text = '1';
-      _handledProductId = null;
-    });
-  }
-
   List<PickerLocationOption> _filterKirimPutaway(String q, {int cap = 40}) {
     final String s = q.trim().toLowerCase();
     if (s.isEmpty) {
@@ -371,31 +331,67 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   }
 
   Future<void> _submitNew() async {
-    if (_lines.isEmpty || _sending) {
+    if (_sending) {
+      return;
+    }
+    final PickerProductDetailResponse? p = _product;
+    final PickerLocationOption? loc = _destLocation;
+    final int q = int.tryParse(_qty.text.trim()) ?? 0;
+    final String batchTrim = _batchNew.text.trim();
+    final String batch = batchTrim.isNotEmpty
+        ? batchTrim
+        : 'MOB-${DateTime.now().millisecondsSinceEpoch}';
+    if (p == null || loc == null || q < 1) {
+      if (mounted) {
+        final AppLocale locMsg = ref.read(appLocaleProvider);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(StringLookup.t(locMsg, 'movementQtyOrLocationInvalid'))),
+        );
+      }
       return;
     }
     setState(() => _sending = true);
     try {
       final receipt = await ref.read(receivingRepositoryProvider).createReceipt(
-            lines: _lines
-                .map(
-                  (_FormLine l) => ReceiptLineCreate(
-                    productId: l.productId,
-                    qty: l.qty,
-                    batch: l.batch,
-                    locationId: l.locationId,
-                    expiryDate: l.expiryDate,
-                  ),
-                )
-                .toList(),
+            lines: <ReceiptLineCreate>[
+              ReceiptLineCreate(
+                productId: p.productId,
+                qty: q,
+                batch: batch,
+                locationId: loc.id,
+                expiryDate: _expiry,
+              ),
+            ],
           );
       await ref.read(receivingRepositoryProvider).completeReceipt(receipt.id);
       if (mounted) {
         final AppLocale loc = ref.read(appLocaleProvider);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(StringLookup.t(loc, 'kirimReceivingDone'))),
+        await showDialog<void>(
+          context: context,
+          builder: (BuildContext ctx) {
+            return AlertDialog(
+              content: Text(StringLookup.t(loc, 'kirimSingleReceiveSuccess')),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
+                ),
+              ],
+            );
+          },
         );
-        context.pop();
+        if (mounted) {
+          setState(() {
+            _lines.clear();
+            _product = null;
+            _destLocation = null;
+            _expiry = null;
+            _batchNew.clear();
+            _kirimPutawaySearch.clear();
+            _qty.text = '1';
+            _handledProductId = null;
+          });
+        }
       }
     } on Exception catch (e) {
       if (mounted) {
@@ -1284,11 +1280,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 12),
-                              FilledButton(
-                                onPressed: _addLineNew,
-                                child: Text(StringLookup.t(appLoc, 'kirimAddLine')),
-                              ),
                             ],
                           ),
                         ),
@@ -1308,24 +1299,26 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                         ),
                     ],
                   ),
-                const Divider(height: 24),
-                Text(
-                  StringLookup.tParams(
-                    appLoc,
-                    'kirimLinesHeading',
-                    <String, String>{'count': '${_lines.length}'},
-                  ),
-                ),
-                ..._lines.map(
-                  (_FormLine l) => ListTile(
-                    title: Text(l.productName),
-                    subtitle: Text('${l.locationCode} · ${l.qty} · ${l.batch}'),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: () => setState(() => _lines.remove(l)),
+                if (_flow == 'return') ...<Widget>[
+                  const Divider(height: 24),
+                  Text(
+                    StringLookup.tParams(
+                      appLoc,
+                      'kirimLinesHeading',
+                      <String, String>{'count': '${_lines.length}'},
                     ),
                   ),
-                ),
+                  ..._lines.map(
+                    (_FormLine l) => ListTile(
+                      title: Text(l.productName),
+                      subtitle: Text('${l.locationCode} · ${l.qty} · ${l.batch}'),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: () => setState(() => _lines.remove(l)),
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 FilledButton(
                   onPressed: _sending
