@@ -251,6 +251,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       _productError = null;
       _product = null;
       _returnPick = null;
+      _destLocation = null;
     });
     try {
       final PickerProductDetailResponse res = await ref
@@ -265,6 +266,11 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           _loadingProduct = false;
           if (_flow == 'return' && res.locations.isNotEmpty) {
             _returnPick = _sortFefo(res.locations).first;
+          }
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            FocusManager.instance.primaryFocus?.unfocus();
           }
         });
       }
@@ -314,6 +320,12 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     final int q = int.tryParse(_qty.text.trim()) ?? 0;
     final String batch = 'MOB-${DateTime.now().millisecondsSinceEpoch}';
     if (p == null || loc == null || q < 1) {
+      if (mounted) {
+        final AppLocale locMsg = ref.read(appLocaleProvider);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(StringLookup.t(locMsg, 'movementQtyOrLocationInvalid'))),
+        );
+      }
       return;
     }
     setState(() {
@@ -759,12 +771,45 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     );
   }
 
+  /// Inventarizatsiya (lokatsiya tarkibi): shtrix, muddat, tizim — `batch_no` ko‘rsatilmaydi.
+  String _invContentsItemMetaLine(LocationContentsItem item) {
+    final List<String> parts = <String>[];
+    final String? bc = item.barcode?.trim();
+    if (bc != null && bc.isNotEmpty) {
+      parts.add(bc);
+    }
+    if (item.expiryDate != null && item.expiryDate!.trim().isNotEmpty) {
+      parts.add(formatExpiryMonthYear(item.expiryDate));
+    }
+    parts.add('Tizim: ${item.availableQty.round()}');
+    return parts.join(' • ');
+  }
+
+  /// Skan rejimi: lokatsiya qatori — mahsulot shtrix/SKU + muddat + tizim (`batch_no` yo‘q).
+  String _invScanLocationSubtitle(PickerProductDetailResponse p, PickerProductLocation loc) {
+    final List<String> parts = <String>[];
+    final String? bc = p.mainBarcode?.trim();
+    if (bc != null && bc.isNotEmpty) {
+      parts.add(bc);
+    }
+    final String code = p.code.trim();
+    if (code.isNotEmpty) {
+      parts.add(code);
+    }
+    if (loc.expiryDate != null && loc.expiryDate!.trim().isNotEmpty) {
+      parts.add(formatExpiryMonthYear(loc.expiryDate));
+    }
+    parts.add('Tizim: ${loc.availableQty.round()}');
+    return parts.join(' • ');
+  }
+
   Widget _buildInventoryBody() {
     if (_invAllLocations.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadInvLocations());
     }
+    final double bottomPad = MediaQuery.viewPaddingOf(context).bottom + 24;
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomPad),
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       children: <Widget>[
         if (_invStep == 0) ...<Widget>[
@@ -900,7 +945,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                       Text(
-                        '${item.batchNo}${item.expiryDate != null ? ' • ${formatExpiryMonthYear(item.expiryDate)}' : ''} • Tizim: ${item.availableQty.round()}',
+                        _invContentsItemMetaLine(item),
                         style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
                       ),
                       TextField(
@@ -958,7 +1003,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
               return ListTile(
                 title: Text(loc.locationCode),
                 subtitle: Text(
-                  '${loc.batchNo}${loc.expiryDate != null ? ' • ${formatExpiryMonthYear(loc.expiryDate)}' : ''} • ${loc.availableQty.round()}',
+                  _invScanLocationSubtitle(_product!, loc),
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
@@ -1080,10 +1125,11 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       );
     }
 
+    final double kirimBodyBottomPad = MediaQuery.viewPaddingOf(context).bottom + 24;
     return Scaffold(
       appBar: AppBar(title: Text(title)),
       body: ListView(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + kirimBodyBottomPad),
               children: <Widget>[
                 if (_flow == 'return')
                   SegmentedButton<String>(
@@ -1204,7 +1250,10 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                         '${loc.batchNo} · ${loc.availableQty.toStringAsFixed(0)} · ${formatExpiryMonthYear(loc.expiryDate)}',
                       ),
                       tileColor: sel ? Colors.blue.shade50 : null,
-                      onTap: () => setState(() => _returnPick = loc),
+                      onTap: () {
+                        FocusManager.instance.primaryFocus?.unfocus();
+                        setState(() => _returnPick = loc);
+                      },
                     );
                   }),
                   TextField(
@@ -1232,7 +1281,10 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                       title: Text(o.code),
                       subtitle: Text(o.name),
                       tileColor: sel ? Colors.green.shade50 : null,
-                      onTap: () => setState(() => _destLocation = o),
+                      onTap: () {
+                        FocusManager.instance.primaryFocus?.unfocus();
+                        setState(() => _destLocation = o);
+                      },
                     );
                   }),
                   TextField(
