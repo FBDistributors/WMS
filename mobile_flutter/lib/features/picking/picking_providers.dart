@@ -25,22 +25,6 @@ class OpenPickTasksNotifier extends AutoDisposeAsyncNotifier<List<PickingListIte
         .toList(growable: false);
   }
 
-  Future<void> _fetchToCacheBackground() async {
-    try {
-      final List<PickingListItem> list =
-          await ref.read(pickingRepositoryProvider).getOpenTasks();
-      final OfflineDatabase? db = await ref.read(offlineDatabaseProvider.future);
-      await db?.saveCachedPickTasks(
-        list.map((PickingListItem e) => e.toJson()).toList(growable: false),
-      );
-      state = AsyncData<List<PickingListItem>>(list);
-    } on Object catch (e, st) {
-      if (kDebugMode) {
-        debugPrint('OpenPickTasksNotifier background sync: $e\n$st');
-      }
-    }
-  }
-
   @override
   Future<List<PickingListItem>> build() async {
     final bool online = ref.watch(networkOnlineProvider).valueOrNull ?? true;
@@ -51,17 +35,19 @@ class OpenPickTasksNotifier extends AutoDisposeAsyncNotifier<List<PickingListIte
       return cached;
     }
 
-    if (cached.isEmpty) {
+    try {
       final List<PickingListItem> list =
           await ref.read(pickingRepositoryProvider).getOpenTasks();
       await db?.saveCachedPickTasks(
         list.map((PickingListItem e) => e.toJson()).toList(growable: false),
       );
       return list;
+    } on Object catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('OpenPickTasksNotifier network-first fallback to cache: $e\n$st');
+      }
+      return cached;
     }
-
-    unawaited(_fetchToCacheBackground());
-    return cached;
   }
 
   Future<void> refreshFromNetwork() async {
@@ -276,7 +262,13 @@ final startupBootstrapProvider = FutureProvider<bool>((Ref ref) async {
   if (!auth.isAuthenticated) {
     return true;
   }
-  await ref.read(openPickTasksProvider.notifier).refreshFromNetwork();
-  await ref.read(consolidatedViewProvider.notifier).refreshFromNetwork();
+  try {
+    await ref.read(openPickTasksProvider.notifier).refreshFromNetwork();
+    await ref.read(consolidatedViewProvider.notifier).refreshFromNetwork();
+  } on Object catch (e, st) {
+    if (kDebugMode) {
+      debugPrint('startupBootstrapProvider refresh warning: $e\n$st');
+    }
+  }
   return true;
 });
