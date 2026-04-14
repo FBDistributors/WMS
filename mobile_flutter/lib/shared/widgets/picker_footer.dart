@@ -7,6 +7,7 @@ import '../../core/app_state/profile_type_controller.dart';
 import '../../core/app_state/theme_controller.dart';
 import '../../core/router/scanner_args.dart';
 import '../../features/picking/domain/profile_type_param.dart';
+import '../../features/picking/data/picking_models.dart';
 import '../../features/picking/picking_providers.dart';
 import '../../l10n/string_lookup.dart';
 import '../../core/app_state/locale_controller.dart';
@@ -20,7 +21,7 @@ enum PickerFooterRoute {
   hisob,
 }
 
-class PickerFooter extends ConsumerWidget {
+class PickerFooter extends ConsumerStatefulWidget {
   const PickerFooter({
     super.key,
     required this.current,
@@ -28,14 +29,25 @@ class PickerFooter extends ConsumerWidget {
 
   final PickerFooterRoute current;
 
+  @override
+  ConsumerState<PickerFooter> createState() => _PickerFooterState();
+}
+
+class _PickerFooterState extends ConsumerState<PickerFooter> {
+  int _lastTaskCount = 0;
+
   static const Color _active = Color(0xFF1A237E);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final AppLocale loc = ref.watch(appLocaleProvider);
     final bool isDark = ref.watch(appThemeModeProvider) == ThemeMode.dark;
-    final int taskCount =
-        ref.watch(openPickTasksProvider).valueOrNull?.length ?? 0;
+    final AsyncValue<List<PickingListItem>> taskAsync = ref.watch(openPickTasksProvider);
+    final int? latest = taskAsync.valueOrNull?.length;
+    if (latest != null) {
+      _lastTaskCount = latest;
+    }
+    final int taskCount = latest ?? _lastTaskCount;
     final ProfileType pt = ref.watch(profileTypeProvider);
     final PickerProfileParam profileParam =
         pt == ProfileType.controller ? PickerProfileParam.controller : PickerProfileParam.picker;
@@ -80,7 +92,7 @@ class PickerFooter extends ConsumerWidget {
                 child: _tab(
                   icon: Icons.home_rounded,
                   label: StringLookup.t(loc, 'tabMain'),
-                  active: current == PickerFooterRoute.pickerHome,
+                  active: widget.current == PickerFooterRoute.pickerHome,
                   activeC: activeC,
                   inactiveC: inactiveC,
                   onTap: goHome,
@@ -90,7 +102,7 @@ class PickerFooter extends ConsumerWidget {
                 child: _tab(
                   icon: Icons.assignment_rounded,
                   label: StringLookup.t(loc, 'tabPickLists'),
-                  active: current == PickerFooterRoute.pickTaskList,
+                  active: widget.current == PickerFooterRoute.pickTaskList,
                   activeC: activeC,
                   inactiveC: inactiveC,
                   badge: taskCount,
@@ -108,7 +120,7 @@ class PickerFooter extends ConsumerWidget {
                 child: _tab(
                   icon: Icons.inventory_2_rounded,
                   label: StringLookup.t(loc, 'tabInventory'),
-                  active: current == PickerFooterRoute.inventory,
+                  active: widget.current == PickerFooterRoute.inventory,
                   activeC: activeC,
                   inactiveC: inactiveC,
                   onTap: goInv,
@@ -118,7 +130,7 @@ class PickerFooter extends ConsumerWidget {
                 child: _tab(
                   icon: Icons.inbox_rounded,
                   label: StringLookup.t(loc, 'kirim'),
-                  active: current == PickerFooterRoute.kirim,
+                  active: widget.current == PickerFooterRoute.kirim,
                   activeC: activeC,
                   inactiveC: inactiveC,
                   onTap: goKirim,

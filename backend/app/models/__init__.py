@@ -4,6 +4,7 @@ from app.models.brand import Brand
 from app.models.customer_return import CustomerReturn, CustomerReturnLine
 from app.models.document import Document, DocumentLine
 from app.models.expired_zone_display_labels import ExpiredZoneDisplayLabels
+from app.models.idempotency_key import IdempotencyKey
 from app.models.location import Location
 from app.models.order import Order, OrderLine, OrderWmsState
 from app.models.picking import PickRequest
@@ -35,6 +36,7 @@ __all__ = [
     "Document",
     "DocumentLine",
     "ExpiredZoneDisplayLabels",
+    "IdempotencyKey",
     "Location",
     "Order",
     "OrderLine",

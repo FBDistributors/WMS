@@ -92,6 +92,36 @@ class _MobileFlutterAppState extends ConsumerState<MobileFlutterApp> {
     final GoRouter router = ref.watch(goRouterProvider);
     final ThemeMode themeMode = ref.watch(appThemeModeProvider);
     final AppLocale appLoc = ref.watch(appLocaleProvider);
+    final AsyncValue<bool> startupReady = ref.watch(startupBootstrapProvider);
+
+    if (startupReady.isLoading || startupReady.hasError) {
+      return MaterialApp(
+        title: 'WMS',
+        themeMode: themeMode,
+        theme: ThemeData(
+          useMaterial3: true,
+          colorScheme: ColorScheme.fromSeed(seedColor: _accent, brightness: Brightness.light),
+        ),
+        darkTheme: ThemeData(
+          useMaterial3: true,
+          brightness: Brightness.dark,
+        ),
+        home: Scaffold(
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                const CircularProgressIndicator(),
+                const SizedBox(height: 12),
+                Text(
+                  startupReady.hasError ? 'Yuklashda xatolik. Qayta urinilmoqda...' : 'Yuklanmoqda...',
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return MaterialApp.router(
       title: 'WMS',

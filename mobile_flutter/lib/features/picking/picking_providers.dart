@@ -8,6 +8,7 @@ import '../../core/app_state/network_status_provider.dart';
 import '../../core/offline/offline_database.dart';
 import '../../core/offline/offline_providers.dart';
 import '../../core/storage/shared_preferences_provider.dart';
+import '../auth/presentation/auth_providers.dart';
 import 'data/picking_models.dart';
 import 'picking_repository_provider.dart';
 
@@ -267,3 +268,15 @@ class ConsolidatedScanFromScanner {
 }
 
 final pendingConsolidatedScanProvider = StateProvider<ConsolidatedScanFromScanner?>((Ref ref) => null);
+
+/// App startup gate: auth holati + task badge manbasi tayyor bo‘lgandan keyin
+/// asosiy router UI ko‘rinadi.
+final startupBootstrapProvider = FutureProvider<bool>((Ref ref) async {
+  final AuthSession auth = await ref.watch(authControllerProvider.future);
+  if (!auth.isAuthenticated) {
+    return true;
+  }
+  await ref.read(openPickTasksProvider.notifier).refreshFromNetwork();
+  await ref.read(consolidatedViewProvider.notifier).refreshFromNetwork();
+  return true;
+});

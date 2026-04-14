@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
@@ -40,6 +41,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
   final TextEditingController _palletDestCtrl = TextEditingController();
   String _palletDestSearch = '';
   bool _submitting = false;
+  String? _productSubmitKey;
 
   LocationContentsResponse? _palletContents;
   bool _palletLoading = false;
@@ -47,6 +49,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
   final TextEditingController _palletCode = TextEditingController();
   PickerLocationOption? _palletTo;
   bool _palletSubmitting = false;
+  String? _palletSubmitKey;
   bool _palletFullTransfer = true;
   final Map<String, bool> _palletSelected = <String, bool>{};
   final Map<String, String> _palletSelectedQty = <String, String>{};
@@ -208,12 +211,15 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
     setState(() => _submitting = true);
     try {
       final repo = ref.read(movementsRepositoryProvider);
+      final String baseKey = _productSubmitKey ?? const Uuid().v4();
+      _productSubmitKey = baseKey;
       await repo.createStockMovement(
         productId: p.productId,
         lotId: from.lotId,
         locationId: from.locationId,
         qtyChange: -n.toDouble(),
         reasonCode: 'inventory_shortage',
+        idempotencyKey: '$baseKey-out',
       );
       await repo.createStockMovement(
         productId: p.productId,
@@ -221,6 +227,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
         locationId: to.id,
         qtyChange: n.toDouble(),
         reasonCode: 'inventory_overage',
+        idempotencyKey: '$baseKey-in',
       );
       if (mounted) {
         final AppLocale loc = ref.read(appLocaleProvider);
@@ -235,6 +242,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
           _qty.clear();
           _locationSearch = '';
           _locationSearchCtrl.clear();
+          _productSubmitKey = null;
         });
       }
     } on Exception catch (e) {
@@ -289,11 +297,14 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
     }
     setState(() => _palletSubmitting = true);
     try {
+      final String requestKey = _palletSubmitKey ?? const Uuid().v4();
+      _palletSubmitKey = requestKey;
       await ref.read(movementsRepositoryProvider).transferLocationStock(
             fromLocationId: c.locationId,
             toLocationId: to.id,
             fullTransfer: _palletFullTransfer,
             lines: lines,
+            idempotencyKey: requestKey,
           );
       if (mounted) {
         final AppLocale loc = ref.read(appLocaleProvider);
@@ -310,6 +321,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
           _palletSelectedQty.clear();
           _palletDestSearch = '';
           _palletDestCtrl.clear();
+          _palletSubmitKey = null;
         });
       }
     } on Exception catch (e) {

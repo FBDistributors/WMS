@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import date, datetime
+import hashlib
+import json
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, List, Literal, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Query, Header, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import case, distinct, exists, func, select
 from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.exc import IntegrityError
 
 from app.auth.deps import get_current_user, require_permission
 from app.auth.guards import check_controller_adjust_reason
@@ -23,6 +27,7 @@ from app.db import get_db
 from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
 from app.models.location import Location as LocationModel
+from app.models.idempotency_key import IdempotencyKey as IdempotencyKeyModel
 from app.models.product import Product as ProductModel
 from app.models.product import ProductBarcode
 from app.models.stock import ON_HAND_MOVEMENT_TYPES
@@ -67,6 +72,76 @@ def _location_ids_for_warehouse(db: Session, warehouse: Optional[str]) -> Option
 
 # On-hand only (zone implementation / Variant A); allocate/unallocate not in ledger
 MOVEMENT_TYPES = set(ON_HAND_MOVEMENT_TYPES)
+
+_IDEMPOTENCY_TTL_HOURS = 24
+
+
+def _idempotency_payload_hash(payload: dict[str, Any]) -> str:
+    raw = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _run_with_idempotency(
+    *,
+    db: Session,
+    user_id: UUID,
+    key: str | None,
+    scope: str,
+    payload: dict[str, Any],
+    expected_status: int,
+    run: callable,
+):
+    if key is None or not key.strip():
+        return run()
+
+    clean_key = key.strip()
+    req_hash = _idempotency_payload_hash(payload)
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    existing = (
+        db.query(IdempotencyKeyModel)
+        .filter(
+            IdempotencyKeyModel.scope == scope,
+            IdempotencyKeyModel.user_id == user_id,
+            IdempotencyKeyModel.key == clean_key,
+        )
+        .one_or_none()
+    )
+    if existing is not None and existing.expires_at >= now_utc:
+        if existing.request_hash != req_hash:
+            raise HTTPException(status_code=409, detail="Idempotency-Key already used with different payload")
+        if existing.response_status == 0 or not existing.response_body:
+            raise HTTPException(status_code=409, detail="Duplicate request in progress. Try again.")
+        return JSONResponse(status_code=existing.response_status, content=json.loads(existing.response_body))
+    if existing is not None and existing.expires_at < now_utc:
+        db.delete(existing)
+        db.flush()
+
+    idem = IdempotencyKeyModel(
+        key=clean_key,
+        scope=scope,
+        user_id=user_id,
+        request_hash=req_hash,
+        response_status=0,
+        response_body="",
+        expires_at=now_utc + timedelta(hours=_IDEMPOTENCY_TTL_HOURS),
+    )
+    db.add(idem)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Duplicate request in progress. Try again.")
+
+    result = run()
+    if isinstance(result, BaseModel):
+        body = result.model_dump(mode="json")
+    else:
+        body = result
+    idem.response_status = expected_status
+    idem.response_body = json.dumps(body, ensure_ascii=False, default=str)
+    db.commit()
+    return JSONResponse(status_code=expected_status, content=body)
 
 
 class StockLotOut(BaseModel):
@@ -578,87 +653,99 @@ async def list_stock_movements(
 async def create_stock_movement(
     request: Request,
     payload: StockMovementCreate,
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
     user: UserModel = Depends(get_current_user),
     _guard=Depends(require_permission("inventory:adjust")),
 ):
-    # Stock ledger is append-only; no update/delete endpoints by design.
-    if payload.movement_type not in MOVEMENT_TYPES:
-        raise HTTPException(status_code=400, detail="Invalid movement type")
-    if payload.qty_change == 0:
-        raise HTTPException(status_code=400, detail="Quantity change cannot be zero")
-    if (payload.source_document_type and not payload.source_document_id) or (
-        payload.source_document_id and not payload.source_document_type
-    ):
-        raise HTTPException(status_code=400, detail="Source document type and id must be provided together")
+    def _run_create():
+        # Stock ledger is append-only; no update/delete endpoints by design.
+        if payload.movement_type not in MOVEMENT_TYPES:
+            raise HTTPException(status_code=400, detail="Invalid movement type")
+        if payload.qty_change == 0:
+            raise HTTPException(status_code=400, detail="Quantity change cannot be zero")
+        if (payload.source_document_type and not payload.source_document_id) or (
+            payload.source_document_id and not payload.source_document_type
+        ):
+            raise HTTPException(status_code=400, detail="Source document type and id must be provided together")
 
-    product = db.query(ProductModel.id).filter(ProductModel.id == payload.product_id).one_or_none()
-    if not product:
-        raise HTTPException(status_code=400, detail="Product not found")
-    lot = db.query(StockLotModel).filter(StockLotModel.id == payload.lot_id).one_or_none()
-    if not lot:
-        raise HTTPException(status_code=400, detail="Stock lot not found")
-    if lot.product_id != payload.product_id:
-        raise HTTPException(status_code=400, detail="Stock lot does not belong to product")
-    location = (
-        db.query(LocationModel.id).filter(LocationModel.id == payload.location_id).one_or_none()
-    )
-    if not location:
-        raise HTTPException(status_code=400, detail="Location not found")
-
-    if payload.qty_change > 0:
-        check_location_single_expiry(db, payload.location_id, payload.product_id, lot.expiry_date)
-
-    if payload.movement_type == "adjust":
-        check_controller_adjust_reason(user, payload.reason_code)
-
-    # allocate/unallocate: ledgerda on_hand va reserved bir xil miqdorda — available o'zgarmaydi.
-    if payload.qty_change < 0 and payload.movement_type not in ("allocate", "unallocate"):
-        require_sufficient_available(
-            db,
-            payload.product_id,
-            payload.lot_id,
-            payload.location_id,
-            abs(Decimal(str(payload.qty_change))),
-            lock=True,
+        product = db.query(ProductModel.id).filter(ProductModel.id == payload.product_id).one_or_none()
+        if not product:
+            raise HTTPException(status_code=400, detail="Product not found")
+        lot = db.query(StockLotModel).filter(StockLotModel.id == payload.lot_id).one_or_none()
+        if not lot:
+            raise HTTPException(status_code=400, detail="Stock lot not found")
+        if lot.product_id != payload.product_id:
+            raise HTTPException(status_code=400, detail="Stock lot does not belong to product")
+        location = (
+            db.query(LocationModel.id).filter(LocationModel.id == payload.location_id).one_or_none()
         )
+        if not location:
+            raise HTTPException(status_code=400, detail="Location not found")
 
-    movement = StockMovementModel(
-        product_id=payload.product_id,
-        lot_id=payload.lot_id,
-        location_id=payload.location_id,
-        qty_change=payload.qty_change,
-        movement_type=payload.movement_type,
-        source_document_type=payload.source_document_type,
-        source_document_id=payload.source_document_id,
-        created_by_user_id=user.id,
-        reason_code=payload.reason_code,
-    )
-    db.add(movement)
-    log_action(
-        db,
+        if payload.qty_change > 0:
+            check_location_single_expiry(db, payload.location_id, payload.product_id, lot.expiry_date)
+
+        if payload.movement_type == "adjust":
+            check_controller_adjust_reason(user, payload.reason_code)
+
+        # allocate/unallocate: ledgerda on_hand va reserved bir xil miqdorda — available o'zgarmaydi.
+        if payload.qty_change < 0 and payload.movement_type not in ("allocate", "unallocate"):
+            require_sufficient_available(
+                db,
+                payload.product_id,
+                payload.lot_id,
+                payload.location_id,
+                abs(Decimal(str(payload.qty_change))),
+                lock=True,
+            )
+
+        movement = StockMovementModel(
+            product_id=payload.product_id,
+            lot_id=payload.lot_id,
+            location_id=payload.location_id,
+            qty_change=payload.qty_change,
+            movement_type=payload.movement_type,
+            source_document_type=payload.source_document_type,
+            source_document_id=payload.source_document_id,
+            created_by_user_id=user.id,
+            reason_code=payload.reason_code,
+        )
+        db.add(movement)
+        log_action(
+            db,
+            user_id=user.id,
+            action=ACTION_CREATE,
+            entity_type="stock_movement",
+            entity_id=str(movement.id),
+            new_data={
+                "product_id": str(payload.product_id),
+                "lot_id": str(payload.lot_id),
+                "location_id": str(payload.location_id),
+                "qty_change": str(payload.qty_change),
+                "movement_type": payload.movement_type,
+            },
+            ip_address=get_client_ip(request),
+        )
+        db.commit()
+        db.refresh(movement)
+        display_name = (
+            (user.full_name and user.full_name.strip())
+            or (user.username and user.username.strip())
+            or (user.code and f"#{user.code}")
+            or "—"
+        )
+        return _to_movement(movement, created_by_username=display_name)
+
+    return _run_with_idempotency(
+        db=db,
         user_id=user.id,
-        action=ACTION_CREATE,
-        entity_type="stock_movement",
-        entity_id=str(movement.id),
-        new_data={
-            "product_id": str(payload.product_id),
-            "lot_id": str(payload.lot_id),
-            "location_id": str(payload.location_id),
-            "qty_change": str(payload.qty_change),
-            "movement_type": payload.movement_type,
-        },
-        ip_address=get_client_ip(request),
+        key=idempotency_key,
+        scope="inventory_movements_create",
+        payload=payload.model_dump(mode="json"),
+        expected_status=status.HTTP_201_CREATED,
+        run=_run_create,
     )
-    db.commit()
-    db.refresh(movement)
-    display_name = (
-        (user.full_name and user.full_name.strip())
-        or (user.username and user.username.strip())
-        or (user.code and f"#{user.code}")
-        or "—"
-    )
-    return _to_movement(movement, created_by_username=display_name)
 
 
 @router.post(
@@ -676,163 +763,175 @@ async def create_stock_movement(
 async def transfer_location_stock(
     request: Request,
     payload: LocationTransferIn,
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
     user: UserModel = Depends(get_current_user),
     _guard=Depends(require_permission("inventory:adjust")),
 ):
-    if payload.from_location_id == payload.to_location_id:
-        raise HTTPException(status_code=400, detail="Source and destination locations must differ")
+    def _run_transfer():
+        if payload.from_location_id == payload.to_location_id:
+            raise HTTPException(status_code=400, detail="Source and destination locations must differ")
 
-    from_loc = (
-        db.query(LocationModel)
-        .filter(LocationModel.id == payload.from_location_id, LocationModel.is_active == True)
-        .one_or_none()
-    )
-    to_loc = (
-        db.query(LocationModel)
-        .filter(LocationModel.id == payload.to_location_id, LocationModel.is_active == True)
-        .one_or_none()
-    )
-    if not from_loc:
-        raise HTTPException(status_code=400, detail="Source location not found or inactive")
-    if not to_loc:
-        raise HTTPException(status_code=400, detail="Destination location not found or inactive")
-
-    check_controller_adjust_reason(user, "inventory_shortage")
-    check_controller_adjust_reason(user, "inventory_overage")
-
-    raw_rows = _get_lot_level_balances(db, product_ids=None, location_id=payload.from_location_id)
-    rows = [r for r in raw_rows if Decimal(str(r["available"])) > 0]
-    if not rows:
-        raise HTTPException(
-            status_code=400,
-            detail="No available quantity to transfer at the source location",
+        from_loc = (
+            db.query(LocationModel)
+            .filter(LocationModel.id == payload.from_location_id, LocationModel.is_active == True)
+            .one_or_none()
         )
-    rows_by_lot = {r["lot_id"]: r for r in rows}
+        to_loc = (
+            db.query(LocationModel)
+            .filter(LocationModel.id == payload.to_location_id, LocationModel.is_active == True)
+            .one_or_none()
+        )
+        if not from_loc:
+            raise HTTPException(status_code=400, detail="Source location not found or inactive")
+        if not to_loc:
+            raise HTTPException(status_code=400, detail="Destination location not found or inactive")
 
-    lines_requested = 0
-    transfer_rows: list[dict[str, Any]] = []
-    if payload.mode == "partial":
-        if not payload.lines:
-            raise HTTPException(status_code=400, detail="Transfer lines are required for partial mode")
-        lines_requested = len(payload.lines)
-        for line in payload.lines:
-            r = rows_by_lot.get(line.lot_id)
-            if r is None:
-                raise HTTPException(status_code=400, detail=f"Lot not available at source location: {line.lot_id}")
-            if r["product_id"] != line.product_id:
-                raise HTTPException(status_code=400, detail=f"Product/lot mismatch: {line.lot_id}")
-            available_qty = Decimal(str(r["available"]))
-            if line.qty > available_qty:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Requested qty exceeds available for lot {line.lot_id}",
+        check_controller_adjust_reason(user, "inventory_shortage")
+        check_controller_adjust_reason(user, "inventory_overage")
+
+        raw_rows = _get_lot_level_balances(db, product_ids=None, location_id=payload.from_location_id)
+        rows = [r for r in raw_rows if Decimal(str(r["available"])) > 0]
+        if not rows:
+            raise HTTPException(
+                status_code=400,
+                detail="No available quantity to transfer at the source location",
+            )
+        rows_by_lot = {r["lot_id"]: r for r in rows}
+
+        lines_requested = 0
+        transfer_rows: list[dict[str, Any]] = []
+        if payload.mode == "partial":
+            if not payload.lines:
+                raise HTTPException(status_code=400, detail="Transfer lines are required for partial mode")
+            lines_requested = len(payload.lines)
+            for line in payload.lines:
+                r = rows_by_lot.get(line.lot_id)
+                if r is None:
+                    raise HTTPException(status_code=400, detail=f"Lot not available at source location: {line.lot_id}")
+                if r["product_id"] != line.product_id:
+                    raise HTTPException(status_code=400, detail=f"Product/lot mismatch: {line.lot_id}")
+                available_qty = Decimal(str(r["available"]))
+                if line.qty > available_qty:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Requested qty exceeds available for lot {line.lot_id}",
+                    )
+                transfer_rows.append(
+                    {
+                        "product_id": r["product_id"],
+                        "lot_id": r["lot_id"],
+                        "qty": line.qty,
+                    }
                 )
-            transfer_rows.append(
+        else:
+            transfer_rows = [
                 {
                     "product_id": r["product_id"],
                     "lot_id": r["lot_id"],
-                    "qty": line.qty,
+                    "qty": Decimal(str(r["available"])),
                 }
-            )
-    else:
-        transfer_rows = [
-            {
-                "product_id": r["product_id"],
-                "lot_id": r["lot_id"],
-                "qty": Decimal(str(r["available"])),
-            }
-            for r in rows
-        ]
+                for r in rows
+            ]
 
-    if not transfer_rows:
-        raise HTTPException(status_code=400, detail="No transfer lines selected")
+        if not transfer_rows:
+            raise HTTPException(status_code=400, detail="No transfer lines selected")
 
-    client_ip = get_client_ip(request)
-    movements_created = 0
-    try:
-        for r in transfer_rows:
-            qty = Decimal(str(r["qty"]))
-            if qty <= 0:
-                continue
-            product_id = r["product_id"]
-            lot_id = r["lot_id"]
-            lot = db.query(StockLotModel).filter(StockLotModel.id == lot_id).one_or_none()
-            if not lot or lot.product_id != product_id:
-                raise HTTPException(status_code=400, detail="Stock lot not found or mismatch")
+        client_ip = get_client_ip(request)
+        movements_created = 0
+        try:
+            for r in transfer_rows:
+                qty = Decimal(str(r["qty"]))
+                if qty <= 0:
+                    continue
+                product_id = r["product_id"]
+                lot_id = r["lot_id"]
+                lot = db.query(StockLotModel).filter(StockLotModel.id == lot_id).one_or_none()
+                if not lot or lot.product_id != product_id:
+                    raise HTTPException(status_code=400, detail="Stock lot not found or mismatch")
 
-            check_location_single_expiry(db, payload.to_location_id, product_id, lot.expiry_date)
+                check_location_single_expiry(db, payload.to_location_id, product_id, lot.expiry_date)
 
-            mov_out = StockMovementModel(
-                product_id=product_id,
-                lot_id=lot_id,
-                location_id=payload.from_location_id,
-                qty_change=-qty,
-                movement_type="adjust",
-                created_by_user_id=user.id,
-                reason_code="inventory_shortage",
-            )
-            mov_in = StockMovementModel(
-                product_id=product_id,
-                lot_id=lot_id,
-                location_id=payload.to_location_id,
-                qty_change=qty,
-                movement_type="adjust",
-                created_by_user_id=user.id,
-                reason_code="inventory_overage",
-            )
-            db.add(mov_out)
-            db.add(mov_in)
-            db.flush()
+                mov_out = StockMovementModel(
+                    product_id=product_id,
+                    lot_id=lot_id,
+                    location_id=payload.from_location_id,
+                    qty_change=-qty,
+                    movement_type="adjust",
+                    created_by_user_id=user.id,
+                    reason_code="inventory_shortage",
+                )
+                mov_in = StockMovementModel(
+                    product_id=product_id,
+                    lot_id=lot_id,
+                    location_id=payload.to_location_id,
+                    qty_change=qty,
+                    movement_type="adjust",
+                    created_by_user_id=user.id,
+                    reason_code="inventory_overage",
+                )
+                db.add(mov_out)
+                db.add(mov_in)
+                db.flush()
 
-            log_action(
-                db,
-                user_id=user.id,
-                action=ACTION_CREATE,
-                entity_type="stock_movement",
-                entity_id=str(mov_out.id),
-                new_data={
-                    "product_id": str(product_id),
-                    "lot_id": str(lot_id),
-                    "location_id": str(payload.from_location_id),
-                    "qty_change": str(-qty),
-                    "movement_type": "adjust",
-                    "transfer_location_bulk": payload.mode == "full",
-                    "transfer_location_partial": payload.mode == "partial",
-                },
-                ip_address=client_ip,
-            )
-            log_action(
-                db,
-                user_id=user.id,
-                action=ACTION_CREATE,
-                entity_type="stock_movement",
-                entity_id=str(mov_in.id),
-                new_data={
-                    "product_id": str(product_id),
-                    "lot_id": str(lot_id),
-                    "location_id": str(payload.to_location_id),
-                    "qty_change": str(qty),
-                    "movement_type": "adjust",
-                    "transfer_location_bulk": payload.mode == "full",
-                    "transfer_location_partial": payload.mode == "partial",
-                },
-                ip_address=client_ip,
-            )
-            movements_created += 2
+                log_action(
+                    db,
+                    user_id=user.id,
+                    action=ACTION_CREATE,
+                    entity_type="stock_movement",
+                    entity_id=str(mov_out.id),
+                    new_data={
+                        "product_id": str(product_id),
+                        "lot_id": str(lot_id),
+                        "location_id": str(payload.from_location_id),
+                        "qty_change": str(-qty),
+                        "movement_type": "adjust",
+                        "transfer_location_bulk": payload.mode == "full",
+                        "transfer_location_partial": payload.mode == "partial",
+                    },
+                    ip_address=client_ip,
+                )
+                log_action(
+                    db,
+                    user_id=user.id,
+                    action=ACTION_CREATE,
+                    entity_type="stock_movement",
+                    entity_id=str(mov_in.id),
+                    new_data={
+                        "product_id": str(product_id),
+                        "lot_id": str(lot_id),
+                        "location_id": str(payload.to_location_id),
+                        "qty_change": str(qty),
+                        "movement_type": "adjust",
+                        "transfer_location_bulk": payload.mode == "full",
+                        "transfer_location_partial": payload.mode == "partial",
+                    },
+                    ip_address=client_ip,
+                )
+                movements_created += 2
 
-        db.commit()
-    except HTTPException:
-        db.rollback()
-        raise
-    except Exception:
-        db.rollback()
-        raise
+            db.commit()
+        except HTTPException:
+            db.rollback()
+            raise
+        except Exception:
+            db.rollback()
+            raise
 
-    return LocationTransferOut(
-        lines_transferred=len(transfer_rows),
-        movements_created=movements_created,
-        lines_requested=lines_requested,
+        return LocationTransferOut(
+            lines_transferred=len(transfer_rows),
+            movements_created=movements_created,
+            lines_requested=lines_requested,
+        )
+
+    return _run_with_idempotency(
+        db=db,
+        user_id=user.id,
+        key=idempotency_key,
+        scope="inventory_transfer_location",
+        payload=payload.model_dump(mode="json"),
+        expected_status=status.HTTP_200_OK,
+        run=_run_transfer,
     )
 
 

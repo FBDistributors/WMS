@@ -51,10 +51,14 @@ class MovementsRepository {
     required double qtyChange,
     String movementType = 'adjust',
     String? reasonCode,
+    String? idempotencyKey,
   }) async {
     try {
       final Response<Object?> res = await _dio.post<Object?>(
         '/inventory/movements',
+        options: idempotencyKey != null && idempotencyKey.isNotEmpty
+            ? Options(headers: <String, String>{'Idempotency-Key': idempotencyKey})
+            : null,
         data: <String, Object?>{
           'product_id': productId,
           'lot_id': lotId,
@@ -83,10 +87,14 @@ class MovementsRepository {
     required String toLocationId,
     bool fullTransfer = true,
     List<TransferLocationLineInput> lines = const <TransferLocationLineInput>[],
+    String? idempotencyKey,
   }) async {
     try {
       final Response<Object?> res = await _dio.post<Object?>(
         '/inventory/movements/transfer-location',
+        options: idempotencyKey != null && idempotencyKey.isNotEmpty
+            ? Options(headers: <String, String>{'Idempotency-Key': idempotencyKey})
+            : null,
         data: <String, Object>{
           'from_location_id': fromLocationId,
           'to_location_id': toLocationId,
