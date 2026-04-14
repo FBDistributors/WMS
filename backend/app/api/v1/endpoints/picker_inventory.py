@@ -320,6 +320,7 @@ class LocationContentsItem(BaseModel):
     lot_id: str
     location_id: str
     product_name: str
+    product_code: str
     barcode: str | None
     batch_no: str
     expiry_date: date | None
@@ -365,6 +366,7 @@ async def get_location_contents(
                 lot_id=str(r["lot_id"]),
                 location_id=str(location.id),
                 product_name=p.name if p else "?",
+                product_code=(p.sku or str(r["product_id"])) if p else str(r["product_id"]),
                 barcode=main_barcode,
                 batch_no=r["batch"],
                 expiry_date=r["expiry_date"],

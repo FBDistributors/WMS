@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, List, Optional
+from typing import Any, List, Literal, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Query, status
@@ -131,11 +131,20 @@ class StockMovementCreate(BaseModel):
 class LocationTransferIn(BaseModel):
     from_location_id: UUID
     to_location_id: UUID
+    mode: Literal["full", "partial"] = "full"
+    lines: list["LocationTransferLineIn"] = Field(default_factory=list)
+
+
+class LocationTransferLineIn(BaseModel):
+    product_id: UUID
+    lot_id: UUID
+    qty: Decimal = Field(..., gt=0)
 
 
 class LocationTransferOut(BaseModel):
     lines_transferred: int
     movements_created: int
+    lines_requested: int = 0
 
 
 class StockBalanceOut(BaseModel):
@@ -699,12 +708,51 @@ async def transfer_location_stock(
             status_code=400,
             detail="No available quantity to transfer at the source location",
         )
+    rows_by_lot = {r["lot_id"]: r for r in rows}
+
+    lines_requested = 0
+    transfer_rows: list[dict[str, Any]] = []
+    if payload.mode == "partial":
+        if not payload.lines:
+            raise HTTPException(status_code=400, detail="Transfer lines are required for partial mode")
+        lines_requested = len(payload.lines)
+        for line in payload.lines:
+            r = rows_by_lot.get(line.lot_id)
+            if r is None:
+                raise HTTPException(status_code=400, detail=f"Lot not available at source location: {line.lot_id}")
+            if r["product_id"] != line.product_id:
+                raise HTTPException(status_code=400, detail=f"Product/lot mismatch: {line.lot_id}")
+            available_qty = Decimal(str(r["available"]))
+            if line.qty > available_qty:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Requested qty exceeds available for lot {line.lot_id}",
+                )
+            transfer_rows.append(
+                {
+                    "product_id": r["product_id"],
+                    "lot_id": r["lot_id"],
+                    "qty": line.qty,
+                }
+            )
+    else:
+        transfer_rows = [
+            {
+                "product_id": r["product_id"],
+                "lot_id": r["lot_id"],
+                "qty": Decimal(str(r["available"])),
+            }
+            for r in rows
+        ]
+
+    if not transfer_rows:
+        raise HTTPException(status_code=400, detail="No transfer lines selected")
 
     client_ip = get_client_ip(request)
     movements_created = 0
     try:
-        for r in rows:
-            qty = Decimal(str(r["available"]))
+        for r in transfer_rows:
+            qty = Decimal(str(r["qty"]))
             if qty <= 0:
                 continue
             product_id = r["product_id"]
@@ -749,7 +797,8 @@ async def transfer_location_stock(
                     "location_id": str(payload.from_location_id),
                     "qty_change": str(-qty),
                     "movement_type": "adjust",
-                    "transfer_location_bulk": True,
+                    "transfer_location_bulk": payload.mode == "full",
+                    "transfer_location_partial": payload.mode == "partial",
                 },
                 ip_address=client_ip,
             )
@@ -765,7 +814,8 @@ async def transfer_location_stock(
                     "location_id": str(payload.to_location_id),
                     "qty_change": str(qty),
                     "movement_type": "adjust",
-                    "transfer_location_bulk": True,
+                    "transfer_location_bulk": payload.mode == "full",
+                    "transfer_location_partial": payload.mode == "partial",
                 },
                 ip_address=client_ip,
             )
@@ -780,8 +830,9 @@ async def transfer_location_stock(
         raise
 
     return LocationTransferOut(
-        lines_transferred=len(rows),
+        lines_transferred=len(transfer_rows),
         movements_created=movements_created,
+        lines_requested=lines_requested,
     )
 
 

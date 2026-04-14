@@ -13,6 +13,7 @@ import '../../inventory/presentation/inventory_providers.dart';
 import '../../../shared/input/stock_quantity_input.dart';
 import '../../../shared/widgets/barcode_search_input.dart';
 import '../../../shared/widgets/product_card.dart';
+import '../data/movements_repository.dart';
 import '../movements_providers.dart';
 
 enum _MovementPhase { choose, scanProduct, pallet }
@@ -46,6 +47,9 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
   final TextEditingController _palletCode = TextEditingController();
   PickerLocationOption? _palletTo;
   bool _palletSubmitting = false;
+  bool _palletFullTransfer = true;
+  final Map<String, bool> _palletSelected = <String, bool>{};
+  final Map<String, String> _palletSelectedQty = <String, String>{};
 
   bool _handledRouteScan = false;
 
@@ -137,21 +141,41 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
   }
 
   Future<void> _loadPallet(String code) async {
+    final String normalized = code.trim();
+    if (normalized.isEmpty) {
+      return;
+    }
     setState(() {
       _palletLoading = true;
       _palletError = null;
       _palletContents = null;
       _palletTo = null;
+      _palletFullTransfer = true;
+      _palletSelected.clear();
+      _palletSelectedQty.clear();
       _palletDestSearch = '';
       _palletDestCtrl.clear();
     });
     try {
       final LocationContentsResponse res =
-          await ref.read(inventoryRepositoryProvider).getLocationContents(code);
+          await ref.read(inventoryRepositoryProvider).getLocationContents(normalized);
       if (mounted) {
+        final Map<String, bool> selected = <String, bool>{};
+        final Map<String, String> qtyByKey = <String, String>{};
+        for (final LocationContentsItem item in res.items) {
+          final String key = _palletItemKey(item);
+          selected[key] = true;
+          qtyByKey[key] = item.availableQty.floor().toString();
+        }
         setState(() {
           _palletContents = res;
           _palletCode.text = res.locationCode;
+          _palletSelected
+            ..clear()
+            ..addAll(selected);
+          _palletSelectedQty
+            ..clear()
+            ..addAll(qtyByKey);
           _palletLoading = false;
         });
       }
@@ -230,11 +254,46 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
     if (c == null || to == null || c.items.isEmpty || c.locationId == to.id) {
       return;
     }
+    final List<TransferLocationLineInput> lines = <TransferLocationLineInput>[];
+    if (!_palletFullTransfer) {
+      for (final LocationContentsItem item in c.items) {
+        final String key = _palletItemKey(item);
+        final bool isSelected = _palletSelected[key] ?? false;
+        if (!isSelected) {
+          continue;
+        }
+        final int qty = int.tryParse((_palletSelectedQty[key] ?? '').trim()) ?? 0;
+        final int max = item.availableQty.floor();
+        if (qty < 1 || qty > max) {
+          final AppLocale loc = ref.read(appLocaleProvider);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(StringLookup.t(loc, 'movementPalletQtyInvalid'))),
+          );
+          return;
+        }
+        lines.add(
+          TransferLocationLineInput(
+            productId: item.productId,
+            lotId: item.lotId,
+            qty: qty,
+          ),
+        );
+      }
+      if (lines.isEmpty) {
+        final AppLocale loc = ref.read(appLocaleProvider);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(StringLookup.t(loc, 'movementPalletSelectAtLeastOne'))),
+        );
+        return;
+      }
+    }
     setState(() => _palletSubmitting = true);
     try {
       await ref.read(movementsRepositoryProvider).transferLocationStock(
             fromLocationId: c.locationId,
             toLocationId: to.id,
+            fullTransfer: _palletFullTransfer,
+            lines: lines,
           );
       if (mounted) {
         final AppLocale loc = ref.read(appLocaleProvider);
@@ -246,6 +305,9 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
           _palletContents = null;
           _palletTo = null;
           _palletCode.clear();
+          _palletFullTransfer = true;
+          _palletSelected.clear();
+          _palletSelectedQty.clear();
           _palletDestSearch = '';
           _palletDestCtrl.clear();
         });
@@ -310,6 +372,49 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
         )
         .take(cap)
         .toList();
+  }
+
+  String _palletItemKey(LocationContentsItem item) => '${item.productId}|${item.lotId}';
+
+  String _palletItemMeta(LocationContentsItem item) {
+    final List<String> parts = <String>[];
+    final String? barcode = item.barcode?.trim();
+    if (barcode != null && barcode.isNotEmpty) {
+      parts.add(barcode);
+    }
+    final String sku = item.productCode.trim();
+    if (sku.isNotEmpty) {
+      parts.add(sku);
+    }
+    if (item.expiryDate != null && item.expiryDate!.trim().isNotEmpty) {
+      parts.add(formatExpiryMonthYear(item.expiryDate));
+    }
+    parts.add('${StringLookup.t(ref.read(appLocaleProvider), 'movementPalletStock')}: ${item.availableQty.floor()}');
+    return parts.join(' • ');
+  }
+
+  void _setPalletTransferMode(bool full) {
+    final LocationContentsResponse? c = _palletContents;
+    final Map<String, bool> selected = <String, bool>{};
+    final Map<String, String> qtyByKey = <String, String>{};
+    if (c != null) {
+      for (final LocationContentsItem item in c.items) {
+        final String key = _palletItemKey(item);
+        selected[key] = true;
+        qtyByKey[key] = item.availableQty.floor().toString();
+      }
+    }
+    setState(() {
+      _palletFullTransfer = full;
+      if (!full) {
+        _palletSelected
+          ..clear()
+          ..addAll(selected);
+        _palletSelectedQty
+          ..clear()
+          ..addAll(qtyByKey);
+      }
+    });
   }
 
   @override
@@ -476,12 +581,28 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
           if (_phase == _MovementPhase.pallet) ...<Widget>[
             TextField(
               controller: _palletCode,
+              textInputAction: TextInputAction.search,
               decoration: InputDecoration(
                 labelText: StringLookup.t(loc, 'movementLocationCodeLabel'),
                 border: const OutlineInputBorder(),
               ),
+              onChanged: (_) => setState(() {}),
               onSubmitted: (_) => _loadPallet(_palletCode.text),
             ),
+            if (_palletCode.text.trim().isNotEmpty) ...<Widget>[
+              const SizedBox(height: 8),
+              ..._filterLocations(_palletCode.text, cap: 12).map((PickerLocationOption o) {
+                return ListTile(
+                  title: Text(o.code),
+                  subtitle: Text(o.name),
+                  onTap: () {
+                    FocusManager.instance.primaryFocus?.unfocus();
+                    setState(() => _palletCode.text = o.code);
+                    _loadPallet(o.code);
+                  },
+                );
+              }),
+            ],
             FilledButton(
               onPressed: _palletLoading ? null : () => _loadPallet(_palletCode.text),
               child: Text(StringLookup.t(loc, 'movementLoad')),
@@ -504,6 +625,80 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
                   'count': '${_palletContents!.items.length}',
                 }),
               ),
+              const SizedBox(height: 8),
+              SegmentedButton<bool>(
+                segments: <ButtonSegment<bool>>[
+                  ButtonSegment<bool>(
+                    value: true,
+                    label: Text(StringLookup.t(loc, 'movementPalletModeFull')),
+                  ),
+                  ButtonSegment<bool>(
+                    value: false,
+                    label: Text(StringLookup.t(loc, 'movementPalletModePartial')),
+                  ),
+                ],
+                selected: <bool>{_palletFullTransfer},
+                onSelectionChanged: (Set<bool> s) {
+                  _setPalletTransferMode(s.first);
+                },
+              ),
+              const SizedBox(height: 8),
+              ..._palletContents!.items.map((LocationContentsItem item) {
+                final String key = _palletItemKey(item);
+                final bool selected = _palletSelected[key] ?? false;
+                final int max = item.availableQty.floor();
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        if (!_palletFullTransfer)
+                          CheckboxListTile(
+                            value: selected,
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            controlAffinity: ListTileControlAffinity.leading,
+                            title: Text(item.productName),
+                            subtitle: Text(_palletItemMeta(item)),
+                            onChanged: (bool? v) {
+                              setState(() {
+                                _palletSelected[key] = v ?? false;
+                                _palletSelectedQty.putIfAbsent(
+                                  key,
+                                  () => max.toString(),
+                                );
+                              });
+                            },
+                          )
+                        else ...<Widget>[
+                          Text(item.productName, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 4),
+                          Text(_palletItemMeta(item)),
+                        ],
+                        if (!_palletFullTransfer && selected) ...<Widget>[
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            key: ValueKey<String>('pallet-qty-$key'),
+                            initialValue: _palletSelectedQty[key] ?? max.toString(),
+                            keyboardType: kStockQtyKeyboardType,
+                            inputFormatters: kStockQtyInputFormatters,
+                            decoration: InputDecoration(
+                              labelText: StringLookup.t(loc, 'qtyShort'),
+                              helperText:
+                                  '${StringLookup.t(loc, 'movementPalletQtyMax')}: $max',
+                              border: const OutlineInputBorder(),
+                            ),
+                            onChanged: (String v) {
+                              _palletSelectedQty[key] = v;
+                            },
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                );
+              }),
               TextField(
                 controller: _palletDestCtrl,
                 textInputAction: TextInputAction.search,

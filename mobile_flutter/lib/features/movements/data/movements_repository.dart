@@ -11,17 +11,32 @@ class TransferLocationResponse {
   const TransferLocationResponse({
     required this.linesTransferred,
     required this.movementsCreated,
+    required this.linesRequested,
   });
 
   final int linesTransferred;
   final int movementsCreated;
+  final int linesRequested;
 
   factory TransferLocationResponse.fromJson(Map<String, Object?> json) {
     return TransferLocationResponse(
       linesTransferred: _int(json['lines_transferred']),
       movementsCreated: _int(json['movements_created']),
+      linesRequested: _int(json['lines_requested']),
     );
   }
+}
+
+class TransferLocationLineInput {
+  const TransferLocationLineInput({
+    required this.productId,
+    required this.lotId,
+    required this.qty,
+  });
+
+  final String productId;
+  final String lotId;
+  final int qty;
 }
 
 class MovementsRepository {
@@ -66,13 +81,26 @@ class MovementsRepository {
   Future<TransferLocationResponse> transferLocationStock({
     required String fromLocationId,
     required String toLocationId,
+    bool fullTransfer = true,
+    List<TransferLocationLineInput> lines = const <TransferLocationLineInput>[],
   }) async {
     try {
       final Response<Object?> res = await _dio.post<Object?>(
         '/inventory/movements/transfer-location',
-        data: <String, String>{
+        data: <String, Object>{
           'from_location_id': fromLocationId,
           'to_location_id': toLocationId,
+          'mode': fullTransfer ? 'full' : 'partial',
+          if (!fullTransfer)
+            'lines': lines
+                .map(
+                  (TransferLocationLineInput l) => <String, Object>{
+                    'product_id': l.productId,
+                    'lot_id': l.lotId,
+                    'qty': l.qty,
+                  },
+                )
+                .toList(growable: false),
         },
       );
       final Object? data = res.data;

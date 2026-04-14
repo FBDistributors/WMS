@@ -272,6 +272,7 @@ class LocationContentsItem {
     required this.lotId,
     required this.locationId,
     required this.productName,
+    required this.productCode,
     required this.barcode,
     required this.batchNo,
     required this.expiryDate,
@@ -282,6 +283,7 @@ class LocationContentsItem {
   final String lotId;
   final String locationId;
   final String productName;
+  final String productCode;
   final String? barcode;
   final String batchNo;
   final String? expiryDate;
@@ -293,6 +295,7 @@ class LocationContentsItem {
       lotId: _reqString(json, 'lot_id'),
       locationId: _reqString(json, 'location_id'),
       productName: _reqString(json, 'product_name'),
+      productCode: _reqString(json, 'product_code'),
       barcode: json['barcode'] as String?,
       batchNo: _reqString(json, 'batch_no'),
       expiryDate: json['expiry_date'] as String?,
