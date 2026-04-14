@@ -417,6 +417,19 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
     });
   }
 
+  void _clearPalletSourceInput() {
+    setState(() {
+      _palletCode.clear();
+      _palletContents = null;
+      _palletError = null;
+      _palletLoading = false;
+      _palletTo = null;
+      _palletFullTransfer = true;
+      _palletSelected.clear();
+      _palletSelectedQty.clear();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final AppLocale loc = ref.watch(appLocaleProvider);
@@ -483,15 +496,11 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
               BarcodeSearchInput(
                 onSelectProduct: _loadProduct,
                 label: StringLookup.t(loc, 'barcodeOrSku'),
-              ),
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                onPressed: () => context.pushNamed(
+                onProductScanPressed: () => context.pushNamed(
                   'scanner',
                   extra: const ScannerArgs(returnToMovement: true),
                 ),
-                icon: const Icon(Icons.camera_alt),
-                label: Text(StringLookup.t(loc, 'scanButton')),
+                showClearButton: true,
               ),
               if (_productError != null) Text(_productError!, style: const TextStyle(color: Colors.red)),
             ] else ...<Widget>[
@@ -585,6 +594,19 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
               decoration: InputDecoration(
                 labelText: StringLookup.t(loc, 'movementLocationCodeLabel'),
                 border: const OutlineInputBorder(),
+                prefixIcon: IconButton(
+                  onPressed: () => context.pushNamed(
+                    'scanner',
+                    extra: const ScannerArgs(returnToMovementPallet: true),
+                  ),
+                  icon: const Icon(Icons.camera_alt),
+                ),
+                suffixIcon: _palletCode.text.trim().isEmpty
+                    ? null
+                    : IconButton(
+                        onPressed: _clearPalletSourceInput,
+                        icon: const Icon(Icons.close),
+                      ),
               ),
               onChanged: (_) => setState(() {}),
               onSubmitted: (_) => _loadPallet(_palletCode.text),
@@ -606,15 +628,6 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
             FilledButton(
               onPressed: _palletLoading ? null : () => _loadPallet(_palletCode.text),
               child: Text(StringLookup.t(loc, 'movementLoad')),
-            ),
-            const SizedBox(height: 8),
-            FilledButton.icon(
-              onPressed: () => context.pushNamed(
-                'scanner',
-                extra: const ScannerArgs(returnToMovementPallet: true),
-              ),
-              icon: const Icon(Icons.camera_alt),
-              label: Text(StringLookup.t(loc, 'movementScanLocationButton')),
             ),
             if (_palletLoading) const LinearProgressIndicator(),
             if (_palletError != null) Text(_palletError!, style: const TextStyle(color: Colors.red)),

@@ -14,6 +14,7 @@ class BarcodeSearchInput extends ConsumerStatefulWidget {
     this.label,
     this.hint,
     this.onProductScanPressed,
+    this.showClearButton = false,
   });
 
   final void Function(String productId) onSelectProduct;
@@ -22,6 +23,7 @@ class BarcodeSearchInput extends ConsumerStatefulWidget {
 
   /// Mahsulot shtrixini skanerlash (masalan kirim `flow=new`).
   final VoidCallback? onProductScanPressed;
+  final bool showClearButton;
 
   @override
   ConsumerState<BarcodeSearchInput> createState() => _BarcodeSearchInputState();
@@ -95,6 +97,16 @@ class _BarcodeSearchInputState extends ConsumerState<BarcodeSearchInput> {
 
   void _select(PickerInventoryItem item) {
     widget.onSelectProduct(item.productId);
+    _c.clear();
+    _debounceTimer?.cancel();
+    setState(() {
+      _suggestions = const <PickerInventoryItem>[];
+      _error = null;
+      _suggestionsLoading = false;
+    });
+  }
+
+  void _clearInput() {
     _c.clear();
     _debounceTimer?.cancel();
     setState(() {
@@ -210,6 +222,12 @@ class _BarcodeSearchInputState extends ConsumerState<BarcodeSearchInput> {
             labelText: widget.label ?? 'Barcode',
             hintText: widget.hint,
             border: const OutlineInputBorder(),
+            prefixIcon: widget.onProductScanPressed != null
+                ? IconButton(
+                    icon: const Icon(Icons.camera_alt),
+                    onPressed: widget.onProductScanPressed,
+                  )
+                : null,
             suffixIconConstraints: const BoxConstraints(minWidth: 96, minHeight: 48),
             suffixIcon: _loading
                 ? const Padding(
@@ -224,19 +242,30 @@ class _BarcodeSearchInputState extends ConsumerState<BarcodeSearchInput> {
                     ? Row(
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
-                          IconButton(
-                            icon: const Icon(Icons.qr_code_scanner),
-                            onPressed: widget.onProductScanPressed,
-                          ),
+                          if (widget.showClearButton && _c.text.trim().isNotEmpty)
+                            IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: _clearInput,
+                            ),
                           IconButton(
                             icon: const Icon(Icons.search),
                             onPressed: _resolve,
                           ),
                         ],
                       )
-                    : IconButton(
-                        icon: const Icon(Icons.search),
-                        onPressed: _resolve,
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          if (widget.showClearButton && _c.text.trim().isNotEmpty)
+                            IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: _clearInput,
+                            ),
+                          IconButton(
+                            icon: const Icon(Icons.search),
+                            onPressed: _resolve,
+                          ),
+                        ],
                       ),
           ),
           onSubmitted: (_) => _resolve(),
