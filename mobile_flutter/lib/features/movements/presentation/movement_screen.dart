@@ -203,8 +203,15 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(StringLookup.t(loc, 'movementTransferred'))),
         );
-        setState(() => _submitting = false);
-        context.goNamed('movement');
+        setState(() {
+          _phase = _MovementPhase.choose;
+          _product = null;
+          _fromLocation = null;
+          _toLocation = null;
+          _qty.clear();
+          _locationSearch = '';
+          _locationSearchCtrl.clear();
+        });
       }
     } on Exception catch (e) {
       if (mounted) {
@@ -234,8 +241,14 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(StringLookup.t(loc, 'movementPalletTransferred'))),
         );
-        setState(() => _palletSubmitting = false);
-        context.goNamed('movement');
+        setState(() {
+          _phase = _MovementPhase.choose;
+          _palletContents = null;
+          _palletTo = null;
+          _palletCode.clear();
+          _palletDestSearch = '';
+          _palletDestCtrl.clear();
+        });
       }
     } on Exception catch (e) {
       if (mounted) {
@@ -250,7 +263,11 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
 
   void _headerBack() {
     if (_phase == _MovementPhase.choose) {
-      context.pop();
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.goNamed('kirim');
+      }
       return;
     }
     if (_phase == _MovementPhase.scanProduct) {
