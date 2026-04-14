@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../core/app_state/network_status_provider.dart';
+import '../../../core/formatting/expiry_display_format.dart';
 import '../../../core/router/scanner_args.dart';
 import '../../../l10n/string_lookup.dart';
 import '../../inventory/data/models/picker_inventory_models.dart';
@@ -47,6 +48,20 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
   bool _palletSubmitting = false;
 
   bool _handledRouteScan = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
+      if (online) {
+        _loadLocations();
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -188,15 +203,8 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(StringLookup.t(loc, 'movementTransferred'))),
         );
-        setState(() {
-          _phase = _MovementPhase.choose;
-          _product = null;
-          _fromLocation = null;
-          _toLocation = null;
-          _qty.clear();
-          _locationSearch = '';
-          _locationSearchCtrl.clear();
-        });
+        setState(() => _submitting = false);
+        context.goNamed('movement');
       }
     } on Exception catch (e) {
       if (mounted) {
@@ -226,14 +234,8 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(StringLookup.t(loc, 'movementPalletTransferred'))),
         );
-        setState(() {
-          _phase = _MovementPhase.choose;
-          _palletContents = null;
-          _palletTo = null;
-          _palletCode.clear();
-          _palletDestSearch = '';
-          _palletDestCtrl.clear();
-        });
+        setState(() => _palletSubmitting = false);
+        context.goNamed('movement');
       }
     } on Exception catch (e) {
       if (mounted) {
@@ -297,9 +299,13 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
   Widget build(BuildContext context) {
     final AppLocale loc = ref.watch(appLocaleProvider);
     final bool online = ref.watch(networkOnlineProvider).valueOrNull ?? true;
-    if (_allLocations.isEmpty && online) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _loadLocations());
-    }
+    ref.listen<AsyncValue<bool>>(networkOnlineProvider, (AsyncValue<bool>? prev, AsyncValue<bool> next) {
+      final bool wasOnline = prev?.valueOrNull ?? true;
+      final bool nowOnline = next.valueOrNull ?? true;
+      if (!wasOnline && nowOnline && mounted) {
+        _loadLocations();
+      }
+    });
 
     if (_loadingProduct && _phase == _MovementPhase.scanProduct) {
       return Scaffold(
@@ -382,15 +388,18 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
                   final bool sel = _fromLocation?.lotId == pl.lotId &&
                       _fromLocation?.locationId == pl.locationId;
                   return Card(
-                    color: sel ? Colors.blue.shade50 : null,
+                    color: sel ? Colors.green.shade50 : null,
                     child: ListTile(
                       title: Text(pl.locationCode),
                       subtitle: Text(
                         StringLookup.tParams(loc, 'movementAvailableInLot', <String, String>{
                           'qty': pl.availableQty.toStringAsFixed(0),
-                          'batch': pl.batchNo,
+                          'expiry': formatExpiryMonthYear(pl.expiryDate),
                         }),
                       ),
+                      trailing: sel
+                          ? Icon(Icons.check_circle, color: Colors.green.shade700)
+                          : null,
                       onTap: () => setState(() => _fromLocation = pl),
                     ),
                   );
