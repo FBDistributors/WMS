@@ -44,6 +44,14 @@ class InventoryBarcodeResolveScreen extends ConsumerStatefulWidget {
 class _InventoryBarcodeResolveScreenState extends ConsumerState<InventoryBarcodeResolveScreen> {
   bool _started = false;
 
+  void _returnToScanner() {
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    context.goNamed('scanner', extra: widget.extra.args);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -96,7 +104,7 @@ class _InventoryBarcodeResolveScreenState extends ConsumerState<InventoryBarcode
       }
       HapticFeedback.heavyImpact();
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-      router.goNamed('scanner', extra: widget.extra.args);
+      _returnToScanner();
     }
   }
 
@@ -107,9 +115,7 @@ class _InventoryBarcodeResolveScreenState extends ConsumerState<InventoryBarcode
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () {
-            context.goNamed('scanner', extra: widget.extra.args);
-          },
+          onPressed: _returnToScanner,
         ),
         title: Text(StringLookup.t(loc, 'loading')),
       ),

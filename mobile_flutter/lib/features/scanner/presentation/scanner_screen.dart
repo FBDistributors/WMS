@@ -199,7 +199,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     if (!mounted) {
       return;
     }
-    router.goNamed(
+    router.pushNamed(
       'inventoryBarcodeResolve',
       extra: InventoryBarcodeResolveExtra(barcode: value, args: a),
     );
@@ -218,49 +218,6 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   }
 
   void _handleBack() {
-    final ScannerArgs? a = widget.args;
-    if (a != null && (a.returnToMovement || a.returnToMovementPallet)) {
-      context.goNamed('movement');
-      return;
-    }
-    if (a != null && a.returnToKirimLocation && a.flow == 'new') {
-      context.goNamed(
-        'kirimForm',
-        queryParameters: <String, String>{
-          'flow': 'new',
-          'newMode': 'byLocation',
-          'warehouse': a.warehouse ?? 'main',
-        },
-      );
-      return;
-    }
-    if (a != null && a.returnToKirimForm) {
-      context.goNamed(
-        'kirimForm',
-        queryParameters: <String, String>{
-          'flow': a.flow ?? 'return',
-          if (a.newMode != null) 'newMode': a.newMode!,
-          if (a.warehouse != null) 'warehouse': a.warehouse!,
-          if (a.inventoryStep != null) 'inventoryStep': '${a.inventoryStep}',
-          if (a.inventoryLocationId != null) 'inventoryLocationId': a.inventoryLocationId!,
-          if (a.inventoryLocationCode != null) 'inventoryLocationCode': a.inventoryLocationCode!,
-          if (a.receivingLocationId != null) 'receivingLocationId': a.receivingLocationId!,
-          if (a.receivingLocationCode != null) 'receivingLocationCode': a.receivingLocationCode!,
-        },
-      );
-      return;
-    }
-    if (a != null && a.returnToReturns) {
-      context.goNamed(
-        'kirimForm',
-        queryParameters: const <String, String>{'flow': 'return'},
-      );
-      return;
-    }
-    if (a != null && a.returnToInventoryDetail) {
-      context.goNamed('inventory');
-      return;
-    }
     if (context.canPop()) {
       context.pop();
     } else {
@@ -286,60 +243,69 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   @override
   Widget build(BuildContext context) {
     final AppLocale loc = ref.watch(appLocaleProvider);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Scanner'),
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: _handleBack,
-        ),
-      ),
-      body: Stack(
-        fit: StackFit.expand,
-        children: <Widget>[
-          MobileScanner(
-            controller: _controller,
-            onDetect: _onDetect,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, Object? result) {
+        if (didPop) {
+          return;
+        }
+        _handleBack();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Scanner'),
+          leading: IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: _handleBack,
           ),
-          if (_lookupInProgress)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: SafeArea(
-                top: false,
-                child: Material(
-                  color: const Color(0xE6000000),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    child: Row(
-                      children: <Widget>[
-                        const SizedBox(
-                          width: 26,
-                          height: 26,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Text(
-                            StringLookup.t(loc, 'loading'),
-                            style: const TextStyle(
+        ),
+        body: Stack(
+          fit: StackFit.expand,
+          children: <Widget>[
+            MobileScanner(
+              controller: _controller,
+              onDetect: _onDetect,
+            ),
+            if (_lookupInProgress)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: SafeArea(
+                  top: false,
+                  child: Material(
+                    color: const Color(0xE6000000),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      child: Row(
+                        children: <Widget>[
+                          const SizedBox(
+                            width: 26,
+                            height: 26,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
                               color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Text(
+                              StringLookup.t(loc, 'loading'),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
