@@ -8,20 +8,23 @@ import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import {
   createMovement,
   getInventoryByLocation,
   getInventoryDetails,
   type InventoryByLocationRow,
+  zeroBrandStock,
   type InventoryDetailRow,
 } from '../../services/inventoryApi'
+import { getBrands, type Brand } from '../../services/brandsApi'
 import { getLocations, type Location } from '../../services/locationsApi'
 import { getProducts, type Product } from '../../services/productsApi'
 import { sanitizeStockQtyDigits } from '../../lib/stockQtyInput'
 
 const REASON_WRITE_OFF = 'inventory_shortage'
 
-type SearchMode = 'by_location' | 'by_product'
+type SearchMode = 'by_location' | 'by_product' | 'by_brand'
 
 export function MahsulotYoqQilishPage() {
   const { t } = useTranslation(['kamomat', 'common'])
@@ -45,11 +48,22 @@ export function MahsulotYoqQilishPage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [detailRows, setDetailRows] = useState<InventoryDetailRow[]>([])
   const [loadingDetail, setLoadingDetail] = useState(false)
+  const [brands, setBrands] = useState<Brand[]>([])
+  const [brandSearch, setBrandSearch] = useState('')
+  const [brandDropdownOpen, setBrandDropdownOpen] = useState(false)
+  const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null)
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   useEffect(() => {
     getLocations(false)
       .then(setLocations)
       .catch(() => setLocations([]))
+  }, [])
+
+  useEffect(() => {
+    getBrands('', false)
+      .then((items) => setBrands(items.filter((item) => item.is_active)))
+      .catch(() => setBrands([]))
   }, [])
 
   useEffect(() => {
@@ -92,6 +106,17 @@ export function MahsulotYoqQilishPage() {
       return code.includes(q) || name.includes(q)
     })
   }, [locations, locationSearch])
+
+  const filteredBrands = useMemo(() => {
+    const q = brandSearch.trim().toLowerCase()
+    if (!q) return brands
+    return brands.filter((brand) => {
+      const code = (brand.code ?? '').toLowerCase()
+      const name = (brand.name ?? '').toLowerCase()
+      const displayName = (brand.display_name ?? '').toLowerCase()
+      return code.includes(q) || name.includes(q) || displayName.includes(q)
+    })
+  }, [brands, brandSearch])
 
   const loadProducts = useCallback(() => {
     if (!locationId.trim()) {
@@ -161,17 +186,21 @@ export function MahsulotYoqQilishPage() {
   const hasAnyWriteOff =
     searchMode === 'by_location'
       ? products.some((row) => getQty(row) > 0)
-      : detailRows.some((row) => getQtyDetail(row) > 0)
+      : searchMode === 'by_product'
+        ? detailRows.some((row) => getQtyDetail(row) > 0)
+        : Boolean(selectedBrand)
   const invalidQty =
     searchMode === 'by_location'
       ? products.some((row) => {
           const q = getQty(row)
           return q > 0 && (q > row.available || q > row.on_hand)
         })
-      : detailRows.some((row) => {
-          const q = getQtyDetail(row)
-          return q > 0 && (q > row.available || q > row.on_hand)
-        })
+      : searchMode === 'by_product'
+        ? detailRows.some((row) => {
+            const q = getQtyDetail(row)
+            return q > 0 && (q > row.available || q > row.on_hand)
+          })
+        : false
 
   const handleSubmit = useCallback(async () => {
     if (!hasAnyWriteOff || invalidQty) return
@@ -236,6 +265,26 @@ export function MahsulotYoqQilishPage() {
       } finally {
         setSubmitLoading(false)
       }
+      return
+    }
+    if (searchMode === 'by_brand' && selectedBrand) {
+      setSubmitLoading(true)
+      setError(null)
+      setSuccess(null)
+      try {
+        const res = await zeroBrandStock(selectedBrand.id)
+        setSuccess(
+          t('kamomat:write_off.brand_zero_success', {
+            products: res.products_affected,
+            movements: res.movements_created,
+          }),
+        )
+        setConfirmOpen(false)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t('kamomat:write_off.error'))
+      } finally {
+        setSubmitLoading(false)
+      }
     }
   }, [
     searchMode,
@@ -250,6 +299,7 @@ export function MahsulotYoqQilishPage() {
     t,
     loadProducts,
     loadProductDetails,
+    selectedBrand,
   ])
 
   return (
@@ -303,6 +353,25 @@ export function MahsulotYoqQilishPage() {
             }`}
           >
             {t('kamomat:write_off.by_product')}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSearchMode('by_brand')
+              setProducts([])
+              setDetailRows([])
+              setSelectedProduct(null)
+              setLocationId('')
+              setLocationSearch('')
+              setWriteOffQty({})
+            }}
+            className={`rounded-xl px-3 py-1.5 text-sm font-medium ${
+              searchMode === 'by_brand'
+                ? 'bg-blue-600 text-white dark:bg-blue-500'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600'
+            }`}
+          >
+            {t('kamomat:write_off.by_brand')}
           </button>
         </div>
 
@@ -442,6 +511,66 @@ export function MahsulotYoqQilishPage() {
             </div>
           </>
         )}
+
+        {searchMode === 'by_brand' && (
+          <>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+              {t('kamomat:write_off.select_brand')}
+            </label>
+            <div className="relative min-w-[280px] max-w-md">
+              <input
+                type="text"
+                className="w-full rounded-2xl border border-slate-200 bg-white py-2 pl-3 pr-9 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                value={brandSearch}
+                onChange={(e) => setBrandSearch(e.target.value)}
+                onFocus={() => setBrandDropdownOpen(true)}
+                onBlur={() => setTimeout(() => setBrandDropdownOpen(false), 180)}
+                placeholder={t('kamomat:write_off.brand_placeholder')}
+                autoComplete="off"
+              />
+              {brandSearch && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBrandSearch('')
+                    setSelectedBrand(null)
+                    setBrandDropdownOpen(false)
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-300"
+                  aria-label={t('common:buttons.clear')}
+                >
+                  <X size={16} />
+                </button>
+              )}
+              {brandDropdownOpen && filteredBrands.length > 0 && (
+                <ul
+                  className="absolute left-0 top-full z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900"
+                  role="listbox"
+                >
+                  {filteredBrands.map((brand) => (
+                    <li key={brand.id} role="option">
+                      <button
+                        type="button"
+                        className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800 ${
+                          selectedBrand?.id === brand.id ? 'bg-blue-50 dark:bg-blue-950/50' : ''
+                        }`}
+                        onMouseDown={(e) => {
+                          e.preventDefault()
+                          setSelectedBrand(brand)
+                          setBrandSearch(`${brand.code} — ${brand.name}`)
+                          setBrandDropdownOpen(false)
+                        }}
+                      >
+                        <span className="font-medium">{brand.code}</span>
+                        <span className="ml-1 text-slate-600 dark:text-slate-400">— {brand.name}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </>
+        )}
       </Card>
 
       {error && (
@@ -455,7 +584,9 @@ export function MahsulotYoqQilishPage() {
         </div>
       )}
 
-      {((searchMode === 'by_location' && locationId) || (searchMode === 'by_product' && selectedProduct)) && (
+      {((searchMode === 'by_location' && locationId)
+        || (searchMode === 'by_product' && selectedProduct)
+        || (searchMode === 'by_brand' && selectedBrand)) && (
         <Card className="space-y-4">
           {searchMode === 'by_location' && (
             <>
@@ -662,8 +793,39 @@ export function MahsulotYoqQilishPage() {
               )}
             </>
           )}
+
+          {searchMode === 'by_brand' && selectedBrand && (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
+                {t('kamomat:write_off.brand_zero_warning', {
+                  brand: `${selectedBrand.code} — ${selectedBrand.name}`,
+                })}
+              </div>
+              <div className="flex items-center gap-3">
+                <Button onClick={() => setConfirmOpen(true)} disabled={!selectedBrand || submitLoading}>
+                  {submitLoading ? t('common:messages.loading') : t('kamomat:write_off.zero_brand_submit')}
+                </Button>
+                <Link to="/admin/kamomat" className="text-sm text-slate-600 dark:text-slate-400">
+                  {t('kamomat:write_off.back')}
+                </Link>
+              </div>
+            </div>
+          )}
         </Card>
       )}
+      <ConfirmDialog
+        open={confirmOpen}
+        title={t('kamomat:write_off.zero_brand_confirm_title')}
+        message={t('kamomat:write_off.zero_brand_confirm_message', {
+          brand: selectedBrand ? `${selectedBrand.code} — ${selectedBrand.name}` : '',
+        })}
+        confirmLabel={t('kamomat:write_off.zero_brand_confirm_button')}
+        cancelLabel={t('common:buttons.cancel')}
+        variant="danger"
+        loading={submitLoading}
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={handleSubmit}
+      />
     </AdminLayout>
   )
 }

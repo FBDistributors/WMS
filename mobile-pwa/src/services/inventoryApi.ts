@@ -258,6 +258,20 @@ export async function createMovement(payload: CreateMovementPayload) {
   })
 }
 
+export type BrandZeroStockResponse = {
+  brand_id: string
+  products_affected: number
+  lots_affected: number
+  movements_created: number
+  skipped: number
+}
+
+export async function zeroBrandStock(brandId: string) {
+  return fetchJSON<BrandZeroStockResponse>(`/api/v1/inventory/brands/${brandId}/zero-stock`, {
+    method: 'POST',
+  })
+}
+
 /** SmartUP balance$export — cache yoki refresh=1 da SmartUP dan yangilash. warehouse_code: 001 = qoldiq, 002 = bron. filial_id: header (all = barcha filiallar). */
 export async function getSmartupBalance(options?: {
   signal?: AbortSignal

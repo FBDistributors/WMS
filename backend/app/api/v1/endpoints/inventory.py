@@ -222,6 +222,14 @@ class LocationTransferOut(BaseModel):
     lines_requested: int = 0
 
 
+class BrandZeroStockResponse(BaseModel):
+    brand_id: UUID
+    products_affected: int
+    lots_affected: int
+    movements_created: int
+    skipped: int = 0
+
+
 class StockBalanceOut(BaseModel):
     product_id: UUID
     lot_id: UUID
@@ -932,6 +940,138 @@ async def transfer_location_stock(
         payload=payload.model_dump(mode="json"),
         expected_status=status.HTTP_200_OK,
         run=_run_transfer,
+    )
+
+
+@router.post(
+    "/brands/{brand_id}/zero-stock",
+    response_model=BrandZeroStockResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Zero all available stock for a brand across all locations",
+)
+@router.post(
+    "/brands/{brand_id}/zero-stock/",
+    response_model=BrandZeroStockResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Zero all available stock for a brand across all locations",
+)
+async def zero_brand_stock(
+    brand_id: UUID,
+    request: Request,
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
+    db: Session = Depends(get_db),
+    user: UserModel = Depends(get_current_user),
+    _guard=Depends(require_permission("inventory:adjust")),
+):
+    def _run_zero() -> BrandZeroStockResponse:
+        brand_exists = db.query(exists().where(ProductModel.brand_id == brand_id)).scalar()
+        if not brand_exists:
+            raise HTTPException(status_code=404, detail="Brand not found or has no products")
+
+        check_controller_adjust_reason(user, "inventory_shortage")
+
+        on_hand_expr = func.sum(
+            case(
+                (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
+                else_=0,
+            )
+        )
+        reserved_expr = func.sum(
+            case(
+                (StockMovementModel.movement_type.in_(("allocate", "unallocate")), StockMovementModel.qty_change),
+                else_=0,
+            )
+        )
+        available_expr = on_hand_expr - reserved_expr
+
+        rows = (
+            db.query(
+                StockLotModel.product_id.label("product_id"),
+                StockLotModel.id.label("lot_id"),
+                StockMovementModel.location_id.label("location_id"),
+                available_expr.label("available_qty"),
+            )
+            .join(ProductModel, ProductModel.id == StockLotModel.product_id)
+            .join(StockMovementModel, StockMovementModel.lot_id == StockLotModel.id)
+            .filter(ProductModel.brand_id == brand_id)
+            .group_by(
+                StockLotModel.product_id,
+                StockLotModel.id,
+                StockMovementModel.location_id,
+            )
+            .having(available_expr > 0)
+            .all()
+        )
+
+        if not rows:
+            return BrandZeroStockResponse(
+                brand_id=brand_id,
+                products_affected=0,
+                lots_affected=0,
+                movements_created=0,
+                skipped=0,
+            )
+
+        client_ip = get_client_ip(request)
+        product_ids: set[UUID] = set()
+        lot_ids: set[UUID] = set()
+        movements_created = 0
+        skipped = 0
+        for row in rows:
+            qty = Decimal(str(row.available_qty))
+            if qty <= 0:
+                skipped += 1
+                continue
+            product_ids.add(row.product_id)
+            lot_ids.add(row.lot_id)
+            movement = StockMovementModel(
+                product_id=row.product_id,
+                lot_id=row.lot_id,
+                location_id=row.location_id,
+                qty_change=-qty,
+                movement_type="adjust",
+                created_by_user_id=user.id,
+                reason_code="inventory_shortage",
+            )
+            db.add(movement)
+            db.flush()
+            log_action(
+                db,
+                user_id=user.id,
+                action=ACTION_CREATE,
+                entity_type="stock_movement",
+                entity_id=str(movement.id),
+                new_data={
+                    "product_id": str(row.product_id),
+                    "lot_id": str(row.lot_id),
+                    "location_id": str(row.location_id),
+                    "qty_change": str(-qty),
+                    "movement_type": "adjust",
+                    "reason_code": "inventory_shortage",
+                    "bulk_brand_zero": True,
+                    "brand_id": str(brand_id),
+                },
+                ip_address=client_ip,
+            )
+            movements_created += 1
+
+        db.commit()
+        return BrandZeroStockResponse(
+            brand_id=brand_id,
+            products_affected=len(product_ids),
+            lots_affected=len(lot_ids),
+            movements_created=movements_created,
+            skipped=skipped,
+        )
+
+    return _run_with_idempotency(
+        db=db,
+        user_id=user.id,
+        key=idempotency_key,
+        scope="inventory_zero_brand_stock",
+        payload={"brand_id": str(brand_id)},
+        expected_status=status.HTTP_200_OK,
+        run=_run_zero,
     )
 
 
