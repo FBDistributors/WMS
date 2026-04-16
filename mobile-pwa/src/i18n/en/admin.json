@@ -74,7 +74,23 @@
       "integrations": "Integrations",
       "security": "Security"
     },
-    "coming_soon": "Coming soon"
+    "coming_soon": "Coming soon",
+    "notifications": {
+      "heading": "Push notifications (FCM)",
+      "intro": "Picking assignments and test messages are sent to the mobile app via Firebase Cloud Messaging. The OS decides how alerts appear.",
+      "fcm_label": "FCM on server",
+      "fcm_ok": "Configured",
+      "fcm_missing": "Not configured",
+      "devices_label": "Devices for your account (tokens)",
+      "hint_server": "The server needs GOOGLE_APPLICATION_CREDENTIALS pointing to a Firebase service account JSON file and the firebase-admin package. Tokens register when you sign in on the mobile app.",
+      "refresh": "Refresh",
+      "test_btn": "Send test notification",
+      "test_sent": "Request accepted. You should see a notification on the mobile app if a token is registered and permissions are granted.",
+      "test_not_sent": "Nothing was sent — no FCM token for this account or FCM is disabled on the server.",
+      "test_error": "Request failed. Check your connection and try again.",
+      "load_error": "Could not load status.",
+      "no_access": "You need admin access to use this section."
+    }
   },
   "dashboard": {
     "title": "Dashboard",

@@ -12,6 +12,19 @@ from app.models.user_fcm_token import UserFCMToken
 
 logger = logging.getLogger(__name__)
 
+# Android 8+ channel id; Flutter `flutter_local_notifications` creates the same channel for foreground banners.
+FCM_ANDROID_CHANNEL_ID = "wms_picking"
+
+
+def _fcm_data_as_strings(data: dict[str, str] | None) -> dict[str, str]:
+    """FCM `data` map values must be strings."""
+    if not data:
+        return {}
+    out: dict[str, str] = {}
+    for k, v in data.items():
+        out[str(k)] = v if isinstance(v, str) else str(v)
+    return out
+
 
 def get_fcm_tokens_for_user(db: Session, user_id: UUID) -> list[str]:
     """Return list of FCM tokens registered for the user."""
@@ -50,17 +63,24 @@ def send_push_to_user(
             return False
         firebase_admin.initialize_app()
 
+    data_payload = _fcm_data_as_strings(data)
     success = False
     for token in tokens:
         try:
             messaging.send(
                 messaging.Message(
                     notification=messaging.Notification(title=title, body=body),
-                    data=data or {},
+                    data=data_payload,
                     token=token,
                     android=messaging.AndroidConfig(
                         priority="high",
-                        notification=messaging.AndroidNotification(sound="default"),
+                        notification=messaging.AndroidNotification(
+                            sound="default",
+                            channel_id=FCM_ANDROID_CHANNEL_ID,
+                        ),
+                    ),
+                    apns=messaging.APNSConfig(
+                        payload=messaging.APNSPayload(aps=messaging.Aps(sound="default")),
                     ),
                 )
             )

@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { NotificationsSettingsPanel } from '../../admin/components/NotificationsSettingsPanel'
 import { SettingsTabs } from '../../admin/components/SettingsTabs'
 import { Card } from '../../components/ui/card'
 import { Button } from '../../components/ui/button'
@@ -48,7 +49,7 @@ export function ProfilePage() {
       <div className="space-y-6">
         <SettingsTabs value={activeTab} onChange={setActiveTab} />
 
-        {activeTab !== 'profile' ? (
+        {activeTab !== 'profile' && activeTab !== 'notifications' ? (
           <Card className="max-w-3xl">
             <div className="flex items-center justify-between">
               <div className="text-base font-semibold text-slate-900 dark:text-slate-100">
@@ -58,6 +59,7 @@ export function ProfilePage() {
             </div>
           </Card>
         ) : null}
+        {activeTab === 'notifications' ? <NotificationsSettingsPanel /> : null}
 
         {activeTab === 'profile' ? (
           <Card className="max-w-3xl space-y-8">
