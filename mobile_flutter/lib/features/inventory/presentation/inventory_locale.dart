@@ -41,6 +41,18 @@ class InventoryStrings {
         InventoryLocale.en => 'Stock',
       };
 
+  static String invOnHand(InventoryLocale l) => switch (l) {
+        InventoryLocale.uz => 'Jami joyda',
+        InventoryLocale.ru => 'В наличии',
+        InventoryLocale.en => 'On hand',
+      };
+
+  static String invAvailable(InventoryLocale l) => switch (l) {
+        InventoryLocale.uz => 'Mavjud',
+        InventoryLocale.ru => 'Доступно',
+        InventoryLocale.en => 'Available',
+      };
+
   static String invLoadError(InventoryLocale l) => switch (l) {
         InventoryLocale.uz => 'Mahsulotlar yuklanmadi',
         InventoryLocale.ru => 'Не удалось загрузить товары',

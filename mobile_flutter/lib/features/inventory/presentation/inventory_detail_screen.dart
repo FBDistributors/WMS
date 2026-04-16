@@ -131,8 +131,9 @@ List<Widget> inventoryLocTiles(
           style: TextStyle(color: isDark ? Colors.white54 : Colors.black45),
         ),
         trailing: Text(
-          '${InventoryStrings.invQoldiq(loc)}: ${l.availableQty.round()}',
+          '${InventoryStrings.invOnHand(loc)}: ${l.onHandQty.round()} · ${InventoryStrings.invAvailable(loc)}: ${l.availableQty.round()}',
           style: TextStyle(color: isDark ? Colors.white70 : Colors.black87),
+          textAlign: TextAlign.right,
         ),
       ),
     );

@@ -130,7 +130,6 @@ export function InventoryDetailsPage() {
               <th className="px-4 py-3 text-left">{t('inventory:columns.batch')}</th>
               <th className="px-4 py-3 text-left">{t('inventory:columns.expiry')}</th>
               <th className="px-4 py-3 text-left">{t('inventory:columns.on_hand')}</th>
-              <th className="px-4 py-3 text-left">{t('inventory:columns.reserved')}</th>
               <th className="px-4 py-3 text-left">{t('inventory:columns.available')}</th>
             </tr>
           </thead>
@@ -146,9 +145,6 @@ export function InventoryDetailsPage() {
                 </td>
                 <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
                   {Math.round(Number(row.on_hand))}
-                </td>
-                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
-                  {Math.round(Number(row.reserved))}
                 </td>
                 <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
                   {Math.round(Number(row.available))}

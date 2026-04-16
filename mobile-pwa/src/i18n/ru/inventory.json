@@ -44,7 +44,6 @@
   "columns": {
     "product": "Товар",
     "on_hand": "В наличии",
-    "reserved": "Резерв",
     "available": "Доступно",
     "lots": "Партии",
     "locations": "Локации",

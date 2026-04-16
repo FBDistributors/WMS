@@ -27,6 +27,8 @@
     "no_results": "No results found",
     "best_location": "Location",
     "available": "Available",
+    "on_hand": "On hand",
+    "batch": "Batch",
     "expiry": "Expiry",
     "more_locations": "More locations",
     "full_details": "Full details",
