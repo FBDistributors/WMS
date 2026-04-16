@@ -262,13 +262,19 @@ export type BrandZeroStockResponse = {
   brand_id: string
   products_affected: number
   lots_affected: number
+  stock_movements_created: number
+  reserve_movements_created: number
+  reserve_lots_affected: number
   movements_created: number
   skipped: number
 }
 
-export async function zeroBrandStock(brandId: string) {
+export type BrandZeroMode = 'brand_only' | 'reserve_only' | 'brand_and_reserve'
+
+export async function zeroBrandStock(brandId: string, mode: BrandZeroMode = 'brand_only') {
   return fetchJSON<BrandZeroStockResponse>(`/api/v1/inventory/brands/${brandId}/zero-stock`, {
     method: 'POST',
+    query: { mode },
   })
 }
 

@@ -11,6 +11,7 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import {
   createMovement,
+  type BrandZeroMode,
   getInventoryByLocation,
   getInventoryDetails,
   type InventoryByLocationRow,
@@ -52,6 +53,7 @@ export function MahsulotYoqQilishPage() {
   const [brandSearch, setBrandSearch] = useState('')
   const [brandDropdownOpen, setBrandDropdownOpen] = useState(false)
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null)
+  const [brandZeroMode, setBrandZeroMode] = useState<BrandZeroMode>('brand_only')
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   useEffect(() => {
@@ -272,11 +274,14 @@ export function MahsulotYoqQilishPage() {
       setError(null)
       setSuccess(null)
       try {
-        const res = await zeroBrandStock(selectedBrand.id)
+        const res = await zeroBrandStock(selectedBrand.id, brandZeroMode)
         setSuccess(
           t('kamomat:write_off.brand_zero_success', {
             products: res.products_affected,
             movements: res.movements_created,
+            stock_movements: res.stock_movements_created,
+            reserve_movements: res.reserve_movements_created,
+            mode: t(`kamomat:write_off.reset_mode_${brandZeroMode}`),
           }),
         )
         setConfirmOpen(false)
@@ -300,6 +305,7 @@ export function MahsulotYoqQilishPage() {
     loadProducts,
     loadProductDetails,
     selectedBrand,
+    brandZeroMode,
   ])
 
   return (
@@ -361,6 +367,7 @@ export function MahsulotYoqQilishPage() {
               setProducts([])
               setDetailRows([])
               setSelectedProduct(null)
+              setBrandZeroMode('brand_only')
               setLocationId('')
               setLocationSearch('')
               setWriteOffQty({})
@@ -796,9 +803,50 @@ export function MahsulotYoqQilishPage() {
 
           {searchMode === 'by_brand' && selectedBrand && (
             <div className="space-y-4">
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  {t('kamomat:write_off.zero_brand_mode_title')}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setBrandZeroMode('brand_only')}
+                    className={`rounded-xl px-3 py-1.5 text-sm font-medium ${
+                      brandZeroMode === 'brand_only'
+                        ? 'bg-blue-600 text-white dark:bg-blue-500'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600'
+                    }`}
+                  >
+                    {t('kamomat:write_off.reset_mode_brand_only')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBrandZeroMode('reserve_only')}
+                    className={`rounded-xl px-3 py-1.5 text-sm font-medium ${
+                      brandZeroMode === 'reserve_only'
+                        ? 'bg-blue-600 text-white dark:bg-blue-500'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600'
+                    }`}
+                  >
+                    {t('kamomat:write_off.reset_mode_reserve_only')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBrandZeroMode('brand_and_reserve')}
+                    className={`rounded-xl px-3 py-1.5 text-sm font-medium ${
+                      brandZeroMode === 'brand_and_reserve'
+                        ? 'bg-blue-600 text-white dark:bg-blue-500'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600'
+                    }`}
+                  >
+                    {t('kamomat:write_off.reset_mode_brand_and_reserve')}
+                  </button>
+                </div>
+              </div>
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
                 {t('kamomat:write_off.brand_zero_warning', {
                   brand: `${selectedBrand.code} — ${selectedBrand.name}`,
+                  mode: t(`kamomat:write_off.reset_mode_${brandZeroMode}`),
                 })}
               </div>
               <div className="flex items-center gap-3">
@@ -818,6 +866,7 @@ export function MahsulotYoqQilishPage() {
         title={t('kamomat:write_off.zero_brand_confirm_title')}
         message={t('kamomat:write_off.zero_brand_confirm_message', {
           brand: selectedBrand ? `${selectedBrand.code} — ${selectedBrand.name}` : '',
+          mode: t(`kamomat:write_off.reset_mode_${brandZeroMode}`),
         })}
         confirmLabel={t('kamomat:write_off.zero_brand_confirm_button')}
         cancelLabel={t('common:buttons.cancel')}

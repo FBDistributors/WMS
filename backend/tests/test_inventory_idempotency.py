@@ -382,3 +382,238 @@ def test_zero_brand_stock_idempotency_prevents_duplicate_adjustments(
         .count()
     )
     assert adjust_rows == 1
+
+
+def test_zero_brand_stock_reserve_only_creates_unallocate(
+    client: TestClient,
+    db_session: Session,
+    admin_user: User,
+    bin_loc: Location,
+) -> None:
+    brand = Brand(code="BZR", name="Brand Reserve", is_active=True)
+    db_session.add(brand)
+    db_session.commit()
+    db_session.refresh(brand)
+
+    product = Product(
+        external_source="test",
+        external_id="brand-reserve-1",
+        name="Brand reserve product",
+        sku="SKU-BRAND-RESERVE-1",
+        is_active=True,
+        brand_id=brand.id,
+    )
+    db_session.add(product)
+    db_session.commit()
+    db_session.refresh(product)
+
+    lot = StockLot(product_id=product.id, batch="BRAND-RESERVE-BATCH", expiry_date=None)
+    db_session.add(lot)
+    db_session.flush()
+    db_session.add_all(
+        [
+            StockMovement(
+                product_id=product.id,
+                lot_id=lot.id,
+                location_id=bin_loc.id,
+                qty_change=Decimal("5"),
+                movement_type="receipt",
+            ),
+            StockMovement(
+                product_id=product.id,
+                lot_id=lot.id,
+                location_id=bin_loc.id,
+                qty_change=Decimal("5"),
+                movement_type="allocate",
+            ),
+        ]
+    )
+    db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: admin_user
+    try:
+        resp = client.post(f"/api/v1/inventory/brands/{brand.id}/zero-stock?mode=reserve_only")
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["stock_movements_created"] == 0
+    assert payload["reserve_movements_created"] == 1
+    assert payload["movements_created"] == 1
+
+    unalloc_rows = (
+        db_session.query(StockMovement)
+        .filter(
+            StockMovement.product_id == product.id,
+            StockMovement.lot_id == lot.id,
+            StockMovement.location_id == bin_loc.id,
+            StockMovement.movement_type == "unallocate",
+            StockMovement.qty_change == Decimal("-5"),
+        )
+        .count()
+    )
+    assert unalloc_rows == 1
+
+
+def test_zero_brand_stock_brand_and_reserve_creates_both_movements(
+    client: TestClient,
+    db_session: Session,
+    admin_user: User,
+    bin_loc: Location,
+) -> None:
+    brand = Brand(code="BZAR", name="Brand both", is_active=True)
+    db_session.add(brand)
+    db_session.commit()
+    db_session.refresh(brand)
+
+    product = Product(
+        external_source="test",
+        external_id="brand-both-1",
+        name="Brand both product",
+        sku="SKU-BRAND-BOTH-1",
+        is_active=True,
+        brand_id=brand.id,
+    )
+    db_session.add(product)
+    db_session.commit()
+    db_session.refresh(product)
+
+    lot = StockLot(product_id=product.id, batch="BRAND-BOTH-BATCH", expiry_date=None)
+    db_session.add(lot)
+    db_session.flush()
+    db_session.add_all(
+        [
+            StockMovement(
+                product_id=product.id,
+                lot_id=lot.id,
+                location_id=bin_loc.id,
+                qty_change=Decimal("7"),
+                movement_type="receipt",
+            ),
+            StockMovement(
+                product_id=product.id,
+                lot_id=lot.id,
+                location_id=bin_loc.id,
+                qty_change=Decimal("2"),
+                movement_type="allocate",
+            ),
+        ]
+    )
+    db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: admin_user
+    try:
+        resp = client.post(f"/api/v1/inventory/brands/{brand.id}/zero-stock?mode=brand_and_reserve")
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["stock_movements_created"] == 1
+    assert payload["reserve_movements_created"] == 1
+    assert payload["movements_created"] == 2
+
+    adjust_rows = (
+        db_session.query(StockMovement)
+        .filter(
+            StockMovement.product_id == product.id,
+            StockMovement.lot_id == lot.id,
+            StockMovement.location_id == bin_loc.id,
+            StockMovement.movement_type == "adjust",
+            StockMovement.reason_code == "inventory_shortage",
+            StockMovement.qty_change == Decimal("-7"),
+        )
+        .count()
+    )
+    assert adjust_rows == 1
+
+    unalloc_rows = (
+        db_session.query(StockMovement)
+        .filter(
+            StockMovement.product_id == product.id,
+            StockMovement.lot_id == lot.id,
+            StockMovement.location_id == bin_loc.id,
+            StockMovement.movement_type == "unallocate",
+            StockMovement.qty_change == Decimal("-2"),
+        )
+        .count()
+    )
+    assert unalloc_rows == 1
+
+
+def test_zero_brand_stock_reserve_only_idempotency_no_duplicate_unallocate(
+    client: TestClient,
+    db_session: Session,
+    admin_user: User,
+    bin_loc: Location,
+) -> None:
+    brand = Brand(code="BZRI", name="Brand Reserve Idem", is_active=True)
+    db_session.add(brand)
+    db_session.commit()
+    db_session.refresh(brand)
+
+    product = Product(
+        external_source="test",
+        external_id="brand-reserve-idem-1",
+        name="Brand reserve idem product",
+        sku="SKU-BRAND-RESERVE-IDEM-1",
+        is_active=True,
+        brand_id=brand.id,
+    )
+    db_session.add(product)
+    db_session.commit()
+    db_session.refresh(product)
+
+    lot = StockLot(product_id=product.id, batch="BRAND-RESERVE-IDEM-BATCH", expiry_date=None)
+    db_session.add(lot)
+    db_session.flush()
+    db_session.add_all(
+        [
+            StockMovement(
+                product_id=product.id,
+                lot_id=lot.id,
+                location_id=bin_loc.id,
+                qty_change=Decimal("3"),
+                movement_type="receipt",
+            ),
+            StockMovement(
+                product_id=product.id,
+                lot_id=lot.id,
+                location_id=bin_loc.id,
+                qty_change=Decimal("3"),
+                movement_type="allocate",
+            ),
+        ]
+    )
+    db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: admin_user
+    try:
+        r1 = client.post(
+            f"/api/v1/inventory/brands/{brand.id}/zero-stock?mode=reserve_only",
+            headers={"Idempotency-Key": "zero-brand-reserve-dup-1"},
+        )
+        r2 = client.post(
+            f"/api/v1/inventory/brands/{brand.id}/zero-stock?mode=reserve_only",
+            headers={"Idempotency-Key": "zero-brand-reserve-dup-1"},
+        )
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    assert r1.status_code == 200
+    assert r2.status_code == 200
+    assert r1.json() == r2.json()
+
+    unalloc_rows = (
+        db_session.query(StockMovement)
+        .filter(
+            StockMovement.product_id == product.id,
+            StockMovement.lot_id == lot.id,
+            StockMovement.location_id == bin_loc.id,
+            StockMovement.movement_type == "unallocate",
+            StockMovement.qty_change == Decimal("-3"),
+        )
+        .count()
+    )
+    assert unalloc_rows == 1
