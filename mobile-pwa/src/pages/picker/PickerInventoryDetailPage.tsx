@@ -86,8 +86,7 @@ export function PickerInventoryDetailPage() {
               </span>
             </div>
             <div className="mt-1 text-xs text-slate-500">
-              {t('inventory.batch')}: {loc.batch_no} • {t('inventory.on_hand')}: {Math.round(Number(loc.on_hand_qty))} •{' '}
-              {t('inventory.available')}: {Math.round(Number(loc.available_qty))}
+              {t('inventory.batch')}: {loc.batch_no} • {t('inventory.on_hand')}: {Math.round(Number(loc.on_hand_qty))}
             </div>
           </Card>
         ))}
