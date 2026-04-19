@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "270662903150",
+    "project_id": "fb-warehouse-76a0c",
+    "storage_bucket": "fb-warehouse-76a0c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:270662903150:android:c55a60617df918ffc60d7f",
+        "android_client_info": {
+          "package_name": "com.example.mobile_flutter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCQIzjski4DIy0PPSvTkrBYq00CigHPfH4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

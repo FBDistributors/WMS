@@ -43,6 +43,8 @@ class _MobileFlutterAppState extends ConsumerState<MobileFlutterApp> {
   static const Color _accent = Color(0xFF1A237E);
   bool _fcmRouterBound = false;
   bool _pickPushHandlerRegistered = false;
+  /// FCM tokenni backendga bir marta yuborish (sovuq startda allaqachon kirgan sessiya ham qamrab olinadi).
+  bool _fcmTokenSentThisSession = false;
 
   @override
   Widget build(BuildContext context) {
@@ -65,13 +67,11 @@ class _MobileFlutterAppState extends ConsumerState<MobileFlutterApp> {
       });
     }
 
-    ref.listen<AsyncValue<AuthSession>>(authControllerProvider, (
-      AsyncValue<AuthSession>? prev,
-      AsyncValue<AuthSession> next,
-    ) {
-      final bool wasAuthed = prev?.valueOrNull?.isAuthenticated ?? false;
-      final bool nowAuthed = next.valueOrNull?.isAuthenticated ?? false;
-      if (!wasAuthed && nowAuthed) {
+    ref.watch(authControllerProvider).whenData((AuthSession session) {
+      if (!session.isAuthenticated) {
+        _fcmTokenSentThisSession = false;
+      } else if (!_fcmTokenSentThisSession) {
+        _fcmTokenSentThisSession = true;
         FcmService.registerTokenIfPossible(ref.read(pickingRepositoryProvider));
       }
     });

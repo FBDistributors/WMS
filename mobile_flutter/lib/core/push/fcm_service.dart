@@ -8,6 +8,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/picking/data/picking_repository.dart';
+import '../../firebase_options.dart';
 
 /// Android channel id — backend `push_notifications.FCM_ANDROID_CHANNEL_ID` bilan mos.
 const String _androidChannelId = 'wms_picking';
@@ -183,7 +184,7 @@ class FcmService {
       return;
     }
     try {
-      await Firebase.initializeApp();
+      await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
       await _ensureLocalNotificationsReady();
       final NotificationAppLaunchDetails? launchDetails = await _local.getNotificationAppLaunchDetails();
       Map<String, dynamic>? coldOpenFromLocal;
