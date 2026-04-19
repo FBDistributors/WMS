@@ -8,6 +8,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/picking/data/picking_repository.dart';
+import '../../features/picking/domain/profile_type_param.dart';
 import '../../firebase_options.dart';
 
 /// Android channel id — backend `push_notifications.FCM_ANDROID_CHANNEL_ID` bilan mos.
@@ -23,12 +24,21 @@ class FcmService {
   static bool _inited = false;
   static GoRouter? _router;
   static String? _pendingTaskId;
+  static bool _pendingPickTaskList = false;
   static PickTasksPushCallback? _onPickTasksPush;
   static final FlutterLocalNotificationsPlugin _local = FlutterLocalNotificationsPlugin();
   static int _localNotifyId = 0;
 
   static void bindRouter(GoRouter router) {
     _router = router;
+    if (_pendingPickTaskList) {
+      _pendingPickTaskList = false;
+      router.goNamed(
+        'pickTasks',
+        queryParameters: <String, String>{'profile': profileToQuery(PickerProfileParam.picker)},
+      );
+      return;
+    }
     final String? p = _pendingTaskId;
     if (p != null && p.isNotEmpty) {
       _pendingTaskId = null;
@@ -36,6 +46,20 @@ class FcmService {
         'pickTaskDetail',
         pathParameters: <String, String>{'taskId': p},
       );
+    }
+  }
+
+  /// Admin tayinlash push — Buyurtmalar (`pickTasks`) bo‘limi.
+  static void _navigateToPickTaskList() {
+    final GoRouter? r = _router;
+    if (r != null) {
+      r.goNamed(
+        'pickTasks',
+        queryParameters: <String, String>{'profile': profileToQuery(PickerProfileParam.picker)},
+      );
+    } else {
+      _pendingPickTaskList = true;
+      _pendingTaskId = null;
     }
   }
 
@@ -47,6 +71,7 @@ class FcmService {
         pathParameters: <String, String>{'taskId': taskId},
       );
     } else {
+      _pendingPickTaskList = false;
       _pendingTaskId = taskId;
     }
   }
@@ -77,6 +102,11 @@ class FcmService {
 
   static void _handleOpen(Map<String, dynamic> data) {
     _handlePickTasksData(data);
+    final String? type = data['type']?.toString();
+    if (type == 'new_pick_task') {
+      _navigateToPickTaskList();
+      return;
+    }
     final String? taskId = _taskIdFromData(data);
     if (taskId != null) {
       _navigateToTask(taskId);
