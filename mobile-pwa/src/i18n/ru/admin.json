@@ -82,7 +82,7 @@
       "fcm_ok": "Настроено",
       "fcm_missing": "Не настроено",
       "devices_label": "Устройства вашей учётной записи (токены)",
-      "hint_server": "На сервере нужны GOOGLE_APPLICATION_CREDENTIALS (JSON сервисного аккаунта Firebase) и пакет firebase-admin. Токены регистрируются при входе в мобильном приложении.",
+      "hint_server": "На сервере нужен firebase-admin. На Render и аналогах задайте секрет FIREBASE_SERVICE_ACCOUNT_JSON с полным JSON сервисного аккаунта Firebase (или FIREBASE_SERVICE_ACCOUNT_JSON_B64 в standard base64). Для VPS/локально подойдёт GOOGLE_APPLICATION_CREDENTIALS с путём к файлу. Токены регистрируются при входе в мобильном приложении тем же аккаунтом.",
       "refresh": "Обновить",
       "test_btn": "Отправить тестовое уведомление",
       "test_sent": "Запрос принят. Уведомление должно появиться в мобильном приложении при наличии токена и разрешений.",

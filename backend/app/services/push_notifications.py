@@ -1,6 +1,8 @@
 """Push notifications via Firebase Cloud Messaging (FCM)."""
 from __future__ import annotations
 
+import base64
+import json
 import logging
 import os
 from typing import Any
@@ -11,6 +13,78 @@ from sqlalchemy.orm import Session
 from app.models.user_fcm_token import UserFCMToken
 
 logger = logging.getLogger(__name__)
+
+# Render / PaaS: paste full service account JSON as a secret (file path is awkward).
+_ENV_JSON = "FIREBASE_SERVICE_ACCOUNT_JSON"
+_ENV_JSON_B64 = "FIREBASE_SERVICE_ACCOUNT_JSON_B64"
+
+
+def _load_service_account_dict() -> dict[str, Any] | None:
+    b64 = os.environ.get(_ENV_JSON_B64, "").strip()
+    if b64:
+        try:
+            raw = base64.standard_b64decode(b64)
+            obj = json.loads(raw.decode("utf-8"))
+            return obj if isinstance(obj, dict) else None
+        except (ValueError, json.JSONDecodeError, OSError) as e:
+            logger.warning("Invalid %s: %s", _ENV_JSON_B64, e)
+            return None
+    raw = os.environ.get(_ENV_JSON, "").strip()
+    if not raw:
+        return None
+    try:
+        obj = json.loads(raw)
+        return obj if isinstance(obj, dict) else None
+    except json.JSONDecodeError as e:
+        logger.warning("Invalid %s: %s", _ENV_JSON, e)
+        return None
+
+
+def _looks_like_service_account(info: dict[str, Any]) -> bool:
+    return info.get("type") == "service_account" and bool(info.get("private_key"))
+
+
+def is_fcm_server_configured() -> bool:
+    """True if firebase-admin is present and credentials are available (not yet initialized)."""
+    try:
+        import firebase_admin
+    except ImportError:
+        return False
+    if firebase_admin._apps:
+        return True
+    data = _load_service_account_dict()
+    if data and _looks_like_service_account(data):
+        return True
+    cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
+    return bool(cred_path and os.path.isfile(cred_path))
+
+
+def ensure_firebase_app() -> bool:
+    """Initialize firebase_admin once. Returns False if credentials missing or init fails."""
+    try:
+        import firebase_admin
+        from firebase_admin import credentials
+    except ImportError:
+        return False
+    if firebase_admin._apps:
+        return True
+    data = _load_service_account_dict()
+    if data and _looks_like_service_account(data):
+        try:
+            firebase_admin.initialize_app(credentials.Certificate(data))
+            return True
+        except Exception as e:
+            logger.warning("Firebase init from env JSON failed: %s", e)
+            return False
+    cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
+    if cred_path and os.path.isfile(cred_path):
+        try:
+            firebase_admin.initialize_app()
+            return True
+        except Exception as e:
+            logger.warning("Firebase init from GOOGLE_APPLICATION_CREDENTIALS failed: %s", e)
+            return False
+    return False
 
 # Android 8+ channel id; Flutter `flutter_local_notifications` creates the same channel for foreground banners.
 FCM_ANDROID_CHANNEL_ID = "wms_picking"
@@ -42,7 +116,8 @@ def send_push_to_user(
     """
     Send a push notification to all devices of the user.
     Returns True if at least one message was sent successfully.
-    Requires firebase-admin and GOOGLE_APPLICATION_CREDENTIALS (or FIREBASE_CREDENTIALS_JSON path).
+    Requires firebase-admin and one of:
+    FIREBASE_SERVICE_ACCOUNT_JSON, FIREBASE_SERVICE_ACCOUNT_JSON_B64, or GOOGLE_APPLICATION_CREDENTIALS (file path).
     """
     tokens = get_fcm_tokens_for_user(db, user_id)
     if not tokens:
@@ -50,18 +125,14 @@ def send_push_to_user(
         return False
 
     try:
-        import firebase_admin
         from firebase_admin import messaging
     except ImportError:
         logger.warning("firebase-admin not installed, push notifications disabled")
         return False
 
-    if not firebase_admin._apps:
-        cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
-        if not cred_path or not os.path.isfile(cred_path):
-            logger.warning("GOOGLE_APPLICATION_CREDENTIALS not set or file missing, push disabled")
-            return False
-        firebase_admin.initialize_app()
+    if not ensure_firebase_app():
+        logger.warning("Firebase credentials not configured, push disabled")
+        return False
 
     data_payload = _fcm_data_as_strings(data)
     success = False

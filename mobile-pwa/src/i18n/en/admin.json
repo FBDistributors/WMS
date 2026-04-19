@@ -82,7 +82,7 @@
       "fcm_ok": "Configured",
       "fcm_missing": "Not configured",
       "devices_label": "Devices for your account (tokens)",
-      "hint_server": "The server needs GOOGLE_APPLICATION_CREDENTIALS pointing to a Firebase service account JSON file and the firebase-admin package. Tokens register when you sign in on the mobile app.",
+      "hint_server": "The server needs firebase-admin. On Render and similar hosts, set Secret FIREBASE_SERVICE_ACCOUNT_JSON to the full Firebase service account JSON (or FIREBASE_SERVICE_ACCOUNT_JSON_B64 as standard base64). For VPS/local, GOOGLE_APPLICATION_CREDENTIALS pointing to the JSON file also works. Tokens register when you sign in on the mobile app with the same account.",
       "refresh": "Refresh",
       "test_btn": "Send test notification",
       "test_sent": "Request accepted. You should see a notification on the mobile app if a token is registered and permissions are granted.",

@@ -82,7 +82,7 @@
       "fcm_ok": "Sozlangan",
       "fcm_missing": "Sozlanmagan",
       "devices_label": "Sizning akkauntingizdagi qurilmalar (token)",
-      "hint_server": "Serverda GOOGLE_APPLICATION_CREDENTIALS (Firebase service account JSON) yo‘li ko‘rsatilgan bo‘lishi va firebase-admin o‘rnatilgan bo‘lishi kerak. Tokenlar mobil ilovadan login qilganda ro‘yxatdan o‘tadi.",
+      "hint_server": "Server: firebase-admin kerak. Render va boshqa PaaS uchun FIREBASE_SERVICE_ACCOUNT_JSON (yoki FIREBASE_SERVICE_ACCOUNT_JSON_B64) ga butun service account JSON ni Secret qilib qo‘ying; VPS/lokal uchun GOOGLE_APPLICATION_CREDENTIALS fayl yo‘li ham ishlaydi. Tokenlar mobil ilovadan shu akkaunt bilan kirganda ro‘yxatdan o‘tadi.",
       "refresh": "Yangilash",
       "test_btn": "Test bildirishnoma yuborish",
       "test_sent": "So‘rov yuborildi. Mobil ilovada bildirishnoma chiqishi kerak (token va ruxsatlar bo‘lsa).",

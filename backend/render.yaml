@@ -26,6 +26,7 @@ services:
         generateValue: true
       - key: CORS_ORIGINS
         value: "*"
+      # FCM: Render Dashboard da FIREBASE_SERVICE_ACCOUNT_JSON (butun service account JSON) Secret qo‘shing.
 
   # Background Worker (SmartUp sync)
   - type: worker
