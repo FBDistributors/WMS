@@ -43,8 +43,39 @@ class _MobileFlutterAppState extends ConsumerState<MobileFlutterApp> {
   static const Color _accent = Color(0xFF1A237E);
   bool _fcmRouterBound = false;
   bool _pickPushHandlerRegistered = false;
-  /// FCM tokenni backendga bir marta yuborish (sovuq startda allaqachon kirgan sessiya ham qamrab olinadi).
+  /// FCM token backendga muvaffaqiyatli yuborilgach true (xato bo‘lsa qayta uriniladi).
   bool _fcmTokenSentThisSession = false;
+  bool _fcmTokenRegisterInFlight = false;
+  DateTime? _fcmRegisterBackoffUntil;
+
+  void _tryRegisterFcmWithBackend(WidgetRef ref, {bool bypassBackoff = false}) {
+    if (_fcmTokenSentThisSession || _fcmTokenRegisterInFlight) {
+      return;
+    }
+    final AuthSession? session = ref.read(authControllerProvider).valueOrNull;
+    if (session == null || !session.isAuthenticated) {
+      return;
+    }
+    final DateTime now = DateTime.now();
+    if (!bypassBackoff &&
+        _fcmRegisterBackoffUntil != null &&
+        now.isBefore(_fcmRegisterBackoffUntil!)) {
+      return;
+    }
+    if (!bypassBackoff) {
+      _fcmRegisterBackoffUntil = now.add(const Duration(seconds: 12));
+    } else {
+      _fcmRegisterBackoffUntil = null;
+    }
+    _fcmTokenRegisterInFlight = true;
+    FcmService.registerTokenIfPossible(ref.read(pickingRepositoryProvider)).then((bool ok) {
+      _fcmTokenRegisterInFlight = false;
+      if (ok) {
+        _fcmTokenSentThisSession = true;
+        _fcmRegisterBackoffUntil = null;
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,9 +101,10 @@ class _MobileFlutterAppState extends ConsumerState<MobileFlutterApp> {
     ref.watch(authControllerProvider).whenData((AuthSession session) {
       if (!session.isAuthenticated) {
         _fcmTokenSentThisSession = false;
-      } else if (!_fcmTokenSentThisSession) {
-        _fcmTokenSentThisSession = true;
-        FcmService.registerTokenIfPossible(ref.read(pickingRepositoryProvider));
+        _fcmTokenRegisterInFlight = false;
+        _fcmRegisterBackoffUntil = null;
+      } else {
+        _tryRegisterFcmWithBackend(ref);
       }
     });
 
@@ -86,6 +118,9 @@ class _MobileFlutterAppState extends ConsumerState<MobileFlutterApp> {
             ref.invalidate(pendingQueueCountProvider);
           }
         });
+        if (ref.read(authControllerProvider).valueOrNull?.isAuthenticated ?? false) {
+          _tryRegisterFcmWithBackend(ref, bypassBackoff: true);
+        }
       }
     });
 

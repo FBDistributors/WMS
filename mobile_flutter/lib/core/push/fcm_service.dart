@@ -229,15 +229,20 @@ class FcmService {
     }
   }
 
-  static Future<void> registerTokenIfPossible(PickingRepository pickingRepo) async {
+  /// Backendga token yuborildi-yuborilmadi (tarmoq xatosi / 401 uchun false).
+  static Future<bool> registerTokenIfPossible(PickingRepository pickingRepo) async {
     try {
       final String? t = await FirebaseMessaging.instance.getToken();
       if (t == null || t.isEmpty) {
-        return;
+        debugPrint('FCM register skipped: no device token');
+        return false;
       }
       await pickingRepo.registerFcmToken(token: t);
+      debugPrint('FCM token registered with backend');
+      return true;
     } on Object catch (e) {
       debugPrint('FCM register skipped: $e');
+      return false;
     }
   }
 }
