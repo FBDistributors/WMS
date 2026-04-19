@@ -3,6 +3,7 @@ import { fetchJSON } from './apiClient'
 export type NotificationsPushStatus = {
   fcm_server_configured: boolean
   registered_devices_for_current_user: number
+  total_fcm_tokens_all_users: number
 }
 
 export type NotificationsTestSelfResponse = {
@@ -16,5 +17,18 @@ export async function getNotificationsPushStatus() {
 export async function postNotificationsTestSelf() {
   return fetchJSON<NotificationsTestSelfResponse>('/api/v1/notifications/test-self', {
     method: 'POST',
+  })
+}
+
+export type NotificationsBroadcastResponse = {
+  total_tokens: number
+  success: number
+  failed: number
+}
+
+export async function postNotificationsBroadcast(payload: { title: string; body: string }) {
+  return fetchJSON<NotificationsBroadcastResponse>('/api/v1/notifications/broadcast', {
+    method: 'POST',
+    body: payload,
   })
 }

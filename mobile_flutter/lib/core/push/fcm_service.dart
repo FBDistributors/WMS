@@ -146,7 +146,7 @@ class FcmService {
       return true;
     }
     final String? t = d['type']?.toString();
-    return t == 'new_pick_task' || t == 'admin_test';
+    return t == 'new_pick_task' || t == 'admin_test' || t == 'admin_broadcast';
   }
 
   static Future<void> _showForegroundBanner(RemoteMessage m) async {

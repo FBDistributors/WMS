@@ -106,6 +106,80 @@ def get_fcm_tokens_for_user(db: Session, user_id: UUID) -> list[str]:
     return [r.token for r in rows if r.token]
 
 
+def get_all_fcm_tokens(db: Session) -> list[str]:
+    """Every registered device token (all users) for broadcast."""
+    rows = db.query(UserFCMToken.token).all()
+    return [r.token for r in rows if r.token]
+
+
+def _fcm_message_for_token(
+    token: str,
+    title: str,
+    body: str,
+    data_payload: dict[str, str],
+):
+    from firebase_admin import messaging
+
+    return messaging.Message(
+        notification=messaging.Notification(title=title, body=body),
+        data=data_payload,
+        token=token,
+        android=messaging.AndroidConfig(
+            priority="high",
+            notification=messaging.AndroidNotification(
+                sound="default",
+                channel_id=FCM_ANDROID_CHANNEL_ID,
+            ),
+        ),
+        apns=messaging.APNSConfig(
+            payload=messaging.APNSPayload(aps=messaging.Aps(sound="default")),
+        ),
+    )
+
+
+def send_push_broadcast(
+    db: Session,
+    title: str,
+    body: str,
+    data: dict[str, str] | None = None,
+) -> tuple[int, int, int]:
+    """
+    Send one notification to every stored FCM token (all users / devices).
+    Returns (total_tokens, success_count, failure_count).
+    """
+    tokens = get_all_fcm_tokens(db)
+    total = len(tokens)
+    if total == 0:
+        return 0, 0, 0
+
+    try:
+        from firebase_admin import messaging
+    except ImportError:
+        logger.warning("firebase-admin not installed, push broadcast skipped")
+        return total, 0, total
+
+    if not ensure_firebase_app():
+        logger.warning("Firebase credentials not configured, push broadcast skipped")
+        return total, 0, total
+
+    data_payload = _fcm_data_as_strings(data)
+    success = 0
+    failure = 0
+    # firebase_admin.messaging.send_each — batch internally; chunk to limit memory / request size
+    batch_size = 500
+    for i in range(0, total, batch_size):
+        chunk = tokens[i : i + batch_size]
+        messages = [_fcm_message_for_token(t, title, body, data_payload) for t in chunk]
+        try:
+            br = messaging.send_each(messages)
+            success += br.success_count
+            failure += br.failure_count
+        except Exception as e:
+            logger.warning("FCM broadcast batch failed: %s", e)
+            failure += len(chunk)
+    return total, success, failure
+
+
 def send_push_to_user(
     db: Session,
     user_id: UUID,
@@ -138,23 +212,7 @@ def send_push_to_user(
     success = False
     for token in tokens:
         try:
-            messaging.send(
-                messaging.Message(
-                    notification=messaging.Notification(title=title, body=body),
-                    data=data_payload,
-                    token=token,
-                    android=messaging.AndroidConfig(
-                        priority="high",
-                        notification=messaging.AndroidNotification(
-                            sound="default",
-                            channel_id=FCM_ANDROID_CHANNEL_ID,
-                        ),
-                    ),
-                    apns=messaging.APNSConfig(
-                        payload=messaging.APNSPayload(aps=messaging.Aps(sound="default")),
-                    ),
-                )
-            )
+            messaging.send(_fcm_message_for_token(token, title, body, data_payload))
             success = True
         except Exception as e:
             logger.warning("FCM send failed for token %s...: %s", token[:20], e)
