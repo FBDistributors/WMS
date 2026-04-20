@@ -1,5 +1,6 @@
 fastapi
 openpyxl
+python-multipart
 uvicorn[standard]
 sqlalchemy
 alembic
