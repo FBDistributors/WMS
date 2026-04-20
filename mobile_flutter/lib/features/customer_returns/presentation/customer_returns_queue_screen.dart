@@ -39,14 +39,18 @@ class CustomerReturnsQueueScreen extends ConsumerWidget {
               itemCount: r.items.length,
               itemBuilder: (BuildContext context, int i) {
                 final CustomerReturn c = r.items[i];
+                final String? custLabel = (c.customerName != null && c.customerName!.trim().isNotEmpty)
+                    ? c.customerName!.trim()
+                    : (c.customerId != null && c.customerId!.trim().isNotEmpty ? c.customerId!.trim() : null);
+                final String summary = StringLookup.tParams(loc, 'returnsLinesSummary', <String, String>{
+                  'status': c.status,
+                  'count': '${c.lines.length}',
+                });
                 return Card(
                   child: ExpansionTile(
                     title: Text(c.docNo),
                     subtitle: Text(
-                      StringLookup.tParams(loc, 'returnsLinesSummary', <String, String>{
-                        'status': c.status,
-                        'count': '${c.lines.length}',
-                      }),
+                      custLabel != null ? '$custLabel · $summary' : summary,
                     ),
                     children: <Widget>[
                       Padding(

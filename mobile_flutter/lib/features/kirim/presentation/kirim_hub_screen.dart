@@ -42,13 +42,6 @@ class KirimHubScreen extends ConsumerWidget {
                 ),
                 _card(
                   context,
-                  icon: Icons.fact_check_outlined,
-                  title: StringLookup.t(loc, 'kirimReturnsQueueCard'),
-                  subtitle: StringLookup.t(loc, 'kirimCardReturnsQueueSubtitle'),
-                  onTap: () => context.pushNamed('customerReturnsQueue'),
-                ),
-                _card(
-                  context,
                   icon: Icons.checklist,
                   title: StringLookup.t(loc, 'kirimInventory'),
                   subtitle: StringLookup.t(loc, 'kirimCardInventorySubtitle'),

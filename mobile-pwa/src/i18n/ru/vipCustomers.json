@@ -34,5 +34,20 @@
     "customer_name": "Имя клиента",
     "min_expiry_months": "Срок годности",
     "actions": "Действия"
-  }
+  },
+  "tab_list": "Список",
+  "tab_import": "Импорт (Excel/CSV)",
+  "import_heading": "Клиенты из экспорта SmartUp",
+  "import_hint": "Колонки: customer_id (обяз.), customer_name, min_expiry_months (необяз., по умолчанию 6). UTF-8 CSV или .xlsx.",
+  "import_choose_file": "Выбрать файл",
+  "import_submit": "Загрузить и импортировать",
+  "import_busy": "Импорт...",
+  "import_preview": "Первые строки",
+  "import_result": "Результат",
+  "import_created": "Создано: {{n}}",
+  "import_updated": "Обновлено: {{n}}",
+  "import_errors": "Ошибки",
+  "import_row": "Строка {{row}}",
+  "import_no_file": "Сначала выберите файл.",
+  "import_readonly": "Нет прав на импорт."
 }

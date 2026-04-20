@@ -50,6 +50,8 @@ class CustomerReturnLineCreate(BaseModel):
 
 class CustomerReturnCreate(BaseModel):
     doc_no: Optional[str] = Field(default=None, max_length=64)
+    customer_id: Optional[str] = Field(default=None, max_length=64)
+    customer_name: Optional[str] = Field(default=None, max_length=255)
     lines: List[CustomerReturnLineCreate]
 
 
@@ -67,6 +69,8 @@ class CustomerReturnLineOut(BaseModel):
 class CustomerReturnOut(BaseModel):
     id: UUID
     doc_no: str
+    customer_id: Optional[str] = None
+    customer_name: Optional[str] = None
     status: str
     created_by_user_id: Optional[UUID] = None
     approved_by_user_id: Optional[UUID] = None
@@ -108,6 +112,8 @@ def _to_out(cr: CustomerReturnModel) -> CustomerReturnOut:
     return CustomerReturnOut(
         id=cr.id,
         doc_no=cr.doc_no,
+        customer_id=cr.customer_id,
+        customer_name=cr.customer_name,
         status=cr.status,
         created_by_user_id=cr.created_by_user_id,
         approved_by_user_id=cr.approved_by_user_id,
@@ -141,6 +147,17 @@ async def create_customer_return(
     if not payload.lines:
         raise HTTPException(status_code=400, detail="Lines must not be empty")
 
+    cid_raw = (payload.customer_id or "").strip() if payload.customer_id else ""
+    cname_raw = (payload.customer_name or "").strip() if payload.customer_name else ""
+    if cid_raw or cname_raw:
+        if not cid_raw or not cname_raw:
+            raise HTTPException(
+                status_code=400,
+                detail="customer_id and customer_name must both be set when providing customer",
+            )
+    cust_id = cid_raw if cid_raw else None
+    cust_name = cname_raw[:255] if cust_id else None
+
     doc_no = payload.doc_no.strip() if payload.doc_no else _generate_doc_no()
     if db.query(CustomerReturnModel).filter(CustomerReturnModel.doc_no == doc_no).first():
         raise HTTPException(status_code=409, detail="doc_no already exists")
@@ -148,6 +165,8 @@ async def create_customer_return(
     first_of_month = first_day_of_current_month()
     cr = CustomerReturnModel(
         doc_no=doc_no,
+        customer_id=cust_id,
+        customer_name=cust_name,
         status=CUSTOMER_RETURN_STATUS_PENDING,
         created_by_user_id=user.id,
     )

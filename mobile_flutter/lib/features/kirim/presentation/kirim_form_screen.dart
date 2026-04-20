@@ -1,4 +1,4 @@
-import 'dart:async' show unawaited;
+import 'dart:async' show Timer, unawaited;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,8 +10,13 @@ import '../../../core/formatting/expiry_display_format.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../core/router/scanner_args.dart';
 import '../../../l10n/string_lookup.dart';
-import '../../customer_returns/data/customer_returns_models.dart';
+import '../../auth/presentation/auth_providers.dart';
 import '../../customer_returns/customer_returns_providers.dart';
+import '../../customer_returns/data/customer_returns_models.dart';
+import '../../picking/data/picking_models.dart';
+import '../../picking/picking_providers.dart';
+import '../../vip_customers/data/vip_customer_models.dart';
+import '../../vip_customers/vip_customers_providers.dart';
 import '../../inventory/data/models/picker_inventory_models.dart';
 import '../../inventory/data/picker_location_format.dart';
 import '../../inventory/presentation/inventory_providers.dart';
@@ -90,6 +95,13 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   bool _sending = false;
   String? _handledProductId;
 
+  final TextEditingController _customerSearchController = TextEditingController();
+  Timer? _vipDebounce;
+  List<VipCustomerRow> _vipSuggestions = <VipCustomerRow>[];
+  bool _vipLoading = false;
+  VipCustomerRow? _selectedVip;
+  String? _returnLineExpiry;
+
   int _invStep = 0;
   String? _invSubMode;
   String _invWarehouse = 'main';
@@ -108,6 +120,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
 
   @override
   void dispose() {
+    _vipDebounce?.cancel();
+    _customerSearchController.dispose();
     _invLocSearch.dispose();
     _invScanActualQty.dispose();
     _batchNew.dispose();
@@ -181,7 +195,9 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           _product = res;
           _loadingProduct = false;
           if (_flow == 'return' && res.locations.isNotEmpty) {
-            _returnPick = _sortFefo(res.locations).first;
+            final List<PickerProductLocation> sorted = _sortFefo(res.locations);
+            _returnPick = sorted.first;
+            _returnLineExpiry = sorted.first.expiryDate;
           }
         });
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -223,6 +239,9 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       );
       return;
     }
+    final String? lineExpiry = (_returnLineExpiry != null && _returnLineExpiry!.trim().isNotEmpty)
+        ? _returnLineExpiry
+        : pick.expiryDate;
     setState(() {
       _lines.add(
         _FormLine(
@@ -233,10 +252,113 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           locationCode: pick.locationCode,
           qty: q,
           batch: pick.batchNo,
-          expiryDate: pick.expiryDate,
+          expiryDate: lineExpiry,
         ),
       );
     });
+  }
+
+  void _scheduleVipSearch() {
+    _vipDebounce?.cancel();
+    _vipDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (!mounted) {
+        return;
+      }
+      final String q = _customerSearchController.text.trim();
+      if (q.length < 2) {
+        setState(() {
+          _vipSuggestions = <VipCustomerRow>[];
+          _vipLoading = false;
+        });
+        return;
+      }
+      unawaited(_fetchVipSuggestions(q));
+    });
+  }
+
+  Future<void> _fetchVipSuggestions(String q) async {
+    setState(() => _vipLoading = true);
+    try {
+      final List<VipCustomerRow> list =
+          await ref.read(vipCustomersRepositoryProvider).list(search: q, limit: 40);
+      if (mounted) {
+        setState(() {
+          _vipSuggestions = list;
+          _vipLoading = false;
+        });
+      }
+    } on Exception {
+      if (mounted) {
+        setState(() {
+          _vipSuggestions = <VipCustomerRow>[];
+          _vipLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<String?> _showReturnPickerDialog() async {
+    final AppLocale loc = ref.read(appLocaleProvider);
+    List<PickerUser> pickers = const <PickerUser>[];
+    try {
+      pickers = await ref.read(pickingRepositoryProvider).getPickers();
+    } on Exception {
+      pickers = const <PickerUser>[];
+    }
+    if (!mounted) {
+      return null;
+    }
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext ctx) {
+        String? selectedId = pickers.isNotEmpty ? pickers.first.id : null;
+        return StatefulBuilder(
+          builder: (BuildContext ctx2, void Function(void Function()) setLocal) {
+            return AlertDialog(
+              title: Text(StringLookup.t(loc, 'returnsSelectPickerTitle')),
+              content: pickers.isEmpty
+                  ? Text(StringLookup.t(loc, 'loadError'))
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        Text(StringLookup.t(loc, 'pickerNameLabel')),
+                        const SizedBox(height: 8),
+                        DropdownButton<String>(
+                          isExpanded: true,
+                          value: selectedId,
+                          items: pickers
+                              .map(
+                                (PickerUser p) => DropdownMenuItem<String>(
+                                  value: p.id,
+                                  child: Text(
+                                    (p.fullName != null && p.fullName!.trim().isNotEmpty)
+                                        ? p.fullName!
+                                        : p.username,
+                                  ),
+                                ),
+                              )
+                              .toList(growable: false),
+                          onChanged: (String? v) => setLocal(() => selectedId = v),
+                        ),
+                      ],
+                    ),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(StringLookup.t(loc, 'cancel')),
+                ),
+                FilledButton(
+                  onPressed: selectedId == null ? null : () => Navigator.pop(ctx, selectedId),
+                  child: Text(StringLookup.t(loc, 'confirmButton')),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   List<PickerLocationOption> _filterKirimPutaway(String q, {int cap = 40}) {
@@ -305,9 +427,24 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     if (_lines.isEmpty || _sending) {
       return;
     }
+    final AppLocale locMsg = ref.read(appLocaleProvider);
+    if (_selectedVip == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(StringLookup.t(locMsg, 'returnsCustomerRequired'))),
+        );
+      }
+      return;
+    }
     setState(() => _sending = true);
     try {
-      await ref.read(customerReturnsRepositoryProvider).createCustomerReturn(
+      final String cname = (_selectedVip!.customerName != null &&
+              _selectedVip!.customerName!.trim().isNotEmpty)
+          ? _selectedVip!.customerName!.trim()
+          : _selectedVip!.customerId;
+      CustomerReturn doc = await ref.read(customerReturnsRepositoryProvider).createCustomerReturn(
+            customerId: _selectedVip!.customerId,
+            customerName: cname,
             lines: _lines
                 .map(
                   (_FormLine l) => CreateCustomerReturnLine(
@@ -322,11 +459,28 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                 )
                 .toList(),
           );
-      if (mounted) {
-        final AppLocale loc = ref.read(appLocaleProvider);
+      final AuthSession session =
+          ref.read(authControllerProvider).valueOrNull ?? const AuthSession.unauthenticated();
+      final List<String> perms = session.me?.permissions ?? const <String>[];
+      if (perms.contains('documents:edit_status')) {
+        doc = await ref.read(customerReturnsRepositoryProvider).controllerApprove(doc.id);
+        if (mounted) {
+          final String? pickerId = await _showReturnPickerDialog();
+          if (pickerId != null && pickerId.isNotEmpty) {
+            await ref.read(customerReturnsRepositoryProvider).assignPicker(doc.id, pickerId);
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(StringLookup.t(locMsg, 'returnsFlowDone'))),
+              );
+            }
+          }
+        }
+      } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(StringLookup.t(loc, 'kirimSentOk'))),
+          SnackBar(content: Text(StringLookup.t(locMsg, 'returnsApproveAssignNeedPermission'))),
         );
+      }
+      if (mounted) {
         context.pop();
       }
     } on Exception catch (e) {
@@ -1159,11 +1313,73 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                         _warehouse = v.first;
                         _product = null;
                         _returnPick = null;
+                        _returnLineExpiry = null;
                         _lines.clear();
                       });
                       _loadLocations();
                     },
                   ),
+                if (_flow == 'return') ...<Widget>[
+                  const SizedBox(height: 12),
+                  Text(
+                    StringLookup.t(appLoc, 'returnsCustomerSearchLabel'),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  if (_selectedVip != null)
+                    InputDecorator(
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () => setState(() => _selectedVip = null),
+                        ),
+                      ),
+                      child: Text(_selectedVip!.displayLabel, style: const TextStyle(fontSize: 15)),
+                    )
+                  else ...<Widget>[
+                    TextField(
+                      controller: _customerSearchController,
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        hintText: StringLookup.t(appLoc, 'returnsCustomerSearchLabel'),
+                      ),
+                      onChanged: (_) => _scheduleVipSearch(),
+                    ),
+                    if (_vipLoading) const LinearProgressIndicator(),
+                    if (_vipSuggestions.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Material(
+                          elevation: 1,
+                          borderRadius: BorderRadius.circular(8),
+                          clipBehavior: Clip.antiAlias,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 200),
+                            child: ListView.builder(
+                              shrinkWrap: true,
+                              padding: EdgeInsets.zero,
+                              itemCount: _vipSuggestions.length,
+                              itemBuilder: (BuildContext _, int i) {
+                                final VipCustomerRow r = _vipSuggestions[i];
+                                return ListTile(
+                                  dense: true,
+                                  title: Text(r.displayLabel),
+                                  onTap: () {
+                                    FocusManager.instance.primaryFocus?.unfocus();
+                                    setState(() {
+                                      _selectedVip = r;
+                                      _vipSuggestions = <VipCustomerRow>[];
+                                    });
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ],
                 const SizedBox(height: 12),
                 BarcodeSearchInput(
                   onSelectProduct: _loadProduct,
@@ -1181,7 +1397,16 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                                   : _receivingLocationCode,
                             ),
                           )
-                      : null,
+                      : _flow == 'return'
+                          ? () => context.pushNamed(
+                                'scanner',
+                                extra: ScannerArgs(
+                                  returnToKirimForm: true,
+                                  flow: 'return',
+                                  warehouse: _warehouse,
+                                ),
+                              )
+                          : null,
                 ),
                 if (_loadingProduct) const LinearProgressIndicator(),
                 if (_productError != null) Text(_productError!, style: const TextStyle(color: Colors.red)),
@@ -1209,7 +1434,10 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                       tileColor: sel ? Colors.blue.shade50 : null,
                       onTap: () {
                         FocusManager.instance.primaryFocus?.unfocus();
-                        setState(() => _returnPick = loc);
+                        setState(() {
+                          _returnPick = loc;
+                          _returnLineExpiry = loc.expiryDate;
+                        });
                       },
                     );
                   }),
@@ -1222,6 +1450,12 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                       border: const OutlineInputBorder(),
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  ExpiryDatePickerField(
+                    value: _returnLineExpiry,
+                    onChanged: (String? v) => setState(() => _returnLineExpiry = v),
+                  ),
+                  const SizedBox(height: 12),
                   FilledButton(
                     onPressed: _addLineReturn,
                     child: Text(StringLookup.t(appLoc, 'kirimAddLine')),

@@ -18,7 +18,9 @@ class ReturnsScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              const Text('Mijoz qaytarishlari uchun Kirim → Mijozdan qaytgan.'),
+              const Text(
+                'Mijoz qaytarishlari: Kirim → Mijozdan qaytgan. Yig\'uvchi topshirig\'i — bosh sahifadan «Mijoz qaytarish navbati».',
+              ),
               const SizedBox(height: 16),
               FilledButton(
                 onPressed: () => context.pushNamed(

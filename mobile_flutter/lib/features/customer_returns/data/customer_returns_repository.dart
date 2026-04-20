@@ -50,6 +50,8 @@ class CustomerReturnsRepository {
 
   Future<CustomerReturn> createCustomerReturn({
     String? docNo,
+    String? customerId,
+    String? customerName,
     required List<CreateCustomerReturnLine> lines,
   }) async {
     try {
@@ -57,6 +59,8 @@ class CustomerReturnsRepository {
         _path,
         data: <String, Object?>{
           if (docNo != null) 'doc_no': docNo,
+          if (customerId != null && customerId.isNotEmpty) 'customer_id': customerId,
+          if (customerName != null && customerName.isNotEmpty) 'customer_name': customerName,
           'lines': lines.map((CreateCustomerReturnLine e) => e.toJson()).toList(),
         },
       );

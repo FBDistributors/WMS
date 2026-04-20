@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import { Loader2, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -13,9 +13,11 @@ import {
   createVipCustomer,
   deleteVipCustomer,
   getVipCustomers,
+  importVipCustomers,
   putVipCustomerBrandLimits,
   updateVipCustomer,
   type VipCustomer,
+  type VipCustomerImportResult,
 } from '../../services/vipCustomersApi'
 import { getBrands, type Brand } from '../../services/brandsApi'
 import { useAuth } from '../../rbac/AuthProvider'
@@ -30,6 +32,7 @@ export function VipCustomersPage() {
   const { t } = useTranslation(['vipCustomers', 'admin', 'common'])
   const { has } = useAuth()
   const canManage = has('orders:read')
+  const [mainTab, setMainTab] = useState<'list' | 'import'>('list')
   const [items, setItems] = useState<VipCustomer[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -151,20 +154,44 @@ export function VipCustomersPage() {
       }
     >
       <Card className="space-y-4">
-        <div className="flex flex-nowrap items-end gap-3">
-          <label className="text-sm text-slate-600 dark:text-slate-300">
-            {t('vipCustomers:search')}
-            <input
-              className="mt-1 w-full min-w-[180px] rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </label>
-          <Button variant="secondary" onClick={load} className="shrink-0">
-            {t('common:buttons.refresh')}
+        <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3 dark:border-slate-800">
+          <Button
+            type="button"
+            variant={mainTab === 'list' ? 'default' : 'secondary'}
+            className="shrink-0"
+            onClick={() => setMainTab('list')}
+          >
+            {t('vipCustomers:tab_list')}
+          </Button>
+          <Button
+            type="button"
+            variant={mainTab === 'import' ? 'default' : 'secondary'}
+            className="shrink-0"
+            onClick={() => setMainTab('import')}
+          >
+            {t('vipCustomers:tab_import')}
           </Button>
         </div>
-        {content}
+        {mainTab === 'import' ? (
+          <VipImportPanel canManage={canManage} onImportDone={load} />
+        ) : (
+          <>
+            <div className="flex flex-nowrap items-end gap-3">
+              <label className="text-sm text-slate-600 dark:text-slate-300">
+                {t('vipCustomers:search')}
+                <input
+                  className="mt-1 w-full min-w-[180px] rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </label>
+              <Button variant="secondary" onClick={load} className="shrink-0">
+                {t('common:buttons.refresh')}
+              </Button>
+            </div>
+            {content}
+          </>
+        )}
       </Card>
 
       {dialog.open ? (
@@ -197,6 +224,117 @@ export function VipCustomersPage() {
         onCancel={() => setConfirmDelete(null)}
       />
     </AdminLayout>
+  )
+}
+
+function VipImportPanel({ canManage, onImportDone }: { canManage: boolean; onImportDone: () => void }) {
+  const { t } = useTranslation(['vipCustomers', 'common'])
+  const [file, setFile] = useState<File | null>(null)
+  const [preview, setPreview] = useState<string>('')
+  const [result, setResult] = useState<VipCustomerImportResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    setFile(f ?? null)
+    setResult(null)
+    setError(null)
+    setPreview('')
+    if (!f) return
+    const lower = f.name.toLowerCase()
+    if (lower.endsWith('.csv') || lower.endsWith('.txt')) {
+      try {
+        const slice = f.slice(0, Math.min(f.size, 12000))
+        const text = await slice.text()
+        const lines = text.split(/\r?\n/).slice(0, 18)
+        setPreview(lines.join('\n'))
+      } catch {
+        setPreview('…')
+      }
+    } else {
+      setPreview(`${f.name} (${Math.round(f.size / 1024)} KB)`)
+    }
+  }
+
+  const submit = async () => {
+    if (!canManage) return
+    if (!file) {
+      setError(t('vipCustomers:import_no_file'))
+      return
+    }
+    setBusy(true)
+    setError(null)
+    setResult(null)
+    try {
+      const r = await importVipCustomers(file)
+      setResult(r)
+      void onImportDone()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Import failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!canManage) {
+    return <p className="text-sm text-slate-600 dark:text-slate-400">{t('vipCustomers:import_readonly')}</p>
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">{t('vipCustomers:import_heading')}</h3>
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{t('vipCustomers:import_hint')}</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <input
+          type="file"
+          accept=".csv,.txt,.xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+          className="text-sm text-slate-700 dark:text-slate-200"
+          onChange={onFile}
+        />
+        <Button type="button" onClick={() => void submit()} disabled={busy}>
+          {busy ? t('vipCustomers:import_busy') : t('vipCustomers:import_submit')}
+        </Button>
+      </div>
+      {error ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+          {error}
+        </div>
+      ) : null}
+      {preview ? (
+        <div>
+          <div className="mb-1 text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
+            {t('vipCustomers:import_preview')}
+          </div>
+          <pre className="max-h-48 overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+            {preview}
+          </pre>
+        </div>
+      ) : null}
+      {result ? (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm dark:border-slate-700 dark:bg-slate-900/50">
+          <div className="font-semibold text-slate-900 dark:text-slate-100">{t('vipCustomers:import_result')}</div>
+          <ul className="mt-2 list-inside list-disc space-y-1 text-slate-700 dark:text-slate-300">
+            <li>{t('vipCustomers:import_created', { n: result.created })}</li>
+            <li>{t('vipCustomers:import_updated', { n: result.updated })}</li>
+          </ul>
+          {result.errors?.length ? (
+            <div className="mt-3">
+              <div className="font-medium text-red-700 dark:text-red-300">{t('vipCustomers:import_errors')}</div>
+              <ul className="mt-1 max-h-40 overflow-auto text-xs text-red-800 dark:text-red-200">
+                {result.errors.map((e, i) => (
+                  <li key={`${e.row}-${i}`}>
+                    {t('vipCustomers:import_row', { row: e.row })}: {e.detail}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   )
 }
 

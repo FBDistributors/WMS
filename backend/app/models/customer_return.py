@@ -25,6 +25,8 @@ class CustomerReturn(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     doc_no: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    customer_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    customer_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default=CUSTOMER_RETURN_STATUS_PENDING)
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
@@ -52,6 +54,7 @@ class CustomerReturn(Base):
         Index("ix_customer_returns_status", "status"),
         Index("ix_customer_returns_created_at", "created_at"),
         Index("ix_customer_returns_assigned_picker_user_id", "assigned_picker_user_id"),
+        Index("ix_customer_returns_customer_id", "customer_id"),
     )
 
 

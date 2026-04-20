@@ -145,6 +145,14 @@ class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
                             isDark: isDark,
                             onTap: () => context.pushNamed('consolidatedPick'),
                           ),
+                        if (profile == PickerProfileParam.picker)
+                          _HomeCard(
+                            icon: Icons.fact_check_outlined,
+                            title: StringLookup.t(loc, 'kirimReturnsQueueCard'),
+                            subtitle: StringLookup.t(loc, 'kirimCardReturnsQueueSubtitle'),
+                            isDark: isDark,
+                            onTap: () => context.pushNamed('customerReturnsQueue'),
+                          ),
                         _HomeCard(
                           icon: Icons.cloud_off_outlined,
                           title:

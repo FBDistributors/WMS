@@ -37,6 +37,8 @@ class CustomerReturn {
   const CustomerReturn({
     required this.id,
     required this.docNo,
+    this.customerId,
+    this.customerName,
     required this.status,
     required this.createdByUserId,
     required this.approvedByUserId,
@@ -48,6 +50,8 @@ class CustomerReturn {
 
   final String id;
   final String docNo;
+  final String? customerId;
+  final String? customerName;
   final String status;
   final String? createdByUserId;
   final String? approvedByUserId;
@@ -70,6 +74,8 @@ class CustomerReturn {
     return CustomerReturn(
       id: json['id']! as String,
       docNo: json['doc_no']! as String,
+      customerId: json['customer_id'] as String?,
+      customerName: json['customer_name'] as String?,
       status: json['status']! as String,
       createdByUserId: json['created_by_user_id'] as String?,
       approvedByUserId: json['approved_by_user_id'] as String?,
