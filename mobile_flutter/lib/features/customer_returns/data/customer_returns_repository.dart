@@ -104,9 +104,15 @@ class CustomerReturnsRepository {
     }
   }
 
-  Future<CustomerReturn> completeCustomerReturn(String id) async {
+  Future<CustomerReturn> completeCustomerReturn(
+    String id, {
+    required String locationId,
+  }) async {
     try {
-      final Response<Object?> res = await _dio.post<Object?>('$_path/$id/complete');
+      final Response<Object?> res = await _dio.post<Object?>(
+        '$_path/$id/complete',
+        data: CompleteCustomerReturnRequest(locationId: locationId).toJson(),
+      );
       final Object? data = res.data;
       if (data is! Map) {
         throw const FormatException('complete');

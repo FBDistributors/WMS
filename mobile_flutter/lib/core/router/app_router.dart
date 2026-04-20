@@ -47,6 +47,19 @@ final goRouterProvider = Provider<GoRouter>((Ref ref) {
       if (authed && loggingIn) {
         return '/picker-home';
       }
+      final List<String> perms = auth.maybeWhen(
+        data: (AuthSession s) => s.me?.permissions ?? const <String>[],
+        orElse: () => const <String>[],
+      );
+      if (path == '/kirim-form') {
+        final String? flow = state.uri.queryParameters['flow'];
+        if (flow == 'return' && !perms.contains('documents:edit_status')) {
+          return '/kirim';
+        }
+      }
+      if (path == '/customer-returns-queue' && !perms.contains('picking:write')) {
+        return '/picker-home';
+      }
       return null;
     },
     routes: <RouteBase>[

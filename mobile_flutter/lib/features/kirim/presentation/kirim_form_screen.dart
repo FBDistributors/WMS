@@ -430,6 +430,17 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       return;
     }
     final AppLocale locMsg = ref.read(appLocaleProvider);
+    final AuthSession session =
+        ref.read(authControllerProvider).valueOrNull ?? const AuthSession.unauthenticated();
+    final List<String> perms = session.me?.permissions ?? const <String>[];
+    if (!perms.contains('documents:edit_status')) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(StringLookup.t(locMsg, 'returnsApproveAssignNeedPermission'))),
+        );
+      }
+      return;
+    }
     if (_selectedCustomer == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -461,26 +472,17 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                 )
                 .toList(),
           );
-      final AuthSession session =
-          ref.read(authControllerProvider).valueOrNull ?? const AuthSession.unauthenticated();
-      final List<String> perms = session.me?.permissions ?? const <String>[];
-      if (perms.contains('documents:edit_status')) {
-        doc = await ref.read(customerReturnsRepositoryProvider).controllerApprove(doc.id);
-        if (mounted) {
-          final String? pickerId = await _showReturnPickerDialog();
-          if (pickerId != null && pickerId.isNotEmpty) {
-            await ref.read(customerReturnsRepositoryProvider).assignPicker(doc.id, pickerId);
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(StringLookup.t(locMsg, 'returnsFlowDone'))),
-              );
-            }
+      doc = await ref.read(customerReturnsRepositoryProvider).controllerApprove(doc.id);
+      if (mounted) {
+        final String? pickerId = await _showReturnPickerDialog();
+        if (pickerId != null && pickerId.isNotEmpty) {
+          await ref.read(customerReturnsRepositoryProvider).assignPicker(doc.id, pickerId);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(StringLookup.t(locMsg, 'returnsFlowDone'))),
+            );
           }
         }
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(StringLookup.t(locMsg, 'returnsApproveAssignNeedPermission'))),
-        );
       }
       if (mounted) {
         context.pop();

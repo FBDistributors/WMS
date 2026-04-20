@@ -4,18 +4,31 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
+import '../../inventory/data/models/picker_inventory_models.dart';
+import '../../inventory/data/picker_location_format.dart';
+import '../../inventory/presentation/inventory_providers.dart';
 import '../../../l10n/string_lookup.dart';
 import '../customer_returns_providers.dart';
 import '../data/customer_returns_models.dart';
 
-class CustomerReturnsQueueScreen extends ConsumerWidget {
+class CustomerReturnsQueueScreen extends ConsumerStatefulWidget {
   const CustomerReturnsQueueScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CustomerReturnsQueueScreen> createState() => _CustomerReturnsQueueScreenState();
+}
+
+class _CustomerReturnsQueueScreenState extends ConsumerState<CustomerReturnsQueueScreen> {
+  final Map<String, String> _selectedLocationByReturn = <String, String>{};
+  final Set<String> _completingIds = <String>{};
+
+  @override
+  Widget build(BuildContext context) {
+    final WidgetRef ref = this.ref;
     final AppLocale loc = ref.watch(appLocaleProvider);
     final AsyncValue<CustomerReturnListResponse> async =
         ref.watch(customerReturnsQueueProvider);
+    final AsyncValue<List<PickerLocationOption>> locationsAsync = ref.watch(pickerLocationsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -70,12 +83,69 @@ class CustomerReturnsQueueScreen extends ConsumerWidget {
                                 ),
                               ),
                             ),
+                            const SizedBox(height: 8),
+                            locationsAsync.when(
+                              data: (List<PickerLocationOption> locations) {
+                                if (locations.isEmpty) {
+                                  return const Text('Lokatsiyalar topilmadi');
+                                }
+                                return DropdownButtonFormField<String>(
+                                  key: ValueKey<String>(
+                                    'ret-loc-${c.id}-${_selectedLocationByReturn[c.id] ?? ''}',
+                                  ),
+                                  isExpanded: true,
+                                  initialValue: _selectedLocationByReturn[c.id],
+                                  decoration: const InputDecoration(
+                                    labelText: 'Qabul lokatsiyasi',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  items: locations
+                                      .map(
+                                        (PickerLocationOption option) => DropdownMenuItem<String>(
+                                          value: option.id,
+                                          child: Text(formatPickerLocationOptionLine(option)),
+                                        ),
+                                      )
+                                      .toList(growable: false),
+                                  onChanged: (String? value) {
+                                    setState(() {
+                                      if (value == null || value.isEmpty) {
+                                        _selectedLocationByReturn.remove(c.id);
+                                      } else {
+                                        _selectedLocationByReturn[c.id] = value;
+                                      }
+                                    });
+                                  },
+                                );
+                              },
+                              loading: () => const LinearProgressIndicator(),
+                              error: (_, __) => const Text('Lokatsiyalarni yuklashda xato'),
+                            ),
+                            const SizedBox(height: 10),
                             FilledButton(
-                              onPressed: () async {
+                              onPressed: _completingIds.contains(c.id)
+                                  ? null
+                                  : () async {
+                                      final String? selectedLocationId =
+                                          _selectedLocationByReturn[c.id];
+                                      if (selectedLocationId == null || selectedLocationId.isEmpty) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Avval qabul lokatsiyasini tanlang'),
+                                            ),
+                                          );
+                                        }
+                                        return;
+                                      }
+                                      setState(() => _completingIds.add(c.id));
                                 try {
                                   await ref
                                       .read(customerReturnsRepositoryProvider)
-                                      .completeCustomerReturn(c.id);
+                                      .completeCustomerReturn(
+                                        c.id,
+                                        locationId: selectedLocationId,
+                                      );
                                   if (context.mounted) {
                                     ref.invalidate(customerReturnsQueueProvider);
                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -89,6 +159,10 @@ class CustomerReturnsQueueScreen extends ConsumerWidget {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(content: Text('$e')),
                                     );
+                                  }
+                                } finally {
+                                  if (mounted) {
+                                    setState(() => _completingIds.remove(c.id));
                                   }
                                 }
                               },

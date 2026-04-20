@@ -89,6 +89,10 @@ class AssignPickerBody(BaseModel):
     picker_user_id: UUID
 
 
+class CompleteCustomerReturnBody(BaseModel):
+    location_id: UUID
+
+
 def _generate_doc_no() -> str:
     today = datetime.utcnow().strftime("%Y%m%d")
     token = uuid4().hex[:6].upper()
@@ -231,10 +235,8 @@ async def list_customer_returns(
         if "picking:write" not in perms:
             raise HTTPException(status_code=403, detail="Insufficient permissions")
         q = q.filter(CustomerReturnModel.assigned_picker_user_id == user.id)
-        if status_filter:
-            q = q.filter(CustomerReturnModel.status == status_filter)
-        elif not status_filter:
-            q = q.filter(CustomerReturnModel.status == CUSTOMER_RETURN_STATUS_ASSIGNED)
+        # Picker queue only exposes controller-sent assigned returns.
+        q = q.filter(CustomerReturnModel.status == CUSTOMER_RETURN_STATUS_ASSIGNED)
     elif status_filter in (
         CUSTOMER_RETURN_STATUS_PENDING,
         CUSTOMER_RETURN_STATUS_APPROVED,
@@ -281,7 +283,11 @@ async def get_customer_return(
             pass
         elif "documents:edit_status" in perms:
             pass
-        elif cr.assigned_picker_user_id == user.id and "picking:write" in perms:
+        elif (
+            cr.assigned_picker_user_id == user.id
+            and "picking:write" in perms
+            and cr.status in (CUSTOMER_RETURN_STATUS_ASSIGNED, CUSTOMER_RETURN_STATUS_COMPLETED)
+        ):
             pass
         else:
             raise HTTPException(status_code=404, detail="Not found")
@@ -330,6 +336,8 @@ async def assign_picker_customer_return(
         raise HTTPException(status_code=404, detail="Not found")
     if cr.status != CUSTOMER_RETURN_STATUS_APPROVED:
         raise HTTPException(status_code=409, detail="Return must be approved before assigning picker")
+    if cr.approved_by_user_id is None:
+        raise HTTPException(status_code=409, detail="Return approval is incomplete")
     picker = (
         db.query(UserModel)
         .filter(
@@ -351,6 +359,7 @@ async def assign_picker_customer_return(
 @router.post("/{return_id}/complete", response_model=CustomerReturnOut)
 async def complete_customer_return(
     return_id: UUID,
+    payload: CompleteCustomerReturnBody,
     db: Session = Depends(get_db),
     user: UserModel = Depends(get_current_user),
     _guard=Depends(require_any_permission(["receiving:write", "picking:write", "admin:access"])),
@@ -365,6 +374,8 @@ async def complete_customer_return(
         raise HTTPException(status_code=404, detail="Not found")
     if cr.status != CUSTOMER_RETURN_STATUS_ASSIGNED:
         raise HTTPException(status_code=409, detail="Return is not assigned to picker")
+    if cr.assigned_picker_user_id is None:
+        raise HTTPException(status_code=409, detail="Assigned picker is missing")
     if cr.assigned_picker_user_id != user.id:
         perms = get_effective_permissions(user)
         if not ("receiving:write" in perms and "admin:access" in perms):
@@ -384,9 +395,19 @@ async def complete_customer_return(
     if not cr.lines:
         raise HTTPException(status_code=400, detail="No lines")
 
+    target_location = (
+        db.query(LocationModel)
+        .filter(LocationModel.id == payload.location_id, LocationModel.is_active.is_(True))
+        .one_or_none()
+    )
+    if not target_location:
+        raise HTTPException(status_code=400, detail="Target location not found")
+
     for line in cr.lines:
+        line.location_id = target_location.id
+        line.location_code = target_location.code
         expiry_normalized = normalize_expiry_to_first_of_month(line.expiry_date)
-        check_location_single_expiry(db, line.location_id, line.product_id, expiry_normalized)
+        check_location_single_expiry(db, target_location.id, line.product_id, expiry_normalized)
 
         lot = (
             db.query(StockLotModel)
@@ -410,7 +431,7 @@ async def complete_customer_return(
             StockMovementModel(
                 product_id=line.product_id,
                 lot_id=lot.id,
-                location_id=line.location_id,
+                location_id=target_location.id,
                 qty_change=line.qty,
                 movement_type="receipt",
                 source_document_type="customer_return",

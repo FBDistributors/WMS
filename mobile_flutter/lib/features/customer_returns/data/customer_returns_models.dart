@@ -144,6 +144,18 @@ class CreateCustomerReturnLine {
       };
 }
 
+class CompleteCustomerReturnRequest {
+  const CompleteCustomerReturnRequest({
+    required this.locationId,
+  });
+
+  final String locationId;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+        'location_id': locationId,
+      };
+}
+
 int _int(Object? v) {
   if (v is int) {
     return v;
