@@ -562,16 +562,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           },
         );
         if (mounted) {
-          setState(() {
-            _lines.clear();
-            _product = null;
-            _destLocation = null;
-            _expiry = null;
-            _batchNew.clear();
-            _kirimPutawaySearch.clear();
-            _qty.clear();
-            _handledProductId = null;
-          });
+          _onNewFlowBack();
         }
       }
     } on Exception catch (e) {
@@ -758,6 +749,18 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         }
       });
     }
+  }
+
+  void _onNewFlowBack() {
+    if (_flow == 'new') {
+      context.goNamed('kirimNew');
+      return;
+    }
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    context.goNamed('kirim');
   }
 
   void _openInventoryScanner() {
@@ -1290,9 +1293,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     }
 
     final double kirimBodyBottomPad = MediaQuery.viewPaddingOf(context).bottom + 24;
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: ListView(
+    final Widget body = ListView(
               padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + kirimBodyBottomPad),
               children: <Widget>[
                 if (_flow == 'return')
@@ -1604,7 +1605,28 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                         ),
                 ),
               ],
-            ),
+            );
+
+    final bool lockBackToKirimNew = _flow == 'new';
+    return PopScope(
+      canPop: !lockBackToKirimNew,
+      onPopInvokedWithResult: (bool didPop, Object? result) {
+        if (!didPop && lockBackToKirimNew) {
+          _onNewFlowBack();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(title),
+          leading: lockBackToKirimNew
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: _onNewFlowBack,
+                )
+              : null,
+        ),
+        body: body,
+      ),
     );
   }
 }
