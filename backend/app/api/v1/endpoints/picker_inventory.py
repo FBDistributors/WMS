@@ -79,6 +79,7 @@ class PickerInventoryItem(BaseModel):
     code: str
     main_barcode: str | None
     best_location: str | None
+    on_hand_qty: Decimal
     available_qty: Decimal
     nearest_expiry: date | None
     top_locations: list[PickerLotInfo]
@@ -221,6 +222,7 @@ def _build_picker_items(
     items = []
     for p in products:
         lots = by_product.get(p.id, [])
+        total_on_hand = sum(Decimal(str(r["on_hand"])) for r in lots)
         total_available = sum(Decimal(str(r["available"])) for r in lots)
         main_barcode = _get_product_main_barcode(db, p)
         best_location = None
@@ -245,6 +247,7 @@ def _build_picker_items(
                 code=p.sku or str(p.id),
                 main_barcode=main_barcode,
                 best_location=best_location,
+                on_hand_qty=total_on_hand,
                 available_qty=total_available,
                 nearest_expiry=nearest_expiry,
                 top_locations=top_locs,

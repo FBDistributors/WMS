@@ -205,6 +205,7 @@ export function MahsulotYoqQilishPage() {
         : false
 
   const handleSubmit = useCallback(async () => {
+    if (submitLoading) return
     if (!hasAnyWriteOff || invalidQty) return
     if (searchMode === 'by_location') {
       if (!locationId) return
@@ -274,7 +275,8 @@ export function MahsulotYoqQilishPage() {
       setError(null)
       setSuccess(null)
       try {
-        const res = await zeroBrandStock(selectedBrand.id, brandZeroMode)
+        const idempotencyKey = `zero-brand:${selectedBrand.id}:${brandZeroMode}:${crypto.randomUUID()}`
+        const res = await zeroBrandStock(selectedBrand.id, brandZeroMode, idempotencyKey)
         setSuccess(
           t('kamomat:write_off.brand_zero_success', {
             products: res.products_affected,
@@ -306,6 +308,7 @@ export function MahsulotYoqQilishPage() {
     loadProductDetails,
     selectedBrand,
     brandZeroMode,
+    submitLoading,
   ])
 
   return (

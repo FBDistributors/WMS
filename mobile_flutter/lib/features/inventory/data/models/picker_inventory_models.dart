@@ -33,6 +33,7 @@ class PickerInventoryItem {
     required this.code,
     required this.mainBarcode,
     required this.bestLocation,
+    required this.onHandQty,
     required this.availableQty,
     required this.nearestExpiry,
     required this.topLocations,
@@ -43,6 +44,7 @@ class PickerInventoryItem {
   final String code;
   final String? mainBarcode;
   final String? bestLocation;
+  final double onHandQty;
   final double availableQty;
   final String? nearestExpiry;
   final List<PickerLotInfo> topLocations;
@@ -65,6 +67,7 @@ class PickerInventoryItem {
       code: _reqString(json, 'code'),
       mainBarcode: json['main_barcode'] as String?,
       bestLocation: json['best_location'] as String?,
+      onHandQty: _reqNum(json, 'on_hand_qty'),
       availableQty: _reqNum(json, 'available_qty'),
       nearestExpiry: json['nearest_expiry'] as String?,
       topLocations: lots,

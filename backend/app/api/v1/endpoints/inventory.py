@@ -19,7 +19,11 @@ from app.auth.deps import get_current_user, require_permission
 from app.auth.guards import check_controller_adjust_reason
 from app.core.stock_rules import check_location_single_expiry
 from app.services.audit_service import ACTION_CREATE, get_client_ip, log_action
-from app.services.stock_availability import require_sufficient_available
+from app.services.stock_availability import (
+    compute_lot_location_balances,
+    lock_lot_location,
+    require_sufficient_available,
+)
 
 from app.api.v1.endpoints import picker_inventory
 from app.api.v1.endpoints.picker_inventory import _get_lot_level_balances
@@ -1000,7 +1004,10 @@ async def zero_brand_stock(
 
         on_hand_expr = func.sum(
             case(
-                (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
+                (
+                    StockMovementModel.movement_type.in_(PHYSICAL_ON_HAND_MOVEMENT_TYPES),
+                    StockMovementModel.qty_change,
+                ),
                 else_=0,
             )
         )
@@ -1017,6 +1024,7 @@ async def zero_brand_stock(
                 StockLotModel.product_id.label("product_id"),
                 StockLotModel.id.label("lot_id"),
                 StockMovementModel.location_id.label("location_id"),
+                on_hand_expr.label("on_hand_qty"),
                 reserved_expr.label("reserved_qty"),
                 available_expr.label("available_qty"),
             )
@@ -1028,7 +1036,7 @@ async def zero_brand_stock(
                 StockLotModel.id,
                 StockMovementModel.location_id,
             )
-            .having((available_expr > 0) | (reserved_expr > 0))
+            .having((on_hand_expr > 0) | (reserved_expr > 0))
             .all()
         )
 
@@ -1052,11 +1060,13 @@ async def zero_brand_stock(
         reserve_movements_created = 0
         skipped = 0
         for row in rows:
-            available_qty = Decimal(str(row.available_qty))
-            # reserved_expr is net allocate/unallocate for lot+location.
-            # Only positive net reserve can be cleared by writing a negative unallocate.
-            reserved_qty = Decimal(str(getattr(row, "reserved_qty", 0) or 0))
-            do_stock = mode in {"brand_only", "brand_and_reserve"} and available_qty > 0
+            lock_lot_location(db, row.lot_id, row.location_id)
+            on_hand_qty, reserved_qty, _available_qty = compute_lot_location_balances(
+                db,
+                row.lot_id,
+                row.location_id,
+            )
+            do_stock = mode in {"brand_only", "brand_and_reserve"} and on_hand_qty > 0
             do_reserve = mode in {"reserve_only", "brand_and_reserve"} and reserved_qty > 0
             if not do_stock and not do_reserve:
                 skipped += 1
@@ -1068,7 +1078,7 @@ async def zero_brand_stock(
                     product_id=row.product_id,
                     lot_id=row.lot_id,
                     location_id=row.location_id,
-                    qty_change=-available_qty,
+                    qty_change=-on_hand_qty,
                     movement_type="adjust",
                     created_by_user_id=user.id,
                     reason_code="inventory_shortage",
@@ -1085,7 +1095,7 @@ async def zero_brand_stock(
                         "product_id": str(row.product_id),
                         "lot_id": str(row.lot_id),
                         "location_id": str(row.location_id),
-                        "qty_change": str(-available_qty),
+                        "qty_change": str(-on_hand_qty),
                         "movement_type": "adjust",
                         "reason_code": "inventory_shortage",
                         "bulk_brand_zero": True,

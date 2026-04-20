@@ -161,7 +161,17 @@ List<Widget> inventoryLocTiles(
       ),
     ];
   }
-  final List<PickerProductLocation> merged = mergePickerProductLocationsForDisplay(locations);
+  final List<PickerProductLocation> merged = mergePickerProductLocationsForDisplay(locations)
+      .where((PickerProductLocation l) => _toNonNegativeRounded(l.onHandQty) > 0)
+      .toList(growable: false);
+  if (merged.isEmpty) {
+    return <Widget>[
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Text(InventoryStrings.invNoResults(loc)),
+      ),
+    ];
+  }
   return merged.map((PickerProductLocation l) {
     return Card(
       color: isDark ? const Color(0xFF1E293B) : Colors.white,

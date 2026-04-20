@@ -42,6 +42,15 @@ def lock_lot_location(db: Session, lot_id: UUID, location_id: UUID) -> None:
 
 def compute_lot_location_available(db: Session, lot_id: UUID, location_id: UUID) -> Decimal:
     """_get_lot_level_balances bilan bir xil: available = on_hand - reserved."""
+    return compute_lot_location_balances(db, lot_id, location_id)[2]
+
+
+def compute_lot_location_balances(
+    db: Session,
+    lot_id: UUID,
+    location_id: UUID,
+) -> tuple[Decimal, Decimal, Decimal]:
+    """Return (on_hand, reserved, available) for a lot-location pair."""
     on_hand_expr = func.sum(
         case(
             (
@@ -61,7 +70,11 @@ def compute_lot_location_available(db: Session, lot_id: UUID, location_id: UUID)
         )
     )
     row = (
-        db.query((on_hand_expr - reserved_expr).label("available"))
+        db.query(
+            on_hand_expr.label("on_hand"),
+            reserved_expr.label("reserved"),
+            (on_hand_expr - reserved_expr).label("available"),
+        )
         .select_from(StockMovementModel)
         .join(StockLotModel, StockLotModel.id == StockMovementModel.lot_id)
         .filter(
@@ -71,9 +84,12 @@ def compute_lot_location_available(db: Session, lot_id: UUID, location_id: UUID)
         .group_by(StockLotModel.id, StockMovementModel.location_id)
         .one_or_none()
     )
-    if row is None or row.available is None:
-        return Decimal("0")
-    return Decimal(str(row.available))
+    if row is None:
+        return (Decimal("0"), Decimal("0"), Decimal("0"))
+    on_hand = Decimal(str(row.on_hand or 0))
+    reserved = Decimal(str(row.reserved or 0))
+    available = Decimal(str(row.available or 0))
+    return (on_hand, reserved, available)
 
 
 def require_sufficient_available(

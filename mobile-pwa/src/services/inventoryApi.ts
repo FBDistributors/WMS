@@ -271,10 +271,15 @@ export type BrandZeroStockResponse = {
 
 export type BrandZeroMode = 'brand_only' | 'reserve_only' | 'brand_and_reserve'
 
-export async function zeroBrandStock(brandId: string, mode: BrandZeroMode = 'brand_only') {
+export async function zeroBrandStock(
+  brandId: string,
+  mode: BrandZeroMode = 'brand_only',
+  idempotencyKey?: string,
+) {
   return fetchJSON<BrandZeroStockResponse>(`/api/v1/inventory/brands/${brandId}/zero-stock`, {
     method: 'POST',
     query: { mode },
+    headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
   })
 }
 
