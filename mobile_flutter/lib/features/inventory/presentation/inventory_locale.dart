@@ -42,9 +42,9 @@ class InventoryStrings {
       };
 
   static String invOnHand(InventoryLocale l) => switch (l) {
-        InventoryLocale.uz => 'Fakt (omborda bor)',
-        InventoryLocale.ru => 'Факт (в наличии)',
-        InventoryLocale.en => 'Fact (in warehouse)',
+        InventoryLocale.uz => 'Qoldiq',
+        InventoryLocale.ru => 'Остаток',
+        InventoryLocale.en => 'Stock',
       };
 
   static String invLoadError(InventoryLocale l) => switch (l) {

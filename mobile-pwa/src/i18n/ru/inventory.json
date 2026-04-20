@@ -44,7 +44,7 @@
   "columns": {
     "product": "Товар",
     "on_hand": "В наличии",
-    "available": "Факт (в наличии)",
+    "available": "Остаток",
     "lots": "Партии",
     "locations": "Локации",
     "location": "Локация",
