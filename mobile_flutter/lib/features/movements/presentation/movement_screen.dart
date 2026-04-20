@@ -11,9 +11,11 @@ import '../../../core/router/scanner_args.dart';
 import '../../../l10n/string_lookup.dart';
 import '../../inventory/data/models/picker_inventory_models.dart';
 import '../../inventory/presentation/inventory_providers.dart';
+import '../../../shared/input/input_clear_button.dart';
 import '../../../shared/input/stock_quantity_input.dart';
 import '../../../shared/widgets/barcode_search_input.dart';
 import '../../../shared/widgets/product_card.dart';
+import '../../../shared/widgets/scan_action_button.dart';
 import '../data/movements_repository.dart';
 import '../movements_providers.dart';
 
@@ -556,6 +558,14 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
                 decoration: InputDecoration(
                   labelText: StringLookup.t(loc, 'movementLocationSearchLabel'),
                   border: const OutlineInputBorder(),
+                  suffixIcon: buildInputClearButton(
+                    visible: _locationSearchCtrl.text.trim().isNotEmpty,
+                    onPressed: () => setState(() {
+                      _locationSearchCtrl.clear();
+                      _locationSearch = '';
+                      _toLocation = null;
+                    }),
+                  ),
                 ),
                 onChanged: (String v) => setState(() => _locationSearch = v),
               ),
@@ -584,7 +594,12 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
                 decoration: InputDecoration(
                   labelText: StringLookup.t(loc, 'qtyShort'),
                   border: const OutlineInputBorder(),
+                  suffixIcon: buildInputClearButton(
+                    visible: _qty.text.trim().isNotEmpty,
+                    onPressed: () => setState(() => _qty.clear()),
+                  ),
                 ),
+                onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: 12),
               FilledButton(
@@ -606,22 +621,20 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
               decoration: InputDecoration(
                 labelText: StringLookup.t(loc, 'movementLocationCodeLabel'),
                 border: const OutlineInputBorder(),
-                prefixIcon: IconButton(
-                  onPressed: () => context.pushNamed(
-                    'scanner',
-                    extra: const ScannerArgs(returnToMovementPallet: true),
-                  ),
-                  icon: const Icon(Icons.camera_alt),
+                suffixIcon: buildInputClearButton(
+                  visible: _palletCode.text.trim().isNotEmpty,
+                  onPressed: _clearPalletSourceInput,
                 ),
-                suffixIcon: _palletCode.text.trim().isEmpty
-                    ? null
-                    : IconButton(
-                        onPressed: _clearPalletSourceInput,
-                        icon: const Icon(Icons.close),
-                      ),
               ),
               onChanged: (_) => setState(() {}),
               onSubmitted: (_) => _loadPallet(_palletCode.text),
+            ),
+            const SizedBox(height: 8),
+            ScanActionButton(
+              onPressed: () => context.pushNamed(
+                'scanner',
+                extra: const ScannerArgs(returnToMovementPallet: true),
+              ),
             ),
             if (_palletCode.text.trim().isNotEmpty) ...<Widget>[
               const SizedBox(height: 8),
@@ -730,6 +743,14 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
                 decoration: InputDecoration(
                   labelText: StringLookup.t(loc, 'movementDestSearchLabel'),
                   border: const OutlineInputBorder(),
+                  suffixIcon: buildInputClearButton(
+                    visible: _palletDestCtrl.text.trim().isNotEmpty,
+                    onPressed: () => setState(() {
+                      _palletDestCtrl.clear();
+                      _palletDestSearch = '';
+                      _palletTo = null;
+                    }),
+                  ),
                 ),
                 onChanged: (String v) => setState(() => _palletDestSearch = v),
               ),

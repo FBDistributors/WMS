@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
 
 import '../../../core/config/brand.dart';
+import '../../../shared/input/input_clear_button.dart';
 import '../../../shared/widgets/picker_footer.dart';
 import '../data/models/picker_inventory_models.dart';
 import '../data/picker_location_format.dart';
@@ -324,13 +325,14 @@ class _StickySearchFieldState extends State<_StickySearchField> {
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         prefixIcon: Icon(Icons.search_rounded, color: widget.secondaryText, size: 22),
         suffixIcon: widget.controller.text.isNotEmpty
-            ? IconButton(
+            ? buildInputClearButton(
+                visible: true,
                 tooltip: 'Tozalash',
                 onPressed: () {
                   widget.onClear();
                   setState(() {});
                 },
-                icon: Icon(Icons.clear_rounded, color: widget.secondaryText),
+                icon: Icons.close,
               )
             : null,
         hintText: InventoryStrings.invSearchPlaceholder(widget.locale),

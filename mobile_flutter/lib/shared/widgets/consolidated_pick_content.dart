@@ -15,6 +15,7 @@ import '../../features/picking/data/picking_models.dart';
 import '../../features/picking/domain/profile_type_param.dart';
 import '../../features/picking/picking_providers.dart';
 import '../../l10n/string_lookup.dart';
+import '../input/input_clear_button.dart';
 import '../input/stock_quantity_input.dart';
 import '../layout/sheet_bottom_inset.dart';
 import 'consolidated_pick_success_snackbar.dart';
@@ -360,7 +361,12 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                         decoration: InputDecoration(
                           labelText: StringLookup.t(loc, 'barcodeOrSku'),
                           border: const OutlineInputBorder(),
+                          suffixIcon: buildInputClearButton(
+                            visible: bc.text.trim().isNotEmpty,
+                            onPressed: () => setM(() => bc.clear()),
+                          ),
                         ),
+                        onChanged: (_) => setM(() {}),
                         onSubmitted: (String v) {
                           final String t = v.trim();
                           if (t.isEmpty) {
@@ -431,7 +437,12 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                         decoration: InputDecoration(
                           labelText: StringLookup.t(loc, 'qtyShort'),
                           border: const OutlineInputBorder(),
+                          suffixIcon: buildInputClearButton(
+                            visible: qty.text.trim().isNotEmpty,
+                            onPressed: () => setM(() => qty.clear()),
+                          ),
                         ),
+                        onChanged: (_) => setM(() {}),
                       ),
                       const SizedBox(height: 16),
                       FilledButton(

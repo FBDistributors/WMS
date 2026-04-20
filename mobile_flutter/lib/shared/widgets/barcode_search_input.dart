@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/inventory/data/models/picker_inventory_models.dart';
 import '../../features/inventory/presentation/inventory_providers.dart';
+import '../input/input_clear_button.dart';
+import 'scan_action_button.dart';
 
 /// RN `BarcodeSearchInput` bilan bir xil: `listPickerInventory(q)` — ilike SKU/nom/shtrix.
 class BarcodeSearchInput extends ConsumerStatefulWidget {
@@ -222,12 +224,6 @@ class _BarcodeSearchInputState extends ConsumerState<BarcodeSearchInput> {
             labelText: widget.label ?? 'Barcode',
             hintText: widget.hint,
             border: const OutlineInputBorder(),
-            prefixIcon: widget.onProductScanPressed != null
-                ? IconButton(
-                    icon: const Icon(Icons.camera_alt),
-                    onPressed: widget.onProductScanPressed,
-                  )
-                : null,
             suffixIconConstraints: const BoxConstraints(minWidth: 96, minHeight: 48),
             suffixIcon: _loading
                 ? const Padding(
@@ -238,38 +234,27 @@ class _BarcodeSearchInputState extends ConsumerState<BarcodeSearchInput> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                   )
-                : widget.onProductScanPressed != null
-                    ? Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          if (widget.showClearButton && _c.text.trim().isNotEmpty)
-                            IconButton(
-                              icon: const Icon(Icons.close),
-                              onPressed: _clearInput,
-                            ),
-                          IconButton(
-                            icon: const Icon(Icons.search),
-                            onPressed: _resolve,
-                          ),
-                        ],
-                      )
-                    : Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          if (widget.showClearButton && _c.text.trim().isNotEmpty)
-                            IconButton(
-                              icon: const Icon(Icons.close),
-                              onPressed: _clearInput,
-                            ),
-                          IconButton(
-                            icon: const Icon(Icons.search),
-                            onPressed: _resolve,
-                          ),
-                        ],
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      IconButton(
+                        icon: const Icon(Icons.search),
+                        onPressed: _resolve,
                       ),
+                      buildInputClearButton(
+                        visible: widget.showClearButton && _c.text.trim().isNotEmpty,
+                        onPressed: _clearInput,
+                      ) ??
+                          const SizedBox.shrink(),
+                    ],
+                  ),
           ),
           onSubmitted: (_) => _resolve(),
         ),
+        if (widget.onProductScanPressed != null) ...<Widget>[
+          const SizedBox(height: 8),
+          ScanActionButton(onPressed: widget.onProductScanPressed!),
+        ],
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(top: 8),

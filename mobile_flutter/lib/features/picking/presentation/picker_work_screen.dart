@@ -8,6 +8,7 @@ import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../core/app_state/theme_controller.dart';
 import '../../../l10n/string_lookup.dart';
+import '../../../shared/input/input_clear_button.dart';
 import '../data/picking_models.dart';
 import '../picking_providers.dart';
 
@@ -281,9 +282,13 @@ class _PickerWorkScreenState extends ConsumerState<PickerWorkScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: TextField(
               controller: _search,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Qidiruv',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
+                suffixIcon: buildInputClearButton(
+                  visible: _search.text.trim().isNotEmpty,
+                  onPressed: () => setState(() => _search.clear()),
+                ),
               ),
               onChanged: (_) => setState(() {}),
             ),
@@ -299,7 +304,12 @@ class _PickerWorkScreenState extends ConsumerState<PickerWorkScreen> {
                     decoration: InputDecoration(
                       labelText: StringLookup.t(loc, 'barcodeOrSku'),
                       border: const OutlineInputBorder(),
+                      suffixIcon: buildInputClearButton(
+                        visible: _barcode.text.trim().isNotEmpty,
+                        onPressed: () => setState(() => _barcode.clear()),
+                      ),
                     ),
+                    onChanged: (_) => setState(() {}),
                     onSubmitted: (_) => _onBarcodeSubmit(),
                   ),
                 ),

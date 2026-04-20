@@ -24,6 +24,7 @@ import '../../movements/data/movements_repository.dart';
 import '../../movements/movements_providers.dart';
 import '../../receiving/data/receiving_models.dart';
 import '../../receiving/receiving_providers.dart';
+import '../../../shared/input/input_clear_button.dart';
 import '../../../shared/input/stock_quantity_input.dart';
 import '../../../shared/widgets/barcode_search_input.dart';
 import '../../../shared/widgets/expiry_date_picker.dart';
@@ -1022,9 +1023,16 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           const SizedBox(height: 8),
           TextField(
             controller: _invLocSearch,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Kod yoki nom bo‘yicha qidiruv',
-              border: OutlineInputBorder(),
+              border: const OutlineInputBorder(),
+              suffixIcon: buildInputClearButton(
+                visible: _invLocSearch.text.trim().isNotEmpty,
+                onPressed: () => setState(() {
+                  _invLocSearch.clear();
+                  _invLocation = null;
+                }),
+              ),
             ),
             onChanged: (_) => setState(() {}),
             textCapitalization: TextCapitalization.characters,
@@ -1344,6 +1352,14 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                       decoration: InputDecoration(
                         border: const OutlineInputBorder(),
                         hintText: StringLookup.t(appLoc, 'returnsCustomerSearchLabel'),
+                        suffixIcon: buildInputClearButton(
+                          visible: _customerSearchController.text.trim().isNotEmpty,
+                          onPressed: () => setState(() {
+                            _customerSearchController.clear();
+                            _vipSuggestions = <VipCustomerRow>[];
+                            _vipLoading = false;
+                          }),
+                        ),
                       ),
                       onChanged: (_) => _scheduleVipSearch(),
                     ),
@@ -1449,7 +1465,12 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                     decoration: InputDecoration(
                       labelText: StringLookup.t(appLoc, 'qtyShort'),
                       border: const OutlineInputBorder(),
+                      suffixIcon: buildInputClearButton(
+                        visible: _qty.text.trim().isNotEmpty,
+                        onPressed: () => setState(() => _qty.clear()),
+                      ),
                     ),
+                    onChanged: (_) => setState(() {}),
                   ),
                   const SizedBox(height: 12),
                   ExpiryDatePickerField(
@@ -1483,17 +1504,15 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                                 decoration: InputDecoration(
                                   labelText: StringLookup.t(appLoc, 'kirimPutawaySearchLabel'),
                                   border: const OutlineInputBorder(),
-                                  suffixIcon: _kirimPutawaySearch.text.trim().isEmpty
-                                      ? null
-                                      : IconButton(
-                                          icon: const Icon(Icons.clear),
-                                          onPressed: () {
-                                            setState(() {
-                                              _kirimPutawaySearch.clear();
-                                              _destLocation = null;
-                                            });
-                                          },
-                                        ),
+                                  suffixIcon: buildInputClearButton(
+                                    visible: _kirimPutawaySearch.text.trim().isNotEmpty,
+                                    onPressed: () {
+                                      setState(() {
+                                        _kirimPutawaySearch.clear();
+                                        _destLocation = null;
+                                      });
+                                    },
+                                  ),
                                 ),
                                 onChanged: (String v) {
                                   setState(() {
@@ -1526,7 +1545,12 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                                         decoration: InputDecoration(
                                           labelText: StringLookup.t(appLoc, 'kirimBatchLabel'),
                                           border: const OutlineInputBorder(),
+                                          suffixIcon: buildInputClearButton(
+                                            visible: _batchNew.text.trim().isNotEmpty,
+                                            onPressed: () => setState(() => _batchNew.clear()),
+                                          ),
                                         ),
+                                        onChanged: (_) => setState(() {}),
                                       ),
                                       const SizedBox(height: 12),
                                       TextField(
@@ -1536,7 +1560,12 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                                         decoration: InputDecoration(
                                           labelText: StringLookup.t(appLoc, 'qtyShort'),
                                           border: const OutlineInputBorder(),
+                                          suffixIcon: buildInputClearButton(
+                                            visible: _qty.text.trim().isNotEmpty,
+                                            onPressed: () => setState(() => _qty.clear()),
+                                          ),
                                         ),
+                                        onChanged: (_) => setState(() {}),
                                       ),
                                     ],
                                   ),

@@ -11,6 +11,7 @@ import '../../core/config/brand.dart';
 import '../../core/app_state/prefs_keys.dart';
 import '../../core/storage/shared_preferences_provider.dart';
 import '../../l10n/string_lookup.dart';
+import '../../shared/input/input_clear_button.dart';
 import 'presentation/auth_providers.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -179,9 +180,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       decoration: InputDecoration(
                         labelText: StringLookup.t(loc, 'loginPlaceholder'),
                         border: const OutlineInputBorder(),
+                        suffixIcon: buildInputClearButton(
+                          visible: _user.text.trim().isNotEmpty,
+                          onPressed: () => setState(() => _user.clear()),
+                        ),
                       ),
                       textInputAction: TextInputAction.next,
                       autocorrect: false,
+                      onChanged: (_) => setState(() {}),
                       enabled: !busy,
                     ),
                     const SizedBox(height: 12),
