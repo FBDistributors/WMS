@@ -35,8 +35,9 @@
     "min_expiry_months": "Срок годности",
     "actions": "Действия"
   },
-  "tab_list": "Список",
-  "tab_import": "Импорт (Excel/CSV)",
+  "tab_vip_customers": "VIP клиенты",
+  "tab_general_customers": "Общие клиенты",
+  "add_general": "Добавить общего клиента",
   "import_heading": "Клиенты из экспорта SmartUp",
   "import_hint": "Колонки: customer_id (обяз.), customer_name, min_expiry_months (необяз., по умолчанию 6). UTF-8 CSV или .xlsx.",
   "import_choose_file": "Выбрать файл",
@@ -49,5 +50,16 @@
   "import_errors": "Ошибки",
   "import_row": "Строка {{row}}",
   "import_no_file": "Сначала выберите файл.",
-  "import_readonly": "Нет прав на импорт."
+  "import_readonly": "Нет прав на импорт.",
+  "general_empty": "Общие клиенты не найдены",
+  "general_empty_desc": "Добавьте или импортируйте первого общего клиента.",
+  "general_import_button": "Импорт Excel",
+  "general_import_busy": "Импорт...",
+  "general_import_hint": "Колонки: customer_id (обяз.), customer_name. UTF-8 CSV или .xlsx.",
+  "general_import_result": "Результат импорта",
+  "general_import_created": "Создано: {{n}}",
+  "general_import_updated": "Обновлено: {{n}}",
+  "general_import_row": "Строка {{row}}",
+  "general_import_no_file": "Сначала выберите файл.",
+  "general_import_readonly": "Нет прав на импорт."
 }

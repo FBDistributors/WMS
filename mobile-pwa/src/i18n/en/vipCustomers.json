@@ -35,8 +35,9 @@
     "min_expiry_months": "Expiry limit",
     "actions": "Actions"
   },
-  "tab_list": "List",
-  "tab_import": "Import (Excel/CSV)",
+  "tab_vip_customers": "VIP customers",
+  "tab_general_customers": "General customers",
+  "add_general": "Add general customer",
   "import_heading": "Customers from SmartUp export",
   "import_hint": "Columns: customer_id (required), customer_name, min_expiry_months (optional, default 6). UTF-8 CSV or .xlsx.",
   "import_choose_file": "Choose file",
@@ -49,5 +50,16 @@
   "import_errors": "Errors",
   "import_row": "Row {{row}}",
   "import_no_file": "Select a file first.",
-  "import_readonly": "You do not have permission to import."
+  "import_readonly": "You do not have permission to import.",
+  "general_empty": "No general customers",
+  "general_empty_desc": "Add or import your first general customer.",
+  "general_import_button": "Import Excel",
+  "general_import_busy": "Importing...",
+  "general_import_hint": "Columns: customer_id (required), customer_name. UTF-8 CSV or .xlsx.",
+  "general_import_result": "Import result",
+  "general_import_created": "Created: {{n}}",
+  "general_import_updated": "Updated: {{n}}",
+  "general_import_row": "Row {{row}}",
+  "general_import_no_file": "Select a file first.",
+  "general_import_readonly": "You do not have permission to import."
 }

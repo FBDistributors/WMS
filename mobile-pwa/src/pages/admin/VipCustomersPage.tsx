@@ -10,53 +10,88 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import {
+  createGeneralCustomer,
+  deleteGeneralCustomer,
+  getGeneralCustomers,
+  importGeneralCustomers,
+  type GeneralCustomer,
+  type GeneralCustomerImportResult,
+  updateGeneralCustomer,
+} from '../../services/generalCustomersApi'
+import {
   createVipCustomer,
   deleteVipCustomer,
   getVipCustomers,
-  importVipCustomers,
   putVipCustomerBrandLimits,
   updateVipCustomer,
   type VipCustomer,
-  type VipCustomerImportResult,
 } from '../../services/vipCustomersApi'
 import { getBrands, type Brand } from '../../services/brandsApi'
 import { useAuth } from '../../rbac/AuthProvider'
 
-type DialogState = {
-  open: boolean
-  mode: 'create' | 'edit'
-  target?: VipCustomer
+type TabKey = 'vip' | 'general'
+type VipDialogState = { open: boolean; mode: 'create' | 'edit'; target?: VipCustomer }
+type GeneralDialogState = { open: boolean; mode: 'create' | 'edit'; target?: GeneralCustomer }
+
+type CustomerTableRow = {
+  id: string
+  customer_id: string
+  customer_name: string | null
+  extra?: string
 }
 
 export function VipCustomersPage() {
   const { t } = useTranslation(['vipCustomers', 'admin', 'common'])
   const { has } = useAuth()
   const canManage = has('orders:read')
-  const [mainTab, setMainTab] = useState<'list' | 'import'>('list')
-  const [items, setItems] = useState<VipCustomer[]>([])
+  const [tab, setTab] = useState<TabKey>('vip')
+  const [search, setSearch] = useState('')
+  const [vipItems, setVipItems] = useState<VipCustomer[]>([])
+  const [generalItems, setGeneralItems] = useState<GeneralCustomer[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
-  const [dialog, setDialog] = useState<DialogState>({ open: false, mode: 'create' })
-  const [confirmDelete, setConfirmDelete] = useState<VipCustomer | null>(null)
+  const [vipDialog, setVipDialog] = useState<VipDialogState>({ open: false, mode: 'create' })
+  const [generalDialog, setGeneralDialog] = useState<GeneralDialogState>({ open: false, mode: 'create' })
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
   const load = useCallback(async () => {
     setIsLoading(true)
     setError(null)
     try {
-      const list = await getVipCustomers(search.trim() || undefined)
-      setItems(list)
+      if (tab === 'vip') {
+        const list = await getVipCustomers(search.trim() || undefined)
+        setVipItems(list)
+      } else {
+        const list = await getGeneralCustomers(search.trim() || undefined)
+        setGeneralItems(list)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : t('vipCustomers:load_failed'))
     } finally {
       setIsLoading(false)
     }
-  }, [search, t])
+  }, [search, tab, t])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  const tableRows = useMemo<CustomerTableRow[]>(() => {
+    if (tab === 'vip') {
+      return vipItems.map((x) => ({
+        id: x.id,
+        customer_id: x.customer_id,
+        customer_name: x.customer_name,
+        extra: `${x.min_expiry_months} ${t('vipCustomers:months')}`,
+      }))
+    }
+    return generalItems.map((x) => ({
+      id: x.id,
+      customer_id: x.customer_id,
+      customer_name: x.customer_name,
+    }))
+  }, [generalItems, tab, t, vipItems])
 
   const content = useMemo(() => {
     if (isLoading) {
@@ -69,189 +104,225 @@ export function VipCustomersPage() {
     if (error) {
       return <EmptyState title={error} actionLabel={t('common:buttons.retry')} onAction={load} />
     }
-    if (items.length === 0) {
+    if (tableRows.length === 0) {
       return (
         <EmptyState
-          title={t('vipCustomers:empty')}
-          description={t('vipCustomers:empty_desc')}
+          title={tab === 'vip' ? t('vipCustomers:empty') : t('vipCustomers:general_empty')}
+          description={tab === 'vip' ? t('vipCustomers:empty_desc') : t('vipCustomers:general_empty_desc')}
           actionLabel={t('common:buttons.refresh')}
           onAction={load}
         />
       )
     }
     return (
-      <TableScrollArea>
-        <table className="w-full min-w-[520px] text-sm">
-          <thead className="text-xs uppercase text-slate-500">
-            <tr className="border-b border-slate-200 dark:border-slate-800">
-              <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('vipCustomers:columns.customer_id')}</th>
-              <th className="px-3 py-3 text-left sm:px-4">{t('vipCustomers:columns.customer_name')}</th>
-              <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('vipCustomers:columns.min_expiry_months')}</th>
-              {canManage ? <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('vipCustomers:columns.actions')}</th> : null}
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((vip) => {
-              const overrides = vip.brand_limits?.length ?? 0
-              return (
-                <tr key={vip.id} className="border-b border-slate-100 dark:border-slate-800">
-                  <td className="whitespace-nowrap px-3 py-3 font-semibold text-slate-900 dark:text-slate-100 sm:px-4">
-                    {vip.customer_id}
-                  </td>
-                  <td className="min-w-[80px] px-3 py-3 text-slate-700 dark:text-slate-200 sm:px-4">
-                    {vip.customer_name ?? '—'}
-                  </td>
-                  <td className="px-3 py-3 text-slate-600 dark:text-slate-300 sm:px-4">
-                    <div className="whitespace-nowrap">
-                      {vip.min_expiry_months} {t('vipCustomers:months')}
-                    </div>
-                    {overrides > 0 ? (
-                      <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                        {t('vipCustomers:brand_overrides_count', { count: overrides })}
-                      </div>
-                    ) : null}
-                  </td>
-                  {canManage ? (
-                    <td className="whitespace-nowrap px-3 py-3 sm:px-4">
-                      <div className="flex flex-nowrap items-center gap-1 sm:gap-2">
-                        <Button
-                          variant="ghost"
-                          className="p-2"
-                          onClick={() => setDialog({ open: true, mode: 'edit', target: vip })}
-                          aria-label={t('vipCustomers:edit')}
-                        >
-                          <Pencil size={16} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          className="text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
-                          onClick={() => setConfirmDelete(vip)}
-                        >
-                          <Trash2 size={16} />
-                        </Button>
-                      </div>
-                    </td>
-                  ) : null}
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </TableScrollArea>
+      <CustomerTable
+        rows={tableRows}
+        showExtra={tab === 'vip'}
+        extraHeader={t('vipCustomers:columns.min_expiry_months')}
+        canManage={canManage}
+        onEdit={(id) => {
+          if (tab === 'vip') {
+            const target = vipItems.find((x) => x.id === id)
+            if (target) setVipDialog({ open: true, mode: 'edit', target })
+          } else {
+            const target = generalItems.find((x) => x.id === id)
+            if (target) setGeneralDialog({ open: true, mode: 'edit', target })
+          }
+        }}
+        onDelete={(id) => setConfirmDeleteId(id)}
+      />
     )
-  }, [canManage, error, isLoading, items, load, t])
+  }, [isLoading, error, tableRows, tab, canManage, t, load, vipItems, generalItems])
+
+  const actionLabel = tab === 'vip' ? t('vipCustomers:add') : t('vipCustomers:add_general')
 
   return (
     <AdminLayout
       title={t('vipCustomers:title')}
       actionSlot={
         canManage ? (
-          <Button onClick={() => setDialog({ open: true, mode: 'create' })} className="shrink-0">
+          <Button
+            onClick={() =>
+              tab === 'vip'
+                ? setVipDialog({ open: true, mode: 'create' })
+                : setGeneralDialog({ open: true, mode: 'create' })
+            }
+            className="shrink-0"
+          >
             <Plus size={16} />
-            <span className="hidden sm:inline">{t('vipCustomers:add')}</span>
+            <span className="hidden sm:inline">{actionLabel}</span>
           </Button>
         ) : null
       }
     >
       <Card className="space-y-4">
         <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3 dark:border-slate-800">
-          <Button
-            type="button"
-            variant={mainTab === 'list' ? 'default' : 'secondary'}
-            className="shrink-0"
-            onClick={() => setMainTab('list')}
-          >
-            {t('vipCustomers:tab_list')}
+          <Button type="button" variant={tab === 'vip' ? 'default' : 'secondary'} onClick={() => setTab('vip')}>
+            {t('vipCustomers:tab_vip_customers')}
           </Button>
           <Button
             type="button"
-            variant={mainTab === 'import' ? 'default' : 'secondary'}
-            className="shrink-0"
-            onClick={() => setMainTab('import')}
+            variant={tab === 'general' ? 'default' : 'secondary'}
+            onClick={() => setTab('general')}
           >
-            {t('vipCustomers:tab_import')}
+            {t('vipCustomers:tab_general_customers')}
           </Button>
         </div>
-        {mainTab === 'import' ? (
-          <VipImportPanel canManage={canManage} onImportDone={load} />
-        ) : (
-          <>
-            <div className="flex flex-nowrap items-end gap-3">
-              <label className="text-sm text-slate-600 dark:text-slate-300">
-                {t('vipCustomers:search')}
-                <input
-                  className="mt-1 w-full min-w-[180px] rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </label>
-              <Button variant="secondary" onClick={load} className="shrink-0">
-                {t('common:buttons.refresh')}
-              </Button>
-            </div>
-            {content}
-          </>
-        )}
+
+        {tab === 'general' ? <GeneralImportPanel canManage={canManage} onImportDone={load} /> : null}
+
+        <div className="flex flex-nowrap items-end gap-3">
+          <label className="text-sm text-slate-600 dark:text-slate-300">
+            {t('vipCustomers:search')}
+            <input
+              className="mt-1 w-full min-w-[180px] rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </label>
+          <Button variant="secondary" onClick={load} className="shrink-0">
+            {t('common:buttons.refresh')}
+          </Button>
+        </div>
+        {content}
       </Card>
 
-      {dialog.open ? (
+      {vipDialog.open ? (
         <VipCustomerDialog
-          mode={dialog.mode}
-          target={dialog.target}
-          onClose={() => setDialog({ open: false, mode: 'create' })}
+          mode={vipDialog.mode}
+          target={vipDialog.target}
+          onClose={() => setVipDialog({ open: false, mode: 'create' })}
           onSaved={load}
         />
       ) : null}
+
+      {generalDialog.open ? (
+        <GeneralCustomerDialog
+          mode={generalDialog.mode}
+          target={generalDialog.target}
+          onClose={() => setGeneralDialog({ open: false, mode: 'create' })}
+          onSaved={load}
+        />
+      ) : null}
+
       <ConfirmDialog
-        open={!!confirmDelete}
+        open={!!confirmDeleteId}
         title={t('vipCustomers:confirm_delete_title')}
-        message={t('vipCustomers:confirm_delete', { name: (confirmDelete?.customer_name || confirmDelete?.customer_id) ?? '' })}
+        message={t('vipCustomers:confirm_delete', {
+          name:
+            (tab === 'vip'
+              ? vipItems.find((x) => x.id === confirmDeleteId)?.customer_name ??
+                vipItems.find((x) => x.id === confirmDeleteId)?.customer_id
+              : generalItems.find((x) => x.id === confirmDeleteId)?.customer_name ??
+                generalItems.find((x) => x.id === confirmDeleteId)?.customer_id) ?? '',
+        })}
         confirmLabel={t('vipCustomers:confirm_yes')}
         cancelLabel={t('common:buttons.cancel')}
         variant="danger"
         loading={isDeleting}
         onConfirm={async () => {
-          if (!confirmDelete) return
+          if (!confirmDeleteId) return
           setIsDeleting(true)
           try {
-            await deleteVipCustomer(confirmDelete.id)
-            setConfirmDelete(null)
+            if (tab === 'vip') {
+              await deleteVipCustomer(confirmDeleteId)
+            } else {
+              await deleteGeneralCustomer(confirmDeleteId)
+            }
+            setConfirmDeleteId(null)
             await load()
           } finally {
             setIsDeleting(false)
           }
         }}
-        onCancel={() => setConfirmDelete(null)}
+        onCancel={() => setConfirmDeleteId(null)}
       />
     </AdminLayout>
   )
 }
 
-function VipImportPanel({ canManage, onImportDone }: { canManage: boolean; onImportDone: () => void }) {
-  const { t } = useTranslation(['vipCustomers', 'common'])
+function CustomerTable({
+  rows,
+  showExtra,
+  extraHeader,
+  canManage,
+  onEdit,
+  onDelete,
+}: {
+  rows: CustomerTableRow[]
+  showExtra: boolean
+  extraHeader: string
+  canManage: boolean
+  onEdit: (id: string) => void
+  onDelete: (id: string) => void
+}) {
+  const { t } = useTranslation(['vipCustomers'])
+
+  return (
+    <TableScrollArea>
+      <table className="w-full min-w-[520px] text-sm">
+        <thead className="text-xs uppercase text-slate-500">
+          <tr className="border-b border-slate-200 dark:border-slate-800">
+            <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('vipCustomers:columns.customer_id')}</th>
+            <th className="px-3 py-3 text-left sm:px-4">{t('vipCustomers:columns.customer_name')}</th>
+            {showExtra ? <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{extraHeader}</th> : null}
+            {canManage ? <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('vipCustomers:columns.actions')}</th> : null}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id} className="border-b border-slate-100 dark:border-slate-800">
+              <td className="whitespace-nowrap px-3 py-3 font-semibold text-slate-900 dark:text-slate-100 sm:px-4">
+                {row.customer_id}
+              </td>
+              <td className="min-w-[80px] px-3 py-3 text-slate-700 dark:text-slate-200 sm:px-4">
+                {row.customer_name ?? '—'}
+              </td>
+              {showExtra ? (
+                <td className="whitespace-nowrap px-3 py-3 text-slate-600 dark:text-slate-300 sm:px-4">{row.extra ?? '—'}</td>
+              ) : null}
+              {canManage ? (
+                <td className="whitespace-nowrap px-3 py-3 sm:px-4">
+                  <div className="flex flex-nowrap items-center gap-1 sm:gap-2">
+                    <Button variant="ghost" className="p-2" onClick={() => onEdit(row.id)} aria-label={t('vipCustomers:edit')}>
+                      <Pencil size={16} />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+                      onClick={() => onDelete(row.id)}
+                    >
+                      <Trash2 size={16} />
+                    </Button>
+                  </div>
+                </td>
+              ) : null}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </TableScrollArea>
+  )
+}
+
+function GeneralImportPanel({ canManage, onImportDone }: { canManage: boolean; onImportDone: () => void }) {
+  const { t } = useTranslation(['vipCustomers'])
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string>('')
-  const [result, setResult] = useState<VipCustomerImportResult | null>(null)
+  const [result, setResult] = useState<GeneralCustomerImportResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     setFile(f ?? null)
-    setResult(null)
     setError(null)
+    setResult(null)
     setPreview('')
     if (!f) return
-    const lower = f.name.toLowerCase()
-    if (lower.endsWith('.csv') || lower.endsWith('.txt')) {
-      try {
-        const slice = f.slice(0, Math.min(f.size, 12000))
-        const text = await slice.text()
-        const lines = text.split(/\r?\n/).slice(0, 18)
-        setPreview(lines.join('\n'))
-      } catch {
-        setPreview('…')
-      }
+    if (f.name.toLowerCase().endsWith('.csv')) {
+      const text = await f.slice(0, 12000).text()
+      setPreview(text.split(/\r?\n/).slice(0, 18).join('\n'))
     } else {
       setPreview(`${f.name} (${Math.round(f.size / 1024)} KB)`)
     }
@@ -260,16 +331,16 @@ function VipImportPanel({ canManage, onImportDone }: { canManage: boolean; onImp
   const submit = async () => {
     if (!canManage) return
     if (!file) {
-      setError(t('vipCustomers:import_no_file'))
+      setError(t('vipCustomers:general_import_no_file'))
       return
     }
     setBusy(true)
     setError(null)
     setResult(null)
     try {
-      const r = await importVipCustomers(file)
+      const r = await importGeneralCustomers(file)
       setResult(r)
-      void onImportDone()
+      await onImportDone()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed')
     } finally {
@@ -278,59 +349,48 @@ function VipImportPanel({ canManage, onImportDone }: { canManage: boolean; onImp
   }
 
   if (!canManage) {
-    return <p className="text-sm text-slate-600 dark:text-slate-400">{t('vipCustomers:import_readonly')}</p>
+    return <p className="text-sm text-slate-600 dark:text-slate-400">{t('vipCustomers:general_import_readonly')}</p>
   }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">{t('vipCustomers:import_heading')}</h3>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{t('vipCustomers:import_hint')}</p>
-      </div>
+    <div className="space-y-4 rounded-xl border border-slate-200 p-4 dark:border-slate-800">
       <div className="flex flex-wrap items-center gap-3">
+        <Button type="button" variant="secondary" onClick={() => void submit()} disabled={busy}>
+          {busy ? t('vipCustomers:general_import_busy') : t('vipCustomers:general_import_button')}
+        </Button>
         <input
           type="file"
           accept=".csv,.txt,.xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
           className="text-sm text-slate-700 dark:text-slate-200"
           onChange={onFile}
         />
-        <Button type="button" onClick={() => void submit()} disabled={busy}>
-          {busy ? t('vipCustomers:import_busy') : t('vipCustomers:import_submit')}
-        </Button>
       </div>
+      <p className="text-sm text-slate-600 dark:text-slate-400">{t('vipCustomers:general_import_hint')}</p>
       {error ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
           {error}
         </div>
       ) : null}
       {preview ? (
-        <div>
-          <div className="mb-1 text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
-            {t('vipCustomers:import_preview')}
-          </div>
-          <pre className="max-h-48 overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-            {preview}
-          </pre>
-        </div>
+        <pre className="max-h-48 overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+          {preview}
+        </pre>
       ) : null}
       {result ? (
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm dark:border-slate-700 dark:bg-slate-900/50">
-          <div className="font-semibold text-slate-900 dark:text-slate-100">{t('vipCustomers:import_result')}</div>
+          <div className="font-semibold text-slate-900 dark:text-slate-100">{t('vipCustomers:general_import_result')}</div>
           <ul className="mt-2 list-inside list-disc space-y-1 text-slate-700 dark:text-slate-300">
-            <li>{t('vipCustomers:import_created', { n: result.created })}</li>
-            <li>{t('vipCustomers:import_updated', { n: result.updated })}</li>
+            <li>{t('vipCustomers:general_import_created', { n: result.created })}</li>
+            <li>{t('vipCustomers:general_import_updated', { n: result.updated })}</li>
           </ul>
           {result.errors?.length ? (
-            <div className="mt-3">
-              <div className="font-medium text-red-700 dark:text-red-300">{t('vipCustomers:import_errors')}</div>
-              <ul className="mt-1 max-h-40 overflow-auto text-xs text-red-800 dark:text-red-200">
-                {result.errors.map((e, i) => (
-                  <li key={`${e.row}-${i}`}>
-                    {t('vipCustomers:import_row', { row: e.row })}: {e.detail}
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <ul className="mt-2 max-h-40 overflow-auto text-xs text-red-700 dark:text-red-300">
+              {result.errors.map((e, i) => (
+                <li key={`${e.row}-${i}`}>
+                  {t('vipCustomers:general_import_row', { row: e.row })}: {e.detail}
+                </li>
+              ))}
+            </ul>
           ) : null}
         </div>
       ) : null}
@@ -567,6 +627,107 @@ function VipCustomerDialog({ mode, target, onClose, onSaved }: DialogProps) {
             onClick={() => void handleSubmit()}
             disabled={isSubmitting || (mode === 'edit' && (brandsLoading || !!brandsError))}
           >
+            {isSubmitting ? t('vipCustomers:saving') : t('vipCustomers:save')}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+type GeneralDialogProps = {
+  mode: 'create' | 'edit'
+  target?: GeneralCustomer
+  onClose: () => void
+  onSaved: () => void
+}
+
+function GeneralCustomerDialog({ mode, target, onClose, onSaved }: GeneralDialogProps) {
+  const { t } = useTranslation(['vipCustomers', 'common'])
+  const [customerId, setCustomerId] = useState(target?.customer_id ?? '')
+  const [customerName, setCustomerName] = useState(target?.customer_name ?? '')
+  const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    setCustomerId(target?.customer_id ?? '')
+    setCustomerName(target?.customer_name ?? '')
+    setError(null)
+  }, [mode, target?.id, target?.customer_id, target?.customer_name])
+
+  const handleSubmit = async () => {
+    if (!customerId.trim()) {
+      setError(t('vipCustomers:validation.customer_id_required'))
+      return
+    }
+    setIsSubmitting(true)
+    setError(null)
+    try {
+      if (mode === 'create') {
+        await createGeneralCustomer({
+          customer_id: customerId.trim(),
+          customer_name: customerName.trim() || null,
+        })
+      } else if (target) {
+        await updateGeneralCustomer(target.id, {
+          customer_name: customerName.trim() || null,
+        })
+      }
+      onSaved()
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('vipCustomers:save_failed'))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
+      <button
+        className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm"
+        onClick={onClose}
+        aria-label={t('common:buttons.close')}
+        type="button"
+      />
+      <div className="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
+          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            {mode === 'create' ? t('vipCustomers:add_general') : t('vipCustomers:edit')}
+          </div>
+          <Button variant="ghost" className="rounded-full px-3 py-3" onClick={onClose}>
+            <X size={18} />
+          </Button>
+        </div>
+        <div className="space-y-3 px-6 py-5">
+          {error ? (
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-500/30 dark:bg-red-500/10">
+              {error}
+            </div>
+          ) : null}
+          <label className="text-sm text-slate-600 dark:text-slate-300">
+            {t('vipCustomers:fields.customer_id')}
+            <input
+              className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 disabled:opacity-60"
+              value={customerId}
+              onChange={(e) => setCustomerId(e.target.value)}
+              disabled={mode === 'edit'}
+            />
+          </label>
+          <label className="text-sm text-slate-600 dark:text-slate-300">
+            {t('vipCustomers:fields.customer_name')}
+            <input
+              className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+            />
+          </label>
+        </div>
+        <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-6 py-4 dark:border-slate-800">
+          <Button variant="ghost" onClick={onClose}>
+            {t('common:buttons.cancel')}
+          </Button>
+          <Button onClick={() => void handleSubmit()} disabled={isSubmitting}>
             {isSubmitting ? t('vipCustomers:saving') : t('vipCustomers:save')}
           </Button>
         </div>

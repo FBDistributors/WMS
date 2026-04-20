@@ -35,8 +35,9 @@
     "min_expiry_months": "Muddat chegarasi",
     "actions": "Amallar"
   },
-  "tab_list": "Ro'yxat",
-  "tab_import": "Import (Excel/CSV)",
+  "tab_vip_customers": "VIP mijozlar",
+  "tab_general_customers": "Umumiy mijozlar",
+  "add_general": "Umumiy mijoz qo'shish",
   "import_heading": "SmartUp dan eksport qilingan mijozlar",
   "import_hint": "Ustunlar: customer_id (majburiy), customer_name, min_expiry_months (ixtiyoriy, default 6). UTF-8 CSV yoki .xlsx.",
   "import_choose_file": "Fayl tanlash",
@@ -49,5 +50,16 @@
   "import_errors": "Xatolar",
   "import_row": "Qator {{row}}",
   "import_no_file": "Avval fayl tanlang.",
-  "import_readonly": "Import uchun ruxsat yo'q."
+  "import_readonly": "Import uchun ruxsat yo'q.",
+  "general_empty": "Umumiy mijozlar topilmadi",
+  "general_empty_desc": "Birinchi umumiy mijozni qo'shing yoki import qiling.",
+  "general_import_button": "Import Excel",
+  "general_import_busy": "Import qilinmoqda...",
+  "general_import_hint": "Ustunlar: customer_id (majburiy), customer_name. UTF-8 CSV yoki .xlsx.",
+  "general_import_result": "Import natijasi",
+  "general_import_created": "Yaratildi: {{n}}",
+  "general_import_updated": "Yangilandi: {{n}}",
+  "general_import_row": "Qator {{row}}",
+  "general_import_no_file": "Avval fayl tanlang.",
+  "general_import_readonly": "Import uchun ruxsat yo'q."
 }
