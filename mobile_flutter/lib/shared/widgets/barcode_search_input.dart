@@ -214,47 +214,58 @@ class _BarcodeSearchInputState extends ConsumerState<BarcodeSearchInput> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        TextField(
-          controller: _c,
-          onChanged: _onTextChanged,
-          decoration: InputDecoration(
-            labelText: widget.label ?? 'Barcode',
-            hintText: widget.hint,
-            border: const OutlineInputBorder(),
-            suffixIconConstraints: const BoxConstraints(minWidth: 96, minHeight: 48),
-            suffixIcon: _loading
-                ? const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      IconButton(
-                        icon: const Icon(Icons.search),
-                        onPressed: _resolve,
-                      ),
-                      buildInputClearButton(
+    final Widget inputField = TextField(
+      controller: _c,
+      onChanged: _onTextChanged,
+      decoration: InputDecoration(
+        labelText: widget.label ?? 'Barcode',
+        hintText: widget.hint,
+        border: const OutlineInputBorder(),
+        suffixIconConstraints: const BoxConstraints(minWidth: 96, minHeight: 48),
+        suffixIcon: _loading
+            ? const Padding(
+                padding: EdgeInsets.all(12),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  IconButton(
+                    icon: const Icon(Icons.search),
+                    onPressed: _resolve,
+                  ),
+                  buildInputClearButton(
                         visible: widget.showClearButton && _c.text.trim().isNotEmpty,
                         onPressed: _clearInput,
                       ) ??
-                          const SizedBox.shrink(),
-                    ],
-                  ),
-          ),
-          onSubmitted: (_) => _resolve(),
-        ),
-        if (widget.onProductScanPressed != null) ...<Widget>[
-          const SizedBox(height: 8),
-          ScanActionButton(onPressed: widget.onProductScanPressed!),
-        ],
+                      const SizedBox.shrink(),
+                ],
+              ),
+      ),
+      onSubmitted: (_) => _resolve(),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        if (widget.onProductScanPressed != null)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: <Widget>[
+              Expanded(child: inputField),
+              const SizedBox(width: 8),
+              ScanActionButton(
+                onPressed: widget.onProductScanPressed!,
+                compact: true,
+              ),
+            ],
+          )
+        else
+          inputField,
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(top: 8),

@@ -15,8 +15,10 @@ import '../../../core/offline/offline_database.dart';
 import '../../../core/offline/offline_providers.dart';
 import '../../../core/router/scanner_args.dart';
 import '../../../l10n/string_lookup.dart';
+import '../../../shared/input/input_clear_button.dart';
 import '../../../shared/input/stock_quantity_input.dart';
 import '../../../shared/layout/sheet_bottom_inset.dart';
+import '../../../shared/widgets/scan_action_button.dart';
 import '../alternate_location_menu_label.dart' show mergeAlternateLocationsForDisplay, MergedAlternateLocationRow;
 import '../data/picking_constants.dart';
 import '../data/picking_models.dart';
@@ -875,57 +877,69 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                       const SizedBox(height: 8),
                       Text('${StringLookup.t(loc, 'incompleteReasonLabel')} ${stock.skipReason}'),
                     ],
-                    const SizedBox(height: 16),
-                    FilledButton.icon(
-                      onPressed: () {
-                        Navigator.of(ctx).pop();
-                        context.pushNamed(
-                          'scanner',
-                          extra: ScannerArgs(
-                            returnToPick: true,
-                            taskId: widget.taskId,
-                            lineId: profile == PickerProfileParam.controller &&
-                                    group.members.length > 1
-                                ? null
-                                : stock.id,
-                            profileType: profile,
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.qr_code_scanner_rounded),
-                      label: Text(StringLookup.t(loc, 'scanButton')),
-                    ),
-                    const SizedBox(height: 16),
                     if (profile == PickerProfileParam.controller) ...<Widget>[
-                      TextField(
-                        controller: bc,
-                        decoration: InputDecoration(
-                          labelText: StringLookup.t(loc, 'barcodeOrSku'),
-                          border: const OutlineInputBorder(),
-                        ),
-                        onSubmitted: (String v) {
-                          final String t = v.trim();
-                          final PickingLine? match = _findLineByScan(doc.lines, t);
-                          if (match == null) {
-                            _rejectScanHaptic();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(StringLookup.t(loc, 'productNotInOrder'))),
-                            );
-                            return;
-                          }
-                          if (!group.members.any((PickingLine m) => m.id == match.id)) {
-                            _rejectScanHaptic();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(StringLookup.t(loc, 'wrongBarcodeTitle'))),
-                            );
-                            return;
-                          }
-                          setM(() {
-                            scannedForQty = t;
-                            qty.text =
-                                formatPickQty(_aggregateQtyPicked(group.members));
-                          });
-                        },
+                      const SizedBox(height: 16),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: <Widget>[
+                          Expanded(
+                            child: TextField(
+                              controller: bc,
+                              decoration: InputDecoration(
+                                labelText: StringLookup.t(loc, 'barcodeOrSku'),
+                                border: const OutlineInputBorder(),
+                                suffixIcon: buildInputClearButton(
+                                  visible: bc.text.trim().isNotEmpty,
+                                  onPressed: () => setM(() => bc.clear()),
+                                ),
+                              ),
+                              onChanged: (_) => setM(() {}),
+                              onSubmitted: (String v) {
+                                final String t = v.trim();
+                                final PickingLine? match = _findLineByScan(doc.lines, t);
+                                if (match == null) {
+                                  _rejectScanHaptic();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text(StringLookup.t(loc, 'productNotInOrder'))),
+                                  );
+                                  return;
+                                }
+                                if (!group.members.any((PickingLine m) => m.id == match.id)) {
+                                  _rejectScanHaptic();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text(StringLookup.t(loc, 'wrongBarcodeTitle'))),
+                                  );
+                                  return;
+                                }
+                                setM(() {
+                                  scannedForQty = t;
+                                  qty.text =
+                                      formatPickQty(_aggregateQtyPicked(group.members));
+                                });
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ScanActionButton(
+                            onPressed: () {
+                              Navigator.of(ctx).pop();
+                              context.pushNamed(
+                                'scanner',
+                                extra: ScannerArgs(
+                                  returnToPick: true,
+                                  taskId: widget.taskId,
+                                  lineId: profile == PickerProfileParam.controller &&
+                                          group.members.length > 1
+                                      ? null
+                                      : stock.id,
+                                  profileType: profile,
+                                ),
+                              );
+                            },
+                            label: StringLookup.t(loc, 'scanButton'),
+                            compact: true,
+                          ),
+                        ],
                       ),
                       if (scannedForQty != null) ...<Widget>[
                         const SizedBox(height: 12),
@@ -936,7 +950,12 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                           decoration: InputDecoration(
                             labelText: StringLookup.t(loc, 'qtyShort'),
                             border: const OutlineInputBorder(),
+                            suffixIcon: buildInputClearButton(
+                              visible: qty.text.trim().isNotEmpty,
+                              onPressed: () => setM(() => qty.clear()),
+                            ),
                           ),
+                          onChanged: (_) => setM(() {}),
                         ),
                         const SizedBox(height: 16),
                         FilledButton(
@@ -977,30 +996,60 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                         ),
                       ],
                     ] else ...<Widget>[
-                      TextField(
-                        controller: bc,
-                        decoration: InputDecoration(
-                          labelText: StringLookup.t(loc, 'barcodeOrSku'),
-                          border: const OutlineInputBorder(),
-                        ),
-                        onSubmitted: (String v) {
-                          if (_barcodeMatchesLine(v, stock)) {
-                            setM(() {
-                              scannedForQty = v.trim();
-                              final double rem = stock.qtyRequired - stock.qtyPicked;
-                              qty.text = rem >= 1 ? formatPickQty(rem) : '0';
-                            });
-                          } else {
-                            _rejectScanHaptic();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  '${StringLookup.t(loc, 'wrongBarcodeMessage')}${stock.barcode ?? stock.sku ?? '—'}',
+                      const SizedBox(height: 16),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: <Widget>[
+                          Expanded(
+                            child: TextField(
+                              controller: bc,
+                              decoration: InputDecoration(
+                                labelText: StringLookup.t(loc, 'barcodeOrSku'),
+                                border: const OutlineInputBorder(),
+                                suffixIcon: buildInputClearButton(
+                                  visible: bc.text.trim().isNotEmpty,
+                                  onPressed: () => setM(() => bc.clear()),
                                 ),
                               ),
-                            );
-                          }
-                        },
+                              onChanged: (_) => setM(() {}),
+                              onSubmitted: (String v) {
+                                if (_barcodeMatchesLine(v, stock)) {
+                                  setM(() {
+                                    scannedForQty = v.trim();
+                                    final double rem = stock.qtyRequired - stock.qtyPicked;
+                                    qty.text = rem >= 1 ? formatPickQty(rem) : '0';
+                                  });
+                                } else {
+                                  _rejectScanHaptic();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        '${StringLookup.t(loc, 'wrongBarcodeMessage')}${stock.barcode ?? stock.sku ?? '—'}',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ScanActionButton(
+                            onPressed: () {
+                              Navigator.of(ctx).pop();
+                              context.pushNamed(
+                                'scanner',
+                                extra: ScannerArgs(
+                                  returnToPick: true,
+                                  taskId: widget.taskId,
+                                  lineId: stock.id,
+                                  profileType: profile,
+                                ),
+                              );
+                            },
+                            label: StringLookup.t(loc, 'scanButton'),
+                            compact: true,
+                          ),
+                        ],
                       ),
                       if (scannedForQty != null) ...<Widget>[
                         const SizedBox(height: 12),
@@ -1011,7 +1060,12 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                           decoration: InputDecoration(
                             labelText: StringLookup.t(loc, 'qtyShort'),
                             border: const OutlineInputBorder(),
+                            suffixIcon: buildInputClearButton(
+                              visible: qty.text.trim().isNotEmpty,
+                              onPressed: () => setM(() => qty.clear()),
+                            ),
                           ),
+                          onChanged: (_) => setM(() {}),
                         ),
                         const SizedBox(height: 16),
                         FilledButton(

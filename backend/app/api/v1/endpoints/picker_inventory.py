@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+import logging
 from typing import Any, Optional
 from uuid import UUID
 
@@ -26,9 +27,14 @@ from app.models.user import User as UserModel
 from app.services.expired_zone_labels import get_labels_row, resolve_expired_display_label
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Picker/operator/manager read-only access (not admin inventory management)
 PICKER_INVENTORY_PERMISSION = require_any_permission(["picking:read", "inventory:read"])
+
+PHYSICAL_ON_HAND_MOVEMENT_TYPES = tuple(
+    movement for movement in ON_HAND_MOVEMENT_TYPES if movement not in ("allocate", "unallocate")
+)
 
 
 def _get_showroom_root_id(db: Session) -> Optional[UUID]:
@@ -147,7 +153,10 @@ def _get_lot_level_balances(
 ) -> list[dict[str, Any]]:
     on_hand_expr = func.sum(
         case(
-            (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
+            (
+                StockMovementModel.movement_type.in_(PHYSICAL_ON_HAND_MOVEMENT_TYPES),
+                StockMovementModel.qty_change,
+            ),
             else_=0,
         )
     )
@@ -499,19 +508,35 @@ async def get_picker_product_detail(
     loc_ids = _location_ids_for_warehouse(db, warehouse) if warehouse else None
     lot_data = _get_lot_level_balances(db, [product_id], location_ids=loc_ids)
     main_barcode = _get_product_main_barcode(db, product)
-    locations = [
-        PickerProductLocation(
-            location_id=r["location_id"],
-            location_code=r["location_code"],
-            lot_id=r["lot_id"],
-            batch_no=r["batch"],
-            expiry_date=r["expiry_date"],
-            on_hand_qty=Decimal(str(r["on_hand"])),
-            reserved_qty=Decimal(str(r["reserved"])),
-            available_qty=Decimal(str(r["available"])),
+    locations: list[PickerProductLocation] = []
+    negative_rows = 0
+    for r in lot_data:
+        on_hand = Decimal(str(r["on_hand"]))
+        reserved = Decimal(str(r["reserved"]))
+        available = Decimal(str(r["available"]))
+        if on_hand < 0 or available < 0:
+            negative_rows += 1
+        locations.append(
+            PickerProductLocation(
+                location_id=r["location_id"],
+                location_code=r["location_code"],
+                lot_id=r["lot_id"],
+                batch_no=r["batch"],
+                expiry_date=r["expiry_date"],
+                on_hand_qty=on_hand,
+                reserved_qty=reserved,
+                available_qty=available,
+            )
         )
-        for r in lot_data
-    ]
+    if negative_rows:
+        logger.warning(
+            "Negative stock balances detected in picker detail",
+            extra={
+                "product_id": str(product_id),
+                "warehouse": warehouse,
+                "negative_rows": negative_rows,
+            },
+        )
     return PickerProductDetailResponse(
         product_id=product.id,
         name=product.name,

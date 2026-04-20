@@ -29,6 +29,7 @@ import '../../../shared/input/stock_quantity_input.dart';
 import '../../../shared/widgets/barcode_search_input.dart';
 import '../../../shared/widgets/expiry_date_picker.dart';
 import '../../../shared/widgets/product_card.dart';
+import '../../../shared/widgets/scan_action_button.dart';
 
 List<PickerProductLocation> _sortFefo(List<PickerProductLocation> locs) {
   final List<PickerProductLocation> copy = List<PickerProductLocation>.from(locs);
@@ -1021,21 +1022,33 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           const SizedBox(height: 12),
           const Text('Lokatsiyani tanlang', style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
-          TextField(
-            controller: _invLocSearch,
-            decoration: InputDecoration(
-              labelText: 'Kod yoki nom bo‘yicha qidiruv',
-              border: const OutlineInputBorder(),
-              suffixIcon: buildInputClearButton(
-                visible: _invLocSearch.text.trim().isNotEmpty,
-                onPressed: () => setState(() {
-                  _invLocSearch.clear();
-                  _invLocation = null;
-                }),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: <Widget>[
+              Expanded(
+                child: TextField(
+                  controller: _invLocSearch,
+                  decoration: InputDecoration(
+                    labelText: 'Kod yoki nom bo‘yicha qidiruv',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: buildInputClearButton(
+                      visible: _invLocSearch.text.trim().isNotEmpty,
+                      onPressed: () => setState(() {
+                        _invLocSearch.clear();
+                        _invLocation = null;
+                      }),
+                    ),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                  textCapitalization: TextCapitalization.characters,
+                ),
               ),
-            ),
-            onChanged: (_) => setState(() {}),
-            textCapitalization: TextCapitalization.characters,
+              const SizedBox(width: 8),
+              ScanActionButton(
+                onPressed: _openInventoryScanner,
+                compact: true,
+              ),
+            ],
           ),
           if (_showInvLocDropdown)
             Card(
@@ -1068,12 +1081,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                     unawaited(_refreshInvLocationContents());
                   },
             child: const Text('Lokatsiya tarkibini ko‘rish'),
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: _openInventoryScanner,
-            icon: const Icon(Icons.qr_code_scanner),
-            label: const Text('Skanerlash'),
           ),
         ],
         if (_invSubMode == 'byLocation' && _invStep == 2 && _invLocation != null) ...<Widget>[
@@ -1154,12 +1161,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           BarcodeSearchInput(
             onSelectProduct: _invSelectProductFromBarcode,
             label: 'Mahsulot barcode',
-          ),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: _openInventoryScanner,
-            icon: const Icon(Icons.qr_code_scanner),
-            label: const Text('Skanerlash'),
+            onProductScanPressed: _openInventoryScanner,
           ),
         ],
         if (_invSubMode == 'byScan' && _invStep == 2 && _loadingProduct) const LinearProgressIndicator(),

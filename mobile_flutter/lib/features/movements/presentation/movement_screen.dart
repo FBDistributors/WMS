@@ -615,26 +615,34 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
             ],
           ],
           if (_phase == _MovementPhase.pallet) ...<Widget>[
-            TextField(
-              controller: _palletCode,
-              textInputAction: TextInputAction.search,
-              decoration: InputDecoration(
-                labelText: StringLookup.t(loc, 'movementLocationCodeLabel'),
-                border: const OutlineInputBorder(),
-                suffixIcon: buildInputClearButton(
-                  visible: _palletCode.text.trim().isNotEmpty,
-                  onPressed: _clearPalletSourceInput,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: <Widget>[
+                Expanded(
+                  child: TextField(
+                    controller: _palletCode,
+                    textInputAction: TextInputAction.search,
+                    decoration: InputDecoration(
+                      labelText: StringLookup.t(loc, 'movementLocationCodeLabel'),
+                      border: const OutlineInputBorder(),
+                      suffixIcon: buildInputClearButton(
+                        visible: _palletCode.text.trim().isNotEmpty,
+                        onPressed: _clearPalletSourceInput,
+                      ),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                    onSubmitted: (_) => _loadPallet(_palletCode.text),
+                  ),
                 ),
-              ),
-              onChanged: (_) => setState(() {}),
-              onSubmitted: (_) => _loadPallet(_palletCode.text),
-            ),
-            const SizedBox(height: 8),
-            ScanActionButton(
-              onPressed: () => context.pushNamed(
-                'scanner',
-                extra: const ScannerArgs(returnToMovementPallet: true),
-              ),
+                const SizedBox(width: 8),
+                ScanActionButton(
+                  onPressed: () => context.pushNamed(
+                    'scanner',
+                    extra: const ScannerArgs(returnToMovementPallet: true),
+                  ),
+                  compact: true,
+                ),
+              ],
             ),
             if (_palletCode.text.trim().isNotEmpty) ...<Widget>[
               const SizedBox(height: 8),

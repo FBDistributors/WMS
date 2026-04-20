@@ -19,6 +19,7 @@ import '../input/input_clear_button.dart';
 import '../input/stock_quantity_input.dart';
 import '../layout/sheet_bottom_inset.dart';
 import 'consolidated_pick_success_snackbar.dart';
+import 'scan_action_button.dart';
 
 /// Takrorlanmas joy kodlari, `lines` tartibida birinchi uchragan tartibda.
 String _consolidatedUniqueLocationsLine(ConsolidatedProduct p) {
@@ -330,62 +331,61 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                         ),
                       ),
                       const SizedBox(height: 12),
-                      FilledButton.icon(
-                        onPressed: sheetBusy
-                            ? null
-                            : () {
-                                Navigator.of(ctx).pop();
-                                host.pushNamed(
-                                  'scanner',
-                                  extra: ScannerArgs(
-                                    returnToConsolidated: true,
-                                    profileType: PickerProfileParam.picker,
-                                    selectedProductKey: consolidatedProductKey(product),
-                                  ),
-                                );
-                              },
-                        icon: const Icon(Icons.qr_code_scanner_rounded),
-                        label: Text(StringLookup.t(loc, 'scanButton')),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        StringLookup.t(loc, 'orEnterManually'),
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: bc,
-                        decoration: InputDecoration(
-                          labelText: StringLookup.t(loc, 'barcodeOrSku'),
-                          border: const OutlineInputBorder(),
-                          suffixIcon: buildInputClearButton(
-                            visible: bc.text.trim().isNotEmpty,
-                            onPressed: () => setM(() => bc.clear()),
-                          ),
-                        ),
-                        onChanged: (_) => setM(() {}),
-                        onSubmitted: (String v) {
-                          final String t = v.trim();
-                          if (t.isEmpty) {
-                            return;
-                          }
-                          if (!consolidatedScanMatchesProduct(t, product)) {
-                            ScaffoldMessenger.of(host).showSnackBar(
-                              SnackBar(
-                                content: Text(StringLookup.t(loc, 'consolidatedScanMismatch')),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: <Widget>[
+                          Expanded(
+                            child: TextField(
+                              controller: bc,
+                              decoration: InputDecoration(
+                                labelText: StringLookup.t(loc, 'barcodeOrSku'),
+                                border: const OutlineInputBorder(),
+                                suffixIcon: buildInputClearButton(
+                                  visible: bc.text.trim().isNotEmpty,
+                                  onPressed: () => setM(() => bc.clear()),
+                                ),
                               ),
-                            );
-                            return;
-                          }
-                          setM(() {
-                            scannedForQty = t;
-                            final double rem = product.totalRequired - product.totalPicked;
-                            qty.text = '${max(1, rem.round())}';
-                          });
-                        },
+                              onChanged: (_) => setM(() {}),
+                              onSubmitted: (String v) {
+                                final String t = v.trim();
+                                if (t.isEmpty) {
+                                  return;
+                                }
+                                if (!consolidatedScanMatchesProduct(t, product)) {
+                                  ScaffoldMessenger.of(host).showSnackBar(
+                                    SnackBar(
+                                      content: Text(StringLookup.t(loc, 'consolidatedScanMismatch')),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                setM(() {
+                                  scannedForQty = t;
+                                  final double rem = product.totalRequired - product.totalPicked;
+                                  qty.text = '${max(1, rem.round())}';
+                                });
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ScanActionButton(
+                            onPressed: sheetBusy
+                                ? null
+                                : () {
+                                    Navigator.of(ctx).pop();
+                                    host.pushNamed(
+                                      'scanner',
+                                      extra: ScannerArgs(
+                                        returnToConsolidated: true,
+                                        profileType: PickerProfileParam.picker,
+                                        selectedProductKey: consolidatedProductKey(product),
+                                      ),
+                                    );
+                                  },
+                            label: StringLookup.t(loc, 'scanButton'),
+                            compact: true,
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 12),
                       FilledButton(

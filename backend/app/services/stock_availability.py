@@ -15,6 +15,12 @@ from app.models.stock import ON_HAND_MOVEMENT_TYPES
 from app.models.stock import StockLot as StockLotModel
 from app.models.stock import StockMovement as StockMovementModel
 
+# Physical stock movements used for on_hand balance.
+# Reservation bookkeeping (allocate/unallocate) is handled in reserved_expr only.
+PHYSICAL_ON_HAND_MOVEMENT_TYPES = tuple(
+    movement for movement in ON_HAND_MOVEMENT_TYPES if movement not in ("allocate", "unallocate")
+)
+
 
 def _advisory_keys(lot_id: UUID, location_id: UUID) -> tuple[int, int]:
     k1 = int.from_bytes(lot_id.bytes[:8], "big", signed=False) % (2**31 - 1) + 1
@@ -38,7 +44,10 @@ def compute_lot_location_available(db: Session, lot_id: UUID, location_id: UUID)
     """_get_lot_level_balances bilan bir xil: available = on_hand - reserved."""
     on_hand_expr = func.sum(
         case(
-            (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
+            (
+                StockMovementModel.movement_type.in_(PHYSICAL_ON_HAND_MOVEMENT_TYPES),
+                StockMovementModel.qty_change,
+            ),
             else_=0,
         )
     )

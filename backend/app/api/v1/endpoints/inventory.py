@@ -72,6 +72,9 @@ def _location_ids_for_warehouse(db: Session, warehouse: Optional[str]) -> Option
 
 # On-hand only (zone implementation / Variant A); allocate/unallocate not in ledger
 MOVEMENT_TYPES = set(ON_HAND_MOVEMENT_TYPES)
+PHYSICAL_ON_HAND_MOVEMENT_TYPES = tuple(
+    movement for movement in ON_HAND_MOVEMENT_TYPES if movement not in ("allocate", "unallocate")
+)
 
 _IDEMPOTENCY_TTL_HOURS = 24
 
@@ -261,6 +264,24 @@ class BalanceDiagnosticOut(BaseModel):
     available: Decimal
     movements: List[BalanceMovementItem]
     summary: str
+
+
+class NegativeBalanceRow(BaseModel):
+    product_id: UUID
+    sku: str | None
+    location_id: UUID
+    location_code: str
+    lot_id: UUID
+    batch: str
+    expiry_date: date | None
+    on_hand: Decimal
+    reserved: Decimal
+    available: Decimal
+
+
+class NegativeBalanceCheckOut(BaseModel):
+    total_rows: int
+    rows: list[NegativeBalanceRow]
 
 
 class InventorySummaryRow(BaseModel):
@@ -1798,9 +1819,9 @@ async def balance_diagnostic(
         .all()
     )
 
-    # Qoldiq: faqat Kirim (receipt) va Jo'natish (ship)
+    # Qoldiq: jismoniy on_hand harakatlari; reservation esa alohida.
     on_hand = sum(
-        (m.qty_change for m in movements if m.movement_type in ON_HAND_MOVEMENT_TYPES),
+        (m.qty_change for m in movements if m.movement_type in PHYSICAL_ON_HAND_MOVEMENT_TYPES),
         Decimal("0"),
     )
     reserved = sum(
@@ -1826,7 +1847,7 @@ async def balance_diagnostic(
     pick_count = sum(1 for m in movements if m.movement_type == "pick")
     ship_sum = sum(m.qty_change for m in movements if m.movement_type == "ship")
     summary = (
-        f"Qoldiq hisobi: faqat Kirim (receipt) va Jo'natish (ship). "
+        f"Qoldiq hisobi: jismoniy harakatlar (opening/receipt/putaway/pick/ship/adjust/transfer). "
         f"Kirim: {receipt_sum}, Jo'natish: {ship_sum} → on_hand={on_hand}, reserved={reserved}, available={available}."
     )
     if pick_count >= 2:
@@ -1844,6 +1865,91 @@ async def balance_diagnostic(
         movements=items,
         summary=summary,
     )
+
+
+@router.get(
+    "/negative-balance-check",
+    response_model=NegativeBalanceCheckOut,
+    summary="Manfiy qoldiq qatorlarini tekshirish (read-only)",
+)
+async def negative_balance_check(
+    product_id: Optional[UUID] = Query(None),
+    warehouse: Optional[str] = Query(None, description="main | showroom"),
+    limit: int = Query(200, ge=1, le=1000),
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("inventory:read")),
+):
+    on_hand_expr = func.sum(
+        case(
+            (
+                StockMovementModel.movement_type.in_(PHYSICAL_ON_HAND_MOVEMENT_TYPES),
+                StockMovementModel.qty_change,
+            ),
+            else_=0,
+        )
+    )
+    reserved_expr = func.sum(
+        case(
+            (
+                StockMovementModel.movement_type.in_(("allocate", "unallocate")),
+                StockMovementModel.qty_change,
+            ),
+            else_=0,
+        )
+    )
+    available_expr = on_hand_expr - reserved_expr
+    query = (
+        db.query(
+            StockLotModel.product_id.label("product_id"),
+            ProductModel.sku.label("sku"),
+            StockMovementModel.location_id.label("location_id"),
+            LocationModel.code.label("location_code"),
+            StockLotModel.id.label("lot_id"),
+            StockLotModel.batch.label("batch"),
+            StockLotModel.expiry_date.label("expiry_date"),
+            on_hand_expr.label("on_hand"),
+            reserved_expr.label("reserved"),
+            available_expr.label("available"),
+        )
+        .join(StockLotModel, StockLotModel.id == StockMovementModel.lot_id)
+        .join(ProductModel, ProductModel.id == StockLotModel.product_id)
+        .join(LocationModel, LocationModel.id == StockMovementModel.location_id)
+        .group_by(
+            StockLotModel.product_id,
+            ProductModel.sku,
+            StockMovementModel.location_id,
+            LocationModel.code,
+            StockLotModel.id,
+            StockLotModel.batch,
+            StockLotModel.expiry_date,
+        )
+        .having((on_hand_expr < 0) | (available_expr < 0))
+    )
+    if product_id is not None:
+        query = query.filter(StockLotModel.product_id == product_id)
+    loc_ids = _location_ids_for_warehouse(db, warehouse) if warehouse else None
+    if loc_ids is not None:
+        if not loc_ids:
+            return NegativeBalanceCheckOut(total_rows=0, rows=[])
+        query = query.filter(StockMovementModel.location_id.in_(loc_ids))
+
+    rows = query.order_by(available_expr.asc(), on_hand_expr.asc()).limit(limit).all()
+    result = [
+        NegativeBalanceRow(
+            product_id=r.product_id,
+            sku=r.sku,
+            location_id=r.location_id,
+            location_code=r.location_code,
+            lot_id=r.lot_id,
+            batch=r.batch,
+            expiry_date=r.expiry_date,
+            on_hand=Decimal(str(r.on_hand)),
+            reserved=Decimal(str(r.reserved)),
+            available=Decimal(str(r.available)),
+        )
+        for r in rows
+    ]
+    return NegativeBalanceCheckOut(total_rows=len(result), rows=result)
 
 
 class FixDuplicatePickRequest(BaseModel):

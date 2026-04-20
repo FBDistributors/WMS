@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
+import 'dart:math' as math;
 
 import '../../../core/config/brand.dart';
 import '../../../shared/input/input_clear_button.dart';
@@ -651,7 +652,7 @@ class _CorporateInventoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final int stockQty = item.availableQty.round();
+    final int stockQty = math.max(0, item.availableQty).round();
     final bool lowStock = stockQty < 10;
     final Color qtyColor = lowStock ? stockLowColor : stockOkColor;
 

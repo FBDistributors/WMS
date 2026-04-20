@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'dart:math' as math;
 
 import '../../../core/formatting/expiry_display_format.dart';
 import '../data/models/picker_inventory_models.dart';
@@ -32,6 +33,12 @@ class InventoryDetailScreen extends ConsumerWidget {
       body: data.when(
         data: (InventoryDetailPair pair) {
           final PickerProductDetailResponse main = pair.main;
+          final List<PickerProductLocation> mainMerged =
+              mergePickerProductLocationsForDisplay(main.locations);
+          final List<PickerProductLocation> showroomMerged =
+              mergePickerProductLocationsForDisplay(pair.showroom.locations);
+          final int mainTotalOnHand = _totalOnHandForDisplay(mainMerged);
+          final int showroomTotalOnHand = _totalOnHandForDisplay(showroomMerged);
           return ListView(
             padding: const EdgeInsets.all(16),
             children: <Widget>[
@@ -52,21 +59,47 @@ class InventoryDetailScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              Text(
-                '${InventoryStrings.invTitle(loc)} — asosiy',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white70 : Colors.black54,
-                ),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      '${InventoryStrings.invTitle(loc)} — asosiy',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white70 : Colors.black54,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '${InventoryStrings.invOnHand(loc)}: $mainTotalOnHand',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white70 : Colors.black54,
+                    ),
+                  ),
+                ],
               ),
               ...inventoryLocTiles(main.locations, loc, isDark),
               const SizedBox(height: 16),
-              Text(
-                'Showroom',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white70 : Colors.black54,
-                ),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      'Showroom',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white70 : Colors.black54,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '${InventoryStrings.invOnHand(loc)}: $showroomTotalOnHand',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white70 : Colors.black54,
+                    ),
+                  ),
+                ],
               ),
               ...inventoryLocTiles(pair.showroom.locations, loc, isDark),
             ],
@@ -107,6 +140,14 @@ List<PickerProductLocation> mergePickerProductLocationsForDisplay(
   return byKey.values.toList();
 }
 
+int _toNonNegativeRounded(double value) => math.max(0, value).round();
+
+int _totalOnHandForDisplay(List<PickerProductLocation> locations) {
+  return locations.fold<int>(0, (int sum, PickerProductLocation l) {
+    return sum + _toNonNegativeRounded(l.onHandQty);
+  });
+}
+
 List<Widget> inventoryLocTiles(
   List<PickerProductLocation> locations,
   InventoryLocale loc,
@@ -131,7 +172,7 @@ List<Widget> inventoryLocTiles(
           style: TextStyle(color: isDark ? Colors.white54 : Colors.black45),
         ),
         trailing: Text(
-          '${InventoryStrings.invOnHand(loc)}: ${l.onHandQty.round()}',
+          '${InventoryStrings.invOnHand(loc)}: ${_toNonNegativeRounded(l.onHandQty)}',
           style: TextStyle(color: isDark ? Colors.white70 : Colors.black87),
           textAlign: TextAlign.right,
         ),
