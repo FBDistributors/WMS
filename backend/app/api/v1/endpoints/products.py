@@ -27,6 +27,9 @@ from app.models.stock import StockMovement as StockMovementModel
 from app.schemas.product import ProductCreateIn, ProductImportItem, ProductListOut, ProductOut
 
 router = APIRouter()
+PHYSICAL_ON_HAND_MOVEMENT_TYPES = tuple(
+    movement for movement in ON_HAND_MOVEMENT_TYPES if movement not in ("allocate", "unallocate")
+)
 
 class ProductImportFailure(BaseModel):
     row: int
@@ -133,12 +136,15 @@ def _to_product(
 
 
 def _fetch_inventory_summary(db: Session, product_ids: List[UUID]) -> Dict[UUID, dict]:
-    """Single aggregate query for on_hand/available per product. Qoldiq: faqat Kirim (receipt) va Jo'natish (ship)."""
+    """Single aggregate query for on_hand/available per product."""
     if not product_ids:
         return {}
     on_hand_expr = func.sum(
         case(
-            (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
+            (
+                StockMovementModel.movement_type.in_(PHYSICAL_ON_HAND_MOVEMENT_TYPES),
+                StockMovementModel.qty_change,
+            ),
             else_=0,
         )
     )

@@ -652,7 +652,7 @@ class _CorporateInventoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final int stockQty = math.max(0, item.onHandQty).round();
+    final int stockQty = math.max(0, item.availableQty).round();
     final bool lowStock = stockQty < 10;
     final Color qtyColor = lowStock ? stockLowColor : stockOkColor;
 

@@ -120,7 +120,7 @@ export function ProductDetailsPage() {
     )
   }
 
-  const onHand = history?.on_hand_total ?? product?.on_hand_total
+  const available = history?.available_total ?? product?.available_total
 
   const tabs: { id: TabId; labelKey: string; icon: React.ReactNode }[] = [
     { id: 'basic', labelKey: 'products:history.tab_basic', icon: <Info size={16} /> },
@@ -454,10 +454,10 @@ export function ProductDetailsPage() {
                 <dl className="mb-6 grid gap-4 sm:grid-cols-1">
                   <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/50">
                     <dt className="text-sm font-medium text-slate-500 dark:text-slate-400">
-                      {t('products:history.on_hand')}
+                      {t('products:history.available')}
                     </dt>
                     <dd className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-100">
-                      {onHand != null ? Math.round(Number(onHand)) : '—'}
+                      {available != null ? Math.round(Number(available)) : '—'}
                     </dd>
                   </div>
                 </dl>
@@ -479,7 +479,7 @@ export function ProductDetailsPage() {
                             {t('products:history.location_code')}
                           </th>
                           <th className="px-3 py-2 text-right font-medium text-slate-600 dark:text-slate-400">
-                            {t('products:history.on_hand')}
+                            {t('products:history.available')}
                           </th>
                         </tr>
                       </thead>
@@ -493,7 +493,7 @@ export function ProductDetailsPage() {
                               {row.location_code}
                             </td>
                             <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">
-                              {Math.round(Number(row.on_hand))}
+                              {Math.round(Number(row.available))}
                             </td>
                           </tr>
                         ))}

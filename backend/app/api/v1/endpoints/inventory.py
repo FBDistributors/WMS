@@ -1173,10 +1173,12 @@ async def inventory_summary(
     db: Session = Depends(get_db),
     _user=Depends(require_permission("inventory:read")),
 ):
-    # Qoldiq: faqat Kirim (receipt) va Jo'natish (ship)
     on_hand_expr = func.sum(
         case(
-            (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
+            (
+                StockMovementModel.movement_type.in_(PHYSICAL_ON_HAND_MOVEMENT_TYPES),
+                StockMovementModel.qty_change,
+            ),
             else_=0,
         )
     )
@@ -1230,7 +1232,10 @@ def _fetch_locations_by_products(
     loc_ids = _location_ids_for_warehouse(db, warehouse)
     on_hand_expr = func.sum(
         case(
-            (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
+            (
+                StockMovementModel.movement_type.in_(PHYSICAL_ON_HAND_MOVEMENT_TYPES),
+                StockMovementModel.qty_change,
+            ),
             else_=0,
         )
     )
@@ -1299,7 +1304,10 @@ async def inventory_summary_light(
     loc_ids = _location_ids_for_warehouse(db, warehouse)
     on_hand_expr = func.sum(
         case(
-            (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
+            (
+                StockMovementModel.movement_type.in_(PHYSICAL_ON_HAND_MOVEMENT_TYPES),
+                StockMovementModel.qty_change,
+            ),
             else_=0,
         )
     )
@@ -1390,7 +1398,10 @@ async def inventory_by_product(
     loc_ids = _location_ids_for_warehouse(db, warehouse)
     on_hand_expr = func.sum(
         case(
-            (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
+            (
+                StockMovementModel.movement_type.in_(PHYSICAL_ON_HAND_MOVEMENT_TYPES),
+                StockMovementModel.qty_change,
+            ),
             else_=0,
         )
     )
@@ -1459,7 +1470,10 @@ async def inventory_details(
     loc_ids = _location_ids_for_warehouse(db, warehouse)
     on_hand_expr = func.sum(
         case(
-            (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
+            (
+                StockMovementModel.movement_type.in_(PHYSICAL_ON_HAND_MOVEMENT_TYPES),
+                StockMovementModel.qty_change,
+            ),
             else_=0,
         )
     )
@@ -1545,7 +1559,10 @@ async def inventory_by_location(
     """List all product lots at the given location with product code, name, barcode, brand, expiry, qty."""
     on_hand_expr = func.sum(
         case(
-            (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
+            (
+                StockMovementModel.movement_type.in_(PHYSICAL_ON_HAND_MOVEMENT_TYPES),
+                StockMovementModel.qty_change,
+            ),
             else_=0,
         )
     )
@@ -1631,7 +1648,10 @@ async def inventory_summary_by_location(
     loc_ids = _location_ids_for_warehouse(db, warehouse)
     on_hand_expr = func.sum(
         case(
-            (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
+            (
+                StockMovementModel.movement_type.in_(PHYSICAL_ON_HAND_MOVEMENT_TYPES),
+                StockMovementModel.qty_change,
+            ),
             else_=0,
         )
     )
@@ -1753,7 +1773,10 @@ async def list_stock_balances(
     loc_ids = _location_ids_for_warehouse(db, warehouse)
     qty_expr = func.sum(
         case(
-            (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
+            (
+                StockMovementModel.movement_type.in_(PHYSICAL_ON_HAND_MOVEMENT_TYPES),
+                StockMovementModel.qty_change,
+            ),
             else_=0,
         )
     )
@@ -1862,7 +1885,7 @@ async def balance_diagnostic(
     )
     if pick_count >= 2:
         summary += (
-            f" Eslatma: {pick_count} ta terish (pick) yozuvi bor; qoldiqda faqat receipt+ship hisoblanadi."
+            f" Eslatma: {pick_count} ta terish (pick) yozuvi bor; bu harakatlar jismoniy on_handga kiritiladi."
         )
 
     return BalanceDiagnosticOut(

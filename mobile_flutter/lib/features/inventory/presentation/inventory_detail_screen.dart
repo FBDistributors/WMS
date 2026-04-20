@@ -144,7 +144,7 @@ int _toNonNegativeRounded(double value) => math.max(0, value).round();
 
 int _totalOnHandForDisplay(List<PickerProductLocation> locations) {
   return locations.fold<int>(0, (int sum, PickerProductLocation l) {
-    return sum + _toNonNegativeRounded(l.onHandQty);
+    return sum + _toNonNegativeRounded(l.availableQty);
   });
 }
 
@@ -162,7 +162,7 @@ List<Widget> inventoryLocTiles(
     ];
   }
   final List<PickerProductLocation> merged = mergePickerProductLocationsForDisplay(locations)
-      .where((PickerProductLocation l) => _toNonNegativeRounded(l.onHandQty) > 0)
+      .where((PickerProductLocation l) => _toNonNegativeRounded(l.availableQty) > 0)
       .toList(growable: false);
   if (merged.isEmpty) {
     return <Widget>[
@@ -182,7 +182,7 @@ List<Widget> inventoryLocTiles(
           style: TextStyle(color: isDark ? Colors.white54 : Colors.black45),
         ),
         trailing: Text(
-          '${InventoryStrings.invOnHand(loc)}: ${_toNonNegativeRounded(l.onHandQty)}',
+          '${InventoryStrings.invOnHand(loc)}: ${_toNonNegativeRounded(l.availableQty)}',
           style: TextStyle(color: isDark ? Colors.white70 : Colors.black87),
           textAlign: TextAlign.right,
         ),

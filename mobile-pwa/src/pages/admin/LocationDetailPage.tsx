@@ -156,7 +156,7 @@ export function LocationDetailPage() {
                         {row.expiry_date ?? '—'}
                       </td>
                       <td className="px-3 py-3 text-center font-medium text-slate-800 dark:text-slate-200">
-                        {Math.round(Number(row.on_hand))}
+                        {Math.round(Number(row.available))}
                       </td>
                     </tr>
                   ))

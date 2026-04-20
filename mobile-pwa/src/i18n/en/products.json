@@ -113,7 +113,7 @@
     "pick_history": "Pick history",
     "adjustment_history": "Inventory adjustments",
     "on_hand": "On hand",
-    "available": "Available",
+    "available": "Fact (in warehouse)",
     "date": "Date",
     "received_by": "Received by",
     "order_number": "Order",
