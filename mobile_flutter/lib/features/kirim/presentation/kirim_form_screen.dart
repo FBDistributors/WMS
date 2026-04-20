@@ -485,7 +485,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         }
       }
       if (mounted) {
-        context.pop();
+        context.goNamed('kirim');
       }
     } on Exception catch (e) {
       if (mounted) {
@@ -758,6 +758,18 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   void _onNewFlowBack() {
     if (_flow == 'new') {
       context.goNamed('kirimNew');
+      return;
+    }
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    context.goNamed('kirim');
+  }
+
+  void _onReturnFlowBack() {
+    if (_flow == 'return') {
+      context.goNamed('kirim');
       return;
     }
     if (context.canPop()) {
@@ -1642,11 +1654,15 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             );
 
     final bool lockBackToKirimNew = _flow == 'new';
+    final bool lockBackToKirimReturn = _flow == 'return';
     return PopScope(
-      canPop: !lockBackToKirimNew,
+      canPop: !(lockBackToKirimNew || lockBackToKirimReturn),
       onPopInvokedWithResult: (bool didPop, Object? result) {
         if (!didPop && lockBackToKirimNew) {
           _onNewFlowBack();
+        }
+        if (!didPop && lockBackToKirimReturn) {
+          _onReturnFlowBack();
         }
       },
       child: Scaffold(
@@ -1657,6 +1673,11 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                   icon: const Icon(Icons.arrow_back),
                   onPressed: _onNewFlowBack,
                 )
+              : lockBackToKirimReturn
+                  ? IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: _onReturnFlowBack,
+                    )
               : null,
         ),
         body: body,

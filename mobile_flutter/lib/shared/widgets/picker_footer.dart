@@ -9,6 +9,7 @@ import '../../core/router/scanner_args.dart';
 import '../../features/picking/data/picking_models.dart';
 import '../../features/picking/domain/profile_type_param.dart';
 import '../../features/picking/picking_providers.dart';
+import '../../features/customer_returns/customer_returns_providers.dart';
 import '../../l10n/string_lookup.dart';
 import '../../core/app_state/locale_controller.dart';
 import '../../core/app_state/app_locale.dart';
@@ -40,6 +41,7 @@ class PickerFooter extends ConsumerWidget {
       data: (List<PickingListItem> v) => v.length,
       orElse: () => 0,
     );
+    final int returnsAssignedCount = ref.watch(customerReturnsAssignedCountProvider);
     final ProfileType pt = ref.watch(profileTypeProvider);
     final PickerProfileParam profileParam =
         pt == ProfileType.controller ? PickerProfileParam.controller : PickerProfileParam.picker;
@@ -125,6 +127,7 @@ class PickerFooter extends ConsumerWidget {
                   active: current == PickerFooterRoute.kirim,
                   activeC: activeC,
                   inactiveC: inactiveC,
+                  badge: returnsAssignedCount,
                   onTap: goKirim,
                 ),
               ),

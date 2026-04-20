@@ -15,3 +15,10 @@ final customerReturnsQueueProvider =
         limit: 50,
       ),
 );
+
+final customerReturnsAssignedCountProvider = Provider.autoDispose<int>((Ref ref) {
+  return ref.watch(customerReturnsQueueProvider).maybeWhen(
+        data: (CustomerReturnListResponse r) => r.total,
+        orElse: () => 0,
+      );
+});
