@@ -1341,8 +1341,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                     InputDecorator(
                       decoration: InputDecoration(
                         border: const OutlineInputBorder(),
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.clear),
+                        suffixIcon: buildInputClearButton(
+                          visible: true,
                           onPressed: () => setState(() => _selectedVip = null),
                         ),
                       ),
@@ -1403,6 +1403,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                 BarcodeSearchInput(
                   onSelectProduct: _loadProduct,
                   label: StringLookup.t(appLoc, 'barcodeOrSku'),
+                  showClearButton: true,
                   onProductScanPressed: _flow == 'new'
                       ? () => context.pushNamed(
                             'scanner',

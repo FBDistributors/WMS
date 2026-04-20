@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { getProducts, type Product } from '../services/productsApi'
@@ -203,13 +203,17 @@ export function ProductSearchCombobox({
         <button
           type="button"
           onClick={() => (value ? handleClear() : setIsOpen((o) => !o))}
-          className="flex shrink-0 items-center justify-center px-2 py-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+          className="mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
           aria-label={value ? t('common:buttons.close') : 'Toggle'}
         >
-          <ChevronDown
-            size={18}
-            className={`transition-transform ${showDropdown ? 'rotate-180' : ''}`}
-          />
+          {value ? (
+            <X size={16} />
+          ) : (
+            <ChevronDown
+              size={18}
+              className={`transition-transform ${showDropdown ? 'rotate-180' : ''}`}
+            />
+          )}
         </button>
       </div>
       {showDropdown && (

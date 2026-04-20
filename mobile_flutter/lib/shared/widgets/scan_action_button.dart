@@ -15,6 +15,7 @@ class ScanActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (compact) {
+      final Color borderColor = Theme.of(context).colorScheme.outline;
       return Tooltip(
         message: label,
         child: OutlinedButton(
@@ -24,6 +25,10 @@ class ScanActionButton extends StatelessWidget {
             fixedSize: const Size(48, 48),
             padding: EdgeInsets.zero,
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            side: BorderSide(color: borderColor),
           ),
           child: Icon(
             Icons.qr_code_scanner,
