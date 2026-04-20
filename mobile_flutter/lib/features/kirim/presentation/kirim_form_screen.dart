@@ -15,8 +15,8 @@ import '../../customer_returns/customer_returns_providers.dart';
 import '../../customer_returns/data/customer_returns_models.dart';
 import '../../picking/data/picking_models.dart';
 import '../../picking/picking_providers.dart';
-import '../../vip_customers/data/vip_customer_models.dart';
-import '../../vip_customers/vip_customers_providers.dart';
+import '../../general_customers/data/general_customer_models.dart';
+import '../../general_customers/general_customers_providers.dart';
 import '../../inventory/data/models/picker_inventory_models.dart';
 import '../../inventory/data/picker_location_format.dart';
 import '../../inventory/presentation/inventory_providers.dart';
@@ -98,10 +98,10 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   String? _handledProductId;
 
   final TextEditingController _customerSearchController = TextEditingController();
-  Timer? _vipDebounce;
-  List<VipCustomerRow> _vipSuggestions = <VipCustomerRow>[];
-  bool _vipLoading = false;
-  VipCustomerRow? _selectedVip;
+  Timer? _customerDebounce;
+  List<GeneralCustomerRow> _customerSuggestions = <GeneralCustomerRow>[];
+  bool _customerLoading = false;
+  GeneralCustomerRow? _selectedCustomer;
   String? _returnLineExpiry;
 
   int _invStep = 0;
@@ -122,7 +122,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
 
   @override
   void dispose() {
-    _vipDebounce?.cancel();
+    _customerDebounce?.cancel();
     _customerSearchController.dispose();
     _invLocSearch.dispose();
     _invScanActualQty.dispose();
@@ -260,40 +260,40 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     });
   }
 
-  void _scheduleVipSearch() {
-    _vipDebounce?.cancel();
-    _vipDebounce = Timer(const Duration(milliseconds: 400), () {
+  void _scheduleCustomerSearch() {
+    _customerDebounce?.cancel();
+    _customerDebounce = Timer(const Duration(milliseconds: 400), () {
       if (!mounted) {
         return;
       }
       final String q = _customerSearchController.text.trim();
       if (q.length < 2) {
         setState(() {
-          _vipSuggestions = <VipCustomerRow>[];
-          _vipLoading = false;
+          _customerSuggestions = <GeneralCustomerRow>[];
+          _customerLoading = false;
         });
         return;
       }
-      unawaited(_fetchVipSuggestions(q));
+      unawaited(_fetchCustomerSuggestions(q));
     });
   }
 
-  Future<void> _fetchVipSuggestions(String q) async {
-    setState(() => _vipLoading = true);
+  Future<void> _fetchCustomerSuggestions(String q) async {
+    setState(() => _customerLoading = true);
     try {
-      final List<VipCustomerRow> list =
-          await ref.read(vipCustomersRepositoryProvider).list(search: q, limit: 40);
+      final List<GeneralCustomerRow> list =
+          await ref.read(generalCustomersRepositoryProvider).list(search: q, limit: 40);
       if (mounted) {
         setState(() {
-          _vipSuggestions = list;
-          _vipLoading = false;
+          _customerSuggestions = list;
+          _customerLoading = false;
         });
       }
     } on Exception {
       if (mounted) {
         setState(() {
-          _vipSuggestions = <VipCustomerRow>[];
-          _vipLoading = false;
+          _customerSuggestions = <GeneralCustomerRow>[];
+          _customerLoading = false;
         });
       }
     }
@@ -430,7 +430,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       return;
     }
     final AppLocale locMsg = ref.read(appLocaleProvider);
-    if (_selectedVip == null) {
+    if (_selectedCustomer == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(StringLookup.t(locMsg, 'returnsCustomerRequired'))),
@@ -440,12 +440,12 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     }
     setState(() => _sending = true);
     try {
-      final String cname = (_selectedVip!.customerName != null &&
-              _selectedVip!.customerName!.trim().isNotEmpty)
-          ? _selectedVip!.customerName!.trim()
-          : _selectedVip!.customerId;
+      final String cname = (_selectedCustomer!.customerName != null &&
+              _selectedCustomer!.customerName!.trim().isNotEmpty)
+          ? _selectedCustomer!.customerName!.trim()
+          : _selectedCustomer!.customerId;
       CustomerReturn doc = await ref.read(customerReturnsRepositoryProvider).createCustomerReturn(
-            customerId: _selectedVip!.customerId,
+            customerId: _selectedCustomer!.customerId,
             customerName: cname,
             lines: _lines
                 .map(
@@ -1337,16 +1337,16 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
-                  if (_selectedVip != null)
+                  if (_selectedCustomer != null)
                     InputDecorator(
                       decoration: InputDecoration(
                         border: const OutlineInputBorder(),
                         suffixIcon: buildInputClearButton(
                           visible: true,
-                          onPressed: () => setState(() => _selectedVip = null),
+                          onPressed: () => setState(() => _selectedCustomer = null),
                         ),
                       ),
-                      child: Text(_selectedVip!.displayLabel, style: const TextStyle(fontSize: 15)),
+                      child: Text(_selectedCustomer!.displayLabel, style: const TextStyle(fontSize: 15)),
                     )
                   else ...<Widget>[
                     TextField(
@@ -1358,15 +1358,15 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                           visible: _customerSearchController.text.trim().isNotEmpty,
                           onPressed: () => setState(() {
                             _customerSearchController.clear();
-                            _vipSuggestions = <VipCustomerRow>[];
-                            _vipLoading = false;
+                            _customerSuggestions = <GeneralCustomerRow>[];
+                            _customerLoading = false;
                           }),
                         ),
                       ),
-                      onChanged: (_) => _scheduleVipSearch(),
+                      onChanged: (_) => _scheduleCustomerSearch(),
                     ),
-                    if (_vipLoading) const LinearProgressIndicator(),
-                    if (_vipSuggestions.isNotEmpty)
+                    if (_customerLoading) const LinearProgressIndicator(),
+                    if (_customerSuggestions.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
                         child: Material(
@@ -1378,17 +1378,17 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                             child: ListView.builder(
                               shrinkWrap: true,
                               padding: EdgeInsets.zero,
-                              itemCount: _vipSuggestions.length,
+                              itemCount: _customerSuggestions.length,
                               itemBuilder: (BuildContext _, int i) {
-                                final VipCustomerRow r = _vipSuggestions[i];
+                                final GeneralCustomerRow r = _customerSuggestions[i];
                                 return ListTile(
                                   dense: true,
                                   title: Text(r.displayLabel),
                                   onTap: () {
                                     FocusManager.instance.primaryFocus?.unfocus();
                                     setState(() {
-                                      _selectedVip = r;
-                                      _vipSuggestions = <VipCustomerRow>[];
+                                      _selectedCustomer = r;
+                                      _customerSuggestions = <GeneralCustomerRow>[];
                                     });
                                   },
                                 );

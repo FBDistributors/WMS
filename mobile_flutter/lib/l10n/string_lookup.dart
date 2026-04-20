@@ -223,7 +223,7 @@ abstract final class StringLookup {
     'kirimCompleteReceiving': 'Qabulni yakunlash',
     'kirimQtyExceedsStock': 'Mavjud miqdordan oshmasin',
     'kirimSentOk': 'Yuborildi',
-    'returnsCustomerSearchLabel': 'Mijoz (VIP) qidiruv',
+    'returnsCustomerSearchLabel': 'Mijoz qidiruv',
     'returnsCustomerRequired': 'Mijozni tanlang.',
     'returnsApproveAssignNeedPermission':
         'Hujjat yaratildi. Tasdiq va yig\'uvchini biriktirish uchun documents:edit_status kerak.',
@@ -435,7 +435,7 @@ abstract final class StringLookup {
     'kirimCompleteReceiving': 'Завершить приёмку',
     'kirimQtyExceedsStock': 'Не больше доступного количества',
     'kirimSentOk': 'Отправлено',
-    'returnsCustomerSearchLabel': 'Клиент (VIP), поиск',
+    'returnsCustomerSearchLabel': 'Поиск клиента',
     'returnsCustomerRequired': 'Выберите клиента.',
     'returnsApproveAssignNeedPermission':
         'Документ создан. Для подтверждения и назначения сборщика нужно право documents:edit_status.',
@@ -647,7 +647,7 @@ abstract final class StringLookup {
     'kirimCompleteReceiving': 'Complete receiving',
     'kirimQtyExceedsStock': 'Cannot exceed available quantity',
     'kirimSentOk': 'Sent',
-    'returnsCustomerSearchLabel': 'Customer (VIP) search',
+    'returnsCustomerSearchLabel': 'Customer search',
     'returnsCustomerRequired': 'Select a customer.',
     'returnsApproveAssignNeedPermission':
         'Document created. documents:edit_status is required to approve and assign a picker.',

@@ -21,8 +21,8 @@ class ScanActionButton extends StatelessWidget {
         child: OutlinedButton(
           onPressed: onPressed,
           style: OutlinedButton.styleFrom(
-            minimumSize: const Size(48, 48),
-            fixedSize: const Size(48, 48),
+            minimumSize: const Size(56, 56),
+            fixedSize: const Size(56, 56),
             padding: EdgeInsets.zero,
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             shape: RoundedRectangleBorder(
