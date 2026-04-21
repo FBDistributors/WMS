@@ -106,30 +106,27 @@ void showAppSnackBar(
                           shape: shape,
                           elevation: elevation,
                           clipBehavior: clipBehavior,
-                          child: SafeArea(
-                            bottom: false,
-                            child: Padding(
-                              padding: padding,
-                              child: _TopSnackBarContent(
-                                content: snackBar.content,
-                                contentTextStyle:
-                                    barTheme.contentTextStyle ??
-                                    theme.textTheme.bodyMedium?.copyWith(
-                                      color: fgColor,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      height: 1.0,
-                                    ),
-                                leadingIcon: leadingIcon,
-                                leadingColor: fgColor,
-                                action: snackBar.action,
-                                showCloseIcon: snackBar.showCloseIcon ?? false,
-                                closeIconColor:
-                                    snackBar.closeIconColor ??
-                                    barTheme.closeIconColor ??
-                                    fgColor,
-                                onClose: handle.dismiss,
-                              ),
+                          child: Padding(
+                            padding: padding,
+                            child: _TopSnackBarContent(
+                              content: snackBar.content,
+                              contentTextStyle:
+                                  barTheme.contentTextStyle ??
+                                  theme.textTheme.bodyMedium?.copyWith(
+                                    color: fgColor,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.0,
+                                  ),
+                              leadingIcon: leadingIcon,
+                              leadingColor: fgColor,
+                              action: snackBar.action,
+                              showCloseIcon: snackBar.showCloseIcon ?? false,
+                              closeIconColor:
+                                  snackBar.closeIconColor ??
+                                  barTheme.closeIconColor ??
+                                  fgColor,
+                              onClose: handle.dismiss,
                             ),
                           ),
                         ),
