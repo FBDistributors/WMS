@@ -74,7 +74,7 @@ void showAppSnackBar(
       final Clip clipBehavior = snackBar.clipBehavior;
       final EdgeInsetsGeometry padding =
           snackBar.padding ??
-          const EdgeInsets.symmetric(horizontal: 9, vertical: 6);
+          const EdgeInsets.symmetric(horizontal: 8, vertical: 5);
       final IconData leadingIcon = _toastIcon(type);
 
       return Positioned(
@@ -116,7 +116,7 @@ void showAppSnackBar(
                                     barTheme.contentTextStyle ??
                                     theme.textTheme.bodyMedium?.copyWith(
                                       color: fgColor,
-                                      fontSize: 14,
+                                      fontSize: 13,
                                       fontWeight: FontWeight.w600,
                                       height: 1.1,
                                     ),
@@ -238,22 +238,26 @@ class _TopSnackBarContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Widget centeredContent = _centeredToastContent(content);
-    final double maxTextWidth = MediaQuery.sizeOf(context).width * 0.58;
+    final double maxTextWidth = MediaQuery.sizeOf(context).width * 0.46;
     final List<Widget> rowChildren = <Widget>[
-      Icon(leadingIcon, color: leadingColor, size: 15),
-      const SizedBox(width: 4),
+      Icon(leadingIcon, color: leadingColor, size: 14),
+      const SizedBox(width: 3),
       ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxTextWidth),
-        child: DefaultTextStyle(
-          style: contentTextStyle ?? const TextStyle(),
-          textAlign: TextAlign.center,
-          child: centeredContent,
+        child: Align(
+          alignment: Alignment.center,
+          widthFactor: 1,
+          child: DefaultTextStyle(
+            style: contentTextStyle ?? const TextStyle(),
+            textAlign: TextAlign.center,
+            child: centeredContent,
+          ),
         ),
       ),
     ];
 
     if (action != null) {
-      rowChildren.add(const SizedBox(width: 4));
+      rowChildren.add(const SizedBox(width: 3));
       rowChildren.add(action!);
     }
     if (showCloseIcon) {
