@@ -182,7 +182,7 @@ void showAppTopStatusText(
   showAppSnackBar(
     context,
     SnackBar(
-      content: Center(child: Text(text, textAlign: TextAlign.center)),
+      content: Text(text, textAlign: TextAlign.center),
       duration: duration,
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -240,12 +240,10 @@ class _TopSnackBarContent extends StatelessWidget {
       const SizedBox(width: 8),
       Flexible(
         fit: FlexFit.loose,
-        child: Center(
-          child: DefaultTextStyle(
-            style: contentTextStyle ?? const TextStyle(),
-            textAlign: TextAlign.center,
-            child: centeredContent,
-          ),
+        child: DefaultTextStyle(
+          style: contentTextStyle ?? const TextStyle(),
+          textAlign: TextAlign.center,
+          child: centeredContent,
         ),
       ),
     ];
@@ -314,7 +312,7 @@ Widget _centeredToastContent(Widget content) {
       );
     }
   }
-  return Center(child: content);
+  return content;
 }
 
 Color _toastBgColor(AppToastType type) {
