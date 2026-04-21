@@ -17,6 +17,7 @@ import '../../../core/router/scanner_args.dart';
 import '../../../l10n/string_lookup.dart';
 import '../../../shared/input/input_clear_button.dart';
 import '../../../shared/input/stock_quantity_input.dart';
+import '../../../shared/feedback/app_top_snackbar.dart';
 import '../../../shared/layout/sheet_bottom_inset.dart';
 import '../../../shared/widgets/scan_action_button.dart';
 import '../alternate_location_menu_label.dart' show mergeAlternateLocationsForDisplay, MergedAlternateLocationRow;
@@ -230,7 +231,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
         return;
       }
       final Color iconColor = Colors.green.shade700;
-      ScaffoldMessenger.of(context).showSnackBar(
+      showAppSnackBar(context,
         SnackBar(
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 3),
@@ -271,7 +272,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     } on Exception catch (e) {
       if (mounted) {
         _rejectScanHaptic();
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showAppSnackBar(context, SnackBar(content: Text('$e')));
       }
     } finally {
       if (mounted) {
@@ -332,7 +333,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     final PickingLine? line = _findLineByScan(doc.lines, barcode);
     if (line == null) {
       _rejectScanHaptic();
-      ScaffoldMessenger.of(context).showSnackBar(
+      showAppSnackBar(context,
         SnackBar(content: Text(StringLookup.t(loc, 'productNotInOrder'))),
       );
       return;
@@ -355,14 +356,14 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     final AppLocale loc = ref.read(appLocaleProvider);
     if (physical == null) {
       _rejectScanHaptic();
-      ScaffoldMessenger.of(context).showSnackBar(
+      showAppSnackBar(context,
         SnackBar(content: Text(StringLookup.t(loc, 'notFound'))),
       );
       return;
     }
     if (!_barcodeMatchesLine(barcode, physical)) {
       _rejectScanHaptic();
-      ScaffoldMessenger.of(context).showSnackBar(
+      showAppSnackBar(context,
         SnackBar(
           content: Text(
             '${StringLookup.t(loc, 'wrongBarcodeMessage')}'
@@ -391,14 +392,14 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     }
     if (line == null) {
       _rejectScanHaptic();
-      ScaffoldMessenger.of(context).showSnackBar(
+      showAppSnackBar(context,
         SnackBar(content: Text(StringLookup.t(loc, 'notFound'))),
       );
       return;
     }
     if (!_barcodeMatchesLine(barcode, line)) {
       _rejectScanHaptic();
-      ScaffoldMessenger.of(context).showSnackBar(
+      showAppSnackBar(context,
         SnackBar(
           content: Text(
             '${StringLookup.t(loc, 'wrongBarcodeMessage')}'
@@ -466,7 +467,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                     onPressed: () async {
                       if (_controllerQtyMismatch(qty.text, aggPicked)) {
                         _rejectScanHaptic();
-                        ScaffoldMessenger.of(hostContext).showSnackBar(
+                        showAppSnackBar(hostContext,
                           SnackBar(
                             content: Text(
                               '${StringLookup.t(loc, 'qtyMismatch')}: ${physical.productName}',
@@ -516,7 +517,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
       final AppLocale loc = ref.read(appLocaleProvider);
       if (!online) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(context,
           SnackBar(
             content: Text(
               StringLookup.tParams(
@@ -538,7 +539,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
         final PickingLine? line = _findLineByScan(doc.lines, code);
         if (line == null) {
           _rejectScanHaptic();
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(context,
             SnackBar(content: Text(StringLookup.t(loc, 'productNotInOrder'))),
           );
           return;
@@ -548,7 +549,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       } on Exception catch (e) {
         if (mounted) {
           _rejectScanHaptic();
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+          showAppSnackBar(context, SnackBar(content: Text('$e')));
         }
       } finally {
         if (mounted) {
@@ -587,7 +588,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     } on Exception catch (e) {
       if (mounted) {
         _rejectScanHaptic();
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showAppSnackBar(context, SnackBar(content: Text('$e')));
       }
     } finally {
       if (mounted) {
@@ -740,7 +741,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
           }
         } on Exception catch (e) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+            showAppSnackBar(context, SnackBar(content: Text('$e')));
           }
         } finally {
           if (mounted) {
@@ -757,7 +758,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
           (PickingLine l) => _verifiedLineIds.contains(l.id),
         );
         if (!allOk) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(context,
             SnackBar(content: Text(StringLookup.t(loc, 'verifyAllPickedLines'))),
           );
           return;
@@ -807,7 +808,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     } on Exception catch (e) {
       if (mounted) {
         _rejectScanHaptic();
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showAppSnackBar(context, SnackBar(content: Text('$e')));
       }
     } finally {
       if (mounted) {
@@ -899,14 +900,14 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                 final PickingLine? match = _findLineByScan(doc.lines, t);
                                 if (match == null) {
                                   _rejectScanHaptic();
-                                  ScaffoldMessenger.of(context).showSnackBar(
+                                  showAppSnackBar(context,
                                     SnackBar(content: Text(StringLookup.t(loc, 'productNotInOrder'))),
                                   );
                                   return;
                                 }
                                 if (!group.members.any((PickingLine m) => m.id == match.id)) {
                                   _rejectScanHaptic();
-                                  ScaffoldMessenger.of(context).showSnackBar(
+                                  showAppSnackBar(context,
                                     SnackBar(content: Text(StringLookup.t(loc, 'wrongBarcodeTitle'))),
                                   );
                                   return;
@@ -972,7 +973,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                 _aggregateQtyPicked(group.members);
                             if (_controllerQtyMismatch(qty.text, aggPickConfirm)) {
                               _rejectScanHaptic();
-                              ScaffoldMessenger.of(context).showSnackBar(
+                              showAppSnackBar(context,
                                 SnackBar(
                                   content: Text(
                                     '${StringLookup.t(loc, 'qtyMismatch')}: ${physical.productName}',
@@ -1021,7 +1022,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                   });
                                 } else {
                                   _rejectScanHaptic();
-                                  ScaffoldMessenger.of(context).showSnackBar(
+                                  showAppSnackBar(context,
                                     SnackBar(
                                       content: Text(
                                         '${StringLookup.t(loc, 'wrongBarcodeMessage')}${stock.barcode ?? stock.sku ?? '—'}',
@@ -1076,7 +1077,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                               final double rem = stock.qtyRequired - stock.qtyPicked;
                             if (delta < 1 || delta > rem) {
                               _rejectScanHaptic();
-                              ScaffoldMessenger.of(context).showSnackBar(
+                              showAppSnackBar(context,
                                 SnackBar(
                                   content: Text(
                                     StringLookup.tParams(
@@ -1124,8 +1125,10 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                             } on Exception catch (e) {
                               if (mounted) {
                                 _rejectScanHaptic();
-                                ScaffoldMessenger.of(context)
-                                    .showSnackBar(SnackBar(content: Text('$e')));
+                                showAppSnackBar(
+                                  context,
+                                  SnackBar(content: Text('$e')),
+                                );
                               }
                             } finally {
                               setM(() => sheetBusy = false);
@@ -1172,7 +1175,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                       lotId: a.lotId,
                                     );
                                 if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
+                                  showAppSnackBar(context,
                                     SnackBar(
                                       content: Text(StringLookup.t(loc, 'pickSwitchSourceDone')),
                                     ),
@@ -1187,8 +1190,10 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                               } on Exception catch (e) {
                                 if (mounted) {
                                   _rejectScanHaptic();
-                                  ScaffoldMessenger.of(context)
-                                      .showSnackBar(SnackBar(content: Text('$e')));
+                                  showAppSnackBar(
+                                    context,
+                                    SnackBar(content: Text('$e')),
+                                  );
                                 }
                               }
                             },
@@ -1214,7 +1219,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     final AppLocale loc = ref.read(appLocaleProvider);
     final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
     if (!online) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      showAppSnackBar(context,
         SnackBar(content: Text(StringLookup.t(loc, 'reportReasonOffline'))),
       );
       return;
@@ -1252,7 +1257,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                   } on Exception catch (e) {
                     if (mounted) {
                       _rejectScanHaptic();
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+                      showAppSnackBar(context, SnackBar(content: Text('$e')));
                     }
                   }
                 },

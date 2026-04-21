@@ -8,6 +8,7 @@ import '../../inventory/data/models/picker_inventory_models.dart';
 import '../../inventory/data/picker_location_format.dart';
 import '../../inventory/presentation/inventory_providers.dart';
 import '../../../l10n/string_lookup.dart';
+import '../../../shared/feedback/app_top_snackbar.dart';
 import '../customer_returns_providers.dart';
 import '../data/customer_returns_models.dart';
 
@@ -130,7 +131,8 @@ class _CustomerReturnsQueueScreenState extends ConsumerState<CustomerReturnsQueu
                                           _selectedLocationByReturn[c.id];
                                       if (selectedLocationId == null || selectedLocationId.isEmpty) {
                                         if (context.mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
+                                          showAppSnackBar(
+                                            context,
                                             const SnackBar(
                                               content: Text('Avval qabul lokatsiyasini tanlang'),
                                             ),
@@ -148,7 +150,8 @@ class _CustomerReturnsQueueScreenState extends ConsumerState<CustomerReturnsQueu
                                       );
                                   if (context.mounted) {
                                     ref.invalidate(customerReturnsQueueProvider);
-                                    ScaffoldMessenger.of(context).showSnackBar(
+                                    showAppSnackBar(
+                                      context,
                                       SnackBar(
                                         content: Text(StringLookup.t(loc, 'returnsCompleted')),
                                       ),
@@ -156,7 +159,8 @@ class _CustomerReturnsQueueScreenState extends ConsumerState<CustomerReturnsQueu
                                   }
                                 } on Exception catch (e) {
                                   if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
+                                    showAppSnackBar(
+                                      context,
                                       SnackBar(content: Text('$e')),
                                     );
                                   }

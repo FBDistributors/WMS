@@ -10,6 +10,7 @@ import '../../../core/formatting/expiry_display_format.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../core/router/scanner_args.dart';
 import '../../../l10n/string_lookup.dart';
+import '../../../shared/feedback/app_top_snackbar.dart';
 import '../../auth/presentation/auth_providers.dart';
 import '../../customer_returns/customer_returns_providers.dart';
 import '../../customer_returns/data/customer_returns_models.dart';
@@ -257,7 +258,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     if (q < 1) {
       if (mounted) {
         final AppLocale loc = ref.read(appLocaleProvider);
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+        context,
           SnackBar(content: Text(StringLookup.t(loc, 'kirimNewReceiveFillAll'))),
         );
       }
@@ -265,7 +267,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     }
     if (q > pick.availableQty.floor()) {
       final AppLocale loc = ref.read(appLocaleProvider);
-      ScaffoldMessenger.of(context).showSnackBar(
+      showAppSnackBar(
+        context,
         SnackBar(content: Text(StringLookup.t(loc, 'kirimQtyExceedsStock'))),
       );
       return;
@@ -472,7 +475,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     final List<String> perms = session.me?.permissions ?? const <String>[];
     if (!perms.contains('documents:edit_status')) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+        context,
           SnackBar(content: Text(StringLookup.t(locMsg, 'returnsApproveAssignNeedPermission'))),
         );
       }
@@ -480,7 +484,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     }
     if (_selectedCustomer == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+        context,
           SnackBar(content: Text(StringLookup.t(locMsg, 'returnsCustomerRequired'))),
         );
       }
@@ -515,7 +520,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         if (pickerId != null && pickerId.isNotEmpty) {
           await ref.read(customerReturnsRepositoryProvider).assignPicker(doc.id, pickerId);
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            showAppSnackBar(
+        context,
               SnackBar(content: Text(StringLookup.t(locMsg, 'returnsFlowDone'))),
             );
           }
@@ -526,7 +532,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       }
     } on Exception catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showAppSnackBar(context, SnackBar(content: Text('$e')));
       }
     } finally {
       if (mounted) {
@@ -542,7 +548,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     final AppLocale locMsg = ref.read(appLocaleProvider);
     void showFillAll() {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+        context,
           SnackBar(content: Text(StringLookup.t(locMsg, 'kirimNewReceiveFillAll'))),
         );
       }
@@ -608,7 +615,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       }
     } on Exception catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showAppSnackBar(context, SnackBar(content: Text('$e')));
       }
     } finally {
       if (mounted) {
@@ -883,15 +890,18 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       }
       if (mounted) {
         if (forbidden) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+        context,
             const SnackBar(content: Text('Inventarizatsiya uchun ruxsat yo‘q')),
           );
         } else if (hadError) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+        context,
             const SnackBar(content: Text('Ayrim qatorlar yuborilmadi')),
           );
         } else if (sent.isNotEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+        context,
             const SnackBar(content: Text('Saqlandi')),
           );
           setState(() => _invActualQty.clear());
@@ -913,7 +923,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     final int actual = int.tryParse(_invScanActualQty.text.trim()) ?? 0;
     final double delta = actual.toDouble() - loc.availableQty;
     if (delta == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      showAppSnackBar(
+        context,
         const SnackBar(content: Text('O‘zgarish yo‘q')),
       );
       return;
@@ -928,7 +939,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             reasonCode: delta < 0 ? 'inventory_shortage' : 'inventory_overage',
           );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+        context,
           const SnackBar(content: Text('Tuzatildi')),
         );
         setState(() {
@@ -941,13 +953,14 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       }
     } on StockMovementForbiddenException {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+        context,
           const SnackBar(content: Text('Inventarizatsiya uchun ruxsat yo‘q')),
         );
       }
     } on Exception catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showAppSnackBar(context, SnackBar(content: Text('$e')));
       }
     } finally {
       if (mounted) {
@@ -1618,7 +1631,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                           child: GestureDetector(
                             behavior: HitTestBehavior.translucent,
                             onTap: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
+                              showAppSnackBar(
+        context,
                                 SnackBar(
                                   content: Text(StringLookup.t(appLoc, 'kirimSelectProductFirst')),
                                 ),

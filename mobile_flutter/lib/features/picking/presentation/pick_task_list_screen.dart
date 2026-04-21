@@ -10,6 +10,7 @@ import '../../../core/app_state/locale_controller.dart';
 import '../../../core/app_state/network_status_provider.dart';
 import '../../../core/app_state/theme_controller.dart';
 import '../../../l10n/string_lookup.dart';
+import '../../../shared/feedback/app_top_snackbar.dart';
 import '../../../shared/widgets/app_header.dart';
 import '../../../shared/widgets/consolidated_pick_content.dart';
 import '../../../shared/widgets/consolidated_top_pick_qty_sheet.dart';
@@ -228,7 +229,10 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
       }
     } on Exception catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showAppSnackBar(
+          context,
+          SnackBar(content: Text('$e')),
+        );
       }
       return;
     }
@@ -279,7 +283,8 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
     }
     if (!online) {
       final AppLocale loc = ref.read(appLocaleProvider);
-      ScaffoldMessenger.of(context).showSnackBar(
+      showAppSnackBar(
+        context,
         SnackBar(content: Text(StringLookup.t(loc, 'loadError'))),
       );
       return;
@@ -316,7 +321,7 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
                   await _openControllerModal(doc);
                 } on Exception catch (e) {
                   if (ctx.mounted) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('$e')));
+                    showAppSnackBar(ctx, SnackBar(content: Text('$e')));
                   }
                 } finally {
                   if (context.mounted) {
@@ -360,12 +365,16 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
         return;
       }
       unawaited(ref.read(openPickTasksProvider.notifier).refreshFromNetwork());
-      ScaffoldMessenger.of(context).showSnackBar(
+      showAppSnackBar(
+        context,
         SnackBar(content: Text(StringLookup.t(loc, 'cancelOrderSuccess'))),
       );
     } on Exception catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showAppSnackBar(
+          context,
+          SnackBar(content: Text('$e')),
+        );
       }
     }
   }
@@ -433,7 +442,10 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
       }
     } on Exception catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showAppSnackBar(
+          context,
+          SnackBar(content: Text('$e')),
+        );
       }
       return;
     }
@@ -506,7 +518,10 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
                       <String, String>{'ok': '$ok', 'fail': '$fail'},
                     );
                   }
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+                  showAppSnackBar(
+                    context,
+                    SnackBar(content: Text(msg)),
+                  );
                 } finally {
                   if (context.mounted) {
                     setModal(() => sending = false);
@@ -539,7 +554,8 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
       if (!online) {
         final AppLocale loc = ref.read(appLocaleProvider);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+        context,
             SnackBar(content: Text(StringLookup.t(loc, 'loadError'))),
           );
         }
@@ -572,12 +588,16 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
       setState(() => _consolidatedRefreshKey++);
       unawaited(ref.read(openPickTasksProvider.notifier).refreshFromNetwork());
       unawaited(ref.read(consolidatedViewProvider.notifier).refreshFromNetwork());
-      ScaffoldMessenger.of(context).showSnackBar(
+      showAppSnackBar(
+        context,
         SnackBar(content: Text(StringLookup.t(loc, 'sendToControllerDone'))),
       );
     } on Exception catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showAppSnackBar(
+          context,
+          SnackBar(content: Text('$e')),
+        );
       }
     }
   }
@@ -595,7 +615,8 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
     }
     if (!view.hasValue) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+        context,
           SnackBar(content: Text(StringLookup.t(loc, 'loading'))),
         );
       }
@@ -604,7 +625,8 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
     final int? openQty = consolidatedOpenPickQtyForBarcode(b, view.requireValue.products);
     if (openQty == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+        context,
           SnackBar(content: Text(StringLookup.t(loc, 'productNotInOrder'))),
         );
       }
@@ -612,7 +634,8 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
     }
     if (openQty < 1) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+        context,
           SnackBar(content: Text(StringLookup.t(loc, 'consolidatedNothingToPick'))),
         );
       }
@@ -622,7 +645,8 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
         consolidatedProductForBarcode(b, view.requireValue.products);
     if (product == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+        context,
           SnackBar(content: Text(StringLookup.t(loc, 'productNotInOrder'))),
         );
       }

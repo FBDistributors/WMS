@@ -7,6 +7,7 @@ import '../../core/app_state/app_locale.dart';
 import '../../features/picking/data/picking_models.dart';
 import '../../features/picking/picking_providers.dart';
 import '../../l10n/string_lookup.dart';
+import '../feedback/app_top_snackbar.dart';
 import '../input/stock_quantity_input.dart';
 import '../layout/sheet_bottom_inset.dart';
 import 'consolidated_pick_success_snackbar.dart';
@@ -79,7 +80,8 @@ class _ConsolidatedTopPickQtySheetState extends State<_ConsolidatedTopPickQtyShe
     final int maxPick = max(0, rem.round());
     if (q < 1 || q > maxPick) {
       if (widget.host.mounted) {
-        ScaffoldMessenger.of(widget.host).showSnackBar(
+        showAppSnackBar(
+          widget.host,
           SnackBar(
             content: Text(
               StringLookup.tParams(
@@ -111,7 +113,10 @@ class _ConsolidatedTopPickQtySheetState extends State<_ConsolidatedTopPickQtyShe
       widget.onSuccess?.call();
     } on Exception catch (e) {
       if (widget.host.mounted) {
-        ScaffoldMessenger.of(widget.host).showSnackBar(SnackBar(content: Text('$e')));
+        showAppSnackBar(
+          widget.host,
+          SnackBar(content: Text('$e')),
+        );
       }
     } finally {
       if (mounted) {

@@ -8,6 +8,7 @@ import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../core/app_state/theme_controller.dart';
 import '../../../l10n/string_lookup.dart';
+import '../../../shared/feedback/app_top_snackbar.dart';
 import '../../../shared/input/input_clear_button.dart';
 import '../data/picking_models.dart';
 import '../picking_providers.dart';
@@ -153,7 +154,7 @@ class _PickerWorkScreenState extends ConsumerState<PickerWorkScreen> {
   }
 
   void _toast(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    showAppSnackBar(context, SnackBar(content: Text(msg)));
   }
 
   void _onBarcodeSubmit() {

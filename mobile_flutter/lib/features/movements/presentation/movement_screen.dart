@@ -9,6 +9,7 @@ import '../../../core/app_state/network_status_provider.dart';
 import '../../../core/formatting/expiry_display_format.dart';
 import '../../../core/router/scanner_args.dart';
 import '../../../l10n/string_lookup.dart';
+import '../../../shared/feedback/app_top_snackbar.dart';
 import '../../inventory/data/models/picker_inventory_models.dart';
 import '../../inventory/presentation/inventory_providers.dart';
 import '../../../shared/input/input_clear_button.dart';
@@ -205,7 +206,8 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
     final int max = from.availableQty.floor();
     if (n < 1 || n > max || from.locationId == to.id) {
       final AppLocale loc = ref.read(appLocaleProvider);
-      ScaffoldMessenger.of(context).showSnackBar(
+      showAppSnackBar(
+        context,
         SnackBar(content: Text(StringLookup.t(loc, 'movementQtyOrLocationInvalid'))),
       );
       return;
@@ -233,7 +235,8 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
       );
       if (mounted) {
         final AppLocale loc = ref.read(appLocaleProvider);
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+        context,
           SnackBar(content: Text(StringLookup.t(loc, 'movementTransferred'))),
         );
         setState(() {
@@ -249,7 +252,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
       }
     } on Exception catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showAppSnackBar(context, SnackBar(content: Text('$e')));
       }
     } finally {
       if (mounted) {
@@ -276,7 +279,8 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
         final int max = item.availableQty.floor();
         if (qty < 1 || qty > max) {
           final AppLocale loc = ref.read(appLocaleProvider);
-          ScaffoldMessenger.of(context).showSnackBar(
+          showAppSnackBar(
+        context,
             SnackBar(content: Text(StringLookup.t(loc, 'movementPalletQtyInvalid'))),
           );
           return;
@@ -291,7 +295,8 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
       }
       if (lines.isEmpty) {
         final AppLocale loc = ref.read(appLocaleProvider);
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+        context,
           SnackBar(content: Text(StringLookup.t(loc, 'movementPalletSelectAtLeastOne'))),
         );
         return;
@@ -310,7 +315,8 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
           );
       if (mounted) {
         final AppLocale loc = ref.read(appLocaleProvider);
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+        context,
           SnackBar(content: Text(StringLookup.t(loc, 'movementPalletTransferred'))),
         );
         setState(() {
@@ -328,7 +334,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
       }
     } on Exception catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showAppSnackBar(context, SnackBar(content: Text('$e')));
       }
     } finally {
       if (mounted) {

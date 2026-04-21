@@ -10,6 +10,7 @@ import '../../../core/app_state/profile_type_controller.dart';
 import '../../../core/app_state/theme_controller.dart';
 import '../../../core/offline/offline_providers.dart';
 import '../../../l10n/string_lookup.dart';
+import '../../../shared/feedback/app_top_snackbar.dart';
 import '../../../shared/widgets/app_header.dart';
 import '../../../shared/widgets/picker_footer.dart';
 import '../domain/profile_type_param.dart';
@@ -46,7 +47,8 @@ class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
+      showAppSnackBar(
+        context,
         SnackBar(content: Text(Uri.decodeComponent(msg))),
       );
       context.goNamed(

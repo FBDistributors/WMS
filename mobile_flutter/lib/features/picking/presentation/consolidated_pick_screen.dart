@@ -6,6 +6,7 @@ import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../core/app_state/theme_controller.dart';
 import '../../../l10n/string_lookup.dart';
+import '../../../shared/feedback/app_top_snackbar.dart';
 import '../../../shared/widgets/consolidated_pick_content.dart';
 import '../../../shared/widgets/consolidated_top_pick_qty_sheet.dart';
 import '../data/picking_models.dart';
@@ -55,7 +56,8 @@ class _ConsolidatedPickScreenState extends ConsumerState<ConsolidatedPickScreen>
     }
     if (!view.hasValue) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           SnackBar(content: Text(StringLookup.t(loc, 'loading'))),
         );
       }
@@ -64,7 +66,8 @@ class _ConsolidatedPickScreenState extends ConsumerState<ConsolidatedPickScreen>
     final int? openQty = consolidatedOpenPickQtyForBarcode(b, view.requireValue.products);
     if (openQty == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           SnackBar(content: Text(StringLookup.t(loc, 'productNotInOrder'))),
         );
       }
@@ -72,7 +75,8 @@ class _ConsolidatedPickScreenState extends ConsumerState<ConsolidatedPickScreen>
     }
     if (openQty < 1) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           SnackBar(content: Text(StringLookup.t(loc, 'consolidatedNothingToPick'))),
         );
       }
@@ -82,7 +86,8 @@ class _ConsolidatedPickScreenState extends ConsumerState<ConsolidatedPickScreen>
         consolidatedProductForBarcode(b, view.requireValue.products);
     if (product == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showAppSnackBar(
+          context,
           SnackBar(content: Text(StringLookup.t(loc, 'productNotInOrder'))),
         );
       }

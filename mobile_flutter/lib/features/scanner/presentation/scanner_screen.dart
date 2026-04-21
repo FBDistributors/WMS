@@ -10,6 +10,7 @@ import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../core/router/scanner_args.dart';
 import '../../../l10n/string_lookup.dart';
+import '../../../shared/feedback/app_top_snackbar.dart';
 import '../../inventory/presentation/inventory_barcode_resolve_extra.dart';
 import '../../picking/domain/profile_type_param.dart';
 import '../../picking/picking_providers.dart';
@@ -223,7 +224,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
   void _showError(String msg) {
     HapticFeedback.heavyImpact();
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    showAppSnackBar(context, SnackBar(content: Text(msg)));
     _resetScanGuards();
   }
 

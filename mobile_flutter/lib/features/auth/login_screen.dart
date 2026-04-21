@@ -11,6 +11,7 @@ import '../../core/config/brand.dart';
 import '../../core/app_state/prefs_keys.dart';
 import '../../core/storage/shared_preferences_provider.dart';
 import '../../l10n/string_lookup.dart';
+import '../../shared/feedback/app_top_snackbar.dart';
 import '../../shared/input/input_clear_button.dart';
 import 'presentation/auth_providers.dart';
 
@@ -60,7 +61,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final String u = _user.text.trim();
     final String p = _pass.text.trim();
     if (u.isEmpty || p.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      showAppSnackBar(
+        context,
         SnackBar(content: Text(StringLookup.t(loc, 'enterLoginPassword'))),
       );
       return;
@@ -83,11 +85,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       return;
     }
     if (err != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      showAppSnackBar(
+        context,
         SnackBar(content: Text(err.toString())),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
+      showAppSnackBar(
+        context,
         SnackBar(content: Text(StringLookup.t(loc, 'loginError'))),
       );
     }

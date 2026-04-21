@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/offline/offline_database.dart';
 import '../../../core/offline/offline_providers.dart';
 import '../../../core/offline/offline_sync_service.dart';
+import '../../../shared/feedback/app_top_snackbar.dart';
 
 class QueueScreen extends ConsumerWidget {
   const QueueScreen({super.key});
@@ -31,7 +32,8 @@ class QueueScreen extends ConsumerWidget {
               ref.invalidate(_failedRowsProvider);
               ref.invalidate(pendingQueueCountProvider);
               if (context.mounted && !r.ok) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                showAppSnackBar(
+                  context,
                   SnackBar(content: Text(r.error ?? 'Sync failed')),
                 );
               }
