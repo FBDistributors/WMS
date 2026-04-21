@@ -22,3 +22,9 @@ final customerReturnsAssignedCountProvider = Provider.autoDispose<int>((Ref ref)
         orElse: () => 0,
       );
 });
+
+final customerReturnDetailProvider =
+    FutureProvider.autoDispose.family<CustomerReturn, String>(
+  (Ref ref, String returnId) =>
+      ref.watch(customerReturnsRepositoryProvider).getCustomerReturn(returnId),
+);

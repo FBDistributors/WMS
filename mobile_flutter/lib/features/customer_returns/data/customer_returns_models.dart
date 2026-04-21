@@ -43,6 +43,10 @@ class CustomerReturn {
     required this.createdByUserId,
     required this.approvedByUserId,
     required this.assignedPickerUserId,
+    required this.assignedByUserId,
+    required this.assignedAt,
+    required this.assignedByUserName,
+    required this.assignedPickerUserName,
     required this.createdAt,
     required this.updatedAt,
     required this.lines,
@@ -56,6 +60,10 @@ class CustomerReturn {
   final String? createdByUserId;
   final String? approvedByUserId;
   final String? assignedPickerUserId;
+  final String? assignedByUserId;
+  final String? assignedAt;
+  final String? assignedByUserName;
+  final String? assignedPickerUserName;
   final String createdAt;
   final String updatedAt;
   final List<CustomerReturnLine> lines;
@@ -80,6 +88,10 @@ class CustomerReturn {
       createdByUserId: json['created_by_user_id'] as String?,
       approvedByUserId: json['approved_by_user_id'] as String?,
       assignedPickerUserId: json['assigned_picker_user_id'] as String?,
+      assignedByUserId: json['assigned_by_user_id'] as String?,
+      assignedAt: json['assigned_at'] as String?,
+      assignedByUserName: json['assigned_by_user_name'] as String?,
+      assignedPickerUserName: json['assigned_picker_user_name'] as String?,
       createdAt: json['created_at']! as String,
       updatedAt: json['updated_at']! as String,
       lines: lines,
@@ -146,12 +158,33 @@ class CreateCustomerReturnLine {
 
 class CompleteCustomerReturnRequest {
   const CompleteCustomerReturnRequest({
+    this.locationId,
+    this.lines,
+  });
+
+  final String? locationId;
+  final List<CompleteCustomerReturnLineRequest>? lines;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+        if (locationId != null) 'location_id': locationId,
+        if (lines != null)
+          'lines': lines!
+              .map((CompleteCustomerReturnLineRequest e) => e.toJson())
+              .toList(growable: false),
+      };
+}
+
+class CompleteCustomerReturnLineRequest {
+  const CompleteCustomerReturnLineRequest({
+    required this.lineId,
     required this.locationId,
   });
 
+  final String lineId;
   final String locationId;
 
   Map<String, Object?> toJson() => <String, Object?>{
+        'line_id': lineId,
         'location_id': locationId,
       };
 }

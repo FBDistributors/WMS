@@ -106,12 +106,16 @@ class CustomerReturnsRepository {
 
   Future<CustomerReturn> completeCustomerReturn(
     String id, {
-    required String locationId,
+    String? locationId,
+    List<CompleteCustomerReturnLineRequest>? lines,
   }) async {
     try {
       final Response<Object?> res = await _dio.post<Object?>(
         '$_path/$id/complete',
-        data: CompleteCustomerReturnRequest(locationId: locationId).toJson(),
+        data: CompleteCustomerReturnRequest(
+          locationId: locationId,
+          lines: lines,
+        ).toJson(),
       );
       final Object? data = res.data;
       if (data is! Map) {

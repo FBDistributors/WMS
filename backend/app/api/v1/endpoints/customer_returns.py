@@ -75,6 +75,10 @@ class CustomerReturnOut(BaseModel):
     created_by_user_id: Optional[UUID] = None
     approved_by_user_id: Optional[UUID] = None
     assigned_picker_user_id: Optional[UUID] = None
+    assigned_by_user_id: Optional[UUID] = None
+    assigned_at: Optional[datetime] = None
+    assigned_by_user_name: Optional[str] = None
+    assigned_picker_user_name: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     lines: List[CustomerReturnLineOut]
@@ -89,8 +93,14 @@ class AssignPickerBody(BaseModel):
     picker_user_id: UUID
 
 
-class CompleteCustomerReturnBody(BaseModel):
+class CompleteCustomerReturnLineBody(BaseModel):
+    line_id: UUID
     location_id: UUID
+
+
+class CompleteCustomerReturnBody(BaseModel):
+    location_id: Optional[UUID] = None
+    lines: Optional[List[CompleteCustomerReturnLineBody]] = None
 
 
 def _generate_doc_no() -> str:
@@ -112,7 +122,12 @@ def _line_to_out(line: CustomerReturnLineModel) -> CustomerReturnLineOut:
     )
 
 
-def _to_out(cr: CustomerReturnModel) -> CustomerReturnOut:
+def _to_out(
+    cr: CustomerReturnModel,
+    *,
+    assigned_by_user_name: Optional[str] = None,
+    assigned_picker_user_name: Optional[str] = None,
+) -> CustomerReturnOut:
     return CustomerReturnOut(
         id=cr.id,
         doc_no=cr.doc_no,
@@ -122,10 +137,22 @@ def _to_out(cr: CustomerReturnModel) -> CustomerReturnOut:
         created_by_user_id=cr.created_by_user_id,
         approved_by_user_id=cr.approved_by_user_id,
         assigned_picker_user_id=cr.assigned_picker_user_id,
+        assigned_by_user_id=cr.assigned_by_user_id,
+        assigned_at=cr.assigned_at,
+        assigned_by_user_name=assigned_by_user_name,
+        assigned_picker_user_name=assigned_picker_user_name,
         created_at=cr.created_at,
         updated_at=cr.updated_at,
         lines=[_line_to_out(l) for l in cr.lines],
     )
+
+
+def _build_user_name_map(db: Session, user_ids: List[UUID]) -> dict[UUID, str]:
+    unique_ids = list({uid for uid in user_ids if uid is not None})
+    if not unique_ids:
+        return {}
+    users = db.query(UserModel.id, UserModel.full_name, UserModel.username).filter(UserModel.id.in_(unique_ids)).all()
+    return {u.id: (u.full_name or u.username or "").strip() for u in users}
 
 
 def _parse_expiry(s: Optional[str]):
@@ -260,7 +287,29 @@ async def list_customer_returns(
         q = q.filter(CustomerReturnModel.created_by_user_id == user.id)
     total = q.count()
     rows = q.order_by(CustomerReturnModel.created_at.desc()).offset(offset).limit(limit).all()
-    return CustomerReturnListOut(items=[_to_out(r) for r in rows], total=total)
+    user_name_map = _build_user_name_map(
+        db,
+        [
+            uid
+            for row in rows
+            for uid in (
+                row.assigned_by_user_id,
+                row.assigned_picker_user_id,
+            )
+            if uid is not None
+        ],
+    )
+    return CustomerReturnListOut(
+        items=[
+            _to_out(
+                r,
+                assigned_by_user_name=user_name_map.get(r.assigned_by_user_id),
+                assigned_picker_user_name=user_name_map.get(r.assigned_picker_user_id),
+            )
+            for r in rows
+        ],
+        total=total,
+    )
 
 
 @router.get("/{return_id}", response_model=CustomerReturnOut)
@@ -291,7 +340,15 @@ async def get_customer_return(
             pass
         else:
             raise HTTPException(status_code=404, detail="Not found")
-    return _to_out(cr)
+    user_name_map = _build_user_name_map(
+        db,
+        [uid for uid in (cr.assigned_by_user_id, cr.assigned_picker_user_id) if uid is not None],
+    )
+    return _to_out(
+        cr,
+        assigned_by_user_name=user_name_map.get(cr.assigned_by_user_id),
+        assigned_picker_user_name=user_name_map.get(cr.assigned_picker_user_id),
+    )
 
 
 @router.post("/{return_id}/controller-approve", response_model=CustomerReturnOut)
@@ -323,7 +380,7 @@ async def assign_picker_customer_return(
     return_id: UUID,
     payload: AssignPickerBody,
     db: Session = Depends(get_db),
-    _user: UserModel = Depends(get_current_user),
+    user: UserModel = Depends(get_current_user),
     _guard=Depends(require_permission("documents:edit_status")),
 ):
     cr = (
@@ -350,10 +407,16 @@ async def assign_picker_customer_return(
     if not picker:
         raise HTTPException(status_code=400, detail="Invalid picker user")
     cr.assigned_picker_user_id = payload.picker_user_id
+    cr.assigned_by_user_id = user.id
+    cr.assigned_at = datetime.utcnow()
     cr.status = CUSTOMER_RETURN_STATUS_ASSIGNED
     db.commit()
     db.refresh(cr)
-    return _to_out(cr)
+    return _to_out(
+        cr,
+        assigned_by_user_name=(user.full_name or user.username or "").strip(),
+        assigned_picker_user_name=(picker.full_name or picker.username or "").strip(),
+    )
 
 
 @router.post("/{return_id}/complete", response_model=CustomerReturnOut)
@@ -395,15 +458,32 @@ async def complete_customer_return(
     if not cr.lines:
         raise HTTPException(status_code=400, detail="No lines")
 
-    target_location = (
+    line_location_map: dict[UUID, UUID] = {}
+    if payload.lines:
+        for item in payload.lines:
+            line_location_map[item.line_id] = item.location_id
+    elif payload.location_id:
+        for line in cr.lines:
+            line_location_map[line.id] = payload.location_id
+    else:
+        raise HTTPException(status_code=400, detail="location_id or lines[] is required")
+
+    cr_line_ids = {line.id for line in cr.lines}
+    if set(line_location_map.keys()) != cr_line_ids:
+        raise HTTPException(status_code=400, detail="All return lines must have location mapping")
+
+    location_ids = list({loc_id for loc_id in line_location_map.values()})
+    locations = (
         db.query(LocationModel)
-        .filter(LocationModel.id == payload.location_id, LocationModel.is_active.is_(True))
-        .one_or_none()
+        .filter(LocationModel.id.in_(location_ids), LocationModel.is_active.is_(True))
+        .all()
     )
-    if not target_location:
-        raise HTTPException(status_code=400, detail="Target location not found")
+    location_map = {loc.id: loc for loc in locations}
+    if len(location_map) != len(location_ids):
+        raise HTTPException(status_code=400, detail="One or more target locations not found")
 
     for line in cr.lines:
+        target_location = location_map[line_location_map[line.id]]
         line.location_id = target_location.id
         line.location_code = target_location.code
         expiry_normalized = normalize_expiry_to_first_of_month(line.expiry_date)
@@ -449,4 +529,12 @@ async def complete_customer_return(
         .filter(CustomerReturnModel.id == return_id)
         .one()
     )
-    return _to_out(cr)
+    user_name_map = _build_user_name_map(
+        db,
+        [uid for uid in (cr.assigned_by_user_id, cr.assigned_picker_user_id) if uid is not None],
+    )
+    return _to_out(
+        cr,
+        assigned_by_user_name=user_name_map.get(cr.assigned_by_user_id),
+        assigned_picker_user_name=user_name_map.get(cr.assigned_picker_user_id),
+    )

@@ -10,6 +10,7 @@ import '../../features/inventory/presentation/inventory_barcode_resolve_screen.d
 import '../../features/inventory/presentation/inventory_detail_screen.dart';
 import '../../features/inventory/presentation/inventory_screen.dart';
 import '../../features/customer_returns/presentation/customer_returns_queue_screen.dart';
+import '../../features/customer_returns/presentation/customer_return_detail_screen.dart';
 import '../../features/kirim/presentation/kirim_form_screen.dart';
 import '../../features/kirim/presentation/kirim_hub_screen.dart';
 import '../../features/kirim/presentation/kirim_new_screen.dart';
@@ -58,6 +59,9 @@ final goRouterProvider = Provider<GoRouter>((Ref ref) {
         }
       }
       if (path == '/customer-returns-queue' && !perms.contains('picking:write')) {
+        return '/picker-home';
+      }
+      if (path.startsWith('/customer-returns-detail/') && !perms.contains('picking:write')) {
         return '/picker-home';
       }
       return null;
@@ -169,6 +173,14 @@ final goRouterProvider = Provider<GoRouter>((Ref ref) {
         path: '/customer-returns-queue',
         name: 'customerReturnsQueue',
         builder: (BuildContext context, GoRouterState state) => const CustomerReturnsQueueScreen(),
+      ),
+      GoRoute(
+        path: '/customer-returns-detail/:returnId',
+        name: 'customerReturnDetail',
+        builder: (BuildContext context, GoRouterState state) {
+          final String returnId = state.pathParameters['returnId']!;
+          return CustomerReturnDetailScreen(returnId: returnId);
+        },
       ),
       GoRoute(
         path: '/movement',

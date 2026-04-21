@@ -37,6 +37,10 @@ class CustomerReturn(Base):
     assigned_picker_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+    assigned_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    assigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -54,6 +58,7 @@ class CustomerReturn(Base):
         Index("ix_customer_returns_status", "status"),
         Index("ix_customer_returns_created_at", "created_at"),
         Index("ix_customer_returns_assigned_picker_user_id", "assigned_picker_user_id"),
+        Index("ix_customer_returns_assigned_by_user_id", "assigned_by_user_id"),
         Index("ix_customer_returns_customer_id", "customer_id"),
     )
 
