@@ -20,41 +20,15 @@ void routeAfterInventoryBarcodeLookup(
   if (a.returnToPick || a.returnToMovementPallet || a.returnToKirimLocation) {
     return;
   }
-  if (a.returnToKirimForm) {
-    router.goNamed(
-      'kirimForm',
-      queryParameters: <String, String>{
-        'flow': a.flow ?? 'return',
-        if (a.newMode != null) 'newMode': a.newMode!,
-        if (a.warehouse != null) 'warehouse': a.warehouse!,
-        'scannedProductId': product.productId,
-        if (product.barcode != null && product.barcode!.isNotEmpty)
-          'scannedBarcode': product.barcode!,
-        if (a.inventoryStep != null) 'inventoryStep': '${a.inventoryStep}',
-        if (a.inventoryLocationId != null) 'inventoryLocationId': a.inventoryLocationId!,
-        if (a.inventoryLocationCode != null) 'inventoryLocationCode': a.inventoryLocationCode!,
-        if (a.receivingLocationId != null) 'receivingLocationId': a.receivingLocationId!,
-        if (a.receivingLocationCode != null) 'receivingLocationCode': a.receivingLocationCode!,
-      },
-    );
+  // returnToKirimForm / returnToReturns: [InventoryBarcodeResolveScreen] pops productId
+  // so KirimForm state is preserved (avoid router.goNamed stack reset).
+  if (a.returnToKirimForm || a.returnToReturns) {
     return;
   }
   if (a.returnToMovement) {
     router.goNamed(
       'movement',
       queryParameters: <String, String>{
-        'scannedProductId': product.productId,
-        if (product.barcode != null && product.barcode!.isNotEmpty)
-          'scannedBarcode': product.barcode!,
-      },
-    );
-    return;
-  }
-  if (a.returnToReturns) {
-    router.goNamed(
-      'kirimForm',
-      queryParameters: <String, String>{
-        'flow': 'return',
         'scannedProductId': product.productId,
         if (product.barcode != null && product.barcode!.isNotEmpty)
           'scannedBarcode': product.barcode!,

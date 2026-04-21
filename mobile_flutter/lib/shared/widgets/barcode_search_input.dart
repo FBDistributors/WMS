@@ -253,16 +253,18 @@ class _BarcodeSearchInputState extends ConsumerState<BarcodeSearchInput> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         if (widget.onProductScanPressed != null)
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: <Widget>[
-              Expanded(child: inputField),
-              const SizedBox(width: 8),
-              ScanActionButton(
-                onPressed: widget.onProductScanPressed!,
-                compact: true,
-              ),
-            ],
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Expanded(child: inputField),
+                const SizedBox(width: 8),
+                ScanActionButton(
+                  onPressed: widget.onProductScanPressed!,
+                  compact: true,
+                ),
+              ],
+            ),
           )
         else
           inputField,

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
+import '../../../core/router/scanner_args.dart';
 import '../../../l10n/string_lookup.dart';
 import '../data/models/picker_inventory_models.dart';
 import 'inventory_barcode_resolve_extra.dart';
@@ -58,6 +59,17 @@ class _InventoryBarcodeResolveScreenState extends ConsumerState<InventoryBarcode
     WidgetsBinding.instance.addPostFrameCallback((_) => _resolve());
   }
 
+  void _finishLookupWithProduct(InventoryByBarcodeResponse product, GoRouter router) {
+    final ScannerArgs? a = widget.extra.args;
+    if (a != null && (a.returnToKirimForm || a.returnToReturns)) {
+      if (mounted) {
+        context.pop<String>(product.productId);
+      }
+      return;
+    }
+    routeAfterInventoryBarcodeLookup(router, product, a);
+  }
+
   Future<void> _resolve() async {
     if (_started) {
       return;
@@ -71,7 +83,7 @@ class _InventoryBarcodeResolveScreenState extends ConsumerState<InventoryBarcode
       if (!mounted) {
         return;
       }
-      routeAfterInventoryBarcodeLookup(router, product, widget.extra.args);
+      _finishLookupWithProduct(product, router);
     } on Object catch (e) {
       if (!mounted) {
         return;
@@ -91,10 +103,9 @@ class _InventoryBarcodeResolveScreenState extends ConsumerState<InventoryBarcode
             return;
           }
           if (pick.items.length == 1) {
-            routeAfterInventoryBarcodeLookup(
-              router,
+            _finishLookupWithProduct(
               _byBarcodeFromPickerItem(pick.items.first),
-              widget.extra.args,
+              router,
             );
             return;
           }

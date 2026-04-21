@@ -96,6 +96,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   final TextEditingController _kirimPutawaySearch = TextEditingController();
   bool _sending = false;
   String? _handledProductId;
+  int _barcodeFieldKey = 0;
 
   final TextEditingController _customerSearchController = TextEditingController();
   Timer? _customerDebounce;
@@ -218,6 +219,34 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     }
   }
 
+  Future<void> _openKirimProductScannerAndLoad() async {
+    if (_flow != 'new' && _flow != 'return') {
+      return;
+    }
+    final ScannerArgs extra = _flow == 'new'
+        ? ScannerArgs(
+            returnToKirimForm: true,
+            flow: 'new',
+            warehouse: _warehouse,
+            receivingLocationId: _receivingLocationId,
+            receivingLocationCode:
+                _receivingLocationCode.isEmpty ? null : _receivingLocationCode,
+          )
+        : ScannerArgs(
+            returnToKirimForm: true,
+            flow: 'return',
+            warehouse: _warehouse,
+          );
+    final String? id = await context.pushNamed<String>(
+      'scanner',
+      extra: extra,
+    );
+    if (!mounted || id == null || id.isEmpty) {
+      return;
+    }
+    await _loadProduct(id);
+  }
+
   Future<void> _addLineReturn() async {
     final PickerProductDetailResponse? p = _product;
     final PickerProductLocation? pick = _returnPick;
@@ -257,6 +286,14 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           expiryDate: lineExpiry,
         ),
       );
+      _product = null;
+      _returnPick = null;
+      _returnLineExpiry = null;
+      _qty.clear();
+      _productError = null;
+      _loadingProduct = false;
+      _handledProductId = null;
+      _barcodeFieldKey++;
     });
   }
 
@@ -1415,32 +1452,13 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                 ],
                 const SizedBox(height: 12),
                 BarcodeSearchInput(
+                  key: ValueKey<int>(_barcodeFieldKey),
                   onSelectProduct: _loadProduct,
                   label: StringLookup.t(appLoc, 'barcodeOrSku'),
                   showClearButton: true,
-                  onProductScanPressed: _flow == 'new'
-                      ? () => context.pushNamed(
-                            'scanner',
-                            extra: ScannerArgs(
-                              returnToKirimForm: true,
-                              flow: 'new',
-                              warehouse: _warehouse,
-                              receivingLocationId: _receivingLocationId,
-                              receivingLocationCode: _receivingLocationCode.isEmpty
-                                  ? null
-                                  : _receivingLocationCode,
-                            ),
-                          )
-                      : _flow == 'return'
-                          ? () => context.pushNamed(
-                                'scanner',
-                                extra: ScannerArgs(
-                                  returnToKirimForm: true,
-                                  flow: 'return',
-                                  warehouse: _warehouse,
-                                ),
-                              )
-                          : null,
+                  onProductScanPressed: (_flow == 'new' || _flow == 'return')
+                      ? () => unawaited(_openKirimProductScannerAndLoad())
+                      : null,
                 ),
                 if (_loadingProduct) const LinearProgressIndicator(),
                 if (_productError != null) Text(_productError!, style: const TextStyle(color: Colors.red)),
@@ -1463,7 +1481,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                     return ListTile(
                       title: Text(loc.locationCode),
                       subtitle: Text(
-                        '${loc.batchNo} · ${loc.availableQty.toStringAsFixed(0)} · ${formatExpiryMonthYear(loc.expiryDate)}',
+                        '${loc.availableQty.toStringAsFixed(0)} · ${formatExpiryMonthYear(loc.expiryDate)}',
                       ),
                       tileColor: sel ? Colors.blue.shade50 : null,
                       onTap: () {

@@ -199,10 +199,20 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     if (!mounted) {
       return;
     }
-    router.pushNamed(
+    final bool popChainToKirim =
+        a != null && (a.returnToKirimForm || a.returnToReturns);
+    final Object? resolveResult = await context.pushNamed<Object?>(
       'inventoryBarcodeResolve',
       extra: InventoryBarcodeResolveExtra(barcode: value, args: a),
     );
+    if (!mounted) {
+      return;
+    }
+    if (popChainToKirim && resolveResult is String && resolveResult.isNotEmpty) {
+      context.pop<String>(resolveResult);
+      return;
+    }
+    _resumeScan();
   }
 
   void _resumeScan() {
