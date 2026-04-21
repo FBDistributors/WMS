@@ -75,8 +75,8 @@ void showAppSnackBar(BuildContext context, SnackBar snackBar) {
           const EdgeInsets.symmetric(horizontal: 16, vertical: 12);
 
       return Positioned(
-        left: margin.left,
-        right: margin.right,
+        left: 0,
+        right: 0,
         top: margin.top,
         child: Material(
           type: MaterialType.transparency,
@@ -90,29 +90,40 @@ void showAppSnackBar(BuildContext context, SnackBar snackBar) {
                   key: ValueKey<int>(entry.hashCode),
                   direction: DismissDirection.up,
                   onDismissed: (_) => handle.dismiss(),
-                  child: Material(
-                    color: bgColor,
-                    shape: shape,
-                    elevation: elevation,
-                    clipBehavior: clipBehavior,
-                    child: SafeArea(
-                      bottom: false,
-                      child: Padding(
-                        padding: padding,
-                        child: _TopSnackBarContent(
-                          content: snackBar.content,
-                          contentTextStyle:
-                              barTheme.contentTextStyle ??
-                              theme.textTheme.bodyMedium?.copyWith(
-                                color: fgColor,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: margin.left),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth:
+                              MediaQuery.sizeOf(overlayContext).width - margin.horizontal,
+                        ),
+                        child: Material(
+                          color: bgColor,
+                          shape: shape,
+                          elevation: elevation,
+                          clipBehavior: clipBehavior,
+                          child: SafeArea(
+                            bottom: false,
+                            child: Padding(
+                              padding: padding,
+                              child: _TopSnackBarContent(
+                                content: snackBar.content,
+                                contentTextStyle:
+                                    barTheme.contentTextStyle ??
+                                    theme.textTheme.bodyMedium?.copyWith(
+                                      color: fgColor,
+                                    ),
+                                action: snackBar.action,
+                                showCloseIcon: snackBar.showCloseIcon ?? false,
+                                closeIconColor:
+                                    snackBar.closeIconColor ??
+                                    barTheme.closeIconColor ??
+                                    fgColor,
+                                onClose: handle.dismiss,
                               ),
-                          action: snackBar.action,
-                          showCloseIcon: snackBar.showCloseIcon ?? false,
-                          closeIconColor:
-                              snackBar.closeIconColor ??
-                              barTheme.closeIconColor ??
-                              fgColor,
-                          onClose: handle.dismiss,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -184,29 +195,47 @@ void showAppTopSuccess(
   showAppSnackBar(
     context,
     SnackBar(
-      content: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          const Icon(
-            Icons.check_circle_rounded,
-            color: Colors.white,
-            size: 18,
+      content: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          decoration: BoxDecoration(
+            color: Colors.green.shade600,
+            borderRadius: BorderRadius.circular(999),
+            boxShadow: const <BoxShadow>[
+              BoxShadow(
+                blurRadius: 8,
+                offset: Offset(0, 2),
+                color: Color(0x26000000),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              text,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              const Icon(
+                Icons.check_circle_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                text,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
       duration: duration,
-      backgroundColor: Colors.green.shade600,
-      elevation: 2,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
       showCloseIcon: false,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 6),
     ),
   );
 }
@@ -231,7 +260,8 @@ class _TopSnackBarContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final List<Widget> rowChildren = <Widget>[
-      Expanded(
+      Flexible(
+        fit: FlexFit.loose,
         child: DefaultTextStyle(
           style: contentTextStyle ?? const TextStyle(),
           child: content,
@@ -255,10 +285,7 @@ class _TopSnackBarContent extends StatelessWidget {
       );
     }
 
-    return Row(
-      mainAxisSize: MainAxisSize.max,
-      children: rowChildren,
-    );
+    return Row(mainAxisSize: MainAxisSize.min, children: rowChildren);
   }
 }
 
