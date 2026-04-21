@@ -231,9 +231,9 @@ abstract final class StringLookup {
     'returnsApproveAssignNeedPermission':
         'Hujjat yaratildi. Tasdiq va yig\'uvchini biriktirish uchun documents:edit_status kerak.',
     'returnsSelectPickerTitle': 'Yig\'uvchini tanlang',
-    'returnsFlowDone': 'Mijoz qaytarishi yig\'uvchiga yuborildi',
+    'returnsFlowDone': 'Yakunlandi',
     'kirimReceivingDone': 'Qabul yakunlandi',
-    'kirimSingleReceiveSuccess': 'Qabul muvaffaqiyatli yakunlandi',
+    'kirimSingleReceiveSuccess': 'Yakunlandi',
     'kirimNewReceiveFillAll': 'Barcha maydonlarni to‘ldiring',
   };
 
@@ -446,9 +446,9 @@ abstract final class StringLookup {
     'returnsApproveAssignNeedPermission':
         'Документ создан. Для подтверждения и назначения сборщика нужно право documents:edit_status.',
     'returnsSelectPickerTitle': 'Выберите сборщика',
-    'returnsFlowDone': 'Возврат отправлен сборщику',
+    'returnsFlowDone': 'Завершено',
     'kirimReceivingDone': 'Приёмка завершена',
-    'kirimSingleReceiveSuccess': 'Приёмка успешно завершена',
+    'kirimSingleReceiveSuccess': 'Завершено',
     'kirimNewReceiveFillAll': 'Заполните все поля',
   };
 
@@ -661,9 +661,9 @@ abstract final class StringLookup {
     'returnsApproveAssignNeedPermission':
         'Document created. documents:edit_status is required to approve and assign a picker.',
     'returnsSelectPickerTitle': 'Select picker',
-    'returnsFlowDone': 'Return sent to picker',
+    'returnsFlowDone': 'Completed',
     'kirimReceivingDone': 'Receiving completed',
-    'kirimSingleReceiveSuccess': 'Receiving completed successfully',
+    'kirimSingleReceiveSuccess': 'Completed',
     'kirimNewReceiveFillAll': 'Fill in all fields',
   };
 }
