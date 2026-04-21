@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 
 const Duration _kTopSnackMinComfort = Duration(seconds: 3);
 const Duration _kTopSnackDefaultLong = Duration(seconds: 4);
+const Duration _kTopSnackEnterDuration = Duration(milliseconds: 220);
+const Duration _kTopSnackExitDuration = Duration(milliseconds: 320);
+const Curve _kTopSnackEnterCurve = Curves.easeOutCubic;
+const Curve _kTopSnackExitCurve = Curves.easeInCubic;
+
+_TopToastHandle? _activeTopToast;
 
 EdgeInsets _topSnackBarMargin(BuildContext context) {
   final double top = MediaQuery.viewPaddingOf(context).top + 8;
@@ -20,25 +26,118 @@ Duration _topSnackDuration(SnackBar snackBar) {
 
 /// Pastki tab/footer bilan to‘qnashmasligi uchun SnackBar yuqorida, sekinroq vaqt + dismiss animatsiyasi.
 void showAppSnackBar(BuildContext context, SnackBar snackBar) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: snackBar.content,
-      backgroundColor: snackBar.backgroundColor,
-      elevation: snackBar.elevation,
-      margin: _topSnackBarMargin(context),
-      padding: snackBar.padding,
-      width: snackBar.width,
-      shape: snackBar.shape,
-      behavior: SnackBarBehavior.floating,
-      action: snackBar.action,
-      duration: _topSnackDuration(snackBar),
-      dismissDirection: DismissDirection.up,
-      clipBehavior: snackBar.clipBehavior,
-      actionOverflowThreshold: snackBar.actionOverflowThreshold,
-      showCloseIcon: snackBar.showCloseIcon,
-      closeIconColor: snackBar.closeIconColor,
-    ),
+  final OverlayState? overlay = Overlay.maybeOf(context, rootOverlay: true);
+  if (overlay == null) {
+    return;
+  }
+
+  final NavigatorState navigator = Navigator.of(context, rootNavigator: true);
+  _activeTopToast?.dismiss(immediate: true);
+
+  final AnimationController controller = AnimationController(
+    vsync: navigator,
+    duration: _kTopSnackEnterDuration,
+    reverseDuration: _kTopSnackExitDuration,
   );
+
+  final CurvedAnimation fadeAnimation = CurvedAnimation(
+    parent: controller,
+    curve: _kTopSnackEnterCurve,
+    reverseCurve: _kTopSnackExitCurve,
+  );
+  final Animation<Offset> slideAnimation = Tween<Offset>(
+    begin: const Offset(0, -0.15),
+    end: Offset.zero,
+  ).animate(fadeAnimation);
+
+  final _TopToastHandle handle = _TopToastHandle(controller: controller);
+  late final OverlayEntry entry;
+  entry = OverlayEntry(
+    builder: (BuildContext overlayContext) {
+      final ThemeData theme = Theme.of(overlayContext);
+      final SnackBarThemeData barTheme = theme.snackBarTheme;
+      final EdgeInsets margin = _topSnackBarMargin(overlayContext);
+
+      final Color bgColor =
+          snackBar.backgroundColor ??
+          barTheme.backgroundColor ??
+          theme.colorScheme.inverseSurface;
+      final Color fgColor =
+          barTheme.contentTextStyle?.color ?? theme.colorScheme.onInverseSurface;
+      final ShapeBorder shape =
+          snackBar.shape ??
+          barTheme.shape ??
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12));
+      final double elevation = snackBar.elevation ?? barTheme.elevation ?? 6;
+      final Clip clipBehavior = snackBar.clipBehavior;
+      final EdgeInsetsGeometry padding =
+          snackBar.padding ??
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 12);
+
+      return Positioned(
+        left: margin.left,
+        right: margin.right,
+        top: margin.top,
+        child: Material(
+          type: MaterialType.transparency,
+          child: IgnorePointer(
+            ignoring: false,
+            child: FadeTransition(
+              opacity: fadeAnimation,
+              child: SlideTransition(
+                position: slideAnimation,
+                child: Dismissible(
+                  key: ValueKey<int>(entry.hashCode),
+                  direction: DismissDirection.up,
+                  onDismissed: (_) => handle.dismiss(),
+                  child: Material(
+                    color: bgColor,
+                    shape: shape,
+                    elevation: elevation,
+                    clipBehavior: clipBehavior,
+                    child: SafeArea(
+                      bottom: false,
+                      child: Padding(
+                        padding: padding,
+                        child: _TopSnackBarContent(
+                          content: snackBar.content,
+                          contentTextStyle:
+                              barTheme.contentTextStyle ??
+                              theme.textTheme.bodyMedium?.copyWith(
+                                color: fgColor,
+                              ),
+                          action: snackBar.action,
+                          showCloseIcon: snackBar.showCloseIcon ?? false,
+                          closeIconColor:
+                              snackBar.closeIconColor ??
+                              barTheme.closeIconColor ??
+                              fgColor,
+                          onClose: handle.dismiss,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+  );
+
+  handle.attach(
+    entry: entry,
+    timeout: _topSnackDuration(snackBar),
+    onDisposed: () {
+      if (identical(_activeTopToast, handle)) {
+        _activeTopToast = null;
+      }
+    },
+  );
+  _activeTopToast = handle;
+  overlay.insert(entry);
+  controller.forward();
 }
 
 void showAppSnackBarMessage(
@@ -55,4 +154,96 @@ void showAppSnackBarMessage(
       action: action,
     ),
   );
+}
+
+class _TopSnackBarContent extends StatelessWidget {
+  const _TopSnackBarContent({
+    required this.content,
+    required this.contentTextStyle,
+    required this.action,
+    required this.showCloseIcon,
+    required this.closeIconColor,
+    required this.onClose,
+  });
+
+  final Widget content;
+  final TextStyle? contentTextStyle;
+  final SnackBarAction? action;
+  final bool showCloseIcon;
+  final Color closeIconColor;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final List<Widget> rowChildren = <Widget>[
+      Expanded(
+        child: DefaultTextStyle(
+          style: contentTextStyle ?? const TextStyle(),
+          child: content,
+        ),
+      ),
+    ];
+
+    if (action != null) {
+      rowChildren.add(const SizedBox(width: 8));
+      rowChildren.add(action!);
+    }
+    if (showCloseIcon) {
+      rowChildren.add(const SizedBox(width: 4));
+      rowChildren.add(
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          splashRadius: 18,
+          icon: Icon(Icons.close_rounded, color: closeIconColor),
+          onPressed: onClose,
+        ),
+      );
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.max,
+      children: rowChildren,
+    );
+  }
+}
+
+class _TopToastHandle {
+  _TopToastHandle({required this.controller});
+
+  final AnimationController controller;
+  OverlayEntry? _entry;
+  VoidCallback? _onDisposed;
+  bool _disposed = false;
+
+  void attach({
+    required OverlayEntry entry,
+    required Duration timeout,
+    required VoidCallback onDisposed,
+  }) {
+    _entry = entry;
+    _onDisposed = onDisposed;
+    Future<void>.delayed(timeout, () {
+      if (!_disposed) {
+        dismiss();
+      }
+    });
+  }
+
+  Future<void> dismiss({bool immediate = false}) async {
+    if (_disposed) {
+      return;
+    }
+    _disposed = true;
+    try {
+      if (!immediate && controller.status != AnimationStatus.dismissed) {
+        await controller.reverse();
+      }
+    } finally {
+      _entry?.remove();
+      controller.dispose();
+      _onDisposed?.call();
+      _entry = null;
+      _onDisposed = null;
+    }
+  }
 }
