@@ -21,6 +21,7 @@ class KirimHubScreen extends ConsumerWidget {
     final List<String> perms = session.me?.permissions ?? const <String>[];
     final bool canReceive = perms.contains('receiving:write');
     final bool canControllerReturns = perms.contains('documents:edit_status');
+    final bool canPickerReturns = perms.contains('picking:write');
     final bool canInventoryAdjust = perms.contains('inventory:adjust');
     final int returnsBadge = ref.watch(customerReturnsAssignedCountProvider);
 
@@ -40,17 +41,23 @@ class KirimHubScreen extends ConsumerWidget {
                     subtitle: StringLookup.t(loc, 'kirimCardNewProductsSubtitle'),
                     onTap: () => context.pushNamed('kirimNew'),
                   ),
-                if (canControllerReturns)
+                if (canControllerReturns || canPickerReturns)
                   _card(
                     context,
                     icon: Icons.undo,
                     title: StringLookup.t(loc, 'kirimCustomerReturns'),
                     subtitle: StringLookup.t(loc, 'kirimCardReturnsSubtitle'),
                     badge: returnsBadge,
-                    onTap: () => context.pushNamed(
-                      'kirimForm',
-                      queryParameters: <String, String>{'flow': 'return'},
-                    ),
+                    onTap: () {
+                      if (canControllerReturns) {
+                        context.pushNamed(
+                          'kirimForm',
+                          queryParameters: <String, String>{'flow': 'return'},
+                        );
+                        return;
+                      }
+                      context.pushNamed('customerReturnsQueue');
+                    },
                   ),
                 if (canInventoryAdjust)
                   _card(
