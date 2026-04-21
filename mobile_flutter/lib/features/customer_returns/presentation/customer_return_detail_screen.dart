@@ -45,11 +45,6 @@ class _CustomerReturnDetailScreenState
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (Object e, _) => Center(child: Text('$e')),
         data: (CustomerReturn ret) {
-          final String assignedBy =
-              ret.assignedByUserName ??
-              ret.assignedByUserId ??
-              ret.approvedByUserId ??
-              'Nomaʼlum';
           final String sentAt = _prettyDate(ret.assignedAt ?? ret.updatedAt);
 
           return ListView(
@@ -73,9 +68,7 @@ class _CustomerReturnDetailScreenState
                           ? ret.customerName!
                           : (ret.customerId ?? 'Mijoz yo‘q')),
                       const SizedBox(height: 8),
-                      Text('Controller: $assignedBy'),
                       Text('Yuborilgan sana: $sentAt'),
-                      Text('Status: ${ret.status}'),
                     ],
                   ),
                 ),
@@ -102,11 +95,22 @@ class _CustomerReturnDetailScreenState
                           error: (_, __) =>
                               const Text('Lokatsiyalarni yuklashda xato'),
                           data: (List<PickerLocationOption> locations) {
+                            final String? selectedId =
+                                _selectedLocationByLine[line.id];
+                            final PickerLocationOption? selectedOption = selectedId == null
+                                ? null
+                                : locations.cast<PickerLocationOption?>().firstWhere(
+                                      (PickerLocationOption? option) =>
+                                          option?.id == selectedId,
+                                      orElse: () => null,
+                                    );
                             return _LocationSearchField(
-                              lineId: line.id,
                               locations: locations,
                               enabled: !_submitting,
                               controller: _controllerForLine(line.id),
+                              selectedLabel: selectedOption == null
+                                  ? null
+                                  : formatPickerLocationOptionLine(selectedOption),
                               onSelected: (PickerLocationOption option) {
                                 setState(() {
                                   _selectedLocationByLine[line.id] = option.id;
@@ -165,7 +169,7 @@ class _CustomerReturnDetailScreenState
       if (!mounted) {
         return;
       }
-      showAppTopStatusText(context, 'Yakunlandi');
+      showAppTopSuccess(context, 'Yakunlandi');
       context.pop();
     } on Exception catch (e) {
       if (!mounted) {
@@ -238,17 +242,17 @@ class _BalanceLine extends ConsumerWidget {
 
 class _LocationSearchField extends StatelessWidget {
   const _LocationSearchField({
-    required this.lineId,
     required this.locations,
     required this.enabled,
     required this.controller,
+    required this.selectedLabel,
     required this.onSelected,
   });
 
-  final String lineId;
   final List<PickerLocationOption> locations;
   final bool enabled;
   final TextEditingController controller;
+  final String? selectedLabel;
   final ValueChanged<PickerLocationOption> onSelected;
 
   @override
@@ -272,8 +276,12 @@ class _LocationSearchField extends StatelessWidget {
         FocusNode focusNode,
         VoidCallback onFieldSubmitted,
       ) {
-        if (fieldController.text != controller.text) {
-          fieldController.text = controller.text;
+        final String desiredText = selectedLabel ?? controller.text;
+        if (fieldController.text != desiredText) {
+          fieldController.value = TextEditingValue(
+            text: desiredText,
+            selection: TextSelection.collapsed(offset: desiredText.length),
+          );
         }
         return TextFormField(
           controller: fieldController,
@@ -311,7 +319,14 @@ class _LocationSearchField extends StatelessWidget {
                   return ListTile(
                     dense: true,
                     title: Text(formatPickerLocationOptionLine(option)),
-                    onTap: () => onSelected(option),
+                    onTap: () {
+                      final String label = formatPickerLocationOptionLine(option);
+                      controller.value = TextEditingValue(
+                        text: label,
+                        selection: TextSelection.collapsed(offset: label.length),
+                      );
+                      onSelected(option);
+                    },
                   );
                 },
               ),

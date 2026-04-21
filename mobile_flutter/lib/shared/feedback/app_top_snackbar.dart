@@ -176,6 +176,41 @@ void showAppTopStatusText(
   );
 }
 
+void showAppTopSuccess(
+  BuildContext context,
+  String text, {
+  Duration duration = const Duration(seconds: 2),
+}) {
+  showAppSnackBar(
+    context,
+    SnackBar(
+      content: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          const Icon(
+            Icons.check_circle_rounded,
+            color: Colors.white,
+            size: 18,
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              text,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+      duration: duration,
+      backgroundColor: Colors.green.shade600,
+      elevation: 2,
+      showCloseIcon: false,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    ),
+  );
+}
+
 class _TopSnackBarContent extends StatelessWidget {
   const _TopSnackBarContent({
     required this.content,
