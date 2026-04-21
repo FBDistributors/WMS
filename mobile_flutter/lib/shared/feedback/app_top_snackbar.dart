@@ -74,7 +74,7 @@ void showAppSnackBar(
       final Clip clipBehavior = snackBar.clipBehavior;
       final EdgeInsetsGeometry padding =
           snackBar.padding ??
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 9);
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 8);
       final IconData leadingIcon = _toastIcon(type);
 
       return Positioned(
@@ -235,11 +235,12 @@ class _TopSnackBarContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Widget centeredContent = _centeredToastContent(content);
+    final double maxTextWidth = MediaQuery.sizeOf(context).width * 0.58;
     final List<Widget> rowChildren = <Widget>[
-      Icon(leadingIcon, color: leadingColor, size: 18),
-      const SizedBox(width: 8),
-      Flexible(
-        fit: FlexFit.loose,
+      Icon(leadingIcon, color: leadingColor, size: 17),
+      const SizedBox(width: 6),
+      ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxTextWidth),
         child: DefaultTextStyle(
           style: contentTextStyle ?? const TextStyle(),
           textAlign: TextAlign.center,
@@ -249,7 +250,7 @@ class _TopSnackBarContent extends StatelessWidget {
     ];
 
     if (action != null) {
-      rowChildren.add(const SizedBox(width: 8));
+      rowChildren.add(const SizedBox(width: 6));
       rowChildren.add(action!);
     }
     if (showCloseIcon) {

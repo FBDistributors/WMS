@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { ClipboardList } from 'lucide-react'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
-import { OrdersHubTabs } from '../../admin/components/orders/OrdersHubTabs'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { DateInput } from '../../components/DateInput'
@@ -62,7 +62,14 @@ export function ReturnsHistoryPage() {
   }, [page, total])
 
   return (
-    <AdminLayout titleSlot={<OrdersHubTabs />}>
+    <AdminLayout
+      titleSlot={
+        <div className="flex items-center gap-2">
+          <ClipboardList size={18} />
+          <span className="text-sm font-semibold">{t('admin:menu.returns_history')}</span>
+        </div>
+      }
+    >
       <Card className="space-y-4">
         <div className="grid gap-3 md:grid-cols-4">
           <input

@@ -109,7 +109,6 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
             const isActive =
               path === '/admin/orders'
                 ? location.pathname === '/admin/orders' ||
-                  location.pathname === '/admin/returns-history' ||
                   location.pathname === '/admin/order-statuses' ||
                   location.pathname.startsWith('/admin/orders-diller') ||
                   location.pathname.startsWith('/admin/orders-orikzor') ||
