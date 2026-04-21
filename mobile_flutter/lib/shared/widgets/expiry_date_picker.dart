@@ -105,11 +105,11 @@ class ExpiryDatePickerField extends StatelessWidget {
           ),
           content: SizedBox(
             width: double.maxFinite,
-            height: 320,
+            height: 260,
             child: GridView.builder(
               padding: const EdgeInsets.all(12),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
+                crossAxisCount: 3,
                 mainAxisSpacing: 12,
                 crossAxisSpacing: 12,
                 childAspectRatio: 1.35,
