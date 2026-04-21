@@ -149,6 +149,7 @@ class _CustomerReturnDetailScreenState
         showAppSnackBar(
           context,
           const SnackBar(content: Text('Har bir mahsulot uchun lokatsiya tanlang')),
+          type: AppToastType.warning,
         );
         return;
       }
@@ -175,7 +176,11 @@ class _CustomerReturnDetailScreenState
       if (!mounted) {
         return;
       }
-      showAppSnackBar(context, SnackBar(content: Text('$e')));
+      showAppSnackBar(
+        context,
+        SnackBar(content: Text('$e')),
+        type: AppToastType.error,
+      );
     } finally {
       if (mounted) {
         setState(() => _submitting = false);

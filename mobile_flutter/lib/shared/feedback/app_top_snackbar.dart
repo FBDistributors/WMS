@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+enum AppToastType { success, error, warning, info }
+
 const Duration _kTopSnackMinComfort = Duration(seconds: 3);
 const Duration _kTopSnackDefaultLong = Duration(seconds: 4);
 const Duration _kTopSnackEnterDuration = Duration(milliseconds: 220);
@@ -25,7 +27,11 @@ Duration _topSnackDuration(SnackBar snackBar) {
 }
 
 /// Pastki tab/footer bilan to‘qnashmasligi uchun SnackBar yuqorida, sekinroq vaqt + dismiss animatsiyasi.
-void showAppSnackBar(BuildContext context, SnackBar snackBar) {
+void showAppSnackBar(
+  BuildContext context,
+  SnackBar snackBar, {
+  AppToastType type = AppToastType.info,
+}) {
   final OverlayState? overlay = Overlay.maybeOf(context, rootOverlay: true);
   if (overlay == null) {
     return;
@@ -58,21 +64,18 @@ void showAppSnackBar(BuildContext context, SnackBar snackBar) {
       final SnackBarThemeData barTheme = theme.snackBarTheme;
       final EdgeInsets margin = _topSnackBarMargin(overlayContext);
 
-      final Color bgColor =
-          snackBar.backgroundColor ??
-          barTheme.backgroundColor ??
-          theme.colorScheme.inverseSurface;
-      final Color fgColor =
-          barTheme.contentTextStyle?.color ?? theme.colorScheme.onInverseSurface;
+      final Color bgColor = _toastBgColor(type);
+      const Color fgColor = Colors.white;
       final ShapeBorder shape =
           snackBar.shape ??
           barTheme.shape ??
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12));
-      final double elevation = snackBar.elevation ?? barTheme.elevation ?? 6;
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(999));
+      final double elevation = snackBar.elevation ?? 0;
       final Clip clipBehavior = snackBar.clipBehavior;
       final EdgeInsetsGeometry padding =
           snackBar.padding ??
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 12);
+          const EdgeInsets.symmetric(horizontal: 14, vertical: 9);
+      final IconData leadingIcon = _toastIcon(type);
 
       return Positioned(
         left: 0,
@@ -114,6 +117,8 @@ void showAppSnackBar(BuildContext context, SnackBar snackBar) {
                                     theme.textTheme.bodyMedium?.copyWith(
                                       color: fgColor,
                                     ),
+                                leadingIcon: leadingIcon,
+                                leadingColor: fgColor,
                                 action: snackBar.action,
                                 showCloseIcon: snackBar.showCloseIcon ?? false,
                                 closeIconColor:
@@ -156,6 +161,7 @@ void showAppSnackBarMessage(
   String text, {
   Duration? duration,
   SnackBarAction? action,
+  AppToastType type = AppToastType.info,
 }) {
   showAppSnackBar(
     context,
@@ -164,6 +170,7 @@ void showAppSnackBarMessage(
       duration: duration ?? _kTopSnackDefaultLong,
       action: action,
     ),
+    type: type,
   );
 }
 
@@ -184,6 +191,7 @@ void showAppTopStatusText(
       ),
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
     ),
+    type: AppToastType.info,
   );
 }
 
@@ -195,48 +203,11 @@ void showAppTopSuccess(
   showAppSnackBar(
     context,
     SnackBar(
-      content: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          decoration: BoxDecoration(
-            color: Colors.green.shade600,
-            borderRadius: BorderRadius.circular(999),
-            boxShadow: const <BoxShadow>[
-              BoxShadow(
-                blurRadius: 8,
-                offset: Offset(0, 2),
-                color: Color(0x26000000),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              const Icon(
-                Icons.check_circle_rounded,
-                color: Colors.white,
-                size: 18,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                text,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      content: Text(text, textAlign: TextAlign.center),
       duration: duration,
-      backgroundColor: Colors.transparent,
-      elevation: 0,
       showCloseIcon: false,
-      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 6),
     ),
+    type: AppToastType.success,
   );
 }
 
@@ -244,6 +215,8 @@ class _TopSnackBarContent extends StatelessWidget {
   const _TopSnackBarContent({
     required this.content,
     required this.contentTextStyle,
+    required this.leadingIcon,
+    required this.leadingColor,
     required this.action,
     required this.showCloseIcon,
     required this.closeIconColor,
@@ -252,6 +225,8 @@ class _TopSnackBarContent extends StatelessWidget {
 
   final Widget content;
   final TextStyle? contentTextStyle;
+  final IconData leadingIcon;
+  final Color leadingColor;
   final SnackBarAction? action;
   final bool showCloseIcon;
   final Color closeIconColor;
@@ -260,6 +235,8 @@ class _TopSnackBarContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final List<Widget> rowChildren = <Widget>[
+      Icon(leadingIcon, color: leadingColor, size: 18),
+      const SizedBox(width: 8),
       Flexible(
         fit: FlexFit.loose,
         child: DefaultTextStyle(
@@ -286,6 +263,32 @@ class _TopSnackBarContent extends StatelessWidget {
     }
 
     return Row(mainAxisSize: MainAxisSize.min, children: rowChildren);
+  }
+}
+
+Color _toastBgColor(AppToastType type) {
+  switch (type) {
+    case AppToastType.success:
+      return Colors.green.shade600;
+    case AppToastType.error:
+      return Colors.red.shade600;
+    case AppToastType.warning:
+      return Colors.orange.shade700;
+    case AppToastType.info:
+      return Colors.blue.shade600;
+  }
+}
+
+IconData _toastIcon(AppToastType type) {
+  switch (type) {
+    case AppToastType.success:
+      return Icons.check_circle_rounded;
+    case AppToastType.error:
+      return Icons.error_rounded;
+    case AppToastType.warning:
+      return Icons.warning_amber_rounded;
+    case AppToastType.info:
+      return Icons.info_rounded;
   }
 }
 
