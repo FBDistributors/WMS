@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
+import '../../../core/app_state/profile_type.dart';
+import '../../../core/app_state/profile_type_controller.dart';
 import '../../auth/presentation/auth_providers.dart';
 import '../../customer_returns/customer_returns_providers.dart';
 import '../../../l10n/string_lookup.dart';
@@ -19,6 +21,7 @@ class KirimHubScreen extends ConsumerWidget {
     final AuthSession session =
         ref.watch(authControllerProvider).valueOrNull ?? const AuthSession.unauthenticated();
     final List<String> perms = session.me?.permissions ?? const <String>[];
+    final ProfileType activeProfile = ref.watch(profileTypeProvider);
     final bool canReceive = perms.contains('receiving:write');
     final bool canControllerReturns = perms.contains('documents:edit_status');
     final bool canPickerReturns = perms.contains('picking:write');
@@ -49,7 +52,7 @@ class KirimHubScreen extends ConsumerWidget {
                     subtitle: StringLookup.t(loc, 'kirimCardReturnsSubtitle'),
                     badge: returnsBadge,
                     onTap: () {
-                      if (canControllerReturns) {
+                      if (activeProfile == ProfileType.controller) {
                         context.pushNamed(
                           'kirimForm',
                           queryParameters: <String, String>{'flow': 'return'},
