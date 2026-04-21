@@ -42,6 +42,11 @@ class CustomerReturnsQueueScreen extends ConsumerWidget {
                 final String? custLabel = (c.customerName != null && c.customerName!.trim().isNotEmpty)
                     ? c.customerName!.trim()
                     : (c.customerId != null && c.customerId!.trim().isNotEmpty ? c.customerId!.trim() : null);
+                final String controllerLabel = (c.assignedByUserName != null &&
+                        c.assignedByUserName!.trim().isNotEmpty)
+                    ? c.assignedByUserName!.trim()
+                    : (c.assignedByUserId ?? 'Nomaʼlum');
+                final String sentAt = _prettyDate(c.assignedAt ?? c.updatedAt);
                 final String summary = StringLookup.tParams(loc, 'returnsLinesSummary', <String, String>{
                   'status': c.status,
                   'count': '${c.lines.length}',
@@ -49,7 +54,10 @@ class CustomerReturnsQueueScreen extends ConsumerWidget {
                 return Card(
                   child: ListTile(
                     title: Text(c.docNo),
-                    subtitle: Text(custLabel != null ? '$custLabel · $summary' : summary),
+                    subtitle: Text(
+                      '${custLabel ?? 'Mijoz yo‘q'}\nController: $controllerLabel · $sentAt\n$summary',
+                    ),
+                    isThreeLine: true,
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => context.pushNamed(
                       'customerReturnDetail',
@@ -76,5 +84,18 @@ class CustomerReturnsQueueScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  String _prettyDate(String raw) {
+    final DateTime? dt = DateTime.tryParse(raw);
+    if (dt == null) {
+      return raw;
+    }
+    final DateTime local = dt.toLocal();
+    final String mm = local.month.toString().padLeft(2, '0');
+    final String dd = local.day.toString().padLeft(2, '0');
+    final String hh = local.hour.toString().padLeft(2, '0');
+    final String min = local.minute.toString().padLeft(2, '0');
+    return '${local.year}-$mm-$dd $hh:$min';
   }
 }

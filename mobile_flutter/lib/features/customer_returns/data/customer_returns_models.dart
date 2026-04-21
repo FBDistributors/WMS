@@ -197,7 +197,15 @@ int _int(Object? v) {
     return v.toInt();
   }
   if (v is String) {
-    return int.tryParse(v) ?? 0;
+    final int? asInt = int.tryParse(v);
+    if (asInt != null) {
+      return asInt;
+    }
+    final double? asDouble = double.tryParse(v);
+    if (asDouble != null) {
+      return asDouble.toInt();
+    }
+    return 0;
   }
   return 0;
 }

@@ -22,6 +22,8 @@ class CustomerReturnDetailScreen extends ConsumerStatefulWidget {
 class _CustomerReturnDetailScreenState
     extends ConsumerState<CustomerReturnDetailScreen> {
   final Map<String, String> _selectedLocationByLine = <String, String>{};
+  final Map<String, TextEditingController> _searchControllerByLine =
+      <String, TextEditingController>{};
   bool _submitting = false;
 
   @override
@@ -100,35 +102,16 @@ class _CustomerReturnDetailScreenState
                           error: (_, __) =>
                               const Text('Lokatsiyalarni yuklashda xato'),
                           data: (List<PickerLocationOption> locations) {
-                            return DropdownButtonFormField<String>(
-                              isExpanded: true,
-                              initialValue: _selectedLocationByLine[line.id],
-                              decoration: const InputDecoration(
-                                labelText: 'Lokatsiya tanlang',
-                                border: OutlineInputBorder(),
-                              ),
-                              items: locations
-                                  .map(
-                                    (PickerLocationOption option) =>
-                                        DropdownMenuItem<String>(
-                                      value: option.id,
-                                      child: Text(
-                                        formatPickerLocationOptionLine(option),
-                                      ),
-                                    ),
-                                  )
-                                  .toList(growable: false),
-                              onChanged: _submitting
-                                  ? null
-                                  : (String? value) {
-                                      setState(() {
-                                        if (value == null || value.isEmpty) {
-                                          _selectedLocationByLine.remove(line.id);
-                                        } else {
-                                          _selectedLocationByLine[line.id] = value;
-                                        }
-                                      });
-                                    },
+                            return _LocationSearchField(
+                              lineId: line.id,
+                              locations: locations,
+                              enabled: !_submitting,
+                              controller: _controllerForLine(line.id),
+                              onSelected: (PickerLocationOption option) {
+                                setState(() {
+                                  _selectedLocationByLine[line.id] = option.id;
+                                });
+                              },
                             );
                           },
                         ),
@@ -182,10 +165,7 @@ class _CustomerReturnDetailScreenState
       if (!mounted) {
         return;
       }
-      showAppSnackBar(
-        context,
-        SnackBar(content: Text('Yakunlandi')),
-      );
+      showAppTopStatusText(context, 'Yakunlandi');
       context.pop();
     } on Exception catch (e) {
       if (!mounted) {
@@ -210,6 +190,21 @@ class _CustomerReturnDetailScreenState
     final String hh = local.hour.toString().padLeft(2, '0');
     final String min = local.minute.toString().padLeft(2, '0');
     return '${local.year}-$mm-$dd $hh:$min';
+  }
+
+  TextEditingController _controllerForLine(String lineId) {
+    return _searchControllerByLine.putIfAbsent(
+      lineId,
+      () => TextEditingController(),
+    );
+  }
+
+  @override
+  void dispose() {
+    for (final TextEditingController c in _searchControllerByLine.values) {
+      c.dispose();
+    }
+    super.dispose();
   }
 }
 
@@ -236,6 +231,93 @@ class _BalanceLine extends ConsumerWidget {
         );
         final double total = mainAvail + showroomAvail;
         return Text('Qoldiq: ${total.toStringAsFixed(0)}');
+      },
+    );
+  }
+}
+
+class _LocationSearchField extends StatelessWidget {
+  const _LocationSearchField({
+    required this.lineId,
+    required this.locations,
+    required this.enabled,
+    required this.controller,
+    required this.onSelected,
+  });
+
+  final String lineId;
+  final List<PickerLocationOption> locations;
+  final bool enabled;
+  final TextEditingController controller;
+  final ValueChanged<PickerLocationOption> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Autocomplete<PickerLocationOption>(
+      displayStringForOption: formatPickerLocationOptionLine,
+      optionsBuilder: (TextEditingValue textEditingValue) {
+        final String q = textEditingValue.text.trim().toLowerCase();
+        if (q.isEmpty) {
+          return locations.take(20);
+        }
+        return locations.where((PickerLocationOption option) {
+          final String label = formatPickerLocationOptionLine(option).toLowerCase();
+          return label.contains(q);
+        }).take(20);
+      },
+      onSelected: onSelected,
+      fieldViewBuilder: (
+        BuildContext context,
+        TextEditingController fieldController,
+        FocusNode focusNode,
+        VoidCallback onFieldSubmitted,
+      ) {
+        if (fieldController.text != controller.text) {
+          fieldController.text = controller.text;
+        }
+        return TextFormField(
+          controller: fieldController,
+          focusNode: focusNode,
+          enabled: enabled,
+          decoration: const InputDecoration(
+            labelText: 'Lokatsiya qidirish',
+            hintText: 'Lokatsiya kodini yozing...',
+            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.search),
+          ),
+          onChanged: (String value) {
+            controller.text = value;
+          },
+          onFieldSubmitted: (_) => onFieldSubmitted(),
+        );
+      },
+      optionsViewBuilder: (
+        BuildContext context,
+        AutocompleteOnSelected<PickerLocationOption> onSelected,
+        Iterable<PickerLocationOption> options,
+      ) {
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 4,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 240, minWidth: 260),
+              child: ListView.builder(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                itemCount: options.length,
+                itemBuilder: (BuildContext context, int index) {
+                  final PickerLocationOption option = options.elementAt(index);
+                  return ListTile(
+                    dense: true,
+                    title: Text(formatPickerLocationOptionLine(option)),
+                    onTap: () => onSelected(option),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
       },
     );
   }
