@@ -65,6 +65,24 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
   bool _bannerScheduled = false;
   bool _orderSelectionMode = false;
   final Set<String> _selectedOrderIds = <String>{};
+  bool _headerRefreshing = false;
+
+  Future<void> _onAppBarRefresh() async {
+    setState(() => _headerRefreshing = true);
+    try {
+      await ref.read(openPickTasksProvider.notifier).refreshFromNetwork();
+      if (_showConsolidated) {
+        await ref.read(consolidatedViewProvider.notifier).refreshFromNetwork();
+        if (mounted) {
+          setState(() => _consolidatedRefreshKey++);
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _headerRefreshing = false);
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -734,13 +752,8 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
                     ),
                   )
                 : null,
-            onRefresh: () {
-              unawaited(ref.read(openPickTasksProvider.notifier).refreshFromNetwork());
-              if (_showConsolidated) {
-                unawaited(ref.read(consolidatedViewProvider.notifier).refreshFromNetwork());
-                setState(() => _consolidatedRefreshKey++);
-              }
-            },
+            onRefresh: () => unawaited(_onAppBarRefresh()),
+            refreshing: _headerRefreshing,
           ),
           if (!_showConsolidated && profile == PickerProfileParam.controller)
             Padding(
@@ -816,6 +829,7 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
                       Expanded(
                         child: ConsolidatedPickContent(
                           refreshVersion: _consolidatedRefreshKey,
+                          onPullRefresh: _onAppBarRefresh,
                           pendingScannedBarcode: _pendingConsolidatedBarcode,
                           restoreConsolidatedProductKey:
                               _restoreConsolidatedProductKey,
@@ -879,11 +893,14 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
                               },
                             ),
                           Expanded(
-                            child: ListView.separated(
-                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                              itemCount: shown.length,
-                              separatorBuilder: (_, __) => const SizedBox(height: 10),
-                              itemBuilder: (BuildContext context, int i) {
+                            child: RefreshIndicator(
+                              onRefresh: _onAppBarRefresh,
+                              child: ListView.separated(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                                itemCount: shown.length,
+                                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                                itemBuilder: (BuildContext context, int i) {
                                 final PickingListItem item = shown[i];
                                 final bool eligible =
                                     _pickerEligibleBulkSend(item, profile);
@@ -938,6 +955,7 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
                                       : null,
                                 );
                               },
+                            ),
                             ),
                           ),
                           if (_orderSelectionMode &&

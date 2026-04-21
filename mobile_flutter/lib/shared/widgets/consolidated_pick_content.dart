@@ -62,6 +62,7 @@ class ConsolidatedPickContent extends ConsumerStatefulWidget {
   const ConsolidatedPickContent({
     super.key,
     this.refreshVersion = 0,
+    this.onPullRefresh,
     this.pendingScannedBarcode,
     this.restoreConsolidatedProductKey,
     this.onClearPendingScan,
@@ -69,6 +70,8 @@ class ConsolidatedPickContent extends ConsumerStatefulWidget {
   });
 
   final int refreshVersion;
+  /// Pastga tortib yangilash (masalan topshiriqlar ro‘yxati umumiy yig‘ish rejimi).
+  final Future<void> Function()? onPullRefresh;
   final String? pendingScannedBarcode;
   final String? restoreConsolidatedProductKey;
   final VoidCallback? onClearPendingScan;
@@ -531,7 +534,7 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
         }
 
         if (v.products.isEmpty) {
-          return Center(
+          final Widget emptyBody = Center(
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: Text(
@@ -540,6 +543,24 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                 style: TextStyle(color: cs.onSurfaceVariant, fontSize: 15),
               ),
             ),
+          );
+          final Future<void> Function()? pull = widget.onPullRefresh;
+          if (pull == null) {
+            return emptyBody;
+          }
+          return LayoutBuilder(
+            builder: (BuildContext context, BoxConstraints constraints) {
+              return RefreshIndicator(
+                onRefresh: pull,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    child: emptyBody,
+                  ),
+                ),
+              );
+            },
           );
         }
         final List<ConsolidatedProduct> incomplete = v.products
@@ -552,7 +573,10 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
             <ConsolidatedProduct>[...incomplete, ...complete];
         final bool isDark = Theme.of(context).brightness == Brightness.dark;
 
-        return ListView.separated(
+        final ListView separatedList = ListView.separated(
+          physics: widget.onPullRefresh != null
+              ? const AlwaysScrollableScrollPhysics()
+              : null,
           padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
           itemCount: orderedProducts.length,
           separatorBuilder: (_, __) => const SizedBox(height: 8),
@@ -651,6 +675,14 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
               ),
             );
           },
+        );
+        final Future<void> Function()? pull = widget.onPullRefresh;
+        if (pull == null) {
+          return separatedList;
+        }
+        return RefreshIndicator(
+          onRefresh: pull,
+          child: separatedList,
         );
       },
       loading: () => const Center(

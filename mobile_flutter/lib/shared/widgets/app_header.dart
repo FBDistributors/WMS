@@ -3,6 +3,71 @@ import 'package:flutter/services.dart';
 
 import '../../core/config/brand.dart';
 
+class _AppHeaderRefreshButton extends StatefulWidget {
+  const _AppHeaderRefreshButton({
+    required this.onPressed,
+    required this.refreshing,
+    required this.accent,
+  });
+
+  final VoidCallback onPressed;
+  final bool refreshing;
+  final Color accent;
+
+  @override
+  State<_AppHeaderRefreshButton> createState() => _AppHeaderRefreshButtonState();
+}
+
+class _AppHeaderRefreshButtonState extends State<_AppHeaderRefreshButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.refreshing) {
+      _controller.repeat();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _AppHeaderRefreshButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.refreshing && !oldWidget.refreshing) {
+      _controller.repeat();
+    } else if (!widget.refreshing && oldWidget.refreshing) {
+      _controller
+        ..stop()
+        ..reset();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool busy = widget.refreshing;
+    return IconButton(
+      onPressed: busy ? null : widget.onPressed,
+      tooltip: 'Yangilash',
+      icon: RotationTransition(
+        turns: _controller,
+        child: Icon(
+          Icons.refresh,
+          color: busy ? Colors.grey.shade400 : widget.accent,
+        ),
+      ),
+    );
+  }
+}
+
 /// ERP-style app bar matching React Native `AppHeader.tsx` (logo, title, refresh).
 /// [SafeArea] (top) bilan status bar ostida kontent — tizim vaqt/batareya bilan ustma-ust tushmaydi.
 class AppHeader extends StatelessWidget {
@@ -100,13 +165,10 @@ class AppHeader extends StatelessWidget {
                   ),
                   if (trailing != null) trailing!,
                   if (onRefresh != null)
-                    IconButton(
-                      onPressed: refreshing ? null : onRefresh,
-                      icon: Icon(
-                        Icons.refresh,
-                        color: refreshing ? Colors.grey.shade400 : accent,
-                      ),
-                      tooltip: 'Yangilash',
+                    _AppHeaderRefreshButton(
+                      onPressed: onRefresh!,
+                      refreshing: refreshing,
+                      accent: accent,
                     ),
                 ],
               ),

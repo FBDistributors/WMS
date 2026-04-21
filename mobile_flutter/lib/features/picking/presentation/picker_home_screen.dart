@@ -121,8 +121,11 @@ class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
               ),
             ),
           Expanded(
-            child: CustomScrollView(
-              slivers: <Widget>[
+            child: RefreshIndicator(
+              onRefresh: _onRefresh,
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: <Widget>[
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
                   sliver: SliverList(
@@ -170,6 +173,7 @@ class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
                   child: SizedBox.shrink(),
                 ),
               ],
+            ),
             ),
           ),
           const PickerFooter(current: PickerFooterRoute.pickerHome),

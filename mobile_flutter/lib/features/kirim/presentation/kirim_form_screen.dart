@@ -1479,9 +1479,12 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                     final bool sel =
                         _returnPick?.lotId == loc.lotId && _returnPick?.locationId == loc.locationId;
                     return ListTile(
-                      title: Text(loc.locationCode),
+                      title: Text(
+                        '${StringLookup.t(appLoc, 'kirimFefoLocationPrefix')}${loc.locationCode}',
+                      ),
                       subtitle: Text(
-                        '${loc.availableQty.toStringAsFixed(0)} · ${formatExpiryMonthYear(loc.expiryDate)}',
+                        '${StringLookup.t(appLoc, 'kirimFefoQtyPrefix')}${loc.availableQty.toStringAsFixed(0)} · '
+                        '${StringLookup.t(appLoc, 'kirimFefoExpiryPrefix')}${formatExpiryMonthYear(loc.expiryDate)}',
                       ),
                       tileColor: sel ? Colors.blue.shade50 : null,
                       onTap: () {
