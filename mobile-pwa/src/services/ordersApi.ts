@@ -348,6 +348,58 @@ export async function shipOrder(orderId: string) {
   })
 }
 
+export type CustomerReturnLine = {
+  id: string
+  product_id: string
+  location_id: string
+  product_name: string
+  location_code: string
+  qty: number | string
+  batch: string
+  expiry_date?: string | null
+}
+
+export type CustomerReturnOut = {
+  id: string
+  doc_no: string
+  customer_id?: string | null
+  customer_name?: string | null
+  status: string
+  created_by_user_id?: string | null
+  created_by_user_name?: string | null
+  approved_by_user_id?: string | null
+  approved_by_user_name?: string | null
+  assigned_picker_user_id?: string | null
+  assigned_by_user_id?: string | null
+  assigned_at?: string | null
+  assigned_by_user_name?: string | null
+  assigned_picker_user_name?: string | null
+  created_at: string
+  updated_at: string
+  lines: CustomerReturnLine[]
+}
+
+export type CustomerReturnListOut = {
+  items: CustomerReturnOut[]
+  total: number
+}
+
+export type CustomerReturnsHistoryQuery = {
+  q?: string
+  status?: string
+  date_from?: string
+  date_to?: string
+  limit?: number
+  offset?: number
+}
+
+export async function getCustomerReturnsHistory(
+  query: CustomerReturnsHistoryQuery = {},
+  init?: { signal?: AbortSignal }
+) {
+  return fetchJSON<CustomerReturnListOut>('/api/v1/customer-returns', { query, signal: init?.signal })
+}
+
 /** Admin: buyurtma statusini o'zgartirish (documents:edit_status kerak). Tekshiruvda: controller_user_id ixtiyoriy (controllerga yuborish). */
 export async function updateOrderStatus(
   orderId: string,

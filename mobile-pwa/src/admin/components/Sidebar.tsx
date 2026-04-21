@@ -33,6 +33,7 @@ const MENU_ITEMS: Array<MenuItem & { key: string }> = [
   { key: 'products', label: 'Products', path: '/admin/products', icon: Package, required: 'products:read' },
   { key: 'brands', label: 'Brands', path: '/admin/brands', icon: Tag, required: 'brands:manage' },
   { key: 'orders', label: 'Orders', path: '/admin/orders', icon: ClipboardList, required: 'orders:read' },
+  { key: 'returns_history', label: 'Qaytganlar', path: '/admin/returns-history', icon: ClipboardList, required: 'orders:read' },
   { key: 'vip_customers', label: 'VIP mijozlar', path: '/admin/vip-customers', icon: Crown, required: 'orders:read' },
   { key: 'locations', label: 'Locations', path: '/admin/locations', icon: MapPin, required: 'locations:manage' },
   { key: 'inventory', label: 'Qoldiq', path: '/admin/inventory', icon: Boxes, required: 'inventory:read' },
@@ -108,6 +109,7 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
             const isActive =
               path === '/admin/orders'
                 ? location.pathname === '/admin/orders' ||
+                  location.pathname === '/admin/returns-history' ||
                   location.pathname === '/admin/order-statuses' ||
                   location.pathname.startsWith('/admin/orders-diller') ||
                   location.pathname.startsWith('/admin/orders-orikzor') ||

@@ -73,7 +73,9 @@ class CustomerReturnOut(BaseModel):
     customer_name: Optional[str] = None
     status: str
     created_by_user_id: Optional[UUID] = None
+    created_by_user_name: Optional[str] = None
     approved_by_user_id: Optional[UUID] = None
+    approved_by_user_name: Optional[str] = None
     assigned_picker_user_id: Optional[UUID] = None
     assigned_by_user_id: Optional[UUID] = None
     assigned_at: Optional[datetime] = None
@@ -125,6 +127,8 @@ def _line_to_out(line: CustomerReturnLineModel) -> CustomerReturnLineOut:
 def _to_out(
     cr: CustomerReturnModel,
     *,
+    created_by_user_name: Optional[str] = None,
+    approved_by_user_name: Optional[str] = None,
     assigned_by_user_name: Optional[str] = None,
     assigned_picker_user_name: Optional[str] = None,
 ) -> CustomerReturnOut:
@@ -135,7 +139,9 @@ def _to_out(
         customer_name=cr.customer_name,
         status=cr.status,
         created_by_user_id=cr.created_by_user_id,
+        created_by_user_name=created_by_user_name,
         approved_by_user_id=cr.approved_by_user_id,
+        approved_by_user_name=approved_by_user_name,
         assigned_picker_user_id=cr.assigned_picker_user_id,
         assigned_by_user_id=cr.assigned_by_user_id,
         assigned_at=cr.assigned_at,
@@ -251,6 +257,9 @@ async def create_customer_return(
 async def list_customer_returns(
     status_filter: Optional[str] = Query(None, alias="status"),
     mine_as_picker: bool = Query(False, description="Faqat menga biriktirilgan (yig'uvchi)"),
+    search_q: Optional[str] = Query(None, alias="q", min_length=1, max_length=120),
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -282,9 +291,22 @@ async def list_customer_returns(
         if "admin:access" not in perms and "documents:edit_status" not in perms:
             q = q.filter(CustomerReturnModel.created_by_user_id == user.id)
     else:
-        if "receiving:read" not in perms:
+        if "receiving:read" not in perms and "admin:access" not in perms and "documents:edit_status" not in perms:
             raise HTTPException(status_code=403, detail="Insufficient permissions")
-        q = q.filter(CustomerReturnModel.created_by_user_id == user.id)
+        if "admin:access" not in perms and "documents:edit_status" not in perms:
+            q = q.filter(CustomerReturnModel.created_by_user_id == user.id)
+    if date_from is not None:
+        q = q.filter(CustomerReturnModel.created_at >= date_from)
+    if date_to is not None:
+        q = q.filter(CustomerReturnModel.created_at <= date_to)
+    search = (search_q or "").strip()
+    if search:
+        like_value = f"%{search}%"
+        q = q.filter(
+            (CustomerReturnModel.doc_no.ilike(like_value))
+            | (CustomerReturnModel.customer_id.ilike(like_value))
+            | (CustomerReturnModel.customer_name.ilike(like_value))
+        )
     total = q.count()
     rows = q.order_by(CustomerReturnModel.created_at.desc()).offset(offset).limit(limit).all()
     user_name_map = _build_user_name_map(
@@ -293,6 +315,8 @@ async def list_customer_returns(
             uid
             for row in rows
             for uid in (
+                row.created_by_user_id,
+                row.approved_by_user_id,
                 row.assigned_by_user_id,
                 row.assigned_picker_user_id,
             )
@@ -303,6 +327,8 @@ async def list_customer_returns(
         items=[
             _to_out(
                 r,
+                created_by_user_name=user_name_map.get(r.created_by_user_id),
+                approved_by_user_name=user_name_map.get(r.approved_by_user_id),
                 assigned_by_user_name=user_name_map.get(r.assigned_by_user_id),
                 assigned_picker_user_name=user_name_map.get(r.assigned_picker_user_id),
             )
@@ -342,10 +368,21 @@ async def get_customer_return(
             raise HTTPException(status_code=404, detail="Not found")
     user_name_map = _build_user_name_map(
         db,
-        [uid for uid in (cr.assigned_by_user_id, cr.assigned_picker_user_id) if uid is not None],
+        [
+            uid
+            for uid in (
+                cr.created_by_user_id,
+                cr.approved_by_user_id,
+                cr.assigned_by_user_id,
+                cr.assigned_picker_user_id,
+            )
+            if uid is not None
+        ],
     )
     return _to_out(
         cr,
+        created_by_user_name=user_name_map.get(cr.created_by_user_id),
+        approved_by_user_name=user_name_map.get(cr.approved_by_user_id),
         assigned_by_user_name=user_name_map.get(cr.assigned_by_user_id),
         assigned_picker_user_name=user_name_map.get(cr.assigned_picker_user_id),
     )
@@ -531,10 +568,21 @@ async def complete_customer_return(
     )
     user_name_map = _build_user_name_map(
         db,
-        [uid for uid in (cr.assigned_by_user_id, cr.assigned_picker_user_id) if uid is not None],
+        [
+            uid
+            for uid in (
+                cr.created_by_user_id,
+                cr.approved_by_user_id,
+                cr.assigned_by_user_id,
+                cr.assigned_picker_user_id,
+            )
+            if uid is not None
+        ],
     )
     return _to_out(
         cr,
+        created_by_user_name=user_name_map.get(cr.created_by_user_id),
+        approved_by_user_name=user_name_map.get(cr.approved_by_user_id),
         assigned_by_user_name=user_name_map.get(cr.assigned_by_user_id),
         assigned_picker_user_name=user_name_map.get(cr.assigned_picker_user_id),
     )

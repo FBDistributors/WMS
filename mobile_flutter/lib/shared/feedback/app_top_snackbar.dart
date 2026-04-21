@@ -234,14 +234,18 @@ class _TopSnackBarContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final Widget centeredContent = _centeredToastContent(content);
     final List<Widget> rowChildren = <Widget>[
       Icon(leadingIcon, color: leadingColor, size: 18),
       const SizedBox(width: 8),
       Flexible(
         fit: FlexFit.loose,
-        child: DefaultTextStyle(
-          style: contentTextStyle ?? const TextStyle(),
-          child: content,
+        child: Center(
+          child: DefaultTextStyle(
+            style: contentTextStyle ?? const TextStyle(),
+            textAlign: TextAlign.center,
+            child: centeredContent,
+          ),
         ),
       ),
     ];
@@ -262,8 +266,55 @@ class _TopSnackBarContent extends StatelessWidget {
       );
     }
 
-    return Row(mainAxisSize: MainAxisSize.min, children: rowChildren);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: rowChildren,
+    );
   }
+}
+
+Widget _centeredToastContent(Widget content) {
+  if (content is Text) {
+    if (content.data != null) {
+      return Text(
+        content.data!,
+        key: content.key,
+        style: content.style,
+        strutStyle: content.strutStyle,
+        textAlign: TextAlign.center,
+        textDirection: content.textDirection,
+        locale: content.locale,
+        softWrap: content.softWrap,
+        overflow: content.overflow,
+        textScaler: content.textScaler,
+        maxLines: content.maxLines,
+        semanticsLabel: content.semanticsLabel,
+        textWidthBasis: content.textWidthBasis,
+        textHeightBehavior: content.textHeightBehavior,
+      );
+    }
+    if (content.textSpan != null) {
+      return Text.rich(
+        content.textSpan!,
+        key: content.key,
+        style: content.style,
+        strutStyle: content.strutStyle,
+        textAlign: TextAlign.center,
+        textDirection: content.textDirection,
+        locale: content.locale,
+        softWrap: content.softWrap,
+        overflow: content.overflow,
+        textScaler: content.textScaler,
+        maxLines: content.maxLines,
+        semanticsLabel: content.semanticsLabel,
+        textWidthBasis: content.textWidthBasis,
+        textHeightBehavior: content.textHeightBehavior,
+      );
+    }
+  }
+  return Center(child: content);
 }
 
 Color _toastBgColor(AppToastType type) {
