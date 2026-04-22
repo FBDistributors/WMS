@@ -20,20 +20,32 @@ class ScanActionButton extends StatelessWidget {
         message: label,
         child: SizedBox(
           width: 56,
-          child: Material(
-            color: scheme.primary,
-            borderRadius: BorderRadius.circular(8),
-            child: InkWell(
-              onTap: onPressed,
-              borderRadius: BorderRadius.circular(8),
-              child: Center(
-                child: Icon(
-                  Icons.qr_code_scanner,
-                  color: scheme.onPrimary,
-                  semanticLabel: label,
+          child: LayoutBuilder(
+            builder: (BuildContext context, BoxConstraints constraints) {
+              final double h = constraints.maxHeight.isFinite && constraints.maxHeight > 0
+                  ? constraints.maxHeight
+                  : 48;
+              return Material(
+                color: scheme.primary,
+                borderRadius: BorderRadius.circular(8),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: onPressed,
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox(
+                    height: h,
+                    width: 56,
+                    child: Center(
+                      child: Icon(
+                        Icons.qr_code_scanner,
+                        color: scheme.onPrimary,
+                        semanticLabel: label,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       );

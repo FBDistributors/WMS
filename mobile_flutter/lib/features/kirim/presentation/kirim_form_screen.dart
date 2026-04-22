@@ -1086,33 +1086,35 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           const SizedBox(height: 12),
           const Text('Lokatsiyani tanlang', style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: <Widget>[
-              Expanded(
-                child: TextField(
-                  controller: _invLocSearch,
-                  decoration: InputDecoration(
-                    labelText: 'Kod yoki nom bo‘yicha qidiruv',
-                    border: const OutlineInputBorder(),
-                    suffixIcon: buildInputClearButton(
-                      visible: _invLocSearch.text.trim().isNotEmpty,
-                      onPressed: () => setState(() {
-                        _invLocSearch.clear();
-                        _invLocation = null;
-                      }),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Expanded(
+                  child: TextField(
+                    controller: _invLocSearch,
+                    decoration: InputDecoration(
+                      labelText: 'Kod yoki nom bo‘yicha qidiruv',
+                      border: const OutlineInputBorder(),
+                      suffixIcon: buildInputClearButton(
+                        visible: _invLocSearch.text.trim().isNotEmpty,
+                        onPressed: () => setState(() {
+                          _invLocSearch.clear();
+                          _invLocation = null;
+                        }),
+                      ),
                     ),
+                    onChanged: (_) => setState(() {}),
+                    textCapitalization: TextCapitalization.characters,
                   ),
-                  onChanged: (_) => setState(() {}),
-                  textCapitalization: TextCapitalization.characters,
                 ),
-              ),
-              const SizedBox(width: 8),
-              ScanActionButton(
-                onPressed: _openInventoryScanner,
-                compact: true,
-              ),
-            ],
+                const SizedBox(width: 8),
+                ScanActionButton(
+                  onPressed: _openInventoryScanner,
+                  compact: true,
+                ),
+              ],
+            ),
           ),
           if (_showInvLocDropdown)
             Card(

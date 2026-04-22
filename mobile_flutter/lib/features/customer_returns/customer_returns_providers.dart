@@ -22,6 +22,20 @@ class CustomerReturnLocationScanFromScanner {
 final pendingCustomerReturnLocationScanProvider =
     StateProvider<CustomerReturnLocationScanFromScanner?>((Ref ref) => null);
 
+/// Skanerdan mahsulot tekshiruvi muvaffaqiyatli — detal ekran `ref.listen`.
+class CustomerReturnProductVerifyFromScanner {
+  const CustomerReturnProductVerifyFromScanner({
+    required this.returnId,
+    required this.lineId,
+  });
+
+  final String returnId;
+  final String lineId;
+}
+
+final pendingCustomerReturnProductVerifyProvider =
+    StateProvider<CustomerReturnProductVerifyFromScanner?>((Ref ref) => null);
+
 final customerReturnsRepositoryProvider = Provider<CustomerReturnsRepository>((Ref ref) {
   return CustomerReturnsRepository(ref.watch(appDioProvider));
 });

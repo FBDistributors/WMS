@@ -36,5 +36,9 @@ void routeAfterInventoryBarcodeLookup(
     );
     return;
   }
+  if (a.returnToInventoryDetail) {
+    goInventoryDetailFromBarcode(router, product.productId);
+    return;
+  }
   goInventoryDetailFromBarcode(router, product.productId);
 }

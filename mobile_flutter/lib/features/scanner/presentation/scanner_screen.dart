@@ -117,6 +117,57 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     }
 
     if (a != null &&
+        a.returnToCustomerReturnProductVerify &&
+        (a.customerReturnId ?? '').trim().isNotEmpty &&
+        (a.lineId ?? '').trim().isNotEmpty &&
+        (a.expectedProductId ?? '').trim().isNotEmpty) {
+      final AppLocale locProduct = ref.read(appLocaleProvider);
+      if (mounted) {
+        setState(() => _lookupInProgress = true);
+      }
+      try {
+        final ScannerResolveOut out =
+            await ref.read(scannerRepositoryProvider).resolveBarcode(value);
+        if (!mounted) {
+          return;
+        }
+        if (out.type == ScannerResolveType.product &&
+            out.productId != null &&
+            out.productId!.trim().isNotEmpty &&
+            out.productId!.trim().toLowerCase() == a.expectedProductId!.trim().toLowerCase()) {
+          ref.read(pendingCustomerReturnProductVerifyProvider.notifier).state =
+              CustomerReturnProductVerifyFromScanner(
+            returnId: a.customerReturnId!.trim(),
+            lineId: a.lineId!.trim(),
+          );
+          router.pop();
+        } else if (out.type == ScannerResolveType.location) {
+          _showError(StringLookup.t(locProduct, 'returnsExpectProductNotLocation'));
+          _resumeScan();
+        } else if (out.type == ScannerResolveType.product) {
+          _showError(StringLookup.t(locProduct, 'returnsProductMismatch'));
+          _resumeScan();
+        } else {
+          _showError(
+            out.message ??
+                StringLookup.t(locProduct, 'returnsProductMismatch'),
+          );
+          _resumeScan();
+        }
+      } on Exception catch (e) {
+        if (mounted) {
+          _showError('$e');
+          _resumeScan();
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _lookupInProgress = false);
+        }
+      }
+      return;
+    }
+
+    if (a != null &&
         a.returnToCustomerReturnLocation &&
         (a.customerReturnId ?? '').trim().isNotEmpty &&
         (a.lineId ?? '').trim().isNotEmpty) {
@@ -254,8 +305,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     }
     final bool popChainToKirim =
         a != null && (a.returnToKirimForm || a.returnToReturns);
-    final Object? resolveResult = await context.pushNamed<Object?>(
-      'inventoryBarcodeResolve',
+    // To‘liq path: `/scanner` dan `pushNamed('inventoryBarcodeResolve')` nested marshrutda
+    // ba’zi stacklarda ishonchsiz — `/inventory/resolve-barcode` aniq ishlaydi.
+    final Object? resolveResult = await context.push<Object?>(
+      '/inventory/resolve-barcode',
       extra: InventoryBarcodeResolveExtra(barcode: value, args: a),
     );
     if (!mounted) {
@@ -264,6 +317,13 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     if (popChainToKirim && resolveResult is String && resolveResult.isNotEmpty) {
       context.pop<String>(resolveResult);
       return;
+    }
+    if (a != null && a.returnToInventoryDetail) {
+      final String loc = GoRouterState.of(context).matchedLocation;
+      if (loc == '/scanner' && context.canPop()) {
+        context.pop();
+        return;
+      }
     }
     _resumeScan();
   }

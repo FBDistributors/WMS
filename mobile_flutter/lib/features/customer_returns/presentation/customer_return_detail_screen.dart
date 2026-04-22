@@ -7,6 +7,8 @@ import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../l10n/string_lookup.dart';
 import '../../../shared/feedback/app_top_snackbar.dart';
+import '../../scanner/data/scanner_repository.dart';
+import '../../scanner/scanner_providers.dart';
 import '../../inventory/data/models/picker_inventory_models.dart';
 import '../../inventory/data/picker_location_format.dart';
 import '../../inventory/presentation/inventory_providers.dart';
@@ -14,6 +16,17 @@ import '../customer_returns_providers.dart';
 import '../data/customer_return_doc_no_display.dart';
 import '../data/customer_return_expiry_match.dart';
 import '../data/customer_returns_models.dart';
+
+bool _barcodeResolveMatchesProduct(ScannerResolveOut out, String expectedProductId) {
+  if (out.type != ScannerResolveType.product) {
+    return false;
+  }
+  final String? pid = out.productId;
+  if (pid == null || pid.isEmpty) {
+    return false;
+  }
+  return pid.trim().toLowerCase() == expectedProductId.trim().toLowerCase();
+}
 
 class CustomerReturnDetailScreen extends ConsumerStatefulWidget {
   const CustomerReturnDetailScreen({super.key, required this.returnId});
@@ -30,6 +43,7 @@ class _CustomerReturnDetailScreenState
   final Map<String, String> _selectedLocationByLine = <String, String>{};
   final Map<String, TextEditingController> _searchControllerByLine =
       <String, TextEditingController>{};
+  final Map<String, bool> _productVerifiedByLine = <String, bool>{};
   bool _submitting = false;
 
   @override
@@ -61,6 +75,29 @@ class _CustomerReturnDetailScreenState
           setState(() {
             _selectedLocationByLine[snap.lineId] = snap.locationId;
             _controllerForLine(snap.lineId).text = label;
+          });
+        });
+      },
+    );
+    ref.listen<CustomerReturnProductVerifyFromScanner?>(
+      pendingCustomerReturnProductVerifyProvider,
+      (CustomerReturnProductVerifyFromScanner? prev, CustomerReturnProductVerifyFromScanner? next) {
+        if (next == null || next.returnId != widget.returnId) {
+          return;
+        }
+        ref.read(pendingCustomerReturnProductVerifyProvider.notifier).state = null;
+        final CustomerReturnProductVerifyFromScanner snap = next;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) {
+            return;
+          }
+          final CustomerReturn? ret =
+              ref.read(customerReturnDetailProvider(widget.returnId)).valueOrNull;
+          if (ret == null || !ret.lines.any((CustomerReturnLine l) => l.id == snap.lineId)) {
+            return;
+          }
+          setState(() {
+            _productVerifiedByLine[snap.lineId] = true;
           });
         });
       },
@@ -139,6 +176,7 @@ class _CustomerReturnDetailScreenState
                     appLocale: loc,
                     allLocations: locations,
                     enabled: !_submitting,
+                    isProductVerified: _productVerifiedByLine[line.id] == true,
                     selectedLocationId: _selectedLocationByLine[line.id],
                     searchController: _controllerForLine(line.id),
                     onLocationPicked: (String locationId, String label) {
@@ -147,6 +185,12 @@ class _CustomerReturnDetailScreenState
                         _controllerForLine(line.id).text = label;
                       });
                     },
+                    onClearLocation: _submitting
+                        ? null
+                        : () => _clearLocationForLine(line.id),
+                    onProductVerifyTap: _submitting
+                        ? null
+                        : () => _openProductVerifyBottomSheet(context, line, loc),
                   ),
                 ),
               ),
@@ -154,8 +198,12 @@ class _CustomerReturnDetailScreenState
               FilledButton(
                 onPressed: _submitting
                     ? null
-                    : () => _completeReturn(ret),
-                child: Text(_submitting ? 'Yuborilmoqda...' : 'Yakunlash (yig‘uvchi)'),
+                    : () => _completeReturn(ret, loc),
+                child: Text(
+                  _submitting
+                      ? StringLookup.t(loc, 'returnsSubmitting')
+                      : StringLookup.t(loc, 'returnsCompletePutaway'),
+                ),
               ),
             ],
           );
@@ -164,17 +212,150 @@ class _CustomerReturnDetailScreenState
     );
   }
 
+  void _clearLocationForLine(String lineId) {
+    setState(() {
+      _selectedLocationByLine.remove(lineId);
+      _controllerForLine(lineId).clear();
+      _productVerifiedByLine.remove(lineId);
+    });
+  }
+
+  Future<void> _openProductVerifyBottomSheet(
+    BuildContext host,
+    CustomerReturnLine line,
+    AppLocale loc,
+  ) async {
+    final TextEditingController tc = TextEditingController();
+    try {
+      await showModalBottomSheet<void>(
+        context: host,
+        isScrollControlled: true,
+        builder: (BuildContext sheetContext) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Text(
+                    StringLookup.t(loc, 'returnsVerifyProductTitle'),
+                    style: Theme.of(sheetContext).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: tc,
+                    decoration: InputDecoration(
+                      labelText: StringLookup.t(loc, 'returnsVerifyProductHint'),
+                      border: const OutlineInputBorder(),
+                    ),
+                    textInputAction: TextInputAction.done,
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: <Widget>[
+                      TextButton.icon(
+                        icon: const Icon(Icons.qr_code_scanner),
+                        label: Text(StringLookup.t(loc, 'returnsVerifyProductOpenScanner')),
+                        onPressed: () {
+                          Navigator.pop(sheetContext);
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (!mounted) {
+                              return;
+                            }
+                            context.pushNamed(
+                              'scanner',
+                              extra: ScannerArgs(
+                                returnToCustomerReturnProductVerify: true,
+                                customerReturnId: widget.returnId,
+                                lineId: line.id,
+                                expectedProductId: line.productId,
+                              ),
+                            );
+                          });
+                        },
+                      ),
+                      const Spacer(),
+                      FilledButton(
+                        onPressed: () async {
+                          final String raw = tc.text.trim();
+                          if (raw.isEmpty) {
+                            return;
+                          }
+                          try {
+                            final ScannerResolveOut out =
+                                await ref.read(scannerRepositoryProvider).resolveBarcode(raw);
+                            if (!mounted) {
+                              return;
+                            }
+                            if (!_barcodeResolveMatchesProduct(out, line.productId)) {
+                              showAppSnackBar(
+                                context,
+                                SnackBar(
+                                  content: Text(
+                                    out.type == ScannerResolveType.location
+                                        ? StringLookup.t(loc, 'returnsExpectProductNotLocation')
+                                        : StringLookup.t(loc, 'returnsProductMismatch'),
+                                  ),
+                                ),
+                                type: AppToastType.warning,
+                              );
+                              return;
+                            }
+                            setState(() {
+                              _productVerifiedByLine[line.id] = true;
+                            });
+                            if (sheetContext.mounted) {
+                              Navigator.pop(sheetContext);
+                            }
+                          } on Exception catch (e) {
+                            if (mounted) {
+                              showAppSnackBar(
+                                context,
+                                SnackBar(content: Text('$e')),
+                                type: AppToastType.error,
+                              );
+                            }
+                          }
+                        },
+                        child: Text(StringLookup.t(loc, 'returnsVerifyProductSubmit')),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    } finally {
+      tc.dispose();
+    }
+  }
+
   Future<void> _completeReturn(
     CustomerReturn ret,
+    AppLocale loc,
   ) async {
     final List<CompleteCustomerReturnLineRequest> lines =
         <CompleteCustomerReturnLineRequest>[];
     for (final CustomerReturnLine line in ret.lines) {
+      if (_productVerifiedByLine[line.id] != true) {
+        showAppSnackBar(
+          context,
+          SnackBar(content: Text(StringLookup.t(loc, 'returnsAllProductsMustBeVerified'))),
+          type: AppToastType.warning,
+        );
+        return;
+      }
       final String? locationId = _selectedLocationByLine[line.id];
       if (locationId == null || locationId.isEmpty) {
         showAppSnackBar(
           context,
-          const SnackBar(content: Text('Har bir mahsulot uchun lokatsiya tanlang')),
+          SnackBar(content: Text(StringLookup.t(loc, 'returnsLocationRequired'))),
           type: AppToastType.warning,
         );
         return;
@@ -318,9 +499,12 @@ class _ReturnLineCard extends ConsumerWidget {
     required this.appLocale,
     required this.allLocations,
     required this.enabled,
+    required this.isProductVerified,
     required this.selectedLocationId,
     required this.searchController,
     required this.onLocationPicked,
+    this.onClearLocation,
+    this.onProductVerifyTap,
   });
 
   final String returnId;
@@ -328,9 +512,12 @@ class _ReturnLineCard extends ConsumerWidget {
   final AppLocale appLocale;
   final List<PickerLocationOption> allLocations;
   final bool enabled;
+  final bool isProductVerified;
   final String? selectedLocationId;
   final TextEditingController searchController;
   final void Function(String locationId, String label) onLocationPicked;
+  final VoidCallback? onClearLocation;
+  final VoidCallback? onProductVerifyTap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -340,19 +527,40 @@ class _ReturnLineCard extends ConsumerWidget {
         _optionById(allLocations, selectedLocationId);
 
     return Card(
+      color: isProductVerified ? Colors.green.shade50 : null,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text(
-              line.productName,
-              style: const TextStyle(fontWeight: FontWeight.w600),
+            InkWell(
+              onTap: onProductVerifyTap,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            line.productName,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 6),
+                          Text('Miqdor: ${line.qty}'),
+                          Text('Muddati: ${line.expiryDate ?? '—'}'),
+                        ],
+                      ),
+                    ),
+                    if (isProductVerified)
+                      Icon(Icons.check_circle, color: Colors.green.shade700, size: 26),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(height: 6),
-            Text('Miqdor: ${line.qty}'),
-            Text('Muddati: ${line.expiryDate ?? '—'}'),
-            _BalanceLine(productId: line.productId),
             const SizedBox(height: 10),
             detailAsync.when(
               loading: () => const LinearProgressIndicator(),
@@ -450,6 +658,11 @@ class _ReturnLineCard extends ConsumerWidget {
                           formatPickerLocationOptionLine(option),
                         );
                       },
+                      hasSelectedLocation:
+                          selectedLocationId != null && selectedLocationId!.isNotEmpty,
+                      clearTooltip:
+                          StringLookup.t(appLocale, 'returnsClearLocation'),
+                      onClearLocation: onClearLocation,
                       scanTooltip:
                           StringLookup.t(appLocale, 'returnsScanLocationButton'),
                       onScanPressed: enabled
@@ -476,34 +689,6 @@ class _ReturnLineCard extends ConsumerWidget {
   }
 }
 
-class _BalanceLine extends ConsumerWidget {
-  const _BalanceLine({required this.productId});
-
-  final String productId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<InventoryDetailPair> detailAsync =
-        ref.watch(inventoryProductDetailProvider(productId));
-    return detailAsync.when(
-      loading: () => const Text('Qoldiq: ...'),
-      error: (_, __) => const Text('Qoldiq: xato'),
-      data: (InventoryDetailPair pair) {
-        final double mainAvail = pair.main.locations.fold<double>(
-          0,
-          (double sum, PickerProductLocation loc) => sum + loc.availableQty,
-        );
-        final double showroomAvail = pair.showroom.locations.fold<double>(
-          0,
-          (double sum, PickerProductLocation loc) => sum + loc.availableQty,
-        );
-        final double total = mainAvail + showroomAvail;
-        return Text('Qoldiq: ${total.toStringAsFixed(0)}');
-      },
-    );
-  }
-}
-
 class _LocationSearchField extends StatelessWidget {
   const _LocationSearchField({
     required this.locations,
@@ -511,6 +696,9 @@ class _LocationSearchField extends StatelessWidget {
     required this.controller,
     required this.selectedLabel,
     required this.onSelected,
+    this.hasSelectedLocation = false,
+    this.clearTooltip,
+    this.onClearLocation,
     this.scanTooltip,
     this.onScanPressed,
   });
@@ -520,6 +708,9 @@ class _LocationSearchField extends StatelessWidget {
   final TextEditingController controller;
   final String? selectedLabel;
   final ValueChanged<PickerLocationOption> onSelected;
+  final bool hasSelectedLocation;
+  final String? clearTooltip;
+  final VoidCallback? onClearLocation;
   final String? scanTooltip;
   final VoidCallback? onScanPressed;
 
@@ -551,6 +742,9 @@ class _LocationSearchField extends StatelessWidget {
             selection: TextSelection.collapsed(offset: desiredText.length),
           );
         }
+        final bool showClear =
+            onClearLocation != null && hasSelectedLocation && enabled;
+        final bool showScan = onScanPressed != null;
         return TextFormField(
           controller: fieldController,
           focusNode: focusNode,
@@ -560,12 +754,24 @@ class _LocationSearchField extends StatelessWidget {
             hintText: 'Lokatsiya kodini yozing...',
             border: const OutlineInputBorder(),
             prefixIcon: const Icon(Icons.search),
-            suffixIcon: onScanPressed == null
+            suffixIcon: (!showClear && !showScan)
                 ? null
-                : IconButton(
-                    tooltip: scanTooltip ?? '',
-                    icon: const Icon(Icons.qr_code_scanner),
-                    onPressed: enabled ? onScanPressed : null,
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      if (showClear)
+                        IconButton(
+                          tooltip: clearTooltip ?? '',
+                          icon: const Icon(Icons.close),
+                          onPressed: onClearLocation,
+                        ),
+                      if (showScan)
+                        IconButton(
+                          tooltip: scanTooltip ?? '',
+                          icon: const Icon(Icons.qr_code_scanner),
+                          onPressed: enabled ? onScanPressed : null,
+                        ),
+                    ],
                   ),
           ),
           onChanged: (String value) {
