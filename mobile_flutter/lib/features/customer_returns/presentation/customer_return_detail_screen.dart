@@ -127,34 +127,45 @@ class _CustomerReturnDetailScreenState
                   ? ret.customerId!.trim()
                   : 'Mijoz yo‘q');
 
-          return ListView(
-            padding: const EdgeInsets.all(12),
+          final List<CustomerReturnLine> orderedLines = <CustomerReturnLine>[
+            ...ret.lines,
+          ]..sort((CustomerReturnLine a, CustomerReturnLine b) {
+              final String ka = _lineSortKey(a.id, a.productName, _selectedLocationByLine, locationsAsync.valueOrNull);
+              final String kb = _lineSortKey(b.id, b.productName, _selectedLocationByLine, locationsAsync.valueOrNull);
+              return ka.compareTo(kb);
+            });
+
+          return Column(
             children: <Widget>[
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        '${StringLookup.t(loc, 'returnsFieldDoc')}: $docDisplay',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 17,
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                  children: <Widget>[
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              '${StringLookup.t(loc, 'returnsFieldDoc')}: $docDisplay',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 17,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${StringLookup.t(loc, 'returnsFieldCustomer')}: $customerText',
+                            ),
+                            const SizedBox(height: 8),
+                            Text('Yuborilgan sana: $sentAt'),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${StringLookup.t(loc, 'returnsFieldCustomer')}: $customerText',
-                      ),
-                      const SizedBox(height: 8),
-                      Text('Yuborilgan sana: $sentAt'),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              ...ret.lines.map(
+                    ),
+                    const SizedBox(height: 8),
+                    ...orderedLines.map(
                 (CustomerReturnLine line) => locationsAsync.when(
                   loading: () => const Card(
                     child: Padding(
@@ -194,15 +205,25 @@ class _CustomerReturnDetailScreenState
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              FilledButton(
-                onPressed: _submitting
-                    ? null
-                    : () => _completeReturn(ret, loc),
-                child: Text(
-                  _submitting
-                      ? StringLookup.t(loc, 'returnsSubmitting')
-                      : StringLookup.t(loc, 'returnsCompletePutaway'),
+                    const SizedBox(height: 4),
+                  ],
+                ),
+              ),
+              SafeArea(
+                top: false,
+                minimum: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _submitting
+                        ? null
+                        : () => _completeReturn(ret, loc),
+                    child: Text(
+                      _submitting
+                          ? StringLookup.t(loc, 'returnsSubmitting')
+                          : StringLookup.t(loc, 'returnsCompletePutaway'),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -439,6 +460,38 @@ class _SuggestionEntry {
   final String fallbackLabel;
 }
 
+String _lineSortKey(
+  String lineId,
+  String productName,
+  Map<String, String> selectedByLine,
+  List<PickerLocationOption>? locations,
+) {
+  final String? locationId = selectedByLine[lineId];
+  String locationLabel = 'zzz';
+  if (locationId != null && locationId.isNotEmpty && locations != null) {
+    final PickerLocationOption? opt = _optionById(locations, locationId);
+    if (opt != null) {
+      locationLabel = formatPickerLocationOptionLine(opt).toLowerCase();
+    }
+  }
+  return '$locationLabel|${productName.toLowerCase()}';
+}
+
+_SuggestionEntry? _pickDefaultSuggestion(List<_SuggestionEntry> suggestions) {
+  if (suggestions.isEmpty) {
+    return null;
+  }
+  final List<_SuggestionEntry> sorted = <_SuggestionEntry>[...suggestions]
+    ..sort((a, b) {
+      final int qtyCmp = a.qty.compareTo(b.qty);
+      if (qtyCmp != 0) {
+        return qtyCmp;
+      }
+      return a.fallbackLabel.toLowerCase().compareTo(b.fallbackLabel.toLowerCase());
+    });
+  return sorted.first;
+}
+
 List<_SuggestionEntry> _buildExpirySuggestions(
   CustomerReturnLine line,
   List<PickerProductLocation> main,
@@ -602,6 +655,19 @@ class _ReturnLineCard extends ConsumerWidget {
                   pair.main.locations,
                   pair.showroom.locations,
                 );
+                if ((selectedLocationId == null || selectedLocationId!.isEmpty) &&
+                    enabled &&
+                    suggestions.isNotEmpty) {
+                  final _SuggestionEntry? def = _pickDefaultSuggestion(suggestions);
+                  if (def != null) {
+                    final PickerLocationOption? defOpt = _optionById(allLocations, def.locationId);
+                    if (defOpt != null) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        onLocationPicked(defOpt.id, formatPickerLocationOptionLine(defOpt));
+                      });
+                    }
+                  }
+                }
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
@@ -694,20 +760,6 @@ class _ReturnLineCard extends ConsumerWidget {
                       clearTooltip:
                           StringLookup.t(appLocale, 'returnsClearLocation'),
                       onClearLocation: onClearLocation,
-                      scanTooltip:
-                          StringLookup.t(appLocale, 'returnsScanLocationButton'),
-                      onScanPressed: enabled
-                          ? () {
-                              context.pushNamed(
-                                'scanner',
-                                extra: ScannerArgs(
-                                  returnToCustomerReturnLocation: true,
-                                  customerReturnId: returnId,
-                                  lineId: line.id,
-                                ),
-                              );
-                            }
-                          : null,
                     ),
                   ],
                 );
@@ -730,8 +782,6 @@ class _LocationSearchField extends StatelessWidget {
     this.hasSelectedLocation = false,
     this.clearTooltip,
     this.onClearLocation,
-    this.scanTooltip,
-    this.onScanPressed,
   });
 
   final List<PickerLocationOption> locations;
@@ -742,8 +792,6 @@ class _LocationSearchField extends StatelessWidget {
   final bool hasSelectedLocation;
   final String? clearTooltip;
   final VoidCallback? onClearLocation;
-  final String? scanTooltip;
-  final VoidCallback? onScanPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -775,7 +823,6 @@ class _LocationSearchField extends StatelessWidget {
         }
         final bool showClear =
             onClearLocation != null && hasSelectedLocation && enabled;
-        final bool showScan = onScanPressed != null;
         return TextFormField(
           controller: fieldController,
           focusNode: focusNode,
@@ -785,7 +832,7 @@ class _LocationSearchField extends StatelessWidget {
             hintText: 'Lokatsiya kodini yozing...',
             border: const OutlineInputBorder(),
             prefixIcon: const Icon(Icons.search),
-            suffixIcon: (!showClear && !showScan)
+            suffixIcon: !showClear
                 ? null
                 : Row(
                     mainAxisSize: MainAxisSize.min,
@@ -795,12 +842,6 @@ class _LocationSearchField extends StatelessWidget {
                           tooltip: clearTooltip ?? '',
                           icon: const Icon(Icons.close),
                           onPressed: onClearLocation,
-                        ),
-                      if (showScan)
-                        IconButton(
-                          tooltip: scanTooltip ?? '',
-                          icon: const Icon(Icons.qr_code_scanner),
-                          onPressed: enabled ? onScanPressed : null,
                         ),
                     ],
                   ),
