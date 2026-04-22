@@ -16,6 +16,7 @@ import '../../features/kirim/presentation/kirim_hub_screen.dart';
 import '../../features/kirim/presentation/kirim_new_screen.dart';
 import '../../features/misc/presentation/stub_screens.dart';
 import '../../features/movements/presentation/movement_screen.dart';
+import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/picking/presentation/consolidated_pick_screen.dart';
 import '../../features/picking/presentation/pick_task_details_screen.dart';
 import '../../features/picking/presentation/pick_task_list_screen.dart';
@@ -115,6 +116,12 @@ final goRouterProvider = Provider<GoRouter>((Ref ref) {
         path: '/account',
         name: 'account',
         builder: (BuildContext context, GoRouterState state) => const AccountScreen(),
+      ),
+      GoRoute(
+        path: '/notifications',
+        name: 'notifications',
+        builder: (BuildContext context, GoRouterState state) =>
+            const NotificationsScreen(),
       ),
       GoRoute(
         path: '/inventory',

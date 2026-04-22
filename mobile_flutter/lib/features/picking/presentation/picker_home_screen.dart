@@ -13,6 +13,7 @@ import '../../../l10n/string_lookup.dart';
 import '../../../shared/feedback/app_top_snackbar.dart';
 import '../../../shared/widgets/app_header.dart';
 import '../../../shared/widgets/picker_footer.dart';
+import '../../notifications/presentation/notification_bell_button.dart';
 import '../domain/profile_type_param.dart';
 import '../picking_providers.dart';
 import '../data/picking_models.dart';
@@ -97,16 +98,24 @@ class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
               onPressed: () => context.pushNamed('account'),
               tooltip: StringLookup.t(loc, 'tabAccount'),
             ),
-            trailing: !isOnline
-                ? Container(
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                if (!isOnline)
+                  Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.orange.shade400,
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: const Text('Offline', style: TextStyle(color: Colors.white, fontSize: 12)),
-                  )
-                : null,
+                    child: const Text(
+                      'Offline',
+                      style: TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                  ),
+                const NotificationBellButton(iconColor: Colors.white),
+              ],
+            ),
           ),
           if (!isOnline)
             Container(

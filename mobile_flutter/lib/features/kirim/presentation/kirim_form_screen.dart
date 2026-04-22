@@ -1026,22 +1026,85 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     return parts.join(' • ');
   }
 
-  /// Skan rejimi: lokatsiya qatori — mahsulot shtrix/SKU + muddat + tizim (`batch_no` yo‘q).
-  String _invScanLocationSubtitle(PickerProductDetailResponse p, PickerProductLocation loc) {
-    final List<String> parts = <String>[];
-    final String? bc = p.mainBarcode?.trim();
-    if (bc != null && bc.isNotEmpty) {
-      parts.add(bc);
-    }
-    final String code = p.code.trim();
-    if (code.isNotEmpty) {
-      parts.add(code);
-    }
-    if (loc.expiryDate != null && loc.expiryDate!.trim().isNotEmpty) {
-      parts.add(formatExpiryMonthYear(loc.expiryDate));
-    }
-    parts.add('Tizim: ${loc.availableQty.round()}');
-    return parts.join(' • ');
+  Widget _invValueRow(String label, String value, {bool emphasize = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: RichText(
+        text: TextSpan(
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey.shade800,
+          ),
+          children: <InlineSpan>[
+            TextSpan(
+              text: '$label: ',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            TextSpan(
+              text: value,
+              style: TextStyle(
+                fontWeight: emphasize ? FontWeight.w700 : FontWeight.w500,
+                color: emphasize ? const Color(0xFF1A237E) : Colors.grey.shade900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _invScanLocationCard(PickerProductDetailResponse p, PickerProductLocation loc) {
+    final String ean = (p.mainBarcode ?? '').trim().isEmpty ? '—' : p.mainBarcode!.trim();
+    final String lot = loc.batchNo.trim().isEmpty ? '—' : loc.batchNo.trim();
+    final String expiry = formatExpiryMonthYear(loc.expiryDate);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          setState(() {
+            _invScanSelectedLoc = loc;
+            _invScanActualQty.text = '${loc.availableQty.round()}';
+            _invScanExpiry = loc.expiryDate;
+            _invStep = 3;
+          });
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      loc.locationCode,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1A237E),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _invValueRow('EAN', ean),
+                    _invValueRow('SKU', p.code.trim().isEmpty ? '—' : p.code.trim()),
+                    _invValueRow('Lot', lot),
+                    _invValueRow('Muddat', expiry),
+                    _invValueRow('Tizim', '${loc.availableQty.round()}', emphasize: true),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Icon(Icons.chevron_right, color: Color(0xFF1A237E)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildInventoryBody() {
@@ -1250,23 +1313,9 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           if (_product!.locations.isEmpty)
             Text('Qoldiq topilmadi', style: TextStyle(color: Colors.grey.shade700))
           else
-            ..._product!.locations.map((PickerProductLocation loc) {
-              return ListTile(
-                title: Text(loc.locationCode),
-                subtitle: Text(
-                  _invScanLocationSubtitle(_product!, loc),
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  setState(() {
-                    _invScanSelectedLoc = loc;
-                    _invScanActualQty.text = '${loc.availableQty.round()}';
-                    _invScanExpiry = loc.expiryDate;
-                    _invStep = 3;
-                  });
-                },
-              );
-            }),
+            ..._product!.locations.map(
+              (PickerProductLocation loc) => _invScanLocationCard(_product!, loc),
+            ),
           TextButton(
             onPressed: () => setState(() {
               _product = null;
@@ -1281,10 +1330,10 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             _invScanSelectedLoc != null) ...<Widget>[
           Row(
             children: <Widget>[
-              Expanded(
+              const Expanded(
                 child: Text(
-                  _invScanSelectedLoc!.locationCode,
-                  style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1565C0)),
+                  'Tanlangan lokatsiya',
+                  style: TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
               TextButton(
@@ -1296,13 +1345,52 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
               ),
             ],
           ),
+          Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    _invScanSelectedLoc!.locationCode,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1A237E),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _invValueRow('Nomi', _product!.name),
+                  _invValueRow('SKU', _product!.code.trim().isEmpty ? '—' : _product!.code.trim()),
+                  _invValueRow(
+                    'EAN',
+                    (_product!.mainBarcode ?? '').trim().isEmpty
+                        ? '—'
+                        : _product!.mainBarcode!.trim(),
+                  ),
+                  _invValueRow(
+                    'Lot',
+                    _invScanSelectedLoc!.batchNo.trim().isEmpty
+                        ? '—'
+                        : _invScanSelectedLoc!.batchNo.trim(),
+                  ),
+                  _invValueRow('Muddat', formatExpiryMonthYear(_invScanSelectedLoc!.expiryDate)),
+                  _invValueRow(
+                    'Tizim',
+                    '${_invScanSelectedLoc!.availableQty.round()}',
+                    emphasize: true,
+                  ),
+                ],
+              ),
+            ),
+          ),
           ProductCard(
             title: _product!.name,
             subtitle: _product!.code,
             barcode: _product!.mainBarcode,
           ),
-          Text('Tizim: ${_invScanSelectedLoc!.availableQty.round()}',
-              style: const TextStyle(fontWeight: FontWeight.w500)),
+          const SizedBox(height: 6),
           TextField(
             controller: _invScanActualQty,
             keyboardType: kStockQtyKeyboardType,

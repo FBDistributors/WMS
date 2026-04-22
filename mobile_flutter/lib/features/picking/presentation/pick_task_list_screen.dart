@@ -15,6 +15,7 @@ import '../../../shared/widgets/app_header.dart';
 import '../../../shared/widgets/consolidated_pick_content.dart';
 import '../../../shared/widgets/consolidated_top_pick_qty_sheet.dart';
 import '../../../shared/widgets/picker_footer.dart';
+import '../../notifications/presentation/notification_bell_button.dart';
 import '../data/picking_constants.dart';
 import '../data/picking_models.dart';
 import '../domain/profile_type_param.dart';
@@ -756,11 +757,16 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
             headerBackgroundColor: isDark ? const Color(0xFF1E293B) : null,
             titleColor: isDark ? const Color(0xFFF1F5F9) : null,
             accentColor: isDark ? const Color(0xFF93C5FD) : null,
-            trailing: !_showConsolidated && profile == PickerProfileParam.picker
-                ? TextButton(
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                if (!_showConsolidated && profile == PickerProfileParam.picker)
+                  TextButton(
                     style: isDark
                         ? null
-                        : TextButton.styleFrom(foregroundColor: Colors.white.withValues(alpha: 0.92)),
+                        : TextButton.styleFrom(
+                            foregroundColor: Colors.white.withValues(alpha: 0.92),
+                          ),
                     onPressed: () {
                       setState(() {
                         _orderSelectionMode = !_orderSelectionMode;
@@ -774,8 +780,10 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
                           ? StringLookup.t(loc, 'orderSelectModeDone')
                           : StringLookup.t(loc, 'orderSelectMode'),
                     ),
-                  )
-                : null,
+                  ),
+                const NotificationBellButton(iconColor: Colors.white),
+              ],
+            ),
             onRefresh: () => unawaited(_onAppBarRefresh()),
             refreshing: _headerRefreshing,
           ),

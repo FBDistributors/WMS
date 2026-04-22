@@ -45,6 +45,11 @@ class AccountScreen extends ConsumerWidget {
             },
           ),
           ListTile(
+            leading: const Icon(Icons.notifications_none_rounded),
+            title: Text(StringLookup.t(loc, 'notifications')),
+            onTap: () => context.pushNamed('notifications'),
+          ),
+          ListTile(
             title: Text(StringLookup.t(loc, 'logout')),
             onTap: () async {
               final bool? confirm = await showDialog<bool>(
