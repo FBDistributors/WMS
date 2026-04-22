@@ -130,6 +130,7 @@ export async function getInventorySummaryByLocation(query: InventorySummaryByLoc
 /** Lightweight paginated summary - fast initial load */
 export type InventorySummaryLightQuery = {
   search?: string
+  brand_ids?: string[]
   only_available?: boolean
   include_locations?: boolean
   limit?: number
@@ -167,6 +168,7 @@ export async function getInventorySummaryLight(query: InventorySummaryLightQuery
   return fetchJSON<InventorySummaryLightResponse>('/api/v1/inventory/summary-light', {
     query: {
       search: query.search,
+      brand_ids: query.brand_ids?.join(','),
       only_available: query.only_available ?? true,
       include_locations: query.include_locations ?? true,
       limit: query.limit ?? 50,

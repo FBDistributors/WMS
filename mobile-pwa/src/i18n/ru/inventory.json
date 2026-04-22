@@ -61,6 +61,7 @@
   "filters": {
     "apply": "Применить",
     "only_available": "Только доступные",
+    "brand": "Фильтр по бренду",
     "all_products": "Все товары (Smartup)",
     "low_stock": "Порог низкого остатка",
     "location": "Локация",

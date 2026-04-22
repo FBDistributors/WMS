@@ -115,3 +115,33 @@ def require_sufficient_available(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Yetarli qoldiq yo'q (lot/joy: mavjud {avail}, so'ralgan {qty})",
         )
+
+
+def require_sufficient_reserved(
+    db: Session,
+    product_id: UUID,
+    lot_id: UUID,
+    location_id: UUID,
+    qty: Decimal,
+    *,
+    lock: bool = True,
+) -> None:
+    """qty > 0 bo'lsa, reserved < qty yoki reserved < 0 bo'lsa 409."""
+    if qty <= 0:
+        return
+    if lock:
+        lock_lot_location(db, lot_id, location_id)
+    lot = db.get(StockLotModel, lot_id)
+    if not lot or lot.product_id != product_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid lot for product")
+    _on_hand, reserved, _available = compute_lot_location_balances(db, lot_id, location_id)
+    if reserved < 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Rezerv manfiy holatda (lot/joy: reserved {reserved})",
+        )
+    if qty > reserved:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Yetarli rezerv yo'q (lot/joy: rezerv {reserved}, so'ralgan {qty})",
+        )

@@ -13,11 +13,13 @@ from sqlalchemy.orm import Session
 from app.auth.deps import get_current_user
 from app.auth.security import get_password_hash
 from app.main import app
+from app.models.brand import Brand
 from app.models.location import Location
 from app.models.product import Product
 from app.models.stock import StockLot, StockMovement
 from app.models.user import User
 from app.services.stock_availability import (
+    compute_lot_location_balances,
     compute_lot_location_available,
     require_sufficient_available,
 )
@@ -185,7 +187,7 @@ def test_inventory_unallocate_negative_skips_available_gate(
     prod: Product,
     bin_loc: Location,
 ) -> None:
-    """unallocate available ni kamaytirmaydi — qo‘lda yozuv bloklanmasin."""
+    """unallocate reserved'dan ortiq yecha olmaydi."""
     lot = StockLot(product_id=prod.id, batch="B-UN", expiry_date=None)
     db_session.add(lot)
     db_session.flush()
@@ -221,4 +223,59 @@ def test_inventory_unallocate_negative_skips_available_gate(
         r = client.post("/api/v1/inventory/movements", json=body)
     finally:
         app.dependency_overrides.pop(get_current_user, None)
-    assert r.status_code == 201
+    assert r.status_code == 409
+
+
+def test_zero_stock_brand_only_keeps_non_negative_available(
+    client: TestClient,
+    db_session: Session,
+    admin_user: User,
+    bin_loc: Location,
+) -> None:
+    brand = Brand(code="TNEG", name="Test Negative", is_active=True)
+    db_session.add(brand)
+    db_session.flush()
+    product = Product(
+        external_source="test",
+        external_id="neg-zero-prod",
+        name="Negative Zero Product",
+        sku="SKU-NEG-ZERO",
+        is_active=True,
+        brand_id=brand.id,
+    )
+    db_session.add(product)
+    db_session.flush()
+    lot = StockLot(product_id=product.id, batch="B-ZERO", expiry_date=None)
+    db_session.add(lot)
+    db_session.flush()
+    db_session.add(
+        StockMovement(
+            product_id=product.id,
+            lot_id=lot.id,
+            location_id=bin_loc.id,
+            qty_change=Decimal("5"),
+            movement_type="receipt",
+        )
+    )
+    db_session.add(
+        StockMovement(
+            product_id=product.id,
+            lot_id=lot.id,
+            location_id=bin_loc.id,
+            qty_change=Decimal("7"),
+            movement_type="allocate",
+        )
+    )
+    db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: admin_user
+    try:
+        r = client.post(f"/api/v1/inventory/brands/{brand.id}/zero-stock?mode=brand_only")
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+    assert r.status_code == 200
+
+    on_hand, reserved, available = compute_lot_location_balances(db_session, lot.id, bin_loc.id)
+    assert on_hand >= 0
+    assert reserved >= 0
+    assert available >= 0

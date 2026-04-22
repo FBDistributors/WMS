@@ -9,6 +9,8 @@ import {
   Loader2,
   Check,
   CloudDownload,
+  Funnel,
+  X,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import * as XLSX from 'xlsx'
@@ -28,6 +30,7 @@ import {
   getSmartupBalance,
   type WarehouseFilter,
 } from '../../services/inventoryApi'
+import { getBrands, type Brand } from '../../services/brandsApi'
 import { writeExcelFile } from '../../utils/exportExcel'
 
 const COLUMN_OPTIONS = [
@@ -115,6 +118,10 @@ export function InventorySummaryPage() {
   const [error, setError] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
   const [excelMenuOpen, setExcelMenuOpen] = useState(false)
+  const [brandFilterOpen, setBrandFilterOpen] = useState(false)
+  const [brandOptions, setBrandOptions] = useState<Brand[]>([])
+  const [brandFilterLoading, setBrandFilterLoading] = useState(false)
+  const [selectedBrandIds, setSelectedBrandIds] = useState<string[]>([])
   const excelMenuRef = useRef<HTMLDivElement>(null)
   const [smartupQoldiqByCode, setSmartupQoldiqByCode] = useState<Map<string, number>>(new Map())
   const [smartupBronByCode, setSmartupBronByCode] = useState<Map<string, number>>(new Map())
@@ -134,6 +141,7 @@ export function InventorySummaryPage() {
     try {
       const summaryRes = await getInventorySummaryLight({
         search: debouncedSearch.trim() || undefined,
+        brand_ids: selectedBrandIds.length > 0 ? selectedBrandIds : undefined,
         only_available: onlyAvailable,
         include_locations: true,
         limit: PAGE_SIZE,
@@ -163,7 +171,19 @@ export function InventorySummaryPage() {
       q002.status === 'fulfilled' ? buildSmartupQtyByProductCode(q002.value) : new Map()
     )
     setIsLoading(false)
-  }, [debouncedSearch, onlyAvailable, offset, warehouse, t])
+  }, [debouncedSearch, selectedBrandIds, onlyAvailable, offset, warehouse, t])
+
+  const loadBrands = useCallback(async () => {
+    setBrandFilterLoading(true)
+    try {
+      const rows = await getBrands(undefined, false)
+      setBrandOptions(rows.filter((b) => b.is_active))
+    } catch {
+      setBrandOptions([])
+    } finally {
+      setBrandFilterLoading(false)
+    }
+  }, [])
 
   const syncSmartupFromSource = useCallback(async () => {
     setIsSmartupSyncing(true)
@@ -200,18 +220,27 @@ export function InventorySummaryPage() {
   const prevSearchRef = useRef(debouncedSearch)
   const prevOnlyRef = useRef(onlyAvailable)
   const prevWarehouseRef = useRef(warehouse)
+  const prevBrandFilterRef = useRef(selectedBrandIds.join(','))
   useEffect(() => {
+    const brandFilterKey = selectedBrandIds.join(',')
     if (
       prevSearchRef.current !== debouncedSearch ||
       prevOnlyRef.current !== onlyAvailable ||
-      prevWarehouseRef.current !== warehouse
+      prevWarehouseRef.current !== warehouse ||
+      prevBrandFilterRef.current !== brandFilterKey
     ) {
       prevSearchRef.current = debouncedSearch
       prevOnlyRef.current = onlyAvailable
       prevWarehouseRef.current = warehouse
+      prevBrandFilterRef.current = brandFilterKey
       setOffset(0)
     }
-  }, [debouncedSearch, onlyAvailable, warehouse])
+  }, [debouncedSearch, selectedBrandIds, onlyAvailable, warehouse])
+
+  useEffect(() => {
+    if (!brandFilterOpen || brandOptions.length > 0 || brandFilterLoading) return
+    void loadBrands()
+  }, [brandFilterOpen, brandFilterLoading, brandOptions.length, loadBrands])
 
   useEffect(() => {
     void load()
@@ -257,6 +286,7 @@ export function InventorySummaryPage() {
       try {
         const res = await getInventorySummaryLight({
           search: debouncedSearch.trim() || undefined,
+          brand_ids: selectedBrandIds.length > 0 ? selectedBrandIds : undefined,
           only_available: onlyAvailable,
           include_locations: true,
           limit: EXPORT_LIMIT,
@@ -338,7 +368,15 @@ export function InventorySummaryPage() {
         setIsExporting(false)
       }
     },
-    [debouncedSearch, onlyAvailable, warehouse, t, smartupQoldiqByCode, smartupBronByCode]
+    [
+      debouncedSearch,
+      selectedBrandIds,
+      onlyAvailable,
+      warehouse,
+      t,
+      smartupQoldiqByCode,
+      smartupBronByCode,
+    ]
   )
 
   const content = useMemo(() => {
@@ -556,6 +594,20 @@ export function InventorySummaryPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
+          <Button
+            variant="ghost"
+            className="relative rounded-full px-3 py-3"
+            onClick={() => setBrandFilterOpen(true)}
+            title={t('inventory:filters.brand')}
+            aria-label={t('inventory:filters.brand')}
+          >
+            <Funnel size={18} />
+            {selectedBrandIds.length > 0 ? (
+              <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-white">
+                {selectedBrandIds.length}
+              </span>
+            ) : null}
+          </Button>
           <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
             <input
               type="checkbox"
@@ -696,6 +748,75 @@ export function InventorySummaryPage() {
         onSave={updateConfig}
         onReset={resetConfig}
       />
+      {brandFilterOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-950">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
+              <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                {t('inventory:filters.brand')}
+              </h3>
+              <Button
+                variant="ghost"
+                className="rounded-full px-3 py-2"
+                onClick={() => setBrandFilterOpen(false)}
+                aria-label={t('common:buttons.close')}
+              >
+                <X size={16} />
+              </Button>
+            </div>
+            <div className="space-y-3 px-6 py-5">
+              {brandFilterLoading ? (
+                <div className="flex items-center gap-2 text-sm text-slate-500">
+                  <Loader2 size={16} className="animate-spin" />
+                  {t('common:messages.loading')}
+                </div>
+              ) : brandOptions.length === 0 ? (
+                <p className="text-sm text-slate-500">{t('inventory:empty')}</p>
+              ) : (
+                <div className="max-h-72 space-y-2 overflow-auto pr-1">
+                  {brandOptions.map((brand) => {
+                    const checked = selectedBrandIds.includes(brand.id)
+                    return (
+                      <label
+                        key={brand.id}
+                        className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-800"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedBrandIds((prev) =>
+                                prev.includes(brand.id) ? prev : [...prev, brand.id]
+                              )
+                            } else {
+                              setSelectedBrandIds((prev) => prev.filter((id) => id !== brand.id))
+                            }
+                          }}
+                        />
+                        <span className="text-slate-700 dark:text-slate-200">
+                          {brand.display_name || brand.name}
+                        </span>
+                      </label>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-6 py-4 dark:border-slate-800">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setSelectedBrandIds([])
+                }}
+              >
+                {t('inventory:table.reset_default')}
+              </Button>
+              <Button onClick={() => setBrandFilterOpen(false)}>{t('inventory:filters.apply')}</Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </AdminLayout>
   )
 }

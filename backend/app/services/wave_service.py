@@ -14,7 +14,6 @@ from app.models.order import Order as OrderModel
 from app.models.order import OrderLine as OrderLineModel
 from app.models.product import Product as ProductModel
 from app.models.product import ProductBarcode
-from app.models.stock import ON_HAND_MOVEMENT_TYPES
 from app.models.stock import StockLot as StockLotModel
 from app.models.stock import StockMovement as StockMovementModel
 from app.models.wave import (
@@ -25,6 +24,7 @@ from app.models.wave import (
     WaveLine,
     WaveOrder,
 )
+from app.services.stock_availability import PHYSICAL_ON_HAND_MOVEMENT_TYPES
 
 
 STAGING_LOCATION_CODE = "Z-SORT-01"
@@ -66,7 +66,7 @@ def _fefo_available_for_product(db: Session, product_id: UUID, min_expiry_date: 
     """
     on_hand_expr = func.sum(
         case(
-            (StockMovementModel.movement_type.in_(ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
+            (StockMovementModel.movement_type.in_(PHYSICAL_ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
             else_=0,
         )
     )

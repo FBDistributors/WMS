@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Query, status
 
 from app.core.expiry import first_day_of_current_month, min_expiry_date_from_months
 from app.services.stock_availability import (
+    PHYSICAL_ON_HAND_MOVEMENT_TYPES,
     compute_lot_location_available,
     lock_lot_location,
     require_sufficient_available,
@@ -18,7 +19,7 @@ from app.services.stock_availability import (
 from app.services.vip_service import resolve_vip_min_expiry_months
 from pydantic import BaseModel, Field
 from decimal import Decimal
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth.deps import get_current_user, require_any_permission, require_permission, require_role
@@ -239,6 +240,21 @@ def _resolve_product_id(db: Session, line: OrderLineModel) -> UUID | None:
 
 
 def _fefo_available_lots(db: Session, product_id: UUID, min_expiry_date: date | None = None):
+    on_hand_expr = func.sum(
+        case(
+            (
+                StockMovementModel.movement_type.in_(PHYSICAL_ON_HAND_MOVEMENT_TYPES),
+                StockMovementModel.qty_change,
+            ),
+            else_=0,
+        )
+    )
+    reserved_expr = func.sum(
+        case(
+            (StockMovementModel.movement_type.in_(("allocate", "unallocate")), StockMovementModel.qty_change),
+            else_=0,
+        )
+    )
     filters = [
         StockLotModel.product_id == product_id,
         LocationModel.zone_type == "NORMAL",
@@ -253,7 +269,7 @@ def _fefo_available_lots(db: Session, product_id: UUID, min_expiry_date: date | 
         db.query(
             StockMovementModel.lot_id,
             StockMovementModel.location_id,
-            func.sum(StockMovementModel.qty_change).label("qty"),
+            (func.coalesce(on_hand_expr, 0) - func.coalesce(reserved_expr, 0)).label("qty"),
             StockLotModel.batch,
             StockLotModel.expiry_date,
             LocationModel.code.label("location_code"),
@@ -268,7 +284,7 @@ def _fefo_available_lots(db: Session, product_id: UUID, min_expiry_date: date | 
             StockLotModel.expiry_date,
             LocationModel.code,
         )
-        .having(func.sum(StockMovementModel.qty_change) > 0)
+        .having(func.coalesce(on_hand_expr, 0) - func.coalesce(reserved_expr, 0) > 0)
         .order_by(StockLotModel.expiry_date.asc().nullslast(), LocationModel.code.asc())
         .all()
     )

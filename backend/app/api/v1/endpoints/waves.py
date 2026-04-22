@@ -40,7 +40,7 @@ from app.services.wave_service import (
     compute_wave_lines,
     get_staging_location_id,
 )
-from app.services.stock_availability import lock_lot_location
+from app.services.stock_availability import compute_lot_location_available, lock_lot_location
 
 router = APIRouter()
 
@@ -282,13 +282,22 @@ async def start_wave(
         min_expiry_date = min_expiry_date_from_months(max_vip_months) if max_vip_months > 0 else None
         rows = _fefo_available_for_product(db, wl.product_id, min_expiry_date=min_expiry_date)
         remaining = wl.total_qty
+        alloc_scratch: dict[tuple[UUID, UUID], Decimal] = {}
         for row in rows:
             if remaining <= 0:
                 break
             avail = Decimal(str(row.available))
             if avail <= 0:
                 continue
-            allocate_qty = min(avail, remaining)
+            lk = (row.lot_id, row.location_id)
+            lock_lot_location(db, lk[0], lk[1])
+            if lk not in alloc_scratch:
+                alloc_scratch[lk] = compute_lot_location_available(db, lk[0], lk[1])
+            room = alloc_scratch[lk]
+            allocate_qty = min(avail, remaining, room)
+            if allocate_qty <= 0:
+                continue
+            alloc_scratch[lk] -= allocate_qty
             wa = WaveAllocation(
                 wave_line_id=wl.id,
                 stock_lot_id=row.lot_id,
