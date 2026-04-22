@@ -305,12 +305,23 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     }
     final bool popChainToKirim =
         a != null && (a.returnToKirimForm || a.returnToReturns);
-    // To‘liq path: `/scanner` dan `pushNamed('inventoryBarcodeResolve')` nested marshrutda
-    // ba’zi stacklarda ishonchsiz — `/inventory/resolve-barcode` aniq ishlaydi.
-    final Object? resolveResult = await context.push<Object?>(
-      '/inventory/resolve-barcode',
-      extra: InventoryBarcodeResolveExtra(barcode: value, args: a),
-    );
+    Object? resolveResult;
+    try {
+      // Birinchi urinish: named route (barqarorroq).
+      resolveResult = await context.pushNamed<Object?>(
+        'inventoryBarcodeResolve',
+        extra: InventoryBarcodeResolveExtra(barcode: value, args: a),
+      );
+    } on Object {
+      if (!mounted) {
+        return;
+      }
+      // Fallback: to‘liq path.
+      resolveResult = await context.push<Object?>(
+        '/inventory/resolve-barcode',
+        extra: InventoryBarcodeResolveExtra(barcode: value, args: a),
+      );
+    }
     if (!mounted) {
       return;
     }
@@ -324,8 +335,12 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     // Resolve ekrani `router.go('/inventory/detail/...')` qilganda hali bir frame
     // Scanner mounted bo‘lishi mumkin; shunda `_resumeScan` kamerani qayta yoqadi
     // yoki orqa stackda skaner qoladi. Faqat hozirgi joy `/scanner` bo‘lsa davom etamiz.
-    final String loc = GoRouterState.of(context).matchedLocation;
-    if (loc == '/scanner') {
+    try {
+      final String loc = GoRouterState.of(context).matchedLocation;
+      if (loc == '/scanner') {
+        _resumeScan();
+      }
+    } on Object {
       _resumeScan();
     }
   }

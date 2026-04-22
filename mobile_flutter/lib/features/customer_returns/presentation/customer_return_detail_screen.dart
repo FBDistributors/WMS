@@ -230,102 +230,105 @@ class _CustomerReturnDetailScreenState
       await showModalBottomSheet<void>(
         context: host,
         isScrollControlled: true,
+        useSafeArea: false,
         builder: (BuildContext sheetContext) {
           return Padding(
             padding: EdgeInsets.only(
               bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  Text(
-                    StringLookup.t(loc, 'returnsVerifyProductTitle'),
-                    style: Theme.of(sheetContext).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: tc,
-                    decoration: InputDecoration(
-                      labelText: StringLookup.t(loc, 'returnsVerifyProductHint'),
-                      border: const OutlineInputBorder(),
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    Text(
+                      StringLookup.t(loc, 'returnsVerifyProductTitle'),
+                      style: Theme.of(sheetContext).textTheme.titleMedium,
                     ),
-                    textInputAction: TextInputAction.done,
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: <Widget>[
-                      TextButton.icon(
-                        icon: const Icon(Icons.qr_code_scanner),
-                        label: Text(StringLookup.t(loc, 'returnsVerifyProductOpenScanner')),
-                        onPressed: () {
-                          Navigator.pop(sheetContext);
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            if (!mounted) {
-                              return;
-                            }
-                            context.pushNamed(
-                              'scanner',
-                              extra: ScannerArgs(
-                                returnToCustomerReturnProductVerify: true,
-                                customerReturnId: widget.returnId,
-                                lineId: line.id,
-                                expectedProductId: line.productId,
-                              ),
-                            );
-                          });
-                        },
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: tc,
+                      decoration: InputDecoration(
+                        labelText: StringLookup.t(loc, 'returnsVerifyProductHint'),
+                        border: const OutlineInputBorder(),
                       ),
-                      const Spacer(),
-                      FilledButton(
-                        onPressed: () async {
-                          final String raw = tc.text.trim();
-                          if (raw.isEmpty) {
-                            return;
-                          }
-                          try {
-                            final ScannerResolveOut out =
-                                await ref.read(scannerRepositoryProvider).resolveBarcode(raw);
-                            if (!mounted) {
-                              return;
-                            }
-                            if (!_barcodeResolveMatchesProduct(out, line.productId)) {
-                              showAppSnackBar(
-                                context,
-                                SnackBar(
-                                  content: Text(
-                                    out.type == ScannerResolveType.location
-                                        ? StringLookup.t(loc, 'returnsExpectProductNotLocation')
-                                        : StringLookup.t(loc, 'returnsProductMismatch'),
-                                  ),
+                      textInputAction: TextInputAction.done,
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: <Widget>[
+                        TextButton.icon(
+                          icon: const Icon(Icons.qr_code_scanner),
+                          label: Text(StringLookup.t(loc, 'returnsVerifyProductOpenScanner')),
+                          onPressed: () {
+                            Navigator.pop(sheetContext);
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (!mounted) {
+                                return;
+                              }
+                              context.pushNamed(
+                                'scanner',
+                                extra: ScannerArgs(
+                                  returnToCustomerReturnProductVerify: true,
+                                  customerReturnId: widget.returnId,
+                                  lineId: line.id,
+                                  expectedProductId: line.productId,
                                 ),
-                                type: AppToastType.warning,
                               );
+                            });
+                          },
+                        ),
+                        const Spacer(),
+                        FilledButton(
+                          onPressed: () async {
+                            final String raw = tc.text.trim();
+                            if (raw.isEmpty) {
                               return;
                             }
-                            setState(() {
-                              _productVerifiedByLine[line.id] = true;
-                            });
-                            if (sheetContext.mounted) {
-                              Navigator.pop(sheetContext);
+                            try {
+                              final ScannerResolveOut out =
+                                  await ref.read(scannerRepositoryProvider).resolveBarcode(raw);
+                              if (!mounted) {
+                                return;
+                              }
+                              if (!_barcodeResolveMatchesProduct(out, line.productId)) {
+                                showAppSnackBar(
+                                  context,
+                                  SnackBar(
+                                    content: Text(
+                                      out.type == ScannerResolveType.location
+                                          ? StringLookup.t(loc, 'returnsExpectProductNotLocation')
+                                          : StringLookup.t(loc, 'returnsProductMismatch'),
+                                    ),
+                                  ),
+                                  type: AppToastType.warning,
+                                );
+                                return;
+                              }
+                              setState(() {
+                                _productVerifiedByLine[line.id] = true;
+                              });
+                              if (sheetContext.mounted) {
+                                Navigator.pop(sheetContext);
+                              }
+                            } on Exception catch (e) {
+                              if (mounted) {
+                                showAppSnackBar(
+                                  context,
+                                  SnackBar(content: Text('$e')),
+                                  type: AppToastType.error,
+                                );
+                              }
                             }
-                          } on Exception catch (e) {
-                            if (mounted) {
-                              showAppSnackBar(
-                                context,
-                                SnackBar(content: Text('$e')),
-                                type: AppToastType.error,
-                              );
-                            }
-                          }
-                        },
-                        child: Text(StringLookup.t(loc, 'returnsVerifyProductSubmit')),
-                      ),
-                    ],
-                  ),
-                ],
+                          },
+                          child: Text(StringLookup.t(loc, 'returnsVerifyProductSubmit')),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           );
@@ -533,15 +536,15 @@ class _ReturnLineCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            InkWell(
-              onTap: onProductVerifyTap,
-              borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Expanded(
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: <Widget>[
+                Expanded(
+                  child: InkWell(
+                    onTap: onProductVerifyTap,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
@@ -555,11 +558,39 @@ class _ReturnLineCard extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    if (isProductVerified)
-                      Icon(Icons.check_circle, color: Colors.green.shade700, size: 26),
-                  ],
+                  ),
                 ),
-              ),
+                if (isProductVerified)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 2),
+                    child: Icon(Icons.check_circle, color: Colors.green.shade700, size: 26),
+                  )
+                else
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 2),
+                    child: IconButton(
+                      tooltip: StringLookup.t(appLocale, 'returnsVerifyProductOpenScanner'),
+                      style: IconButton.styleFrom(
+                        foregroundColor: Theme.of(context).colorScheme.primary,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      onPressed: enabled
+                          ? () {
+                              context.pushNamed(
+                                'scanner',
+                                extra: ScannerArgs(
+                                  returnToCustomerReturnProductVerify: true,
+                                  customerReturnId: returnId,
+                                  lineId: line.id,
+                                  expectedProductId: line.productId,
+                                ),
+                              );
+                            }
+                          : null,
+                      icon: const Icon(Icons.qr_code_scanner),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 10),
             detailAsync.when(
