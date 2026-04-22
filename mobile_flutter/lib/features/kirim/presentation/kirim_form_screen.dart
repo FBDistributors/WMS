@@ -824,8 +824,12 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   }
 
   void _openInventoryScanner() {
+    unawaited(_openInventoryScannerAndHandleResult());
+  }
+
+  Future<void> _openInventoryScannerAndHandleResult() async {
     final bool byLoc = _invSubMode == 'byLocation' && _invLocation != null;
-    context.pushNamed(
+    final String? productId = await context.pushNamed<String>(
       'scanner',
       extra: ScannerArgs(
         returnToKirimForm: true,
@@ -836,6 +840,10 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         inventoryLocationCode: byLoc ? _invLocation!.code : null,
       ),
     );
+    if (!mounted || productId == null || productId.isEmpty) {
+      return;
+    }
+    _invSelectProductFromBarcode(productId);
   }
 
   void _invSelectProductFromBarcode(String productId) {
