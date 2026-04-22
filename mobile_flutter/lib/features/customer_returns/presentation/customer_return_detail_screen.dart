@@ -41,6 +41,7 @@ class CustomerReturnDetailScreen extends ConsumerStatefulWidget {
 class _CustomerReturnDetailScreenState
     extends ConsumerState<CustomerReturnDetailScreen> {
   final Map<String, String> _selectedLocationByLine = <String, String>{};
+  final Map<String, bool> _skipAutoDefaultByLine = <String, bool>{};
   final Map<String, TextEditingController> _searchControllerByLine =
       <String, TextEditingController>{};
   final Map<String, bool> _productVerifiedByLine = <String, bool>{};
@@ -74,6 +75,7 @@ class _CustomerReturnDetailScreenState
               : (snap.displayLabel.trim().isEmpty ? snap.locationId : snap.displayLabel);
           setState(() {
             _selectedLocationByLine[snap.lineId] = snap.locationId;
+            _skipAutoDefaultByLine[snap.lineId] = false;
             _controllerForLine(snap.lineId).text = label;
           });
         });
@@ -193,12 +195,14 @@ class _CustomerReturnDetailScreenState
                     onLocationPicked: (String locationId, String label) {
                       setState(() {
                         _selectedLocationByLine[line.id] = locationId;
+                        _skipAutoDefaultByLine[line.id] = false;
                         _controllerForLine(line.id).text = label;
                       });
                     },
                     onClearLocation: _submitting
                         ? null
                         : () => _clearLocationForLine(line.id),
+                    allowAutoDefaultLocation: !(_skipAutoDefaultByLine[line.id] ?? false),
                     onProductVerifyTap: _submitting
                         ? null
                         : () => _openProductVerifyBottomSheet(context, line, loc),
@@ -236,6 +240,7 @@ class _CustomerReturnDetailScreenState
   void _clearLocationForLine(String lineId) {
     setState(() {
       _selectedLocationByLine.remove(lineId);
+      _skipAutoDefaultByLine[lineId] = true;
       _controllerForLine(lineId).clear();
       _productVerifiedByLine.remove(lineId);
     });
@@ -559,6 +564,7 @@ class _ReturnLineCard extends ConsumerWidget {
     required this.selectedLocationId,
     required this.searchController,
     required this.onLocationPicked,
+    required this.allowAutoDefaultLocation,
     this.onClearLocation,
     this.onProductVerifyTap,
   });
@@ -572,6 +578,7 @@ class _ReturnLineCard extends ConsumerWidget {
   final String? selectedLocationId;
   final TextEditingController searchController;
   final void Function(String locationId, String label) onLocationPicked;
+  final bool allowAutoDefaultLocation;
   final VoidCallback? onClearLocation;
   final VoidCallback? onProductVerifyTap;
 
@@ -656,6 +663,7 @@ class _ReturnLineCard extends ConsumerWidget {
                   pair.showroom.locations,
                 );
                 if ((selectedLocationId == null || selectedLocationId!.isEmpty) &&
+                    allowAutoDefaultLocation &&
                     enabled &&
                     suggestions.isNotEmpty) {
                   final _SuggestionEntry? def = _pickDefaultSuggestion(suggestions);

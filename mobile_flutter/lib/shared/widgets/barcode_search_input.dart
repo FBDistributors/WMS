@@ -221,7 +221,7 @@ class _BarcodeSearchInputState extends ConsumerState<BarcodeSearchInput> {
         labelText: widget.label ?? 'Barcode',
         hintText: widget.hint,
         border: const OutlineInputBorder(),
-        suffixIconConstraints: const BoxConstraints(minWidth: 96, minHeight: 48),
+        suffixIconConstraints: const BoxConstraints(minWidth: 48, minHeight: 48),
         suffixIcon: _loading
             ? const Padding(
                 padding: EdgeInsets.all(12),
@@ -231,20 +231,10 @@ class _BarcodeSearchInputState extends ConsumerState<BarcodeSearchInput> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 ),
               )
-            : Row(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  IconButton(
-                    icon: const Icon(Icons.search),
-                    onPressed: _resolve,
-                  ),
-                  buildInputClearButton(
-                        visible: widget.showClearButton && _c.text.trim().isNotEmpty,
-                        onPressed: _clearInput,
-                      ) ??
-                      const SizedBox.shrink(),
-                ],
-              ),
+            : buildInputClearButton(
+                  visible: widget.showClearButton && _c.text.trim().isNotEmpty,
+                  onPressed: _clearInput,
+                ),
       ),
       onSubmitted: (_) => _resolve(),
     );
