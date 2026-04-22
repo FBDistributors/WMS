@@ -216,6 +216,32 @@
       }
     }
   },
+  "returns_details": {
+    "title": "Qaytim tafsiloti",
+    "load_failed": "Qaytim tafsilotini yuklab bo'lmadi",
+    "not_found": "Qaytim hujjati topilmadi",
+    "lines_title": "Pozitsiyalar",
+    "no_lines": "Pozitsiyalar topilmadi",
+    "fields": {
+      "doc_no": "Hujjat raqami",
+      "status": "Status",
+      "customer": "Mijoz",
+      "created_by": "Yaratgan",
+      "approved_by": "Tasdiqlagan",
+      "assigned_picker": "Yig'uvchi",
+      "assigned_by": "Biriktirgan",
+      "assigned_at": "Yuborilgan",
+      "created_at": "Yaratilgan",
+      "updated_at": "Yangilangan"
+    },
+    "columns": {
+      "product": "Mahsulot",
+      "location": "Lokatsiya",
+      "qty": "Miqdor",
+      "batch": "Partiya",
+      "expiry": "Yaroqlilik muddati"
+    }
+  },
   "profile": {
     "menu": "Profil menyusi",
     "title": "Sozlamalar",

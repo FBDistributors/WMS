@@ -400,6 +400,12 @@ export async function getCustomerReturnsHistory(
   return fetchJSON<CustomerReturnListOut>('/api/v1/customer-returns', { query, signal: init?.signal })
 }
 
+export async function getCustomerReturn(returnId: string, init?: { signal?: AbortSignal }) {
+  return fetchJSON<CustomerReturnOut>(`/api/v1/customer-returns/${returnId}`, {
+    signal: init?.signal,
+  })
+}
+
 /** Admin: buyurtma statusini o'zgartirish (documents:edit_status kerak). Tekshiruvda: controller_user_id ixtiyoriy (controllerga yuborish). */
 export async function updateOrderStatus(
   orderId: string,

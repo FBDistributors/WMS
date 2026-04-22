@@ -216,6 +216,32 @@
       }
     }
   },
+  "returns_details": {
+    "title": "Return details",
+    "load_failed": "Failed to load return details",
+    "not_found": "Return document not found",
+    "lines_title": "Lines",
+    "no_lines": "No line items found",
+    "fields": {
+      "doc_no": "Document No",
+      "status": "Status",
+      "customer": "Customer",
+      "created_by": "Created by",
+      "approved_by": "Approved by",
+      "assigned_picker": "Picker",
+      "assigned_by": "Assigned by",
+      "assigned_at": "Sent at",
+      "created_at": "Created at",
+      "updated_at": "Updated at"
+    },
+    "columns": {
+      "product": "Product",
+      "location": "Location",
+      "qty": "Qty",
+      "batch": "Batch",
+      "expiry": "Expiry date"
+    }
+  },
   "profile": {
     "menu": "Profile menu",
     "title": "Settings",

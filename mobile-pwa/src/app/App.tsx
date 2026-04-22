@@ -34,6 +34,7 @@ import { AuditLogsPage } from '../pages/admin/AuditLogsPage'
 import { KamomatlarPage } from '../pages/admin/KamomatlarPage'
 import { ApiPage } from '../pages/admin/ApiPage'
 import { ReturnsHistoryPage } from '../pages/admin/ReturnsHistoryPage'
+import { ReturnDetailsPage } from '../pages/admin/ReturnDetailsPage'
 import { MahsulotYoqQilishPage } from '../pages/admin/MahsulotYoqQilishPage'
 import { PickListsPage } from '../pages/admin/PickListsPage'
 import { OfflineQueuePage } from '../pages/offline/OfflineQueuePage'
@@ -527,6 +528,16 @@ export function App() {
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">
               <RequirePermission permission="orders:read">
                 <ReturnsHistoryPage />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/returns-history/:id"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="orders:read">
+                <ReturnDetailsPage />
               </RequirePermission>
             </RequirePermission>
           }

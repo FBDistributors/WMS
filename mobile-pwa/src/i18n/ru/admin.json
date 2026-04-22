@@ -216,6 +216,32 @@
       }
     }
   },
+  "returns_details": {
+    "title": "Детали возврата",
+    "load_failed": "Не удалось загрузить детали возврата",
+    "not_found": "Документ возврата не найден",
+    "lines_title": "Позиции",
+    "no_lines": "Позиции не найдены",
+    "fields": {
+      "doc_no": "Номер документа",
+      "status": "Статус",
+      "customer": "Клиент",
+      "created_by": "Создал",
+      "approved_by": "Подтвердил",
+      "assigned_picker": "Сборщик",
+      "assigned_by": "Назначил",
+      "assigned_at": "Отправлено",
+      "created_at": "Создано",
+      "updated_at": "Обновлено"
+    },
+    "columns": {
+      "product": "Товар",
+      "location": "Локация",
+      "qty": "Кол-во",
+      "batch": "Партия",
+      "expiry": "Срок годности"
+    }
+  },
   "profile": {
     "menu": "Меню профиля",
     "title": "Настройки",
