@@ -9,7 +9,7 @@ import {
   Loader2,
   Check,
   CloudDownload,
-  Funnel,
+  Filter,
   X,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -601,7 +601,7 @@ export function InventorySummaryPage() {
             title={t('inventory:filters.brand')}
             aria-label={t('inventory:filters.brand')}
           >
-            <Funnel size={18} />
+            <Filter size={18} />
             {selectedBrandIds.length > 0 ? (
               <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-white">
                 {selectedBrandIds.length}
