@@ -1022,7 +1022,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     if (item.expiryDate != null && item.expiryDate!.trim().isNotEmpty) {
       parts.add(formatExpiryMonthYear(item.expiryDate));
     }
-    parts.add('Tizim: ${item.availableQty.round()}');
+    parts.add('Qoldiq: ${item.availableQty.round()}');
     return parts.join(' • ');
   }
 
@@ -1055,7 +1055,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
 
   Widget _invScanLocationCard(PickerProductDetailResponse p, PickerProductLocation loc) {
     final String ean = (p.mainBarcode ?? '').trim().isEmpty ? '—' : p.mainBarcode!.trim();
-    final String lot = loc.batchNo.trim().isEmpty ? '—' : loc.batchNo.trim();
     final String expiry = formatExpiryMonthYear(loc.expiryDate);
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -1087,11 +1086,10 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    _invValueRow('EAN', ean),
+                    _invValueRow('Shtrix kod', ean),
                     _invValueRow('SKU', p.code.trim().isEmpty ? '—' : p.code.trim()),
-                    _invValueRow('Lot', lot),
                     _invValueRow('Muddat', expiry),
-                    _invValueRow('Tizim', '${loc.availableQty.round()}', emphasize: true),
+                    _invValueRow('Qoldiq', '${loc.availableQty.round()}', emphasize: true),
                   ],
                 ),
               ),
@@ -1341,7 +1339,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                   _invStep = 2;
                   _invScanSelectedLoc = null;
                 }),
-                child: const Text('Almashtirish'),
+                child: const Text('Ortga'),
               ),
             ],
           ),
@@ -1364,20 +1362,14 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                   _invValueRow('Nomi', _product!.name),
                   _invValueRow('SKU', _product!.code.trim().isEmpty ? '—' : _product!.code.trim()),
                   _invValueRow(
-                    'EAN',
+                    'Shtrix kod',
                     (_product!.mainBarcode ?? '').trim().isEmpty
                         ? '—'
                         : _product!.mainBarcode!.trim(),
                   ),
-                  _invValueRow(
-                    'Lot',
-                    _invScanSelectedLoc!.batchNo.trim().isEmpty
-                        ? '—'
-                        : _invScanSelectedLoc!.batchNo.trim(),
-                  ),
                   _invValueRow('Muddat', formatExpiryMonthYear(_invScanSelectedLoc!.expiryDate)),
                   _invValueRow(
-                    'Tizim',
+                    'Qoldiq',
                     '${_invScanSelectedLoc!.availableQty.round()}',
                     emphasize: true,
                   ),
@@ -1400,6 +1392,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
               border: OutlineInputBorder(),
             ),
           ),
+          const SizedBox(height: 10),
           ExpiryDatePickerField(
             value: _invScanExpiry,
             onChanged: (String? v) => setState(() => _invScanExpiry = v),
