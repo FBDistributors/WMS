@@ -204,6 +204,9 @@ abstract final class StringLookup {
     'returnsSuggestedLocationsTitle': 'Tavsiya (shu mahsulot muddati)',
     'returnsNoExpiryMatchLocations':
         'Bu muddat bo‘yicha zaxirada joy topilmadi — pastdan qidiring.',
+    'returnsScanLocationButton': 'Lokatsiyani skanerlash',
+    'returnsLocationScanExpectLocation': 'Lokatsiya kutilmoqda, mahsulot emas',
+    'returnsLocationScanUnknown': 'Lokatsiya aniqlanmadi',
     'returnsLinesSummary': '{{status}} · {{count}} qator',
     'returnsLineSubtitle': '{{location}} · {{qty}}',
     'returnsCompletePicker': 'Yakunlash (yig‘uvchi)',
@@ -426,6 +429,9 @@ abstract final class StringLookup {
     'returnsSuggestedLocationsTitle': 'Рекомендации (срок годности строки)',
     'returnsNoExpiryMatchLocations':
         'По этому сроку ячейки не найдены — выберите ниже.',
+    'returnsScanLocationButton': 'Сканировать ячейку',
+    'returnsLocationScanExpectLocation': 'Ожидается ячейка, не товар',
+    'returnsLocationScanUnknown': 'Ячейка не определена',
     'returnsLinesSummary': '{{status}} · {{count}} строк',
     'returnsLineSubtitle': '{{location}} · {{qty}}',
     'returnsCompletePicker': 'Завершить (сборщик)',
@@ -648,6 +654,9 @@ abstract final class StringLookup {
     'returnsSuggestedLocationsTitle': 'Suggested (line expiry)',
     'returnsNoExpiryMatchLocations':
         'No stock for this expiry — search below.',
+    'returnsScanLocationButton': 'Scan location',
+    'returnsLocationScanExpectLocation': 'Location expected, not a product',
+    'returnsLocationScanUnknown': 'Location could not be resolved',
     'returnsLinesSummary': '{{status}} · {{count}} lines',
     'returnsLineSubtitle': '{{location}} · {{qty}}',
     'returnsCompletePicker': 'Complete (picker)',

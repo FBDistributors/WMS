@@ -11,6 +11,7 @@ import '../../../core/app_state/locale_controller.dart';
 import '../../../core/router/scanner_args.dart';
 import '../../../l10n/string_lookup.dart';
 import '../../../shared/feedback/app_top_snackbar.dart';
+import '../../customer_returns/customer_returns_providers.dart';
 import '../../inventory/presentation/inventory_barcode_resolve_extra.dart';
 import '../../picking/domain/profile_type_param.dart';
 import '../../picking/picking_providers.dart';
@@ -113,6 +114,57 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
     if (mounted) {
       setState(() => _scanEnabled = false);
+    }
+
+    if (a != null &&
+        a.returnToCustomerReturnLocation &&
+        (a.customerReturnId ?? '').trim().isNotEmpty &&
+        (a.lineId ?? '').trim().isNotEmpty) {
+      final AppLocale locResolve = ref.read(appLocaleProvider);
+      if (mounted) {
+        setState(() => _lookupInProgress = true);
+      }
+      try {
+        final ScannerResolveOut out =
+            await ref.read(scannerRepositoryProvider).resolveBarcode(value);
+        if (!mounted) {
+          return;
+        }
+        if (out.type == ScannerResolveType.location &&
+            out.locationId != null &&
+            out.locationId!.trim().isNotEmpty) {
+          final String label = (out.displayLabel != null && out.displayLabel!.trim().isNotEmpty)
+              ? out.displayLabel!.trim()
+              : (out.locationCode ?? value);
+          ref.read(pendingCustomerReturnLocationScanProvider.notifier).state =
+              CustomerReturnLocationScanFromScanner(
+            returnId: a.customerReturnId!.trim(),
+            lineId: a.lineId!.trim(),
+            locationId: out.locationId!.trim(),
+            displayLabel: label,
+          );
+          router.pop();
+        } else if (out.type == ScannerResolveType.product) {
+          _showError(StringLookup.t(locResolve, 'returnsLocationScanExpectLocation'));
+          _resumeScan();
+        } else {
+          _showError(
+            out.message ??
+                StringLookup.t(locResolve, 'returnsLocationScanUnknown'),
+          );
+          _resumeScan();
+        }
+      } on Exception catch (e) {
+        if (mounted) {
+          _showError('$e');
+          _resumeScan();
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _lookupInProgress = false);
+        }
+      }
+      return;
     }
 
     if (await _dispatchRouteOnlyIfPossible(router, value, a)) {

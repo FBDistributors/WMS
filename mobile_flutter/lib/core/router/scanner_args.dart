@@ -11,10 +11,12 @@ class ScannerArgs {
     this.returnToMovementPallet = false,
     this.returnToKirimLocation = false,
     this.returnToInventoryDetail = false,
+    this.returnToCustomerReturnLocation = false,
     this.flow,
     this.newMode,
     this.warehouse,
     this.taskId,
+    this.customerReturnId,
     this.lineId,
     this.profileType,
     this.selectedProductKey,
@@ -33,10 +35,12 @@ class ScannerArgs {
   final bool returnToMovementPallet;
   final bool returnToKirimLocation;
   final bool returnToInventoryDetail;
+  final bool returnToCustomerReturnLocation;
   final String? flow;
   final String? newMode;
   final String? warehouse;
   final String? taskId;
+  final String? customerReturnId;
   final String? lineId;
   final PickerProfileParam? profileType;
   final String? selectedProductKey;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/router/scanner_args.dart';
 import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../l10n/string_lookup.dart';
@@ -34,6 +35,36 @@ class _CustomerReturnDetailScreenState
   @override
   Widget build(BuildContext context) {
     final AppLocale loc = ref.watch(appLocaleProvider);
+    ref.listen<CustomerReturnLocationScanFromScanner?>(
+      pendingCustomerReturnLocationScanProvider,
+      (CustomerReturnLocationScanFromScanner? prev, CustomerReturnLocationScanFromScanner? next) {
+        if (next == null || next.returnId != widget.returnId) {
+          return;
+        }
+        ref.read(pendingCustomerReturnLocationScanProvider.notifier).state = null;
+        final CustomerReturnLocationScanFromScanner snap = next;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) {
+            return;
+          }
+          final CustomerReturn? ret =
+              ref.read(customerReturnDetailProvider(widget.returnId)).valueOrNull;
+          if (ret == null || !ret.lines.any((CustomerReturnLine l) => l.id == snap.lineId)) {
+            return;
+          }
+          final List<PickerLocationOption> locs =
+              ref.read(pickerLocationsProvider).valueOrNull ?? const <PickerLocationOption>[];
+          final PickerLocationOption? opt = _optionById(locs, snap.locationId);
+          final String label = opt != null
+              ? formatPickerLocationOptionLine(opt)
+              : (snap.displayLabel.trim().isEmpty ? snap.locationId : snap.displayLabel);
+          setState(() {
+            _selectedLocationByLine[snap.lineId] = snap.locationId;
+            _controllerForLine(snap.lineId).text = label;
+          });
+        });
+      },
+    );
     final AsyncValue<CustomerReturn> detailAsync =
         ref.watch(customerReturnDetailProvider(widget.returnId));
     final AsyncValue<List<PickerLocationOption>> locationsAsync =
@@ -103,6 +134,7 @@ class _CustomerReturnDetailScreenState
                     ),
                   ),
                   data: (List<PickerLocationOption> locations) => _ReturnLineCard(
+                    returnId: widget.returnId,
                     line: line,
                     appLocale: loc,
                     allLocations: locations,
@@ -281,6 +313,7 @@ PickerLocationOption? _optionById(
 
 class _ReturnLineCard extends ConsumerWidget {
   const _ReturnLineCard({
+    required this.returnId,
     required this.line,
     required this.appLocale,
     required this.allLocations,
@@ -290,6 +323,7 @@ class _ReturnLineCard extends ConsumerWidget {
     required this.onLocationPicked,
   });
 
+  final String returnId;
   final CustomerReturnLine line;
   final AppLocale appLocale;
   final List<PickerLocationOption> allLocations;
@@ -416,6 +450,20 @@ class _ReturnLineCard extends ConsumerWidget {
                           formatPickerLocationOptionLine(option),
                         );
                       },
+                      scanTooltip:
+                          StringLookup.t(appLocale, 'returnsScanLocationButton'),
+                      onScanPressed: enabled
+                          ? () {
+                              context.pushNamed(
+                                'scanner',
+                                extra: ScannerArgs(
+                                  returnToCustomerReturnLocation: true,
+                                  customerReturnId: returnId,
+                                  lineId: line.id,
+                                ),
+                              );
+                            }
+                          : null,
                     ),
                   ],
                 );
@@ -463,6 +511,8 @@ class _LocationSearchField extends StatelessWidget {
     required this.controller,
     required this.selectedLabel,
     required this.onSelected,
+    this.scanTooltip,
+    this.onScanPressed,
   });
 
   final List<PickerLocationOption> locations;
@@ -470,6 +520,8 @@ class _LocationSearchField extends StatelessWidget {
   final TextEditingController controller;
   final String? selectedLabel;
   final ValueChanged<PickerLocationOption> onSelected;
+  final String? scanTooltip;
+  final VoidCallback? onScanPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -503,11 +555,18 @@ class _LocationSearchField extends StatelessWidget {
           controller: fieldController,
           focusNode: focusNode,
           enabled: enabled,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Lokatsiya qidirish',
             hintText: 'Lokatsiya kodini yozing...',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.search),
+            border: const OutlineInputBorder(),
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: onScanPressed == null
+                ? null
+                : IconButton(
+                    tooltip: scanTooltip ?? '',
+                    icon: const Icon(Icons.qr_code_scanner),
+                    onPressed: enabled ? onScanPressed : null,
+                  ),
           ),
           onChanged: (String value) {
             controller.text = value;
