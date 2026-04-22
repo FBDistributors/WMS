@@ -6,6 +6,7 @@ import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../l10n/string_lookup.dart';
 import '../customer_returns_providers.dart';
+import '../data/customer_return_doc_no_display.dart';
 import '../data/customer_returns_models.dart';
 
 class CustomerReturnsQueueScreen extends ConsumerWidget {
@@ -51,11 +52,16 @@ class CustomerReturnsQueueScreen extends ConsumerWidget {
                   'status': c.status,
                   'count': '${c.lines.length}',
                 });
+                final String docTitle = displayCustomerReturnDocNo(c.docNo);
+                final String custLine =
+                    '${StringLookup.t(loc, 'returnsFieldCustomer')}: ${custLabel ?? 'Mijoz yo‘q'}';
+                final String dateLine =
+                    '${StringLookup.t(loc, 'returnsFieldDate')}: $sentAt';
                 return Card(
                   child: ListTile(
-                    title: Text(c.docNo),
+                    title: Text(docTitle),
                     subtitle: Text(
-                      '${custLabel ?? 'Mijoz yo‘q'}\nController: $controllerLabel · $sentAt\n$summary',
+                      '$custLine\nController: $controllerLabel\n$dateLine\n$summary',
                     ),
                     isThreeLine: true,
                     trailing: const Icon(Icons.chevron_right),

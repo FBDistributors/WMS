@@ -2,11 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/app_state/app_locale.dart';
+import '../../../core/app_state/locale_controller.dart';
+import '../../../l10n/string_lookup.dart';
 import '../../../shared/feedback/app_top_snackbar.dart';
 import '../../inventory/data/models/picker_inventory_models.dart';
 import '../../inventory/data/picker_location_format.dart';
 import '../../inventory/presentation/inventory_providers.dart';
 import '../customer_returns_providers.dart';
+import '../data/customer_return_doc_no_display.dart';
+import '../data/customer_return_expiry_match.dart';
 import '../data/customer_returns_models.dart';
 
 class CustomerReturnDetailScreen extends ConsumerStatefulWidget {
@@ -28,6 +33,7 @@ class _CustomerReturnDetailScreenState
 
   @override
   Widget build(BuildContext context) {
+    final AppLocale loc = ref.watch(appLocaleProvider);
     final AsyncValue<CustomerReturn> detailAsync =
         ref.watch(customerReturnDetailProvider(widget.returnId));
     final AsyncValue<List<PickerLocationOption>> locationsAsync =
@@ -46,6 +52,12 @@ class _CustomerReturnDetailScreenState
         error: (Object e, _) => Center(child: Text('$e')),
         data: (CustomerReturn ret) {
           final String sentAt = _prettyDate(ret.assignedAt ?? ret.updatedAt);
+          final String docDisplay = displayCustomerReturnDocNo(ret.docNo);
+          final String customerText = ret.customerName?.trim().isNotEmpty == true
+              ? ret.customerName!.trim()
+              : (ret.customerId?.trim().isNotEmpty == true
+                  ? ret.customerId!.trim()
+                  : 'Mijoz yo‘q');
 
           return ListView(
             padding: const EdgeInsets.all(12),
@@ -57,16 +69,16 @@ class _CustomerReturnDetailScreenState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
-                        ret.docNo,
+                        '${StringLookup.t(loc, 'returnsFieldDoc')}: $docDisplay',
                         style: const TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 17,
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(ret.customerName?.trim().isNotEmpty == true
-                          ? ret.customerName!
-                          : (ret.customerId ?? 'Mijoz yo‘q')),
+                      Text(
+                        '${StringLookup.t(loc, 'returnsFieldCustomer')}: $customerText',
+                      ),
                       const SizedBox(height: 8),
                       Text('Yuborilgan sana: $sentAt'),
                     ],
@@ -75,52 +87,34 @@ class _CustomerReturnDetailScreenState
               ),
               const SizedBox(height: 8),
               ...ret.lines.map(
-                (CustomerReturnLine line) => Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          line.productName,
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 6),
-                        Text('Miqdor: ${line.qty}'),
-                        Text('Muddati: ${line.expiryDate ?? '—'}'),
-                        _BalanceLine(productId: line.productId),
-                        const SizedBox(height: 10),
-                        locationsAsync.when(
-                          loading: () => const LinearProgressIndicator(),
-                          error: (_, __) =>
-                              const Text('Lokatsiyalarni yuklashda xato'),
-                          data: (List<PickerLocationOption> locations) {
-                            final String? selectedId =
-                                _selectedLocationByLine[line.id];
-                            final PickerLocationOption? selectedOption = selectedId == null
-                                ? null
-                                : locations.cast<PickerLocationOption?>().firstWhere(
-                                      (PickerLocationOption? option) =>
-                                          option?.id == selectedId,
-                                      orElse: () => null,
-                                    );
-                            return _LocationSearchField(
-                              locations: locations,
-                              enabled: !_submitting,
-                              controller: _controllerForLine(line.id),
-                              selectedLabel: selectedOption == null
-                                  ? null
-                                  : formatPickerLocationOptionLine(selectedOption),
-                              onSelected: (PickerLocationOption option) {
-                                setState(() {
-                                  _selectedLocationByLine[line.id] = option.id;
-                                });
-                              },
-                            );
-                          },
-                        ),
-                      ],
+                (CustomerReturnLine line) => locationsAsync.when(
+                  loading: () => const Card(
+                    child: Padding(
+                      padding: EdgeInsets.all(12),
+                      child: LinearProgressIndicator(),
                     ),
+                  ),
+                  error: (_, __) => Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Text(
+                        '${line.productName}\nLokatsiyalarni yuklashda xato',
+                      ),
+                    ),
+                  ),
+                  data: (List<PickerLocationOption> locations) => _ReturnLineCard(
+                    line: line,
+                    appLocale: loc,
+                    allLocations: locations,
+                    enabled: !_submitting,
+                    selectedLocationId: _selectedLocationByLine[line.id],
+                    searchController: _controllerForLine(line.id),
+                    onLocationPicked: (String locationId, String label) {
+                      setState(() {
+                        _selectedLocationByLine[line.id] = locationId;
+                        _controllerForLine(line.id).text = label;
+                      });
+                    },
                   ),
                 ),
               ),
@@ -214,6 +208,223 @@ class _CustomerReturnDetailScreenState
       c.dispose();
     }
     super.dispose();
+  }
+}
+
+class _SuggestionEntry {
+  _SuggestionEntry({
+    required this.locationId,
+    required this.qty,
+    required this.fallbackLabel,
+  });
+
+  final String locationId;
+  final double qty;
+  final String fallbackLabel;
+}
+
+List<_SuggestionEntry> _buildExpirySuggestions(
+  CustomerReturnLine line,
+  List<PickerProductLocation> main,
+  List<PickerProductLocation> showroom,
+) {
+  final List<PickerProductLocation> merged = <PickerProductLocation>[
+    ...main,
+    ...showroom,
+  ];
+  final List<PickerProductLocation> matched = merged
+      .where(
+        (PickerProductLocation l) =>
+            expiryMatchesReturnLine(line.expiryDate, l.expiryDate) &&
+            l.availableQty > 0,
+      )
+      .toList(growable: false);
+  final Map<String, double> qtyByLoc = <String, double>{};
+  for (final PickerProductLocation l in matched) {
+    qtyByLoc[l.locationId] = (qtyByLoc[l.locationId] ?? 0) + l.availableQty;
+  }
+  final List<_SuggestionEntry> out = qtyByLoc.entries
+      .map(
+        (MapEntry<String, double> e) {
+          final PickerProductLocation sample =
+              matched.firstWhere((PickerProductLocation l) => l.locationId == e.key);
+          final String fallback =
+              '${sample.locationCode} · ${sample.expiryDate ?? "—"} · ${e.value.toStringAsFixed(0)}';
+          return _SuggestionEntry(
+            locationId: e.key,
+            qty: e.value,
+            fallbackLabel: fallback,
+          );
+        },
+      )
+      .toList(growable: false);
+  out.sort(
+    (a, b) => a.fallbackLabel.toLowerCase().compareTo(b.fallbackLabel.toLowerCase()),
+  );
+  return out;
+}
+
+PickerLocationOption? _optionById(
+  List<PickerLocationOption> locations,
+  String? locationId,
+) {
+  if (locationId == null || locationId.isEmpty) {
+    return null;
+  }
+  for (final PickerLocationOption o in locations) {
+    if (o.id == locationId) {
+      return o;
+    }
+  }
+  return null;
+}
+
+class _ReturnLineCard extends ConsumerWidget {
+  const _ReturnLineCard({
+    required this.line,
+    required this.appLocale,
+    required this.allLocations,
+    required this.enabled,
+    required this.selectedLocationId,
+    required this.searchController,
+    required this.onLocationPicked,
+  });
+
+  final CustomerReturnLine line;
+  final AppLocale appLocale;
+  final List<PickerLocationOption> allLocations;
+  final bool enabled;
+  final String? selectedLocationId;
+  final TextEditingController searchController;
+  final void Function(String locationId, String label) onLocationPicked;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final AsyncValue<InventoryDetailPair> detailAsync =
+        ref.watch(inventoryProductDetailProvider(line.productId));
+    final PickerLocationOption? selectedOption =
+        _optionById(allLocations, selectedLocationId);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              line.productName,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 6),
+            Text('Miqdor: ${line.qty}'),
+            Text('Muddati: ${line.expiryDate ?? '—'}'),
+            _BalanceLine(productId: line.productId),
+            const SizedBox(height: 10),
+            detailAsync.when(
+              loading: () => const LinearProgressIndicator(),
+              error: (_, __) => const SizedBox.shrink(),
+              data: (InventoryDetailPair pair) {
+                final List<_SuggestionEntry> suggestions = _buildExpirySuggestions(
+                  line,
+                  pair.main.locations,
+                  pair.showroom.locations,
+                );
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    if (suggestions.isNotEmpty) ...<Widget>[
+                      Text(
+                        StringLookup.t(appLocale, 'returnsSuggestedLocationsTitle'),
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 6),
+                      ...suggestions.map(
+                        (_SuggestionEntry s) {
+                          final PickerLocationOption? opt =
+                              _optionById(allLocations, s.locationId);
+                          final String label = opt == null
+                              ? s.fallbackLabel
+                              : '${formatPickerLocationOptionLine(opt)} · ${s.qty.toStringAsFixed(0)}';
+                          final bool selected = selectedLocationId == s.locationId;
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Material(
+                              color: selected
+                                  ? Colors.green.shade50
+                                  : Theme.of(context)
+                                      .colorScheme
+                                      .surfaceContainerHighest
+                                      .withValues(alpha: 0.35),
+                              borderRadius: BorderRadius.circular(8),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(8),
+                                onTap: enabled
+                                    ? () {
+                                        if (opt != null) {
+                                          onLocationPicked(opt.id, label);
+                                        } else {
+                                          onLocationPicked(s.locationId, label);
+                                        }
+                                      }
+                                    : null,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
+                                  ),
+                                  child: Row(
+                                    children: <Widget>[
+                                      Expanded(child: Text(label)),
+                                      if (selected)
+                                        Icon(
+                                          Icons.check_circle,
+                                          color: Colors.green.shade700,
+                                          size: 22,
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 4),
+                    ] else
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          StringLookup.t(
+                            appLocale,
+                            'returnsNoExpiryMatchLocations',
+                          ),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                      ),
+                    _LocationSearchField(
+                      locations: allLocations,
+                      enabled: enabled,
+                      controller: searchController,
+                      selectedLabel: selectedOption == null
+                          ? null
+                          : formatPickerLocationOptionLine(selectedOption),
+                      onSelected: (PickerLocationOption option) {
+                        onLocationPicked(
+                          option.id,
+                          formatPickerLocationOptionLine(option),
+                        );
+                      },
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
