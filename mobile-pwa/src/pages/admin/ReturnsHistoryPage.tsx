@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ClipboardList } from 'lucide-react'
 
@@ -17,6 +17,7 @@ const STATUS_OPTIONS = ['pending', 'approved', 'assigned', 'completed'] as const
 
 export function ReturnsHistoryPage() {
   const { t } = useTranslation(['admin', 'common'])
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -161,9 +162,22 @@ export function ReturnsHistoryPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((item) => (
-                  <tr key={item.id} className="border-b border-slate-100 dark:border-slate-800">
-                    <td className="px-3 py-2 font-semibold">{item.doc_no}</td>
+                {rows.map((item) => {
+                  const rowId = getReturnId(item)
+                  return (
+                    <tr
+                      key={rowId || item.doc_no}
+                      className={`border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/40 ${
+                        rowId ? 'cursor-pointer' : 'cursor-default'
+                      }`}
+                      onClick={() => {
+                        if (!rowId) return
+                        navigate(`/admin/returns-history/${rowId}`, {
+                          state: { listQuery: searchParams.toString() },
+                        })
+                      }}
+                    >
+                    <td className="px-3 py-2 font-semibold text-blue-700 dark:text-blue-300">{item.doc_no}</td>
                     <td className="px-3 py-2">{item.customer_name || item.customer_id || '—'}</td>
                     <td className="px-3 py-2">{item.status}</td>
                     <td className="px-3 py-2">{item.assigned_by_user_name || item.approved_by_user_name || item.assigned_by_user_id || '—'}</td>
@@ -171,8 +185,9 @@ export function ReturnsHistoryPage() {
                     <td className="px-3 py-2">{formatDateTime(item.assigned_at)}</td>
                     <td className="px-3 py-2">{formatDateTime(item.created_at)}</td>
                     <td className="px-3 py-2">{formatDateTime(item.updated_at)}</td>
-                  </tr>
-                ))}
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -222,4 +237,9 @@ function formatDateTime(value?: string | null) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleString('uz-UZ')
+}
+
+function getReturnId(item: CustomerReturnOut): string {
+  const fallback = (item as CustomerReturnOut & { return_id?: string }).return_id
+  return String(item.id ?? fallback ?? '').trim()
 }
