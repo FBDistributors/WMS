@@ -146,6 +146,24 @@ export type InventorySummaryLightResponse = {
   offset: number
 }
 
+export type NegativeBalanceRow = {
+  product_id: string
+  sku?: string | null
+  location_id: string
+  location_code: string
+  lot_id: string
+  batch: string
+  expiry_date?: string | null
+  on_hand: number
+  reserved: number
+  available: number
+}
+
+export type NegativeBalanceCheckResponse = {
+  total_rows: number
+  rows: NegativeBalanceRow[]
+}
+
 export type InventorySummaryLightLocation = {
   location_code: string
   qty: number
@@ -191,6 +209,22 @@ export type InventoryByProductRow = {
 export async function getInventoryByProduct(productId: string, warehouse?: WarehouseFilter) {
   return fetchJSON<InventoryByProductRow[]>(`/api/v1/inventory/by-product/${productId}`, {
     query: warehouse ? { warehouse } : {},
+  })
+}
+
+export type NegativeBalanceCheckQuery = {
+  product_id?: string
+  warehouse?: WarehouseFilter
+  limit?: number
+}
+
+export async function getNegativeBalanceCheck(query: NegativeBalanceCheckQuery = {}) {
+  return fetchJSON<NegativeBalanceCheckResponse>('/api/v1/inventory/negative-balance-check', {
+    query: {
+      product_id: query.product_id,
+      warehouse: query.warehouse,
+      limit: query.limit ?? 200,
+    },
   })
 }
 

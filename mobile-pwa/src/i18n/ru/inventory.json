@@ -15,6 +15,7 @@
   "smartup_balance_short": "Остаток SmartUP",
   "smartup_bron_short": "Smartup Bron",
   "smartup_custom_tab": "Custom (на выбор)",
+  "reserve_health_tab": "Резерв и минус",
   "filial_label": "Филиал",
   "filial_all": "Все филиалы",
   "smartup_balance_empty_title": "Данные за сегодня ещё не загружены",
@@ -41,10 +42,27 @@
   "empty_details_desc": "Измените фильтры, чтобы увидеть детали.",
   "movements_empty": "Движений не найдено",
   "movements_empty_desc": "Попробуйте другие фильтры или период.",
+  "reserve_health": {
+    "search_placeholder": "Поиск по SKU, локации или партии",
+    "segments": {
+      "reserved": "Зависший резерв",
+      "negative": "Отрицательный остаток"
+    },
+    "counts": {
+      "reserved": "Товаров с резервом",
+      "negative": "Отрицательных строк"
+    },
+    "reserved_empty_title": "Товаров с зависшим резервом не найдено",
+    "reserved_empty_desc": "Сейчас нет товаров с резервным остатком.",
+    "negative_empty_title": "Отрицательный остаток не найден",
+    "negative_empty_desc": "Нет строк lot/location с отрицательным on-hand или available."
+  },
   "columns": {
     "product": "Товар",
     "on_hand": "В наличии",
     "available": "Остаток",
+    "reserved_total": "Резерв",
+    "available_total": "Доступно",
     "lots": "Партии",
     "locations": "Локации",
     "location": "Локация",
