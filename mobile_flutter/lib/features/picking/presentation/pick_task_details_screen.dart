@@ -382,22 +382,47 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     if (!mounted) {
       return;
     }
+    await _openPickerPickModalByBarcode(
+      doc: doc,
+      barcode: barcode,
+      preferredLineId: lineId,
+    );
+  }
+
+  Future<void> _openPickerPickModalByBarcode({
+    required PickingDocument doc,
+    required String barcode,
+    String? preferredLineId,
+  }) async {
     final AppLocale loc = ref.read(appLocaleProvider);
-    PickingLine? line;
-    for (final PickingLine l in doc.lines) {
-      if (l.id == lineId) {
-        line = l;
-        break;
+    final String normalized = barcode.trim();
+    PickingLine? line = preferredLineId != null && preferredLineId.isNotEmpty
+        ? null
+        : _findLineByScan(doc.lines, normalized);
+
+    if (preferredLineId != null && preferredLineId.isNotEmpty) {
+      for (final PickingLine l in doc.lines) {
+        if (l.id == preferredLineId) {
+          line = l;
+          break;
+        }
       }
     }
+
     if (line == null) {
       _rejectScanHaptic();
       showAppSnackBar(context,
-        SnackBar(content: Text(StringLookup.t(loc, 'notFound'))),
+        SnackBar(
+          content: Text(
+            preferredLineId != null && preferredLineId.isNotEmpty
+                ? StringLookup.t(loc, 'notFound')
+                : StringLookup.t(loc, 'productNotInOrder'),
+          ),
+        ),
       );
       return;
     }
-    if (!_barcodeMatchesLine(barcode, line)) {
+    if (!_barcodeMatchesLine(normalized, line)) {
       _rejectScanHaptic();
       showAppSnackBar(context,
         SnackBar(
@@ -409,11 +434,20 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       );
       return;
     }
+    final double remaining = line.qtyRequired - line.qtyPicked;
+    if (remaining <= 0) {
+      _rejectScanHaptic();
+      showAppSnackBar(context,
+        SnackBar(content: Text(StringLookup.t(loc, 'consolidatedNothingToPick'))),
+      );
+      return;
+    }
+    _topScan.clear();
     await _openLineSheet(
       doc,
       _LineGroup(virtual: line, members: <PickingLine>[line]),
       PickerProfileParam.picker,
-      presetScannedBarcode: barcode.trim(),
+      presetScannedBarcode: normalized,
     );
   }
 
@@ -559,32 +593,13 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       return;
     }
 
-    final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
-    final OfflineDatabase? db = await ref.read(offlineDatabaseProvider.future);
     setState(() => _busy = true);
     try {
-      if (online) {
-        final PickLineResponse res = await ref.read(pickingRepositoryProvider).submitScan(
-              widget.taskId,
-              barcode: code,
-            );
-        _topScan.clear();
-        await ref
-            .read(pickTaskDetailProvider(widget.taskId).notifier)
-            .applyPickLineResponse(widget.taskId, res);
-      } else if (db != null) {
-        await db.queueAdd(
-          'q_${DateTime.now().millisecondsSinceEpoch}',
-          'PICK_SCAN',
-          <String, Object?>{
-            'taskId': widget.taskId,
-            'barcode': code,
-            'ts': DateTime.now().millisecondsSinceEpoch,
-          },
-          'pending',
-        );
-        _topScan.clear();
+      final PickingDocument doc = await _loadRouteScanDocument();
+      if (!mounted) {
+        return;
       }
+      await _openPickerPickModalByBarcode(doc: doc, barcode: code);
     } on Exception catch (e) {
       if (mounted) {
         _rejectScanHaptic();
