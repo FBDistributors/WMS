@@ -851,26 +851,27 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     final String presetQtyText = pickerPreset != null
         ? (remPick >= 1 ? formatPickQty(remPick) : '0')
         : '';
+    final TextEditingController bc = TextEditingController();
+    final TextEditingController qty =
+        TextEditingController(text: presetQtyText);
+    String? scannedForQty = pickerPreset;
+    bool sheetBusy = false;
 
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (BuildContext ctx) {
-        final TextEditingController bc = TextEditingController();
-        final TextEditingController qty =
-            TextEditingController(text: presetQtyText);
-        String? scannedForQty = pickerPreset;
-        bool sheetBusy = false;
-        return StatefulBuilder(
-          builder: (BuildContext context, void Function(void Function()) setM) {
-            return Padding(
-              padding: EdgeInsets.only(bottom: sheetBottomPadding(context)),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (BuildContext ctx) {
+          return StatefulBuilder(
+            builder: (BuildContext context, void Function(void Function()) setM) {
+              return Padding(
+                padding: EdgeInsets.only(bottom: sheetBottomPadding(context)),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
                     Text(
                       group.virtual.productName,
                       style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
@@ -1216,18 +1217,22 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                         }),
                       ],
                     ],
-                    TextButton(
-                      onPressed: () => Navigator.of(ctx).pop(),
-                      child: Text(StringLookup.t(loc, 'cancel')),
-                    ),
-                  ],
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: Text(StringLookup.t(loc, 'cancel')),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
-        );
-      },
-    );
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      bc.dispose();
+      qty.dispose();
+    }
   }
 
   Future<void> _showSkipReasonSheet(PickingLine line) async {
