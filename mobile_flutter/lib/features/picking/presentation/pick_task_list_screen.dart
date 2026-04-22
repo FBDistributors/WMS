@@ -749,11 +749,6 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
             ),
           AppHeader(
             title: headerTitle,
-            showBack: true,
-            onBack: () => context.goNamed(
-              'pickerHome',
-              queryParameters: <String, String>{'profile': profileToQuery(profile)},
-            ),
             headerBackgroundColor: isDark ? const Color(0xFF1E293B) : null,
             titleColor: isDark ? const Color(0xFFF1F5F9) : null,
             accentColor: isDark ? const Color(0xFF93C5FD) : null,
@@ -761,12 +756,10 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 if (!_showConsolidated && profile == PickerProfileParam.picker)
-                  TextButton(
-                    style: isDark
-                        ? null
-                        : TextButton.styleFrom(
-                            foregroundColor: Colors.white.withValues(alpha: 0.92),
-                          ),
+                  IconButton(
+                    tooltip: _orderSelectionMode
+                        ? StringLookup.t(loc, 'orderSelectModeDone')
+                        : StringLookup.t(loc, 'orderSelectMode'),
                     onPressed: () {
                       setState(() {
                         _orderSelectionMode = !_orderSelectionMode;
@@ -775,10 +768,11 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
                         }
                       });
                     },
-                    child: Text(
+                    icon: Icon(
                       _orderSelectionMode
-                          ? StringLookup.t(loc, 'orderSelectModeDone')
-                          : StringLookup.t(loc, 'orderSelectMode'),
+                          ? Icons.checklist_rtl_rounded
+                          : Icons.checklist_rounded,
+                      color: Colors.white,
                     ),
                   ),
                 const NotificationBellButton(iconColor: Colors.white),

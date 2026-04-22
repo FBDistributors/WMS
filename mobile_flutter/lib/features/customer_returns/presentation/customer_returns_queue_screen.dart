@@ -6,7 +6,6 @@ import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../l10n/string_lookup.dart';
 import '../customer_returns_providers.dart';
-import '../data/customer_return_doc_no_display.dart';
 import '../data/customer_returns_models.dart';
 
 class CustomerReturnsQueueScreen extends ConsumerWidget {
@@ -48,20 +47,16 @@ class CustomerReturnsQueueScreen extends ConsumerWidget {
                     ? c.assignedByUserName!.trim()
                     : (c.assignedByUserId ?? 'Nomaʼlum');
                 final String sentAt = _prettyDate(c.assignedAt ?? c.updatedAt);
-                final String summary = StringLookup.tParams(loc, 'returnsLinesSummary', <String, String>{
-                  'status': c.status,
-                  'count': '${c.lines.length}',
-                });
-                final String docTitle = displayCustomerReturnDocNo(c.docNo);
+                final String title = custLabel ?? StringLookup.t(loc, 'customerReturns');
                 final String custLine =
                     '${StringLookup.t(loc, 'returnsFieldCustomer')}: ${custLabel ?? 'Mijoz yo‘q'}';
                 final String dateLine =
                     '${StringLookup.t(loc, 'returnsFieldDate')}: $sentAt';
                 return Card(
                   child: ListTile(
-                    title: Text(docTitle),
+                    title: Text(title),
                     subtitle: Text(
-                      '$custLine\nController: $controllerLabel\n$dateLine\n$summary',
+                      '$custLine\nController: $controllerLabel\n$dateLine\n${c.lines.length} qator',
                     ),
                     isThreeLine: true,
                     trailing: const Icon(Icons.chevron_right),

@@ -841,7 +841,11 @@ class _LocationSearchField extends StatelessWidget {
                         IconButton(
                           tooltip: clearTooltip ?? '',
                           icon: const Icon(Icons.close),
-                          onPressed: onClearLocation,
+                          onPressed: () {
+                            fieldController.clear();
+                            controller.clear();
+                            onClearLocation?.call();
+                          },
                         ),
                     ],
                   ),

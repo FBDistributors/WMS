@@ -28,15 +28,18 @@ class AccountScreen extends ConsumerWidget {
         children: <Widget>[
           if (me != null)
             ListTile(
+              leading: const Icon(Icons.person_outline),
               title: Text(me.username),
               subtitle: Text(me.fullName ?? ''),
             ),
           ListTile(
+            leading: const Icon(Icons.language_rounded),
             title: Text(StringLookup.t(loc, 'language')),
             subtitle: Text(_langLabel(loc)),
             onTap: () => _pickLang(context, ref),
           ),
           SwitchListTile(
+            secondary: const Icon(Icons.dark_mode_outlined),
             title: Text(StringLookup.t(loc, 'theme_label')),
             subtitle: Text(tm == ThemeMode.dark ? StringLookup.t(loc, 'theme_dark') : StringLookup.t(loc, 'theme_light')),
             value: tm == ThemeMode.dark,
@@ -50,6 +53,7 @@ class AccountScreen extends ConsumerWidget {
             onTap: () => context.pushNamed('notifications'),
           ),
           ListTile(
+            leading: const Icon(Icons.logout_rounded),
             title: Text(StringLookup.t(loc, 'logout')),
             onTap: () async {
               final bool? confirm = await showDialog<bool>(
