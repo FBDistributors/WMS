@@ -318,14 +318,16 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       context.pop<String>(resolveResult);
       return;
     }
-    if (a != null && a.returnToInventoryDetail) {
-      final String loc = GoRouterState.of(context).matchedLocation;
-      if (loc == '/scanner' && context.canPop()) {
-        context.pop();
-        return;
-      }
+    if (!mounted) {
+      return;
     }
-    _resumeScan();
+    // Resolve ekrani `router.go('/inventory/detail/...')` qilganda hali bir frame
+    // Scanner mounted bo‘lishi mumkin; shunda `_resumeScan` kamerani qayta yoqadi
+    // yoki orqa stackda skaner qoladi. Faqat hozirgi joy `/scanner` bo‘lsa davom etamiz.
+    final String loc = GoRouterState.of(context).matchedLocation;
+    if (loc == '/scanner') {
+      _resumeScan();
+    }
   }
 
   void _resumeScan() {
