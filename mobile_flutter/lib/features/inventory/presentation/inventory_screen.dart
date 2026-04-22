@@ -836,61 +836,143 @@ class _LocationFilterRow extends ConsumerWidget {
   Future<void> _openPicker(BuildContext context, WidgetRef ref) async {
     final Color modalBg = isDark ? const Color(0xFF1E293B) : Colors.white;
     final Color rowText = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF333333);
+    final Color searchFill = isDark ? const Color(0xFF334155) : const Color(0xFFF8FAFC);
+    final Color searchBorder = isDark ? const Color(0xFF475569) : const Color(0xFFE2E8F0);
+    final TextEditingController searchController = TextEditingController();
 
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (BuildContext ctx) {
-        return Material(
-          color: Colors.black54,
-          child: InkWell(
-            onTap: () => Navigator.of(ctx).pop(),
-            child: Center(
-              child: InkWell(
-                onTap: () {},
-                child: Container(
-                  margin: const EdgeInsets.all(24),
-                  constraints: const BoxConstraints(maxHeight: 360),
-                  decoration: BoxDecoration(
-                    color: modalBg,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: ListView(
-                    shrinkWrap: true,
-                    children: <Widget>[
-                      ListTile(
-                        title: Text(
-                          InventoryStrings.invAllLocations(locale),
-                          style: GoogleFonts.inter(color: rowText, fontSize: 16),
+    try {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        builder: (BuildContext ctx) {
+          return StatefulBuilder(
+            builder: (BuildContext context, void Function(void Function()) setM) {
+              final String q = searchController.text.trim().toLowerCase();
+              final List<PickerLocationOption> filtered = q.isEmpty
+                  ? locations
+                  : locations.where((PickerLocationOption loc) {
+                      final String code = loc.code.toLowerCase();
+                      final String name = loc.name.toLowerCase();
+                      return code.contains(q) || name.contains(q);
+                    }).toList(growable: false);
+              return Material(
+                color: Colors.black54,
+                child: InkWell(
+                  onTap: () => Navigator.of(ctx).pop(),
+                  child: Center(
+                    child: InkWell(
+                      onTap: () {},
+                      child: Container(
+                        margin: const EdgeInsets.all(24),
+                        constraints: const BoxConstraints(maxHeight: 460),
+                        decoration: BoxDecoration(
+                          color: modalBg,
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        onTap: () {
-                          ref.read(inventoryLocationIdProvider.notifier).state = '';
-                          Navigator.of(ctx).pop();
-                        },
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+                              child: TextField(
+                                controller: searchController,
+                                onChanged: (_) => setM(() {}),
+                                style: GoogleFonts.inter(color: rowText, fontSize: 14),
+                                decoration: InputDecoration(
+                                  hintText:
+                                      '${InventoryStrings.invSearch(locale)} ${InventoryStrings.invBestLocation(locale).toLowerCase()}',
+                                  prefixIcon: Icon(
+                                    Icons.search_rounded,
+                                    color: rowText.withValues(alpha: 0.7),
+                                  ),
+                                  suffixIcon: searchController.text.isNotEmpty
+                                      ? buildInputClearButton(
+                                          visible: true,
+                                          onPressed: () {
+                                            searchController.clear();
+                                            setM(() {});
+                                          },
+                                        )
+                                      : null,
+                                  filled: true,
+                                  fillColor: searchFill,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: searchBorder),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: searchBorder),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: const BorderSide(
+                                      color: Color(0xFF3B82F6),
+                                      width: 1.4,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Flexible(
+                              child: ListView(
+                                shrinkWrap: true,
+                                children: <Widget>[
+                                  if (q.isEmpty)
+                                    ListTile(
+                                      title: Text(
+                                        InventoryStrings.invAllLocations(locale),
+                                        style: GoogleFonts.inter(color: rowText, fontSize: 16),
+                                      ),
+                                      onTap: () {
+                                        ref.read(inventoryLocationIdProvider.notifier).state = '';
+                                        Navigator.of(ctx).pop();
+                                      },
+                                    ),
+                                  if (filtered.isEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(16, 18, 16, 20),
+                                      child: Text(
+                                        InventoryStrings.invNoResults(locale),
+                                        textAlign: TextAlign.center,
+                                        style: GoogleFonts.inter(
+                                          color: rowText.withValues(alpha: 0.75),
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                  ...filtered.map((PickerLocationOption loc) {
+                                    final String line = formatPickerLocationOptionLine(loc);
+                                    final String suffix = loc.name.isNotEmpty && loc.name != loc.code
+                                        ? ' — ${loc.name}'
+                                        : '';
+                                    return ListTile(
+                                      title: Text(
+                                        '$line$suffix',
+                                        style: GoogleFonts.inter(color: rowText, fontSize: 16),
+                                      ),
+                                      onTap: () {
+                                        ref.read(inventoryLocationIdProvider.notifier).state = loc.id;
+                                        Navigator.of(ctx).pop();
+                                      },
+                                    );
+                                  }),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      ...locations.map((PickerLocationOption loc) {
-                        final String line = formatPickerLocationOptionLine(loc);
-                        final String suffix =
-                            loc.name.isNotEmpty && loc.name != loc.code ? ' — ${loc.name}' : '';
-                        return ListTile(
-                          title: Text(
-                            '$line$suffix',
-                            style: GoogleFonts.inter(color: rowText, fontSize: 16),
-                          ),
-                          onTap: () {
-                            ref.read(inventoryLocationIdProvider.notifier).state = loc.id;
-                            Navigator.of(ctx).pop();
-                          },
-                        );
-                      }),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      searchController.dispose();
+    }
   }
 }
