@@ -93,6 +93,29 @@ export async function getPickerPerformance(params?: {
   }))
 }
 
+export type PickingStaffStatsRow = {
+  user_id: string
+  full_name: string
+  documents_count: number
+  lines_count: number
+  total_picked_qty: number
+}
+
+export type PickingStaffStatsResponse = {
+  pickers: PickingStaffStatsRow[]
+  controllers: PickingStaffStatsRow[]
+}
+
+export async function getPickingStaffStats(params?: {
+  date_from?: string
+  date_to?: string
+}): Promise<PickingStaffStatsResponse> {
+  const query: Record<string, string> = {}
+  if (params?.date_from) query.date_from = params.date_from
+  if (params?.date_to) query.date_to = params.date_to
+  return fetchJSON<PickingStaffStatsResponse>('/api/v1/dashboard/picking-staff-stats', { query })
+}
+
 export async function getPickDocuments(params?: {
   limit?: number
   offset?: number

@@ -17,8 +17,10 @@ logger = logging.getLogger(__name__)
 from app.auth.deps import require_any_permission, require_permission
 from app.db import get_db
 from app.models.document import Document as DocumentModel
+from app.models.document import DocumentLine as DocumentLineModel
 from app.models.order import Order as OrderModel
 from app.models.order import OrderWmsState as OrderWmsStateModel
+from app.models.user import User as UserModel
 
 router = APIRouter()
 DEFAULT_FILIAL_ID = os.getenv("WMS_DEFAULT_FILIAL_ID", "3788131").strip()
@@ -57,6 +59,19 @@ class OrdersByStatusRow(BaseModel):
 
 class OrdersByStatusResponse(BaseModel):
     items: List[OrdersByStatusRow]
+
+
+class PickingStaffStatsRow(BaseModel):
+    user_id: UUID
+    full_name: str
+    documents_count: int
+    lines_count: int
+    total_picked_qty: float
+
+
+class PickingStaffStatsResponse(BaseModel):
+    pickers: List[PickingStaffStatsRow]
+    controllers: List[PickingStaffStatsRow]
 
 
 def _today_utc() -> date:
@@ -233,3 +248,85 @@ async def get_pick_documents(
             )
         )
     return PickDocumentsListResponse(items=items)
+
+
+def _aggregate_staff_by_user_column(
+    db: Session,
+    user_id_column,
+    date_from: Optional[date],
+    date_to: Optional[date],
+) -> List[PickingStaffStatsRow]:
+    filters = [
+        DocumentModel.doc_type == "SO",
+        DocumentModel.status == "completed",
+        user_id_column.isnot(None),
+    ]
+    if date_from is not None:
+        filters.append(func.date(DocumentModel.updated_at) >= date_from)
+    if date_to is not None:
+        filters.append(func.date(DocumentModel.updated_at) <= date_to)
+
+    per_doc = (
+        db.query(
+            user_id_column.label("uid"),
+            DocumentModel.id.label("doc_id"),
+            func.count(DocumentLineModel.id).label("lines_cnt"),
+            func.coalesce(func.sum(DocumentLineModel.picked_qty), 0).label("picked_sum"),
+        )
+        .outerjoin(DocumentLineModel, DocumentLineModel.document_id == DocumentModel.id)
+        .filter(and_(*filters))
+        .group_by(user_id_column, DocumentModel.id)
+    ).subquery()
+
+    rows = (
+        db.query(
+            per_doc.c.uid,
+            UserModel.full_name,
+            UserModel.username,
+            func.count().label("documents_count"),
+            func.sum(per_doc.c.lines_cnt).label("lines_count"),
+            func.sum(per_doc.c.picked_sum).label("total_picked_qty"),
+        )
+        .join(UserModel, UserModel.id == per_doc.c.uid)
+        .group_by(per_doc.c.uid, UserModel.full_name, UserModel.username)
+        .all()
+    )
+    out: List[PickingStaffStatsRow] = []
+    for r in rows:
+        name = (r.full_name or "").strip() or (r.username or "Unknown")
+        tqty = float(r.total_picked_qty or 0)
+        out.append(
+            PickingStaffStatsRow(
+                user_id=r.uid,
+                full_name=name,
+                documents_count=int(r.documents_count or 0),
+                lines_count=int(r.lines_count or 0),
+                total_picked_qty=tqty,
+            )
+        )
+    out.sort(
+        key=lambda x: (-x.total_picked_qty, -x.documents_count, -x.lines_count, x.full_name.lower()),
+    )
+    return out
+
+
+@router.get(
+    "/picking-staff-stats",
+    response_model=PickingStaffStatsResponse,
+    summary="Completed SO documents: picker vs controller stats (orders, lines, qty)",
+)
+async def get_picking_staff_stats(
+    date_from: Optional[date] = Query(None, description="Filter documents.updated_at (UTC date) from"),
+    date_to: Optional[date] = Query(None, description="Filter documents.updated_at (UTC date) to"),
+    db: Session = Depends(get_db),
+    _user=Depends(require_any_permission(["reports:read", "audit:read", "admin:access"])),
+):
+    if date_from is not None and date_to is not None and date_from > date_to:
+        raise HTTPException(status_code=400, detail="date_from must be on or before date_to")
+    pickers = _aggregate_staff_by_user_column(
+        db, DocumentModel.assigned_to_user_id, date_from, date_to
+    )
+    controllers = _aggregate_staff_by_user_column(
+        db, DocumentModel.controlled_by_user_id, date_from, date_to
+    )
+    return PickingStaffStatsResponse(pickers=pickers, controllers=controllers)
