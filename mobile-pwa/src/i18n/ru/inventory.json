@@ -15,6 +15,7 @@
   "smartup_balance_short": "Остаток SmartUP",
   "smartup_bron_short": "Smartup Bron",
   "smartup_custom_tab": "Custom (на выбор)",
+  "reserve_history_tab": "История резерва",
   "reserve_health_tab": "Резерв и минус",
   "filial_label": "Филиал",
   "filial_all": "Все филиалы",
@@ -42,6 +43,13 @@
   "empty_details_desc": "Измените фильтры, чтобы увидеть детали.",
   "movements_empty": "Движений не найдено",
   "movements_empty_desc": "Попробуйте другие фильтры или период.",
+  "reserve_history": {
+    "search_label": "Поиск",
+    "search_placeholder": "Поиск по товару, заказу или документу",
+    "all_reserve_events": "Все события резерва",
+    "empty_title": "История резерва пуста",
+    "empty_desc": "По выбранным фильтрам нет событий allocate/unallocate."
+  },
   "reserve_health": {
     "search_placeholder": "Поиск по SKU, локации или партии",
     "segments": {
@@ -71,6 +79,8 @@
     "movement_type": "Движение",
     "qty": "Кол-во",
     "lot": "Партия",
+    "order": "Заказ",
+    "document": "Документ",
     "created_by": "Кто выполнил",
     "created_at": "Создано",
     "smartup_qoldiq": "Остаток SmartUP",

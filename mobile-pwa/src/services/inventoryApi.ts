@@ -60,6 +60,34 @@ export type InventoryMovement = {
   created_by_username?: string | null
 }
 
+export type ReserveHistoryRow = {
+  id: string
+  movement_type: string
+  qty_change: number
+  created_at: string
+  created_by_user_id?: string | null
+  created_by_username?: string | null
+  source_document_type?: string | null
+  source_document_id?: string | null
+  product_id: string
+  product_code?: string | null
+  product_name?: string | null
+  location_id: string
+  location_code?: string | null
+  lot_id: string
+  batch?: string | null
+  order_id?: string | null
+  order_number?: string | null
+  doc_no?: string | null
+}
+
+export type ReserveHistoryResponse = {
+  items: ReserveHistoryRow[]
+  total: number
+  limit: number
+  offset: number
+}
+
 export type WarehouseFilter = 'main' | 'showroom'
 
 export type InventorySummaryQuery = {
@@ -258,9 +286,33 @@ export type InventoryMovementsQuery = {
   offset?: number
 }
 
+export type ReserveHistoryQuery = {
+  search?: string
+  movement_type?: string
+  date_from?: string
+  date_to?: string
+  warehouse?: WarehouseFilter
+  limit?: number
+  offset?: number
+}
+
 export async function getInventoryMovements(query: InventoryMovementsQuery = {}) {
   return fetchJSON<InventoryMovement[]>('/api/v1/inventory/movements', {
     query,
+  })
+}
+
+export async function getReserveHistory(query: ReserveHistoryQuery = {}) {
+  return fetchJSON<ReserveHistoryResponse>('/api/v1/inventory/reserve-history', {
+    query: {
+      search: query.search,
+      movement_type: query.movement_type,
+      date_from: query.date_from,
+      date_to: query.date_to,
+      warehouse: query.warehouse,
+      limit: query.limit ?? 50,
+      offset: query.offset ?? 0,
+    },
   })
 }
 

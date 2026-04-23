@@ -11,8 +11,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, Query, Header, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import case, distinct, exists, func, select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy import and_, case, distinct, exists, func, or_, select
+from sqlalchemy.orm import Session, aliased, selectinload
 from sqlalchemy.exc import IntegrityError
 
 from app.auth.deps import get_current_user, require_permission
@@ -33,6 +33,7 @@ from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
 from app.models.location import Location as LocationModel
 from app.models.idempotency_key import IdempotencyKey as IdempotencyKeyModel
+from app.models.order import Order as OrderModel
 from app.models.product import Product as ProductModel
 from app.models.product import ProductBarcode
 from app.models.stock import ON_HAND_MOVEMENT_TYPES
@@ -228,6 +229,34 @@ class StockMovementOut(BaseModel):
     created_at: datetime
     created_by_user_id: Optional[UUID] = None
     created_by_username: Optional[str] = None
+
+
+class ReserveHistoryRow(BaseModel):
+    id: UUID
+    movement_type: str
+    qty_change: Decimal
+    created_at: datetime
+    created_by_user_id: Optional[UUID] = None
+    created_by_username: Optional[str] = None
+    source_document_type: Optional[str] = None
+    source_document_id: Optional[UUID] = None
+    product_id: UUID
+    product_code: Optional[str] = None
+    product_name: Optional[str] = None
+    location_id: UUID
+    location_code: Optional[str] = None
+    lot_id: UUID
+    batch: Optional[str] = None
+    order_id: Optional[UUID] = None
+    order_number: Optional[str] = None
+    doc_no: Optional[str] = None
+
+
+class ReserveHistoryResponse(BaseModel):
+    items: List[ReserveHistoryRow]
+    total: int
+    limit: int
+    offset: int
 
 
 class StockMovementCreate(BaseModel):
@@ -493,6 +522,39 @@ def _to_movement(
     )
 
 
+def _to_reserve_history_row(
+    movement: StockMovementModel,
+    *,
+    created_by_username: Optional[str],
+    order_id: Optional[UUID],
+    order_number: Optional[str],
+    doc_no: Optional[str],
+) -> ReserveHistoryRow:
+    product = getattr(movement, "product", None)
+    lot = getattr(movement, "lot", None)
+    location = getattr(movement, "location", None)
+    return ReserveHistoryRow(
+        id=movement.id,
+        movement_type=movement.movement_type,
+        qty_change=movement.qty_change,
+        created_at=movement.created_at,
+        created_by_user_id=movement.created_by_user_id,
+        created_by_username=created_by_username,
+        source_document_type=movement.source_document_type,
+        source_document_id=movement.source_document_id,
+        product_id=movement.product_id,
+        product_code=product.sku if product else None,
+        product_name=product.name if product else None,
+        location_id=movement.location_id,
+        location_code=location.code if location else None,
+        lot_id=movement.lot_id,
+        batch=lot.batch if lot else None,
+        order_id=order_id,
+        order_number=order_number,
+        doc_no=doc_no,
+    )
+
+
 @router.get("/lots", response_model=List[StockLotOut], summary="List stock lots")
 @router.get("/lots/", response_model=List[StockLotOut], summary="List stock lots")
 async def list_stock_lots(
@@ -713,6 +775,167 @@ async def list_stock_movements(
         _to_movement(mov, creator_map.get(mov.created_by_user_id))
         for mov in movements
     ]
+
+
+@router.get(
+    "/reserve-history",
+    response_model=ReserveHistoryResponse,
+    summary="List reserve history (allocate/unallocate)",
+)
+@router.get(
+    "/reserve-history/",
+    response_model=ReserveHistoryResponse,
+    summary="List reserve history (allocate/unallocate)",
+)
+async def list_reserve_history(
+    search: Optional[str] = None,
+    movement_type: Optional[str] = Query(
+        default=None, description="allocate,unallocate (default: both)"
+    ),
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    warehouse: Optional[Literal["main", "showroom"]] = Query(default="main"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("inventory:read")),
+):
+    movement_tokens = [token.strip() for token in (movement_type or "").split(",") if token.strip()]
+    if movement_tokens:
+        invalid = [token for token in movement_tokens if token not in {"allocate", "unallocate"}]
+        if invalid:
+            raise HTTPException(status_code=400, detail="Invalid movement_type for reserve history")
+    else:
+        movement_tokens = ["allocate", "unallocate"]
+
+    doc_alias = aliased(DocumentModel)
+    order_direct_alias = aliased(OrderModel)
+    order_from_doc_alias = aliased(OrderModel)
+
+    query = (
+        db.query(StockMovementModel)
+        .join(ProductModel, ProductModel.id == StockMovementModel.product_id)
+        .join(LocationModel, LocationModel.id == StockMovementModel.location_id)
+        .outerjoin(
+            doc_alias,
+            and_(
+                StockMovementModel.source_document_type == "document",
+                StockMovementModel.source_document_id == doc_alias.id,
+            ),
+        )
+        .outerjoin(
+            order_direct_alias,
+            and_(
+                StockMovementModel.source_document_type == "order",
+                StockMovementModel.source_document_id == order_direct_alias.id,
+            ),
+        )
+        .outerjoin(order_from_doc_alias, order_from_doc_alias.id == doc_alias.order_id)
+        .filter(StockMovementModel.movement_type.in_(movement_tokens))
+    )
+
+    location_ids = _location_ids_for_warehouse(db, warehouse)
+    if location_ids is not None:
+        if len(location_ids) == 0:
+            return ReserveHistoryResponse(items=[], total=0, limit=limit, offset=offset)
+        query = query.filter(StockMovementModel.location_id.in_(location_ids))
+
+    if date_from:
+        query = query.filter(func.date(StockMovementModel.created_at) >= date_from)
+    if date_to:
+        query = query.filter(func.date(StockMovementModel.created_at) <= date_to)
+
+    term = (search or "").strip()
+    if term:
+        term_like = f"%{term}%"
+        query = query.filter(
+            or_(
+                func.lower(ProductModel.sku).ilike(func.lower(term_like)),
+                func.lower(ProductModel.name).ilike(func.lower(term_like)),
+                func.lower(LocationModel.code).ilike(func.lower(term_like)),
+                func.lower(func.coalesce(doc_alias.doc_no, "")).ilike(func.lower(term_like)),
+                func.lower(func.coalesce(order_direct_alias.order_number, "")).ilike(func.lower(term_like)),
+                func.lower(func.coalesce(order_from_doc_alias.order_number, "")).ilike(func.lower(term_like)),
+            )
+        )
+
+    total = query.with_entities(func.count(StockMovementModel.id)).scalar() or 0
+    movements = (
+        query.options(
+            selectinload(StockMovementModel.product),
+            selectinload(StockMovementModel.lot),
+            selectinload(StockMovementModel.location),
+        )
+        .order_by(StockMovementModel.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+    creator_ids = {m.created_by_user_id for m in movements if m.created_by_user_id}
+    creator_map: dict[UUID, str] = {}
+    if creator_ids:
+        for user_row in db.query(UserModel).filter(UserModel.id.in_(creator_ids)).all():
+            creator_map[user_row.id] = (
+                (user_row.full_name and user_row.full_name.strip())
+                or (user_row.username and user_row.username.strip())
+                or (user_row.code and f"#{user_row.code}".strip())
+                or "—"
+            )
+
+    doc_ids = [
+        m.source_document_id
+        for m in movements
+        if m.source_document_type == "document" and m.source_document_id is not None
+    ]
+    docs_by_id: dict[UUID, DocumentModel] = {}
+    if doc_ids:
+        for doc in db.query(DocumentModel).filter(DocumentModel.id.in_(doc_ids)).all():
+            docs_by_id[doc.id] = doc
+
+    order_ids: set[UUID] = set()
+    for movement in movements:
+        if movement.source_document_type == "order" and movement.source_document_id:
+            order_ids.add(movement.source_document_id)
+        elif movement.source_document_type == "document" and movement.source_document_id:
+            doc = docs_by_id.get(movement.source_document_id)
+            if doc and doc.order_id:
+                order_ids.add(doc.order_id)
+
+    orders_by_id: dict[UUID, OrderModel] = {}
+    if order_ids:
+        for order in db.query(OrderModel).filter(OrderModel.id.in_(order_ids)).all():
+            orders_by_id[order.id] = order
+
+    items: list[ReserveHistoryRow] = []
+    for movement in movements:
+        doc_no: Optional[str] = None
+        order_id: Optional[UUID] = None
+        order_number: Optional[str] = None
+        if movement.source_document_type == "document" and movement.source_document_id:
+            doc = docs_by_id.get(movement.source_document_id)
+            if doc:
+                doc_no = doc.doc_no
+                order_id = doc.order_id
+        elif movement.source_document_type == "order" and movement.source_document_id:
+            order_id = movement.source_document_id
+
+        if order_id:
+            order = orders_by_id.get(order_id)
+            if order:
+                order_number = order.order_number
+
+        items.append(
+            _to_reserve_history_row(
+                movement,
+                created_by_username=creator_map.get(movement.created_by_user_id),
+                order_id=order_id,
+                order_number=order_number,
+                doc_no=doc_no,
+            )
+        )
+
+    return ReserveHistoryResponse(items=items, total=int(total), limit=limit, offset=offset)
 
 
 @router.post("/movements", response_model=StockMovementOut, status_code=status.HTTP_201_CREATED)

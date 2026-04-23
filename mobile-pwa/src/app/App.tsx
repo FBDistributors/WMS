@@ -25,6 +25,7 @@ import { SmartupBalancePage } from '../pages/admin/SmartupBalancePage'
 import { SmartupBronPage } from '../pages/admin/SmartupBronPage'
 import { SmartupCustomPage } from '../pages/admin/SmartupCustomPage'
 import { InventoryReserveHealthPage } from '../pages/admin/InventoryReserveHealthPage'
+import { InventoryReserveHistoryPage } from '../pages/admin/InventoryReserveHistoryPage'
 import { InventoryDetailsPage } from '../pages/admin/InventoryDetailsPage'
 import { InventoryMovementsPage } from '../pages/admin/InventoryMovementsPage'
 import { MovementPage } from '../pages/admin/MovementPage'
@@ -431,6 +432,16 @@ export function App() {
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">
               <RequirePermission permission="inventory:read">
                 <SmartupCustomPage />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/inventory/reserve-history"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="inventory:read">
+                <InventoryReserveHistoryPage />
               </RequirePermission>
             </RequirePermission>
           }

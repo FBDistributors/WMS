@@ -50,6 +50,15 @@ export function InventoryHeaderTabs() {
         {t('smartup_custom_tab')}
       </NavLink>
       <NavLink
+        to="/admin/inventory/reserve-history"
+        end
+        className={({ isActive }) =>
+          [base, isActive ? active : inactive].join(' ')
+        }
+      >
+        {t('reserve_history_tab')}
+      </NavLink>
+      <NavLink
         to="/admin/inventory/reserve-health"
         end
         className={({ isActive }) =>
