@@ -1,22 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Package, ClipboardList, SearchCheck, PackageCheck, LayoutGrid } from 'lucide-react'
 
-import { ActivePickList } from '../../admin/components/ActivePickList'
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { KpiCard } from '../../admin/components/KpiCard'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
-import {
-  getOrdersByStatus,
-  getPickDocuments,
-  getPickingStaffStats,
-  type PickingStaffStatsRow,
-} from '../../services/dashboardApi'
-import type { ActivePick } from '../../types/dashboard'
+import { getOrdersByStatus, getPickingStaffStats, type PickingStaffStatsRow } from '../../services/dashboardApi'
 
 // Yangi = Smartupdan kelgan, admin yig'uvchiga yubormagan
 const STATUS_XOM = ['imported', 'B#W']
@@ -112,7 +105,6 @@ export function DashboardPage() {
   const [ordersByStatus, setOrdersByStatus] = useState<{ status: string; count: number }[]>([])
   const [pickerRows, setPickerRows] = useState<PickingStaffStatsRow[]>([])
   const [controllerRows, setControllerRows] = useState<PickingStaffStatsRow[]>([])
-  const [activePicks, setActivePicks] = useState<ActivePick[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dateFrom, setDateFrom] = useState('')
@@ -125,18 +117,16 @@ export function DashboardPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const [ordersByStatusData, staffData, picksData] = await Promise.all([
+      const [ordersByStatusData, staffData] = await Promise.all([
         getOrdersByStatus().catch(() => []),
         getPickingStaffStats({
           date_from: dateFrom.trim() || undefined,
           date_to: dateTo.trim() || undefined,
         }).catch(() => ({ pickers: [], controllers: [] })),
-        getPickDocuments({ limit: 12, offset: 0 }).catch(() => []),
       ])
       setOrdersByStatus(Array.isArray(ordersByStatusData) ? ordersByStatusData : [])
       setPickerRows(Array.isArray(staffData?.pickers) ? staffData.pickers : [])
       setControllerRows(Array.isArray(staffData?.controllers) ? staffData.controllers : [])
-      setActivePicks(Array.isArray(picksData) ? picksData : [])
     } catch {
       setError(t('admin:dashboard.load_error'))
     } finally {
@@ -263,27 +253,6 @@ export function DashboardPage() {
                 </table>
               )}
             </div>
-          </Card>
-
-          <Card className="mt-6">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div className="text-base font-semibold text-slate-900 dark:text-slate-100">
-                {t('admin:dashboard.active_pick_documents_title')}
-              </div>
-              <Link
-                to="/admin/picking"
-                className="inline-flex shrink-0 items-center justify-center rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:text-slate-100 dark:hover:bg-slate-800"
-              >
-                {t('admin:dashboard.view_all_picking')}
-              </Link>
-            </div>
-            {isLoading ? (
-              <div className="relative min-h-[6rem]">
-                <LoadingOverlay label={t('common:messages.loading')} />
-              </div>
-            ) : (
-              <ActivePickList items={activePicks} onOpen={(id) => navigate(`/picking/mobile-pwa/${id}`)} />
-            )}
           </Card>
 
           <Card className="mt-6">
