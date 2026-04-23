@@ -24,6 +24,7 @@ import {
   getVipCustomers,
   putVipCustomerBrandLimits,
   updateVipCustomer,
+  VIP_DEFAULT_BRAND_EXPIRY_MONTHS,
   type VipCustomer,
 } from '../../services/vipCustomersApi'
 import { getBrands, type Brand } from '../../services/brandsApi'
@@ -38,6 +39,16 @@ type CustomerTableRow = {
   customer_id: string
   customer_name: string | null
   extra?: string
+}
+
+function formatVipBrandExpirySummary(v: VipCustomer, monthsLabel: string): string {
+  const lims = v.brand_limits ?? []
+  if (lims.length === 0) return '—'
+  const vals = lims.map((x) => x.min_expiry_months)
+  const mn = Math.min(...vals)
+  const mx = Math.max(...vals)
+  if (mn === mx) return `${mn} ${monthsLabel}`
+  return `${mn}–${mx} ${monthsLabel}`
 }
 
 export function VipCustomersPage() {
@@ -83,7 +94,7 @@ export function VipCustomersPage() {
         id: x.id,
         customer_id: x.customer_id,
         customer_name: x.customer_name,
-        extra: `${x.min_expiry_months} ${t('vipCustomers:months')}`,
+        extra: formatVipBrandExpirySummary(x, t('vipCustomers:months')),
       }))
     }
     return generalItems.map((x) => ({
@@ -409,7 +420,6 @@ function VipCustomerDialog({ mode, target, onClose, onSaved }: DialogProps) {
   const { t } = useTranslation(['vipCustomers', 'common'])
   const [customerId, setCustomerId] = useState(target?.customer_id ?? '')
   const [customerName, setCustomerName] = useState(target?.customer_name ?? '')
-  const [minExpiryMonths, setMinExpiryMonths] = useState(target?.min_expiry_months ?? 6)
   const [brands, setBrands] = useState<Brand[]>([])
   const [brandMonths, setBrandMonths] = useState<Record<string, number>>({})
   const [brandsLoading, setBrandsLoading] = useState(false)
@@ -420,18 +430,11 @@ function VipCustomerDialog({ mode, target, onClose, onSaved }: DialogProps) {
   useEffect(() => {
     setCustomerId(target?.customer_id ?? '')
     setCustomerName(target?.customer_name ?? '')
-    setMinExpiryMonths(target?.min_expiry_months ?? 6)
     setError(null)
     setBrandsError(null)
-  }, [mode, target?.id, target?.customer_id, target?.customer_name, target?.min_expiry_months])
+  }, [mode, target?.id, target?.customer_id, target?.customer_name])
 
   useEffect(() => {
-    if (mode !== 'edit' || !target) {
-      setBrands([])
-      setBrandMonths({})
-      setBrandsLoading(false)
-      return
-    }
     let cancelled = false
     setBrandsLoading(true)
     setBrandsError(null)
@@ -440,11 +443,16 @@ function VipCustomerDialog({ mode, target, onClose, onSaved }: DialogProps) {
         if (cancelled) return
         const active = list.filter((b) => b.is_active)
         setBrands(active)
-        const lim = new Map((target.brand_limits ?? []).map((x) => [x.brand_id, x.min_expiry_months]))
         const init: Record<string, number> = {}
-        const def = target.min_expiry_months
-        for (const b of active) {
-          init[b.id] = lim.get(b.id) ?? def
+        if (mode === 'edit' && target) {
+          const lim = new Map((target.brand_limits ?? []).map((x) => [x.brand_id, x.min_expiry_months]))
+          for (const b of active) {
+            init[b.id] = lim.get(b.id) ?? VIP_DEFAULT_BRAND_EXPIRY_MONTHS
+          }
+        } else {
+          for (const b of active) {
+            init[b.id] = VIP_DEFAULT_BRAND_EXPIRY_MONTHS
+          }
         }
         setBrandMonths(init)
       })
@@ -466,37 +474,47 @@ function VipCustomerDialog({ mode, target, onClose, onSaved }: DialogProps) {
       setError(t('vipCustomers:validation.customer_id_required'))
       return
     }
-    const defaultMonths = Number(minExpiryMonths)
-    if (!validateMonths(defaultMonths)) {
-      setError(t('vipCustomers:validation.months_range'))
-      return
-    }
-    if (mode === 'edit' && target) {
-      for (const b of brands) {
-        const v = brandMonths[b.id]
-        if (v === undefined || !validateMonths(Number(v))) {
-          setError(t('vipCustomers:validation.months_range'))
-          return
-        }
+    for (const b of brands) {
+      const v = brandMonths[b.id]
+      if (v === undefined || !validateMonths(Number(v))) {
+        setError(t('vipCustomers:validation.months_range'))
+        return
       }
     }
     setIsSubmitting(true)
     setError(null)
     try {
       if (mode === 'create') {
-        await createVipCustomer({
-          customer_id: customerId.trim(),
-          customer_name: customerName.trim() || null,
-          min_expiry_months: defaultMonths,
-        })
+        const nameVal = customerName.trim() || null
+        if (brands.length > 0) {
+          const limitsPayload = brands.map((b) => ({
+            brand_id: b.id,
+            min_expiry_months: Math.min(
+              60,
+              Math.max(1, Math.round(Number(brandMonths[b.id] ?? VIP_DEFAULT_BRAND_EXPIRY_MONTHS))),
+            ),
+          }))
+          await createVipCustomer({
+            customer_id: customerId.trim(),
+            customer_name: nameVal,
+            brand_limits: limitsPayload,
+          })
+        } else {
+          await createVipCustomer({
+            customer_id: customerId.trim(),
+            customer_name: nameVal,
+          })
+        }
       } else if (target) {
         await updateVipCustomer(target.id, {
           customer_name: customerName.trim() || null,
-          min_expiry_months: defaultMonths,
         })
         const limitsPayload = brands.map((b) => ({
           brand_id: b.id,
-          min_expiry_months: Math.min(60, Math.max(1, Math.round(Number(brandMonths[b.id] ?? defaultMonths)))),
+          min_expiry_months: Math.min(
+            60,
+            Math.max(1, Math.round(Number(brandMonths[b.id] ?? VIP_DEFAULT_BRAND_EXPIRY_MONTHS))),
+          ),
         }))
         await putVipCustomerBrandLimits(target.id, limitsPayload)
       }
@@ -509,8 +527,6 @@ function VipCustomerDialog({ mode, target, onClose, onSaved }: DialogProps) {
     }
   }
 
-  const modalMax = mode === 'edit' ? 'max-w-2xl' : 'max-w-lg'
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
       <button
@@ -519,9 +535,7 @@ function VipCustomerDialog({ mode, target, onClose, onSaved }: DialogProps) {
         aria-label={t('common:buttons.close')}
         type="button"
       />
-      <div
-        className={`relative w-full ${modalMax} max-h-[min(90vh,720px)] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950 flex flex-col`}
-      >
+      <div className="relative flex max-h-[min(90vh,720px)] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
         <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
           <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
             {mode === 'create' ? t('vipCustomers:add') : t('vipCustomers:edit')}
@@ -553,80 +567,67 @@ function VipCustomerDialog({ mode, target, onClose, onSaved }: DialogProps) {
               onChange={(e) => setCustomerName(e.target.value)}
             />
           </label>
-          <label className="text-sm text-slate-600 dark:text-slate-300">
-            {mode === 'create' ? t('vipCustomers:fields.min_expiry_months_create') : t('vipCustomers:fields.min_expiry_months')}
-            <input
-              type="number"
-              min={1}
-              max={60}
-              className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-              value={minExpiryMonths}
-              onChange={(e) => setMinExpiryMonths(parseInt(e.target.value, 10) || 6)}
-            />
-          </label>
 
-          {mode === 'edit' ? (
-            <div className="space-y-2 border-t border-slate-200 pt-4 dark:border-slate-800">
-              <div className="text-sm font-medium text-slate-800 dark:text-slate-200">
-                {t('vipCustomers:brand_limits_heading')}
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{t('vipCustomers:brand_limits_hint')}</p>
-              {brandsLoading ? (
-                <div className="flex min-h-[100px] items-center justify-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-                  <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden />
-                  {t('common:messages.loading')}
-                </div>
-              ) : brandsError ? (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-                  {brandsError}
-                </div>
-              ) : brands.length === 0 ? (
-                <div className="text-sm text-slate-500 dark:text-slate-400">{t('vipCustomers:no_active_brands')}</div>
-              ) : (
-                <div className="max-h-[min(40vh,320px)] overflow-y-auto rounded-2xl border border-slate-200 dark:border-slate-800">
-                  <table className="w-full text-sm">
-                    <thead className="sticky top-0 bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-900">
-                      <tr className="border-b border-slate-200 dark:border-slate-800">
-                        <th className="px-3 py-2 text-left">{t('vipCustomers:brand_column')}</th>
-                        <th className="w-28 px-3 py-2 text-right">{t('vipCustomers:months')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {brands.map((b) => (
-                        <tr key={b.id} className="border-b border-slate-100 dark:border-slate-800">
-                          <td className="px-3 py-2 text-slate-800 dark:text-slate-200">
-                            {b.display_name?.trim() || b.name}
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              type="number"
-                              min={1}
-                              max={60}
-                              className="w-full rounded-xl border border-slate-200 bg-white px-2 py-1 text-right tabular-nums text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                              value={brandMonths[b.id] ?? minExpiryMonths}
-                              onChange={(e) => {
-                                const n = parseInt(e.target.value, 10)
-                                setBrandMonths((prev) => ({ ...prev, [b.id]: Number.isFinite(n) ? n : minExpiryMonths }))
-                              }}
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+          <div className="space-y-2 border-t border-slate-200 pt-4 dark:border-slate-800">
+            <div className="text-sm font-medium text-slate-800 dark:text-slate-200">
+              {t('vipCustomers:brand_limits_heading')}
             </div>
-          ) : null}
+            <p className="text-xs text-slate-500 dark:text-slate-400">{t('vipCustomers:brand_limits_hint')}</p>
+            {brandsLoading ? (
+              <div className="flex min-h-[100px] items-center justify-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden />
+                {t('common:messages.loading')}
+              </div>
+            ) : brandsError ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                {brandsError}
+              </div>
+            ) : brands.length === 0 ? (
+              <div className="text-sm text-slate-500 dark:text-slate-400">{t('vipCustomers:no_active_brands')}</div>
+            ) : (
+              <div className="max-h-[min(40vh,320px)] overflow-y-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-900">
+                    <tr className="border-b border-slate-200 dark:border-slate-800">
+                      <th className="px-3 py-2 text-left">{t('vipCustomers:brand_column')}</th>
+                      <th className="w-28 px-3 py-2 text-right">{t('vipCustomers:months')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {brands.map((b) => (
+                      <tr key={b.id} className="border-b border-slate-100 dark:border-slate-800">
+                        <td className="px-3 py-2 text-slate-800 dark:text-slate-200">
+                          {b.display_name?.trim() || b.name}
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="number"
+                            min={1}
+                            max={60}
+                            className="w-full rounded-xl border border-slate-200 bg-white px-2 py-1 text-right tabular-nums text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                            value={brandMonths[b.id] ?? VIP_DEFAULT_BRAND_EXPIRY_MONTHS}
+                            onChange={(e) => {
+                              const n = parseInt(e.target.value, 10)
+                              setBrandMonths((prev) => ({
+                                ...prev,
+                                [b.id]: Number.isFinite(n) ? n : VIP_DEFAULT_BRAND_EXPIRY_MONTHS,
+                              }))
+                            }}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-200 px-6 py-4 dark:border-slate-800">
           <Button variant="ghost" onClick={onClose}>
             {t('common:buttons.cancel')}
           </Button>
-          <Button
-            onClick={() => void handleSubmit()}
-            disabled={isSubmitting || (mode === 'edit' && (brandsLoading || !!brandsError))}
-          >
+          <Button onClick={() => void handleSubmit()} disabled={isSubmitting || brandsLoading || !!brandsError}>
             {isSubmitting ? t('vipCustomers:saving') : t('vipCustomers:save')}
           </Button>
         </div>

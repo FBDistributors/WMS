@@ -2,6 +2,9 @@ import { buildApiUrl, fetchJSON } from './apiClient'
 
 const TOKEN_KEY = 'wms_token'
 
+/** Backend `VIP_DEFAULT_BRAND_EXPIRY_MONTHS` bilan mos */
+export const VIP_DEFAULT_BRAND_EXPIRY_MONTHS = 19
+
 export type VipBrandLimit = {
   brand_id: string
   min_expiry_months: number
@@ -11,7 +14,6 @@ export type VipCustomer = {
   id: string
   customer_id: string
   customer_name: string | null
-  min_expiry_months: number
   created_at: string
   brand_limits: VipBrandLimit[]
 }
@@ -19,12 +21,12 @@ export type VipCustomer = {
 export type VipCustomerCreateInput = {
   customer_id: string
   customer_name?: string | null
-  min_expiry_months: number
+  /** Bo'sh bo'lsa server har bir faol brend uchun default oy qo'llaydi */
+  brand_limits?: VipBrandLimitInput[]
 }
 
 export type VipCustomerUpdateInput = {
   customer_name?: string | null
-  min_expiry_months?: number
 }
 
 export type VipBrandLimitInput = {

@@ -13,6 +13,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth.deps import require_any_permission, require_permission
+from app.core.vip_constants import VIP_DEFAULT_BRAND_EXPIRY_MONTHS
 from app.db import get_db
 from app.models.brand import Brand as BrandModel
 from app.models.vip_customer import VipCustomer as VipCustomerModel
@@ -37,25 +38,26 @@ class VipCustomerOut(BaseModel):
     id: UUID
     customer_id: str
     customer_name: str | None
-    min_expiry_months: int
     created_at: datetime
     brand_limits: list[VipBrandLimitOut] = Field(default_factory=list)
-
-
-class VipCustomerCreate(BaseModel):
-    customer_id: str = Field(..., min_length=1, max_length=64)
-    customer_name: str | None = Field(default=None, max_length=255)
-    min_expiry_months: int = Field(..., ge=1, le=60, description="Muddat chegarasi (oy)")
-
-
-class VipCustomerUpdate(BaseModel):
-    customer_name: str | None = Field(default=None, max_length=255)
-    min_expiry_months: int | None = Field(default=None, ge=1, le=60)
 
 
 class VipBrandLimitItemIn(BaseModel):
     brand_id: UUID
     min_expiry_months: int = Field(..., ge=1, le=60)
+
+
+class VipCustomerCreate(BaseModel):
+    customer_id: str = Field(..., min_length=1, max_length=64)
+    customer_name: str | None = Field(default=None, max_length=255)
+    brand_limits: list[VipBrandLimitItemIn] | None = Field(
+        default=None,
+        description="Bo'sh bo'lsa — har bir faol brend uchun default oy",
+    )
+
+
+class VipCustomerUpdate(BaseModel):
+    customer_name: str | None = Field(default=None, max_length=255)
 
 
 class VipCustomerImportError(BaseModel):
@@ -81,10 +83,56 @@ def _to_out(v: VipCustomerModel) -> VipCustomerOut:
         id=v.id,
         customer_id=v.customer_id,
         customer_name=v.customer_name,
-        min_expiry_months=v.min_expiry_months,
         created_at=v.created_at,
         brand_limits=limits,
     )
+
+
+def _active_brands_ordered(db: Session) -> list[BrandModel]:
+    return db.query(BrandModel).filter(BrandModel.is_active.is_(True)).order_by(BrandModel.id).all()
+
+
+def _active_brand_id_set(db: Session) -> set[UUID]:
+    return {b.id for b in _active_brands_ordered(db)}
+
+
+def _apply_brand_limits(db: Session, vip_id: UUID, items: list[VipBrandLimitItemIn]) -> None:
+    db.query(VipCustomerBrandLimitModel).filter(VipCustomerBrandLimitModel.vip_customer_id == vip_id).delete(
+        synchronize_session=False
+    )
+    for item in items:
+        db.add(
+            VipCustomerBrandLimitModel(
+                vip_customer_id=vip_id,
+                brand_id=item.brand_id,
+                min_expiry_months=item.min_expiry_months,
+            )
+        )
+
+
+def _validate_brand_limit_items(db: Session, items: list[VipBrandLimitItemIn]) -> None:
+    active_ids = _active_brand_id_set(db)
+    seen: set[UUID] = set()
+    for item in items:
+        if item.brand_id in seen:
+            raise HTTPException(status_code=400, detail="Duplicate brand_id in payload")
+        seen.add(item.brand_id)
+        brand = db.query(BrandModel).filter(BrandModel.id == item.brand_id).one_or_none()
+        if not brand:
+            raise HTTPException(status_code=400, detail=f"Brand not found: {item.brand_id}")
+    if active_ids and seen != active_ids:
+        raise HTTPException(
+            status_code=400,
+            detail="brand_limits must include every active brand exactly once",
+        )
+
+
+def _apply_uniform_brand_limits(db: Session, vip_id: UUID, months: int) -> None:
+    m = max(1, min(60, int(months)))
+    items = [
+        VipBrandLimitItemIn(brand_id=b.id, min_expiry_months=m) for b in _active_brands_ordered(db)
+    ]
+    _apply_brand_limits(db, vip_id, items)
 
 
 def _norm_header_key(s: str) -> str:
@@ -160,7 +208,7 @@ def _get_cell(row: dict[str, str], *keys: str) -> str:
     return ""
 
 
-def _parse_min_months(raw: str, default: int = 6) -> tuple[int | None, str | None]:
+def _parse_min_months(raw: str, default: int = VIP_DEFAULT_BRAND_EXPIRY_MONTHS) -> tuple[int | None, str | None]:
     s = (raw or "").strip()
     if not s:
         return default, None
@@ -249,16 +297,28 @@ async def import_vip_customers(
         if len(cid) > 64:
             errors.append(VipCustomerImportError(row=i, detail="customer_id too long"))
             continue
-        months, m_err = _parse_min_months(months_raw, default=6)
+        months, m_err = _parse_min_months(months_raw, default=VIP_DEFAULT_BRAND_EXPIRY_MONTHS)
         if months is None or m_err:
             errors.append(VipCustomerImportError(row=i, detail=m_err or "invalid min_expiry_months"))
             continue
         cname_val = (cname[:255] if cname else None) or None
         existing = db.query(VipCustomerModel).filter(VipCustomerModel.customer_id == cid).one_or_none()
         if existing:
-            old_data = {"customer_name": existing.customer_name, "min_expiry_months": existing.min_expiry_months}
+            old_limits = [
+                {"brand_id": str(b.brand_id), "min_expiry_months": b.min_expiry_months}
+                for b in db.query(VipCustomerBrandLimitModel)
+                .filter(VipCustomerBrandLimitModel.vip_customer_id == existing.id)
+                .all()
+            ]
+            old_data = {"customer_name": existing.customer_name, "brand_limits": old_limits}
             existing.customer_name = cname_val
-            existing.min_expiry_months = months
+            _apply_uniform_brand_limits(db, existing.id, months)
+            new_limits = [
+                {"brand_id": str(b.brand_id), "min_expiry_months": b.min_expiry_months}
+                for b in db.query(VipCustomerBrandLimitModel)
+                .filter(VipCustomerBrandLimitModel.vip_customer_id == existing.id)
+                .all()
+            ]
             log_action(
                 db,
                 user_id=user.id,
@@ -266,7 +326,7 @@ async def import_vip_customers(
                 entity_type="vip_customer",
                 entity_id=str(existing.id),
                 old_data=old_data,
-                new_data={"customer_name": cname_val, "min_expiry_months": months},
+                new_data={"customer_name": cname_val, "brand_limits": new_limits},
                 ip_address=get_client_ip(request),
             )
             updated += 1
@@ -274,17 +334,23 @@ async def import_vip_customers(
             vip = VipCustomerModel(
                 customer_id=cid,
                 customer_name=cname_val,
-                min_expiry_months=months,
             )
             db.add(vip)
             db.flush()
+            _apply_uniform_brand_limits(db, vip.id, months)
+            new_limits = [
+                {"brand_id": str(b.brand_id), "min_expiry_months": b.min_expiry_months}
+                for b in db.query(VipCustomerBrandLimitModel)
+                .filter(VipCustomerBrandLimitModel.vip_customer_id == vip.id)
+                .all()
+            ]
             log_action(
                 db,
                 user_id=user.id,
                 action=ACTION_CREATE,
                 entity_type="vip_customer",
                 entity_id=str(vip.id),
-                new_data={"customer_id": cid, "min_expiry_months": months},
+                new_data={"customer_id": cid, "brand_limits": new_limits},
                 ip_address=get_client_ip(request),
             )
             created += 1
@@ -306,16 +372,28 @@ async def create_vip_customer(
     vip = VipCustomerModel(
         customer_id=payload.customer_id.strip(),
         customer_name=payload.customer_name.strip() if payload.customer_name else None,
-        min_expiry_months=payload.min_expiry_months,
     )
     db.add(vip)
+    db.flush()
+    if payload.brand_limits:
+        _validate_brand_limit_items(db, payload.brand_limits)
+        _apply_brand_limits(db, vip.id, payload.brand_limits)
+        limits_snapshot = [{"brand_id": str(i.brand_id), "min_expiry_months": i.min_expiry_months} for i in payload.brand_limits]
+    else:
+        defaults = [
+            VipBrandLimitItemIn(brand_id=b.id, min_expiry_months=VIP_DEFAULT_BRAND_EXPIRY_MONTHS)
+            for b in _active_brands_ordered(db)
+        ]
+        if defaults:
+            _apply_brand_limits(db, vip.id, defaults)
+        limits_snapshot = [{"brand_id": str(i.brand_id), "min_expiry_months": i.min_expiry_months} for i in defaults]
     log_action(
         db,
         user_id=user.id,
         action=ACTION_CREATE,
         entity_type="vip_customer",
         entity_id=str(vip.id),
-        new_data={"customer_id": vip.customer_id, "min_expiry_months": vip.min_expiry_months},
+        new_data={"customer_id": vip.customer_id, "brand_limits": limits_snapshot},
         ip_address=get_client_ip(request),
     )
     db.commit()
@@ -334,11 +412,9 @@ async def update_vip_customer(
     vip = db.query(VipCustomerModel).filter(VipCustomerModel.id == vip_id).one_or_none()
     if not vip:
         raise HTTPException(status_code=404, detail="VIP customer not found")
-    old_data = {"customer_name": vip.customer_name, "min_expiry_months": vip.min_expiry_months}
+    old_data = {"customer_name": vip.customer_name}
     if payload.customer_name is not None:
         vip.customer_name = payload.customer_name.strip() or None
-    if payload.min_expiry_months is not None:
-        vip.min_expiry_months = payload.min_expiry_months
     log_action(
         db,
         user_id=user.id,
@@ -346,7 +422,7 @@ async def update_vip_customer(
         entity_type="vip_customer",
         entity_id=str(vip_id),
         old_data=old_data,
-        new_data={"customer_name": vip.customer_name, "min_expiry_months": vip.min_expiry_months},
+        new_data={"customer_name": vip.customer_name},
         ip_address=get_client_ip(request),
     )
     db.commit()
@@ -369,30 +445,13 @@ async def replace_vip_brand_limits(
     vip = db.query(VipCustomerModel).filter(VipCustomerModel.id == vip_id).one_or_none()
     if not vip:
         raise HTTPException(status_code=404, detail="VIP customer not found")
-    seen_brands: set[UUID] = set()
-    for item in payload:
-        if item.brand_id in seen_brands:
-            raise HTTPException(status_code=400, detail="Duplicate brand_id in payload")
-        seen_brands.add(item.brand_id)
-        brand = db.query(BrandModel).filter(BrandModel.id == item.brand_id).one_or_none()
-        if not brand:
-            raise HTTPException(status_code=400, detail=f"Brand not found: {item.brand_id}")
+    _validate_brand_limit_items(db, list(payload))
 
     old_limits = [
         {"brand_id": str(b.brand_id), "min_expiry_months": b.min_expiry_months}
         for b in db.query(VipCustomerBrandLimitModel).filter(VipCustomerBrandLimitModel.vip_customer_id == vip_id).all()
     ]
-    db.query(VipCustomerBrandLimitModel).filter(VipCustomerBrandLimitModel.vip_customer_id == vip_id).delete(
-        synchronize_session=False
-    )
-    for item in payload:
-        db.add(
-            VipCustomerBrandLimitModel(
-                vip_customer_id=vip_id,
-                brand_id=item.brand_id,
-                min_expiry_months=item.min_expiry_months,
-            )
-        )
+    _apply_brand_limits(db, vip_id, list(payload))
     new_limits = [{"brand_id": str(i.brand_id), "min_expiry_months": i.min_expiry_months} for i in payload]
     log_action(
         db,

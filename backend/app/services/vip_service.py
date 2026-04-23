@@ -1,4 +1,4 @@
-"""VIP customers: min_expiry_months for allocation (default + per-brand)."""
+"""VIP customers: faqat brend bo'yicha min_expiry_months (ajratish)."""
 from __future__ import annotations
 
 import uuid
@@ -15,9 +15,8 @@ def resolve_vip_min_expiry_months(
     brand_id: uuid.UUID | None,
 ) -> int:
     """
-    VIP emas -> 0.
-    VIP + brend uchun alohida qator bo'lsa -> shu oy.
-    Aks holda -> vip_customers.min_expiry_months (standart).
+    VIP emas yoki brend yo'q yoki limit qatori yo'q -> 0.
+    VIP + brend uchun qator bo'lsa -> shu oy.
     """
     if not customer_id or not str(customer_id).strip():
         return 0
@@ -25,21 +24,16 @@ def resolve_vip_min_expiry_months(
     vip = db.query(VipCustomer).filter(VipCustomer.customer_id == cid).one_or_none()
     if not vip:
         return 0
-    if brand_id is not None:
-        row = (
-            db.query(VipCustomerBrandLimit)
-            .filter(
-                VipCustomerBrandLimit.vip_customer_id == vip.id,
-                VipCustomerBrandLimit.brand_id == brand_id,
-            )
-            .one_or_none()
+    if brand_id is None:
+        return 0
+    row = (
+        db.query(VipCustomerBrandLimit)
+        .filter(
+            VipCustomerBrandLimit.vip_customer_id == vip.id,
+            VipCustomerBrandLimit.brand_id == brand_id,
         )
-        if row is not None:
-            return row.min_expiry_months
-    return vip.min_expiry_months
-
-
-def get_vip_customer_expiry_months(db: Session) -> dict[str, int]:
-    """Eski API: customer_id -> min_expiry_months (faqat jadvaldagi standart qiymat)."""
-    rows = db.query(VipCustomer.customer_id, VipCustomer.min_expiry_months).all()
-    return {r.customer_id: r.min_expiry_months for r in rows}
+        .one_or_none()
+    )
+    if row is None:
+        return 0
+    return row.min_expiry_months

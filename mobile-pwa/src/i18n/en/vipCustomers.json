@@ -19,27 +19,25 @@
   },
   "brand_column": "Brand",
   "brand_limits_heading": "Expiry limit per brand (months)",
-  "brand_limits_hint": "Set months for each brand. Products without a brand or brands not listed use the default below.",
+  "brand_limits_hint": "Minimum shelf-life months per active brand. New rows start at 19; edit as needed. VIP allocation uses only these per-brand limits.",
   "brands_load_failed": "Could not load brands.",
   "no_active_brands": "No active brands. Add brands in the Brands section.",
   "brand_overrides_count": "{{count}} brand override(s)",
   "fields": {
     "customer_id": "Customer ID",
-    "customer_name": "Customer name",
-    "min_expiry_months": "Default expiry limit (months)",
-    "min_expiry_months_create": "Expiry limit (months)"
+    "customer_name": "Customer name"
   },
   "columns": {
     "customer_id": "Customer ID",
     "customer_name": "Customer name",
-    "min_expiry_months": "Expiry limit",
+    "min_expiry_months": "Expiry (brands)",
     "actions": "Actions"
   },
   "tab_vip_customers": "VIP customers",
   "tab_general_customers": "General customers",
   "add_general": "Add general customer",
   "import_heading": "Customers from SmartUp export",
-  "import_hint": "Columns: customer_id (required), customer_name, min_expiry_months (optional, default 6). UTF-8 CSV or .xlsx.",
+  "import_hint": "Columns: customer_id (required), customer_name, min_expiry_months (optional; if empty, 19 months applied to every active brand). UTF-8 CSV or .xlsx.",
   "import_choose_file": "Choose file",
   "import_submit": "Upload and import",
   "import_busy": "Importing...",

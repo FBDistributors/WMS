@@ -19,27 +19,25 @@
   },
   "brand_column": "Бренд",
   "brand_limits_heading": "Срок по брендам (мес.)",
-  "brand_limits_hint": "Для каждого бренда свой срок. Для остальных брендов и товаров без бренда используется стандарт ниже.",
+  "brand_limits_hint": "Минимальный срок (мес.) по каждому активному бренду. Новые строки — 19 мес., при необходимости измените. VIP-отбор учитывает только эти лимиты по брендам.",
   "brands_load_failed": "Не удалось загрузить бренды.",
   "no_active_brands": "Нет активных брендов. Добавьте бренды в разделе «Бренды».",
   "brand_overrides_count": "Отдельно: {{count}} бр.",
   "fields": {
     "customer_id": "ID клиента",
-    "customer_name": "Имя клиента",
-    "min_expiry_months": "Стандартный срок (мес.)",
-    "min_expiry_months_create": "Срок годности (месяцы)"
+    "customer_name": "Имя клиента"
   },
   "columns": {
     "customer_id": "ID клиента",
     "customer_name": "Имя клиента",
-    "min_expiry_months": "Срок годности",
+    "min_expiry_months": "Срок (бренды)",
     "actions": "Действия"
   },
   "tab_vip_customers": "VIP клиенты",
   "tab_general_customers": "Общие клиенты",
   "add_general": "Добавить общего клиента",
   "import_heading": "Клиенты из экспорта SmartUp",
-  "import_hint": "Колонки: customer_id (обяз.), customer_name, min_expiry_months (необяз., по умолчанию 6). UTF-8 CSV или .xlsx.",
+  "import_hint": "Колонки: customer_id (обяз.), customer_name, min_expiry_months (необяз.; если пусто — 19 мес. для всех активных брендов). UTF-8 CSV или .xlsx.",
   "import_choose_file": "Выбрать файл",
   "import_submit": "Загрузить и импортировать",
   "import_busy": "Импорт...",
