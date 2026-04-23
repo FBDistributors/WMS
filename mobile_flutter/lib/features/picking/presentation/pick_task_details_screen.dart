@@ -1,4 +1,4 @@
-import 'dart:async' show unawaited;
+import 'dart:async' show Timer, unawaited;
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -14,6 +14,7 @@ import '../../../core/app_state/theme_controller.dart';
 import '../../../core/offline/offline_database.dart';
 import '../../../core/offline/offline_providers.dart';
 import '../../../core/router/scanner_args.dart';
+import '../../../core/storage/shared_preferences_provider.dart';
 import '../../../l10n/string_lookup.dart';
 import '../../../shared/input/input_clear_button.dart';
 import '../../../shared/input/stock_quantity_input.dart';
@@ -22,6 +23,7 @@ import '../../../shared/layout/sheet_bottom_inset.dart';
 import '../../../shared/widgets/scan_action_button.dart';
 import '../alternate_location_menu_label.dart' show mergeAlternateLocationsForDisplay, MergedAlternateLocationRow;
 import '../data/picking_constants.dart';
+import '../data/return_session_storage.dart';
 import '../data/picking_models.dart';
 import '../domain/profile_type_param.dart';
 import '../picking_providers.dart';
@@ -180,11 +182,18 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
   bool _busy = false;
   String? _appliedRouteScanKey;
   Set<String> _verifiedLineIds = <String>{};
+  Timer? _detailPollTimer;
 
   @override
   void initState() {
     super.initState();
     _loadVerified();
+    _detailPollTimer = Timer.periodic(const Duration(seconds: 12), (_) {
+      if (!mounted) {
+        return;
+      }
+      ref.invalidate(pickTaskDetailProvider(widget.taskId));
+    });
   }
 
   Future<void> _loadVerified() async {
@@ -215,6 +224,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
 
   @override
   void dispose() {
+    _detailPollTimer?.cancel();
     _topScan.dispose();
     super.dispose();
   }
@@ -1321,6 +1331,21 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     );
     final AsyncValue<PickingDocument> docAsync =
         ref.watch(pickTaskDetailProvider(widget.taskId));
+    ref.listen<AsyncValue<PickingDocument>>(
+      pickTaskDetailProvider(widget.taskId),
+      (AsyncValue<PickingDocument>? prev, AsyncValue<PickingDocument> next) {
+        next.whenData((PickingDocument d) {
+          final String? sid = d.safeCancelReturnSessionId;
+          if (d.orderWmsStatus == 'cancelling_in_progress' &&
+              sid != null &&
+              sid.isNotEmpty) {
+            unawaited(
+              ReturnSessionStorage.save(ref.read(sharedPreferencesProvider), sid),
+            );
+          }
+        });
+      },
+    );
     final Color bg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF5F5F5);
 
     return Scaffold(
@@ -1371,7 +1396,12 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
               ? _orderedLineGroupsController(groups, _verifiedLineIds)
               : _orderedLineGroups(groups);
 
-          return Column(
+          final String? sidRaw = d.safeCancelReturnSessionId;
+          final bool cancelBlock = profile == PickerProfileParam.picker &&
+              d.orderWmsStatus == 'cancelling_in_progress' &&
+              (sidRaw ?? '').isNotEmpty;
+
+          final Widget mainPick = Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               Padding(
@@ -1565,12 +1595,74 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
               ),
             ],
           );
+          if (!cancelBlock) {
+            return mainPick;
+          }
+          final String sidReturn = sidRaw!;
+          return Stack(
+            fit: StackFit.expand,
+            children: <Widget>[
+              IgnorePointer(ignoring: true, child: mainPick),
+              Positioned.fill(
+                child: Material(
+                  color: Colors.black54,
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 360),
+                      child: Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: <Widget>[
+                              Text(
+                                'DIQQAT',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.red.shade800,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              const Text(
+                                'Buyurtma bekor qilindi. Terish to\'xtatildi. Terilgan mahsulotlarni ko\'rsatilgan joyga qaytaring.',
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 20),
+                              FilledButton(
+                                onPressed: () async {
+                                  await ReturnSessionStorage.save(
+                                    ref.read(sharedPreferencesProvider),
+                                    sidReturn,
+                                  );
+                                  if (!context.mounted) {
+                                    return;
+                                  }
+                                  context.go('/return-items/$sidReturn');
+                                },
+                                child: const Text('Qaytarish ekraniga o\'tish'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => Center(child: Text(StringLookup.t(loc, 'notFound'))),
       ),
       bottomNavigationBar: docAsync.maybeWhen(
         data: (PickingDocument d) {
+          if (profile == PickerProfileParam.picker &&
+              d.orderWmsStatus == 'cancelling_in_progress' &&
+              (d.safeCancelReturnSessionId ?? '').isNotEmpty) {
+            return const SizedBox.shrink();
+          }
           void onComplete() => _complete(d, profile);
           void onScan() {
             context.pushNamed(

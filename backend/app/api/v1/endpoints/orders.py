@@ -26,6 +26,7 @@ from app.auth.deps import get_current_user, require_any_permission, require_perm
 from app.db import get_db
 from app.services.audit_service import ACTION_CREATE, ACTION_DELETE, ACTION_UPDATE, get_client_ip, log_action
 from app.services.push_notifications import send_push_to_user
+from app.services.safe_cancel_return_service import initiate_safe_cancel_return
 from app.integrations.smartup.client import SmartupClient
 from app.integrations.smartup.importer import delete_stale_orders, import_orders
 from app.integrations.smartup.sync_lock import smartup_sync_lock
@@ -50,6 +51,7 @@ ORDER_STATUSES = {
     "allocated",
     "ready_for_picking",
     "picking",
+    "cancelling_in_progress",
     "picked",
     "completed",
     "packed",
@@ -884,6 +886,42 @@ async def update_order_status(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     old_status = order.wms_state.status
+
+    if normalized_status == "cancelled":
+        doc_so = (
+            db.query(DocumentModel)
+            .options(selectinload(DocumentModel.lines))
+            .filter(DocumentModel.order_id == order.id, DocumentModel.doc_type == "SO")
+            .one_or_none()
+        )
+        if (
+            doc_so
+            and old_status == "picking"
+            and any(float(ln.picked_qty or 0) > 0 for ln in doc_so.lines)
+        ):
+            initiate_safe_cancel_return(db, order=order, document=doc_so, admin_user_id=user.id)
+            log_action(
+                db,
+                user_id=user.id,
+                action=ACTION_UPDATE,
+                entity_type="order",
+                entity_id=str(order_id),
+                old_data={"status": old_status},
+                new_data={
+                    "status": "cancelling_in_progress",
+                    "note": "safe_cancel_return_initiated",
+                },
+                ip_address=get_client_ip(request),
+            )
+            db.commit()
+            order = (
+                db.query(OrderModel)
+                .options(selectinload(OrderModel.lines), selectinload(OrderModel.wms_state))
+                .filter(OrderModel.id == order_id)
+                .one()
+            )
+            return _to_order_details(order, db)
+
     order.wms_state.status = normalized_status
 
     if normalized_status == "picked" and payload.controller_user_id is not None:

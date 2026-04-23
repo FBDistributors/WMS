@@ -160,6 +160,7 @@ ORDER_STATUSES_FOR_COUNTS = (
     "allocated",
     "ready_for_picking",
     "picking",
+    "cancelling_in_progress",
     "picked",
     "completed",  # controller yakunlagach
     "packed",

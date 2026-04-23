@@ -25,11 +25,21 @@ from app.models.picking import PickRequest
 from app.models.stock import StockMovement as StockMovementModel
 from app.models.product import Product as ProductModel
 from app.models.user import User as UserModel
+from app.models.safe_cancel_return import SafeCancelReturnSession as SafeCancelReturnSessionModel
 from app.models.user_fcm_token import UserFCMToken
 from app.models.stock import StockLot as StockLotModel
 from app.api.v1.endpoints.picker_inventory import _get_lot_level_balances, _location_ids_for_warehouse
 from app.services.stock_availability import require_sufficient_available
 from app.services.audit_service import ACTION_UPDATE, get_client_ip, log_action
+from app.services.safe_cancel_return_service import (
+    active_return_session_id_for_document,
+    finish_safe_cancel_return,
+    get_active_return_session_for_picker,
+    list_session_lines_ordered,
+    order_in_cancelling_flow,
+    scan_return_location,
+    scan_return_product,
+)
 
 router = APIRouter()
 
@@ -74,6 +84,8 @@ class PickingDocument(BaseModel):
     assigned_to_user_id: Optional[UUID] = None
     assigned_to_user_name: Optional[str] = None
     order_number: Optional[str] = None
+    order_wms_status: Optional[str] = None
+    safe_cancel_return_session_id: Optional[UUID] = None
 
 
 class PickingListItem(BaseModel):
@@ -215,6 +227,31 @@ class CompletePickingRequest(BaseModel):
         json_schema_extra = {
             "example": {"incomplete_reason": "out_of_stock"},
         }
+
+
+class ReturnScanBody(BaseModel):
+    raw: str = Field(..., min_length=1, description="Skaner yoki qo'lda kiritilgan kod")
+
+
+class SafeCancelReturnLineOut(BaseModel):
+    id: UUID
+    document_line_id: UUID
+    expected_location_code: str
+    product_name: str
+    barcode: Optional[str] = None
+    sku: Optional[str] = None
+    qty_to_return: float
+    location_confirmed: bool
+    product_confirmed: bool
+
+
+class SafeCancelReturnSessionOut(BaseModel):
+    id: UUID
+    document_id: UUID
+    reference_number: str
+    order_number: Optional[str] = None
+    lines: List[SafeCancelReturnLineOut]
+    all_lines_complete: bool
 
 
 class MyPickerStatsDay(BaseModel):
@@ -435,8 +472,22 @@ def _controller_name(doc: DocumentModel) -> Optional[str]:
     return getattr(user, "full_name", None) or getattr(user, "username", None)
 
 
-def _to_picking_document(doc: DocumentModel) -> PickingDocument:
+def _picking_cancel_meta(db: Optional[Session], doc: DocumentModel) -> tuple[Optional[str], Optional[UUID]]:
+    if db is None or not doc.order_id:
+        return None, None
+    wms = (
+        db.query(OrderWmsStateModel.status)
+        .filter(OrderWmsStateModel.order_id == doc.order_id)
+        .limit(1)
+        .scalar()
+    )
+    sid = active_return_session_id_for_document(db, doc.id)
+    return (str(wms) if wms is not None else None, sid)
+
+
+def _to_picking_document(doc: DocumentModel, db: Optional[Session] = None) -> PickingDocument:
     lines = getattr(doc, "lines", None) or []
+    wms, sid = _picking_cancel_meta(db, doc)
     return PickingDocument(
         id=doc.id,
         reference_number=doc.doc_no,
@@ -447,6 +498,8 @@ def _to_picking_document(doc: DocumentModel) -> PickingDocument:
         assigned_to_user_id=doc.assigned_to_user_id,
         assigned_to_user_name=_picker_name(doc),
         order_number=_order_number(doc),
+        order_wms_status=wms,
+        safe_cancel_return_session_id=sid,
     )
 
 
@@ -460,6 +513,7 @@ def _to_picking_document_with_lines(
         plines = _picking_lines_with_alternates(db, doc, lines)
     else:
         plines = [_to_picking_line(line) for line in lines]
+    wms, sid = _picking_cancel_meta(db, doc)
     return PickingDocument(
         id=doc.id,
         reference_number=doc.doc_no,
@@ -470,6 +524,8 @@ def _to_picking_document_with_lines(
         assigned_to_user_id=doc.assigned_to_user_id,
         assigned_to_user_name=_picker_name(doc),
         order_number=_order_number(doc),
+        order_wms_status=wms,
+        safe_cancel_return_session_id=sid,
     )
 
 
@@ -509,6 +565,8 @@ def _to_picking_list_item(doc: DocumentModel) -> PickingListItem:
 
 
 def _refresh_document_status(doc: DocumentModel, lines: List[DocumentLineModel]) -> None:
+    if doc.status == "cancelling":
+        return
     if all(line.picked_qty >= line.required_qty for line in lines):
         doc.status = "in_progress"
     elif any(line.picked_qty > 0 for line in lines):
@@ -690,6 +748,7 @@ async def get_consolidated(
             ),
             DocumentModel.status != "cancelled",
             DocumentModel.status != "completed",
+            DocumentModel.status != "cancelling",
         )
     )
     doc_ids_raw = [r[0] for r in docs_id_query.all()]
@@ -868,6 +927,7 @@ async def consolidated_pick(
             ),
             DocumentModel.status != "cancelled",
             DocumentModel.status != "completed",
+            DocumentModel.status != "cancelling",
         )
     )
     doc_ids = [r[0] for r in docs_query.all()]
@@ -1135,6 +1195,11 @@ async def send_to_controller(
         raise HTTPException(status_code=404, detail="Document not found")
     if document.assigned_to_user_id != user.id:
         raise HTTPException(status_code=403, detail="Document not assigned to you")
+    if document.status == "cancelling":
+        raise HTTPException(
+            status_code=409,
+            detail="Buyurtma xavfsiz bekor rejimida: avval qaytarish tugallansin",
+        )
     if document.status != "picked":
         raise HTTPException(status_code=409, detail="Document must be in picked status")
     if document.controlled_by_user_id is not None:
@@ -1153,7 +1218,7 @@ async def send_to_controller(
     document.controlled_by_user_id = payload.controller_user_id
     document.sent_to_controller_at = datetime.now(timezone.utc)
     db.commit()
-    return _to_picking_document(document)
+    return _to_picking_document(document, db)
 
 
 def _product_level_alternates(rows: list[dict], *, max_rows: int = 24) -> List[PickingAlternateLocation]:
@@ -1209,6 +1274,11 @@ async def change_pick_source(
         raise HTTPException(status_code=404, detail="Document not found")
     if user.role == "picker" and document.assigned_to_user_id != user.id:
         raise HTTPException(status_code=403, detail="Forbidden")
+    if document.order_id and order_in_cancelling_flow(db, document.order_id):
+        raise HTTPException(
+            status_code=409,
+            detail="Buyurtma bekor qilinmoqda: avval terilganlarni joyiga qaytaring.",
+        )
     if line.skip_reason:
         raise HTTPException(status_code=409, detail="Line is skipped")
     if not document.order_id:
@@ -1382,6 +1452,11 @@ def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
         raise HTTPException(status_code=404, detail="Document not found")
     if user.role == "picker" and document.assigned_to_user_id != user.id:
         raise HTTPException(status_code=403, detail="Forbidden")
+    if document.order_id and order_in_cancelling_flow(db, document.order_id):
+        raise HTTPException(
+            status_code=409,
+            detail="Buyurtma bekor qilinmoqda: avval terilganlarni joyiga qaytaring.",
+        )
 
     next_qty = line.picked_qty + payload.delta
     if next_qty < 0:
@@ -1587,6 +1662,11 @@ async def skip_line(
         raise HTTPException(status_code=404, detail="Document not found")
     if user.role == "picker" and document.assigned_to_user_id != user.id:
         raise HTTPException(status_code=403, detail="Forbidden")
+    if document.order_id and order_in_cancelling_flow(db, document.order_id):
+        raise HTTPException(
+            status_code=409,
+            detail="Buyurtma bekor qilinmoqda: avval terilganlarni joyiga qaytaring.",
+        )
     if line.picked_qty <= 0:
         raise HTTPException(status_code=400, detail="Line has no picked qty to skip")
 
@@ -1668,6 +1748,11 @@ async def complete_picking_document(
     )
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
+    if document.status == "cancelling":
+        raise HTTPException(
+            status_code=409,
+            detail="Buyurtma xavfsiz bekor rejimida: avval qaytarish tugallansin",
+        )
 
     cutoff = _picking_urgency_cutoff_today()
     ordered_ids = [
@@ -1738,3 +1823,166 @@ async def complete_picking_document(
     response = _to_picking_document_with_lines(document, lines, db)
     db.commit()
     return response
+
+
+def _safe_cancel_session_to_out(db: Session, session: SafeCancelReturnSessionModel) -> SafeCancelReturnSessionOut:
+    doc = db.query(DocumentModel).filter(DocumentModel.id == session.document_id).one_or_none()
+    ref = doc.doc_no if doc else ""
+    ordered = list_session_lines_ordered(db, session)
+    lines_out = [
+        SafeCancelReturnLineOut(
+            id=ln.id,
+            document_line_id=ln.document_line_id,
+            expected_location_code=ln.expected_location_code or "",
+            product_name=ln.product_name,
+            barcode=ln.barcode,
+            sku=ln.sku,
+            qty_to_return=float(ln.qty_to_return),
+            location_confirmed=bool(ln.location_confirmed),
+            product_confirmed=bool(ln.product_confirmed),
+        )
+        for ln in ordered
+    ]
+    all_done = all(ln.location_confirmed and ln.product_confirmed for ln in ordered) if ordered else True
+    return SafeCancelReturnSessionOut(
+        id=session.id,
+        document_id=session.document_id,
+        reference_number=ref,
+        order_number=_order_number(doc) if doc else None,
+        lines=lines_out,
+        all_lines_complete=all_done,
+    )
+
+
+@router.get(
+    "/return-session/mine",
+    response_model=Optional[SafeCancelReturnSessionOut],
+    summary="Yig'uvchi: faol qaytarish sessiyasi (xavfsiz bekor)",
+)
+async def get_my_safe_cancel_return_session(
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("picking:read")),
+):
+    if user.role != "picker":
+        raise HTTPException(status_code=403, detail="Only for pickers")
+    session = get_active_return_session_for_picker(db, user.id)
+    if not session:
+        return None
+    return _safe_cancel_session_to_out(db, session)
+
+
+@router.get(
+    "/return-session/{session_id}",
+    response_model=SafeCancelReturnSessionOut,
+    summary="Qaytarish sessiyasi tafsilotlari",
+)
+async def get_safe_cancel_return_session(
+    session_id: UUID,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("picking:read")),
+):
+    session = (
+        db.query(SafeCancelReturnSessionModel)
+        .options(selectinload(SafeCancelReturnSessionModel.lines))
+        .filter(SafeCancelReturnSessionModel.id == session_id)
+        .one_or_none()
+    )
+    if not session:
+        raise HTTPException(status_code=404, detail="Return session not found")
+    if user.role == "picker" and session.picker_user_id != user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    return _safe_cancel_session_to_out(db, session)
+
+
+@router.post(
+    "/return-session/{session_id}/scan-location",
+    response_model=SafeCancelReturnSessionOut,
+    summary="Qaytarish: navbatdagi qator uchun manzilni skanerlash",
+)
+async def scan_safe_cancel_return_location(
+    session_id: UUID,
+    body: ReturnScanBody,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("picking:pick")),
+):
+    if user.role != "picker":
+        raise HTTPException(status_code=403, detail="Only for pickers")
+    try:
+        scan_return_location(db, session_id=session_id, picker_user_id=user.id, raw=body.raw)
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    session = (
+        db.query(SafeCancelReturnSessionModel)
+        .options(selectinload(SafeCancelReturnSessionModel.lines))
+        .filter(SafeCancelReturnSessionModel.id == session_id)
+        .one()
+    )
+    return _safe_cancel_session_to_out(db, session)
+
+
+@router.post(
+    "/return-session/{session_id}/scan-product",
+    response_model=SafeCancelReturnSessionOut,
+    summary="Qaytarish: manzil tasdiqlangan qator uchun mahsulotni skanerlash",
+)
+async def scan_safe_cancel_return_product(
+    session_id: UUID,
+    body: ReturnScanBody,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("picking:pick")),
+):
+    if user.role != "picker":
+        raise HTTPException(status_code=403, detail="Only for pickers")
+    try:
+        scan_return_product(db, session_id=session_id, picker_user_id=user.id, raw=body.raw)
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    session = (
+        db.query(SafeCancelReturnSessionModel)
+        .options(selectinload(SafeCancelReturnSessionModel.lines))
+        .filter(SafeCancelReturnSessionModel.id == session_id)
+        .one()
+    )
+    return _safe_cancel_session_to_out(db, session)
+
+
+@router.post(
+    "/return-session/{session_id}/finish",
+    response_model=SafeCancelReturnSessionOut,
+    summary="Qaytarishni yakunlash: stok tiklash + buyurtma cancelled",
+)
+async def finish_safe_cancel_return_session(
+    request: Request,
+    session_id: UUID,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("picking:pick")),
+):
+    if user.role != "picker":
+        raise HTTPException(status_code=403, detail="Only for pickers")
+    try:
+        finish_safe_cancel_return(db, session_id=session_id, picker_user_id=user.id)
+        log_action(
+            db,
+            user_id=user.id,
+            action=ACTION_UPDATE,
+            entity_type="safe_cancel_return_session",
+            entity_id=str(session_id),
+            old_data={"status": "returns_pending"},
+            new_data={"status": "completed"},
+            ip_address=get_client_ip(request),
+        )
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    session = (
+        db.query(SafeCancelReturnSessionModel)
+        .options(selectinload(SafeCancelReturnSessionModel.lines))
+        .filter(SafeCancelReturnSessionModel.id == session_id)
+        .one()
+    )
+    return _safe_cancel_session_to_out(db, session)

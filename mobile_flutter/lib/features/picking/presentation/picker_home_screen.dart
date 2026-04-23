@@ -1,6 +1,9 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
@@ -17,6 +20,7 @@ import '../../notifications/presentation/notification_bell_button.dart';
 import '../domain/profile_type_param.dart';
 import '../picking_providers.dart';
 import '../data/picking_models.dart';
+import '../data/return_session_storage.dart';
 
 /// RN `PickerHome`.
 class PickerHomeScreen extends ConsumerStatefulWidget {
@@ -29,6 +33,42 @@ class PickerHomeScreen extends ConsumerStatefulWidget {
 class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
   bool _refreshing = false;
   String? _consumedCompletedMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_maybeNavigateToPendingReturn());
+    });
+  }
+
+  Future<void> _maybeNavigateToPendingReturn() async {
+    final ProfileType pt = ref.read(profileTypeProvider);
+    final GoRouterState rs = GoRouterState.of(context);
+    final String? qp = rs.uri.queryParameters['profile'];
+    if (qp == 'controller' || pt == ProfileType.controller) {
+      return;
+    }
+    final SharedPreferences sp = await SharedPreferences.getInstance();
+    final String? cached = ReturnSessionStorage.read(sp);
+    if (cached != null && cached.isNotEmpty && mounted) {
+      context.go('/return-items/$cached');
+      return;
+    }
+    try {
+      final SafeCancelReturnSession? s =
+          await ref.read(pickingRepositoryProvider).getMyReturnSession();
+      if (s != null && mounted) {
+        await ReturnSessionStorage.save(sp, s.id);
+        if (!mounted) {
+          return;
+        }
+        context.go('/return-items/${s.id}');
+      }
+    } on Object {
+      /* tarmoq yo'q yoki 401 — e'tiborsiz */
+    }
+  }
 
   @override
   void didChangeDependencies() {

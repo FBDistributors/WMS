@@ -144,6 +144,8 @@ class PickingDocument {
     required this.assignedToUserId,
     required this.assignedToUserName,
     required this.orderNumber,
+    this.orderWmsStatus,
+    this.safeCancelReturnSessionId,
   });
 
   final String id;
@@ -155,6 +157,10 @@ class PickingDocument {
   final String? assignedToUserId;
   final String? assignedToUserName;
   final String? orderNumber;
+  /// Buyurtma WMS holati (masalan `cancelling_in_progress`).
+  final String? orderWmsStatus;
+  /// Faol qaytarish sessiyasi UUID (mavjud bo'lsa).
+  final String? safeCancelReturnSessionId;
 
   factory PickingDocument.fromJson(Map<String, Object?> json) {
     final Object? linesRaw = json['lines'];
@@ -178,6 +184,8 @@ class PickingDocument {
       assignedToUserId: json['assigned_to_user_id'] as String?,
       assignedToUserName: json['assigned_to_user_name'] as String?,
       orderNumber: json['order_number'] as String?,
+      orderWmsStatus: json['order_wms_status'] as String?,
+      safeCancelReturnSessionId: json['safe_cancel_return_session_id'] as String?,
     );
   }
 
@@ -191,6 +199,8 @@ class PickingDocument {
         'assigned_to_user_id': assignedToUserId,
         'assigned_to_user_name': assignedToUserName,
         'order_number': orderNumber,
+        'order_wms_status': orderWmsStatus,
+        'safe_cancel_return_session_id': safeCancelReturnSessionId,
       };
 
   PickingDocument applyPickLineResponse(PickLineResponse res) {
@@ -207,6 +217,83 @@ class PickingDocument {
       assignedToUserId: assignedToUserId,
       assignedToUserName: assignedToUserName,
       orderNumber: orderNumber,
+      orderWmsStatus: orderWmsStatus,
+      safeCancelReturnSessionId: safeCancelReturnSessionId,
+    );
+  }
+}
+
+class SafeCancelReturnLine {
+  const SafeCancelReturnLine({
+    required this.id,
+    required this.documentLineId,
+    required this.expectedLocationCode,
+    required this.productName,
+    required this.barcode,
+    required this.sku,
+    required this.qtyToReturn,
+    required this.locationConfirmed,
+    required this.productConfirmed,
+  });
+
+  final String id;
+  final String documentLineId;
+  final String expectedLocationCode;
+  final String productName;
+  final String? barcode;
+  final String? sku;
+  final double qtyToReturn;
+  final bool locationConfirmed;
+  final bool productConfirmed;
+
+  factory SafeCancelReturnLine.fromJson(Map<String, Object?> json) {
+    return SafeCancelReturnLine(
+      id: json['id']! as String,
+      documentLineId: json['document_line_id']! as String,
+      expectedLocationCode: json['expected_location_code']! as String,
+      productName: json['product_name']! as String,
+      barcode: json['barcode'] as String?,
+      sku: json['sku'] as String?,
+      qtyToReturn: _num(json['qty_to_return']),
+      locationConfirmed: json['location_confirmed'] == true,
+      productConfirmed: json['product_confirmed'] == true,
+    );
+  }
+}
+
+class SafeCancelReturnSession {
+  const SafeCancelReturnSession({
+    required this.id,
+    required this.documentId,
+    required this.referenceNumber,
+    required this.orderNumber,
+    required this.lines,
+    required this.allLinesComplete,
+  });
+
+  final String id;
+  final String documentId;
+  final String referenceNumber;
+  final String? orderNumber;
+  final List<SafeCancelReturnLine> lines;
+  final bool allLinesComplete;
+
+  factory SafeCancelReturnSession.fromJson(Map<String, Object?> json) {
+    final Object? linesRaw = json['lines'];
+    final List<SafeCancelReturnLine> lines = linesRaw is List
+        ? linesRaw
+            .whereType<Map<dynamic, dynamic>>()
+            .map((Map<dynamic, dynamic> m) =>
+                SafeCancelReturnLine.fromJson(Map<String, Object?>.from(m)))
+            .toList(growable: false)
+        : const <SafeCancelReturnLine>[];
+    return SafeCancelReturnSession(
+      id: json['id']! as String,
+      documentId: json['document_id']! as String,
+      referenceNumber: json['reference_number']! as String,
+      orderNumber: json['order_number'] as String?,
+      lines: lines,
+      allLinesComplete: json['all_lines_complete'] == true,
     );
   }
 }

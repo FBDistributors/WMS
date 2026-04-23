@@ -139,6 +139,8 @@ class _PickerWorkScreenState extends ConsumerState<PickerWorkScreen> {
             assignedToUserId: _doc!.assignedToUserId,
             assignedToUserName: _doc!.assignedToUserName,
             orderNumber: _doc!.orderNumber,
+            orderWmsStatus: _doc!.orderWmsStatus,
+            safeCancelReturnSessionId: _doc!.safeCancelReturnSessionId,
           );
         }
       });

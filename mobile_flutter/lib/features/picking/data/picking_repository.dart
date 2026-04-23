@@ -291,6 +291,82 @@ class PickingRepository {
     );
   }
 
+  Future<SafeCancelReturnSession?> getMyReturnSession() async {
+    try {
+      final Response<Object?> res = await _dio.get<Object?>('$_p/return-session/mine');
+      final Object? data = res.data;
+      if (data == null) {
+        return null;
+      }
+      if (data is! Map) {
+        return null;
+      }
+      return SafeCancelReturnSession.fromJson(Map<String, Object?>.from(data));
+    } on DioException catch (e) {
+      throw Exception(mapDioExceptionToMessage(e));
+    }
+  }
+
+  Future<SafeCancelReturnSession> getReturnSession(String sessionId) async {
+    try {
+      final Response<Object?> res =
+          await _dio.get<Object?>('$_p/return-session/$sessionId');
+      final Object? data = res.data;
+      if (data is! Map) {
+        throw const FormatException('return_session');
+      }
+      return SafeCancelReturnSession.fromJson(Map<String, Object?>.from(data));
+    } on DioException catch (e) {
+      throw Exception(mapDioExceptionToMessage(e));
+    }
+  }
+
+  Future<SafeCancelReturnSession> scanReturnLocation(String sessionId, String raw) async {
+    try {
+      final Response<Object?> res = await _dio.post<Object?>(
+        '$_p/return-session/$sessionId/scan-location',
+        data: <String, String>{'raw': raw.trim()},
+      );
+      final Object? data = res.data;
+      if (data is! Map) {
+        throw const FormatException('scan_location');
+      }
+      return SafeCancelReturnSession.fromJson(Map<String, Object?>.from(data));
+    } on DioException catch (e) {
+      throw Exception(mapDioExceptionToMessage(e));
+    }
+  }
+
+  Future<SafeCancelReturnSession> scanReturnProduct(String sessionId, String raw) async {
+    try {
+      final Response<Object?> res = await _dio.post<Object?>(
+        '$_p/return-session/$sessionId/scan-product',
+        data: <String, String>{'raw': raw.trim()},
+      );
+      final Object? data = res.data;
+      if (data is! Map) {
+        throw const FormatException('scan_product');
+      }
+      return SafeCancelReturnSession.fromJson(Map<String, Object?>.from(data));
+    } on DioException catch (e) {
+      throw Exception(mapDioExceptionToMessage(e));
+    }
+  }
+
+  Future<SafeCancelReturnSession> finishReturnSession(String sessionId) async {
+    try {
+      final Response<Object?> res =
+          await _dio.post<Object?>('$_p/return-session/$sessionId/finish');
+      final Object? data = res.data;
+      if (data is! Map) {
+        throw const FormatException('finish_return');
+      }
+      return SafeCancelReturnSession.fromJson(Map<String, Object?>.from(data));
+    } on DioException catch (e) {
+      throw Exception(mapDioExceptionToMessage(e));
+    }
+  }
+
   Future<void> registerFcmToken({
     required String token,
     String? deviceId,

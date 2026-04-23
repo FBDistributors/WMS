@@ -11,6 +11,7 @@ from app.models.order import Order, OrderLine, OrderWmsState
 from app.models.picking import PickRequest
 from app.models.product import Product, ProductBarcode
 from app.models.receipt import Receipt, ReceiptLine
+from app.models.safe_cancel_return import SafeCancelReturnLine, SafeCancelReturnSession
 from app.models.stock import StockLot, StockMovement
 from app.models.smartup_sync import SmartupSyncRun
 from app.models.user import User
@@ -48,6 +49,8 @@ __all__ = [
     "ProductBarcode",
     "Receipt",
     "ReceiptLine",
+    "SafeCancelReturnLine",
+    "SafeCancelReturnSession",
     "StockLot",
     "StockMovement",
     "SmartupSyncRun",

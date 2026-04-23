@@ -22,6 +22,7 @@ import '../../features/picking/presentation/pick_task_details_screen.dart';
 import '../../features/picking/presentation/pick_task_list_screen.dart';
 import '../../features/picking/presentation/picker_home_screen.dart';
 import '../../features/picking/presentation/picker_work_screen.dart';
+import '../../features/picking/presentation/return_items_screen.dart';
 import '../../features/queue/presentation/queue_screen.dart';
 import '../../features/scanner/presentation/scanner_screen.dart';
 import 'router_refresh.dart';
@@ -65,6 +66,9 @@ final goRouterProvider = Provider<GoRouter>((Ref ref) {
       if (path.startsWith('/customer-returns-detail/') && !perms.contains('picking:write')) {
         return '/picker-home';
       }
+      if (path.startsWith('/return-items/') && !perms.contains('picking:read')) {
+        return '/picker-home';
+      }
       return null;
     },
     routes: <RouteBase>[
@@ -89,6 +93,14 @@ final goRouterProvider = Provider<GoRouter>((Ref ref) {
         builder: (BuildContext context, GoRouterState state) {
           final String taskId = state.pathParameters['taskId']!;
           return PickTaskDetailsScreen(taskId: taskId);
+        },
+      ),
+      GoRoute(
+        path: '/return-items/:sessionId',
+        name: 'returnItems',
+        builder: (BuildContext context, GoRouterState state) {
+          final String sessionId = state.pathParameters['sessionId']!;
+          return ReturnItemsScreen(sessionId: sessionId);
         },
       ),
       GoRoute(
