@@ -899,7 +899,20 @@ async def update_order_status(
             and old_status == "picking"
             and any(float(ln.picked_qty or 0) > 0 for ln in doc_so.lines)
         ):
-            initiate_safe_cancel_return(db, order=order, document=doc_so, admin_user_id=user.id)
+            session = initiate_safe_cancel_return(db, order=order, document=doc_so, admin_user_id=user.id)
+            if doc_so.assigned_to_user_id:
+                send_push_to_user(
+                    db,
+                    doc_so.assigned_to_user_id,
+                    title="DIQQAT: Buyurtma bekor qilindi",
+                    body="Terishni to'xtating va mahsulotlarni joyiga qaytaring.",
+                    data={
+                        "type": "safe_cancel_return_required",
+                        "taskId": str(doc_so.id),
+                        "returnSessionId": str(session.id),
+                        "orderId": str(order.id),
+                    },
+                )
             log_action(
                 db,
                 user_id=user.id,

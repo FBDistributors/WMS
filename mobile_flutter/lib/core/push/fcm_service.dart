@@ -24,6 +24,7 @@ class FcmService {
   static bool _inited = false;
   static GoRouter? _router;
   static String? _pendingTaskId;
+  static String? _pendingReturnSessionId;
   static bool _pendingPickTaskList = false;
   static PickTasksPushCallback? _onPickTasksPush;
   static final FlutterLocalNotificationsPlugin _local = FlutterLocalNotificationsPlugin();
@@ -31,6 +32,12 @@ class FcmService {
 
   static void bindRouter(GoRouter router) {
     _router = router;
+    final String? rs = _pendingReturnSessionId;
+    if (rs != null && rs.isNotEmpty) {
+      _pendingReturnSessionId = null;
+      router.go('/return-items/$rs');
+      return;
+    }
     if (_pendingPickTaskList) {
       _pendingPickTaskList = false;
       router.goNamed(
@@ -76,6 +83,26 @@ class FcmService {
     }
   }
 
+  static String? _returnSessionIdFromData(Map<String, dynamic> data) {
+    final Object? sid = data['returnSessionId'];
+    final String? sessionId = sid is String ? sid : sid?.toString();
+    if (sessionId == null || sessionId.isEmpty) {
+      return null;
+    }
+    return sessionId;
+  }
+
+  static void _navigateToReturnSession(String sessionId) {
+    final GoRouter? r = _router;
+    if (r != null) {
+      r.go('/return-items/$sessionId');
+    } else {
+      _pendingReturnSessionId = sessionId;
+      _pendingPickTaskList = false;
+      _pendingTaskId = null;
+    }
+  }
+
   static void registerPickTasksPushHandler(PickTasksPushCallback? cb) {
     _onPickTasksPush = cb;
   }
@@ -106,6 +133,13 @@ class FcmService {
     if (type == 'new_pick_task') {
       _navigateToPickTaskList();
       return;
+    }
+    if (type == 'safe_cancel_return_required') {
+      final String? sessionId = _returnSessionIdFromData(data);
+      if (sessionId != null) {
+        _navigateToReturnSession(sessionId);
+        return;
+      }
     }
     final String? taskId = _taskIdFromData(data);
     if (taskId != null) {
@@ -176,7 +210,10 @@ class FcmService {
       return true;
     }
     final String? t = d['type']?.toString();
-    return t == 'new_pick_task' || t == 'admin_test' || t == 'admin_broadcast';
+    return t == 'new_pick_task' ||
+        t == 'admin_test' ||
+        t == 'admin_broadcast' ||
+        t == 'safe_cancel_return_required';
   }
 
   static Future<void> _showForegroundBanner(RemoteMessage m) async {
