@@ -15,6 +15,9 @@ import { useAuth } from '../../rbac/AuthProvider'
 
 const PAGE_SIZE = 200
 
+/** Jarayon: hujjat yakunlangan (controllerdan keyin) — mapStatus emas, chunki boshqa holatlar DONE ga tushishi mumkin. */
+const JARAYON_HIDDEN_DOCUMENT_STATUSES = new Set(['completed', 'packed', 'shipped'])
+
 function statusBadgeClass(status: PickListStatus): string {
   switch (status) {
     case 'DONE':
@@ -125,9 +128,13 @@ export function PickListsPage() {
     })
   }, [items, query])
 
-  // process_scope=active|archived serverda filtrlash. Clientda status!==DONE qo'shimcha
-  // filteri hujjat packed/shipped va buyurtma WMS hali jarayonda bo'lganda qatorlarni
-  // yashirib, faqat REVIEW (picked) qatorlarini qoldirardi.
+  const tableRows = useMemo(() => {
+    if (archive) return filtered
+    return filtered.filter((item) => {
+      const s = item.document_status.toLowerCase().replace(/-/g, '_')
+      return !JARAYON_HIDDEN_DOCUMENT_STATUSES.has(s)
+    })
+  }, [archive, filtered])
 
   const docStatusLabel = useCallback(
     (raw: string) => {
@@ -187,11 +194,24 @@ export function PickListsPage() {
         />
       )
     }
-    if (filtered.length === 0) {
+    if (query.trim() && tableRows.length === 0) {
       return (
         <EmptyState
           title={t('picking:search_empty_title')}
           description={t('picking:search_empty_desc')}
+          actionLabel={t('common:buttons.refresh')}
+          onAction={() => {
+            nextOffsetRef.current = 0
+            void load()
+          }}
+        />
+      )
+    }
+    if (tableRows.length === 0) {
+      return (
+        <EmptyState
+          title={archive ? t('picking:empty_archive_title') : t('picking:empty_jarayon_title')}
+          description={archive ? t('picking:empty_archive_desc') : t('picking:empty_jarayon_desc')}
           actionLabel={t('common:buttons.refresh')}
           onAction={() => {
             nextOffsetRef.current = 0
@@ -217,7 +237,7 @@ export function PickListsPage() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((item) => (
+            {tableRows.map((item) => (
               <tr
                 key={item.id}
                 className="cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
@@ -291,6 +311,8 @@ export function PickListsPage() {
     error,
     filtered,
     handleCancel,
+    query,
+    tableRows,
     i18n.language,
     isLoading,
     items.length,

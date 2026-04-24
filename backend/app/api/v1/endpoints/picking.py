@@ -8,7 +8,7 @@ import logging
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import case, func, or_
+from sqlalchemy import and_, case, func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -673,7 +673,8 @@ async def list_picking_documents(
     process_scope: Optional[Literal["active", "archived"]] = Query(
         default=None,
         description=(
-            "active: admin Jarayon — buyurtma WMS allocated..picked. "
+            "active: admin Jarayon — buyurtma WMS allocated..picked va "
+            "hujjat completed/packed/shipped emas (WMS kechiksa ham yakunlangan chiqmasin). "
             "archived: admin Arxiv — hujjat completed/packed/shipped. "
             "picker/inventory_controller uchun e'tiborsiz."
         ),
@@ -702,9 +703,12 @@ async def list_picking_documents(
     )
     if effective_scope == "active":
         query = query.filter(
-            or_(
-                OrderModel.id.is_(None),
-                OrderWmsStateModel.status.in_(ACTIVE_PIPELINE_ORDER_STATUSES),
+            and_(
+                or_(
+                    OrderModel.id.is_(None),
+                    OrderWmsStateModel.status.in_(ACTIVE_PIPELINE_ORDER_STATUSES),
+                ),
+                DocumentModel.status.notin_(("completed", "packed", "shipped")),
             )
         )
     elif effective_scope == "archived":
