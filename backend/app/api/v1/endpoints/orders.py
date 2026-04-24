@@ -1155,7 +1155,15 @@ async def send_movement_to_picking(
     if not order.lines:
         raise HTTPException(status_code=409, detail="Order has no lines")
 
-    existing = db.query(DocumentModel).filter(DocumentModel.order_id == order.id).one_or_none()
+    existing = (
+        db.query(DocumentModel)
+        .filter(
+            DocumentModel.order_id == order.id,
+            DocumentModel.doc_type == "SO",
+            DocumentModel.status != "cancelled",
+        )
+        .one_or_none()
+    )
     if existing:
         raise HTTPException(status_code=409, detail="Picking task already created")
 
@@ -1232,7 +1240,15 @@ async def send_order_to_picking(
     if not order.lines:
         raise HTTPException(status_code=409, detail="Order has no lines")
 
-    existing = db.query(DocumentModel).filter(DocumentModel.order_id == order.id).one_or_none()
+    existing = (
+        db.query(DocumentModel)
+        .filter(
+            DocumentModel.order_id == order.id,
+            DocumentModel.doc_type == "SO",
+            DocumentModel.status != "cancelled",
+        )
+        .one_or_none()
+    )
     if existing:
         raise HTTPException(status_code=409, detail="Picking task already created")
 
