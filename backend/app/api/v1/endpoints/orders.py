@@ -1017,11 +1017,19 @@ async def sync_orders_from_smartup(
             client = SmartupClient(filial_id=(payload.filial_id or "").strip() or None)
             response = client.export_orders(filial_code=payload.filial_code)
             filial_override = (payload.filial_id or "").strip() or None
-            items_to_import = response.items
+            items_b_w = [
+                item for item in response.items
+                if (item.status or "").strip().upper() == "B#W"
+            ]
+            filtered_out = max(0, len(response.items) - len(items_b_w))
+            if filtered_out:
+                logger.info("sync-smartup: skipped non-B#W items=%s", filtered_out)
+            items_to_import = items_b_w
             created, updated, skipped, import_errors, _ = import_orders(
                 db, items_to_import, order_source=payload.order_source, filial_id_override=filial_override
             )
             delete_stale_orders(db, list(items_to_import))
+            skipped += filtered_out
             detail = import_errors[0].reason if import_errors else None
             errors_count = len(import_errors) if import_errors else None
             return SmartupSyncResponse(
