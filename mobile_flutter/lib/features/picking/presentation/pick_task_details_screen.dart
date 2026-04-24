@@ -184,6 +184,10 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
   Set<String> _verifiedLineIds = <String>{};
   Timer? _detailPollTimer;
 
+  String _postCompleteRouteName(PickerProfileParam profile) {
+    return profile == PickerProfileParam.controller ? 'pickTasks' : 'pickerHome';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -705,7 +709,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
           );
           if (mounted) {
             context.goNamed(
-              'pickerHome',
+              _postCompleteRouteName(profile),
               queryParameters: <String, String>{
                 'profile': profileToQuery(profile),
                 'completedMessage': StringLookup.t(loc, 'taskCompletedBanner'),
@@ -757,7 +761,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
               );
           if (mounted) {
             context.goNamed(
-              'pickerHome',
+              _postCompleteRouteName(profile),
               queryParameters: <String, String>{
                 'profile': profileToQuery(profile),
                 'completedMessage': StringLookup.t(loc, 'taskCompletedBanner'),
@@ -806,7 +810,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       }
       if (mounted) {
         context.goNamed(
-          'pickerHome',
+          _postCompleteRouteName(profile),
           queryParameters: <String, String>{
             'profile': profileToQuery(profile),
             'completedMessage': StringLookup.t(loc, 'taskCompletedBanner'),
@@ -823,7 +827,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       await sp.remove(_verifiedKey(widget.taskId));
       if (mounted) {
         context.goNamed(
-          'pickerHome',
+          _postCompleteRouteName(profile),
           queryParameters: <String, String>{
             'profile': profileToQuery(profile),
             'completedMessage': StringLookup.t(loc, 'taskCompletedBanner'),
@@ -1387,7 +1391,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                   data: (PickingDocument d) {
                     if (d.status == 'completed') {
                       context.goNamed(
-                        'pickerHome',
+                        _postCompleteRouteName(profile),
                         queryParameters: <String, String>{
                           'profile': profileToQuery(profile),
                         },
