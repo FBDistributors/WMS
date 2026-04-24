@@ -14,10 +14,17 @@ from typing import Any
 
 from pydantic import ValidationError as PydanticValidationError
 
+from app.constants.order_wms_status import normalize_order_wms_status_for_storage
 from app.integrations.smartup.schemas import SmartupOrder, SmartupOrderExportResponse
 
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_movement_row_status(raw: Any) -> str:
+    if raw is None:
+        return normalize_order_wms_status_for_storage(None)
+    return normalize_order_wms_status_for_storage(str(raw).strip())
 
 DEFAULT_MFM_URL = "https://smartup.online/b/anor/mxsx/mfm/movement$export"
 
@@ -110,7 +117,7 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
                 "external_id": external_id or f"mfm:{group_id}",
                 "deal_id": group_id,
                 "order_no": group_id,
-                "status": "B#W",
+                "status": "imported",
                 "filial_id": filial,
                 "filial_code": filial,
                 "lines": lines,
@@ -163,7 +170,7 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
                 "external_id": (m.get("external_id") or "").strip() or f"mfm:{movement_id}",
                 "deal_id": movement_id,
                 "order_no": (m.get("delivery_number") or m.get("movement_number") or movement_id) or movement_id,
-                "status": (m.get("status") or "B#W").strip() or "B#W",
+                "status": _normalize_movement_row_status(m.get("status")),
                 "filial_id": filial,
                 "filial_code": filial,
                 "total_amount": amount,

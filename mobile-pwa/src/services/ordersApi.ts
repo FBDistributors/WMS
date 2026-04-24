@@ -121,14 +121,15 @@ export type OrderLineCreateBody = {
   uom?: string | null
 }
 
-/** Legacy: B#S → B#W (backend endi faqat B#W ni qo‘llab-quvvatlaydi). */
+/** Legacy: B#S / B#W / ready_for_picking → imported (canonical WMS). */
 function normalizeOrdersStatusQuery(status: string | undefined): string | undefined {
   if (status == null || status === '') return undefined
   const parts = status.split(',').map((s) => {
     const t = s.trim()
-    return t === 'B#S' ? 'B#W' : t
+    if (t === 'B#S' || t === 'B#W' || t === 'ready_for_picking') return 'imported'
+    return t
   })
-  return parts.filter(Boolean).join(',')
+  return [...new Set(parts.filter(Boolean))].join(',')
 }
 
 export type OrdersQuery = {

@@ -101,6 +101,7 @@ class PickingListItem(BaseModel):
     assigned_to_user_name: Optional[str] = None
     order_number: Optional[str] = None
     delivery_number: Optional[str] = None
+    order_wms_status: Optional[str] = None
     sent_to_controller_at: Optional[datetime] = None
     updated_at: datetime
 
@@ -546,6 +547,12 @@ def _to_picking_list_item(doc: DocumentModel) -> PickingListItem:
     lines_total = len(doc.lines)
     lines_done = sum(1 for line in doc.lines if line.picked_qty >= line.required_qty)
     picked_any = any(line.picked_qty > 0 for line in doc.lines)
+    order = getattr(doc, "order", None)
+    wms_status: Optional[str] = None
+    if order is not None:
+        ws = getattr(order, "wms_state", None)
+        if ws is not None:
+            wms_status = getattr(ws, "status", None)
     return PickingListItem(
         id=doc.id,
         reference_number=doc.doc_no,
@@ -559,6 +566,7 @@ def _to_picking_list_item(doc: DocumentModel) -> PickingListItem:
         assigned_to_user_name=_picker_name(doc),
         order_number=_order_number(doc),
         delivery_number=_delivery_number(doc),
+        order_wms_status=wms_status,
         sent_to_controller_at=doc.sent_to_controller_at,
         updated_at=doc.updated_at,
     )
@@ -684,7 +692,7 @@ async def list_picking_documents(
 ):
     # Admin buyurtmani packed/shipped/cancelled qilsa — yig'uvchi va controller ro'yxatida ko'rinmasin
     ORDER_HIDDEN_STATUSES = ("completed", "packed", "shipped", "cancelled")
-    ACTIVE_PIPELINE_ORDER_STATUSES = ("allocated", "ready_for_picking", "picking", "picked")
+    ACTIVE_PIPELINE_ORDER_STATUSES = ("allocated", "picking", "picked")
 
     effective_scope: Optional[str] = process_scope
     if user.role in ("picker", "inventory_controller"):
@@ -1066,7 +1074,7 @@ async def consolidated_pick(
                         .with_for_update()
                         .one_or_none()
                     )
-                    if order and order.wms_state and order.wms_state.status in {"allocated", "ready_for_picking"}:
+                    if order and order.wms_state and order.wms_state.status == "allocated":
                         order.wms_state.status = "picking"
         if first_picked_line_id is not None:
             db.add(PickRequest(request_id=payload.request_id, line_id=first_picked_line_id))
@@ -1585,7 +1593,7 @@ def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
                 .with_for_update()
                 .one_or_none()
             )
-            if order and order.wms_state and order.wms_state.status in {"allocated", "ready_for_picking"}:
+            if order and order.wms_state and order.wms_state.status == "allocated":
                 order.wms_state.status = "picking"
         db.add(PickRequest(request_id=payload.request_id, line_id=line.id))
         db.flush()

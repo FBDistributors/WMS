@@ -45,7 +45,7 @@ function formatActivity(iso: string | undefined, locale: string): string {
 }
 
 export function PickListsPage() {
-  const { t, i18n } = useTranslation(['picking', 'common'])
+  const { t, i18n } = useTranslation(['picking', 'common', 'orders'])
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const archive = pathname.endsWith('/picking/archive')
@@ -119,6 +119,7 @@ export function PickListsPage() {
         item.document_no,
         item.order_number ?? '',
         item.delivery_number ?? '',
+        item.order_wms_status ?? '',
         item.picker_name ?? '',
         item.controller_name ?? '',
       ]
@@ -142,6 +143,19 @@ export function PickListsPage() {
       return t(`picking:doc_status.${k}`, { defaultValue: raw })
     },
     [t]
+  )
+
+  /** Jarayon: ustuvor buyurtma WMS bosqichi; buyurtmasiz hujjatda hujjat holati. */
+  const pipelineStatusLabel = useCallback(
+    (item: PickList) => {
+      const wms = item.order_wms_status
+      if (wms != null && String(wms).trim() !== '') {
+        const k = String(wms).toLowerCase().replace(/-/g, '_')
+        return t(`orders:status.${k}`, { defaultValue: wms })
+      }
+      return docStatusLabel(item.document_status)
+    },
+    [t, docStatusLabel]
   )
 
   const handleCancel = useCallback(
@@ -255,7 +269,7 @@ export function PickListsPage() {
                   <span
                     className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(item.status)}`}
                   >
-                    {docStatusLabel(item.document_status)}
+                    {pipelineStatusLabel(item)}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
@@ -308,6 +322,7 @@ export function PickListsPage() {
     canCancel,
     cancellingId,
     docStatusLabel,
+    pipelineStatusLabel,
     error,
     filtered,
     handleCancel,

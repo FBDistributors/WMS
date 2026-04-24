@@ -22,7 +22,7 @@ import { getFilialNameByCode } from '../../constants/filialCodes'
 
 const PAGE_SIZE = 50
 const MOVEMENT_PAGE_SIZE = 50
-/** B#W barchasini yuklashda API dan har safar olinadigan maksimum (backend max 500) */
+/** Yangi navbat (imported) barchasini yuklashda API dan har safar olinadigan maksimum (backend max 500) */
 const BULK_PAGE_SIZE = 500
 const COLUMN_OPTIONS = [
   { id: 'select', labelKey: 'orders:columns.select' },
@@ -55,7 +55,7 @@ type SimpleOrderStatus = (typeof SIMPLE_STATUS_OPTIONS)[number]['value']
 
 function backendStatusToSimple(status: string): SimpleOrderStatus {
   if (status === 'cancelled') return 'cancelled'
-  if (['imported', 'B#W', 'allocated', 'ready_for_picking', 'picking'].includes(status)) return 'picking'
+  if (['imported', 'allocated', 'picking'].includes(status)) return 'picking'
   if (status === 'picked') return 'picked'
   return 'completed' // completed, packed, shipped
 }
@@ -108,21 +108,24 @@ const SEARCH_FIELD_OPTIONS = [
   { id: 'agent', labelKey: 'orders:search_fields.agent' },
 ]
 
-/** Eski bookmark / cache B#S qoldirishi mumkin; API va bulk yuklash B#W bilan ishlashi kerak */
+/** Eski bookmark: B#S / B#W / ready_for_picking → imported */
 function normalizeOrderListStatusParam(s: string | undefined): string | undefined {
   if (s == null || s === '') return undefined
-  return s
+  const parts = s
     .split(',')
-    .map((p) => (p.trim() === 'B#S' ? 'B#W' : p.trim()))
+    .map((p) => {
+      const t = p.trim()
+      if (t === 'B#S' || t === 'B#W' || t === 'ready_for_picking') return 'imported'
+      return t
+    })
     .filter(Boolean)
-    .join(',')
+  return [...new Set(parts)].join(',')
 }
 
 const GROUP_TO_STATUS: Record<string, string | undefined> = {
-  xom: 'imported,B#W', // Yangi: Smartupdan kelgan, admin yig'uvchiga yubormagan
-  // Default "yangi": imported + B#W — faqat B#W so‘raganda bazada imported qolganlar ko‘rinmasdi
-  yangi: 'imported,B#W',
-  yigishda: 'allocated,ready_for_picking,picking', // Yig'uvchi yig'ishda / controllerga yubormagan
+  xom: 'imported',
+  yangi: 'imported',
+  yigishda: 'allocated,picking', // Yig'uvchi yig'ishda / controllerga yubormagan
   tekshiruvda: 'picked', // Controllerga yuborilgan, controller yakunlamagan
   yakunlangan: 'completed,packed,shipped,cancelled', // Yakunlangan, jo'natilgan yoki bekor
   all: undefined,
@@ -189,12 +192,8 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   )
 
   const onlyNotSentToPicking =
-    !isMainOrdersSimple &&
-    mode === 'default' &&
-    !orderSource &&
-    (group === 'yangi' || group === 'xom') &&
-    (statusParam === 'B#W' || statusParam === 'imported,B#W')
-  const SENT_TO_PICKING_STATUSES = new Set(['allocated', 'ready_for_picking', 'picking'])
+    !isMainOrdersSimple && mode === 'default' && !orderSource && (group === 'yangi' || group === 'xom')
+  const SENT_TO_PICKING_STATUSES = new Set(['allocated', 'picking'])
   const { has, isWarehouseAdmin } = useAuth()
   const canSync = has('orders:write')
   const canSend = has('orders:write')
@@ -272,7 +271,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const ordersLoadAbortRef = useRef<AbortController | null>(null)
   const ordersLoadGenRef = useRef(0)
 
-  const ELIGIBLE_PICKING_STATUSES = new Set(['imported', 'B#W', 'ready_for_picking', 'allocated'])
+  const ELIGIBLE_PICKING_STATUSES = new Set(['imported', 'allocated'])
   const canBeSentToPicking = (order: OrderListItem) =>
     canSend && ELIGIBLE_PICKING_STATUSES.has(order.status)
   const eligibleItems = useMemo(
@@ -328,7 +327,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         !orderSource &&
         mode === 'default' &&
         (group === 'yangi' || group === 'xom') &&
-        (statusParam === 'B#W' || statusParam === 'imported,B#W')
+        statusParam === 'imported'
 
       if (loadAllBS) {
         const allItems: OrderListItem[] = []
@@ -853,7 +852,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       if (mode !== 'statuses' && !defaultWithStatusTab) return ''
       if (order.is_incomplete) return 'bg-red-50 dark:bg-red-950/30'
       const status = order.status
-      if (status === 'allocated' || status === 'ready_for_picking' || status === 'picking')
+      if (status === 'allocated' || status === 'picking')
         return 'bg-blue-50 dark:bg-blue-950/30'
       if (status === 'picked') return 'bg-amber-50 dark:bg-amber-950/30'
       if (status === 'completed' || status === 'packed' || status === 'shipped')
@@ -961,7 +960,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
           return (
             <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
               <span className="inline-flex flex-wrap items-center gap-1.5">
-                {t(`orders:status.${order.status === 'B#W' ? 'b#w' : order.status}`, order.status)}
+                {t(`orders:status.${order.status}`, order.status)}
                 {order.has_so && (
                   <span className="rounded bg-slate-200 px-1.5 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-600 dark:text-slate-200">
                     {t('orders:so_order_badge', 'SO buyurtma')}
@@ -1446,7 +1445,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                   !orderSource &&
                   mode === 'default' &&
                   (group === 'yangi' || group === 'xom') &&
-                  (statusParam === 'B#W' || statusParam === 'imported,B#W')
+                  statusParam === 'imported'
                 if (isAllBSLoaded) {
                   return (
                     <span className="text-sm text-slate-600 dark:text-slate-400">

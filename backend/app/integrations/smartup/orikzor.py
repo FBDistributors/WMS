@@ -455,7 +455,7 @@ def _parse_movement_response(
             "external_id": external_key,
             "deal_id": movement_id,
             "order_no": movement_number,
-            "status": "B#W",
+            "status": "imported",
             "filial_id": filial,
             "filial_code": filial,
             "lines": lines,

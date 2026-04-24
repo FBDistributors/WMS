@@ -11,6 +11,8 @@ export type PickList = {
   completed_at?: string | null
   /** Backend document status string (for labels). */
   document_status: string
+  /** Buyurtma WMS bosqichi (buyurtma bo'lsa); badge va oqim yorlig'i uchun. */
+  order_wms_status?: string | null
   status: PickListStatus
   total_lines: number
   picked_lines: number
@@ -44,6 +46,7 @@ type BackendPickingListItem = {
   order_number?: string | null
   delivery_number?: string | null
   status: string
+  order_wms_status?: string | null
   lines_total: number
   lines_done: number
   completed_at?: string | null
@@ -93,6 +96,18 @@ function mapStatus(status: string): PickListStatus {
   return STATUS_MAP[status] ?? 'UNKNOWN'
 }
 
+/** Jadval badge rangi: buyurtma WMS (Jarayon oqimi). */
+function mapWmsStatusToPickListBadge(wms: string | null | undefined): PickListStatus | null {
+  if (wms == null || String(wms).trim() === '') return null
+  const k = String(wms).toLowerCase()
+  if (k === 'imported') return 'NEW'
+  if (k === 'allocated' || k === 'picking') return 'IN_PROGRESS'
+  if (k === 'picked') return 'REVIEW'
+  if (k === 'completed' || k === 'packed' || k === 'shipped') return 'DONE'
+  if (k === 'cancelled' || k === 'cancelling_in_progress') return 'ERROR'
+  return 'UNKNOWN'
+}
+
 function mapLineStatus(line: BackendDocumentLine): PickLineStatus {
   if (line.qty_picked >= line.qty_required) return 'DONE'
   if (line.qty_picked > 0) return 'IN_PROGRESS'
@@ -116,13 +131,15 @@ function mapPickingLineToPickerViewModel(line: BackendDocumentLine): PickLine {
 
 function mapList(item: BackendPickingListItem): PickList {
   const raw = item.status
+  const wmsBadge = mapWmsStatusToPickListBadge(item.order_wms_status)
   return {
     id: item.id,
     document_no: item.reference_number,
     order_number: item.order_number ?? undefined,
     delivery_number: item.delivery_number?.trim() || undefined,
     document_status: raw,
-    status: mapStatus(raw),
+    order_wms_status: item.order_wms_status ?? undefined,
+    status: wmsBadge ?? mapStatus(raw),
     total_lines: item.lines_total,
     picked_lines: item.lines_done,
     completed_at: item.completed_at ?? undefined,

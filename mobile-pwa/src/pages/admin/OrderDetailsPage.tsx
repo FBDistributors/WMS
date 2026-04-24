@@ -49,7 +49,7 @@ export function OrderDetailsPage() {
   ] as const
 
   const backendToSimple = (status: string): string => {
-    if (['imported', 'B#W', 'allocated', 'ready_for_picking', 'picking'].includes(status)) return 'picking'
+    if (['imported', 'allocated', 'picking'].includes(status)) return 'picking'
     if (status === 'picked') return 'picked'
     return 'completed'
   }

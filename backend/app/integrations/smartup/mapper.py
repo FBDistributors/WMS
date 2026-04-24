@@ -5,6 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
 
+from app.constants.order_wms_status import normalize_order_wms_status_for_storage
 from app.integrations.smartup.schemas import SmartupOrder
 
 
@@ -54,6 +55,7 @@ def map_order_to_wms_order(order: SmartupOrder) -> OrderPayload:
         )
         for line in order.lines
     ]
+    wms_status = normalize_order_wms_status_for_storage(order.status)
     return OrderPayload(
         source="smartup",
         source_external_id=external_id,
@@ -64,7 +66,7 @@ def map_order_to_wms_order(order: SmartupOrder) -> OrderPayload:
         agent_id=order.agent_id,
         agent_name=order.agent_name,
         total_amount=order.total_amount,
-        status=(order.status or "B#W").strip() or "B#W",
+        status=wms_status,
         lines=lines,
         from_warehouse_code=getattr(order, "from_warehouse_code", None) or None,
         to_warehouse_code=getattr(order, "to_warehouse_code", None) or None,

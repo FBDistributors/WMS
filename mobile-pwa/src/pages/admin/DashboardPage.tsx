@@ -12,9 +12,9 @@ import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { getOrdersByStatus, getPickingStaffStats, type PickingStaffStatsRow } from '../../services/dashboardApi'
 
 // Yangi = Smartupdan kelgan, admin yig'uvchiga yubormagan
-const STATUS_XOM = ['imported', 'B#W']
+const STATUS_XOM = ['imported']
 // Yig'ishda = admin yuborgan, yig'uvchi yig'ib controllerga yubormagan (allocated → picking)
-const STATUS_YIGISHDA = ['allocated', 'ready_for_picking', 'picking']
+const STATUS_YIGISHDA = ['allocated', 'picking']
 // Tekshiruvda = yig'uvchi controllerga yuborgan, controller yakunlamagan
 const STATUS_TEKSHIRUVDA = ['picked']
 // Yakunlangan = controller tekshirib yakunlagan (completed) yoki packed/shipped

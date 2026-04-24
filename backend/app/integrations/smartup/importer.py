@@ -7,6 +7,7 @@ from typing import Dict, Iterable, List, Tuple
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
+from app.constants.order_wms_status import normalize_order_wms_status_for_storage
 from app.integrations.smartup.mapper import OrderLinePayload, _resolve_external_id, map_order_to_wms_order
 from app.integrations.smartup.schemas import SmartupOrder
 from app.models.order import Order, OrderLine, OrderWmsState
@@ -73,11 +74,9 @@ def _process_one_order(
         .one_or_none()
     )
     payload = map_order_to_wms_order(order)
-    # Smartup status bo'sh bo'lsa mapper B#W qo'yadi; "imported" ga yozish yangi buyurtmalarni
-    # GET /orders?status=B#W (default "yangi" navbat) dan yashirardi.
     raw_status = (order.status or "").strip()
     if raw_status:
-        payload.status = raw_status
+        payload.status = normalize_order_wms_status_for_storage(raw_status)
     if override and not (payload.filial_id or "").strip():
         payload.filial_id = override
     if override and external_id != payload.source_external_id:
@@ -103,7 +102,7 @@ def _process_one_order(
             if getattr(payload, "delivery_date", None) is not None:
                 existing.delivery_date = payload.delivery_date
             if existing.wms_state:
-                existing.wms_state.status = payload.status
+                existing.wms_state.status = normalize_order_wms_status_for_storage(payload.status)
             if payload.lines:
                 _upsert_lines(existing, payload.lines)
             if do_commit:
@@ -124,7 +123,7 @@ def _process_one_order(
             movement_note=getattr(payload, "movement_note", None),
             delivery_date=getattr(payload, "delivery_date", None),
         )
-        record.wms_state = OrderWmsState(status=payload.status)
+        record.wms_state = OrderWmsState(status=normalize_order_wms_status_for_storage(payload.status))
         record.lines = [
             OrderLine(
                 sku=line.sku,
@@ -157,7 +156,7 @@ def _process_one_order(
         return 0, 0, 1
 
 
-STALE_ORDER_STATUSES = ("imported", "B#W")
+STALE_ORDER_STATUSES = ("imported",)
 
 
 def delete_stale_orders(
@@ -165,7 +164,7 @@ def delete_stale_orders(
     orders_from_smartup: List[SmartupOrder],
 ) -> int:
     """
-    7 kunlik modified_on javobida kelmagan va hali workflow da bo'lmagan (imported/B#W) buyurtmalarni o'chiradi.
+    7 kunlik modified_on javobida kelmagan va hali workflow da bo'lmagan (imported) buyurtmalarni o'chiradi.
     Picking, allocated, picked, completed va boshqa statusdagilar o'chirilmaydi.
     """
     external_ids_to_keep = {_resolve_external_id(o) for o in orders_from_smartup}
@@ -185,7 +184,7 @@ def delete_stale_orders(
         return 0
     deleted = db.query(Order).filter(Order.id.in_(ids_to_delete)).delete(synchronize_session=False)
     db.commit()
-    logger.info("delete_stale_orders: %d ta eski buyurtma o'chirildi (faqat imported/B#W)", deleted)
+    logger.info("delete_stale_orders: %d ta eski buyurtma o'chirildi (faqat imported)", deleted)
     return deleted
 
 

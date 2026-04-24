@@ -165,7 +165,7 @@ def _enrich_movements_chunk_with_wms(db: Session, chunk: list[Any]) -> list[Any]
 
 
 def _movement_is_wms_new(wms_order_status: Any) -> bool:
-    """Yig'ishga yuborilmagan: WMS yozuvi yo'q yoki imported / B#W."""
+    """Yig'ishga yuborilmagan: WMS yozuvi yo'q yoki imported (legacy B#W migratsiyadan keyin ham imported)."""
     if wms_order_status is None:
         return True
     s = str(wms_order_status).strip()
@@ -216,11 +216,11 @@ async def list_movements(
     refresh: bool = Query(False, description="Cache ni bypass qilish, SmartUP dan qayta yuklash"),
     smartup_status: str = Query(
         "W",
-        description="Smartup harakat statusi: W (default), all yoki * (hammasi), yoki vergul bilan: N,W,B#W",
+        description="Smartup harakat statusi: W (default), all yoki * (hammasi), yoki vergul bilan: N,W",
     ),
     wms_status: str | None = Query(
         None,
-        description="WMS status filter: new (SmartUp W + WMS imported/B#W/yozuvsiz), picking, ...",
+        description="WMS status filter: new (SmartUp W + WMS imported/yozuvsiz), picking, ...",
     ),
     db: Session = Depends(get_db),
     _user=Depends(require_permission("orders:read")),
