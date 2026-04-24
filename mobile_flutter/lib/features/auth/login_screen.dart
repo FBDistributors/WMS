@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/app_state/app_locale.dart';
 import '../../core/app_state/locale_controller.dart';
 import '../../core/config/brand.dart';
+import '../../core/network/app_dio.dart';
 import '../../core/app_state/prefs_keys.dart';
 import '../../core/storage/shared_preferences_provider.dart';
 import '../../l10n/string_lookup.dart';
@@ -26,6 +27,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final TextEditingController _user = TextEditingController();
   final TextEditingController _pass = TextEditingController();
   bool _showPassword = false;
+  bool _submitting = false;
   @override
   void initState() {
     super.initState();
@@ -67,8 +69,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       );
       return;
     }
-    final bool ok =
-        await ref.read(authControllerProvider.notifier).login(u, p);
+    setState(() => _submitting = true);
+    final bool ok = await ref.read(authControllerProvider.notifier).login(u, p);
     if (!mounted) {
       return;
     }
@@ -78,6 +80,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         return;
       }
       context.goNamed('pickerHome');
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
       return;
     }
     final Object? err = ref.read(authControllerProvider).error;
@@ -85,15 +90,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       return;
     }
     if (err != null) {
+      final String raw = err.toString();
+      final String msg = raw.contains(unauthorizedMessage)
+          ? StringLookup.t(loc, 'loginError')
+          : raw;
       showAppSnackBar(
         context,
-        SnackBar(content: Text(err.toString())),
+        SnackBar(content: Text(msg)),
       );
     } else {
       showAppSnackBar(
         context,
         SnackBar(content: Text(StringLookup.t(loc, 'loginError'))),
       );
+    }
+    if (mounted) {
+      setState(() => _submitting = false);
     }
   }
 
@@ -105,27 +117,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final bool isDark = theme.brightness == Brightness.dark;
 
     return auth.when(
-      loading: () => Scaffold(
-        backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF5F5F5),
-        appBar: AppBar(
-          automaticallyImplyLeading: false,
-          elevation: 0,
-          backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF5F5F5),
-          systemOverlayStyle: _loginStatusBarStyle(isDark),
-          actions: _languageMenuActions(loc, isDark),
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              const CircularProgressIndicator(),
-              const SizedBox(height: 12),
-              Text(StringLookup.t(loc, 'loading')),
-            ],
-          ),
-        ),
-      ),
-      error: (_, __) => _form(context, loc, isDark, false),
+      loading: () => _form(context, loc, isDark),
+      error: (_, __) => _form(context, loc, isDark),
       data: (AuthSession s) {
         if (s.isAuthenticated) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -134,13 +127,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             }
           });
         }
-        return _form(context, loc, isDark, false);
+        return _form(context, loc, isDark);
       },
     );
   }
 
-  Widget _form(BuildContext context, AppLocale loc, bool isDark, bool _) {
-    final bool busy = ref.watch(authControllerProvider).isLoading;
+  Widget _form(BuildContext context, AppLocale loc, bool isDark) {
+    final bool busy = _submitting;
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF5F5F5),
       appBar: AppBar(
