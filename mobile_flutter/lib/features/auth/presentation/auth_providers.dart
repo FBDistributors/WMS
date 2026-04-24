@@ -27,6 +27,10 @@ class AuthSession {
 }
 
 class AuthController extends AsyncNotifier<AuthSession> {
+  String? _lastLoginError;
+
+  String? get lastLoginError => _lastLoginError;
+
   @override
   Future<AuthSession> build() async {
     final AuthTokenStorage storage = ref.read(authTokenStorageProvider);
@@ -48,7 +52,8 @@ class AuthController extends AsyncNotifier<AuthSession> {
   }
 
   Future<bool> login(String username, String password) async {
-    final AsyncValue<AuthSession> next = await AsyncValue.guard(() async {
+    _lastLoginError = null;
+    try {
       await ref.read(authRepositoryProvider).login(
             username: username,
             password: password,
@@ -58,13 +63,14 @@ class AuthController extends AsyncNotifier<AuthSession> {
           ? ProfileType.controller
           : ProfileType.picker;
       await ref.read(profileTypeProvider.notifier).setProfileType(pt);
-      return AuthSession.authenticated(me);
-    });
-    state = next;
-    return next.maybeWhen(
-      data: (AuthSession s) => s.isAuthenticated,
-      orElse: () => false,
-    );
+      state = AsyncData<AuthSession>(AuthSession.authenticated(me));
+      return true;
+    } on Exception catch (e) {
+      _lastLoginError = e.toString();
+      // App bootstrap'da global error ekranga tushib ketmasligi uchun state ni unauth holatda saqlaymiz.
+      state = const AsyncData<AuthSession>(AuthSession.unauthenticated());
+      return false;
+    }
   }
 
   Future<void> logout() async {

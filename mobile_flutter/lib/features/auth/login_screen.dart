@@ -85,12 +85,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
       return;
     }
-    final Object? err = ref.read(authControllerProvider).error;
+    final String? err = ref.read(authControllerProvider.notifier).lastLoginError;
     if (!mounted) {
       return;
     }
     if (err != null) {
-      final String raw = err.toString();
+      final String raw = err;
       final String msg = raw.contains(unauthorizedMessage)
           ? StringLookup.t(loc, 'loginError')
           : raw;
