@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from typing import Dict, Iterable, List, Tuple
 
 from sqlalchemy.exc import IntegrityError
@@ -27,6 +28,7 @@ WORKFLOW_LOCKED_STATUSES = frozenset(
         "cancelled",
     }
 )
+FINAL_FROZEN_STATUSES = frozenset({"completed", "packed", "shipped"})
 
 
 def _enrich_order_line_names_from_products(db: Session, lines: List[OrderLinePayload]) -> None:
@@ -98,6 +100,23 @@ def _process_one_order(
     try:
         _enrich_order_line_names_from_products(db, payload.lines)
         if existing:
+            current_status = normalize_order_wms_status_for_storage(
+                existing.wms_state.status if existing.wms_state else None
+            )
+            if (
+                current_status in FINAL_FROZEN_STATUSES
+                and _order_lines_fingerprint_from_order(existing)
+                == _order_lines_fingerprint_from_payload(payload.lines)
+            ):
+                skipped_by_reason["completed_match_skipped"] = (
+                    skipped_by_reason.get("completed_match_skipped", 0) + 1
+                )
+                logger.info(
+                    "import_orders: skip matched reimport for finalized order %s (status=%s)",
+                    external_id,
+                    current_status,
+                )
+                return 0, 0, 1
             existing.source = source
             existing.order_number = payload.order_number
             existing.filial_id = payload.filial_id
@@ -116,7 +135,6 @@ def _process_one_order(
                 existing.delivery_date = payload.delivery_date
             if existing.wms_state:
                 incoming_status = normalize_order_wms_status_for_storage(payload.status)
-                current_status = normalize_order_wms_status_for_storage(existing.wms_state.status)
                 if current_status in WORKFLOW_LOCKED_STATUSES:
                     logger.info(
                         "import_orders: preserve wms status for %s (current=%s, incoming=%s)",
@@ -236,6 +254,7 @@ def import_orders(
         "validation_error": 0,
         "duplicate_conflict": 0,
         "exception": 0,
+        "completed_match_skipped": 0,
     }
     override = (filial_id_override or "").strip() or None
     orders_list = list(orders)
@@ -317,6 +336,61 @@ def _payload_key(payload_line: OrderLinePayload) -> Tuple[str, str, str, str]:
         (payload_line.barcode or "").strip(),
         (payload_line.name or "").strip(),
         (payload_line.uom or "").strip(),
+    )
+
+
+def _normalize_decimalish(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        raw = value.strip().replace(" ", "").replace(",", ".")
+        if not raw:
+            return ""
+        try:
+            return format(Decimal(raw).normalize(), "f")
+        except InvalidOperation:
+            return raw
+    if isinstance(value, (int, float, Decimal)):
+        return format(Decimal(str(value)).normalize(), "f")
+    return str(value).strip()
+
+
+def _line_price_token(raw_json: dict | None) -> str:
+    if not isinstance(raw_json, dict):
+        return ""
+    for key in ("price", "sale_price", "unit_price", "item_price"):
+        if key in raw_json:
+            return _normalize_decimalish(raw_json.get(key))
+    return ""
+
+
+def _order_lines_fingerprint_from_order(order: Order) -> List[Tuple[str, str, str, str, str, str]]:
+    return sorted(
+        (
+            (line.sku or "").strip(),
+            (line.barcode or "").strip(),
+            (line.name or "").strip(),
+            _normalize_decimalish(line.qty),
+            (line.uom or "").strip(),
+            _line_price_token(line.raw_json),
+        )
+        for line in order.lines
+    )
+
+
+def _order_lines_fingerprint_from_payload(
+    payload_lines: List[OrderLinePayload],
+) -> List[Tuple[str, str, str, str, str, str]]:
+    return sorted(
+        (
+            (line.sku or "").strip(),
+            (line.barcode or "").strip(),
+            (line.name or "").strip(),
+            _normalize_decimalish(line.qty),
+            (line.uom or "").strip(),
+            _line_price_token(line.raw_json),
+        )
+        for line in payload_lines
     )
 
 

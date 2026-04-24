@@ -1026,15 +1026,26 @@ async def sync_orders_from_smartup(
             if filtered_out:
                 logger.info("sync-smartup: skipped non-B#W items=%s", filtered_out)
             items_to_import = items_b_w
-            created, updated, skipped, import_errors, _ = import_orders(
+            created, updated, skipped, import_errors, skipped_by_reason = import_orders(
                 db, items_to_import, order_source=payload.order_source, filial_id_override=filial_override
             )
             delete_stale_orders(db, list(items_to_import))
             skipped += filtered_out
+            completed_match_skipped = int(skipped_by_reason.get("completed_match_skipped", 0))
             detail = import_errors[0].reason if import_errors else None
+            if not detail and completed_match_skipped > 0:
+                detail = (
+                    f"Skipped {completed_match_skipped} finalized orders: "
+                    "incoming payload fully matched existing completed/packed/shipped lines."
+                )
             errors_count = len(import_errors) if import_errors else None
             return SmartupSyncResponse(
-                created=created, updated=updated, skipped=skipped, detail=detail, errors_count=errors_count
+                created=created,
+                updated=updated,
+                skipped=skipped,
+                detail=detail,
+                errors_count=errors_count,
+                debug={"skipped_by_reason": skipped_by_reason},
             )
         except RuntimeError as exc:
             msg = str(exc)
