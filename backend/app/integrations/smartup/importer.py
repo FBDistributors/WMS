@@ -15,6 +15,19 @@ from app.models.product import Product as ProductModel
 
 logger = logging.getLogger(__name__)
 
+WORKFLOW_LOCKED_STATUSES = frozenset(
+    {
+        "allocated",
+        "picking",
+        "picked",
+        "completed",
+        "packed",
+        "shipped",
+        "cancelling_in_progress",
+        "cancelled",
+    }
+)
+
 
 def _enrich_order_line_names_from_products(db: Session, lines: List[OrderLinePayload]) -> None:
     """Order line nomi bo'sh yoki faqat SKU bo'lsa, products jadvalidan SKU bo'yicha to'liq nomni olib to'ldiradi."""
@@ -102,7 +115,21 @@ def _process_one_order(
             if getattr(payload, "delivery_date", None) is not None:
                 existing.delivery_date = payload.delivery_date
             if existing.wms_state:
-                existing.wms_state.status = normalize_order_wms_status_for_storage(payload.status)
+                incoming_status = normalize_order_wms_status_for_storage(payload.status)
+                current_status = normalize_order_wms_status_for_storage(existing.wms_state.status)
+                if current_status in WORKFLOW_LOCKED_STATUSES:
+                    logger.info(
+                        "import_orders: preserve wms status for %s (current=%s, incoming=%s)",
+                        external_id,
+                        current_status,
+                        incoming_status,
+                    )
+                else:
+                    existing.wms_state.status = incoming_status
+            else:
+                existing.wms_state = OrderWmsState(
+                    status=normalize_order_wms_status_for_storage(payload.status)
+                )
             if payload.lines:
                 _upsert_lines(existing, payload.lines)
             if do_commit:
