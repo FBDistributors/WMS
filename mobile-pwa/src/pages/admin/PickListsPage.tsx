@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { FileText, RefreshCw, XCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -12,6 +12,8 @@ import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { listPickLists, cancelPickList, type PickList, type PickListStatus } from '../../services/pickingApi'
 import { useAuth } from '../../rbac/AuthProvider'
+
+const PAGE_SIZE = 200
 
 function statusBadgeClass(status: PickListStatus): string {
   switch (status) {
@@ -46,36 +48,65 @@ export function PickListsPage() {
   const archive = pathname.endsWith('/picking/archive')
   const { has } = useAuth()
 
+  const processScope = archive ? ('archived' as const) : ('active' as const)
+
   const [items, setItems] = useState<PickList[]>([])
+  const [hasMore, setHasMore] = useState(false)
   const [query, setQuery] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
+
+  /** Keyingi sahifa uchun offset (yuklangan qatorlar soni) */
+  const nextOffsetRef = useRef(0)
 
   const canCancel = has('documents:edit_status')
 
-  const load = useCallback(async (background = false) => {
-    if (!background) {
-      setIsLoading(true)
-      setError(null)
-    } else {
-      setIsRefreshing(true)
-    }
-    try {
-      const data = await listPickLists(100, 0)
-      setItems(data)
-    } catch {
-      if (!background) setError(t('picking:load_error'))
-    } finally {
-      if (!background) setIsLoading(false)
-      else setIsRefreshing(false)
-    }
-  }, [t])
+  const load = useCallback(
+    async (opts: { background?: boolean; append?: boolean } = {}) => {
+      const { background = false, append = false } = opts
+      if (!background && !append) {
+        setIsLoading(true)
+        setError(null)
+      } else if (background && !append) {
+        setIsRefreshing(true)
+      } else if (append) {
+        setLoadingMore(true)
+      }
+      try {
+        const offset = append ? nextOffsetRef.current : 0
+        const data = await listPickLists(PAGE_SIZE, offset, { processScope })
+        if (append) {
+          setItems((prev) => [...prev, ...data])
+          nextOffsetRef.current += data.length
+        } else {
+          setItems(data)
+          nextOffsetRef.current = data.length
+        }
+        setHasMore(data.length === PAGE_SIZE)
+      } catch {
+        if (!append) {
+          if (!background) setError(t('picking:load_error'))
+        }
+      } finally {
+        if (!background && !append) {
+          setIsLoading(false)
+        } else if (background && !append) {
+          setIsRefreshing(false)
+        } else if (append) {
+          setLoadingMore(false)
+        }
+      }
+    },
+    [processScope, t]
+  )
 
   useEffect(() => {
+    nextOffsetRef.current = 0
     void load()
-  }, [load])
+  }, [load, archive])
 
   const filtered = useMemo(() => {
     if (!query.trim()) return items
@@ -115,7 +146,8 @@ export function PickListsPage() {
       setCancellingId(item.id)
       try {
         await cancelPickList(item.id)
-        void load(true)
+        nextOffsetRef.current = 0
+        void load({ background: true })
       } catch {
         setError(t('picking:cancel_error'))
       } finally {
@@ -138,7 +170,10 @@ export function PickListsPage() {
         <EmptyState
           title={error}
           actionLabel={t('common:buttons.retry')}
-          onAction={() => load()}
+          onAction={() => {
+            nextOffsetRef.current = 0
+            void load()
+          }}
         />
       )
     }
@@ -148,7 +183,10 @@ export function PickListsPage() {
           title={t('picking:empty_title')}
           description={t('picking:empty_desc')}
           actionLabel={t('common:buttons.refresh')}
-          onAction={load}
+          onAction={() => {
+            nextOffsetRef.current = 0
+            void load()
+          }}
         />
       )
     }
@@ -158,7 +196,10 @@ export function PickListsPage() {
           title={t('picking:search_empty_title')}
           description={t('picking:search_empty_desc')}
           actionLabel={t('common:buttons.refresh')}
-          onAction={load}
+          onAction={() => {
+            nextOffsetRef.current = 0
+            void load()
+          }}
         />
       )
     }
@@ -168,7 +209,10 @@ export function PickListsPage() {
           title={archive ? t('picking:empty_archive_title') : t('picking:empty_jarayon_title')}
           description={archive ? t('picking:empty_archive_desc') : t('picking:empty_jarayon_desc')}
           actionLabel={t('common:buttons.refresh')}
-          onAction={load}
+          onAction={() => {
+            nextOffsetRef.current = 0
+            void load()
+          }}
         />
       )
     }
@@ -289,7 +333,14 @@ export function PickListsPage() {
               )}
             </div>
           </div>
-          <Button variant="secondary" onClick={() => load(true)} disabled={isRefreshing}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              nextOffsetRef.current = 0
+              void load({ background: true })
+            }}
+            disabled={isRefreshing}
+          >
             <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
             {t('common:buttons.refresh')}
           </Button>
@@ -306,6 +357,14 @@ export function PickListsPage() {
         </label>
 
         <div className="max-h-[calc(100vh-320px)] min-h-0 overflow-auto">{content}</div>
+
+        {hasMore && !isLoading && items.length > 0 && (
+          <div className="flex justify-center pb-2">
+            <Button variant="secondary" onClick={() => void load({ append: true })} disabled={loadingMore}>
+              {loadingMore ? t('common:messages.loading') : t('picking:load_more')}
+            </Button>
+          </div>
+        )}
       </Card>
     </AdminLayout>
   )

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, RefreshCcw, ShieldAlert } from 'lucide-react'
+import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, RefreshCcw, ShieldAlert } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
@@ -21,7 +21,127 @@ import {
 
 type SegmentMode = 'reserved' | 'negative'
 
+type SortDir = 'asc' | 'desc'
+
+type ReservedSortKey =
+  | 'code'
+  | 'product'
+  | 'order'
+  | 'reserved_qty'
+  | 'created_by'
+  | 'last_movement_at'
+  | 'available_total'
+
+type NegativeSortKey = 'code' | 'location' | 'lot' | 'batch' | 'on_hand' | 'reserved' | 'available'
+
+type SortState<K extends string> = { key: K; dir: SortDir } | null
+
 const NEGATIVE_LIMIT = 500
+
+function compareReservedRows(
+  a: ReserveByOrderRow,
+  b: ReserveByOrderRow,
+  key: ReservedSortKey,
+  availableByProductId: Map<string, number>,
+): number {
+  switch (key) {
+    case 'code':
+      return a.product_code.localeCompare(b.product_code, undefined, { sensitivity: 'base' })
+    case 'product':
+      return a.product_name.localeCompare(b.product_name, undefined, { sensitivity: 'base' })
+    case 'order':
+      return (a.order_number ?? '').localeCompare(b.order_number ?? '', undefined, {
+        sensitivity: 'base',
+        numeric: true,
+      })
+    case 'reserved_qty':
+      return Number(a.reserved_qty) - Number(b.reserved_qty)
+    case 'created_by':
+      return (a.last_movement_by_username ?? '').localeCompare(b.last_movement_by_username ?? '', undefined, {
+        sensitivity: 'base',
+      })
+    case 'last_movement_at':
+      return new Date(a.last_movement_at).getTime() - new Date(b.last_movement_at).getTime()
+    case 'available_total': {
+      const hasA = availableByProductId.has(a.product_id)
+      const hasB = availableByProductId.has(b.product_id)
+      if (!hasA && !hasB) return 0
+      if (!hasA) return 1
+      if (!hasB) return -1
+      return (availableByProductId.get(a.product_id) ?? 0) - (availableByProductId.get(b.product_id) ?? 0)
+    }
+    default:
+      return 0
+  }
+}
+
+function compareNegativeRows(a: NegativeBalanceRow, b: NegativeBalanceRow, key: NegativeSortKey): number {
+  switch (key) {
+    case 'code':
+      return (a.sku ?? '').localeCompare(b.sku ?? '', undefined, { sensitivity: 'base' })
+    case 'location':
+      return a.location_code.localeCompare(b.location_code, undefined, { sensitivity: 'base' })
+    case 'lot':
+      return String(a.lot_id).localeCompare(String(b.lot_id))
+    case 'batch':
+      return a.batch.localeCompare(b.batch, undefined, { sensitivity: 'base' })
+    case 'on_hand':
+      return Number(a.on_hand) - Number(b.on_hand)
+    case 'reserved':
+      return Number(a.reserved) - Number(b.reserved)
+    case 'available':
+      return Number(a.available) - Number(b.available)
+    default:
+      return 0
+  }
+}
+
+function SortTh<K extends string>({
+  columnKey,
+  sortState,
+  onSort,
+  label,
+  ariaSortLabelAsc,
+  ariaSortLabelDesc,
+}: {
+  columnKey: K
+  sortState: SortState<K>
+  onSort: (key: K) => void
+  label: string
+  ariaSortLabelAsc: string
+  ariaSortLabelDesc: string
+}) {
+  const active = sortState?.key === columnKey
+  const dir = sortState?.dir
+  const ariaSort = active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'
+  const ariaLabel = active
+    ? dir === 'asc'
+      ? `${label}. ${ariaSortLabelDesc}`
+      : `${label}. ${ariaSortLabelAsc}`
+    : `${label}. ${ariaSortLabelAsc}`
+
+  return (
+    <th className="px-3 py-2" aria-sort={ariaSort}>
+      <button
+        type="button"
+        onClick={() => onSort(columnKey)}
+        className="inline-flex max-w-full items-center gap-1 rounded-md text-left font-semibold uppercase tracking-wide text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+        aria-label={ariaLabel}
+      >
+        <span className="min-w-0 truncate">{label}</span>
+        {active ? (
+          dir === 'asc' ? (
+            <ArrowUp className="shrink-0 opacity-90" size={14} aria-hidden />
+          ) : (
+            <ArrowDown className="shrink-0 opacity-90" size={14} aria-hidden />
+          )
+        ) : (
+          <ArrowUpDown className="shrink-0 opacity-35" size={14} aria-hidden />
+        )}
+      </button>
+    </th>
+  )
+}
 
 export function InventoryReserveHealthPage() {
   const { t } = useTranslation(['inventory', 'common'])
@@ -34,6 +154,8 @@ export function InventoryReserveHealthPage() {
   const [negativeRows, setNegativeRows] = useState<NegativeBalanceRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [reservedSort, setReservedSort] = useState<SortState<ReservedSortKey>>(null)
+  const [negativeSort, setNegativeSort] = useState<SortState<NegativeSortKey>>(null)
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -65,6 +187,20 @@ export function InventoryReserveHealthPage() {
     void load()
   }, [load])
 
+  const toggleReservedSort = useCallback((key: ReservedSortKey) => {
+    setReservedSort((prev) => ({
+      key,
+      dir: prev?.key === key && prev.dir === 'asc' ? 'desc' : 'asc',
+    }))
+  }, [])
+
+  const toggleNegativeSort = useCallback((key: NegativeSortKey) => {
+    setNegativeSort((prev) => ({
+      key,
+      dir: prev?.key === key && prev.dir === 'asc' ? 'desc' : 'asc',
+    }))
+  }, [])
+
   const normalizedSearch = search.trim().toLowerCase()
 
   const reservedProductCount = useMemo(() => {
@@ -95,6 +231,23 @@ export function InventoryReserveHealthPage() {
     })
   }, [negativeRows, normalizedSearch])
 
+  const sortedReserved = useMemo(() => {
+    if (!reservedSort) return filteredReserved
+    const { key, dir } = reservedSort
+    const mult = dir === 'asc' ? 1 : -1
+    return [...filteredReserved].sort((a, b) => mult * compareReservedRows(a, b, key, availableByProductId))
+  }, [availableByProductId, filteredReserved, reservedSort])
+
+  const sortedNegative = useMemo(() => {
+    if (!negativeSort) return filteredNegative
+    const { key, dir } = negativeSort
+    const mult = dir === 'asc' ? 1 : -1
+    return [...filteredNegative].sort((a, b) => mult * compareNegativeRows(a, b, key))
+  }, [filteredNegative, negativeSort])
+
+  const ariaAsc = t('inventory:reserve_health.sort_aria_asc')
+  const ariaDesc = t('inventory:reserve_health.sort_aria_desc')
+
   const content = useMemo(() => {
     if (isLoading) {
       return (
@@ -110,7 +263,7 @@ export function InventoryReserveHealthPage() {
     }
 
     if (segment === 'reserved') {
-      if (filteredReserved.length === 0) {
+      if (sortedReserved.length === 0) {
         return (
           <EmptyState
             title={t('inventory:reserve_health.reserved_empty_title')}
@@ -123,19 +276,68 @@ export function InventoryReserveHealthPage() {
       return (
         <div className="overflow-auto">
           <table className="min-w-[1100px] w-full text-sm">
-            <thead className="text-left text-xs uppercase text-slate-500">
+            <thead className="text-left text-xs text-slate-500">
               <tr className="border-b border-slate-200 dark:border-slate-800">
-                <th className="px-3 py-2">{t('inventory:columns.code')}</th>
-                <th className="px-3 py-2">{t('inventory:columns.product')}</th>
-                <th className="px-3 py-2">{t('inventory:columns.order')}</th>
-                <th className="px-3 py-2">{t('inventory:reserve_health.reserved_qty_order')}</th>
-                <th className="px-3 py-2">{t('inventory:columns.created_by')}</th>
-                <th className="px-3 py-2">{t('inventory:reserve_health.last_movement_at')}</th>
-                <th className="px-3 py-2">{t('inventory:columns.available_total')}</th>
+                <SortTh
+                  columnKey="code"
+                  sortState={reservedSort}
+                  onSort={toggleReservedSort}
+                  label={t('inventory:columns.code')}
+                  ariaSortLabelAsc={ariaAsc}
+                  ariaSortLabelDesc={ariaDesc}
+                />
+                <SortTh
+                  columnKey="product"
+                  sortState={reservedSort}
+                  onSort={toggleReservedSort}
+                  label={t('inventory:columns.product')}
+                  ariaSortLabelAsc={ariaAsc}
+                  ariaSortLabelDesc={ariaDesc}
+                />
+                <SortTh
+                  columnKey="order"
+                  sortState={reservedSort}
+                  onSort={toggleReservedSort}
+                  label={t('inventory:columns.order')}
+                  ariaSortLabelAsc={ariaAsc}
+                  ariaSortLabelDesc={ariaDesc}
+                />
+                <SortTh
+                  columnKey="reserved_qty"
+                  sortState={reservedSort}
+                  onSort={toggleReservedSort}
+                  label={t('inventory:reserve_health.reserved_qty_order')}
+                  ariaSortLabelAsc={ariaAsc}
+                  ariaSortLabelDesc={ariaDesc}
+                />
+                <SortTh
+                  columnKey="created_by"
+                  sortState={reservedSort}
+                  onSort={toggleReservedSort}
+                  label={t('inventory:columns.created_by')}
+                  ariaSortLabelAsc={ariaAsc}
+                  ariaSortLabelDesc={ariaDesc}
+                />
+                <SortTh
+                  columnKey="last_movement_at"
+                  sortState={reservedSort}
+                  onSort={toggleReservedSort}
+                  label={t('inventory:reserve_health.last_movement_at')}
+                  ariaSortLabelAsc={ariaAsc}
+                  ariaSortLabelDesc={ariaDesc}
+                />
+                <SortTh
+                  columnKey="available_total"
+                  sortState={reservedSort}
+                  onSort={toggleReservedSort}
+                  label={t('inventory:columns.available_total')}
+                  ariaSortLabelAsc={ariaAsc}
+                  ariaSortLabelDesc={ariaDesc}
+                />
               </tr>
             </thead>
             <tbody>
-              {filteredReserved.map((row) => {
+              {sortedReserved.map((row) => {
                 const avail = availableByProductId.get(row.product_id)
                 return (
                   <tr
@@ -162,7 +364,7 @@ export function InventoryReserveHealthPage() {
       )
     }
 
-    if (filteredNegative.length === 0) {
+    if (sortedNegative.length === 0) {
       return (
         <EmptyState
           title={t('inventory:reserve_health.negative_empty_title')}
@@ -175,19 +377,68 @@ export function InventoryReserveHealthPage() {
     return (
       <div className="overflow-auto">
         <table className="min-w-[1100px] w-full text-sm">
-          <thead className="text-left text-xs uppercase text-slate-500">
+          <thead className="text-left text-xs text-slate-500">
             <tr className="border-b border-slate-200 dark:border-slate-800">
-              <th className="px-3 py-2">{t('inventory:columns.code')}</th>
-              <th className="px-3 py-2">{t('inventory:columns.location')}</th>
-              <th className="px-3 py-2">{t('inventory:columns.lot')}</th>
-              <th className="px-3 py-2">{t('inventory:columns.batch')}</th>
-              <th className="px-3 py-2">{t('inventory:columns.on_hand')}</th>
-              <th className="px-3 py-2">{t('inventory:columns.reserved_total')}</th>
-              <th className="px-3 py-2">{t('inventory:columns.available_total')}</th>
+              <SortTh
+                columnKey="code"
+                sortState={negativeSort}
+                onSort={toggleNegativeSort}
+                label={t('inventory:columns.code')}
+                ariaSortLabelAsc={ariaAsc}
+                ariaSortLabelDesc={ariaDesc}
+              />
+              <SortTh
+                columnKey="location"
+                sortState={negativeSort}
+                onSort={toggleNegativeSort}
+                label={t('inventory:columns.location')}
+                ariaSortLabelAsc={ariaAsc}
+                ariaSortLabelDesc={ariaDesc}
+              />
+              <SortTh
+                columnKey="lot"
+                sortState={negativeSort}
+                onSort={toggleNegativeSort}
+                label={t('inventory:columns.lot')}
+                ariaSortLabelAsc={ariaAsc}
+                ariaSortLabelDesc={ariaDesc}
+              />
+              <SortTh
+                columnKey="batch"
+                sortState={negativeSort}
+                onSort={toggleNegativeSort}
+                label={t('inventory:columns.batch')}
+                ariaSortLabelAsc={ariaAsc}
+                ariaSortLabelDesc={ariaDesc}
+              />
+              <SortTh
+                columnKey="on_hand"
+                sortState={negativeSort}
+                onSort={toggleNegativeSort}
+                label={t('inventory:columns.on_hand')}
+                ariaSortLabelAsc={ariaAsc}
+                ariaSortLabelDesc={ariaDesc}
+              />
+              <SortTh
+                columnKey="reserved"
+                sortState={negativeSort}
+                onSort={toggleNegativeSort}
+                label={t('inventory:columns.reserved_total')}
+                ariaSortLabelAsc={ariaAsc}
+                ariaSortLabelDesc={ariaDesc}
+              />
+              <SortTh
+                columnKey="available"
+                sortState={negativeSort}
+                onSort={toggleNegativeSort}
+                label={t('inventory:columns.available_total')}
+                ariaSortLabelAsc={ariaAsc}
+                ariaSortLabelDesc={ariaDesc}
+              />
             </tr>
           </thead>
           <tbody>
-            {filteredNegative.map((row) => (
+            {sortedNegative.map((row) => (
               <tr key={`${row.lot_id}:${row.location_id}`} className="border-b border-slate-100 dark:border-slate-800">
                 <td className="px-3 py-2 font-mono">{row.sku || '—'}</td>
                 <td className="px-3 py-2 font-mono">{row.location_code}</td>
@@ -203,14 +454,20 @@ export function InventoryReserveHealthPage() {
       </div>
     )
   }, [
+    ariaAsc,
+    ariaDesc,
     availableByProductId,
     error,
-    filteredNegative,
-    filteredReserved,
     isLoading,
     load,
+    negativeSort,
+    reservedSort,
     segment,
+    sortedNegative,
+    sortedReserved,
     t,
+    toggleNegativeSort,
+    toggleReservedSort,
   ])
 
   return (

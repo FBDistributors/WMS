@@ -2,6 +2,7 @@
   "list_title": "Pick lists",
   "search_placeholder": "Search by document number",
   "refresh": "Refresh",
+  "load_more": "Load more",
   "load_error": "Failed to load pick lists. Please try again.",
   "empty_title": "No documents found",
   "empty_desc": "There are no pick lists yet.",

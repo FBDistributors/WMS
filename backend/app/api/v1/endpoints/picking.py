@@ -670,11 +670,25 @@ async def list_picking_documents(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     include_cancelled: bool = False,
+    process_scope: Optional[Literal["active", "archived"]] = Query(
+        default=None,
+        description=(
+            "active: admin Jarayon — buyurtma WMS allocated..picked. "
+            "archived: admin Arxiv — hujjat completed/packed/shipped. "
+            "picker/inventory_controller uchun e'tiborsiz."
+        ),
+    ),
     db: Session = Depends(get_db),
     user=Depends(require_permission("picking:read")),
 ):
     # Admin buyurtmani packed/shipped/cancelled qilsa — yig'uvchi va controller ro'yxatida ko'rinmasin
     ORDER_HIDDEN_STATUSES = ("completed", "packed", "shipped", "cancelled")
+    ACTIVE_PIPELINE_ORDER_STATUSES = ("allocated", "ready_for_picking", "picking", "picked")
+
+    effective_scope: Optional[str] = process_scope
+    if user.role in ("picker", "inventory_controller"):
+        effective_scope = None
+
     query = (
         db.query(DocumentModel)
         .options(
@@ -685,13 +699,23 @@ async def list_picking_documents(
         )
         .outerjoin(OrderModel, DocumentModel.order_id == OrderModel.id)
         .outerjoin(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
-        .filter(
+    )
+    if effective_scope == "active":
+        query = query.filter(
+            or_(
+                OrderModel.id.is_(None),
+                OrderWmsStateModel.status.in_(ACTIVE_PIPELINE_ORDER_STATUSES),
+            )
+        )
+    elif effective_scope == "archived":
+        query = query.filter(DocumentModel.status.in_(("completed", "packed", "shipped")))
+    else:
+        query = query.filter(
             or_(
                 OrderModel.id.is_(None),
                 OrderWmsStateModel.status.notin_(ORDER_HIDDEN_STATUSES),
             )
         )
-    )
     if user.role == "picker":
         query = query.filter(DocumentModel.assigned_to_user_id == user.id)
         # Controllerga yuborilgan (picked + controlled_by) yig'uvchi ro'yxatida ko'rinmasin

@@ -866,6 +866,21 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
         TextEditingController(text: presetQtyText);
     String? scannedForQty = pickerPreset;
     bool sheetBusy = false;
+    String? selectedLocationId;
+    for (final PickingAlternateLocation a in stock.alternateLocations) {
+      if (a.isPrimary) {
+        selectedLocationId = a.locationId;
+        break;
+      }
+    }
+    if (selectedLocationId == null) {
+      for (final PickingAlternateLocation a in stock.alternateLocations) {
+        if (a.locationCode.trim().toLowerCase() == stock.locationCode.trim().toLowerCase()) {
+          selectedLocationId = a.locationId;
+          break;
+        }
+      }
+    }
 
     try {
       await showModalBottomSheet<void>(
@@ -1184,14 +1199,27 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                         ...mergeAlternateLocationsForDisplay(stock.alternateLocations).map((
                           MergedAlternateLocationRow row,
                         ) {
+                          final String rowLocationId = row.representative.locationId;
+                          final bool isSelected = selectedLocationId == rowLocationId;
                           return ListTile(
                             dense: true,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            tileColor: isSelected ? Colors.green.withValues(alpha: 0.12) : null,
                             title: Text(
                               row.menuLabel,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
+                            trailing: isSelected
+                                ? const Icon(Icons.check_circle, color: Colors.green)
+                                : null,
                             onTap: () async {
+                              if (sheetBusy) {
+                                return;
+                              }
+                              setM(() => sheetBusy = true);
                               try {
                                 final PickingAlternateLocation a = row.representative;
                                 final PickLineResponse res =
@@ -1210,9 +1238,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                 await ref
                                     .read(pickTaskDetailProvider(widget.taskId).notifier)
                                     .applyPickLineResponse(widget.taskId, res);
-                                if (ctx.mounted) {
-                                  Navigator.of(ctx).pop();
-                                }
+                                setM(() => selectedLocationId = rowLocationId);
                               } on Exception catch (e) {
                                 if (mounted) {
                                   _rejectScanHaptic();
@@ -1221,6 +1247,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                     SnackBar(content: Text('$e')),
                                   );
                                 }
+                              } finally {
+                                setM(() => sheetBusy = false);
                               }
                             },
                           );

@@ -2,6 +2,7 @@
   "list_title": "Pick listlar",
   "search_placeholder": "Hujjat raqami bo‘yicha qidirish",
   "refresh": "Yangilash",
+  "load_more": "Yana yuklash",
   "load_error": "Pick list yuklanmadi. Qayta urinib ko‘ring.",
   "empty_title": "Hujjatlar topilmadi",
   "empty_desc": "Hozircha pick listlar yo‘q.",

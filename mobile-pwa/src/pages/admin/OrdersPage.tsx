@@ -150,7 +150,8 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
-  const group = searchParams.get('group') ?? (mode === 'statuses' ? 'all' : 'yangi')
+  const isMainOrdersSimple = mode === 'default' && !orderSource
+  const group = searchParams.get('group') ?? (mode === 'statuses' || isMainOrdersSimple ? 'all' : 'yangi')
   const searchQuery = searchParams.get('q') ?? ''
   const brandFilter = searchParams.get('brand_id') ?? ''
   const dateFrom = searchParams.get('date_from') ?? ''
@@ -174,9 +175,11 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     }
     return 'new'
   }, [searchParams])
-  // yangi | xom: B#W / imported+B#W + klientda yig'ishga ketganlarni yashirish; all | order-statuses all: status filtrisiz
+  // Asosiy tab (`/admin/orders`) statussiz ishlaydi; qolgan tablarda eski group->status mantiqi saqlanadi.
   const statusParam = normalizeOrderListStatusParam(
-    orderSource
+    isMainOrdersSimple
+      ? undefined
+      : orderSource
       ? (GROUP_TO_STATUS[group] ?? undefined)
       : mode === 'default' && group === 'all'
         ? undefined
@@ -186,6 +189,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   )
 
   const onlyNotSentToPicking =
+    !isMainOrdersSimple &&
     mode === 'default' &&
     !orderSource &&
     (group === 'yangi' || group === 'xom') &&
@@ -320,6 +324,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         return
       }
       const loadAllBS =
+        !isMainOrdersSimple &&
         !orderSource &&
         mode === 'default' &&
         (group === 'yangi' || group === 'xom') &&
@@ -449,7 +454,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       setFilterBrandId(brandFilter)
       setFilterDateFrom(dateFrom)
       setFilterDateTo(dateTo)
-      if (mode === 'default' && !orderSource) {
+      if (!isMainOrdersSimple && mode === 'default' && !orderSource) {
         setFilterOrderGroup(ORDER_GROUP_FILTER_VALUES.has(group) ? group : 'yangi')
       }
       if (orderSource === 'diller') {
@@ -462,6 +467,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     dateFrom,
     dateTo,
     group,
+    isMainOrdersSimple,
     mode,
     orderSource,
     movementWmsStatusQuery,
@@ -1234,23 +1240,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                         />
                       </label>
                     </div>
-                    {mode === 'default' && !orderSource ? (
-                      <label className="block text-sm text-slate-600 dark:text-slate-400">
-                        {t('orders:filters.order_status_group')}
-                        <select
-                          value={filterOrderGroup}
-                          onChange={(e) => setFilterOrderGroup(e.target.value)}
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                          aria-label={t('orders:filters.order_status_group')}
-                        >
-                          {ORDER_GROUP_FILTER_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {t(opt.labelKey)}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    ) : null}
                     {orderSource === 'diller' ? (
                       <label className="block text-sm text-slate-600 dark:text-slate-400">
                         {t('orders:filters.smartup_movement_status')}
@@ -1275,14 +1264,14 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                       variant="secondary"
                       onClick={() => {
                         if (orderSource === 'diller') setFilterWmsStatus('new')
-                        if (mode === 'default' && !orderSource) setFilterOrderGroup('yangi')
+                        if (!isMainOrdersSimple && mode === 'default' && !orderSource) setFilterOrderGroup('yangi')
                         setSearchParams((prev) => {
                           const next = new URLSearchParams(prev)
                           next.delete('brand_id')
                           next.delete('date_from')
                           next.delete('date_to')
                           next.delete('offset')
-                          if (mode === 'default' && !orderSource) {
+                          if (!isMainOrdersSimple && mode === 'default' && !orderSource) {
                             next.delete('group')
                           }
                           if (orderSource === 'diller') {
@@ -1310,7 +1299,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                           if (dt) next.set('date_to', dt)
                           else next.delete('date_to')
                           next.delete('offset')
-                          if (mode === 'default' && !orderSource) {
+                          if (!isMainOrdersSimple && mode === 'default' && !orderSource) {
                             if (filterOrderGroup === 'yangi') next.delete('group')
                             else next.set('group', filterOrderGroup)
                           }
@@ -1357,9 +1346,9 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             </Button>
           </div>
         ) : null}
-        {(group && group !== 'all') || isRefreshing || (orderSource === 'diller' && movementsData != null) || syncResult ? (
+        {((!isMainOrdersSimple && group && group !== 'all') || isRefreshing || (orderSource === 'diller' && movementsData != null) || syncResult) ? (
           <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-            {group && group !== 'all' ? (
+            {!isMainOrdersSimple && group && group !== 'all' ? (
               <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/50 dark:text-blue-200">
                 {group === 'yangi'
                   ? t('orders:tabs.yangi_bw')
@@ -1393,7 +1382,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
           </div>
         ) : null}
 
-        {mode !== 'statuses' && canSend && selectedOrderIds.size > 0 && onlyNotSentToPicking ? (
+        {mode !== 'statuses' && canSend && selectedOrderIds.size > 0 ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/50">
             <span className="text-sm text-slate-600 dark:text-slate-300">
               {t('orders:send_selected_to_picking', { count: selectedOrderIds.size })}
@@ -1453,6 +1442,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             <>
                 {(() => {
                 const isAllBSLoaded =
+                  !isMainOrdersSimple &&
                   !orderSource &&
                   mode === 'default' &&
                   (group === 'yangi' || group === 'xom') &&

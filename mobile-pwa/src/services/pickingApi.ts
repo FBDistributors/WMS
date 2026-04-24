@@ -148,9 +148,24 @@ function mapDetails(doc: BackendPickingDetails): PickListDetails {
   }
 }
 
-export async function listPickLists(limit = 50, offset = 0) {
+export type ListPickListsOptions = {
+  /** Admin Jarayon / Arxiv: backend filtrlash; mobil yig'uvchi/controller uchun yuborilmaydi. */
+  processScope?: 'active' | 'archived'
+}
+
+export async function listPickLists(
+  limit = 50,
+  offset = 0,
+  options: ListPickListsOptions = {},
+  signal?: AbortSignal
+) {
   const data = await fetchJSON<BackendPickingListItem[]>('/api/v1/picking/documents', {
-    query: { limit, offset },
+    query: {
+      limit,
+      offset,
+      ...(options.processScope ? { process_scope: options.processScope } : {}),
+    },
+    signal,
   })
   return data.map(mapList)
 }
