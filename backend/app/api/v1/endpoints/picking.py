@@ -719,6 +719,11 @@ async def list_picking_documents(
                     DocumentModel.status.in_(ACTIVE_DOCUMENT_STATUSES),
                 ),
                 DocumentModel.status.notin_(("completed", "packed", "shipped")),
+                or_(
+                    OrderModel.id.is_(None),
+                    OrderWmsStateModel.status.is_(None),
+                    OrderWmsStateModel.status.notin_(ORDER_HIDDEN_STATUSES),
+                ),
             )
         )
     elif effective_scope == "archived":
