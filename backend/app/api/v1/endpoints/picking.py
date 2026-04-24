@@ -693,6 +693,7 @@ async def list_picking_documents(
     # Admin buyurtmani packed/shipped/cancelled qilsa — yig'uvchi va controller ro'yxatida ko'rinmasin
     ORDER_HIDDEN_STATUSES = ("completed", "packed", "shipped", "cancelled")
     ACTIVE_PIPELINE_ORDER_STATUSES = ("allocated", "picking", "picked")
+    ACTIVE_DOCUMENT_STATUSES = ("draft", "confirmed", "new", "partial", "in_progress", "picked")
 
     effective_scope: Optional[str] = process_scope
     if user.role in ("picker", "inventory_controller"):
@@ -715,6 +716,7 @@ async def list_picking_documents(
                 or_(
                     OrderModel.id.is_(None),
                     OrderWmsStateModel.status.in_(ACTIVE_PIPELINE_ORDER_STATUSES),
+                    DocumentModel.status.in_(ACTIVE_DOCUMENT_STATUSES),
                 ),
                 DocumentModel.status.notin_(("completed", "packed", "shipped")),
             )

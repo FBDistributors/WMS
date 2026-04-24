@@ -148,6 +148,9 @@ export function PickListsPage() {
   /** Jarayon: ustuvor buyurtma WMS bosqichi; buyurtmasiz hujjatda hujjat holati. */
   const pipelineStatusLabel = useCallback(
     (item: PickList) => {
+      if (archive) {
+        return docStatusLabel(item.document_status)
+      }
       const wms = item.order_wms_status
       if (wms != null && String(wms).trim() !== '') {
         const k = String(wms).toLowerCase().replace(/-/g, '_')
@@ -155,7 +158,7 @@ export function PickListsPage() {
       }
       return docStatusLabel(item.document_status)
     },
-    [t, docStatusLabel]
+    [archive, t, docStatusLabel]
   )
 
   const handleCancel = useCallback(
