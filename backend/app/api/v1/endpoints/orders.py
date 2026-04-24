@@ -469,7 +469,7 @@ async def list_orders(
                 and_(
                     DocumentModel.order_id == OrderModel.id,
                     DocumentModel.doc_type == "SO",
-                    DocumentModel.status.in_(("completed", "packed", "shipped")),
+                    DocumentModel.status != "cancelled",
                 )
             )
         )
