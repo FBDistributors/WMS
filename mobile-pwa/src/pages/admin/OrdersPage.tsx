@@ -190,6 +190,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
           ? undefined
           : (GROUP_TO_STATUS[group] ?? GROUP_TO_STATUS.all)
   )
+  const mainOrdersSource = isMainOrdersSimple ? 'smartup' : orderSource
 
   const onlyNotSentToPicking =
     !isMainOrdersSimple && mode === 'default' && !orderSource && (group === 'yangi' || group === 'xom')
@@ -346,6 +347,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
               limit: BULK_PAGE_SIZE,
               offset: off,
               filial_id: 'all',
+              ...(mainOrdersSource ? { order_source: mainOrdersSource } : {}),
             },
             { signal }
           )
@@ -371,7 +373,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
           limit: PAGE_SIZE,
           offset,
           filial_id: 'all',
-          ...(orderSource ? { order_source: orderSource } : {}),
+          ...(mainOrdersSource ? { order_source: mainOrdersSource } : {}),
         }
         if (statusParam) query.status = statusParam
         const data = await getOrders(query, { signal })
@@ -407,6 +409,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     group,
     mode,
     movementPage,
+    mainOrdersSource,
     offset,
     orderSource,
     searchQuery,
