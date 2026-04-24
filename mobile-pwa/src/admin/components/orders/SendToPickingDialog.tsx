@@ -46,6 +46,13 @@ function formatApiError(err: unknown, t: (key: string) => string): string {
   return err instanceof Error ? err.message : 'Error'
 }
 
+function normalizeSendErrorMessage(msg: string, t: (key: string, options?: Record<string, unknown>) => string): string {
+  const lower = msg.toLowerCase()
+  if (lower.includes('insufficient stock')) return t('orders:send_to_picking.insufficient_stock')
+  if (lower.includes('picking task already created')) return t('orders:send_to_picking.picking_task_exists')
+  return msg
+}
+
 export type MovementPayload = {
   source: 'diller' | 'orikzor'
   movement_id: string
@@ -113,22 +120,37 @@ export function SendToPickingDialog({
     setIsSubmitting(true)
     setError(null)
     try {
+      let successCount = 0
+      const failedMessages: string[] = []
+
       if (movementPayloads?.length) {
         for (const payload of movementPayloads) {
-          await sendMovementToPicking({
-            source: payload.source,
-            movement_id: payload.movement_id,
-            movement: payload.movement,
-            assigned_to_user_id: selectedStr,
-          })
+          try {
+            await sendMovementToPicking({
+              source: payload.source,
+              movement_id: payload.movement_id,
+              movement: payload.movement,
+              assigned_to_user_id: selectedStr,
+            })
+            successCount += 1
+          } catch (err) {
+            const msg = formatApiError(err, t) || t('orders:send_to_picking.failed')
+            failedMessages.push(normalizeSendErrorMessage(msg, t))
+          }
         }
       } else if (isMovementMode && movementPayload) {
-        await sendMovementToPicking({
-          source: movementPayload.source,
-          movement_id: movementPayload.movement_id,
-          movement: movementPayload.movement,
-          assigned_to_user_id: selectedStr,
-        })
+        try {
+          await sendMovementToPicking({
+            source: movementPayload.source,
+            movement_id: movementPayload.movement_id,
+            movement: movementPayload.movement,
+            assigned_to_user_id: selectedStr,
+          })
+          successCount += 1
+        } catch (err) {
+          const msg = formatApiError(err, t) || t('orders:send_to_picking.failed')
+          failedMessages.push(normalizeSendErrorMessage(msg, t))
+        }
       } else {
         const validIds = orderIds.filter((id) => isValidUuid(id))
         if (validIds.length === 0) {
@@ -137,20 +159,21 @@ export function SendToPickingDialog({
           return
         }
         for (const orderIdStr of validIds) {
-          await sendOrderToPicking(orderIdStr, selectedStr)
+          try {
+            await sendOrderToPicking(orderIdStr, selectedStr)
+            successCount += 1
+          } catch (err) {
+            const msg = formatApiError(err, t) || t('orders:send_to_picking.failed')
+            failedMessages.push(normalizeSendErrorMessage(msg, t))
+          }
         }
       }
-      onSent()
-      onOpenChange(false)
-    } catch (err) {
-      const msg = formatApiError(err, t) || t('orders:send_to_picking.failed')
-      setError(
-        msg.toLowerCase().includes('insufficient stock')
-          ? t('orders:send_to_picking.insufficient_stock')
-          : msg.toLowerCase().includes('picking task already created')
-            ? t('orders:send_to_picking.picking_task_exists')
-            : msg
-      )
+      if (successCount > 0) {
+        onSent()
+        onOpenChange(false)
+        return
+      }
+      setError(failedMessages[0] ?? t('orders:send_to_picking.failed'))
     } finally {
       setIsSubmitting(false)
     }
