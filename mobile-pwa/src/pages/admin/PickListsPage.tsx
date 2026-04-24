@@ -125,12 +125,9 @@ export function PickListsPage() {
     })
   }, [items, query])
 
-  const viewItems = useMemo(() => {
-    if (archive) {
-      return filtered.filter((item) => item.status === 'DONE')
-    }
-    return filtered.filter((item) => item.status !== 'DONE')
-  }, [archive, filtered])
+  // process_scope=active|archived serverda filtrlash. Clientda status!==DONE qo'shimcha
+  // filteri hujjat packed/shipped va buyurtma WMS hali jarayonda bo'lganda qatorlarni
+  // yashirib, faqat REVIEW (picked) qatorlarini qoldirardi.
 
   const docStatusLabel = useCallback(
     (raw: string) => {
@@ -203,19 +200,6 @@ export function PickListsPage() {
         />
       )
     }
-    if (viewItems.length === 0) {
-      return (
-        <EmptyState
-          title={archive ? t('picking:empty_archive_title') : t('picking:empty_jarayon_title')}
-          description={archive ? t('picking:empty_archive_desc') : t('picking:empty_jarayon_desc')}
-          actionLabel={t('common:buttons.refresh')}
-          onAction={() => {
-            nextOffsetRef.current = 0
-            void load()
-          }}
-        />
-      )
-    }
     return (
       <TableScrollArea inline>
         <table className="w-max min-w-full text-sm">
@@ -233,7 +217,7 @@ export function PickListsPage() {
             </tr>
           </thead>
           <tbody>
-            {viewItems.map((item) => (
+            {filtered.map((item) => (
               <tr
                 key={item.id}
                 className="cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
@@ -301,7 +285,6 @@ export function PickListsPage() {
       </TableScrollArea>
     )
   }, [
-    archive,
     canCancel,
     cancellingId,
     docStatusLabel,
@@ -314,7 +297,6 @@ export function PickListsPage() {
     load,
     navigate,
     t,
-    viewItems,
   ])
 
   return (
