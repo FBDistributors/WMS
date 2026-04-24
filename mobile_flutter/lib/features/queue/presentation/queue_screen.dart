@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/app_state/locale_controller.dart';
 import '../../../core/offline/offline_database.dart';
 import '../../../core/offline/offline_providers.dart';
 import '../../../core/offline/offline_sync_service.dart';
+import '../../../l10n/string_lookup.dart';
 import '../../../shared/feedback/app_top_snackbar.dart';
 
 class QueueScreen extends ConsumerWidget {
@@ -12,6 +14,7 @@ class QueueScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final loc = ref.watch(appLocaleProvider);
     final AsyncValue<List<OfflineQueueRow>> pending = ref.watch(_pendingRowsProvider);
     final AsyncValue<List<OfflineQueueRow>> failed = ref.watch(_failedRowsProvider);
 
@@ -34,7 +37,7 @@ class QueueScreen extends ConsumerWidget {
               if (context.mounted && !r.ok) {
                 showAppSnackBar(
                   context,
-                  SnackBar(content: Text(r.error ?? 'Sync failed')),
+                  SnackBar(content: Text(r.error ?? StringLookup.t(loc, 'syncFailed'))),
                 );
               }
             },

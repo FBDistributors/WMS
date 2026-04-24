@@ -259,6 +259,21 @@ abstract final class StringLookup {
     'kirimReceivingDone': 'Qabul yakunlandi',
     'kirimSingleReceiveSuccess': 'Yakunlandi',
     'kirimNewReceiveFillAll': 'Barcha maydonlarni to‘ldiring',
+    'syncFailed': 'Sinxronlash muvaffaqiyatsiz tugadi',
+    'pickerQtyExceeded': 'Kerakli miqdordan oshmaydi',
+    'pickerQtyBelowZero': '0 dan kam bo‘lmaydi',
+    'pickerNotFound': 'Topilmadi',
+    'pickerLineAlreadyFilled': 'Bu pozitsiya to‘ldirilgan',
+    'returnsScanOrCodeRequired': 'Skaner yoki kodni kiriting',
+    'returnsNeedInternetRetry':
+        'Internet yo‘q. Tarmoq tiklangandan keyin qayta urinib ko‘ring.',
+    'returnsNeedInternetToFinish': 'Yakunlash uchun internet kerak.',
+    'returnsFinished': 'Qaytarish yakunlandi.',
+    'inventoryPermissionDenied': 'Inventarizatsiya uchun ruxsat yo‘q',
+    'inventorySomeRowsFailed': 'Ayrim qatorlar yuborilmadi',
+    'inventorySaved': 'Saqlandi',
+    'inventoryNoChanges': 'O‘zgarish yo‘q',
+    'inventoryAdjusted': 'Tuzatildi',
   };
 
   static const Map<String, String> _ru = <String, String>{
@@ -498,6 +513,21 @@ abstract final class StringLookup {
     'kirimReceivingDone': 'Приёмка завершена',
     'kirimSingleReceiveSuccess': 'Завершено',
     'kirimNewReceiveFillAll': 'Заполните все поля',
+    'syncFailed': 'Синхронизация завершилась с ошибкой',
+    'pickerQtyExceeded': 'Нельзя превысить требуемое количество',
+    'pickerQtyBelowZero': 'Нельзя меньше 0',
+    'pickerNotFound': 'Не найдено',
+    'pickerLineAlreadyFilled': 'Эта позиция уже заполнена',
+    'returnsScanOrCodeRequired': 'Сканируйте или введите код',
+    'returnsNeedInternetRetry':
+        'Нет интернета. Попробуйте снова после восстановления сети.',
+    'returnsNeedInternetToFinish': 'Для завершения нужен интернет.',
+    'returnsFinished': 'Возврат завершён.',
+    'inventoryPermissionDenied': 'Нет прав для инвентаризации',
+    'inventorySomeRowsFailed': 'Некоторые строки не отправлены',
+    'inventorySaved': 'Сохранено',
+    'inventoryNoChanges': 'Нет изменений',
+    'inventoryAdjusted': 'Исправлено',
   };
 
   static const Map<String, String> _en = <String, String>{
@@ -737,5 +767,20 @@ abstract final class StringLookup {
     'kirimReceivingDone': 'Receiving completed',
     'kirimSingleReceiveSuccess': 'Completed',
     'kirimNewReceiveFillAll': 'Fill in all fields',
+    'syncFailed': 'Sync failed',
+    'pickerQtyExceeded': 'Cannot exceed required quantity',
+    'pickerQtyBelowZero': 'Cannot be less than 0',
+    'pickerNotFound': 'Not found',
+    'pickerLineAlreadyFilled': 'This line is already complete',
+    'returnsScanOrCodeRequired': 'Scan or enter a code',
+    'returnsNeedInternetRetry':
+        'No internet connection. Try again after network is restored.',
+    'returnsNeedInternetToFinish': 'Internet is required to finish.',
+    'returnsFinished': 'Return flow completed.',
+    'inventoryPermissionDenied': 'No permission for inventory adjustments',
+    'inventorySomeRowsFailed': 'Some rows were not submitted',
+    'inventorySaved': 'Saved',
+    'inventoryNoChanges': 'No changes',
+    'inventoryAdjusted': 'Adjusted',
   };
 }

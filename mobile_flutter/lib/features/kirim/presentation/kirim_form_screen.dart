@@ -856,6 +856,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   }
 
   Future<void> _submitInvByLocationAdjust() async {
+    final AppLocale locale = ref.read(appLocaleProvider);
     final List<LocationContentsItem> items = _invContents?.items ?? const <LocationContentsItem>[];
     if (items.isEmpty || _invSubmitting) {
       return;
@@ -900,17 +901,17 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         if (forbidden) {
           showAppSnackBar(
         context,
-            const SnackBar(content: Text('Inventarizatsiya uchun ruxsat yo‘q')),
+            SnackBar(content: Text(StringLookup.t(locale, 'inventoryPermissionDenied'))),
           );
         } else if (hadError) {
           showAppSnackBar(
         context,
-            const SnackBar(content: Text('Ayrim qatorlar yuborilmadi')),
+            SnackBar(content: Text(StringLookup.t(locale, 'inventorySomeRowsFailed'))),
           );
         } else if (sent.isNotEmpty) {
           showAppSnackBar(
         context,
-            const SnackBar(content: Text('Saqlandi')),
+            SnackBar(content: Text(StringLookup.t(locale, 'inventorySaved'))),
           );
           setState(() => _invActualQty.clear());
           await _refreshInvLocationContents();
@@ -924,6 +925,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   }
 
   Future<void> _submitInvScanAdjust(PickerProductLocation loc) async {
+    final AppLocale locale = ref.read(appLocaleProvider);
     final PickerProductDetailResponse? p = _product;
     if (p == null || _invSubmitting) {
       return;
@@ -933,7 +935,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     if (delta == 0) {
       showAppSnackBar(
         context,
-        const SnackBar(content: Text('O‘zgarish yo‘q')),
+        SnackBar(content: Text(StringLookup.t(locale, 'inventoryNoChanges'))),
       );
       return;
     }
@@ -949,7 +951,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       if (mounted) {
         showAppSnackBar(
         context,
-          const SnackBar(content: Text('Tuzatildi')),
+          SnackBar(content: Text(StringLookup.t(locale, 'inventoryAdjusted'))),
         );
         setState(() {
           _invScanSelectedLoc = null;
@@ -963,7 +965,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       if (mounted) {
         showAppSnackBar(
         context,
-          const SnackBar(content: Text('Inventarizatsiya uchun ruxsat yo‘q')),
+          SnackBar(content: Text(StringLookup.t(locale, 'inventoryPermissionDenied'))),
         );
       }
     } on Exception catch (e) {

@@ -181,7 +181,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   // Asosiy tab (`/admin/orders`) statussiz ishlaydi; qolgan tablarda eski group->status mantiqi saqlanadi.
   const statusParam = normalizeOrderListStatusParam(
     isMainOrdersSimple
-      ? undefined
+      ? 'imported'
       : orderSource
       ? (GROUP_TO_STATUS[group] ?? undefined)
       : mode === 'default' && group === 'all'

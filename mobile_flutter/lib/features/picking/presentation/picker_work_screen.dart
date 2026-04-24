@@ -44,6 +44,8 @@ class _PickerWorkScreenState extends ConsumerState<PickerWorkScreen> {
   bool _completing = false;
   bool _lineBusy = false;
 
+  String _tr(String key) => StringLookup.t(ref.read(appLocaleProvider), key);
+
   String get _effectiveTaskId =>
       widget.taskId?.trim().isNotEmpty == true ? widget.taskId!.trim() : '';
 
@@ -109,11 +111,11 @@ class _PickerWorkScreenState extends ConsumerState<PickerWorkScreen> {
       return;
     }
     if (delta > 0 && line.qtyPicked >= line.qtyRequired) {
-      _toast('Kerakli miqdordan oshmaydi');
+      _toast(_tr('pickerQtyExceeded'));
       return;
     }
     if (delta < 0 && line.qtyPicked <= 0) {
-      _toast('0 dan kam bo‘lmaydi');
+      _toast(_tr('pickerQtyBelowZero'));
       return;
     }
     setState(() => _lineBusy = true);
@@ -177,12 +179,12 @@ class _PickerWorkScreenState extends ConsumerState<PickerWorkScreen> {
       }
     }
     if (matched == null) {
-      _toast('Topilmadi');
+      _toast(_tr('pickerNotFound'));
       _barcode.clear();
       return;
     }
     if (matched.qtyPicked >= matched.qtyRequired) {
-      _toast('Bu pozitsiya to‘ldirilgan');
+      _toast(_tr('pickerLineAlreadyFilled'));
       _barcode.clear();
       return;
     }

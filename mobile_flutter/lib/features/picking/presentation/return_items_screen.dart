@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/app_state/locale_controller.dart';
 import '../../../core/app_state/network_status_provider.dart';
 import '../../../core/storage/shared_preferences_provider.dart';
+import '../../../l10n/string_lookup.dart';
 import '../../../shared/feedback/app_top_snackbar.dart';
 import '../data/picking_models.dart';
 import '../data/return_session_storage.dart';
@@ -27,6 +29,7 @@ class _ReturnItemsScreenState extends ConsumerState<ReturnItemsScreen> {
   bool _busy = false;
   SafeCancelReturnSession? _session;
   String? _loadError;
+  String _tr(String key) => StringLookup.t(ref.read(appLocaleProvider), key);
 
   @override
   void initState() {
@@ -75,15 +78,15 @@ class _ReturnItemsScreenState extends ConsumerState<ReturnItemsScreen> {
     }
     final String raw = _scan.text.trim();
     if (raw.isEmpty) {
-      showAppSnackBar(context, const SnackBar(content: Text('Skaner yoki kodni kiriting')));
+      showAppSnackBar(context, SnackBar(content: Text(_tr('returnsScanOrCodeRequired'))));
       return;
     }
     final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
     if (!online) {
       showAppSnackBar(
         context,
-        const SnackBar(
-          content: Text('Internet yo\'q. Tarmoq tiklangandan keyin qayta urinib ko\'ring.'),
+        SnackBar(
+          content: Text(_tr('returnsNeedInternetRetry')),
           backgroundColor: Colors.red,
         ),
       );
@@ -138,8 +141,8 @@ class _ReturnItemsScreenState extends ConsumerState<ReturnItemsScreen> {
     if (!online) {
       showAppSnackBar(
         context,
-        const SnackBar(
-          content: Text('Yakunlash uchun internet kerak.'),
+        SnackBar(
+          content: Text(_tr('returnsNeedInternetToFinish')),
           backgroundColor: Colors.red,
         ),
       );
@@ -152,7 +155,7 @@ class _ReturnItemsScreenState extends ConsumerState<ReturnItemsScreen> {
       if (!mounted) {
         return;
       }
-      showAppSnackBar(context, const SnackBar(content: Text('Qaytarish yakunlandi.')));
+      showAppSnackBar(context, SnackBar(content: Text(_tr('returnsFinished'))));
       context.goNamed('pickerHome', queryParameters: const <String, String>{'profile': 'picker'});
     } on Exception catch (e) {
       if (mounted) {
