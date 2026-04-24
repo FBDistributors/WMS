@@ -1075,7 +1075,7 @@ async def list_reserve_by_order(
             ),
         )
         .join(ProductModel, ProductModel.id == agg.c.product_id)
-        .outerjoin(OrderModel, OrderModel.id == agg.c.order_id)
+        .join(OrderModel, OrderModel.id == agg.c.order_id)
         .order_by(ProductModel.sku.asc(), OrderModel.order_number.asc().nullslast())
     )
 
@@ -1092,6 +1092,24 @@ async def list_reserve_by_order(
 
     raw_rows = q.all()
 
+    # Mahsulot bo'yicha jami allocate/unallocate (ombor lokatsiyalari) — summary bilan bir xil.
+    # Aks holda (product, order_A) net > 0, (product, order_B) net < 0 yig'indisi 0 bo'lsa,
+    # faqat A qatori chiqib "rezerv bor" ko'rinadi (soxta qator).
+    tot_q = (
+        db.query(
+            StockMovementModel.product_id,
+            func.sum(StockMovementModel.qty_change).label("reserved_total"),
+        )
+        .filter(StockMovementModel.movement_type.in_(("allocate", "unallocate")))
+    )
+    if location_ids is not None:
+        tot_q = tot_q.filter(StockMovementModel.location_id.in_(location_ids))
+    product_has_reserve: set[UUID] = set()
+    for pr in tot_q.group_by(StockMovementModel.product_id).all():
+        rt = pr.reserved_total
+        if rt is not None and rt > 0:
+            product_has_reserve.add(pr.product_id)
+
     user_ids = {r.last_movement_by_user_id for r in raw_rows if r.last_movement_by_user_id}
     creator_map: dict[UUID, str] = {}
     if user_ids:
@@ -1105,6 +1123,8 @@ async def list_reserve_by_order(
 
     items: list[ReserveByOrderRow] = []
     for r in raw_rows:
+        if r.product_id not in product_has_reserve:
+            continue
         uid = r.last_movement_by_user_id
         items.append(
             ReserveByOrderRow(
