@@ -19,7 +19,7 @@ from app.services.stock_availability import (
 from app.services.vip_service import resolve_vip_min_expiry_months
 from pydantic import BaseModel, Field
 from decimal import Decimal
-from sqlalchemy import and_, case, func, or_
+from sqlalchemy import and_, case, exists, func, or_
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth.deps import get_current_user, require_any_permission, require_permission, require_role
@@ -441,6 +441,7 @@ async def list_orders(
 ):
     # List uchun lines yuklanmaydi; faqat wms_state. lines_total keyin alohida count querydan olinadi.
     query = db.query(OrderModel).options(selectinload(OrderModel.wms_state))
+    filter_finalized_so_for_main = False
 
     if order_source and order_source.strip():
         query = query.filter(OrderModel.source == order_source.strip())
@@ -451,12 +452,27 @@ async def list_orders(
         if not valid:
             raise HTTPException(status_code=400, detail="Invalid status")
         valid = _expand_status_filters(valid)
+        filter_finalized_so_for_main = (
+            bool(order_source and order_source.strip().lower() == "smartup")
+            and "imported" in valid
+        )
         query = query.join(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
         if len(valid) == 1:
             query = query.filter(OrderWmsStateModel.status == valid[0])
             # imported: barcha yangi navbat buyurtmalar (SO bor bo'lganlar ham); has_so orqali aniqlanadi
         else:
             query = query.filter(OrderWmsStateModel.status.in_(valid))
+
+    if filter_finalized_so_for_main:
+        query = query.filter(
+            ~exists().where(
+                and_(
+                    DocumentModel.order_id == OrderModel.id,
+                    DocumentModel.doc_type == "SO",
+                    DocumentModel.status.in_(("completed", "packed", "shipped")),
+                )
+            )
+        )
 
     if q:
         allowed_fields = {
