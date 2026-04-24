@@ -49,6 +49,7 @@ from app.constants.order_wms_status import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Barcha DB da uchraydigan WMS statuslar (canonical)
 ORDER_STATUSES = CANONICAL_ORDER_WMS_STATUSES
