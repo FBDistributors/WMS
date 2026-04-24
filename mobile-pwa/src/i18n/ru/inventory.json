@@ -51,7 +51,9 @@
     "empty_desc": "По выбранным фильтрам нет событий allocate/unallocate."
   },
   "reserve_health": {
-    "search_placeholder": "Поиск по SKU, локации или партии",
+    "search_placeholder": "Поиск по SKU, названию или номеру заказа",
+    "reserved_qty_order": "Резерв (заказ)",
+    "last_movement_at": "Последнее движение",
     "segments": {
       "reserved": "Зависший резерв",
       "negative": "Отрицательный остаток"
@@ -66,6 +68,7 @@
     "negative_empty_desc": "Нет строк lot/location с отрицательным on-hand или available."
   },
   "columns": {
+    "code": "Код",
     "product": "Товар",
     "on_hand": "В наличии",
     "available": "Остаток",

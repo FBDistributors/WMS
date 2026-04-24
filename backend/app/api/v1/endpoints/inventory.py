@@ -259,6 +259,22 @@ class ReserveHistoryResponse(BaseModel):
     offset: int
 
 
+class ReserveByOrderRow(BaseModel):
+    product_id: UUID
+    product_code: str
+    product_name: str
+    order_id: UUID
+    order_number: Optional[str] = None
+    reserved_qty: Decimal
+    last_movement_at: datetime
+    last_movement_by_user_id: Optional[UUID] = None
+    last_movement_by_username: Optional[str] = None
+
+
+class ReserveByOrderResponse(BaseModel):
+    items: List[ReserveByOrderRow]
+
+
 class StockMovementCreate(BaseModel):
     product_id: UUID
     lot_id: UUID
@@ -936,6 +952,175 @@ async def list_reserve_history(
         )
 
     return ReserveHistoryResponse(items=items, total=int(total), limit=limit, offset=offset)
+
+
+@router.get(
+    "/reserve-by-order",
+    response_model=ReserveByOrderResponse,
+    summary="Reserve breakdown by order (net allocate/unallocate per product+order)",
+)
+@router.get(
+    "/reserve-by-order/",
+    response_model=ReserveByOrderResponse,
+    summary="Reserve breakdown by order (net allocate/unallocate per product+order)",
+)
+async def list_reserve_by_order(
+    warehouse: Optional[Literal["main", "showroom"]] = Query(default="main"),
+    search: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("inventory:read")),
+):
+    """
+    Har (mahsulot, buyurtma) juftligi uchun omborda net rezerv > 0 bo'lgan qatorlar.
+    So'nggi harakat va undagi foydalanuvchi max(created_at) bo'yicha rn=1 qatoridan olinadi.
+    """
+    location_ids = _location_ids_for_warehouse(db, warehouse)
+    if location_ids is not None and len(location_ids) == 0:
+        return ReserveByOrderResponse(items=[])
+
+    doc_reserve = aliased(DocumentModel)
+    order_id_resolved = case(
+        (
+            and_(
+                StockMovementModel.source_document_type == "order",
+                StockMovementModel.source_document_id.isnot(None),
+            ),
+            StockMovementModel.source_document_id,
+        ),
+        (
+            and_(
+                StockMovementModel.source_document_type == "document",
+                doc_reserve.order_id.isnot(None),
+            ),
+            doc_reserve.order_id,
+        ),
+        else_=None,
+    ).label("order_id")
+
+    base_q = (
+        db.query(
+            StockMovementModel.product_id,
+            order_id_resolved,
+            StockMovementModel.qty_change,
+            StockMovementModel.created_at,
+            StockMovementModel.created_by_user_id,
+        )
+        .outerjoin(
+            doc_reserve,
+            and_(
+                StockMovementModel.source_document_type == "document",
+                StockMovementModel.source_document_id == doc_reserve.id,
+            ),
+        )
+        .filter(StockMovementModel.movement_type.in_(("allocate", "unallocate")))
+        .filter(order_id_resolved.isnot(None))
+    )
+    if location_ids is not None:
+        base_q = base_q.filter(StockMovementModel.location_id.in_(location_ids))
+
+    m_sub = base_q.subquery("m")
+
+    rn = func.row_number().over(
+        partition_by=(m_sub.c.product_id, m_sub.c.order_id),
+        order_by=m_sub.c.created_at.desc(),
+    ).label("rn")
+
+    latest_ranked = db.query(
+        m_sub.c.product_id,
+        m_sub.c.order_id,
+        m_sub.c.created_at,
+        m_sub.c.created_by_user_id,
+        rn,
+    ).select_from(m_sub).subquery("lr")
+
+    latest_per_po = (
+        db.query(
+            latest_ranked.c.product_id,
+            latest_ranked.c.order_id,
+            latest_ranked.c.created_at,
+            latest_ranked.c.created_by_user_id,
+        )
+        .filter(latest_ranked.c.rn == 1)
+        .subquery("latest")
+    )
+
+    agg = (
+        db.query(
+            m_sub.c.product_id,
+            m_sub.c.order_id,
+            func.sum(m_sub.c.qty_change).label("reserved_qty"),
+            func.max(m_sub.c.created_at).label("last_movement_at"),
+        )
+        .group_by(m_sub.c.product_id, m_sub.c.order_id)
+        .having(func.sum(m_sub.c.qty_change) > 0)
+        .subquery("agg")
+    )
+
+    q = (
+        db.query(
+            agg.c.product_id,
+            agg.c.order_id,
+            agg.c.reserved_qty,
+            agg.c.last_movement_at,
+            latest_per_po.c.created_by_user_id.label("last_movement_by_user_id"),
+            ProductModel.sku.label("product_code"),
+            ProductModel.name.label("product_name"),
+            OrderModel.order_number,
+        )
+        .join(
+            latest_per_po,
+            and_(
+                latest_per_po.c.product_id == agg.c.product_id,
+                latest_per_po.c.order_id == agg.c.order_id,
+            ),
+        )
+        .join(ProductModel, ProductModel.id == agg.c.product_id)
+        .outerjoin(OrderModel, OrderModel.id == agg.c.order_id)
+        .order_by(ProductModel.sku.asc(), OrderModel.order_number.asc().nullslast())
+    )
+
+    term = (search or "").strip()
+    if term:
+        term_like = f"%{term}%"
+        q = q.filter(
+            or_(
+                func.lower(ProductModel.sku).ilike(func.lower(term_like)),
+                func.lower(ProductModel.name).ilike(func.lower(term_like)),
+                func.lower(func.coalesce(OrderModel.order_number, "")).ilike(func.lower(term_like)),
+            )
+        )
+
+    raw_rows = q.all()
+
+    user_ids = {r.last_movement_by_user_id for r in raw_rows if r.last_movement_by_user_id}
+    creator_map: dict[UUID, str] = {}
+    if user_ids:
+        for user_row in db.query(UserModel).filter(UserModel.id.in_(user_ids)).all():
+            creator_map[user_row.id] = (
+                (user_row.full_name and user_row.full_name.strip())
+                or (user_row.username and user_row.username.strip())
+                or (user_row.code and f"#{user_row.code}".strip())
+                or "—"
+            )
+
+    items: list[ReserveByOrderRow] = []
+    for r in raw_rows:
+        uid = r.last_movement_by_user_id
+        items.append(
+            ReserveByOrderRow(
+                product_id=r.product_id,
+                product_code=r.product_code or "",
+                product_name=r.product_name or "",
+                order_id=r.order_id,
+                order_number=r.order_number,
+                reserved_qty=r.reserved_qty,
+                last_movement_at=r.last_movement_at,
+                last_movement_by_user_id=uid,
+                last_movement_by_username=creator_map.get(uid) if uid else None,
+            )
+        )
+
+    return ReserveByOrderResponse(items=items)
 
 
 @router.post("/movements", response_model=StockMovementOut, status_code=status.HTTP_201_CREATED)

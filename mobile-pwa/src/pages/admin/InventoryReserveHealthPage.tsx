@@ -12,8 +12,10 @@ import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import {
   getInventorySummary,
   getNegativeBalanceCheck,
+  getReserveByOrder,
   type InventorySummaryRow,
   type NegativeBalanceRow,
+  type ReserveByOrderRow,
   type WarehouseFilter,
 } from '../../services/inventoryApi'
 
@@ -27,7 +29,8 @@ export function InventoryReserveHealthPage() {
   const warehouse: WarehouseFilter = (searchParams.get('warehouse') as WarehouseFilter) || 'main'
   const [segment, setSegment] = useState<SegmentMode>('reserved')
   const [search, setSearch] = useState('')
-  const [reservedRows, setReservedRows] = useState<InventorySummaryRow[]>([])
+  const [reservedByOrderRows, setReservedByOrderRows] = useState<ReserveByOrderRow[]>([])
+  const [availableByProductId, setAvailableByProductId] = useState<Map<string, number>>(new Map())
   const [negativeRows, setNegativeRows] = useState<NegativeBalanceRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -36,15 +39,22 @@ export function InventoryReserveHealthPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const [summary, negative] = await Promise.all([
+      const [byOrder, summary, negative] = await Promise.all([
+        getReserveByOrder({ warehouse }),
         getInventorySummary({ warehouse }),
         getNegativeBalanceCheck({ warehouse, limit: NEGATIVE_LIMIT }),
       ])
-      setReservedRows(summary.filter((row) => Number(row.reserved_total) > 0))
+      setReservedByOrderRows(byOrder.items)
+      const avail = new Map<string, number>()
+      for (const row of summary as InventorySummaryRow[]) {
+        avail.set(row.product_id, Number(row.available_total))
+      }
+      setAvailableByProductId(avail)
       setNegativeRows(negative.rows)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('inventory:load_failed'))
-      setReservedRows([])
+      setReservedByOrderRows([])
+      setAvailableByProductId(new Map())
       setNegativeRows([])
     } finally {
       setIsLoading(false)
@@ -57,15 +67,21 @@ export function InventoryReserveHealthPage() {
 
   const normalizedSearch = search.trim().toLowerCase()
 
+  const reservedProductCount = useMemo(() => {
+    return new Set(reservedByOrderRows.map((r) => r.product_id)).size
+  }, [reservedByOrderRows])
+
   const filteredReserved = useMemo(() => {
-    if (!normalizedSearch) return reservedRows
-    return reservedRows.filter((row) => {
+    if (!normalizedSearch) return reservedByOrderRows
+    return reservedByOrderRows.filter((row) => {
+      const orderNo = (row.order_number ?? '').toLowerCase()
       return (
         row.product_code.toLowerCase().includes(normalizedSearch) ||
-        row.name.toLowerCase().includes(normalizedSearch)
+        row.product_name.toLowerCase().includes(normalizedSearch) ||
+        orderNo.includes(normalizedSearch)
       )
     })
-  }, [normalizedSearch, reservedRows])
+  }, [normalizedSearch, reservedByOrderRows])
 
   const filteredNegative = useMemo(() => {
     if (!normalizedSearch) return negativeRows
@@ -106,24 +122,40 @@ export function InventoryReserveHealthPage() {
       }
       return (
         <div className="overflow-auto">
-          <table className="min-w-[860px] w-full text-sm">
+          <table className="min-w-[1100px] w-full text-sm">
             <thead className="text-left text-xs uppercase text-slate-500">
               <tr className="border-b border-slate-200 dark:border-slate-800">
                 <th className="px-3 py-2">{t('inventory:columns.code')}</th>
                 <th className="px-3 py-2">{t('inventory:columns.product')}</th>
-                <th className="px-3 py-2">{t('inventory:columns.reserved_total')}</th>
+                <th className="px-3 py-2">{t('inventory:columns.order')}</th>
+                <th className="px-3 py-2">{t('inventory:reserve_health.reserved_qty_order')}</th>
+                <th className="px-3 py-2">{t('inventory:columns.created_by')}</th>
+                <th className="px-3 py-2">{t('inventory:reserve_health.last_movement_at')}</th>
                 <th className="px-3 py-2">{t('inventory:columns.available_total')}</th>
               </tr>
             </thead>
             <tbody>
-              {filteredReserved.map((row) => (
-                <tr key={row.product_id} className="border-b border-slate-100 dark:border-slate-800">
-                  <td className="px-3 py-2 font-mono">{row.product_code}</td>
-                  <td className="px-3 py-2">{row.name}</td>
-                  <td className="px-3 py-2 tabular-nums">{Math.round(Number(row.reserved_total))}</td>
-                  <td className="px-3 py-2 tabular-nums">{Math.round(Number(row.available_total))}</td>
-                </tr>
-              ))}
+              {filteredReserved.map((row) => {
+                const avail = availableByProductId.get(row.product_id)
+                return (
+                  <tr
+                    key={`${row.product_id}:${row.order_id}`}
+                    className="border-b border-slate-100 dark:border-slate-800"
+                  >
+                    <td className="px-3 py-2 font-mono">{row.product_code}</td>
+                    <td className="px-3 py-2">{row.product_name}</td>
+                    <td className="px-3 py-2 font-mono">{row.order_number ?? '—'}</td>
+                    <td className="px-3 py-2 tabular-nums">{Math.round(Number(row.reserved_qty))}</td>
+                    <td className="px-3 py-2">{row.last_movement_by_username ?? '—'}</td>
+                    <td className="px-3 py-2 text-slate-600 dark:text-slate-300">
+                      {new Date(row.last_movement_at).toLocaleString()}
+                    </td>
+                    <td className="px-3 py-2 tabular-nums">
+                      {avail !== undefined ? Math.round(avail) : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -170,7 +202,16 @@ export function InventoryReserveHealthPage() {
         </table>
       </div>
     )
-  }, [error, filteredNegative, filteredReserved, isLoading, load, segment, t])
+  }, [
+    availableByProductId,
+    error,
+    filteredNegative,
+    filteredReserved,
+    isLoading,
+    load,
+    segment,
+    t,
+  ])
 
   return (
     <AdminLayout titleSlot={<InventoryHeaderTabs />}>
@@ -235,7 +276,7 @@ export function InventoryReserveHealthPage() {
           </button>
 
           <div className="rounded-xl border border-slate-200 px-3 py-1 text-sm dark:border-slate-800">
-            {t('inventory:reserve_health.counts.reserved')}: {reservedRows.length}
+            {t('inventory:reserve_health.counts.reserved')}: {reservedProductCount}
           </div>
           <div className="rounded-xl border border-slate-200 px-3 py-1 text-sm dark:border-slate-800">
             {t('inventory:reserve_health.counts.negative')}: {negativeRows.length}

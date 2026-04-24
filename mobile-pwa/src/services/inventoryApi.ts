@@ -88,6 +88,38 @@ export type ReserveHistoryResponse = {
   offset: number
 }
 
+/** Net reserve per (product, order) for reserve-health table */
+export type ReserveByOrderRow = {
+  product_id: string
+  product_code: string
+  product_name: string
+  order_id: string
+  order_number?: string | null
+  reserved_qty: number
+  last_movement_at: string
+  last_movement_by_user_id?: string | null
+  last_movement_by_username?: string | null
+}
+
+export type ReserveByOrderResponse = {
+  items: ReserveByOrderRow[]
+}
+
+export type ReserveByOrderQuery = {
+  warehouse?: WarehouseFilter
+  search?: string
+}
+
+export async function getReserveByOrder(query: ReserveByOrderQuery = {}, signal?: AbortSignal) {
+  return fetchJSON<ReserveByOrderResponse>('/api/v1/inventory/reserve-by-order', {
+    query: {
+      warehouse: query.warehouse,
+      search: query.search,
+    },
+    signal,
+  })
+}
+
 export type WarehouseFilter = 'main' | 'showroom'
 
 export type InventorySummaryQuery = {
