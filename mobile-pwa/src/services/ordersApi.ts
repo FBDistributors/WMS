@@ -135,6 +135,7 @@ function normalizeOrdersStatusQuery(status: string | undefined): string | undefi
 export type OrdersQuery = {
   status?: string
   q?: string
+  created_from?: string
   date_from?: string
   date_to?: string
   filial_id?: string

@@ -428,6 +428,7 @@ def _allocate_order(
 async def list_orders(
     status: Optional[str] = None,
     q: Optional[str] = None,
+    created_from: Optional[datetime] = Query(None, description="Order created_at >= timestamp (ISO datetime)"),
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
     filial_id: Optional[str] = None,
@@ -515,6 +516,9 @@ async def list_orders(
             )
         else:
             query = query.filter(or_(*[field.ilike(term) for field in fields]))
+
+    if created_from:
+        query = query.filter(OrderModel.created_at >= created_from)
 
     # Filial filter: order_source berilganda filial default qo‘llanmaydi (manba bo‘yicha filtr yetarli)
     if filial_id and filial_id.strip() and filial_id.strip().lower() == "all":

@@ -156,6 +156,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const isMainOrdersSimple = mode === 'default' && !orderSource
   const rawGroup = searchParams.get('group')
   const group = rawGroup ?? (mode === 'statuses' ? 'all' : 'yangi')
+  const syncedFrom = searchParams.get('synced_from') ?? ''
   const searchQuery = searchParams.get('q') ?? ''
   const brandFilter = searchParams.get('brand_id') ?? ''
   const dateFrom = searchParams.get('date_from') ?? ''
@@ -366,6 +367,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       } else {
         const query: Record<string, string | number | undefined> = {
           q: searchQuery.trim() || undefined,
+          created_from: isMainOrdersSimple && syncedFrom.trim() ? syncedFrom.trim() : undefined,
           brand_ids: brandFilter.trim() ? brandFilter.trim() : undefined,
           date_from: dateFrom.trim() || undefined,
           date_to: dateTo.trim() || undefined,
@@ -414,6 +416,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     offset,
     orderSource,
     searchQuery,
+    syncedFrom,
     brandFilter,
     dateFrom,
     dateTo,
@@ -508,8 +511,17 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       const payload: { order_source?: string; begin_deal_date?: string; end_deal_date?: string } = orderSource
         ? { order_source: orderSource, begin_deal_date: beginDealStr, end_deal_date: endDeal }
         : { begin_deal_date: beginDealStr, end_deal_date: endDeal }
+      const syncStartedAt = new Date().toISOString()
       const result = await syncSmartupOrders(payload)
       setSyncResult(result)
+      if (isMainOrdersSimple) {
+        setSearchParams((prev) => {
+          const next = new URLSearchParams(prev)
+          next.set('synced_from', syncStartedAt)
+          next.delete('offset')
+          return next
+        })
+      }
       await load(false)
     } catch (err) {
       const message =
