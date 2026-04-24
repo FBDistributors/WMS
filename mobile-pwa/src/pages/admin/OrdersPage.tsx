@@ -154,7 +154,8 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const isMainOrdersSimple = mode === 'default' && !orderSource
-  const group = searchParams.get('group') ?? (mode === 'statuses' || isMainOrdersSimple ? 'all' : 'yangi')
+  const rawGroup = searchParams.get('group')
+  const group = rawGroup ?? (mode === 'statuses' ? 'all' : 'yangi')
   const searchQuery = searchParams.get('q') ?? ''
   const brandFilter = searchParams.get('brand_id') ?? ''
   const dateFrom = searchParams.get('date_from') ?? ''
@@ -440,6 +441,17 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   }, [loadBrands])
 
   const prevGroupRef = useRef(group)
+  useEffect(() => {
+    if (isMainOrdersSimple && rawGroup === 'all') {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.set('group', 'yangi')
+        next.delete('offset')
+        return next
+      }, { replace: true })
+    }
+  }, [isMainOrdersSimple, rawGroup, setSearchParams])
+
   useEffect(() => {
     if (prevGroupRef.current !== group) {
       prevGroupRef.current = group
@@ -823,6 +835,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     }
     const defaultWithStatusTab =
       mode === 'default' &&
+      !isMainOrdersSimple &&
       !orderSource &&
       (group === 'yigishda' || group === 'tekshiruvda' || group === 'yakunlangan' || group === 'all')
     const columnOptionsForMode =
