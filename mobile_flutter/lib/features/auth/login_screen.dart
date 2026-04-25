@@ -12,7 +12,7 @@ import '../../core/network/app_dio.dart';
 import '../../core/app_state/prefs_keys.dart';
 import '../../core/storage/shared_preferences_provider.dart';
 import '../../l10n/string_lookup.dart';
-import '../../shared/feedback/app_top_snackbar.dart';
+import '../../shared/feedback/app_top_snackbar.dart' show AppToastType, showAppSnackBar;
 import '../../shared/input/input_clear_button.dart';
 import 'presentation/auth_providers.dart';
 
@@ -28,6 +28,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final TextEditingController _pass = TextEditingController();
   bool _showPassword = false;
   bool _submitting = false;
+  String? _submitError;
   @override
   void initState() {
     super.initState();
@@ -63,13 +64,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final String u = _user.text.trim();
     final String p = _pass.text.trim();
     if (u.isEmpty || p.isEmpty) {
+      setState(() => _submitError = null);
       showAppSnackBar(
         context,
         SnackBar(content: Text(StringLookup.t(loc, 'enterLoginPassword'))),
       );
       return;
     }
-    setState(() => _submitting = true);
+    setState(() {
+      _submitting = true;
+      _submitError = null;
+    });
     final bool ok = await ref.read(authControllerProvider.notifier).login(u, p);
     if (!mounted) {
       return;
@@ -81,7 +86,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
       context.goNamed('pickerHome');
       if (mounted) {
-        setState(() => _submitting = false);
+        setState(() {
+          _submitting = false;
+          _submitError = null;
+        });
       }
       return;
     }
@@ -89,24 +97,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!mounted) {
       return;
     }
+    final String msg;
     if (err != null) {
       final String raw = err;
-      final String msg = raw.contains(unauthorizedMessage)
-          ? StringLookup.t(loc, 'loginError')
-          : raw;
-      showAppSnackBar(
-        context,
-        SnackBar(content: Text(msg)),
-      );
+      final bool badCreds = raw.contains(unauthorizedMessage);
+      msg = badCreds ? StringLookup.t(loc, 'invalidCredentialsError') : raw;
     } else {
-      showAppSnackBar(
-        context,
-        SnackBar(content: Text(StringLookup.t(loc, 'loginError'))),
-      );
+      msg = StringLookup.t(loc, 'loginError');
     }
     if (mounted) {
-      setState(() => _submitting = false);
+      setState(() {
+        _submitError = msg;
+        _submitting = false;
+      });
     }
+    if (!mounted) {
+      return;
+    }
+    showAppSnackBar(
+      context,
+      SnackBar(content: Text(msg)),
+      type: AppToastType.error,
+    );
   }
 
   @override
@@ -179,12 +191,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         border: const OutlineInputBorder(),
                         suffixIcon: buildInputClearButton(
                           visible: _user.text.trim().isNotEmpty,
-                          onPressed: () => setState(() => _user.clear()),
+                          onPressed: () => setState(() {
+                            _user.clear();
+                            _submitError = null;
+                          }),
                         ),
                       ),
                       textInputAction: TextInputAction.next,
                       autocorrect: false,
-                      onChanged: (_) => setState(() {}),
+                      onChanged: (_) => setState(() => _submitError = null),
                       enabled: !busy,
                     ),
                     const SizedBox(height: 12),
@@ -199,6 +214,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ),
                       obscureText: !_showPassword,
+                      onChanged: (_) => setState(() => _submitError = null),
                       onSubmitted: (_) => _submit(),
                       enabled: !busy,
                     ),
@@ -216,6 +232,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             : Text(StringLookup.t(loc, 'loginButton')),
                       ),
                     ),
+                    if (_submitError != null) ...<Widget>[
+                      const SizedBox(height: 12),
+                      Text(
+                        _submitError!,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFB91C1C),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

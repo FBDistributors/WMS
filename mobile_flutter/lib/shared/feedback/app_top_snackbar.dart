@@ -34,6 +34,18 @@ void showAppSnackBar(
 }) {
   final OverlayState? overlay = Overlay.maybeOf(context, rootOverlay: true);
   if (overlay == null) {
+    final ScaffoldMessengerState? messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger != null) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: snackBar.content,
+          duration: _topSnackDuration(snackBar),
+          action: snackBar.action,
+          backgroundColor: snackBar.backgroundColor ?? _toastBgColor(type),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
     return;
   }
 
