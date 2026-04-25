@@ -67,8 +67,13 @@ class AuthController extends AsyncNotifier<AuthSession> {
       return true;
     } on Exception catch (e) {
       _lastLoginError = e.toString();
-      // App bootstrap'da global error ekranga tushib ketmasligi uchun state ni unauth holatda saqlaymiz.
-      state = const AsyncData<AuthSession>(AuthSession.unauthenticated());
+      // Allaqachon mehmon bo'lsak state ni qayta yozmaymiz — aks holda authController
+      // o'zgarishi GoRouter refresh qilib LoginScreen State'ini bekor qiladi (parol tozalanadi, xabar chiqmaydi).
+      final bool alreadyGuest =
+          state.hasValue && !state.requireValue.isAuthenticated;
+      if (!alreadyGuest) {
+        state = const AsyncData<AuthSession>(AuthSession.unauthenticated());
+      }
       return false;
     }
   }
