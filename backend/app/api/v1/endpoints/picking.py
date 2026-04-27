@@ -678,12 +678,13 @@ async def list_picking_documents(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     include_cancelled: bool = False,
-    process_scope: Optional[Literal["active", "archived"]] = Query(
+    process_scope: Optional[Literal["active", "archived", "cancelled"]] = Query(
         default=None,
         description=(
             "active: admin Jarayon — buyurtma WMS allocated..picked va "
             "hujjat completed/packed/shipped emas (WMS kechiksa ham yakunlangan chiqmasin). "
             "archived: admin Arxiv — hujjat completed/packed/shipped. "
+            "cancelled: admin Bekor qilingan — buyurtma WMS cancelled. "
             "picker/inventory_controller uchun e'tiborsiz."
         ),
     ),
@@ -728,6 +729,8 @@ async def list_picking_documents(
         )
     elif effective_scope == "archived":
         query = query.filter(DocumentModel.status.in_(("completed", "packed", "shipped")))
+    elif effective_scope == "cancelled":
+        query = query.filter(OrderWmsStateModel.status == "cancelled")
     else:
         query = query.filter(
             or_(
@@ -751,7 +754,7 @@ async def list_picking_documents(
             DocumentModel.controlled_by_user_id == user.id,
             DocumentModel.status == "picked",
         )
-    if not include_cancelled:
+    if not include_cancelled and effective_scope != "cancelled":
         query = query.filter(DocumentModel.status != "cancelled")
     try:
         docs = query.order_by(DocumentModel.created_at.desc()).offset(offset).limit(limit).all()

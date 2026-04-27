@@ -367,6 +367,16 @@ export function App() {
           }
         />
         <Route
+          path="/admin/picking/cancelled"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="picking:read">
+                <PickListsPage />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
           path="/admin/picking/archive"
           element={
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">

@@ -167,7 +167,7 @@ function mapDetails(doc: BackendPickingDetails): PickListDetails {
 
 export type ListPickListsOptions = {
   /** Admin Jarayon / Arxiv: backend filtrlash; mobil yig'uvchi/controller uchun yuborilmaydi. */
-  processScope?: 'active' | 'archived'
+  processScope?: 'active' | 'archived' | 'cancelled'
 }
 
 export async function listPickLists(

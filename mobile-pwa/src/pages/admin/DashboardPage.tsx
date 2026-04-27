@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { Package, ClipboardList, SearchCheck, PackageCheck, LayoutGrid } from 'lucide-react'
+import { Package, ClipboardList, SearchCheck, PackageCheck, LayoutGrid, FileSpreadsheet, Loader2 } from 'lucide-react'
+import * as XLSX from 'xlsx'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { KpiCard } from '../../admin/components/KpiCard'
@@ -10,6 +11,7 @@ import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { getOrdersByStatus, getPickingStaffStats, type PickingStaffStatsRow } from '../../services/dashboardApi'
+import { writeExcelFile } from '../../utils/exportExcel'
 
 // Yangi = Smartupdan kelgan, admin yig'uvchiga yubormagan
 const STATUS_XOM = ['imported']
@@ -36,6 +38,12 @@ function aggregateByFourGroups(
 function formatQty(n: number): string {
   if (Number.isInteger(n)) return String(n)
   return n.toLocaleString(undefined, { maximumFractionDigits: 3 })
+}
+
+/** Excel worksheet name: max 31 chars, no \\ / ? * [ ] : */
+function sheetNameSafe(label: string): string {
+  const cleaned = label.replace(/[:\\/?*[\]]/g, ' ').trim()
+  return (cleaned.slice(0, 31) || 'Sheet').trim()
 }
 
 function StaffStatsTable({
@@ -109,6 +117,7 @@ export function DashboardPage() {
   const [error, setError] = useState<string | null>(null)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [isExporting, setIsExporting] = useState(false)
 
   const counts = useMemo(() => aggregateByFourGroups(ordersByStatus), [ordersByStatus])
   const totalOrders = counts.xom + counts.yigishda + counts.tekshiruvda + counts.yakunlangan
@@ -137,6 +146,53 @@ export function DashboardPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  const staffStatsExportDisabled =
+    isLoading || isExporting || (pickerRows.length === 0 && controllerRows.length === 0)
+
+  const handleExportStaffStatsExcel = useCallback(async () => {
+    if (pickerRows.length === 0 && controllerRows.length === 0) return
+    setIsExporting(true)
+    try {
+      const headers = [
+        t('admin:dashboard.staff_col_rank'),
+        t('admin:dashboard.staff_col_name'),
+        t('admin:dashboard.staff_col_orders'),
+        t('admin:dashboard.staff_col_lines'),
+        t('admin:dashboard.staff_col_qty'),
+      ]
+      const rowsToAoA = (rows: PickingStaffStatsRow[]) =>
+        rows.map((row, index) => [
+          index + 1,
+          row.full_name,
+          row.documents_count,
+          row.lines_count,
+          row.total_picked_qty,
+        ])
+
+      const wb = XLSX.utils.book_new()
+      if (pickerRows.length > 0) {
+        const ws = XLSX.utils.aoa_to_sheet([headers, ...rowsToAoA(pickerRows)])
+        XLSX.utils.book_append_sheet(wb, ws, sheetNameSafe(t('admin:dashboard.pickers_table_title')))
+      }
+      if (controllerRows.length > 0) {
+        const ws = XLSX.utils.aoa_to_sheet([headers, ...rowsToAoA(controllerRows)])
+        XLSX.utils.book_append_sheet(wb, ws, sheetNameSafe(t('admin:dashboard.controllers_table_title')))
+      }
+
+      const day = new Date().toISOString().slice(0, 10)
+      const fromPart = dateFrom.trim() ? dateFrom.trim() : 'all'
+      const toPart = dateTo.trim() ? dateTo.trim() : 'all'
+      const fileName = `picking_staff_stats_${fromPart}_${toPart}_${day}.xlsx`
+
+      await writeExcelFile(wb, fileName)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      window.alert(`${t('admin:dashboard.staff_stats_export_failed')}\n\n${msg}`)
+    } finally {
+      setIsExporting(false)
+    }
+  }, [t, pickerRows, controllerRows, dateFrom, dateTo])
 
   const statusRows = [
     { key: 'xom' as const, labelKey: 'admin:dashboard.status_xom', count: counts.xom },
@@ -289,6 +345,20 @@ export function DashboardPage() {
                 }}
               >
                 {t('admin:dashboard.staff_stats_clear')}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                className="shrink-0"
+                disabled={staffStatsExportDisabled}
+                onClick={() => void handleExportStaffStatsExcel()}
+              >
+                {isExporting ? (
+                  <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                ) : (
+                  <FileSpreadsheet className="mr-2 h-4 w-4 shrink-0" aria-hidden />
+                )}
+                {t('admin:dashboard.staff_stats_export_excel')}
               </Button>
             </div>
             <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">

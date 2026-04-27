@@ -49,9 +49,10 @@ export function PickListsPage() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const archive = pathname.endsWith('/picking/archive')
+  const cancelled = pathname.endsWith('/picking/cancelled')
   const { has } = useAuth()
 
-  const processScope = archive ? ('archived' as const) : ('active' as const)
+  const processScope = cancelled ? ('cancelled' as const) : archive ? ('archived' as const) : ('active' as const)
 
   const [items, setItems] = useState<PickList[]>([])
   const [hasMore, setHasMore] = useState(false)
@@ -130,12 +131,12 @@ export function PickListsPage() {
   }, [items, query])
 
   const tableRows = useMemo(() => {
-    if (archive) return filtered
+    if (archive || cancelled) return filtered
     return filtered.filter((item) => {
       const s = item.document_status.toLowerCase().replace(/-/g, '_')
       return !JARAYON_HIDDEN_DOCUMENT_STATUSES.has(s)
     })
-  }, [archive, filtered])
+  }, [archive, cancelled, filtered])
 
   const docStatusLabel = useCallback(
     (raw: string) => {
@@ -151,6 +152,14 @@ export function PickListsPage() {
       if (archive) {
         return docStatusLabel(item.document_status)
       }
+      if (cancelled) {
+        const wms = item.order_wms_status
+        if (wms != null && String(wms).trim() !== '') {
+          const k = String(wms).toLowerCase().replace(/-/g, '_')
+          return t(`orders:status.${k}`, { defaultValue: wms })
+        }
+        return docStatusLabel(item.document_status)
+      }
       const wms = item.order_wms_status
       if (wms != null && String(wms).trim() !== '') {
         const k = String(wms).toLowerCase().replace(/-/g, '_')
@@ -158,7 +167,7 @@ export function PickListsPage() {
       }
       return docStatusLabel(item.document_status)
     },
-    [archive, t, docStatusLabel]
+    [archive, cancelled, t, docStatusLabel]
   )
 
   const handleCancel = useCallback(

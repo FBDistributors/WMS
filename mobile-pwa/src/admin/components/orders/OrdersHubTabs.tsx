@@ -54,6 +54,12 @@ export function OrdersHubTabs() {
             {t('admin:menu.orders_jarayon')}
           </NavLink>
           <NavLink
+            to="/admin/picking/cancelled"
+            className={({ isActive }) => [base, isActive ? active : inactive].join(' ')}
+          >
+            {t('admin:menu.orders_cancelled')}
+          </NavLink>
+          <NavLink
             to="/admin/picking/archive"
             className={({ isActive }) => [base, isActive ? active : inactive].join(' ')}
           >
