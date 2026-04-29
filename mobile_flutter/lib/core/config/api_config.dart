@@ -3,7 +3,7 @@
 class ApiConfig {
   ApiConfig._();
 
-  static const String _prodDefault = 'https://wms-ngdm.onrender.com';
+  static const String _prodDefault = 'https://api.fbwarehouse.uz';
 
   static String get rawBaseUrl {
     const String fromDefine = String.fromEnvironment(
