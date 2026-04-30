@@ -1,22 +1,46 @@
 # Python
 __pycache__/
 *.py[cod]
+*.pyc
+*.pyo
 *$py.class
 .venv/
 venv/
 .env
 *.egg-info/
 
-# Node / build
+# Node / JS
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Vite / frontend build
 dist/
 *.local
+
+# Tauri / Rust
+mobile-pwa/src-tauri/target/
+
+# SQLite (local / dev databases)
+test.db
+**/test.db
+*.sqlite
+*.sqlite3
+
+# Cursor / local AI tooling
+.cursor/
 
 # IDE / OS
 .idea/
 .vscode/
 .DS_Store
 *.log
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+*.swp
+*.swo
 
 # Mobile
 *.apk
