@@ -38,7 +38,7 @@ type RequestOptions<TBody> = {
 
 const DEFAULT_TIMEOUT_MS = 15000
 const rawBaseUrl =
-  import.meta.env.VITE_API_BASE_URL ?? 'https://wms-ngdm.onrender.com'
+  import.meta.env.VITE_API_BASE_URL ?? 'https://api.fbwarehouse.uz'
 const baseUrl = rawBaseUrl.toString().replace(/\/+$/, '')
 
 function buildUrl(path: string) {

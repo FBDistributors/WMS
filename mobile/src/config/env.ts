@@ -1,9 +1,9 @@
 /**
  * API base URL: default — Render.
- * Agar Render boshqa manzil bersa: API_BASE_URL ni o‘rnating (masalan https://wms-api-xxxx.onrender.com).
+ * Boshqa host kerak bo‘lsa: API_BASE_URL ni o‘rnating (masalan https://api.example.com).
  * To‘liq path kerak bo‘lsa: API_BASE_URL=https://.../api/v1 qilib qo‘ying.
  */
-const PROD_API = 'https://wms-ngdm.onrender.com';
+const PROD_API = 'https://api.fbwarehouse.uz';
 
 const getApiBaseUrl = (): string => {
   const fromEnv = typeof process !== 'undefined' && process.env?.API_BASE_URL;

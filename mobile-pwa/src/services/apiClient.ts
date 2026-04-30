@@ -16,7 +16,7 @@ type RequestOptions<TBody> = {
 const TOKEN_KEY = 'wms_token'
 const FETCH_TIMEOUT_MS = 30000
 const rawBaseUrl =
-  import.meta.env.VITE_API_BASE_URL ?? 'https://wms-ngdm.onrender.com'
+  import.meta.env.VITE_API_BASE_URL ?? 'https://api.fbwarehouse.uz'
 const baseUrl = rawBaseUrl.toString().replace(/\/+$/, '')
 
 export function buildApiUrl(
