@@ -30,8 +30,16 @@ Qo‘shimcha: `cupertino_icons`, dev uchun `flutter_test`, `flutter_lints`.
 
 ## 3. API va muhit
 
-- **Asosiy URL:** React Native `env.ts` dagi default bilan mos — `https://wms-ngdm.onrender.com`; kerak bo‘lsa `/api/v1` avtomatik qo‘shiladi (`ApiConfig.apiV1Base`).
-- **Boshqa server:** ishga tushirishda `--dart-define=API_BASE_URL=https://sizning-host` ishlatiladi.
+- **Asosiy URL (prod default):** `https://api.fbwarehouse.uz`; kerak bo‘lsa `/api/v1` avtomatik qo‘shiladi (`ApiConfig.apiV1Base` ichida [`mobile_flutter/lib/core/config/api_config.dart`](mobile_flutter/lib/core/config/api_config.dart)).
+- **Boshqa server:** build/run vaqtida `--dart-define=API_BASE_URL=https://sizning-host` berilsa, u default ustidan ustun keladi (`String.fromEnvironment`). CI yoki lokal skriptlarda eski host qolib ketmasligi kerak.
+- **Tekshiruv (curl):** token yo‘qida endpoint jonli bo‘lsa `401` va `"Not authenticated"` kutiladi:
+
+```powershell
+curl.exe -sS "https://api.fbwarehouse.uz/api/v1/inventory/picker?limit=1"
+```
+
+Bearer token bilan (`Authorization: Bearer …`) `200` va `items` massivi qaytishi kerak. Mahsulotlar ekranida **kulrang** "Natija yo'q" (xato emas) — odatda API muvaffaqiyatli, lekin `items` bo‘sh: yangi server bazasida qoldiq/mahsulot yo‘q yoki filtr hech narsa qoldirmagan.
+- **VPS / bo‘sh baza:** Agar Postman/curl da ham `items` bo‘sh bo‘lsa, Flutter emas — PostgreSQL dump restore, migratsiyalar (`alembic upgrade head`) va ma’lumotlarni yangi VPS ga ko‘chirishni tekshiring (`backend/` va server runbook).
 
 ## 4. `lib/` tuzilmasi (Clean-style)
 
@@ -86,7 +94,7 @@ React Native **`InventoryScreen.tsx`** + `api/inventory.ts` mantiqasi Flutter ga
 
 - `test/widget_test.dart` — `SharedPreferences` mock bilan `MobileFlutterApp` yuklanishini tekshiradi.
 
-## 7. Tekshiruv buyruqlari
+## 7. Tekshiruv va release build buyruqlari
 
 ```powershell
 cd c:\Users\hp\Desktop\WMS\mobile_flutter
@@ -94,7 +102,11 @@ flutter pub get
 dart analyze
 flutter test
 flutter run -d chrome
+# Production APK (default API = api.fbwarehouse.uz; almashtirish uchun --dart-define=API_BASE_URL=...)
+flutter build apk --release
 ```
+
+APK: `mobile_flutter/build/app/outputs/flutter-apk/app-release.apk` (papka odatda `.gitignore` da).
 
 ## Keyingi qadamlar (tavsiya)
 
