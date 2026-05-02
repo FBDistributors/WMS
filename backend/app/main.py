@@ -42,23 +42,39 @@ app = FastAPI(
 )
 
 def _get_cors_config() -> tuple[list[str], str | None]:
+    """CORS: explicit CORS_ORIGINS wins; empty env uses prod-friendly defaults (web + API + Tauri)."""
     cors_env = os.getenv("CORS_ORIGINS")
     allow_all = False
     origins: list[str] = []
 
     if cors_env:
-        if cors_env.strip() == "*":
+        stripped = cors_env.strip()
+        if stripped == "*":
             allow_all = True
         else:
-            origins = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
-
-    if not origins:
-        origins = ["https://wms-opal.vercel.app"]
+            origins = [o.strip() for o in stripped.split(",") if o.strip()]
 
     if allow_all:
-        origins = ["*"]
+        return ["*"], None
 
-    return origins, r"^https://.*\.vercel\.app$"
+    _default_origins = [
+        "https://wms-opal.vercel.app",
+        "https://www.fbwarehouse.uz",
+        "https://api.fbwarehouse.uz",
+        "http://tauri.localhost",
+        "https://tauri.localhost",
+    ]
+    _default_origin_regex = (
+        r"^https://([\w-]+\.)*fbwarehouse\.uz$"
+        r"|^http://tauri\.localhost(?::\d+)?$"
+        r"|^https://tauri\.localhost(?::\d+)?$"
+        r"|^https://.*\.vercel\.app$"
+    )
+
+    if not origins:
+        return _default_origins, _default_origin_regex
+
+    return origins, None
 
 
 # CORS (frontend ulanishi uchun)

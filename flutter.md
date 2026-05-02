@@ -39,6 +39,17 @@ curl.exe -sS "https://api.fbwarehouse.uz/api/v1/inventory/picker?limit=1"
 ```
 
 Bearer token bilan (`Authorization: Bearer …`) `200` va `items` massivi qaytishi kerak. Mahsulotlar ekranida **kulrang** "Natija yo'q" (xato emas) — odatda API muvaffaqiyatli, lekin `items` bo‘sh: yangi server bazasida qoldiq/mahsulot yo‘q yoki filtr hech narsa qoldirmagan.
+
+**Mahsulotlar ro‘yxati (to‘liq tekshiruv):** ilovadan token olish oson bo‘lmasa, avval login qiling va `access_token` ni oling, keyin:
+
+```powershell
+# TOKEN ni login javobidan qo'ying
+curl.exe -sS -X POST "https://api.fbwarehouse.uz/api/v1/auth/login" -H "Content-Type: application/json" -d "{\"username\":\"USER\",\"password\":\"PASS\"}"
+curl.exe -sS -H "Authorization: Bearer YOUR_ACCESS_TOKEN" "https://api.fbwarehouse.uz/api/v1/inventory/picker?limit=10"
+```
+
+`items` bo‘sh, lekin `200` — odatda **bazada** picker uchun ko‘rinadigan qoldiq yo‘q. **403** — foydalanuvchida `picking:read` / `inventory:read` yo‘q.
+
 - **VPS / bo‘sh baza:** Agar Postman/curl da ham `items` bo‘sh bo‘lsa, Flutter emas — PostgreSQL dump restore, migratsiyalar (`alembic upgrade head`) va ma’lumotlarni yangi VPS ga ko‘chirishni tekshiring (`backend/` va server runbook).
 
 ## 4. `lib/` tuzilmasi (Clean-style)

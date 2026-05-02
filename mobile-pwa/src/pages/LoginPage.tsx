@@ -9,7 +9,11 @@ import { LanguageSwitcher } from '../components/LanguageSwitcher'
 import { useAuth } from '../rbac/AuthProvider'
 import { BRAND } from '../config/branding'
 import { getHomeRouteForRole } from '../rbac/routes'
-import { buildApiUrl } from '../services/apiClient'
+import { buildApiUrl, type ApiError } from '../services/apiClient'
+
+function isApiError(e: unknown): e is ApiError {
+  return typeof e === 'object' && e !== null && 'code' in e
+}
 
 export function LoginPage() {
   const { signIn, user, isLoading: isAuthLoading } = useAuth()
@@ -60,8 +64,20 @@ export function LoginPage() {
           (home === '/controller' &&
             (from.startsWith('/controller') || from.startsWith('/picking'))))
       navigate(shouldUseFrom ? from : home, { replace: true })
-    } catch {
-      setError(t('invalid_credentials'))
+    } catch (err: unknown) {
+      if (isApiError(err)) {
+        if (err.code === 'NETWORK') {
+          setError(t('login_network_error'))
+        } else if (err.code === 'HTTP' && err.status === 401) {
+          setError(t('invalid_credentials'))
+        } else if (err.code === 'HTTP' && typeof err.message === 'string' && err.message.trim()) {
+          setError(err.message)
+        } else {
+          setError(t('invalid_credentials'))
+        }
+      } else {
+        setError(t('invalid_credentials'))
+      }
     } finally {
       setIsLoading(false)
       isSubmittingRef.current = false
