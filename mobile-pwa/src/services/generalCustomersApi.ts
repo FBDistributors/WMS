@@ -1,4 +1,5 @@
 import { buildApiUrl, fetchJSON } from './apiClient'
+import { appFetch } from '../utils/appFetch'
 
 const TOKEN_KEY = 'wms_token'
 
@@ -47,7 +48,7 @@ export async function importGeneralCustomers(file: File): Promise<GeneralCustome
   form.append('file', file)
   const token = localStorage.getItem(TOKEN_KEY)
   const url = buildApiUrl('/api/v1/general-customers/import')
-  const response = await fetch(url, {
+  const response = await appFetch(url, {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: form,

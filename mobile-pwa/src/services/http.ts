@@ -1,3 +1,5 @@
+import { appFetch } from '../utils/appFetch'
+
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 export type HttpError = {
@@ -43,7 +45,7 @@ export async function requestJson<TResponse, TBody = unknown>(
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
-    const response = await fetch(buildUrl(path), {
+    const response = await appFetch(buildUrl(path), {
       method: options.method ?? (options.body ? 'POST' : 'GET'),
       headers: {
         'Content-Type': 'application/json',

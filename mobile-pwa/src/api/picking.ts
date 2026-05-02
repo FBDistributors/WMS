@@ -1,3 +1,5 @@
+import { appFetch } from '../utils/appFetch'
+
 export type PickingLine = {
   id: string
   product_name: string
@@ -56,7 +58,7 @@ async function fetchJSON<TResponse, TBody = unknown>(
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
-    const response = await fetch(buildUrl(path), {
+    const response = await appFetch(buildUrl(path), {
       method: options.method ?? (options.body ? 'POST' : 'GET'),
       headers: {
         'Content-Type': 'application/json',

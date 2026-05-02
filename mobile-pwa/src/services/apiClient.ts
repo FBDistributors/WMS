@@ -1,3 +1,5 @@
+import { appFetch } from '../utils/appFetch'
+
 type ApiError = {
   message: string
   status?: number
@@ -56,7 +58,7 @@ export async function fetchJSON<TResponse, TBody = unknown>(
   try {
     const url = buildApiUrl(path, options.query)
     const token = localStorage.getItem(TOKEN_KEY)
-    const response = await fetch(url, {
+    const response = await appFetch(url, {
       method: options.method ?? (options.body ? 'POST' : 'GET'),
       headers: {
         'Content-Type': 'application/json',

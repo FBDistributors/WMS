@@ -8,6 +8,15 @@
   "permissions": [
     "core:default",
     "core:path:default",
-    "shell:default"
+    "shell:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://api.fbwarehouse.uz/**" },
+        { "url": "https://www.fbwarehouse.uz/**" },
+        { "url": "http://localhost/**" },
+        { "url": "http://127.0.0.1/**" }
+      ]
+    }
   ]
 }

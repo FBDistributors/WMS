@@ -1,4 +1,5 @@
 import { buildApiUrl, fetchJSON } from './apiClient'
+import { appFetch } from '../utils/appFetch'
 
 const TOKEN_KEY = 'wms_token'
 
@@ -70,7 +71,7 @@ export async function importVipCustomers(file: File): Promise<VipCustomerImportR
   form.append('file', file)
   const token = localStorage.getItem(TOKEN_KEY)
   const url = buildApiUrl('/api/v1/vip-customers/import')
-  const response = await fetch(url, {
+  const response = await appFetch(url, {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: form,
