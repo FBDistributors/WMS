@@ -57,17 +57,22 @@ def _get_cors_config() -> tuple[list[str], str | None]:
     if allow_all:
         return ["*"], None
 
+    # Tauri / WebView: https://tauri.app (ishonch); ba'zi buildlarda Origin: null yoki tauri://localhost
     _default_origins = [
         "https://wms-opal.vercel.app",
         "https://www.fbwarehouse.uz",
         "https://api.fbwarehouse.uz",
         "http://tauri.localhost",
         "https://tauri.localhost",
+        "null",  # brauzer/WebView ba'zida "null" sifatida yuboradi
     ]
     _default_origin_regex = (
         r"^https://([\w-]+\.)*fbwarehouse\.uz$"
         r"|^http://tauri\.localhost(?::\d+)?$"
         r"|^https://tauri\.localhost(?::\d+)?$"
+        r"|^tauri://localhost$"
+        r"|^http://localhost(?::\d+)?$"
+        r"|^http://127\.0\.0\.1(?::\d+)?$"
         r"|^https://.*\.vercel\.app$"
     )
 
