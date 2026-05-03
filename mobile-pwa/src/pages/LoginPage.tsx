@@ -88,6 +88,8 @@ export function LoginPage() {
           setError(detail ? `${t('login_network_error')}\n${detail}` : t('login_network_error'))
         } else if (err.code === 'HTTP' && err.status === 401) {
           setError(t('invalid_credentials'))
+        } else if (err.code === 'HTTP' && (err.status === 502 || err.status === 503)) {
+          setError(t('login_service_unavailable'))
         } else if (err.code === 'HTTP' && typeof err.message === 'string' && err.message.trim()) {
           setError(err.message)
         } else {
