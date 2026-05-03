@@ -1,4 +1,4 @@
-/// API base URL — matches React Native `env.ts` (default Render).
+/// API base URL — matches React Native `env.ts` (default: api.fbwarehouse.uz).
 /// Override with `--dart-define=API_BASE_URL=https://your-host` at build/run time.
 class ApiConfig {
   ApiConfig._();

@@ -1,5 +1,5 @@
 /**
- * API base URL: default — Render.
+ * API base URL: default — production VPS API (api.fbwarehouse.uz).
  * Boshqa host kerak bo‘lsa: API_BASE_URL ni o‘rnating (masalan https://api.example.com).
  * To‘liq path kerak bo‘lsa: API_BASE_URL=https://.../api/v1 qilib qo‘ying.
  */

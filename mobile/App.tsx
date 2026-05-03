@@ -1,5 +1,5 @@
 /**
- * WMS Mobile — Render wms-api ga ulangan.
+ * WMS Mobile — API: api.fbwarehouse.uz (env: API_BASE_URL).
  * Stack: Login, Home, PickerHome → PickTaskList → PickTaskDetails, Scanner.
  * Offline MVP: cache + queue + sync.
  * Push: bildirishnoma bosilganda buyurtmaga ochiladi (FCM — PUSH_SETUP.md).
