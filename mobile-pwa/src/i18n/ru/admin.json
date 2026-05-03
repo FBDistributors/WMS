@@ -20,7 +20,6 @@
     "users": "Пользователи и доступ",
     "audit": "Журнал аудита",
     "kamomat": "Инвентаризация",
-    "api": "API",
     "integrations": "Интеграции",
     "smartup_orders": "Заказы Smartup",
     "profile": "Профиль"
@@ -163,23 +162,6 @@
       "open": "Открыто",
       "resolved": "Решено"
     }
-  },
-  "api": {
-    "input_label": "Данные API (JSON)",
-    "placeholder": "Вставьте JSON или ответ API в поле выше — таблица отобразится здесь.",
-    "placeholder_json_only": "Введите JSON в поле выше или загрузите ответ API через быстрые запросы.",
-    "preset_apis": "Быстрые запросы",
-    "order_api_btn": "Order API (imported, все)",
-    "order_api_smartup_btn": "Order API из SmartUp (imported)",
-    "smartup_params_hint": "Как при синхронизации: если дата и филиал пусты, используются последние 7 дней.",
-    "begin_deal_date": "Дата начала",
-    "end_deal_date": "Дата окончания",
-    "filial_code": "Код филиала",
-    "filial_id": "ID филиала",
-    "loading": "Загрузка...",
-    "loaded_count": "Загружено: {{count}} заказов (imported)",
-    "loaded_from_smartup": "Загружено из SmartUp: {{count}} заказов (imported)",
-    "loaded_from_smartup_total": "Загружено из SmartUp: {{count}} / {{total}} заказов (imported)"
   },
   "header": {
     "menu": "Меню"

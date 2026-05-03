@@ -14,7 +14,6 @@
   "empty_desc": "Create the first brand.",
   "search": "Search",
   "show_inactive": "Show inactive",
-  "unknown_codes": "Unknown brand codes",
   "validation": {
     "required": "Code and name are required."
   },

@@ -13,7 +13,6 @@ import {
   createBrand,
   deactivateBrand,
   getBrands,
-  getUnknownBrandCodes,
   updateBrand,
   type Brand,
 } from '../../services/brandsApi'
@@ -30,7 +29,6 @@ export function BrandsPage() {
   const { has } = useAuth()
   const canManage = has('brands:manage')
   const [items, setItems] = useState<Brand[]>([])
-  const [unknownCodes, setUnknownCodes] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -43,18 +41,14 @@ export function BrandsPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const [brands, missing] = await Promise.all([
-        getBrands(search.trim() || undefined, includeInactive),
-        canManage ? getUnknownBrandCodes() : Promise.resolve([]),
-      ])
+      const brands = await getBrands(search.trim() || undefined, includeInactive)
       setItems(brands)
-      setUnknownCodes(missing)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('brands:load_failed'))
     } finally {
       setIsLoading(false)
     }
-  }, [canManage, includeInactive, search, t])
+  }, [includeInactive, search, t])
 
   useEffect(() => {
     void load()
@@ -170,11 +164,6 @@ export function BrandsPage() {
             {t('common:buttons.refresh')}
           </Button>
         </div>
-        {unknownCodes.length > 0 && canManage ? (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10">
-            {t('brands:unknown_codes')}: {unknownCodes.join(', ')}
-          </div>
-        ) : null}
         {content}
       </Card>
 

@@ -39,7 +39,3 @@ export async function updateBrand(id: string, payload: BrandUpdateInput) {
 export async function deactivateBrand(id: string) {
   return fetchJSON<Brand>(`/api/v1/brands/${id}`, { method: 'DELETE' })
 }
-
-export async function getUnknownBrandCodes() {
-  return fetchJSON<string[]>('/api/v1/brands/unknown-codes')
-}

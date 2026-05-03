@@ -14,7 +14,6 @@
   "empty_desc": "Birinchi brendni yarating.",
   "search": "Qidiruv",
   "show_inactive": "Faol emaslarni ko‘rsatish",
-  "unknown_codes": "Noma’lum brend kodlari",
   "validation": {
     "required": "Kod va nom majburiy."
   },
