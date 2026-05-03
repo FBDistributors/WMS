@@ -12,6 +12,7 @@
     {
       "identifier": "http:default",
       "allow": [
+        { "url": "https://**" },
         { "url": "https://api.fbwarehouse.uz/**" },
         { "url": "https://www.fbwarehouse.uz/**" },
         { "url": "http://localhost/**" },

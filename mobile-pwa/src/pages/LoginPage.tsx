@@ -15,6 +15,23 @@ function isApiError(e: unknown): e is ApiError {
   return typeof e === 'object' && e !== null && 'code' in e
 }
 
+function formatNetworkErrorDetail(err: ApiError): string {
+  let msg = typeof err.message === 'string' ? err.message.trim() : ''
+  if (!msg || msg === 'Network error') {
+    msg = ''
+    const d = err.details
+    if (d instanceof Error && d.message.trim()) {
+      msg = d.message.trim()
+    } else if (typeof d === 'string' && d.trim()) {
+      msg = d.trim()
+    }
+  }
+  if (msg.length > 400) {
+    msg = `${msg.slice(0, 400)}…`
+  }
+  return msg
+}
+
 export function LoginPage() {
   const { signIn, user, isLoading: isAuthLoading } = useAuth()
   const { t } = useTranslation('auth')
@@ -67,7 +84,8 @@ export function LoginPage() {
     } catch (err: unknown) {
       if (isApiError(err)) {
         if (err.code === 'NETWORK') {
-          setError(t('login_network_error'))
+          const detail = formatNetworkErrorDetail(err)
+          setError(detail ? `${t('login_network_error')}\n${detail}` : t('login_network_error'))
         } else if (err.code === 'HTTP' && err.status === 401) {
           setError(t('invalid_credentials'))
         } else if (err.code === 'HTTP' && typeof err.message === 'string' && err.message.trim()) {
@@ -126,7 +144,9 @@ export function LoginPage() {
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
-          {error ? <div className="text-sm text-red-600">{error}</div> : null}
+          {error ? (
+            <div className="whitespace-pre-line text-sm text-red-600">{error}</div>
+          ) : null}
           <Button fullWidth disabled={isLoading}>
             {isLoading ? t('logging_in') : t('login')}
           </Button>
