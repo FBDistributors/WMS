@@ -298,6 +298,21 @@ async function fetchProductsBySkuCodes(codes: string[]): Promise<Map<string, Pro
   return map
 }
 
+/** `fetchJSON` ApiError yoki Error — catch da umumiy «import failed» o‘rniga haqiqiy matn. */
+function importSubmitErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof Error) return err.message
+  if (typeof err === 'object' && err !== null && 'message' in err) {
+    const o = err as { message?: unknown; status?: unknown }
+    if (typeof o.message === 'string' && o.message.trim()) {
+      if (typeof o.status === 'number') {
+        return `${o.message} (HTTP ${o.status})`
+      }
+      return o.message
+    }
+  }
+  return fallback
+}
+
 function applyCatalogToLines(
   lines: ImportQtyRowLine[],
   bySku: Map<string, Product>,
@@ -466,7 +481,7 @@ export function ImportInventoryDialog({
       })
       onSuccess()
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : t('inventory:import_failed'))
+      setFormError(importSubmitErrorMessage(err, t('inventory:import_failed')))
     } finally {
       setSubmitting(false)
     }
