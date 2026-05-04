@@ -125,7 +125,11 @@ function findDetailedColumns(headers: string[]): DetailedIdx | null {
       h === 'joylashuv' ||
       h === 'location' ||
       h.includes('joylashuv') ||
-      (h.includes('joylash') && !h.includes('code')),
+      (h.includes('joylash') && !h.includes('code')) ||
+      h === 'локация' ||
+      h === 'место' ||
+      h.includes('локац') ||
+      h.includes('место'),
   )
   let qtyIdx = lower.findIndex((h) => h === 'miqdor')
   if (qtyIdx < 0) {
@@ -133,6 +137,8 @@ function findDetailedColumns(headers: string[]): DetailedIdx | null {
       (h) =>
         h === 'qty' ||
         h === 'quantity' ||
+        h === 'кол-во' ||
+        h === 'количество' ||
         (h.includes('total') && h.includes('qty')),
     )
   }
@@ -160,7 +166,9 @@ function findDetailedColumns(headers: string[]): DetailedIdx | null {
       h === 'expiry' ||
       h.includes('yaroqlilik') ||
       h.includes('expiry') ||
-      h.includes('годен'),
+      h.includes('годен') ||
+      h.includes('годности') ||
+      (h.includes('срок') && h.includes('год')),
   )
   if (locationIdx < 0 || qtyIdx < 0) return null
   const uniq = new Set([codeIdx, qtyIdx, locationIdx])
