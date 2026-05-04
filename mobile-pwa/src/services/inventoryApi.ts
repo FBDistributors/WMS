@@ -438,6 +438,36 @@ export async function importInventoryQty(payload: ImportQtyPayload) {
 
 export { IMPORT_QTY_MAX_LINES }
 
+export type ImportQtyRowLine = {
+  code: string
+  qty: number
+  location_code: string
+  /** ISO date YYYY-MM-DD; omit or undefined when no expiry */
+  expiry_date?: string | null
+}
+
+/** Har qatorda joy kodi + ixtiyoriy muddat (eksport «qoldiq muddati» shabloni). */
+export async function importInventoryQtyRows(payload: {
+  lines: ImportQtyRowLine[]
+  warehouse?: WarehouseFilter
+}) {
+  if (payload.lines.length > IMPORT_QTY_MAX_LINES) {
+    throw new Error(`Too many rows (max ${IMPORT_QTY_MAX_LINES})`)
+  }
+  return fetchJSON<ImportQtyResponse>('/api/v1/inventory/import-qty-rows', {
+    method: 'POST',
+    body: {
+      warehouse: payload.warehouse,
+      lines: payload.lines.map((l) => ({
+        code: l.code,
+        qty: l.qty,
+        location_code: l.location_code,
+        ...(l.expiry_date ? { expiry_date: l.expiry_date } : {}),
+      })),
+    },
+  })
+}
+
 /** SmartUP balance$export — cache yoki refresh=1 da SmartUP dan yangilash. warehouse_code: 001 = qoldiq, 002 = bron. filial_id: header (all = barcha filiallar). */
 export async function getSmartupBalance(options?: {
   signal?: AbortSignal

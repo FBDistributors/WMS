@@ -312,7 +312,6 @@ export function InventorySummaryPage() {
             t('inventory:columns.brand'),
             t('inventory:columns.location'),
             t('inventory:columns.qty'),
-            t('inventory:columns.available'),
             t('inventory:columns.expiry'),
           ]
           const rows = (res.items ?? []).flatMap((row) =>
@@ -323,7 +322,6 @@ export function InventorySummaryPage() {
               row.brand_name ?? '',
               loc.location_code,
               Math.round(Number(loc.qty)),
-              Math.round(Number(loc.available_qty)),
               loc.expiry_date ?? '',
             ])
           )
