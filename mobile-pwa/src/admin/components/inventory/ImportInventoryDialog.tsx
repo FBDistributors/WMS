@@ -6,13 +6,11 @@ import * as XLSX from 'xlsx'
 import { Button } from '../../../components/ui/button'
 import {
   IMPORT_QTY_MAX_LINES,
-  importInventoryQty,
   importInventoryQtyRows,
-  type ImportQtyLine,
   type ImportQtyResponse,
   type ImportQtyRowLine,
 } from '../../../services/inventoryApi'
-import { getLocations, type Location, type WarehouseFilter } from '../../../services/locationsApi'
+import type { WarehouseFilter } from '../../../services/locationsApi'
 
 type ImportInventoryDialogProps = {
   open: boolean
@@ -20,8 +18,6 @@ type ImportInventoryDialogProps = {
   warehouse: WarehouseFilter
   onSuccess: () => void
 }
-
-type ImportMode = 'simple' | 'detailed'
 
 const parseCsv = (text: string) => {
   const rows: string[][] = []
@@ -115,47 +111,6 @@ function parseExpiryCell(raw: unknown): string | undefined {
   return undefined
 }
 
-function findCodeAndQtyColumnIndexes(headers: string[]): { codeIdx: number; qtyIdx: number } | null {
-  const lower = headers.map((h) => normalizeHeader(h))
-  let codeIdx = lower.findIndex(
-    (h) =>
-      h === 'sku' ||
-      h === 'code' ||
-      h === 'product_code' ||
-      h === 'kod' ||
-      h === 'код' ||
-      h === 'barcode' ||
-      h.includes('shtrix') ||
-      h.includes('штрих'),
-  )
-  let qtyIdx = lower.findIndex((h) => h === 'miqdor')
-  if (qtyIdx < 0) {
-    qtyIdx = lower.findIndex(
-      (h) =>
-        h === 'qty' ||
-        h === 'quantity' ||
-        (h.includes('miqdor') && !h.includes('jami')) ||
-        ((h.includes('total') || h.includes('jami')) && h.includes('qty')),
-    )
-  }
-  if (qtyIdx >= 0) {
-    const h = lower[qtyIdx]
-    if (h === 'qoldiq' || h === 'available' || (h.includes('qoldiq') && !h.includes('miqdor'))) {
-      qtyIdx = -1
-    }
-  }
-  if (codeIdx < 0 && lower.length >= 1) {
-    codeIdx = 0
-  }
-  if (qtyIdx < 0 && lower.length >= 5) {
-    qtyIdx = 4
-  }
-  if (codeIdx < 0 || qtyIdx < 0 || codeIdx === qtyIdx) {
-    return null
-  }
-  return { codeIdx, qtyIdx }
-}
-
 type DetailedIdx = {
   codeIdx: number
   qtyIdx: number
@@ -218,33 +173,6 @@ function findDetailedColumns(headers: string[]): DetailedIdx | null {
   }
 }
 
-function parseRowsToLines(rows: string[][]): { lines: ImportQtyLine[]; error: string | null } {
-  if (rows.length < 2) {
-    return { lines: [], error: 'no_rows' }
-  }
-  const headers = rows[0].map((c) => String(c ?? ''))
-  const idx = findCodeAndQtyColumnIndexes(headers)
-  if (!idx) {
-    return { lines: [], error: 'missing_columns' }
-  }
-  const out: ImportQtyLine[] = []
-  for (let r = 1; r < rows.length; r += 1) {
-    const row = rows[r]
-    const code = String(row[idx.codeIdx] ?? '')
-      .trim()
-      .replace(/^'+|'+$/g, '')
-    const qtyRaw = row[idx.qtyIdx]
-    const qtyNum = Math.floor(Number(String(qtyRaw ?? '').replace(/,/g, '.').trim()))
-    if (!code) continue
-    if (!Number.isFinite(qtyNum) || qtyNum <= 0) continue
-    out.push({ code, qty: qtyNum })
-  }
-  if (out.length === 0) {
-    return { lines: [], error: 'no_rows' }
-  }
-  return { lines: out, error: null }
-}
-
 function parseRowsToDetailedLines(
   rows: string[][],
   idx: DetailedIdx,
@@ -288,22 +216,14 @@ export function ImportInventoryDialog({
 }: ImportInventoryDialogProps) {
   const { t } = useTranslation(['inventory', 'common'])
   const [fileName, setFileName] = useState<string | null>(null)
-  const [mode, setMode] = useState<ImportMode>('simple')
-  const [simpleLines, setSimpleLines] = useState<ImportQtyLine[]>([])
-  const [detailedLines, setDetailedLines] = useState<ImportQtyRowLine[]>([])
-  const [locationId, setLocationId] = useState('')
-  const [locations, setLocations] = useState<Location[]>([])
-  const [locationsLoading, setLocationsLoading] = useState(false)
+  const [lines, setLines] = useState<ImportQtyRowLine[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [result, setResult] = useState<ImportQtyResponse | null>(null)
 
   const reset = useCallback(() => {
     setFileName(null)
-    setMode('simple')
-    setSimpleLines([])
-    setDetailedLines([])
-    setLocationId('')
+    setLines([])
     setFormError(null)
     setResult(null)
   }, [])
@@ -313,17 +233,7 @@ export function ImportInventoryDialog({
     reset()
   }, [open, reset])
 
-  useEffect(() => {
-    if (!open) return
-    setLocationsLoading(true)
-    getLocations(false, warehouse)
-      .then(setLocations)
-      .catch(() => setLocations([]))
-      .finally(() => setLocationsLoading(false))
-  }, [open, warehouse])
-
-  const previewSimple = useMemo(() => simpleLines.slice(0, 15), [simpleLines])
-  const previewDetailed = useMemo(() => detailedLines.slice(0, 15), [detailedLines])
+  const preview = useMemo(() => lines.slice(0, 15), [lines])
 
   const parseErrorMessage = (key: string | null) => {
     if (!key) return null
@@ -335,9 +245,7 @@ export function ImportInventoryDialog({
     setFormError(null)
     setResult(null)
     setFileName(file.name)
-    setMode('simple')
-    setSimpleLines([])
-    setDetailedLines([])
+    setLines([])
     const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
     try {
       let rows: string[][] = []
@@ -358,21 +266,11 @@ export function ImportInventoryDialog({
       }
       const headers = rows[0].map((c) => String(c ?? ''))
       const detailedIdx = findDetailedColumns(headers)
-      if (detailedIdx) {
-        const parsedD = parseRowsToDetailedLines(rows, detailedIdx)
-        if (parsedD.error) {
-          setFormError(parseErrorMessage(parsedD.error))
-          return
-        }
-        if (parsedD.lines.length > IMPORT_QTY_MAX_LINES) {
-          setFormError(t('inventory:import_max_rows', { max: IMPORT_QTY_MAX_LINES }))
-          return
-        }
-        setMode('detailed')
-        setDetailedLines(parsedD.lines)
+      if (!detailedIdx) {
+        setFormError(t('inventory:import_requires_location_column'))
         return
       }
-      const parsed = parseRowsToLines(rows)
+      const parsed = parseRowsToDetailedLines(rows, detailedIdx)
       if (parsed.error) {
         setFormError(parseErrorMessage(parsed.error))
         return
@@ -381,18 +279,14 @@ export function ImportInventoryDialog({
         setFormError(t('inventory:import_max_rows', { max: IMPORT_QTY_MAX_LINES }))
         return
       }
-      setSimpleLines(parsed.lines)
+      setLines(parsed.lines)
     } catch {
       setFormError(t('inventory:import_parse_error'))
     }
   }
 
   const handleSubmit = async () => {
-    if (mode === 'simple') {
-      if (!locationId || simpleLines.length === 0) return
-    } else {
-      if (detailedLines.length === 0) return
-    }
+    if (lines.length === 0) return
     setSubmitting(true)
     setFormError(null)
     setResult(null)
@@ -400,29 +294,15 @@ export function ImportInventoryDialog({
       let applied = 0
       let skipped = 0
       const allErrors: { code: string; message: string }[] = []
-      if (mode === 'simple') {
-        for (let i = 0; i < simpleLines.length; i += IMPORT_QTY_MAX_LINES) {
-          const chunk = simpleLines.slice(i, i + IMPORT_QTY_MAX_LINES)
-          const res = await importInventoryQty({
-            location_id: locationId,
-            lines: chunk,
-            warehouse,
-          })
-          applied += res.applied_rows
-          skipped += res.skipped_rows
-          allErrors.push(...res.errors)
-        }
-      } else {
-        for (let i = 0; i < detailedLines.length; i += IMPORT_QTY_MAX_LINES) {
-          const chunk = detailedLines.slice(i, i + IMPORT_QTY_MAX_LINES)
-          const res = await importInventoryQtyRows({
-            lines: chunk,
-            warehouse,
-          })
-          applied += res.applied_rows
-          skipped += res.skipped_rows
-          allErrors.push(...res.errors)
-        }
+      for (let i = 0; i < lines.length; i += IMPORT_QTY_MAX_LINES) {
+        const chunk = lines.slice(i, i + IMPORT_QTY_MAX_LINES)
+        const res = await importInventoryQtyRows({
+          lines: chunk,
+          warehouse,
+        })
+        applied += res.applied_rows
+        skipped += res.skipped_rows
+        allErrors.push(...res.errors)
       }
       setResult({
         applied_rows: applied,
@@ -437,10 +317,7 @@ export function ImportInventoryDialog({
     }
   }
 
-  const canSubmit =
-    mode === 'simple'
-      ? Boolean(locationId && simpleLines.length > 0 && !submitting)
-      : Boolean(detailedLines.length > 0 && !submitting)
+  const canSubmit = Boolean(lines.length > 0 && !submitting)
 
   if (!open) return null
 
@@ -458,9 +335,7 @@ export function ImportInventoryDialog({
             <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               {t('inventory:import_title')}
             </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              {mode === 'detailed' ? t('inventory:import_hint_detailed') : t('inventory:import_hint')}
-            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{t('inventory:import_hint')}</p>
           </div>
           <Button variant="ghost" className="rounded-full px-3 py-3" onClick={() => onOpenChange(false)}>
             <X size={18} />
@@ -473,28 +348,9 @@ export function ImportInventoryDialog({
             </div>
           ) : null}
 
-          {mode === 'simple' ? (
-            <>
-              <label className="text-sm text-slate-600 dark:text-slate-300">{t('inventory:import_location')}</label>
-              <select
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                value={locationId}
-                onChange={(e) => setLocationId(e.target.value)}
-                disabled={locationsLoading}
-              >
-                <option value="">{t('inventory:import_location_placeholder')}</option>
-                {locations.map((loc) => (
-                  <option key={loc.id} value={loc.id}>
-                    {loc.code} — {loc.name}
-                  </option>
-                ))}
-              </select>
-            </>
-          ) : (
-            <p className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-              {t('inventory:import_location_from_file')}
-            </p>
-          )}
+          <p className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+            {t('inventory:import_location_from_file')}
+          </p>
 
           <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100">
             <Upload size={16} />
@@ -511,35 +367,7 @@ export function ImportInventoryDialog({
           </label>
           <p className="text-xs text-slate-500 dark:text-slate-400">{t('inventory:import_file_hint_full')}</p>
 
-          {mode === 'simple' && previewSimple.length > 0 ? (
-            <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
-              <table className="min-w-full text-xs">
-                <thead className="bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-                  <tr>
-                    <th className="px-3 py-2 text-left">#</th>
-                    <th className="px-3 py-2 text-left">{t('inventory:columns.code')}</th>
-                    <th className="px-3 py-2 text-right">{t('inventory:columns.qty')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {previewSimple.map((row, i) => (
-                    <tr key={`${row.code}-${i}`} className="border-t border-slate-200 dark:border-slate-800">
-                      <td className="px-3 py-2">{i + 1}</td>
-                      <td className="px-3 py-2 font-mono">{row.code}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{row.qty}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {simpleLines.length > previewSimple.length ? (
-                <div className="border-t border-slate-200 px-3 py-2 text-xs text-slate-500 dark:border-slate-800">
-                  {t('inventory:import_and_more', { count: simpleLines.length - previewSimple.length })}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-
-          {mode === 'detailed' && previewDetailed.length > 0 ? (
+          {preview.length > 0 ? (
             <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
               <table className="min-w-full text-xs">
                 <thead className="bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
@@ -552,7 +380,7 @@ export function ImportInventoryDialog({
                   </tr>
                 </thead>
                 <tbody>
-                  {previewDetailed.map((row, i) => (
+                  {preview.map((row, i) => (
                     <tr key={`${row.code}-${row.location_code}-${i}`} className="border-t border-slate-200 dark:border-slate-800">
                       <td className="px-3 py-2">{i + 1}</td>
                       <td className="px-3 py-2 font-mono">{row.code}</td>
@@ -563,9 +391,9 @@ export function ImportInventoryDialog({
                   ))}
                 </tbody>
               </table>
-              {detailedLines.length > previewDetailed.length ? (
+              {lines.length > preview.length ? (
                 <div className="border-t border-slate-200 px-3 py-2 text-xs text-slate-500 dark:border-slate-800">
-                  {t('inventory:import_and_more', { count: detailedLines.length - previewDetailed.length })}
+                  {t('inventory:import_and_more', { count: lines.length - preview.length })}
                 </div>
               ) : null}
             </div>
