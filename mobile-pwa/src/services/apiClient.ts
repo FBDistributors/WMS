@@ -44,6 +44,13 @@ function clearTokenAndRedirect() {
   }
 }
 
+/** Faqat `fetchJSON` o‘zi tashlagan ApiError — `DOMException` ham `code` ga ega (raqam). */
+function isOurApiError(error: unknown): error is ApiError {
+  if (typeof error !== 'object' || error === null || !('code' in error)) return false
+  const c = (error as { code: unknown }).code
+  return c === 'HTTP' || c === 'NETWORK'
+}
+
 export async function fetchJSON<TResponse, TBody = unknown>(
   path: string,
   options: RequestOptions<TBody> = {}
@@ -107,12 +114,18 @@ export async function fetchJSON<TResponse, TBody = unknown>(
     return payload as TResponse
   } catch (error) {
     if (timeoutId) clearTimeout(timeoutId)
-    if (typeof error === 'object' && error !== null && 'code' in error) {
-      throw error as ApiError
+    if (isOurApiError(error)) {
+      throw error
     }
     const originalMsg =
       error instanceof Error ? error.message : typeof error === 'string' ? error : ''
-    const isAbort = originalMsg === 'AbortError' || (error && typeof error === 'object' && 'name' in error && (error as { name: string }).name === 'AbortError')
+    const isAbort =
+      originalMsg === 'AbortError' ||
+      (error &&
+        typeof error === 'object' &&
+        'name' in error &&
+        (error as { name: string }).name === 'AbortError') ||
+      /signal is aborted|aborted without reason/i.test(originalMsg)
     throw {
       message: isAbort ? 'Request timeout' : (originalMsg || 'Network error'),
       code: 'NETWORK',
