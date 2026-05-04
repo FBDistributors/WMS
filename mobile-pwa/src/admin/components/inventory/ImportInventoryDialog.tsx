@@ -10,7 +10,11 @@ import {
   type ImportQtyResponse,
   type ImportQtyRowLine,
 } from '../../../services/inventoryApi'
+import { getProducts, type Product } from '../../../services/productsApi'
 import type { WarehouseFilter } from '../../../services/locationsApi'
+
+/** Backend `GET /products` — `limit` va `skus` filtri bilan mos (max 200). */
+const CATALOG_SKU_CHUNK = 200
 
 type ImportInventoryDialogProps = {
   open: boolean
@@ -278,6 +282,46 @@ function parseRowsToDetailedLines(
   return { lines: out, error: null }
 }
 
+async function fetchProductsBySkuCodes(codes: string[]): Promise<Map<string, Product>> {
+  const unique = [...new Set(codes.map((c) => c.trim()).filter(Boolean))]
+  const map = new Map<string, Product>()
+  for (let i = 0; i < unique.length; i += CATALOG_SKU_CHUNK) {
+    const chunk = unique.slice(i, i + CATALOG_SKU_CHUNK)
+    const res = await getProducts({
+      skus: chunk,
+      limit: CATALOG_SKU_CHUNK,
+    })
+    for (const p of res.items) {
+      map.set(p.sku, p)
+    }
+  }
+  return map
+}
+
+function applyCatalogToLines(
+  lines: ImportQtyRowLine[],
+  bySku: Map<string, Product>,
+): { lines: ImportQtyRowLine[]; missingUniqueCodes: number } {
+  const uniqueCodes = [...new Set(lines.map((l) => l.code))]
+  let missingUniqueCodes = 0
+  for (const c of uniqueCodes) {
+    if (!bySku.has(c)) missingUniqueCodes += 1
+  }
+  const next = lines.map((line) => {
+    const p = bySku.get(line.code)
+    if (!p) return line
+    const brandLabel = (p.brand_display_name || p.brand_name || p.brand || '').trim()
+    const barcodeLabel = (p.barcode || p.barcodes?.[0] || '').trim()
+    return {
+      ...line,
+      product_name: p.name,
+      barcode: barcodeLabel || line.barcode,
+      brand: brandLabel || line.brand,
+    }
+  })
+  return { lines: next, missingUniqueCodes }
+}
+
 export function ImportInventoryDialog({
   open,
   onOpenChange,
@@ -291,6 +335,9 @@ export function ImportInventoryDialog({
   const [formError, setFormError] = useState<string | null>(null)
   const [result, setResult] = useState<ImportQtyResponse | null>(null)
   const [columnFlags, setColumnFlags] = useState({ barcode: false, product: false, brand: false })
+  const [catalogEnriching, setCatalogEnriching] = useState(false)
+  const [catalogEnrichError, setCatalogEnrichError] = useState<string | null>(null)
+  const [catalogMissingCount, setCatalogMissingCount] = useState(0)
 
   const reset = useCallback(() => {
     setFileName(null)
@@ -298,6 +345,9 @@ export function ImportInventoryDialog({
     setFormError(null)
     setResult(null)
     setColumnFlags({ barcode: false, product: false, brand: false })
+    setCatalogEnriching(false)
+    setCatalogEnrichError(null)
+    setCatalogMissingCount(0)
   }, [])
 
   useEffect(() => {
@@ -306,6 +356,15 @@ export function ImportInventoryDialog({
   }, [open, reset])
 
   const preview = useMemo(() => lines.slice(0, 15), [lines])
+
+  const displayColumnFlags = useMemo(
+    () => ({
+      barcode: columnFlags.barcode || lines.some((l) => Boolean(l.barcode?.trim())),
+      product: columnFlags.product || lines.some((l) => Boolean(l.product_name?.trim())),
+      brand: columnFlags.brand || lines.some((l) => Boolean(l.brand?.trim())),
+    }),
+    [columnFlags, lines],
+  )
 
   const parseErrorMessage = (key: string | null) => {
     if (!key) return null
@@ -319,6 +378,8 @@ export function ImportInventoryDialog({
     setFileName(file.name)
     setLines([])
     setColumnFlags({ barcode: false, product: false, brand: false })
+    setCatalogEnrichError(null)
+    setCatalogMissingCount(0)
     const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
     try {
       let rows: string[][] = []
@@ -359,7 +420,21 @@ export function ImportInventoryDialog({
         setColumnFlags({ barcode: false, product: false, brand: false })
         return
       }
-      setLines(parsed.lines)
+      setCatalogEnriching(true)
+      setCatalogEnrichError(null)
+      setCatalogMissingCount(0)
+      try {
+        const bySku = await fetchProductsBySkuCodes(parsed.lines.map((l) => l.code))
+        const { lines: enriched, missingUniqueCodes } = applyCatalogToLines(parsed.lines, bySku)
+        setCatalogMissingCount(missingUniqueCodes)
+        setLines(enriched)
+      } catch {
+        setCatalogEnrichError(t('inventory:import_catalog_enrich_failed'))
+        setLines(parsed.lines)
+        setCatalogMissingCount(0)
+      } finally {
+        setCatalogEnriching(false)
+      }
     } catch {
       setFormError(t('inventory:import_parse_error'))
     }
@@ -397,7 +472,7 @@ export function ImportInventoryDialog({
     }
   }
 
-  const canSubmit = Boolean(lines.length > 0 && !submitting)
+  const canSubmit = Boolean(lines.length > 0 && !submitting && !catalogEnriching)
 
   if (!open) return null
 
@@ -455,7 +530,25 @@ export function ImportInventoryDialog({
             />
           </label>
           <p className="text-xs text-slate-500 dark:text-slate-400">{t('inventory:import_file_hint_full')}</p>
-          {columnFlags.barcode || columnFlags.product || columnFlags.brand ? (
+          {catalogEnriching ? (
+            <div className="rounded-2xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200">
+              {t('inventory:import_catalog_enriching')}
+            </div>
+          ) : null}
+          {catalogEnrichError ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+              {catalogEnrichError}
+            </div>
+          ) : null}
+          {lines.length > 0 && !catalogEnriching && !catalogEnrichError ? (
+            <p className="text-xs text-slate-500 dark:text-slate-400">{t('inventory:import_catalog_filled')}</p>
+          ) : null}
+          {catalogMissingCount > 0 && !catalogEnriching ? (
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {t('inventory:import_catalog_missing', { count: catalogMissingCount })}
+            </p>
+          ) : null}
+          {displayColumnFlags.barcode || displayColumnFlags.product || displayColumnFlags.brand ? (
             <p className="text-xs text-slate-500 dark:text-slate-400">{t('inventory:import_extra_columns_preview')}</p>
           ) : null}
 
@@ -468,17 +561,17 @@ export function ImportInventoryDialog({
                     <th className="whitespace-nowrap px-2 py-2 text-left sm:px-3">
                       {t('inventory:columns.code')}
                     </th>
-                    {columnFlags.barcode ? (
+                    {displayColumnFlags.barcode ? (
                       <th className="whitespace-nowrap px-2 py-2 text-left sm:px-3">
                         {t('inventory:columns.barcode')}
                       </th>
                     ) : null}
-                    {columnFlags.product ? (
+                    {displayColumnFlags.product ? (
                       <th className="min-w-[8rem] whitespace-nowrap px-2 py-2 text-left sm:px-3 sm:min-w-[12rem]">
                         {t('inventory:columns.product')}
                       </th>
                     ) : null}
-                    {columnFlags.brand ? (
+                    {displayColumnFlags.brand ? (
                       <th className="whitespace-nowrap px-2 py-2 text-left sm:px-3">
                         {t('inventory:columns.brand')}
                       </th>
@@ -502,12 +595,12 @@ export function ImportInventoryDialog({
                     >
                       <td className="px-2 py-2 sm:px-3">{i + 1}</td>
                       <td className="px-2 py-2 font-mono sm:px-3">{row.code}</td>
-                      {columnFlags.barcode ? (
+                      {displayColumnFlags.barcode ? (
                         <td className="max-w-[9rem] truncate px-2 py-2 font-mono sm:max-w-[11rem] sm:px-3" title={row.barcode}>
                           {row.barcode || '—'}
                         </td>
                       ) : null}
-                      {columnFlags.product ? (
+                      {displayColumnFlags.product ? (
                         <td
                           className="max-w-[10rem] truncate px-2 py-2 sm:max-w-[16rem] sm:px-3"
                           title={row.product_name}
@@ -515,7 +608,7 @@ export function ImportInventoryDialog({
                           {row.product_name || '—'}
                         </td>
                       ) : null}
-                      {columnFlags.brand ? (
+                      {displayColumnFlags.brand ? (
                         <td className="max-w-[7rem] truncate px-2 py-2 sm:px-3" title={row.brand}>
                           {row.brand || '—'}
                         </td>
