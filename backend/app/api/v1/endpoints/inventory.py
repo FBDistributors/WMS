@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, List, Literal, Optional
@@ -75,6 +76,50 @@ def _location_ids_for_warehouse(db: Session, warehouse: Optional[str]) -> Option
         return []
     rows = db.query(LocationModel.id).filter(LocationModel.warehouse_id == showroom_id).all()
     return [r[0] for r in rows]
+
+
+def _resolve_product_by_sku_or_barcode(db: Session, code: str) -> Optional[ProductModel]:
+    """SKU (exact) first, then primary/extra barcodes (exact). Active products only."""
+    code = (code or "").strip()
+    if not code:
+        return None
+    by_sku = (
+        db.query(ProductModel)
+        .options(selectinload(ProductModel.barcodes))
+        .filter(ProductModel.is_active.is_(True), ProductModel.sku == code)
+        .first()
+    )
+    if by_sku:
+        return by_sku
+    return (
+        db.query(ProductModel)
+        .options(selectinload(ProductModel.barcodes))
+        .filter(
+            ProductModel.is_active.is_(True),
+            or_(
+                ProductModel.barcode == code,
+                ProductModel.id.in_(select(ProductBarcode.product_id).where(ProductBarcode.barcode == code)),
+            ),
+        )
+        .first()
+    )
+
+
+def _location_valid_for_warehouse(
+    db: Session, location: LocationModel, warehouse: Optional[str]
+) -> bool:
+    """When warehouse is set, location must belong to that warehouse and be a real bin (not root)."""
+    if not warehouse or warehouse not in ("main", "showroom"):
+        return True
+    if not location.is_active or location.type == "warehouse":
+        return False
+    if warehouse == "main":
+        return location.warehouse_id is None
+    showroom_id = _get_showroom_root_id(db)
+    if showroom_id is None:
+        return False
+    return location.warehouse_id == showroom_id
+
 
 # On-hand only (zone implementation / Variant A); allocate/unallocate not in ledger
 MOVEMENT_TYPES = set(ON_HAND_MOVEMENT_TYPES)
@@ -210,6 +255,28 @@ class BulkOpeningBalanceResponse(BaseModel):
     created_count: int
     skipped_count: int
     errors: List[str] = []
+
+
+class ImportQtyLineIn(BaseModel):
+    code: str = Field(..., min_length=1, max_length=128)
+    qty: int = Field(..., gt=0, le=10_000_000)
+
+
+class ImportQtyRequest(BaseModel):
+    location_id: UUID
+    lines: List[ImportQtyLineIn] = Field(..., min_length=1, max_length=5000)
+    warehouse: Optional[Literal["main", "showroom"]] = None
+
+
+class ImportQtyErrorItem(BaseModel):
+    code: str
+    message: str
+
+
+class ImportQtyResponse(BaseModel):
+    applied_rows: int
+    skipped_rows: int
+    errors: List[ImportQtyErrorItem] = []
 
 
 class StockMovementOut(BaseModel):
@@ -724,6 +791,131 @@ async def bulk_opening_balance(
         skipped_count=skipped_count,
         errors=errors[:20],
     )
+
+
+_MAX_IMPORT_QTY_ERRORS = 50
+
+
+@router.post(
+    "/import-qty",
+    response_model=ImportQtyResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Import positive stock adjustments from spreadsheet (SKU or barcode per line)",
+)
+@router.post(
+    "/import-qty/",
+    response_model=ImportQtyResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Import positive stock adjustments from spreadsheet (SKU or barcode per line)",
+)
+async def import_inventory_qty(
+    request: Request,
+    payload: ImportQtyRequest,
+    db: Session = Depends(get_db),
+    user: UserModel = Depends(get_current_user),
+    _guard=Depends(require_permission("inventory:adjust")),
+):
+    """
+    Har bir qator uchun tanlangan joyga miqdor qo'shiladi (adjust + inventory_overage).
+    Bir xil kod takrorlansa miqdorlar yig'iladi. OPENING partiyasi ishlatiladi.
+    """
+    location = db.query(LocationModel).filter(LocationModel.id == payload.location_id).one_or_none()
+    if not location:
+        raise HTTPException(status_code=400, detail="Location not found")
+    if not _location_valid_for_warehouse(db, location, payload.warehouse):
+        raise HTTPException(
+            status_code=400,
+            detail="Location is inactive, not a storage location, or does not match the selected warehouse",
+        )
+
+    merged: dict[str, int] = defaultdict(int)
+    for line in payload.lines:
+        key = line.code.strip()
+        if not key:
+            continue
+        merged[key] += line.qty
+
+    if not merged:
+        raise HTTPException(status_code=400, detail="No valid lines after merging")
+
+    applied_rows = 0
+    skipped_rows = 0
+    errors: List[ImportQtyErrorItem] = []
+
+    for code, qty in merged.items():
+        if len(errors) >= _MAX_IMPORT_QTY_ERRORS:
+            break
+        try:
+            product = _resolve_product_by_sku_or_barcode(db, code)
+            if not product:
+                skipped_rows += 1
+                errors.append(ImportQtyErrorItem(code=code, message="Product not found"))
+                continue
+
+            check_location_single_expiry(db, payload.location_id, product.id, None)
+
+            lot = (
+                db.query(StockLotModel)
+                .filter(
+                    StockLotModel.product_id == product.id,
+                    StockLotModel.batch == BULK_OPENING_BATCH,
+                    StockLotModel.expiry_date.is_(None),
+                )
+                .first()
+            )
+            if not lot:
+                lot = StockLotModel(
+                    product_id=product.id,
+                    batch=BULK_OPENING_BATCH,
+                    expiry_date=None,
+                )
+                db.add(lot)
+                db.flush()
+
+            check_controller_adjust_reason(user, "inventory_overage")
+
+            movement = StockMovementModel(
+                product_id=product.id,
+                lot_id=lot.id,
+                location_id=payload.location_id,
+                qty_change=Decimal(qty),
+                movement_type="adjust",
+                source_document_type=None,
+                source_document_id=None,
+                created_by_user_id=user.id,
+                reason_code="inventory_overage",
+            )
+            db.add(movement)
+            log_action(
+                db,
+                user_id=user.id,
+                action=ACTION_CREATE,
+                entity_type="stock_movement",
+                entity_id=str(movement.id),
+                new_data={
+                    "product_id": str(product.id),
+                    "lot_id": str(lot.id),
+                    "location_id": str(payload.location_id),
+                    "qty_change": str(qty),
+                    "movement_type": "adjust",
+                    "reason_code": "inventory_overage",
+                    "import_code": code,
+                },
+                ip_address=get_client_ip(request),
+            )
+            db.commit()
+            applied_rows += 1
+        except HTTPException:
+            db.rollback()
+            raise
+        except Exception as e:
+            db.rollback()
+            skipped_rows += 1
+            errors.append(ImportQtyErrorItem(code=code, message=str(e)))
+            if len(errors) >= _MAX_IMPORT_QTY_ERRORS:
+                break
+
+    return ImportQtyResponse(applied_rows=applied_rows, skipped_rows=skipped_rows, errors=errors)
 
 
 @router.get("/movements", response_model=List[StockMovementOut], summary="List stock movements")

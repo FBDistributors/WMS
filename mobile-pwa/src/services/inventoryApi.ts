@@ -403,6 +403,41 @@ export async function zeroBrandStock(
   })
 }
 
+export type ImportQtyLine = { code: string; qty: number }
+
+export type ImportQtyPayload = {
+  location_id: string
+  lines: ImportQtyLine[]
+  warehouse?: WarehouseFilter
+}
+
+export type ImportQtyErrorItem = { code: string; message: string }
+
+export type ImportQtyResponse = {
+  applied_rows: number
+  skipped_rows: number
+  errors: ImportQtyErrorItem[]
+}
+
+const IMPORT_QTY_MAX_LINES = 5000
+
+/** Excel/CSV dan qatorlar — qoldiqka qo‘shish (backend SKU/barcode + miqdor). */
+export async function importInventoryQty(payload: ImportQtyPayload) {
+  if (payload.lines.length > IMPORT_QTY_MAX_LINES) {
+    throw new Error(`Too many rows (max ${IMPORT_QTY_MAX_LINES})`)
+  }
+  return fetchJSON<ImportQtyResponse>('/api/v1/inventory/import-qty', {
+    method: 'POST',
+    body: {
+      location_id: payload.location_id,
+      lines: payload.lines,
+      warehouse: payload.warehouse,
+    },
+  })
+}
+
+export { IMPORT_QTY_MAX_LINES }
+
 /** SmartUP balance$export — cache yoki refresh=1 da SmartUP dan yangilash. warehouse_code: 001 = qoldiq, 002 = bron. filial_id: header (all = barcha filiallar). */
 export async function getSmartupBalance(options?: {
   signal?: AbortSignal

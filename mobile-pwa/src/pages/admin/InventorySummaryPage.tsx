@@ -11,11 +11,13 @@ import {
   CloudDownload,
   Filter,
   X,
+  Upload,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import * as XLSX from 'xlsx'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { ImportInventoryDialog } from '../../admin/components/inventory/ImportInventoryDialog'
 import { InventoryHeaderTabs } from '../../admin/components/inventory/InventoryHeaderTabs'
 import { InventoryTableSettings } from '../../admin/components/inventory/InventoryTableSettings'
 import { useInventoryTableConfig } from '../../admin/hooks/useInventoryTableConfig'
@@ -31,6 +33,7 @@ import {
   type WarehouseFilter,
 } from '../../services/inventoryApi'
 import { getBrands, type Brand } from '../../services/brandsApi'
+import { useAuth } from '../../rbac/AuthProvider'
 import { writeExcelFile } from '../../utils/exportExcel'
 
 const COLUMN_OPTIONS = [
@@ -104,6 +107,8 @@ export function InventorySummaryPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const warehouse: WarehouseFilter = (searchParams.get('warehouse') as WarehouseFilter) || 'main'
   const { t } = useTranslation(['inventory', 'common'])
+  const { has } = useAuth()
+  const canAdjustInventory = has('inventory:adjust')
   const { config, updateConfig, resetConfig } = useInventoryTableConfig()
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [data, setData] = useState<{ items: InventorySummaryLightRow[]; total: number }>({
@@ -129,6 +134,7 @@ export function InventorySummaryPage() {
   const [smartupSyncError, setSmartupSyncError] = useState<string | null>(null)
   const [exportSuccessAt, setExportSuccessAt] = useState<number | null>(null)
   const [exportSavedPath, setExportSavedPath] = useState<string | null>(null)
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), DEBOUNCE_MS)
@@ -661,6 +667,19 @@ export function InventorySummaryPage() {
                   <FileSpreadsheet size={16} />
                   {t('inventory:export_qty_only')}
                 </button>
+                {canAdjustInventory ? (
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                    onClick={() => {
+                      setExcelMenuOpen(false)
+                      setImportDialogOpen(true)
+                    }}
+                  >
+                    <Upload size={16} />
+                    {t('inventory:import_excel')}
+                  </button>
+                ) : null}
               </div>
             )}
           </div>
@@ -817,6 +836,12 @@ export function InventorySummaryPage() {
           </div>
         </div>
       ) : null}
+      <ImportInventoryDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        warehouse={warehouse}
+        onSuccess={() => void load()}
+      />
     </AdminLayout>
   )
 }
