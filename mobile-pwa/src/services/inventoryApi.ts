@@ -444,6 +444,10 @@ export type ImportQtyRowLine = {
   location_code: string
   /** ISO date YYYY-MM-DD; omit or undefined when no expiry */
   expiry_date?: string | null
+  /** Exceldan — faqat ko‘rinish; API ga yuborilmaydi */
+  barcode?: string
+  product_name?: string
+  brand?: string
 }
 
 /** Har qatorda joy kodi + ixtiyoriy muddat (eksport «qoldiq muddati» shabloni). */

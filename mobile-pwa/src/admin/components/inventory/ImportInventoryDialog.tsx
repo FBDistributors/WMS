@@ -116,6 +116,51 @@ type DetailedIdx = {
   qtyIdx: number
   locationIdx: number
   expiryIdx: number
+  barcodeIdx: number
+  productIdx: number
+  brandIdx: number
+}
+
+function findMetaColumnIndices(
+  lower: string[],
+  core: { codeIdx: number; qtyIdx: number; locationIdx: number; expiryIdx: number },
+): Pick<DetailedIdx, 'barcodeIdx' | 'productIdx' | 'brandIdx'> {
+  const used = new Set<number>([core.codeIdx, core.qtyIdx, core.locationIdx])
+  if (core.expiryIdx >= 0) used.add(core.expiryIdx)
+
+  const barcodeIdx = lower.findIndex(
+    (h, i) =>
+      !used.has(i) &&
+      (h === 'barcode' ||
+        h.includes('штрих') ||
+        h.includes('shtrix') ||
+        h === 'ean' ||
+        h === 'upc'),
+  )
+  if (barcodeIdx >= 0) used.add(barcodeIdx)
+
+  const productIdx = lower.findIndex(
+    (h, i) =>
+      !used.has(i) &&
+      (h === 'товар' ||
+        h === 'product' ||
+        h === 'mahsulot' ||
+        h.includes('номенклат') ||
+        h === 'nomenclature' ||
+        (h.includes('товар') && h.length < 60)),
+  )
+  if (productIdx >= 0) used.add(productIdx)
+
+  const brandIdx = lower.findIndex(
+    (h, i) =>
+      !used.has(i) &&
+      (h === 'brand' ||
+        h === 'brend' ||
+        h === 'бренд' ||
+        (h.includes('бренд') && h.length < 40)),
+  )
+
+  return { barcodeIdx, productIdx, brandIdx }
 }
 
 function findDetailedColumns(headers: string[]): DetailedIdx | null {
@@ -173,11 +218,18 @@ function findDetailedColumns(headers: string[]): DetailedIdx | null {
   if (locationIdx < 0 || qtyIdx < 0) return null
   const uniq = new Set([codeIdx, qtyIdx, locationIdx])
   if (uniq.size !== 3) return null
+  const meta = findMetaColumnIndices(lower, {
+    codeIdx,
+    qtyIdx,
+    locationIdx,
+    expiryIdx,
+  })
   return {
     codeIdx,
     qtyIdx,
     locationIdx,
     expiryIdx,
+    ...meta,
   }
 }
 
@@ -203,12 +255,22 @@ function parseRowsToDetailedLines(
     }
     if (!code || !location_code) continue
     if (!Number.isFinite(qtyNum) || qtyNum <= 0) continue
-    out.push({
+    const line: ImportQtyRowLine = {
       code,
       qty: qtyNum,
       location_code,
       ...(expiry_date ? { expiry_date } : {}),
-    })
+    }
+    if (idx.barcodeIdx >= 0) {
+      line.barcode = String(row[idx.barcodeIdx] ?? '').trim()
+    }
+    if (idx.productIdx >= 0) {
+      line.product_name = String(row[idx.productIdx] ?? '').trim()
+    }
+    if (idx.brandIdx >= 0) {
+      line.brand = String(row[idx.brandIdx] ?? '').trim()
+    }
+    out.push(line)
   }
   if (out.length === 0) {
     return { lines: [], error: 'no_rows' }
@@ -228,12 +290,14 @@ export function ImportInventoryDialog({
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [result, setResult] = useState<ImportQtyResponse | null>(null)
+  const [columnFlags, setColumnFlags] = useState({ barcode: false, product: false, brand: false })
 
   const reset = useCallback(() => {
     setFileName(null)
     setLines([])
     setFormError(null)
     setResult(null)
+    setColumnFlags({ barcode: false, product: false, brand: false })
   }, [])
 
   useEffect(() => {
@@ -254,6 +318,7 @@ export function ImportInventoryDialog({
     setResult(null)
     setFileName(file.name)
     setLines([])
+    setColumnFlags({ barcode: false, product: false, brand: false })
     const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
     try {
       let rows: string[][] = []
@@ -278,13 +343,20 @@ export function ImportInventoryDialog({
         setFormError(t('inventory:import_requires_location_column'))
         return
       }
+      setColumnFlags({
+        barcode: detailedIdx.barcodeIdx >= 0,
+        product: detailedIdx.productIdx >= 0,
+        brand: detailedIdx.brandIdx >= 0,
+      })
       const parsed = parseRowsToDetailedLines(rows, detailedIdx)
       if (parsed.error) {
         setFormError(parseErrorMessage(parsed.error))
+        setColumnFlags({ barcode: false, product: false, brand: false })
         return
       }
       if (parsed.lines.length > IMPORT_QTY_MAX_LINES) {
         setFormError(t('inventory:import_max_rows', { max: IMPORT_QTY_MAX_LINES }))
+        setColumnFlags({ barcode: false, product: false, brand: false })
         return
       }
       setLines(parsed.lines)
@@ -330,26 +402,35 @@ export function ImportInventoryDialog({
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       <button
         type="button"
         className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm"
         onClick={() => onOpenChange(false)}
         aria-label={t('common:buttons.close')}
       />
-      <div className="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+      <div
+        className="relative flex max-h-[min(92dvh,900px)] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="import-inventory-title"
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 py-3 sm:px-6 sm:py-4 dark:border-slate-800">
+          <div className="min-w-0 pr-2">
+            <h2
+              id="import-inventory-title"
+              className="text-lg font-semibold text-slate-900 dark:text-slate-100"
+            >
               {t('inventory:import_title')}
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">{t('inventory:import_hint')}</p>
           </div>
-          <Button variant="ghost" className="rounded-full px-3 py-3" onClick={() => onOpenChange(false)}>
+          <Button variant="ghost" className="shrink-0 rounded-full px-3 py-3" onClick={() => onOpenChange(false)}>
             <X size={18} />
           </Button>
         </div>
-        <div className="space-y-3 px-6 py-5">
+
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
           {formError ? (
             <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
               {formError}
@@ -374,33 +455,80 @@ export function ImportInventoryDialog({
             />
           </label>
           <p className="text-xs text-slate-500 dark:text-slate-400">{t('inventory:import_file_hint_full')}</p>
+          {columnFlags.barcode || columnFlags.product || columnFlags.brand ? (
+            <p className="text-xs text-slate-500 dark:text-slate-400">{t('inventory:import_extra_columns_preview')}</p>
+          ) : null}
 
           {preview.length > 0 ? (
-            <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
-              <table className="min-w-full text-xs">
-                <thead className="bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+            <div className="max-h-[min(45vh,380px)] overflow-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+              <table className="w-max min-w-full text-xs">
+                <thead className="sticky top-0 z-10 bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
                   <tr>
-                    <th className="px-3 py-2 text-left">#</th>
-                    <th className="px-3 py-2 text-left">{t('inventory:columns.code')}</th>
-                    <th className="px-3 py-2 text-left">{t('inventory:columns.location')}</th>
-                    <th className="px-3 py-2 text-right">{t('inventory:columns.qty')}</th>
-                    <th className="px-3 py-2 text-left">{t('inventory:columns.expiry')}</th>
+                    <th className="whitespace-nowrap px-2 py-2 text-left sm:px-3">#</th>
+                    <th className="whitespace-nowrap px-2 py-2 text-left sm:px-3">
+                      {t('inventory:columns.code')}
+                    </th>
+                    {columnFlags.barcode ? (
+                      <th className="whitespace-nowrap px-2 py-2 text-left sm:px-3">
+                        {t('inventory:columns.barcode')}
+                      </th>
+                    ) : null}
+                    {columnFlags.product ? (
+                      <th className="min-w-[8rem] whitespace-nowrap px-2 py-2 text-left sm:px-3 sm:min-w-[12rem]">
+                        {t('inventory:columns.product')}
+                      </th>
+                    ) : null}
+                    {columnFlags.brand ? (
+                      <th className="whitespace-nowrap px-2 py-2 text-left sm:px-3">
+                        {t('inventory:columns.brand')}
+                      </th>
+                    ) : null}
+                    <th className="whitespace-nowrap px-2 py-2 text-left sm:px-3">
+                      {t('inventory:columns.location')}
+                    </th>
+                    <th className="whitespace-nowrap px-2 py-2 text-right sm:px-3">
+                      {t('inventory:columns.qty')}
+                    </th>
+                    <th className="whitespace-nowrap px-2 py-2 text-left sm:px-3">
+                      {t('inventory:columns.expiry')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {preview.map((row, i) => (
-                    <tr key={`${row.code}-${row.location_code}-${i}`} className="border-t border-slate-200 dark:border-slate-800">
-                      <td className="px-3 py-2">{i + 1}</td>
-                      <td className="px-3 py-2 font-mono">{row.code}</td>
-                      <td className="px-3 py-2 font-mono">{row.location_code}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{row.qty}</td>
-                      <td className="px-3 py-2">{row.expiry_date ?? '—'}</td>
+                    <tr
+                      key={`import-preview-${i}`}
+                      className="border-t border-slate-200 dark:border-slate-800"
+                    >
+                      <td className="px-2 py-2 sm:px-3">{i + 1}</td>
+                      <td className="px-2 py-2 font-mono sm:px-3">{row.code}</td>
+                      {columnFlags.barcode ? (
+                        <td className="max-w-[9rem] truncate px-2 py-2 font-mono sm:max-w-[11rem] sm:px-3" title={row.barcode}>
+                          {row.barcode || '—'}
+                        </td>
+                      ) : null}
+                      {columnFlags.product ? (
+                        <td
+                          className="max-w-[10rem] truncate px-2 py-2 sm:max-w-[16rem] sm:px-3"
+                          title={row.product_name}
+                        >
+                          {row.product_name || '—'}
+                        </td>
+                      ) : null}
+                      {columnFlags.brand ? (
+                        <td className="max-w-[7rem] truncate px-2 py-2 sm:px-3" title={row.brand}>
+                          {row.brand || '—'}
+                        </td>
+                      ) : null}
+                      <td className="px-2 py-2 font-mono sm:px-3">{row.location_code}</td>
+                      <td className="px-2 py-2 text-right tabular-nums sm:px-3">{row.qty}</td>
+                      <td className="whitespace-nowrap px-2 py-2 sm:px-3">{row.expiry_date ?? '—'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               {lines.length > preview.length ? (
-                <div className="border-t border-slate-200 px-3 py-2 text-xs text-slate-500 dark:border-slate-800">
+                <div className="border-t border-slate-200 px-2 py-2 text-xs text-slate-500 dark:border-slate-800 sm:px-3">
                   {t('inventory:import_and_more', { count: lines.length - preview.length })}
                 </div>
               ) : null}
@@ -427,22 +555,22 @@ export function ImportInventoryDialog({
               ) : null}
             </div>
           ) : null}
+        </div>
 
-          <div className="flex items-center justify-end gap-2 pt-2">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                reset()
-                onOpenChange(false)
-              }}
-            >
-              {t('common:buttons.cancel')}
-            </Button>
-            <Button type="button" disabled={!canSubmit} onClick={() => void handleSubmit()}>
-              {submitting ? t('inventory:import_importing') : t('inventory:import_submit')}
-            </Button>
-          </div>
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-200 px-4 py-3 sm:px-6 dark:border-slate-800">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              reset()
+              onOpenChange(false)
+            }}
+          >
+            {t('common:buttons.cancel')}
+          </Button>
+          <Button type="button" disabled={!canSubmit} onClick={() => void handleSubmit()}>
+            {submitting ? t('inventory:import_importing') : t('inventory:import_submit')}
+          </Button>
         </div>
       </div>
     </div>
