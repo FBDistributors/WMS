@@ -26,7 +26,10 @@ services:
         generateValue: true
       - key: CORS_ORIGINS
         value: "*"
-      # FCM: Render Dashboard da FIREBASE_SERVICE_ACCOUNT_JSON (butun service account JSON) Secret qo‘shing.
+      # FCM: Quyidagilardan bittasini Render Dashboard secret sifatida bering:
+      #  - FIREBASE_SERVICE_ACCOUNT_JSON (tavsiya)
+      #  - FIREBASE_SERVICE_ACCOUNT_JSON_B64
+      #  - GOOGLE_APPLICATION_CREDENTIALS (json file path, agar file mount qilingan bo‘lsa)
 
   # Background Worker (SmartUp sync)
   - type: worker

@@ -15,33 +15,74 @@ from app.models.user_fcm_token import UserFCMToken
 logger = logging.getLogger(__name__)
 
 # Render / PaaS: paste full service account JSON as a secret (file path is awkward).
-_ENV_JSON = "FIREBASE_SERVICE_ACCOUNT_JSON"
-_ENV_JSON_B64 = "FIREBASE_SERVICE_ACCOUNT_JSON_B64"
+# Keep aliases for easier migration from older environment naming.
+_ENV_JSON_KEYS = (
+    "FIREBASE_SERVICE_ACCOUNT_JSON",
+    "FIREBASE_SERVICE_ACCOUNT",
+    "FIREBASE_CREDENTIALS_JSON",
+)
+_ENV_JSON_B64_KEYS = (
+    "FIREBASE_SERVICE_ACCOUNT_JSON_B64",
+    "FIREBASE_SERVICE_ACCOUNT_B64",
+    "FIREBASE_CREDENTIALS_JSON_B64",
+)
+_GOOGLE_CRED_PATH_KEYS = (
+    "GOOGLE_APPLICATION_CREDENTIALS",
+    "GOOGLE_APPLICATION_CREDENTIALS_PATH",
+)
+
+
+def _read_env(*keys: str) -> tuple[str, str]:
+    """Return first non-empty env value + key name."""
+    for key in keys:
+        value = os.environ.get(key, "").strip()
+        if value:
+            return key, value
+    return "", ""
 
 
 def _load_service_account_dict() -> dict[str, Any] | None:
-    b64 = os.environ.get(_ENV_JSON_B64, "").strip()
+    b64_key, b64 = _read_env(*_ENV_JSON_B64_KEYS)
     if b64:
         try:
             raw = base64.standard_b64decode(b64)
             obj = json.loads(raw.decode("utf-8"))
             return obj if isinstance(obj, dict) else None
         except (ValueError, json.JSONDecodeError, OSError) as e:
-            logger.warning("Invalid %s: %s", _ENV_JSON_B64, e)
+            logger.warning("Invalid %s: %s", b64_key, e)
             return None
-    raw = os.environ.get(_ENV_JSON, "").strip()
+    json_key, raw = _read_env(*_ENV_JSON_KEYS)
     if not raw:
         return None
     try:
         obj = json.loads(raw)
         return obj if isinstance(obj, dict) else None
     except json.JSONDecodeError as e:
-        logger.warning("Invalid %s: %s", _ENV_JSON, e)
+        logger.warning("Invalid %s: %s", json_key, e)
         return None
 
 
 def _looks_like_service_account(info: dict[str, Any]) -> bool:
     return info.get("type") == "service_account" and bool(info.get("private_key"))
+
+
+def _credential_path_exists() -> bool:
+    _key, path = _read_env(*_GOOGLE_CRED_PATH_KEYS)
+    return bool(path and os.path.isfile(path))
+
+
+def detect_fcm_credential_source() -> str:
+    """Human-readable source used to configure Firebase credentials."""
+    b64_key, b64 = _read_env(*_ENV_JSON_B64_KEYS)
+    if b64:
+        return b64_key
+    json_key, raw = _read_env(*_ENV_JSON_KEYS)
+    if raw:
+        return json_key
+    path_key, path = _read_env(*_GOOGLE_CRED_PATH_KEYS)
+    if path and os.path.isfile(path):
+        return path_key
+    return "none"
 
 
 def is_fcm_server_configured() -> bool:
@@ -55,8 +96,7 @@ def is_fcm_server_configured() -> bool:
     data = _load_service_account_dict()
     if data and _looks_like_service_account(data):
         return True
-    cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
-    return bool(cred_path and os.path.isfile(cred_path))
+    return _credential_path_exists()
 
 
 def ensure_firebase_app() -> bool:
@@ -76,8 +116,7 @@ def ensure_firebase_app() -> bool:
         except Exception as e:
             logger.warning("Firebase init from env JSON failed: %s", e)
             return False
-    cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
-    if cred_path and os.path.isfile(cred_path):
+    if _credential_path_exists():
         try:
             firebase_admin.initialize_app()
             return True

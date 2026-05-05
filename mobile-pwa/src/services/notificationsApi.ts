@@ -2,6 +2,7 @@ import { fetchJSON } from './apiClient'
 
 export type NotificationsPushStatus = {
   fcm_server_configured: boolean
+  fcm_credential_source: string
   registered_devices_for_current_user: number
   total_fcm_tokens_all_users: number
 }

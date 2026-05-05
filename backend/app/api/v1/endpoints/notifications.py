@@ -10,6 +10,7 @@ from app.db import get_db
 from app.models.user import User
 from app.models.user_fcm_token import UserFCMToken
 from app.services.push_notifications import (
+    detect_fcm_credential_source,
     is_fcm_server_configured,
     send_push_broadcast,
     send_push_to_user,
@@ -20,6 +21,7 @@ router = APIRouter()
 
 class PushStatusResponse(BaseModel):
     fcm_server_configured: bool
+    fcm_credential_source: str
     registered_devices_for_current_user: int
     total_fcm_tokens_all_users: int
 
@@ -33,6 +35,7 @@ def get_push_status(
     total_all = db.query(UserFCMToken).count()
     return PushStatusResponse(
         fcm_server_configured=is_fcm_server_configured(),
+        fcm_credential_source=detect_fcm_credential_source(),
         registered_devices_for_current_user=int(n),
         total_fcm_tokens_all_users=int(total_all),
     )
