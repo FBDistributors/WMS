@@ -14,9 +14,8 @@ import '../../../core/app_state/theme_controller.dart';
 import '../../../core/offline/offline_providers.dart';
 import '../../../l10n/string_lookup.dart';
 import '../../../shared/feedback/app_top_snackbar.dart';
-import '../../../shared/widgets/app_header.dart';
 import '../../../shared/widgets/picker_footer.dart';
-import '../../notifications/presentation/notification_bell_button.dart';
+import '../../../shared/widgets/picker_tab_app_header.dart';
 import '../domain/profile_type_param.dart';
 import '../picking_providers.dart';
 import '../data/picking_models.dart';
@@ -126,36 +125,27 @@ class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
       backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
       body: Column(
         children: <Widget>[
-          AppHeader(
+          PickerTabAppHeader(
             title: title,
             onRefresh: _onRefresh,
             refreshing: _refreshing,
             headerBackgroundColor: isDark ? const Color(0xFF1E293B) : null,
             titleColor: isDark ? const Color(0xFFF1F5F9) : null,
             accentColor: isDark ? const Color(0xFF93C5FD) : null,
-            leading: IconButton(
-              icon: const Icon(Icons.person_outline),
-              onPressed: () => context.pushNamed('account'),
-              tooltip: StringLookup.t(loc, 'tabAccount'),
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                if (!isOnline)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.shade400,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Text(
-                      'Offline',
-                      style: TextStyle(color: Colors.white, fontSize: 12),
-                    ),
+            actionsBeforeNotification: <Widget>[
+              if (!isOnline)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade400,
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                const NotificationBellButton(iconColor: Colors.white),
-              ],
-            ),
+                  child: const Text(
+                    'Offline',
+                    style: TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                ),
+            ],
           ),
           if (!isOnline)
             Container(

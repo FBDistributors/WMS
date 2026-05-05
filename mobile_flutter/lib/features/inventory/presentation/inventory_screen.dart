@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
@@ -10,6 +8,7 @@ import 'dart:math' as math;
 import '../../../core/config/brand.dart';
 import '../../../shared/input/input_clear_button.dart';
 import '../../../shared/widgets/picker_footer.dart';
+import '../../../shared/widgets/picker_tab_app_header.dart';
 import '../data/models/picker_inventory_models.dart';
 import '../data/picker_location_format.dart';
 import 'inventory_locale.dart';
@@ -31,13 +30,6 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   static const Color _scaffoldGrey = Color(0xFFF0F2F5);
   static const Color _stockOk = Color(0xFF2E7D32);
   static const Color _stockLow = Color(0xFFC62828);
-
-  /// Minimal inline SVG (package icon) for AppBar accent — uses `flutter_svg`.
-  static const String _kBarIconSvg =
-      '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">'
-      '<path d="M12 2L8 6h8L12 2z" fill="white" opacity="0.9"/>'
-      '<path d="M7 8v10c0 1.1.9 2 2 2h6c1.1 0 2-.9 2-2V8H7z" fill="white" opacity="0.85"/>'
-      '</svg>';
 
   @override
   void initState() {
@@ -88,104 +80,57 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
 
     return Theme(
       data: Theme.of(context).copyWith(textTheme: textTheme),
-      child: AnnotatedRegion<SystemUiOverlayStyle>(
-        value: SystemUiOverlayStyle.light,
-        child: Scaffold(
-          backgroundColor: scaffoldBg,
-          body: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              Material(
-                color: Brand.pickerHeaderNavy,
-                elevation: 2,
-                shadowColor: Colors.black26,
-                child: SafeArea(
-                  bottom: false,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
-                    child: Row(
-                      children: <Widget>[
-                        Padding(
-                          padding: const EdgeInsets.only(left: 8, right: 10),
-                          child: SvgPicture.string(
-                            _kBarIconSvg,
-                            width: 26,
-                            height: 26,
-                          ),
-                        ),
-                        Expanded(
-                          child: Text(
-                            InventoryStrings.invTitle(locale),
-                            style: GoogleFonts.inter(
-                              fontSize: 19,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                        ),
-                        if (vm.headerRefreshing)
-                          const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.2,
-                                color: Colors.white,
-                              ),
-                            ),
-                          )
-                        else
-                          IconButton(
-                            tooltip: 'Yangilash',
-                            onPressed: () =>
-                                ref.read(inventoryListControllerProvider.notifier).refreshFromHeader(),
-                            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              locationsAsync.when(
-                data: (List<PickerLocationOption> locations) {
-                  if (locations.isEmpty) {
-                    return const SizedBox.shrink();
-                  }
-                  return _LocationFilterRow(
-                    locations: locations,
-                    locationId: locationId,
-                    isDark: isDark,
-                    cardBg: cardBg,
-                    secondaryText: secondaryText,
-                    primaryText: primaryText,
-                    locale: locale,
-                  );
-                },
-                loading: () => const SizedBox.shrink(),
-                error: (_, __) => const SizedBox.shrink(),
-              ),
-              Expanded(
-                child: _InventoryScrollContent(
-                  vm: vm,
+      child: Scaffold(
+        backgroundColor: scaffoldBg,
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            PickerTabAppHeader(
+              title: InventoryStrings.invTitle(locale),
+              onRefresh: () =>
+                  ref.read(inventoryListControllerProvider.notifier).refreshFromHeader(),
+              refreshing: vm.headerRefreshing,
+              headerBackgroundColor: isDark ? const Color(0xFF1E293B) : null,
+              titleColor: isDark ? const Color(0xFFF1F5F9) : null,
+              accentColor: isDark ? const Color(0xFF93C5FD) : null,
+            ),
+            locationsAsync.when(
+              data: (List<PickerLocationOption> locations) {
+                if (locations.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+                return _LocationFilterRow(
+                  locations: locations,
+                  locationId: locationId,
                   isDark: isDark,
-                  scaffoldBg: scaffoldBg,
                   cardBg: cardBg,
-                  primaryText: primaryText,
                   secondaryText: secondaryText,
-                  searchFill: searchFill,
-                  searchBorder: searchBorder,
+                  primaryText: primaryText,
                   locale: locale,
-                  searchController: _searchController,
-                  warehouseLocationLine: _warehouseLocationLine,
-                  stockLowColor: _stockLow,
-                  stockOkColor: _stockOk,
-                ),
+                );
+              },
+              loading: () => const SizedBox.shrink(),
+              error: (_, __) => const SizedBox.shrink(),
+            ),
+            Expanded(
+              child: _InventoryScrollContent(
+                vm: vm,
+                isDark: isDark,
+                scaffoldBg: scaffoldBg,
+                cardBg: cardBg,
+                primaryText: primaryText,
+                secondaryText: secondaryText,
+                searchFill: searchFill,
+                searchBorder: searchBorder,
+                locale: locale,
+                searchController: _searchController,
+                warehouseLocationLine: _warehouseLocationLine,
+                stockLowColor: _stockLow,
+                stockOkColor: _stockOk,
               ),
-              const PickerFooter(current: PickerFooterRoute.inventory),
-            ],
-          ),
+            ),
+            const PickerFooter(current: PickerFooterRoute.inventory),
+          ],
         ),
       ),
     );

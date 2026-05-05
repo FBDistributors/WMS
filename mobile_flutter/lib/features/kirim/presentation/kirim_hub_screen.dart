@@ -6,18 +6,37 @@ import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../core/app_state/profile_type.dart';
 import '../../../core/app_state/profile_type_controller.dart';
+import '../../../core/app_state/theme_controller.dart';
 import '../../auth/presentation/auth_providers.dart';
 import '../../customer_returns/customer_returns_providers.dart';
 import '../../../l10n/string_lookup.dart';
 import '../../../shared/widgets/picker_footer.dart';
+import '../../../shared/widgets/picker_tab_app_header.dart';
 
 /// RN `KirimScreen` — yo‘nalish kartalari.
-class KirimHubScreen extends ConsumerWidget {
+class KirimHubScreen extends ConsumerStatefulWidget {
   const KirimHubScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<KirimHubScreen> createState() => _KirimHubScreenState();
+}
+
+class _KirimHubScreenState extends ConsumerState<KirimHubScreen> {
+  bool _headerRefreshing = false;
+
+  Future<void> _onHeaderRefresh() async {
+    setState(() => _headerRefreshing = true);
+    ref.invalidate(customerReturnsAssignedCountProvider);
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    if (mounted) {
+      setState(() => _headerRefreshing = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final AppLocale loc = ref.watch(appLocaleProvider);
+    final bool isDark = ref.watch(appThemeModeProvider) == ThemeMode.dark;
     final AuthSession session =
         ref.watch(authControllerProvider).valueOrNull ?? const AuthSession.unauthenticated();
     final List<String> perms = session.me?.permissions ?? const <String>[];
@@ -29,9 +48,16 @@ class KirimHubScreen extends ConsumerWidget {
     final int returnsBadge = ref.watch(customerReturnsAssignedCountProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(StringLookup.t(loc, 'kirimTitle'))),
       body: Column(
         children: <Widget>[
+          PickerTabAppHeader(
+            title: StringLookup.t(loc, 'kirimTitle'),
+            onRefresh: _onHeaderRefresh,
+            refreshing: _headerRefreshing,
+            headerBackgroundColor: isDark ? const Color(0xFF1E293B) : null,
+            titleColor: isDark ? const Color(0xFFF1F5F9) : null,
+            accentColor: isDark ? const Color(0xFF93C5FD) : null,
+          ),
           Expanded(
             child: ListView(
               padding: const EdgeInsets.all(16),
