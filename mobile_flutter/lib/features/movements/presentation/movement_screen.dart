@@ -59,6 +59,14 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
 
   bool _handledRouteScan = false;
 
+  void _showValidation(String key) {
+    final AppLocale loc = ref.read(appLocaleProvider);
+    showAppSnackBar(
+      context,
+      SnackBar(content: Text(StringLookup.t(loc, key))),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -199,17 +207,30 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
     final PickerProductDetailResponse? p = _product;
     final PickerProductLocation? from = _fromLocation;
     final PickerLocationOption? to = _toLocation;
-    if (p == null || from == null || to == null) {
+    if (p == null) {
+      _showValidation('movementSelectProductFirst');
+      return;
+    }
+    if (from == null) {
+      _showValidation('movementSelectSource');
+      return;
+    }
+    if (to == null) {
+      _showValidation('movementSelectDestination');
+      return;
+    }
+    if (_locationSearchCtrl.text.trim().isNotEmpty && _locationSearchCtrl.text.trim() != to.code) {
+      _showValidation('movementSelectDestinationFromList');
       return;
     }
     final int n = int.tryParse(_qty.text.trim()) ?? 0;
     final int max = from.availableQty.floor();
-    if (n < 1 || n > max || from.locationId == to.id) {
-      final AppLocale loc = ref.read(appLocaleProvider);
-      showAppSnackBar(
-        context,
-        SnackBar(content: Text(StringLookup.t(loc, 'movementQtyOrLocationInvalid'))),
-      );
+    if (from.locationId == to.id) {
+      _showValidation('movementSourceDestinationSame');
+      return;
+    }
+    if (n < 1 || n > max) {
+      _showValidation('movementQtyOrLocationInvalid');
       return;
     }
     setState(() => _submitting = true);
@@ -234,6 +255,9 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
         idempotencyKey: '$baseKey-in',
       );
       if (mounted) {
+        ref.invalidate(pickerLocationsProvider);
+        ref.invalidate(inventoryListControllerProvider);
+        ref.invalidate(inventoryProductDetailProvider(p.productId));
         final AppLocale loc = ref.read(appLocaleProvider);
         showAppSnackBar(
         context,
@@ -264,7 +288,24 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
   Future<void> _submitPallet() async {
     final LocationContentsResponse? c = _palletContents;
     final PickerLocationOption? to = _palletTo;
-    if (c == null || to == null || c.items.isEmpty || c.locationId == to.id) {
+    if (c == null) {
+      _showValidation('movementLoadLocationFirst');
+      return;
+    }
+    if (c.items.isEmpty) {
+      _showValidation('movementNoStock');
+      return;
+    }
+    if (to == null) {
+      _showValidation('movementSelectDestination');
+      return;
+    }
+    if (_palletDestCtrl.text.trim().isNotEmpty && _palletDestCtrl.text.trim() != to.code) {
+      _showValidation('movementSelectDestinationFromList');
+      return;
+    }
+    if (c.locationId == to.id) {
+      _showValidation('movementSourceDestinationSame');
       return;
     }
     final List<TransferLocationLineInput> lines = <TransferLocationLineInput>[];
@@ -278,11 +319,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
         final int qty = int.tryParse((_palletSelectedQty[key] ?? '').trim()) ?? 0;
         final int max = item.availableQty.floor();
         if (qty < 1 || qty > max) {
-          final AppLocale loc = ref.read(appLocaleProvider);
-          showAppSnackBar(
-        context,
-            SnackBar(content: Text(StringLookup.t(loc, 'movementPalletQtyInvalid'))),
-          );
+          _showValidation('movementPalletQtyInvalid');
           return;
         }
         lines.add(
@@ -294,11 +331,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
         );
       }
       if (lines.isEmpty) {
-        final AppLocale loc = ref.read(appLocaleProvider);
-        showAppSnackBar(
-        context,
-          SnackBar(content: Text(StringLookup.t(loc, 'movementPalletSelectAtLeastOne'))),
-        );
+        _showValidation('movementPalletSelectAtLeastOne');
         return;
       }
     }
@@ -314,6 +347,8 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
             idempotencyKey: requestKey,
           );
       if (mounted) {
+        ref.invalidate(pickerLocationsProvider);
+        ref.invalidate(inventoryListControllerProvider);
         final AppLocale loc = ref.read(appLocaleProvider);
         showAppSnackBar(
         context,
@@ -573,7 +608,12 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
                     }),
                   ),
                 ),
-                onChanged: (String v) => setState(() => _locationSearch = v),
+                onChanged: (String v) => setState(() {
+                  _locationSearch = v;
+                  if (_toLocation != null && v.trim() != _toLocation!.code) {
+                    _toLocation = null;
+                  }
+                }),
               ),
               const SizedBox(height: 8),
               ..._filterLocations(_locationSearch).map((PickerLocationOption o) {
@@ -766,7 +806,12 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
                     }),
                   ),
                 ),
-                onChanged: (String v) => setState(() => _palletDestSearch = v),
+                onChanged: (String v) => setState(() {
+                  _palletDestSearch = v;
+                  if (_palletTo != null && v.trim() != _palletTo!.code) {
+                    _palletTo = null;
+                  }
+                }),
               ),
               ..._filterLocations(_palletDestSearch, cap: 30).map((PickerLocationOption o) {
                 final bool sel = _palletTo?.id == o.id;
