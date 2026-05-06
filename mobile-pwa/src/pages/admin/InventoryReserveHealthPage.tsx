@@ -13,9 +13,11 @@ import {
   getInventorySummary,
   getNegativeBalanceCheck,
   getReserveByOrder,
+  getReserveStuckSummary,
   type InventorySummaryRow,
   type NegativeBalanceRow,
   type ReserveByOrderRow,
+  type ReserveStuckSummaryResponse,
   type WarehouseFilter,
 } from '../../services/inventoryApi'
 
@@ -152,6 +154,7 @@ export function InventoryReserveHealthPage() {
   const [reservedByOrderRows, setReservedByOrderRows] = useState<ReserveByOrderRow[]>([])
   const [availableByProductId, setAvailableByProductId] = useState<Map<string, number>>(new Map())
   const [negativeRows, setNegativeRows] = useState<NegativeBalanceRow[]>([])
+  const [stuckSummary, setStuckSummary] = useState<ReserveStuckSummaryResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [reservedSort, setReservedSort] = useState<SortState<ReservedSortKey>>(null)
@@ -161,10 +164,11 @@ export function InventoryReserveHealthPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const [byOrder, summary, negative] = await Promise.all([
+      const [byOrder, summary, negative, stuck] = await Promise.all([
         getReserveByOrder({ warehouse }),
         getInventorySummary({ warehouse }),
         getNegativeBalanceCheck({ warehouse, limit: NEGATIVE_LIMIT }),
+        getReserveStuckSummary({ warehouse, age_hours: 48, sample_limit: 5 }),
       ])
       setReservedByOrderRows(byOrder.items)
       const avail = new Map<string, number>()
@@ -173,11 +177,13 @@ export function InventoryReserveHealthPage() {
       }
       setAvailableByProductId(avail)
       setNegativeRows(negative.rows)
+      setStuckSummary(stuck)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('inventory:load_failed'))
       setReservedByOrderRows([])
       setAvailableByProductId(new Map())
       setNegativeRows([])
+      setStuckSummary(null)
     } finally {
       setIsLoading(false)
     }
@@ -473,6 +479,20 @@ export function InventoryReserveHealthPage() {
   return (
     <AdminLayout titleSlot={<InventoryHeaderTabs />}>
       <Card className="space-y-4">
+        {stuckSummary && stuckSummary.stuck_rows_count > 0 ? (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-100">
+            <div className="text-sm font-semibold">
+              {t('inventory:reserve_health.stuck_alert_title', { hours: stuckSummary.age_hours })}
+            </div>
+            <div className="mt-1 text-sm">
+              {t('inventory:reserve_health.stuck_alert_desc', {
+                rows: stuckSummary.stuck_rows_count,
+                orders: stuckSummary.stuck_orders_count,
+                oldest: stuckSummary.oldest_hours,
+              })}
+            </div>
+          </div>
+        ) : null}
         <div className="flex gap-1 border-b border-slate-200 dark:border-slate-700">
           <button
             type="button"

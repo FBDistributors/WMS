@@ -105,6 +105,29 @@ export type ReserveByOrderResponse = {
   items: ReserveByOrderRow[]
 }
 
+export type ReserveStuckSampleRow = {
+  product_id: string
+  product_code: string
+  product_name: string
+  order_id: string
+  order_number?: string | null
+  reserved_qty: number
+  last_movement_at: string
+  age_hours: number
+  last_movement_by_user_id?: string | null
+  last_movement_by_username?: string | null
+}
+
+export type ReserveStuckSummaryResponse = {
+  warehouse: WarehouseFilter
+  age_hours: number
+  stuck_orders_count: number
+  stuck_products_count: number
+  stuck_rows_count: number
+  oldest_hours: number
+  sample: ReserveStuckSampleRow[]
+}
+
 export type ReserveByOrderQuery = {
   warehouse?: WarehouseFilter
   search?: string
@@ -115,6 +138,26 @@ export async function getReserveByOrder(query: ReserveByOrderQuery = {}, signal?
     query: {
       warehouse: query.warehouse,
       search: query.search,
+    },
+    signal,
+  })
+}
+
+export type ReserveStuckSummaryQuery = {
+  warehouse?: WarehouseFilter
+  age_hours?: number
+  sample_limit?: number
+}
+
+export async function getReserveStuckSummary(
+  query: ReserveStuckSummaryQuery = {},
+  signal?: AbortSignal,
+) {
+  return fetchJSON<ReserveStuckSummaryResponse>('/api/v1/inventory/reserve-stuck-summary', {
+    query: {
+      warehouse: query.warehouse,
+      age_hours: query.age_hours ?? 48,
+      sample_limit: query.sample_limit ?? 5,
     },
     signal,
   })

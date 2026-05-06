@@ -10,6 +10,7 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { LanguageSwitcher } from '../../components/LanguageSwitcher'
 import { useAuth } from '../../rbac/AuthProvider'
 import { useTheme } from '../../theme/ThemeProvider'
+import { getReserveStuckSummary, type ReserveStuckSummaryResponse } from '../../services/inventoryApi'
 
 type AdminLayoutProps = {
   /** Headerda ko'rsatiladigan sarlavha; berilmasa yoki bo'sh bo'lsa headerda sarlavha ko'rinmaydi (sahifa ichidagi jadval/kartada qoladi). */
@@ -29,10 +30,11 @@ export function AdminLayout({ title, titleSlot, backTo, actionSlot, children }: 
   })
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [stuckSummary, setStuckSummary] = useState<ReserveStuckSummaryResponse | null>(null)
   const userMenuRef = useRef<HTMLDivElement>(null)
   const { user, setRole, isMock, logout } = useAuth()
   const { theme, setTheme } = useTheme()
-  const { t } = useTranslation(['admin', 'common'])
+  const { t } = useTranslation(['admin', 'common', 'inventory'])
   const navigate = useNavigate()
 
   const handleLogout = async () => {
@@ -46,6 +48,38 @@ export function AdminLayout({ title, titleSlot, backTo, actionSlot, children }: 
     if (typeof window === 'undefined') return
     window.localStorage.setItem('wms_sidebar_collapsed', String(isCollapsed))
   }, [isCollapsed])
+
+  useEffect(() => {
+    let mounted = true
+    const loadStuck = async () => {
+      try {
+        const [main, showroom] = await Promise.all([
+          getReserveStuckSummary({ warehouse: 'main', age_hours: 48, sample_limit: 3 }),
+          getReserveStuckSummary({ warehouse: 'showroom', age_hours: 48, sample_limit: 3 }),
+        ])
+        if (!mounted) return
+        setStuckSummary({
+          warehouse: 'main',
+          age_hours: 48,
+          stuck_orders_count: main.stuck_orders_count + showroom.stuck_orders_count,
+          stuck_products_count: main.stuck_products_count + showroom.stuck_products_count,
+          stuck_rows_count: main.stuck_rows_count + showroom.stuck_rows_count,
+          oldest_hours: Math.max(main.oldest_hours, showroom.oldest_hours),
+          sample: [...main.sample, ...showroom.sample].slice(0, 5),
+        })
+      } catch {
+        if (mounted) setStuckSummary(null)
+      }
+    }
+    void loadStuck()
+    const timer = window.setInterval(() => {
+      void loadStuck()
+    }, 90_000)
+    return () => {
+      mounted = false
+      window.clearInterval(timer)
+    }
+  }, [])
 
   // Close user menu when clicking anywhere outside (platform-wide)
   useEffect(() => {
@@ -210,6 +244,26 @@ export function AdminLayout({ title, titleSlot, backTo, actionSlot, children }: 
             ) : null}
           </div>
         </header>
+        {stuckSummary && stuckSummary.stuck_rows_count > 0 ? (
+          <div className="border-b border-rose-200 bg-rose-50 px-4 py-3 text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-100 sm:px-6">
+            <button
+              type="button"
+              className="text-left text-sm"
+              onClick={() => navigate('/admin/inventory/reserve-health?warehouse=main')}
+            >
+              <span className="font-semibold">
+                {t('inventory:reserve_health.stuck_alert_title', { hours: 48 })}
+              </span>
+              <span className="ml-2">
+                {t('inventory:reserve_health.stuck_alert_desc', {
+                  rows: stuckSummary.stuck_rows_count,
+                  orders: stuckSummary.stuck_orders_count,
+                  oldest: stuckSummary.oldest_hours,
+                })}
+              </span>
+            </button>
+          </div>
+        ) : null}
         <main className="min-w-0 flex-1 overflow-x-auto overflow-y-auto px-4 py-4 pb-14 sm:px-6 sm:py-6">{children}</main>
         <footer className="shrink-0 border-t border-slate-200 bg-white/80 px-4 py-2 text-left text-[10px] text-slate-500 backdrop-blur sm:px-6 sm:text-xs dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
           © 2026 FB Warehouse Management System · Developed by Jaloliddin

@@ -11,6 +11,7 @@ import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { getOrdersByStatus, getPickingStaffStats, type PickingStaffStatsRow } from '../../services/dashboardApi'
+import { getReserveStuckSummary } from '../../services/inventoryApi'
 import { writeExcelFile } from '../../utils/exportExcel'
 
 // Yangi = Smartupdan kelgan, admin yig'uvchiga yubormagan
@@ -108,7 +109,7 @@ function StaffStatsTable({
 }
 
 export function DashboardPage() {
-  const { t } = useTranslation(['admin', 'common'])
+  const { t } = useTranslation(['admin', 'common', 'inventory'])
   const navigate = useNavigate()
   const [ordersByStatus, setOrdersByStatus] = useState<{ status: string; count: number }[]>([])
   const [pickerRows, setPickerRows] = useState<PickingStaffStatsRow[]>([])
@@ -118,6 +119,9 @@ export function DashboardPage() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [isExporting, setIsExporting] = useState(false)
+  const [stuckRowsCount, setStuckRowsCount] = useState(0)
+  const [stuckOrdersCount, setStuckOrdersCount] = useState(0)
+  const [stuckOldestHours, setStuckOldestHours] = useState(0)
 
   const counts = useMemo(() => aggregateByFourGroups(ordersByStatus), [ordersByStatus])
   const totalOrders = counts.xom + counts.yigishda + counts.tekshiruvda + counts.yakunlangan
@@ -126,18 +130,34 @@ export function DashboardPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const [ordersByStatusData, staffData] = await Promise.all([
+      const [ordersByStatusData, staffData, stuckMain, stuckShowroom] = await Promise.all([
         getOrdersByStatus().catch(() => []),
         getPickingStaffStats({
           date_from: dateFrom.trim() || undefined,
           date_to: dateTo.trim() || undefined,
         }).catch(() => ({ pickers: [], controllers: [] })),
+        getReserveStuckSummary({ warehouse: 'main', age_hours: 48, sample_limit: 3 }).catch(
+          () => null,
+        ),
+        getReserveStuckSummary({ warehouse: 'showroom', age_hours: 48, sample_limit: 3 }).catch(
+          () => null,
+        ),
       ])
       setOrdersByStatus(Array.isArray(ordersByStatusData) ? ordersByStatusData : [])
       setPickerRows(Array.isArray(staffData?.pickers) ? staffData.pickers : [])
       setControllerRows(Array.isArray(staffData?.controllers) ? staffData.controllers : [])
+      const stuckTotal = (stuckMain?.stuck_rows_count ?? 0) + (stuckShowroom?.stuck_rows_count ?? 0)
+      const stuckOrders =
+        (stuckMain?.stuck_orders_count ?? 0) + (stuckShowroom?.stuck_orders_count ?? 0)
+      const oldest = Math.max(stuckMain?.oldest_hours ?? 0, stuckShowroom?.oldest_hours ?? 0)
+      setStuckRowsCount(stuckTotal)
+      setStuckOrdersCount(stuckOrders)
+      setStuckOldestHours(oldest)
     } catch {
       setError(t('admin:dashboard.load_error'))
+      setStuckRowsCount(0)
+      setStuckOrdersCount(0)
+      setStuckOldestHours(0)
     } finally {
       setIsLoading(false)
     }
@@ -239,6 +259,26 @@ export function DashboardPage() {
               icon={LayoutGrid}
             />
           </div>
+          {stuckRowsCount > 0 ? (
+            <Card className="mt-4 border-rose-200 bg-rose-50 dark:border-rose-900/60 dark:bg-rose-950/30">
+              <button
+                type="button"
+                className="w-full text-left"
+                onClick={() => navigate('/admin/inventory/reserve-health?warehouse=main')}
+              >
+                <div className="text-sm font-semibold text-rose-900 dark:text-rose-100">
+                  {t('inventory:reserve_health.stuck_alert_title', { hours: 48 })}
+                </div>
+                <div className="mt-1 text-sm text-rose-800 dark:text-rose-200">
+                  {t('inventory:reserve_health.stuck_alert_desc', {
+                    rows: stuckRowsCount,
+                    orders: stuckOrdersCount,
+                    oldest: stuckOldestHours,
+                  })}
+                </div>
+              </button>
+            </Card>
+          ) : null}
 
           <Card className="mt-6">
             <div className="text-base font-semibold text-slate-900 dark:text-slate-100">

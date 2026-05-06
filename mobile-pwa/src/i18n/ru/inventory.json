@@ -93,7 +93,9 @@
     "reserved_empty_title": "Товаров с зависшим резервом не найдено",
     "reserved_empty_desc": "Сейчас нет товаров с резервным остатком.",
     "negative_empty_title": "Отрицательный остаток не найден",
-    "negative_empty_desc": "Нет строк lot/location с отрицательным on-hand или available."
+    "negative_empty_desc": "Нет строк lot/location с отрицательным on-hand или available.",
+    "stuck_alert_title": "Внимание: есть зависшие резервы старше {{hours}} часов",
+    "stuck_alert_desc": "{{rows}} зависших строк по {{orders}} заказам. Самый старый резерв: {{oldest}} ч."
   },
   "columns": {
     "code": "Код",
