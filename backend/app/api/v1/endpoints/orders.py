@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import os
-from datetime import date, datetime, timezone
-from typing import List, Optional
+from datetime import date, datetime, timedelta, timezone
+from typing import Any, List, Optional
 import uuid
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Query, status
+from fastapi.responses import JSONResponse
 
 from app.core.expiry import first_day_of_current_month, min_expiry_date_from_months
 from app.services.stock_availability import (
@@ -20,6 +23,7 @@ from app.services.vip_service import resolve_vip_min_expiry_months
 from pydantic import BaseModel, Field
 from decimal import Decimal
 from sqlalchemy import and_, case, exists, func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth.deps import get_current_user, require_any_permission, require_permission, require_role
@@ -40,6 +44,7 @@ from app.models.product import ProductBarcode
 from app.models.location import Location as LocationModel
 from app.models.stock import StockLot as StockLotModel
 from app.models.stock import StockMovement as StockMovementModel
+from app.models.idempotency_key import IdempotencyKey as IdempotencyKeyModel
 from app.auth.permissions import get_permissions_for_role
 from app.models.user import User
 from app.constants.order_wms_status import (
@@ -47,9 +52,11 @@ from app.constants.order_wms_status import (
     normalize_list_status_filter_token,
     normalize_order_wms_status_for_storage,
 )
+from app.services.order_transition_policy import get_transition_rule
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+_IDEMPOTENCY_TTL_HOURS = 24
 
 # Barcha DB da uchraydigan WMS statuslar (canonical)
 ORDER_STATUSES = CANONICAL_ORDER_WMS_STATUSES
@@ -205,6 +212,121 @@ ALLOWED_ADMIN_ORDER_STATUSES = frozenset(
 
 def _normalize_status_for_write(status_value: str) -> str:
     return (status_value or "").strip()
+
+
+def _idempotency_payload_hash(payload: dict[str, Any]) -> str:
+    raw = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _run_with_idempotency(
+    *,
+    db: Session,
+    user_id: UUID,
+    key: str | None,
+    scope: str,
+    payload: dict[str, Any],
+    expected_status: int,
+    run: callable,
+):
+    if key is None or not key.strip():
+        return run()
+
+    clean_key = key.strip()
+    req_hash = _idempotency_payload_hash(payload)
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    existing = (
+        db.query(IdempotencyKeyModel)
+        .filter(
+            IdempotencyKeyModel.scope == scope,
+            IdempotencyKeyModel.user_id == user_id,
+            IdempotencyKeyModel.key == clean_key,
+        )
+        .one_or_none()
+    )
+    if existing is not None and existing.expires_at >= now_utc:
+        if existing.request_hash != req_hash:
+            raise HTTPException(status_code=409, detail="Idempotency-Key already used with different payload")
+        if existing.response_status == 0 or not existing.response_body:
+            raise HTTPException(status_code=409, detail="Duplicate request in progress. Try again.")
+        return JSONResponse(status_code=existing.response_status, content=json.loads(existing.response_body))
+    if existing is not None and existing.expires_at < now_utc:
+        db.delete(existing)
+        db.flush()
+
+    idem = IdempotencyKeyModel(
+        key=clean_key,
+        scope=scope,
+        user_id=user_id,
+        request_hash=req_hash,
+        response_status=0,
+        response_body="",
+        expires_at=now_utc + timedelta(hours=_IDEMPOTENCY_TTL_HOURS),
+    )
+    db.add(idem)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Duplicate request in progress. Try again.")
+
+    result = run()
+    if isinstance(result, BaseModel):
+        body = result.model_dump(mode="json")
+    else:
+        body = result
+    idem.response_status = expected_status
+    idem.response_body = json.dumps(body, ensure_ascii=False, default=str)
+    db.commit()
+    return JSONResponse(status_code=expected_status, content=body)
+
+
+def _reject_transition(
+    *,
+    request: Request,
+    db: Session,
+    user_id: UUID,
+    order_id: UUID,
+    from_status: str,
+    to_status: str,
+    reason: str,
+):
+    log_action(
+        db,
+        user_id=user_id,
+        action=ACTION_UPDATE,
+        entity_type="order",
+        entity_id=str(order_id),
+        old_data={"status": from_status},
+        new_data={"status": to_status, "policy_reject": True, "reason": reason},
+        ip_address=get_client_ip(request),
+    )
+    db.commit()
+    raise HTTPException(status_code=409, detail=reason)
+
+
+def _enforce_transition_or_reject(
+    *,
+    request: Request,
+    db: Session,
+    user_id: UUID,
+    order_id: UUID,
+    from_status: str,
+    to_status: str,
+):
+    rule = get_transition_rule(from_status, to_status)
+    if rule is None:
+        _reject_transition(
+            request=request,
+            db=db,
+            user_id=user_id,
+            order_id=order_id,
+            from_status=from_status,
+            to_status=to_status,
+            reason=f"Core-flow transition blocked: {from_status} -> {to_status}",
+        )
+    return rule
 
 
 def _expand_status_filters(status_values: list[str]) -> list[str]:
@@ -919,6 +1041,14 @@ async def update_order_status(
             and old_status == "picking"
             and any(float(ln.picked_qty or 0) > 0 for ln in doc_so.lines)
         ):
+            _enforce_transition_or_reject(
+                request=request,
+                db=db,
+                user_id=user.id,
+                order_id=order_id,
+                from_status=old_status,
+                to_status="cancelling_in_progress",
+            )
             session = initiate_safe_cancel_return(db, order=order, document=doc_so, admin_user_id=user.id)
             if doc_so.assigned_to_user_id:
                 send_push_to_user(
@@ -954,6 +1084,24 @@ async def update_order_status(
                 .one()
             )
             return _to_order_details(order, db)
+        _reject_transition(
+            request=request,
+            db=db,
+            user_id=user.id,
+            order_id=order_id,
+            from_status=old_status,
+            to_status=normalized_status,
+            reason="Use safe cancel flow (picking -> cancelling_in_progress -> cancelled)",
+        )
+
+    _enforce_transition_or_reject(
+        request=request,
+        db=db,
+        user_id=user.id,
+        order_id=order_id,
+        from_status=old_status,
+        to_status=normalized_status,
+    )
 
     order.wms_state.status = normalize_order_wms_status_for_storage(normalized_status)
 
@@ -1163,6 +1311,7 @@ async def ensure_movement_order(
 async def send_movement_to_picking(
     request: Request,
     payload: SendMovementToPickingRequest,
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
     user=Depends(require_permission("orders:send_to_picking")),
 ):
@@ -1176,74 +1325,92 @@ async def send_movement_to_picking(
     if not assigned_user or assigned_user.role != "picker":
         raise HTTPException(status_code=400, detail="Invalid picker selection")
 
-    try:
+    def _run_send():
         order = _get_or_create_order_from_movement(
             db, payload.source.strip(), payload.movement_id.strip(), payload.movement
         )
-    except HTTPException:
-        raise
-    db.refresh(order)
-    if not order.lines:
-        raise HTTPException(status_code=409, detail="Order has no lines")
+        db.refresh(order)
+        if not order.lines:
+            raise HTTPException(status_code=409, detail="Order has no lines")
 
-    existing = (
-        db.query(DocumentModel)
-        .filter(
-            DocumentModel.order_id == order.id,
-            DocumentModel.doc_type == "SO",
-            DocumentModel.status != "cancelled",
+        existing = (
+            db.query(DocumentModel)
+            .filter(
+                DocumentModel.order_id == order.id,
+                DocumentModel.doc_type == "SO",
+                DocumentModel.status != "cancelled",
+            )
+            .one_or_none()
         )
-        .one_or_none()
-    )
-    if existing:
-        raise HTTPException(status_code=409, detail="Picking task already created")
+        if existing:
+            raise HTTPException(status_code=409, detail="Picking task already created")
 
-    if order.wms_state.status not in {"imported", "allocated"}:
-        raise HTTPException(status_code=409, detail="Order cannot be sent to picking")
+        _enforce_transition_or_reject(
+            request=request,
+            db=db,
+            user_id=user.id,
+            order_id=order.id,
+            from_status=order.wms_state.status,
+            to_status="allocated",
+        )
 
-    document_lines, shortages = _allocate_order(db, order, user.id)
-    if not document_lines:
-        raise HTTPException(status_code=409, detail="Insufficient stock to allocate")
+        document_lines, shortages = _allocate_order(db, order, user.id)
+        if not document_lines:
+            raise HTTPException(status_code=409, detail="Insufficient stock to allocate")
 
-    document = DocumentModel(
-        doc_no=order.order_number,
-        doc_type="SO",
-        status="partial" if shortages else "new",
-        source="orders",
-        source_external_id=order.source_external_id,
-        order_id=order.id,
-        assigned_to_user_id=payload.assigned_to_user_id,
-    )
-    document.lines = document_lines
+        document = DocumentModel(
+            doc_no=order.order_number,
+            doc_type="SO",
+            status="partial" if shortages else "new",
+            source="orders",
+            source_external_id=order.source_external_id,
+            order_id=order.id,
+            assigned_to_user_id=payload.assigned_to_user_id,
+        )
+        document.lines = document_lines
 
-    db.add(document)
-    old_status = order.wms_state.status
-    order.wms_state.status = "allocated"
-    log_action(
-        db,
-        user_id=user.id,
-        action=ACTION_UPDATE,
-        entity_type="order",
-        entity_id=str(order.id),
-        old_data={"status": old_status},
-        new_data={"status": "allocated", "document_id": str(document.id)},
-        ip_address=get_client_ip(request),
-    )
-    db.commit()
-    db.refresh(document)
-
-    try:
-        send_push_to_user(
+        db.add(document)
+        old_status = order.wms_state.status
+        order.wms_state.status = "allocated"
+        log_action(
             db,
-            payload.assigned_to_user_id,
-            "Yangi buyurtma",
-            f"Terish buyurtmasi: {document.doc_no}. Ilovani oching.",
-            data={"taskId": str(document.id), "type": "new_pick_task"},
+            user_id=user.id,
+            action=ACTION_UPDATE,
+            entity_type="order",
+            entity_id=str(order.id),
+            old_data={"status": old_status},
+            new_data={"status": "allocated", "document_id": str(document.id)},
+            ip_address=get_client_ip(request),
         )
-    except Exception:
-        pass
+        db.commit()
+        db.refresh(document)
 
-    return SendToPickingResponse(pick_task_id=document.id, assigned_to=payload.assigned_to_user_id)
+        try:
+            send_push_to_user(
+                db,
+                payload.assigned_to_user_id,
+                "Yangi buyurtma",
+                f"Terish buyurtmasi: {document.doc_no}. Ilovani oching.",
+                data={"taskId": str(document.id), "type": "new_pick_task"},
+            )
+        except Exception:
+            pass
+
+        return SendToPickingResponse(pick_task_id=document.id, assigned_to=payload.assigned_to_user_id)
+
+    return _run_with_idempotency(
+        db=db,
+        user_id=user.id,
+        key=idempotency_key,
+        scope="orders:send_to_picking_movement",
+        payload={
+            "source": payload.source.strip().lower(),
+            "movement_id": payload.movement_id.strip(),
+            "assigned_to_user_id": str(payload.assigned_to_user_id),
+        },
+        expected_status=200,
+        run=_run_send,
+    )
 
 
 @router.post("/{order_id}/send-to-picking", response_model=SendToPickingResponse, summary="Send order to picking")
@@ -1251,85 +1418,106 @@ async def send_order_to_picking(
     request: Request,
     order_id: UUID,
     payload: SendToPickingRequest,
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
     user=Depends(require_permission("orders:send_to_picking")),
 ):
     if "picking:assign" not in get_permissions_for_role(user.role):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    order = (
-        db.query(OrderModel)
-        .options(selectinload(OrderModel.lines), selectinload(OrderModel.wms_state))
-        .filter(OrderModel.id == order_id)
-        .one_or_none()
-    )
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-
-    if order.wms_state.status not in {"imported", "allocated"}:
-        raise HTTPException(status_code=409, detail="Order cannot be sent to picking")
-
-    if not order.lines:
-        raise HTTPException(status_code=409, detail="Order has no lines")
-
-    existing = (
-        db.query(DocumentModel)
-        .filter(
-            DocumentModel.order_id == order.id,
-            DocumentModel.doc_type == "SO",
-            DocumentModel.status != "cancelled",
+    def _run_send():
+        order = (
+            db.query(OrderModel)
+            .options(selectinload(OrderModel.lines), selectinload(OrderModel.wms_state))
+            .filter(OrderModel.id == order_id)
+            .one_or_none()
         )
-        .one_or_none()
-    )
-    if existing:
-        raise HTTPException(status_code=409, detail="Picking task already created")
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
 
-    assigned_user = db.query(User).filter(User.id == payload.assigned_to_user_id).one_or_none()
-    if not assigned_user or assigned_user.role != "picker":
-        raise HTTPException(status_code=400, detail="Invalid picker selection")
+        if not order.lines:
+            raise HTTPException(status_code=409, detail="Order has no lines")
 
-    document_lines, shortages = _allocate_order(db, order, user.id)
-    if not document_lines:
-        raise HTTPException(status_code=409, detail="Insufficient stock to allocate")
+        existing = (
+            db.query(DocumentModel)
+            .filter(
+                DocumentModel.order_id == order.id,
+                DocumentModel.doc_type == "SO",
+                DocumentModel.status != "cancelled",
+            )
+            .one_or_none()
+        )
+        if existing:
+            raise HTTPException(status_code=409, detail="Picking task already created")
 
-    document = DocumentModel(
-        doc_no=order.order_number,
-        doc_type="SO",
-        status="partial" if shortages else "new",
-        source="orders",
-        source_external_id=order.source_external_id,
-        order_id=order.id,
-        assigned_to_user_id=payload.assigned_to_user_id,
-    )
-    document.lines = document_lines
+        assigned_user = db.query(User).filter(User.id == payload.assigned_to_user_id).one_or_none()
+        if not assigned_user or assigned_user.role != "picker":
+            raise HTTPException(status_code=400, detail="Invalid picker selection")
 
-    db.add(document)
-    old_status = order.wms_state.status
-    order.wms_state.status = "allocated"
-    log_action(
-        db,
-        user_id=user.id,
-        action=ACTION_UPDATE,
-        entity_type="order",
-        entity_id=str(order_id),
-        old_data={"status": old_status},
-        new_data={"status": "allocated", "document_id": str(document.id)},
-        ip_address=get_client_ip(request),
-    )
-    db.commit()
-    db.refresh(document)
+        _enforce_transition_or_reject(
+            request=request,
+            db=db,
+            user_id=user.id,
+            order_id=order_id,
+            from_status=order.wms_state.status,
+            to_status="allocated",
+        )
 
-    try:
-        send_push_to_user(
+        document_lines, shortages = _allocate_order(db, order, user.id)
+        if not document_lines:
+            raise HTTPException(status_code=409, detail="Insufficient stock to allocate")
+
+        document = DocumentModel(
+            doc_no=order.order_number,
+            doc_type="SO",
+            status="partial" if shortages else "new",
+            source="orders",
+            source_external_id=order.source_external_id,
+            order_id=order.id,
+            assigned_to_user_id=payload.assigned_to_user_id,
+        )
+        document.lines = document_lines
+
+        db.add(document)
+        old_status = order.wms_state.status
+        order.wms_state.status = "allocated"
+        log_action(
             db,
-            payload.assigned_to_user_id,
-            "Yangi buyurtma",
-            f"Terish buyurtmasi: {document.doc_no}. Ilovani oching.",
-            data={"taskId": str(document.id), "type": "new_pick_task"},
+            user_id=user.id,
+            action=ACTION_UPDATE,
+            entity_type="order",
+            entity_id=str(order_id),
+            old_data={"status": old_status},
+            new_data={"status": "allocated", "document_id": str(document.id)},
+            ip_address=get_client_ip(request),
         )
-    except Exception:
-        pass
+        db.commit()
+        db.refresh(document)
 
-    return SendToPickingResponse(pick_task_id=document.id, assigned_to=payload.assigned_to_user_id)
+        try:
+            send_push_to_user(
+                db,
+                payload.assigned_to_user_id,
+                "Yangi buyurtma",
+                f"Terish buyurtmasi: {document.doc_no}. Ilovani oching.",
+                data={"taskId": str(document.id), "type": "new_pick_task"},
+            )
+        except Exception:
+            pass
+
+        return SendToPickingResponse(pick_task_id=document.id, assigned_to=payload.assigned_to_user_id)
+
+    return _run_with_idempotency(
+        db=db,
+        user_id=user.id,
+        key=idempotency_key,
+        scope="orders:send_to_picking",
+        payload={
+            "order_id": str(order_id),
+            "assigned_to_user_id": str(payload.assigned_to_user_id),
+        },
+        expected_status=200,
+        run=_run_send,
+    )
 
 
 @router.post("/{order_id}/pack", response_model=OrderDetails, summary="Mark order as packed")
@@ -1359,6 +1547,14 @@ async def pack_order(
         raise HTTPException(status_code=409, detail="Picking document must be picked or completed")
 
     old_status = order.wms_state.status
+    _enforce_transition_or_reject(
+        request=request,
+        db=db,
+        user_id=user.id,
+        order_id=order_id,
+        from_status=old_status,
+        to_status="packed",
+    )
     order.wms_state.status = "packed"
     log_action(
         db,
@@ -1446,6 +1642,14 @@ async def ship_order(
         raise HTTPException(status_code=409, detail="No picked quantities to ship")
 
     old_status = order.wms_state.status
+    _enforce_transition_or_reject(
+        request=request,
+        db=db,
+        user_id=user.id,
+        order_id=order_id,
+        from_status=old_status,
+        to_status="shipped",
+    )
     order.wms_state.status = "shipped"
     log_action(
         db,

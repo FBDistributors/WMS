@@ -20,6 +20,7 @@ from app.models.order import OrderWmsState as OrderWmsStateModel
 from app.models.product import ProductBarcode
 from app.models.safe_cancel_return import SafeCancelReturnLine, SafeCancelReturnSession
 from app.models.stock import StockMovement as StockMovementModel
+from app.services.order_transition_policy import require_transition_rule
 
 
 def _norm_scan(value: str) -> str:
@@ -188,6 +189,7 @@ def initiate_safe_cancel_return(
             )
         )
 
+    require_transition_rule(order.wms_state.status, "cancelling_in_progress")
     order.wms_state.status = "cancelling_in_progress"
     document.status = "cancelling"
     db.flush()
@@ -349,6 +351,7 @@ def finish_safe_cancel_return(db: Session, *, session_id: UUID, picker_user_id: 
         )
         dline.picked_qty = 0.0
 
+    require_transition_rule(order.wms_state.status, "cancelled")
     session.status = "completed"
     session.completed_at = datetime.now(timezone.utc)
     document.status = "cancelled"
