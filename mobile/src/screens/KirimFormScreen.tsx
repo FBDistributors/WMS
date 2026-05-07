@@ -668,6 +668,7 @@ export function KirimFormScreen() {
       setSending(true);
       try {
         await createCustomerReturn({
+          reason_code: 'customer_return',
           lines: lines.map((l) => ({
             product_id: l.productId,
             location_id: l.locationId,

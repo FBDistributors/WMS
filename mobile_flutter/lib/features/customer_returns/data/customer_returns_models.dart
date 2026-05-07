@@ -37,6 +37,7 @@ class CustomerReturn {
   const CustomerReturn({
     required this.id,
     required this.docNo,
+    this.reasonCode,
     this.customerId,
     this.customerName,
     required this.status,
@@ -54,6 +55,7 @@ class CustomerReturn {
 
   final String id;
   final String docNo;
+  final String? reasonCode;
   final String? customerId;
   final String? customerName;
   final String status;
@@ -82,6 +84,7 @@ class CustomerReturn {
     return CustomerReturn(
       id: json['id']! as String,
       docNo: json['doc_no']! as String,
+      reasonCode: json['reason_code'] as String?,
       customerId: json['customer_id'] as String?,
       customerName: json['customer_name'] as String?,
       status: json['status']! as String,

@@ -104,6 +104,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   List<GeneralCustomerRow> _customerSuggestions = <GeneralCustomerRow>[];
   bool _customerLoading = false;
   GeneralCustomerRow? _selectedCustomer;
+  String? _returnReasonCode;
   String? _returnLineExpiry;
   /// Zaxira (FEFO) bo'lmasa — RN'dagi kabi qo'lda lokatsiya / partiya.
   PickerLocationOption? _returnManualLocation;
@@ -297,14 +298,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         showAppSnackBar(
           context,
           SnackBar(content: Text(StringLookup.t(loc, 'kirimReturnSelectFefoLine'))),
-        );
-        return;
-      }
-      if (q > pick.availableQty.floor()) {
-        if (!mounted) return;
-        showAppSnackBar(
-          context,
-          SnackBar(content: Text(StringLookup.t(loc, 'kirimQtyExceedsStock'))),
         );
         return;
       }
@@ -632,6 +625,15 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       }
       return;
     }
+    if (_returnReasonCode == null || _returnReasonCode!.trim().isEmpty) {
+      if (mounted) {
+        showAppSnackBar(
+        context,
+          SnackBar(content: Text(StringLookup.t(locMsg, 'returnsReasonRequired'))),
+        );
+      }
+      return;
+    }
     setState(() => _sending = true);
     try {
       final String cname = (_selectedCustomer!.customerName != null &&
@@ -641,6 +643,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       CustomerReturn doc = await ref.read(customerReturnsRepositoryProvider).createCustomerReturn(
             customerId: _selectedCustomer!.customerId,
             customerName: cname,
+            reasonCode: _returnReasonCode!,
             lines: _lines
                 .map(
                   (_FormLine l) => CreateCustomerReturnLine(
@@ -1699,6 +1702,33 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                         ),
                       ),
                   ],
+                  const SizedBox(height: 12),
+                  Text(
+                    StringLookup.t(appLoc, 'returnsReasonLabel'),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    initialValue: _returnReasonCode,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                    ),
+                    items: <DropdownMenuItem<String>>[
+                      DropdownMenuItem<String>(
+                        value: 'customer_return',
+                        child: Text(StringLookup.t(appLoc, 'returnsReasonCustomerReturn')),
+                      ),
+                      DropdownMenuItem<String>(
+                        value: 'damaged',
+                        child: Text(StringLookup.t(appLoc, 'returnsReasonDamaged')),
+                      ),
+                      DropdownMenuItem<String>(
+                        value: 'wrong_shipment',
+                        child: Text(StringLookup.t(appLoc, 'returnsReasonWrongShipment')),
+                      ),
+                    ],
+                    onChanged: (String? v) => setState(() => _returnReasonCode = v),
+                  ),
                 ],
                 const SizedBox(height: 12),
                 BarcodeSearchInput(
@@ -1725,6 +1755,14 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                     StringLookup.t(appLoc, 'kirimBatchFefo'),
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
+                  if (_product!.locations.isNotEmpty) ...<Widget>[
+                    const SizedBox(height: 6),
+                    Text(
+                      StringLookup.t(appLoc, 'returnsFefoSuggestionHint'),
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
+                    ),
+                    const SizedBox(height: 4),
+                  ],
                   if (_product!.locations.isEmpty) ...<Widget>[
                     const SizedBox(height: 6),
                     Text(

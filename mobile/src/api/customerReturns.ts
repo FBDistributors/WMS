@@ -19,6 +19,7 @@ export type CustomerReturn = {
   doc_no: string;
   customer_id?: string | null;
   customer_name?: string | null;
+  reason_code?: string | null;
   status: string;
   created_by_user_id: string | null;
   approved_by_user_id: string | null;
@@ -49,6 +50,7 @@ export async function createCustomerReturn(payload: {
   doc_no?: string | null;
   customer_id?: string | null;
   customer_name?: string | null;
+  reason_code: 'customer_return' | 'damaged' | 'wrong_shipment';
   lines: CreateCustomerReturnLine[];
 }): Promise<CustomerReturn> {
   const { data } = await apiClient.post<CustomerReturn>(PATH, payload);

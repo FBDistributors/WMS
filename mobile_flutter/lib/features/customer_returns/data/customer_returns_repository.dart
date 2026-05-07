@@ -52,6 +52,7 @@ class CustomerReturnsRepository {
     String? docNo,
     String? customerId,
     String? customerName,
+    required String reasonCode,
     required List<CreateCustomerReturnLine> lines,
   }) async {
     try {
@@ -61,6 +62,7 @@ class CustomerReturnsRepository {
           if (docNo != null) 'doc_no': docNo,
           if (customerId != null && customerId.isNotEmpty) 'customer_id': customerId,
           if (customerName != null && customerName.isNotEmpty) 'customer_name': customerName,
+          'reason_code': reasonCode,
           'lines': lines.map((CreateCustomerReturnLine e) => e.toJson()).toList(),
         },
       );

@@ -29,6 +29,7 @@ from app.models.stock import StockMovement as StockMovementModel
 from app.models.user import User as UserModel
 
 router = APIRouter()
+RETURN_REASON_CODES = {"customer_return", "damaged", "wrong_shipment"}
 
 
 class CustomerReturnLineCreate(BaseModel):
@@ -52,7 +53,15 @@ class CustomerReturnCreate(BaseModel):
     doc_no: Optional[str] = Field(default=None, max_length=64)
     customer_id: Optional[str] = Field(default=None, max_length=64)
     customer_name: Optional[str] = Field(default=None, max_length=255)
+    reason_code: str = Field(..., max_length=32)
     lines: List[CustomerReturnLineCreate]
+
+    @validator("reason_code")
+    def reason_code_valid(cls, v: str) -> str:
+        value = (v or "").strip().lower()
+        if value not in RETURN_REASON_CODES:
+            raise ValueError("Invalid reason_code")
+        return value
 
 
 class CustomerReturnLineOut(BaseModel):
@@ -71,6 +80,7 @@ class CustomerReturnOut(BaseModel):
     doc_no: str
     customer_id: Optional[str] = None
     customer_name: Optional[str] = None
+    reason_code: Optional[str] = None
     status: str
     created_by_user_id: Optional[UUID] = None
     created_by_user_name: Optional[str] = None
@@ -137,6 +147,7 @@ def _to_out(
         doc_no=cr.doc_no,
         customer_id=cr.customer_id,
         customer_name=cr.customer_name,
+        reason_code=cr.reason_code,
         status=cr.status,
         created_by_user_id=cr.created_by_user_id,
         created_by_user_name=created_by_user_name,
@@ -204,6 +215,7 @@ async def create_customer_return(
         doc_no=doc_no,
         customer_id=cust_id,
         customer_name=cust_name,
+        reason_code=payload.reason_code,
         status=CUSTOMER_RETURN_STATUS_PENDING,
         created_by_user_id=user.id,
     )
@@ -228,6 +240,8 @@ async def create_customer_return(
         batch_val = (line.batch or "").strip()
         if not batch_val:
             batch_val = uuid4().hex[:12]
+        # Customer return is a receipt flow: we validate location/expiry compatibility,
+        # but do not cap qty by currently available stock.
         check_location_single_expiry(db, line.location_id, line.product_id, norm)
         cr.lines.append(
             CustomerReturnLineModel(

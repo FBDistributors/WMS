@@ -27,6 +27,7 @@ class CustomerReturn(Base):
     doc_no: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     customer_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     customer_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    reason_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default=CUSTOMER_RETURN_STATUS_PENDING)
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True

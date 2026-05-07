@@ -258,12 +258,19 @@ abstract final class StringLookup {
     'kirimQtyExceedsStock': 'Mavjud miqdordan oshmasin',
     'kirimSentOk': 'Yuborildi',
     'returnsCustomerSearchLabel': 'Mijoz qidiruv',
+    'returnsReasonLabel': 'Qaytish sababi',
+    'returnsReasonRequired': 'Qaytish sababini tanlang.',
+    'returnsReasonCustomerReturn': 'Mijoz qaytimi',
+    'returnsReasonDamaged': 'Brak',
+    'returnsReasonWrongShipment': 'Noto‘g‘ri jo‘natilgan',
     'returnsCustomerRequired': 'Mijozni tanlang.',
     'returnsAddAtLeastOne': 'Kamida bitta qator qo‘shing',
     'returnsNoStockInWarehouse':
         'Tanlangan omborda bu mahsulot uchun qoldiq qatori ko‘rinmayapti (zaxira 0 yoki WMS da yo‘q).',
     'returnsNoStockSelectLocationHint':
         'Pastdan ombordagi lokatsiyani qidiring va tanlang — qaytarishni ro‘yxatga qo‘shish mumkin.',
+    'returnsFefoSuggestionHint':
+        'FEFO qatori tavsiya uchun: qaytim miqdori mavjud qoldiq bilan cheklanmaydi.',
     'returnsManualLocationRequired': 'Lokatsiyani ro‘yxatdan tanlang.',
     'kirimReturnSelectFefoLine': 'Partiya (FEFO) ro‘yxatidan qatorni tanlang.',
     'returnsApproveAssignNeedPermission':
@@ -526,12 +533,19 @@ abstract final class StringLookup {
     'kirimQtyExceedsStock': 'Не больше доступного количества',
     'kirimSentOk': 'Отправлено',
     'returnsCustomerSearchLabel': 'Поиск клиента',
+    'returnsReasonLabel': 'Причина возврата',
+    'returnsReasonRequired': 'Выберите причину возврата.',
+    'returnsReasonCustomerReturn': 'Клиентский возврат',
+    'returnsReasonDamaged': 'Брак',
+    'returnsReasonWrongShipment': 'Ошибочная отгрузка',
     'returnsCustomerRequired': 'Выберите клиента.',
     'returnsAddAtLeastOne': 'Добавьте хотя бы одну позицию',
     'returnsNoStockInWarehouse':
         'На выбранном складе нет строк остатка по этому товару (0 или товар не в WMS).',
     'returnsNoStockSelectLocationHint':
         'Найдите и выберите ячейку ниже — возврат в список всё равно можно добавить.',
+    'returnsFefoSuggestionHint':
+        'Строка FEFO — это подсказка: количество возврата не ограничивается остатком.',
     'returnsManualLocationRequired': 'Выберите ячейку из списка.',
     'kirimReturnSelectFefoLine': 'Выберите строку в списке партий (FEFO).',
     'returnsApproveAssignNeedPermission':
@@ -794,12 +808,19 @@ abstract final class StringLookup {
     'kirimQtyExceedsStock': 'Cannot exceed available quantity',
     'kirimSentOk': 'Sent',
     'returnsCustomerSearchLabel': 'Customer search',
+    'returnsReasonLabel': 'Return reason',
+    'returnsReasonRequired': 'Select a return reason.',
+    'returnsReasonCustomerReturn': 'Customer return',
+    'returnsReasonDamaged': 'Damaged',
+    'returnsReasonWrongShipment': 'Wrong shipment',
     'returnsCustomerRequired': 'Select a customer.',
     'returnsAddAtLeastOne': 'Add at least one line',
     'returnsNoStockInWarehouse':
         'No stock rows for this product in the selected warehouse (zero balance or not in WMS).',
     'returnsNoStockSelectLocationHint':
         'Search and pick a warehouse location below — you can still add the return line.',
+    'returnsFefoSuggestionHint':
+        'The FEFO row is a suggestion: return quantity is not limited by available stock.',
     'returnsManualLocationRequired': 'Select a location from the list.',
     'kirimReturnSelectFefoLine': 'Select a row in the batch (FEFO) list.',
     'returnsApproveAssignNeedPermission':
