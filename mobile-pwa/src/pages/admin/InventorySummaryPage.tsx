@@ -41,6 +41,7 @@ const COLUMN_OPTIONS = [
   { id: 'barcode', labelKey: 'inventory:columns.barcode' },
   { id: 'product', labelKey: 'inventory:columns.product' },
   { id: 'brand', labelKey: 'inventory:columns.brand' },
+  { id: 'brand_id', labelKey: 'inventory:columns.brand_id' },
   { id: 'total_qty', labelKey: 'inventory:columns.total_qty' },
   { id: 'smartup_qoldiq', labelKey: 'inventory:columns.smartup_qoldiq' },
   { id: 'smartup_bron', labelKey: 'inventory:columns.smartup_bron' },
@@ -416,7 +417,9 @@ export function InventorySummaryPage() {
     const orderedColumns = config.columnOrder.filter((id) =>
       COLUMN_OPTIONS.some((c) => c.id === id)
     )
-    const columnLabels = new Map(COLUMN_OPTIONS.map((c) => [c.id, t(c.labelKey)]))
+    const columnLabels = new Map(
+      COLUMN_OPTIONS.map((c) => [c.id, c.id === 'brand_id' ? 'Brand ID' : t(c.labelKey)])
+    )
 
     return (
       <TableScrollArea inline>
@@ -432,6 +435,8 @@ export function InventorySummaryPage() {
                         ? 'min-w-[9rem] text-left'
                         : columnId === 'product'
                           ? 'min-w-[12rem] text-left'
+                          : columnId === 'brand_id'
+                            ? 'min-w-[14rem] text-left'
                           : columnId === 'total_qty' ||
                               columnId === 'smartup_qoldiq' ||
                               columnId === 'smartup_bron'
@@ -462,6 +467,8 @@ export function InventorySummaryPage() {
                             ? 'min-w-[9rem]'
                             : columnId === 'product'
                               ? 'min-w-[12rem]'
+                              : columnId === 'brand_id'
+                                ? 'min-w-[14rem]'
                               : columnId === 'total_qty' ||
                                   columnId === 'smartup_qoldiq' ||
                                   columnId === 'smartup_bron'
@@ -485,6 +492,9 @@ export function InventorySummaryPage() {
                           </span>
                         )}
                         {columnId === 'brand' && (row.brand_name ?? '—')}
+                        {columnId === 'brand_id' && (
+                          <span className="font-mono text-xs">{row.brand_id ?? '—'}</span>
+                        )}
                         {columnId === 'total_qty' && formatInt(row.total_qty)}
                         {columnId === 'smartup_qoldiq' &&
                           (() => {
@@ -761,7 +771,10 @@ export function InventorySummaryPage() {
         open={isSettingsOpen}
         onOpenChange={setIsSettingsOpen}
         config={config}
-        columns={COLUMN_OPTIONS.map((c) => ({ id: c.id, label: t(c.labelKey) }))}
+        columns={COLUMN_OPTIONS.map((c) => ({
+          id: c.id,
+          label: c.id === 'brand_id' ? 'Brand ID' : t(c.labelKey),
+        }))}
         onSave={updateConfig}
         onReset={resetConfig}
       />

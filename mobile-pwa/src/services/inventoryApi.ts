@@ -279,6 +279,7 @@ export type InventorySummaryLightRow = {
   product_name: string
   product_code: string
   barcode?: string | null
+  brand_id?: string | null
   brand_name?: string | null
   total_qty: number
   available_qty: number
