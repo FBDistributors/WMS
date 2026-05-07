@@ -261,7 +261,10 @@ abstract final class StringLookup {
     'returnsCustomerRequired': 'Mijozni tanlang.',
     'returnsAddAtLeastOne': 'Kamida bitta qator qo‘shing',
     'returnsNoStockInWarehouse':
-        'Tanlangan omborda bu mahsulot uchun zaxira yo‘q — boshqa omborni tanlang yoki mahsulotni tekshiring.',
+        'Tanlangan omborda bu mahsulot uchun qoldiq qatori ko‘rinmayapti (zaxira 0 yoki WMS da yo‘q).',
+    'returnsNoStockSelectLocationHint':
+        'Pastdan ombordagi lokatsiyani qidiring va tanlang — qaytarishni ro‘yxatga qo‘shish mumkin.',
+    'returnsManualLocationRequired': 'Lokatsiyani ro‘yxatdan tanlang.',
     'kirimReturnSelectFefoLine': 'Partiya (FEFO) ro‘yxatidan qatorni tanlang.',
     'returnsApproveAssignNeedPermission':
         'Hujjat yaratildi. Tasdiq va yig\'uvchini biriktirish uchun documents:edit_status kerak.',
@@ -526,7 +529,10 @@ abstract final class StringLookup {
     'returnsCustomerRequired': 'Выберите клиента.',
     'returnsAddAtLeastOne': 'Добавьте хотя бы одну позицию',
     'returnsNoStockInWarehouse':
-        'На выбранном складе нет остатка — смените склад или проверьте товар.',
+        'На выбранном складе нет строк остатка по этому товару (0 или товар не в WMS).',
+    'returnsNoStockSelectLocationHint':
+        'Найдите и выберите ячейку ниже — возврат в список всё равно можно добавить.',
+    'returnsManualLocationRequired': 'Выберите ячейку из списка.',
     'kirimReturnSelectFefoLine': 'Выберите строку в списке партий (FEFO).',
     'returnsApproveAssignNeedPermission':
         'Документ создан. Для подтверждения и назначения сборщика нужно право documents:edit_status.',
@@ -791,7 +797,10 @@ abstract final class StringLookup {
     'returnsCustomerRequired': 'Select a customer.',
     'returnsAddAtLeastOne': 'Add at least one line',
     'returnsNoStockInWarehouse':
-        'No stock for this product in the selected warehouse — switch warehouse or verify the product.',
+        'No stock rows for this product in the selected warehouse (zero balance or not in WMS).',
+    'returnsNoStockSelectLocationHint':
+        'Search and pick a warehouse location below — you can still add the return line.',
+    'returnsManualLocationRequired': 'Select a location from the list.',
     'kirimReturnSelectFefoLine': 'Select a row in the batch (FEFO) list.',
     'returnsApproveAssignNeedPermission':
         'Document created. documents:edit_status is required to approve and assign a picker.',
