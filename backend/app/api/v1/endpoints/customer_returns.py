@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field, validator
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth.deps import get_current_user, get_effective_permissions, require_any_permission, require_permission
@@ -30,6 +31,15 @@ from app.models.user import User as UserModel
 
 router = APIRouter()
 RETURN_REASON_CODES = {"customer_return", "damaged", "wrong_shipment"}
+
+
+def _is_missing_reason_code_column_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return (
+        "reason_code" in msg
+        and "customer_return" in msg
+        and ("does not exist" in msg or "unknown column" in msg or "no such column" in msg)
+    )
 
 
 class CustomerReturnLineCreate(BaseModel):
@@ -255,7 +265,16 @@ async def create_customer_return(
             )
         )
     db.add(cr)
-    db.commit()
+    try:
+        db.commit()
+    except (ProgrammingError, OperationalError) as exc:
+        db.rollback()
+        if _is_missing_reason_code_column_error(exc):
+            raise HTTPException(
+                status_code=500,
+                detail="DB migration required: customer_returns.reason_code column is missing. Run alembic upgrade head.",
+            ) from exc
+        raise
     db.refresh(cr)
     cr = (
         db.query(CustomerReturnModel)
