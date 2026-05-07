@@ -253,6 +253,28 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     final PickerProductLocation? pick = _returnPick;
     final int q = int.tryParse(_qty.text.trim()) ?? 0;
     if (p == null || pick == null) {
+      if (!mounted) {
+        return;
+      }
+      final AppLocale loc = ref.read(appLocaleProvider);
+      if (p == null) {
+        showAppSnackBar(
+          context,
+          SnackBar(content: Text(StringLookup.t(loc, 'kirimSelectProductFirst'))),
+        );
+        return;
+      }
+      if (p.locations.isEmpty) {
+        showAppSnackBar(
+          context,
+          SnackBar(content: Text(StringLookup.t(loc, 'returnsNoStockInWarehouse'))),
+        );
+      } else {
+        showAppSnackBar(
+          context,
+          SnackBar(content: Text(StringLookup.t(loc, 'kirimReturnSelectFefoLine'))),
+        );
+      }
       return;
     }
     if (q < 1) {
@@ -466,7 +488,17 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   }
 
   Future<void> _submitReturn() async {
-    if (_lines.isEmpty || _sending) {
+    if (_sending) {
+      return;
+    }
+    if (_lines.isEmpty) {
+      if (mounted) {
+        final AppLocale locMsg = ref.read(appLocaleProvider);
+        showAppSnackBar(
+          context,
+          SnackBar(content: Text(StringLookup.t(locMsg, 'returnsAddAtLeastOne'))),
+        );
+      }
       return;
     }
     final AppLocale locMsg = ref.read(appLocaleProvider);
@@ -1581,6 +1613,13 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                     StringLookup.t(appLoc, 'kirimBatchFefo'),
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
+                  if (_product!.locations.isEmpty) ...<Widget>[
+                    const SizedBox(height: 6),
+                    Text(
+                      StringLookup.t(appLoc, 'returnsNoStockInWarehouse'),
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                    ),
+                  ],
                   ..._sortFefo(_product!.locations).map((PickerProductLocation loc) {
                     final bool sel =
                         _returnPick?.lotId == loc.lotId && _returnPick?.locationId == loc.locationId;
@@ -1623,7 +1662,9 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                   ),
                   const SizedBox(height: 12),
                   FilledButton(
-                    onPressed: _addLineReturn,
+                    onPressed: _returnPick == null
+                        ? null
+                        : () => unawaited(_addLineReturn()),
                     child: Text(StringLookup.t(appLoc, 'kirimAddLine')),
                   ),
                 ],

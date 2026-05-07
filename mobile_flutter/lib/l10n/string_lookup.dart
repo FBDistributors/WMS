@@ -259,6 +259,10 @@ abstract final class StringLookup {
     'kirimSentOk': 'Yuborildi',
     'returnsCustomerSearchLabel': 'Mijoz qidiruv',
     'returnsCustomerRequired': 'Mijozni tanlang.',
+    'returnsAddAtLeastOne': 'Kamida bitta qator qo‘shing',
+    'returnsNoStockInWarehouse':
+        'Tanlangan omborda bu mahsulot uchun zaxira yo‘q — boshqa omborni tanlang yoki mahsulotni tekshiring.',
+    'kirimReturnSelectFefoLine': 'Partiya (FEFO) ro‘yxatidan qatorni tanlang.',
     'returnsApproveAssignNeedPermission':
         'Hujjat yaratildi. Tasdiq va yig\'uvchini biriktirish uchun documents:edit_status kerak.',
     'returnsSelectPickerTitle': 'Yig\'uvchini tanlang',
@@ -520,6 +524,10 @@ abstract final class StringLookup {
     'kirimSentOk': 'Отправлено',
     'returnsCustomerSearchLabel': 'Поиск клиента',
     'returnsCustomerRequired': 'Выберите клиента.',
+    'returnsAddAtLeastOne': 'Добавьте хотя бы одну позицию',
+    'returnsNoStockInWarehouse':
+        'На выбранном складе нет остатка — смените склад или проверьте товар.',
+    'kirimReturnSelectFefoLine': 'Выберите строку в списке партий (FEFO).',
     'returnsApproveAssignNeedPermission':
         'Документ создан. Для подтверждения и назначения сборщика нужно право documents:edit_status.',
     'returnsSelectPickerTitle': 'Выберите сборщика',
@@ -781,6 +789,10 @@ abstract final class StringLookup {
     'kirimSentOk': 'Sent',
     'returnsCustomerSearchLabel': 'Customer search',
     'returnsCustomerRequired': 'Select a customer.',
+    'returnsAddAtLeastOne': 'Add at least one line',
+    'returnsNoStockInWarehouse':
+        'No stock for this product in the selected warehouse — switch warehouse or verify the product.',
+    'kirimReturnSelectFefoLine': 'Select a row in the batch (FEFO) list.',
     'returnsApproveAssignNeedPermission':
         'Document created. documents:edit_status is required to approve and assign a picker.',
     'returnsSelectPickerTitle': 'Select picker',

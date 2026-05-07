@@ -321,9 +321,24 @@ export function KirimFormScreen() {
 
   useEffect(() => {
     if (flow === 'new' && newMode === 'byLocation') return;
-    if (currentProduct) {
+    if (!currentProduct) return;
+    if (flow === 'return' && currentProduct.locations && currentProduct.locations.length > 0) {
+      const sorted = sortLocations(currentProduct.locations);
+      const loc = sorted[0];
+      setReturnStockPick(loc);
+      setSelectedLocation({
+        id: loc.location_id,
+        code: loc.location_code,
+        name: loc.location_code,
+      });
+      setLocationSearch(loc.location_code);
+      setCurrentExpiry(loc.expiry_date ? loc.expiry_date.slice(0, 10) : '');
+    } else {
       setSelectedLocation(null);
       setLocationSearch('');
+      if (flow === 'return') {
+        setReturnStockPick(null);
+      }
     }
   }, [currentProduct?.product_id, flow, newMode]);
 
