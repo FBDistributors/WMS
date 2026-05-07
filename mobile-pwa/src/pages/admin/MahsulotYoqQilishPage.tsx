@@ -55,6 +55,33 @@ export function MahsulotYoqQilishPage() {
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null)
   const [brandZeroMode, setBrandZeroMode] = useState<BrandZeroMode>('brand_only')
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const getErrorMessage = useCallback(
+    (err: unknown) => {
+      if (typeof err === 'string' && err.trim()) return err
+      if (err instanceof Error && err.message) return err.message
+      if (typeof err === 'object' && err !== null) {
+        const apiErr = err as {
+          message?: unknown
+          status?: unknown
+          details?: unknown
+          detail?: unknown
+        }
+        if (typeof apiErr.message === 'string' && apiErr.message.trim()) return apiErr.message
+        const nestedDetail =
+          apiErr.details && typeof apiErr.details === 'object' && apiErr.details !== null && 'detail' in apiErr.details
+            ? (apiErr.details as { detail?: unknown }).detail
+            : apiErr.detail
+        if (typeof nestedDetail === 'string' && nestedDetail.trim()) return nestedDetail
+        if (typeof apiErr.status === 'number') return `HTTP ${apiErr.status}`
+      }
+      if (typeof err === 'object' && err !== null && 'message' in err) {
+        const message = (err as { message?: unknown }).message
+        if (typeof message === 'string' && message.trim()) return message
+      }
+      return t('kamomat:write_off.error')
+    },
+    [t],
+  )
 
   useEffect(() => {
     getLocations(false)
@@ -233,7 +260,7 @@ export function MahsulotYoqQilishPage() {
         setWriteOffQty({})
         loadProducts()
       } catch (err) {
-        setError(err instanceof Error ? err.message : t('kamomat:write_off.error'))
+        setError(getErrorMessage(err))
       } finally {
         setSubmitLoading(false)
       }
@@ -264,7 +291,7 @@ export function MahsulotYoqQilishPage() {
         setWriteOffQty({})
         loadProductDetails(selectedProduct.id)
       } catch (err) {
-        setError(err instanceof Error ? err.message : t('kamomat:write_off.error'))
+        setError(getErrorMessage(err))
       } finally {
         setSubmitLoading(false)
       }
@@ -275,8 +302,8 @@ export function MahsulotYoqQilishPage() {
       setError(null)
       setSuccess(null)
       try {
-        const idempotencyKey = `zero-brand:${selectedBrand.id}:${brandZeroMode}:${crypto.randomUUID()}`
-        const res = await zeroBrandStock(selectedBrand.id, brandZeroMode, idempotencyKey)
+        // Keep this call compatible even when idempotency migration is pending.
+        const res = await zeroBrandStock(selectedBrand.id, brandZeroMode)
         setSuccess(
           t('kamomat:write_off.brand_zero_success', {
             products: res.products_affected,
@@ -288,7 +315,7 @@ export function MahsulotYoqQilishPage() {
         )
         setConfirmOpen(false)
       } catch (err) {
-        setError(err instanceof Error ? err.message : t('kamomat:write_off.error'))
+        setError(getErrorMessage(err))
       } finally {
         setSubmitLoading(false)
       }
@@ -309,6 +336,7 @@ export function MahsulotYoqQilishPage() {
     selectedBrand,
     brandZeroMode,
     submitLoading,
+    getErrorMessage,
   ])
 
   return (
