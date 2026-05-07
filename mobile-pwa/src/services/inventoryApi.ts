@@ -435,12 +435,35 @@ export type BrandZeroStockResponse = {
 
 export type BrandZeroMode = 'brand_only' | 'reserve_only' | 'brand_and_reserve'
 
+export type MainZeroStockResponse = {
+  warehouse: 'main'
+  mode: BrandZeroMode
+  products_affected: number
+  lots_affected: number
+  stock_movements_created: number
+  reserve_movements_created: number
+  reserve_lots_affected: number
+  movements_created: number
+  skipped: number
+}
+
 export async function zeroBrandStock(
   brandId: string,
   mode: BrandZeroMode = 'brand_only',
   idempotencyKey?: string,
 ) {
   return fetchJSON<BrandZeroStockResponse>(`/api/v1/inventory/brands/${brandId}/zero-stock`, {
+    method: 'POST',
+    query: { mode },
+    headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+  })
+}
+
+export async function zeroMainStock(
+  mode: BrandZeroMode = 'brand_and_reserve',
+  idempotencyKey?: string,
+) {
+  return fetchJSON<MainZeroStockResponse>('/api/v1/inventory/zero-stock/main', {
     method: 'POST',
     query: { mode },
     headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
@@ -488,6 +511,8 @@ export type ImportQtyRowLine = {
   location_code: string
   /** ISO date YYYY-MM-DD; omit or undefined when no expiry */
   expiry_date?: string | null
+  /** Optional product brand_id from Excel; used for validation/backfill */
+  brand_id?: string | null
   /** Exceldan — faqat ko‘rinish; API ga yuborilmaydi */
   barcode?: string
   product_name?: string
@@ -511,6 +536,7 @@ export async function importInventoryQtyRows(payload: {
         qty: l.qty,
         location_code: l.location_code,
         ...(l.expiry_date ? { expiry_date: l.expiry_date } : {}),
+        ...(l.brand_id ? { brand_id: l.brand_id } : {}),
       })),
     },
   })

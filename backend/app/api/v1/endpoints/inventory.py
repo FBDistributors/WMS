@@ -32,6 +32,7 @@ from app.api.v1.endpoints.picker_inventory import _get_lot_level_balances
 from app.db import get_db
 from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
+from app.models.brand import Brand as BrandModel
 from app.models.location import Location as LocationModel
 from app.models.idempotency_key import IdempotencyKey as IdempotencyKeyModel
 from app.models.order import Order as OrderModel
@@ -333,6 +334,7 @@ class ImportQtyRowLineIn(BaseModel):
     qty: int = Field(..., gt=0, le=10_000_000)
     location_code: str = Field(..., min_length=1, max_length=128)
     expiry_date: Optional[date] = None
+    brand_id: Optional[UUID] = None
 
 
 class ImportQtyRowsRequest(BaseModel):
@@ -458,6 +460,18 @@ class LocationTransferOut(BaseModel):
 
 class BrandZeroStockResponse(BaseModel):
     brand_id: UUID
+    products_affected: int
+    lots_affected: int
+    stock_movements_created: int
+    reserve_movements_created: int
+    reserve_lots_affected: int
+    movements_created: int
+    skipped: int = 0
+
+
+class MainZeroStockResponse(BaseModel):
+    warehouse: Literal["main"] = "main"
+    mode: Literal["brand_only", "reserve_only", "brand_and_reserve"]
     products_affected: int
     lots_affected: int
     stock_movements_created: int
@@ -1031,15 +1045,15 @@ async def import_inventory_qty_rows(
 ):
     """
     Har bir qatorda: mahsulot (SKU yoki shtrix), joy kodi, miqdor, ixtiyoriy muddat.
-    (code, location_code, expiry_date) bo‘yicha miqdorlar yig‘iladi.
+    (code, location_code, expiry_date, brand_id) bo‘yicha miqdorlar yig‘iladi.
     """
-    merged: dict[tuple[str, str, Optional[date]], int] = defaultdict(int)
+    merged: dict[tuple[str, str, Optional[date], Optional[UUID]], int] = defaultdict(int)
     for line in payload.lines:
         c = line.code.strip()
         lc = line.location_code.strip()
         if not c or not lc:
             continue
-        merged[(c, lc, line.expiry_date)] += line.qty
+        merged[(c, lc, line.expiry_date, line.brand_id)] += line.qty
 
     if not merged:
         raise HTTPException(status_code=400, detail="No valid lines after merging")
@@ -1048,7 +1062,7 @@ async def import_inventory_qty_rows(
     skipped_rows = 0
     errors: List[ImportQtyErrorItem] = []
 
-    for (code, loc_code, exp_d), qty in merged.items():
+    for (code, loc_code, exp_d, file_brand_id), qty in merged.items():
         if len(errors) >= _MAX_IMPORT_QTY_ERRORS:
             break
         err_label = f"{code} @ {loc_code}"
@@ -1077,6 +1091,24 @@ async def import_inventory_qty_rows(
                 skipped_rows += 1
                 errors.append(ImportQtyErrorItem(code=err_label, message="Product not found"))
                 continue
+            if file_brand_id:
+                if product.brand_id is None:
+                    brand = (
+                        db.query(BrandModel)
+                        .filter(BrandModel.id == file_brand_id, BrandModel.is_active.is_(True))
+                        .one_or_none()
+                    )
+                    if not brand:
+                        skipped_rows += 1
+                        errors.append(ImportQtyErrorItem(code=err_label, message="brand_id not found or inactive"))
+                        continue
+                    product.brand_id = brand.id
+                    product.brand_code = (brand.code or "").strip() or None
+                    product.brand = (brand.display_name or brand.name or "").strip() or None
+                elif product.brand_id != file_brand_id:
+                    skipped_rows += 1
+                    errors.append(ImportQtyErrorItem(code=err_label, message="brand_id mismatch"))
+                    continue
 
             check_location_single_expiry(db, loc.id, product.id, exp_d)
 
@@ -1112,6 +1144,7 @@ async def import_inventory_qty_rows(
                     "import_code": code,
                     "import_location_code": loc_code,
                     "import_expiry": str(exp_d) if exp_d else None,
+                    "import_brand_id": str(file_brand_id) if file_brand_id else None,
                 },
                 ip_address=get_client_ip(request),
             )
@@ -2257,6 +2290,211 @@ async def zero_brand_stock(
         payload={"brand_id": str(brand_id), "mode": mode},
         expected_status=status.HTTP_200_OK,
         run=_run_zero,
+    )
+
+
+@router.post(
+    "/zero-stock/main",
+    response_model=MainZeroStockResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Zero all stock and reserve in main warehouse",
+)
+@router.post(
+    "/zero-stock/main/",
+    response_model=MainZeroStockResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Zero all stock and reserve in main warehouse",
+)
+async def zero_main_stock(
+    request: Request,
+    mode: Literal["brand_only", "reserve_only", "brand_and_reserve"] = Query(
+        "brand_and_reserve",
+        description="brand_only=adjust on-hand, reserve_only=clear reserve, brand_and_reserve=both",
+    ),
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
+    db: Session = Depends(get_db),
+    user: UserModel = Depends(get_current_user),
+    _guard=Depends(require_permission("inventory:adjust")),
+):
+    def _run_zero_main() -> MainZeroStockResponse:
+        main_location_ids = _location_ids_for_warehouse(db, "main") or []
+        if not main_location_ids:
+            return MainZeroStockResponse(
+                mode=mode,
+                products_affected=0,
+                lots_affected=0,
+                stock_movements_created=0,
+                reserve_movements_created=0,
+                reserve_lots_affected=0,
+                movements_created=0,
+                skipped=0,
+            )
+
+        check_controller_adjust_reason(user, "inventory_shortage")
+        check_controller_adjust_reason(user, "inventory_overage")
+
+        on_hand_expr = func.sum(
+            case(
+                (
+                    StockMovementModel.movement_type.in_(PHYSICAL_ON_HAND_MOVEMENT_TYPES),
+                    StockMovementModel.qty_change,
+                ),
+                else_=0,
+            )
+        )
+        reserved_expr = func.sum(
+            case(
+                (StockMovementModel.movement_type.in_(("allocate", "unallocate")), StockMovementModel.qty_change),
+                else_=0,
+            )
+        )
+
+        rows = (
+            db.query(
+                StockLotModel.product_id.label("product_id"),
+                StockLotModel.id.label("lot_id"),
+                StockMovementModel.location_id.label("location_id"),
+                on_hand_expr.label("on_hand_qty"),
+                reserved_expr.label("reserved_qty"),
+            )
+            .join(StockMovementModel, StockMovementModel.lot_id == StockLotModel.id)
+            .filter(StockMovementModel.location_id.in_(main_location_ids))
+            .group_by(
+                StockLotModel.product_id,
+                StockLotModel.id,
+                StockMovementModel.location_id,
+            )
+            .having((on_hand_expr != 0) | (reserved_expr != 0))
+            .all()
+        )
+        if not rows:
+            return MainZeroStockResponse(
+                mode=mode,
+                products_affected=0,
+                lots_affected=0,
+                stock_movements_created=0,
+                reserve_movements_created=0,
+                reserve_lots_affected=0,
+                movements_created=0,
+                skipped=0,
+            )
+
+        client_ip = get_client_ip(request)
+        product_ids: set[UUID] = set()
+        lot_ids: set[UUID] = set()
+        reserve_lot_ids: set[UUID] = set()
+        stock_movements_created = 0
+        reserve_movements_created = 0
+        skipped = 0
+        touched_rows: list[tuple[UUID, UUID]] = []
+        try:
+            for row in rows:
+                lock_lot_location(db, row.lot_id, row.location_id)
+                on_hand_qty, reserved_qty, _available_qty = compute_lot_location_balances(
+                    db,
+                    row.lot_id,
+                    row.location_id,
+                )
+                do_stock = mode in {"brand_only", "brand_and_reserve"} and on_hand_qty != 0
+                do_reserve = mode in {"reserve_only", "brand_and_reserve"} and reserved_qty != 0
+                if not do_stock and not do_reserve:
+                    skipped += 1
+                    continue
+                product_ids.add(row.product_id)
+                lot_ids.add(row.lot_id)
+                touched_rows.append((row.lot_id, row.location_id))
+                if do_stock:
+                    stock_delta = -on_hand_qty
+                    reason_code = "inventory_shortage" if stock_delta < 0 else "inventory_overage"
+                    stock_movement = StockMovementModel(
+                        product_id=row.product_id,
+                        lot_id=row.lot_id,
+                        location_id=row.location_id,
+                        qty_change=stock_delta,
+                        movement_type="adjust",
+                        created_by_user_id=user.id,
+                        reason_code=reason_code,
+                    )
+                    db.add(stock_movement)
+                    db.flush()
+                    log_action(
+                        db,
+                        user_id=user.id,
+                        action=ACTION_CREATE,
+                        entity_type="stock_movement",
+                        entity_id=str(stock_movement.id),
+                        new_data={
+                            "product_id": str(row.product_id),
+                            "lot_id": str(row.lot_id),
+                            "location_id": str(row.location_id),
+                            "qty_change": str(stock_delta),
+                            "movement_type": "adjust",
+                            "reason_code": reason_code,
+                            "bulk_main_zero": True,
+                            "mode": mode,
+                        },
+                        ip_address=client_ip,
+                    )
+                    stock_movements_created += 1
+                if do_reserve:
+                    reserve_lot_ids.add(row.lot_id)
+                    reserve_movement = StockMovementModel(
+                        product_id=row.product_id,
+                        lot_id=row.lot_id,
+                        location_id=row.location_id,
+                        qty_change=-reserved_qty,
+                        movement_type="unallocate",
+                        created_by_user_id=user.id,
+                    )
+                    db.add(reserve_movement)
+                    db.flush()
+                    log_action(
+                        db,
+                        user_id=user.id,
+                        action=ACTION_CREATE,
+                        entity_type="stock_movement",
+                        entity_id=str(reserve_movement.id),
+                        new_data={
+                            "product_id": str(row.product_id),
+                            "lot_id": str(row.lot_id),
+                            "location_id": str(row.location_id),
+                            "qty_change": str(-reserved_qty),
+                            "movement_type": "unallocate",
+                            "bulk_main_zero": True,
+                            "bulk_main_zero_reserved": True,
+                            "mode": mode,
+                        },
+                        ip_address=client_ip,
+                    )
+                    reserve_movements_created += 1
+            _verify_non_negative_balances_or_raise(db, touched_rows)
+            db.commit()
+        except HTTPException:
+            db.rollback()
+            raise
+        except Exception:
+            db.rollback()
+            raise
+        movements_created = stock_movements_created + reserve_movements_created
+        return MainZeroStockResponse(
+            mode=mode,
+            products_affected=len(product_ids),
+            lots_affected=len(lot_ids),
+            stock_movements_created=stock_movements_created,
+            reserve_movements_created=reserve_movements_created,
+            reserve_lots_affected=len(reserve_lot_ids),
+            movements_created=movements_created,
+            skipped=skipped,
+        )
+
+    return _run_with_idempotency(
+        db=db,
+        user_id=user.id,
+        key=idempotency_key,
+        scope="inventory_zero_main_stock",
+        payload={"warehouse": "main", "mode": mode},
+        expected_status=status.HTTP_200_OK,
+        run=_run_zero_main,
     )
 
 

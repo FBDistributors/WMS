@@ -123,12 +123,13 @@ type DetailedIdx = {
   barcodeIdx: number
   productIdx: number
   brandIdx: number
+  brandIdIdx: number
 }
 
 function findMetaColumnIndices(
   lower: string[],
   core: { codeIdx: number; qtyIdx: number; locationIdx: number; expiryIdx: number },
-): Pick<DetailedIdx, 'barcodeIdx' | 'productIdx' | 'brandIdx'> {
+): Pick<DetailedIdx, 'barcodeIdx' | 'productIdx' | 'brandIdx' | 'brandIdIdx'> {
   const used = new Set<number>([core.codeIdx, core.qtyIdx, core.locationIdx])
   if (core.expiryIdx >= 0) used.add(core.expiryIdx)
 
@@ -163,8 +164,22 @@ function findMetaColumnIndices(
         h === 'бренд' ||
         (h.includes('бренд') && h.length < 40)),
   )
+  if (brandIdx >= 0) used.add(brandIdx)
 
-  return { barcodeIdx, productIdx, brandIdx }
+  const brandIdIdx = lower.findIndex(
+    (h, i) =>
+      !used.has(i) &&
+      (h === 'brand_id' ||
+        h === 'brend_id' ||
+        h === 'brand id' ||
+        h === 'brend id' ||
+        h === 'бренд id' ||
+        h === 'бренд_id' ||
+        h === 'brandid' ||
+        h === 'brendid'),
+  )
+
+  return { barcodeIdx, productIdx, brandIdx, brandIdIdx }
 }
 
 function findDetailedColumns(headers: string[]): DetailedIdx | null {
@@ -274,6 +289,10 @@ function parseRowsToDetailedLines(
     if (idx.brandIdx >= 0) {
       line.brand = String(row[idx.brandIdx] ?? '').trim()
     }
+    if (idx.brandIdIdx >= 0) {
+      const raw = String(row[idx.brandIdIdx] ?? '').trim()
+      if (raw) line.brand_id = raw
+    }
     out.push(line)
   }
   if (out.length === 0) {
@@ -349,7 +368,7 @@ export function ImportInventoryDialog({
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [result, setResult] = useState<ImportQtyResponse | null>(null)
-  const [columnFlags, setColumnFlags] = useState({ barcode: false, product: false, brand: false })
+  const [columnFlags, setColumnFlags] = useState({ barcode: false, product: false, brand: false, brandId: false })
   const [catalogEnriching, setCatalogEnriching] = useState(false)
   const [catalogEnrichError, setCatalogEnrichError] = useState<string | null>(null)
   const [catalogMissingCount, setCatalogMissingCount] = useState(0)
@@ -359,7 +378,7 @@ export function ImportInventoryDialog({
     setLines([])
     setFormError(null)
     setResult(null)
-    setColumnFlags({ barcode: false, product: false, brand: false })
+    setColumnFlags({ barcode: false, product: false, brand: false, brandId: false })
     setCatalogEnriching(false)
     setCatalogEnrichError(null)
     setCatalogMissingCount(0)
@@ -377,6 +396,7 @@ export function ImportInventoryDialog({
       barcode: columnFlags.barcode || lines.some((l) => Boolean(l.barcode?.trim())),
       product: columnFlags.product || lines.some((l) => Boolean(l.product_name?.trim())),
       brand: columnFlags.brand || lines.some((l) => Boolean(l.brand?.trim())),
+      brandId: columnFlags.brandId || lines.some((l) => Boolean(l.brand_id?.trim())),
     }),
     [columnFlags, lines],
   )
@@ -392,7 +412,7 @@ export function ImportInventoryDialog({
     setResult(null)
     setFileName(file.name)
     setLines([])
-    setColumnFlags({ barcode: false, product: false, brand: false })
+    setColumnFlags({ barcode: false, product: false, brand: false, brandId: false })
     setCatalogEnrichError(null)
     setCatalogMissingCount(0)
     const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
@@ -423,16 +443,17 @@ export function ImportInventoryDialog({
         barcode: detailedIdx.barcodeIdx >= 0,
         product: detailedIdx.productIdx >= 0,
         brand: detailedIdx.brandIdx >= 0,
+        brandId: detailedIdx.brandIdIdx >= 0,
       })
       const parsed = parseRowsToDetailedLines(rows, detailedIdx)
       if (parsed.error) {
         setFormError(parseErrorMessage(parsed.error))
-        setColumnFlags({ barcode: false, product: false, brand: false })
+        setColumnFlags({ barcode: false, product: false, brand: false, brandId: false })
         return
       }
       if (parsed.lines.length > IMPORT_QTY_MAX_LINES) {
         setFormError(t('inventory:import_max_rows', { max: IMPORT_QTY_MAX_LINES }))
-        setColumnFlags({ barcode: false, product: false, brand: false })
+        setColumnFlags({ barcode: false, product: false, brand: false, brandId: false })
         return
       }
       setCatalogEnriching(true)
@@ -563,7 +584,7 @@ export function ImportInventoryDialog({
               {t('inventory:import_catalog_missing', { count: catalogMissingCount })}
             </p>
           ) : null}
-          {displayColumnFlags.barcode || displayColumnFlags.product || displayColumnFlags.brand ? (
+          {displayColumnFlags.barcode || displayColumnFlags.product || displayColumnFlags.brand || displayColumnFlags.brandId ? (
             <p className="text-xs text-slate-500 dark:text-slate-400">{t('inventory:import_extra_columns_preview')}</p>
           ) : null}
 
@@ -590,6 +611,9 @@ export function ImportInventoryDialog({
                       <th className="whitespace-nowrap px-2 py-2 text-left sm:px-3">
                         {t('inventory:columns.brand')}
                       </th>
+                    ) : null}
+                    {displayColumnFlags.brandId ? (
+                      <th className="whitespace-nowrap px-2 py-2 text-left sm:px-3">Brand ID</th>
                     ) : null}
                     <th className="whitespace-nowrap px-2 py-2 text-left sm:px-3">
                       {t('inventory:columns.location')}
@@ -626,6 +650,11 @@ export function ImportInventoryDialog({
                       {displayColumnFlags.brand ? (
                         <td className="max-w-[7rem] truncate px-2 py-2 sm:px-3" title={row.brand}>
                           {row.brand || '—'}
+                        </td>
+                      ) : null}
+                      {displayColumnFlags.brandId ? (
+                        <td className="max-w-[14rem] truncate px-2 py-2 font-mono text-xs sm:px-3" title={row.brand_id}>
+                          {row.brand_id || '—'}
                         </td>
                       ) : null}
                       <td className="px-2 py-2 font-mono sm:px-3">{row.location_code}</td>

@@ -15,6 +15,7 @@ import {
   getInventoryByLocation,
   getInventoryDetails,
   type InventoryByLocationRow,
+  zeroMainStock,
   zeroBrandStock,
   type InventoryDetailRow,
 } from '../../services/inventoryApi'
@@ -55,6 +56,7 @@ export function MahsulotYoqQilishPage() {
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null)
   const [brandZeroMode, setBrandZeroMode] = useState<BrandZeroMode>('brand_only')
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [confirmMainOpen, setConfirmMainOpen] = useState(false)
   const getErrorMessage = useCallback(
     (err: unknown) => {
       if (typeof err === 'string' && err.trim()) return err
@@ -338,6 +340,30 @@ export function MahsulotYoqQilishPage() {
     submitLoading,
     getErrorMessage,
   ])
+
+  const handleZeroMain = useCallback(async () => {
+    if (submitLoading) return
+    setSubmitLoading(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      const res = await zeroMainStock('brand_and_reserve')
+      setSuccess(
+        t('kamomat:write_off.brand_zero_success', {
+          products: res.products_affected,
+          movements: res.movements_created,
+          stock_movements: res.stock_movements_created,
+          reserve_movements: res.reserve_movements_created,
+          mode: t('kamomat:write_off.reset_mode_brand_and_reserve'),
+        }),
+      )
+      setConfirmMainOpen(false)
+    } catch (err) {
+      setError(getErrorMessage(err))
+    } finally {
+      setSubmitLoading(false)
+    }
+  }, [submitLoading, t, getErrorMessage])
 
   return (
     <AdminLayout title={t('kamomat:write_off.title')}>
@@ -624,7 +650,7 @@ export function MahsulotYoqQilishPage() {
 
       {((searchMode === 'by_location' && locationId)
         || (searchMode === 'by_product' && selectedProduct)
-        || (searchMode === 'by_brand' && selectedBrand)) && (
+        || searchMode === 'by_brand') && (
         <Card className="space-y-4">
           {searchMode === 'by_location' && (
             <>
@@ -890,6 +916,21 @@ export function MahsulotYoqQilishPage() {
               </div>
             </div>
           )}
+          {searchMode === 'by_brand' && (
+            <div className="space-y-3 rounded-xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/60 dark:bg-rose-950/40">
+              <div className="text-sm font-medium text-rose-900 dark:text-rose-200">
+                Main ombordagi barcha mahsulotni 0 qilish (Qoldiq + Rezerv)
+              </div>
+              <div className="text-xs text-rose-800 dark:text-rose-300">
+                Bu amal barcha mahsulotlarda inventar balansini qoida asosida 0 ga tushiradi va qaytarib bo'lmaydi.
+              </div>
+              <div className="flex items-center gap-3">
+                <Button variant="danger" onClick={() => setConfirmMainOpen(true)} disabled={submitLoading}>
+                  {submitLoading ? t('common:messages.loading') : 'Main omborni to‘liq 0 qilish'}
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
       )}
       <ConfirmDialog
@@ -905,6 +946,17 @@ export function MahsulotYoqQilishPage() {
         loading={submitLoading}
         onCancel={() => setConfirmOpen(false)}
         onConfirm={handleSubmit}
+      />
+      <ConfirmDialog
+        open={confirmMainOpen}
+        title="Main omborni to‘liq 0 qilish"
+        message="Main ombordagi barcha mahsulot uchun qoldiq va rezerv 0 qilinadi. Tasdiqlaysizmi?"
+        confirmLabel="Ha, 0 qilinsin"
+        cancelLabel={t('common:buttons.cancel')}
+        variant="danger"
+        loading={submitLoading}
+        onCancel={() => setConfirmMainOpen(false)}
+        onConfirm={handleZeroMain}
       />
     </AdminLayout>
   )
