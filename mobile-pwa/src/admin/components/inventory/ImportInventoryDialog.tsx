@@ -653,7 +653,10 @@ export function ImportInventoryDialog({
                         </td>
                       ) : null}
                       {displayColumnFlags.brandId ? (
-                        <td className="max-w-[14rem] truncate px-2 py-2 font-mono text-xs sm:px-3" title={row.brand_id}>
+                        <td
+                          className="max-w-[14rem] truncate px-2 py-2 font-mono text-xs sm:px-3"
+                          title={row.brand_id ?? undefined}
+                        >
                           {row.brand_id || '—'}
                         </td>
                       ) : null}

@@ -439,6 +439,31 @@ export function MahsulotYoqQilishPage() {
           </button>
         </div>
 
+        {searchMode === 'by_brand' && (
+          <div
+            className="space-y-3 rounded-xl border-2 border-rose-300 bg-rose-50 p-4 shadow-sm dark:border-rose-700 dark:bg-rose-950/40"
+            data-testid="main-zero-all-panel"
+          >
+            <div className="text-sm font-semibold text-rose-900 dark:text-rose-100">
+              Main ombordagi barcha mahsulotni 0 qilish (qoldiq + rezerv)
+            </div>
+            <div className="text-xs text-rose-800 dark:text-rose-300">
+              Bu amal faqat <span className="font-semibold">main</span> ombordagi barcha mahsulotlarga qo‘llanadi;
+              qaytarib bo‘lmaydi. Alohida brendni nol qilish uchun pastdan brendni tanlang.
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                variant="danger"
+                className="shrink-0"
+                onClick={() => setConfirmMainOpen(true)}
+                disabled={submitLoading}
+              >
+                {submitLoading ? t('common:messages.loading') : "Main omborni to'liq 0 qilish"}
+              </Button>
+            </div>
+          </div>
+        )}
+
         {searchMode === 'by_location' && (
           <>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -913,21 +938,6 @@ export function MahsulotYoqQilishPage() {
                 <Link to="/admin/kamomat" className="text-sm text-slate-600 dark:text-slate-400">
                   {t('kamomat:write_off.back')}
                 </Link>
-              </div>
-            </div>
-          )}
-          {searchMode === 'by_brand' && (
-            <div className="space-y-3 rounded-xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/60 dark:bg-rose-950/40">
-              <div className="text-sm font-medium text-rose-900 dark:text-rose-200">
-                Main ombordagi barcha mahsulotni 0 qilish (Qoldiq + Rezerv)
-              </div>
-              <div className="text-xs text-rose-800 dark:text-rose-300">
-                Bu amal barcha mahsulotlarda inventar balansini qoida asosida 0 ga tushiradi va qaytarib bo'lmaydi.
-              </div>
-              <div className="flex items-center gap-3">
-                <Button variant="danger" onClick={() => setConfirmMainOpen(true)} disabled={submitLoading}>
-                  {submitLoading ? t('common:messages.loading') : 'Main omborni to‘liq 0 qilish'}
-                </Button>
               </div>
             </div>
           )}
