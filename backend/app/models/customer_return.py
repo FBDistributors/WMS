@@ -74,8 +74,8 @@ class CustomerReturnLine(Base):
     product_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("products.id", ondelete="RESTRICT"), nullable=False
     )
-    location_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("locations.id", ondelete="RESTRICT"), nullable=False
+    location_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("locations.id", ondelete="RESTRICT"), nullable=True
     )
     product_name: Mapped[str] = mapped_column(String(512), nullable=False)
     location_code: Mapped[str] = mapped_column(String(64), nullable=False, default="")

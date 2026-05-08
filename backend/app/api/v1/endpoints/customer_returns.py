@@ -51,10 +51,10 @@ def _is_missing_customer_returns_schema_error(exc: Exception) -> bool:
 
 class CustomerReturnLineCreate(BaseModel):
     product_id: UUID
-    location_id: UUID
+    location_id: Optional[UUID] = None
     qty: Decimal = Field(..., gt=0)
     product_name: str = Field(..., max_length=512)
-    location_code: str = Field(default="", max_length=64)
+    location_code: Optional[str] = Field(default=None, max_length=64)
     batch: Optional[str] = Field(default=None, max_length=64)
     expiry_date: Optional[str] = None  # YYYY-MM-DD
 
@@ -84,7 +84,7 @@ class CustomerReturnCreate(BaseModel):
 class CustomerReturnLineOut(BaseModel):
     id: UUID
     product_id: UUID
-    location_id: UUID
+    location_id: Optional[UUID] = None
     product_name: str
     location_code: str
     qty: Decimal
@@ -250,13 +250,15 @@ async def create_customer_return(
         product = db.query(ProductModel).filter(ProductModel.id == line.product_id).one_or_none()
         if not product:
             raise HTTPException(status_code=400, detail=f"Product not found: {line.product_id}")
-        loc = (
-            db.query(LocationModel)
-            .filter(LocationModel.id == line.location_id, LocationModel.is_active.is_(True))
-            .one_or_none()
-        )
-        if not loc:
-            raise HTTPException(status_code=400, detail="Location not found")
+        loc = None
+        if line.location_id is not None:
+            loc = (
+                db.query(LocationModel)
+                .filter(LocationModel.id == line.location_id, LocationModel.is_active.is_(True))
+                .one_or_none()
+            )
+            if not loc:
+                raise HTTPException(status_code=400, detail="Location not found")
         exp = _parse_expiry(line.expiry_date)
         if exp:
             norm = normalize_expiry_to_first_of_month(exp)
@@ -267,15 +269,16 @@ async def create_customer_return(
         batch_val = (line.batch or "").strip()
         if not batch_val:
             batch_val = uuid4().hex[:12]
-        # Customer return is a receipt flow: we validate location/expiry compatibility,
-        # but do not cap qty by currently available stock.
-        check_location_single_expiry(db, line.location_id, line.product_id, norm)
+        # Customer return is a receipt flow: location can be picked later by picker.
+        # If location is provided at create stage, still validate location/expiry compatibility.
+        if line.location_id is not None:
+            check_location_single_expiry(db, line.location_id, line.product_id, norm)
         cr.lines.append(
             CustomerReturnLineModel(
                 product_id=line.product_id,
                 location_id=line.location_id,
                 product_name=(line.product_name or product.name or "")[:512],
-                location_code=(line.location_code or loc.code or "")[:64],
+                location_code=((line.location_code or (loc.code if loc else "") or "")[:64]),
                 qty=line.qty,
                 batch=batch_val,
                 expiry_date=norm,

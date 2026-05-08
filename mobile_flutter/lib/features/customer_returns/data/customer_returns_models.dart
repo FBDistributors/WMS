@@ -12,7 +12,7 @@ class CustomerReturnLine {
 
   final String id;
   final String productId;
-  final String locationId;
+  final String? locationId;
   final String productName;
   final String locationCode;
   final int qty;
@@ -23,7 +23,7 @@ class CustomerReturnLine {
     return CustomerReturnLine(
       id: json['id']! as String,
       productId: json['product_id']! as String,
-      locationId: json['location_id']! as String,
+      locationId: json['location_id'] as String?,
       productName: json['product_name']! as String,
       locationCode: json['location_code']! as String,
       qty: _int(json['qty']),
@@ -132,28 +132,28 @@ class CustomerReturnListResponse {
 class CreateCustomerReturnLine {
   const CreateCustomerReturnLine({
     required this.productId,
-    required this.locationId,
+    this.locationId,
     required this.qty,
     required this.productName,
-    required this.locationCode,
+    this.locationCode,
     this.batch,
     this.expiryDate,
   });
 
   final String productId;
-  final String locationId;
+  final String? locationId;
   final int qty;
   final String productName;
-  final String locationCode;
+  final String? locationCode;
   final String? batch;
   final String? expiryDate;
 
   Map<String, Object?> toJson() => <String, Object?>{
         'product_id': productId,
-        'location_id': locationId,
+        if (locationId != null) 'location_id': locationId,
         'qty': qty,
         'product_name': productName,
-        'location_code': locationCode,
+        if (locationCode != null) 'location_code': locationCode,
         if (batch != null) 'batch': batch,
         if (expiryDate != null) 'expiry_date': expiryDate,
       };

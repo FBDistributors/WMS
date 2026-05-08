@@ -54,8 +54,8 @@ class _FormLine {
     required this.id,
     required this.productId,
     required this.productName,
-    required this.locationId,
-    required this.locationCode,
+    this.locationId,
+    this.locationCode,
     required this.qty,
     required this.batch,
     this.expiryDate,
@@ -64,8 +64,8 @@ class _FormLine {
   final String id;
   final String productId;
   final String productName;
-  final String locationId;
-  final String locationCode;
+  final String? locationId;
+  final String? locationCode;
   final int qty;
   final String batch;
   final String? expiryDate;
@@ -107,8 +107,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   String? _returnReasonCode;
   String? _returnLineExpiry;
   /// Zaxira (FEFO) bo'lmasa — RN'dagi kabi qo'lda lokatsiya / partiya.
-  PickerLocationOption? _returnManualLocation;
-  final TextEditingController _returnLocationSearch = TextEditingController();
   final TextEditingController _returnManualBatch = TextEditingController();
 
   int _invStep = 0;
@@ -135,7 +133,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     _invScanActualQty.dispose();
     _batchNew.dispose();
     _kirimPutawaySearch.dispose();
-    _returnLocationSearch.dispose();
     _returnManualBatch.dispose();
     _qty.dispose();
     super.dispose();
@@ -192,8 +189,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       _expiry = null;
       _batchNew.clear();
       _kirimPutawaySearch.clear();
-      _returnManualLocation = null;
-      _returnLocationSearch.clear();
       _returnManualBatch.clear();
       _qty.clear();
     });
@@ -212,13 +207,9 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             final List<PickerProductLocation> sorted = _sortFefo(res.locations);
             _returnPick = sorted.first;
             _returnLineExpiry = sorted.first.expiryDate;
-            _returnManualLocation = null;
-            _returnLocationSearch.clear();
             _returnManualBatch.clear();
           }
           if (_flow == 'return' && res.locations.isEmpty) {
-            _returnManualLocation = null;
-            _returnLocationSearch.clear();
             _returnManualBatch.clear();
             _returnLineExpiry = null;
           }
@@ -289,49 +280,17 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       return;
     }
 
-    final bool useFefo = p.locations.isNotEmpty;
-
-    if (useFefo) {
-      final PickerProductLocation? pick = _returnPick;
-      if (pick == null) {
-        if (!mounted) return;
-        showAppSnackBar(
-          context,
-          SnackBar(content: Text(StringLookup.t(loc, 'kirimReturnSelectFefoLine'))),
-        );
-        return;
-      }
-      final String? lineExpiry = (_returnLineExpiry != null && _returnLineExpiry!.trim().isNotEmpty)
-          ? _returnLineExpiry
-          : pick.expiryDate;
-      setState(() {
-        _lines.add(
-          _FormLine(
-            id: const Uuid().v4(),
-            productId: p.productId,
-            productName: p.name,
-            locationId: pick.locationId,
-            locationCode: pick.locationCode,
-            qty: q,
-            batch: pick.batchNo,
-            expiryDate: lineExpiry,
-          ),
-        );
-        _clearReturnLineFormAfterAdd();
-      });
-      return;
-    }
-
-    final PickerLocationOption? manualLoc = _returnManualLocation;
-    if (manualLoc == null) {
-      if (!mounted) return;
-      showAppSnackBar(
-        context,
-        SnackBar(content: Text(StringLookup.t(loc, 'returnsManualLocationRequired'))),
-      );
-      return;
-    }
     final String batchTrim = _returnManualBatch.text.trim();
+    final String batchValue = (() {
+      if (batchTrim.isNotEmpty) {
+        return batchTrim;
+      }
+      final PickerProductLocation? pick = _returnPick;
+      if (pick != null && pick.batchNo.trim().isNotEmpty) {
+        return pick.batchNo.trim();
+      }
+      return '';
+    })();
     final String? expTrim = _returnLineExpiry?.trim();
     final String? lineExpiry = (expTrim != null && expTrim.isNotEmpty) ? expTrim : null;
     setState(() {
@@ -340,10 +299,10 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           id: const Uuid().v4(),
           productId: p.productId,
           productName: p.name,
-          locationId: manualLoc.id,
-          locationCode: manualLoc.code,
+          locationId: null,
+          locationCode: null,
           qty: q,
-          batch: batchTrim,
+          batch: batchValue,
           expiryDate: lineExpiry,
         ),
       );
@@ -355,8 +314,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     _product = null;
     _returnPick = null;
     _returnLineExpiry = null;
-    _returnManualLocation = null;
-    _returnLocationSearch.clear();
     _returnManualBatch.clear();
     _qty.clear();
     _productError = null;
@@ -366,62 +323,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   }
 
   bool _canPressAddLineReturn() {
-    final PickerProductDetailResponse? p = _product;
-    if (p == null) return false;
-    if (p.locations.isNotEmpty) {
-      return _returnPick != null;
-    }
-    return _returnManualLocation != null;
-  }
-
-  Widget _returnManualLocationDropdown() {
-    final PickerLocationOption? d = _returnManualLocation;
-    final String qTrim = _returnLocationSearch.text.trim();
-    if (d != null &&
-        qTrim.isNotEmpty &&
-        qTrim.toLowerCase() == d.code.trim().toLowerCase()) {
-      return const SizedBox.shrink();
-    }
-    final List<PickerLocationOption> filtered = _filterKirimPutaway(_returnLocationSearch.text);
-    if (filtered.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Material(
-        elevation: 1,
-        borderRadius: BorderRadius.circular(8),
-        clipBehavior: Clip.antiAlias,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 220),
-          child: ListView.builder(
-            shrinkWrap: true,
-            padding: EdgeInsets.zero,
-            itemCount: filtered.length,
-            itemBuilder: (BuildContext _, int i) {
-              final PickerLocationOption o = filtered[i];
-              final bool sel = _returnManualLocation?.id == o.id;
-              final String n = o.name.trim();
-              final bool showSubtitle =
-                  n.isNotEmpty && n.toLowerCase() != o.code.toLowerCase();
-              return ListTile(
-                dense: true,
-                title: Text(o.code),
-                subtitle: showSubtitle ? Text(o.name) : null,
-                tileColor: sel ? Colors.green.shade50 : null,
-                onTap: () {
-                  FocusManager.instance.primaryFocus?.unfocus();
-                  setState(() {
-                    _returnManualLocation = o;
-                    _returnLocationSearch.text = o.code;
-                  });
-                },
-              );
-            },
-          ),
-        ),
-      ),
-    );
+    return _product != null;
   }
 
   void _scheduleCustomerSearch() {
@@ -1626,8 +1528,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                         _product = null;
                         _returnPick = null;
                         _returnLineExpiry = null;
-                        _returnManualLocation = null;
-                        _returnLocationSearch.clear();
                         _returnManualBatch.clear();
                         _lines.clear();
                       });
@@ -1775,39 +1675,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                       style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
                     ),
                     const SizedBox(height: 12),
-                    Text(
-                      StringLookup.t(appLoc, 'kirimStorageLocation'),
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _returnLocationSearch,
-                      textCapitalization: TextCapitalization.characters,
-                      decoration: InputDecoration(
-                        labelText: StringLookup.t(appLoc, 'kirimPutawaySearchLabel'),
-                        border: const OutlineInputBorder(),
-                        suffixIcon: buildInputClearButton(
-                          visible: _returnLocationSearch.text.trim().isNotEmpty,
-                          onPressed: () {
-                            setState(() {
-                              _returnLocationSearch.clear();
-                              _returnManualLocation = null;
-                            });
-                          },
-                        ),
-                      ),
-                      onChanged: (String v) {
-                        setState(() {
-                          final PickerLocationOption? sel = _returnManualLocation;
-                          if (sel != null &&
-                              v.trim().toLowerCase() != sel.code.trim().toLowerCase()) {
-                            _returnManualLocation = null;
-                          }
-                        });
-                      },
-                    ),
-                    _returnManualLocationDropdown(),
-                    const SizedBox(height: 16),
                     TextField(
                       controller: _returnManualBatch,
                       textCapitalization: TextCapitalization.characters,
@@ -1825,8 +1692,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                   ],
                   if (_product!.locations.isNotEmpty)
                     ..._sortFefo(_product!.locations).map((PickerProductLocation loc) {
-                      final bool sel =
-                          _returnPick?.lotId == loc.lotId && _returnPick?.locationId == loc.locationId;
                       return ListTile(
                         title: Text(
                           '${StringLookup.t(appLoc, 'kirimFefoLocationPrefix')}${loc.locationCode}',
@@ -1835,15 +1700,12 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                           '${StringLookup.t(appLoc, 'kirimFefoQtyPrefix')}${loc.availableQty.toStringAsFixed(0)} · '
                           '${StringLookup.t(appLoc, 'kirimFefoExpiryPrefix')}${formatExpiryMonthYear(loc.expiryDate)}',
                         ),
-                        tileColor: sel ? Colors.blue.shade50 : null,
+                        tileColor: null,
                         onTap: () {
                           FocusManager.instance.primaryFocus?.unfocus();
                           setState(() {
                             _returnPick = loc;
                             _returnLineExpiry = loc.expiryDate;
-                            _returnManualLocation = null;
-                            _returnLocationSearch.clear();
-                            _returnManualBatch.clear();
                           });
                         },
                       );
@@ -1995,7 +1857,9 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                   ..._lines.map(
                     (_FormLine l) => ListTile(
                       title: Text(l.productName),
-                      subtitle: Text('${l.locationCode} · ${l.qty} · ${l.batch}'),
+                      subtitle: Text(
+                        '${(l.locationCode == null || l.locationCode!.isEmpty) ? "Lokatsiya: picker tanlaydi" : l.locationCode} · ${l.qty} · ${l.batch}',
+                      ),
                       trailing: IconButton(
                         icon: const Icon(Icons.delete_outline),
                         onPressed: () => setState(() => _lines.remove(l)),
