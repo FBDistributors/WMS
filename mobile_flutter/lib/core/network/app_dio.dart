@@ -56,6 +56,29 @@ final appDioProvider = Provider<Dio>((Ref ref) {
 
 String mapDioExceptionToMessage(DioException err) {
   final int? status = err.response?.statusCode;
+
+  final Object? data = err.response?.data;
+  if (data is Map<String, Object?>) {
+    final Object? detail = data['detail'];
+    if (detail is String && detail.trim().isNotEmpty) {
+      return detail;
+    }
+    if (detail is Map<String, Object?>) {
+      final Object? m = detail['message'];
+      if (m is String && m.trim().isNotEmpty) {
+        return m;
+      }
+    }
+    if (detail is List) {
+      final Iterable<String> parts = detail
+          .map((Object? e) => e == null ? '' : e.toString().trim())
+          .where((String s) => s.isNotEmpty);
+      if (parts.isNotEmpty) {
+        return parts.join('; ');
+      }
+    }
+  }
+
   if (status == 401) {
     return unauthorizedMessage;
   }
@@ -69,19 +92,6 @@ String mapDioExceptionToMessage(DioException err) {
   }
   if (status != null && status >= 500) {
     return 'Server xatosi. Keyinroq urinib ko\'ring.';
-  }
-  final Object? data = err.response?.data;
-  if (data is Map<String, Object?>) {
-    final Object? detail = data['detail'];
-    if (detail is String) {
-      return detail;
-    }
-    if (detail is Map<String, Object?>) {
-      final Object? m = detail['message'];
-      if (m is String) {
-        return m;
-      }
-    }
   }
   return err.message ?? 'Tarmoq xatosi';
 }
