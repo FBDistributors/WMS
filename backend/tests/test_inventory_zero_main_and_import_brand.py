@@ -209,6 +209,64 @@ def test_import_qty_rows_fills_product_brand_id_when_missing(client: TestClient,
     assert product.brand_id == brand.id
 
 
+def test_import_qty_rows_accepts_brand_code_like_admin_ui(client: TestClient, db_session: Session) -> None:
+    """Excel brand_id column may contain brands.code (e.g. 006) instead of UUID."""
+    admin = User(
+        username="import_brand_code_admin",
+        password_hash=get_password_hash("testpass123"),
+        role="warehouse_admin",
+        is_active=True,
+    )
+    brand = Brand(code="006", name="Code Match Brand", is_active=True)
+    location = Location(
+        code="IMP-BRAND-CODE-01",
+        barcode_value="IMP-BRAND-CODE-01",
+        name="Import Brand Code Bin",
+        type="bin",
+        is_active=True,
+    )
+    product = Product(
+        external_source="test",
+        external_id="import-brand-code-prod",
+        name="Import Brand Code Product",
+        sku="SKU-IMP-BRAND-CODE-1",
+        is_active=True,
+        brand_id=None,
+    )
+    db_session.add_all([admin, brand, location, product])
+    db_session.commit()
+    db_session.refresh(brand)
+    db_session.refresh(location)
+    db_session.refresh(product)
+
+    _override_user(admin)
+    try:
+        resp = client.post(
+            "/api/v1/inventory/import-qty-rows",
+            json={
+                "warehouse": "main",
+                "lines": [
+                    {
+                        "code": product.sku,
+                        "qty": 2,
+                        "location_code": location.code,
+                        "brand_id": "006",
+                    }
+                ],
+            },
+        )
+    finally:
+        _clear_override()
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["applied_rows"] == 1
+    assert payload["skipped_rows"] == 0
+    assert payload["errors"] == []
+
+    db_session.refresh(product)
+    assert product.brand_id == brand.id
+
+
 def test_import_qty_rows_rejects_brand_id_mismatch(client: TestClient, db_session: Session) -> None:
     admin = User(
         username="import_brand_mismatch_admin",

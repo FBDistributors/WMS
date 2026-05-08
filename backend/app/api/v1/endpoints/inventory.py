@@ -117,6 +117,39 @@ def _resolve_location_by_code(db: Session, code: str) -> Optional[LocationModel]
     )
 
 
+def _resolve_import_brand_ref(db: Session, raw: Optional[str]) -> tuple[Optional[UUID], Optional[str]]:
+    """
+    Excel import: brand column may be UUID (brands.id) or human-readable code (brands.code), e.g. '006'.
+    Returns (resolved_brand_id, error_message). Empty input -> (None, None).
+    """
+    if raw is None:
+        return None, None
+    s = str(raw).strip()
+    if not s:
+        return None, None
+    try:
+        uid = UUID(s)
+    except ValueError:
+        uid = None
+    if uid is not None:
+        brand = (
+            db.query(BrandModel)
+            .filter(BrandModel.id == uid, BrandModel.is_active.is_(True))
+            .one_or_none()
+        )
+        if brand:
+            return uid, None
+        return None, "brand_id not found or inactive"
+    brand = (
+        db.query(BrandModel)
+        .filter(BrandModel.code == s, BrandModel.is_active.is_(True))
+        .one_or_none()
+    )
+    if brand:
+        return brand.id, None
+    return None, "brand_id not found or inactive"
+
+
 def _ensure_lot_for_import(db: Session, product_id: UUID, expiry_date: Optional[date]) -> StockLotModel:
     """OPENING + null expiry vs IMPORT + dated expiry (matches import-qty / stock rules)."""
     if expiry_date is None:
@@ -334,7 +367,11 @@ class ImportQtyRowLineIn(BaseModel):
     qty: int = Field(..., gt=0, le=10_000_000)
     location_code: str = Field(..., min_length=1, max_length=128)
     expiry_date: Optional[date] = None
-    brand_id: Optional[UUID] = None
+    brand_id: Optional[str] = Field(
+        None,
+        max_length=128,
+        description="Brand UUID (brands.id) or brand code (brands.code), e.g. 006",
+    )
 
 
 class ImportQtyRowsRequest(BaseModel):
@@ -1047,20 +1084,29 @@ async def import_inventory_qty_rows(
     Har bir qatorda: mahsulot (SKU yoki shtrix), joy kodi, miqdor, ixtiyoriy muddat.
     (code, location_code, expiry_date, brand_id) bo‘yicha miqdorlar yig‘iladi.
     """
+    applied_rows = 0
+    skipped_rows = 0
+    errors: List[ImportQtyErrorItem] = []
+
     merged: dict[tuple[str, str, Optional[date], Optional[UUID]], int] = defaultdict(int)
     for line in payload.lines:
         c = line.code.strip()
         lc = line.location_code.strip()
         if not c or not lc:
             continue
-        merged[(c, lc, line.expiry_date, line.brand_id)] += line.qty
+        resolved_brand_id, brand_resolve_err = _resolve_import_brand_ref(db, line.brand_id)
+        if brand_resolve_err:
+            skipped_rows += 1
+            errors.append(ImportQtyErrorItem(code=f"{c} @ {lc}", message=brand_resolve_err))
+            if len(errors) >= _MAX_IMPORT_QTY_ERRORS:
+                break
+            continue
+        merged[(c, lc, line.expiry_date, resolved_brand_id)] += line.qty
 
     if not merged:
+        if errors:
+            return ImportQtyResponse(applied_rows=0, skipped_rows=skipped_rows, errors=errors)
         raise HTTPException(status_code=400, detail="No valid lines after merging")
-
-    applied_rows = 0
-    skipped_rows = 0
-    errors: List[ImportQtyErrorItem] = []
 
     for (code, loc_code, exp_d, file_brand_id), qty in merged.items():
         if len(errors) >= _MAX_IMPORT_QTY_ERRORS:

@@ -511,7 +511,7 @@ export type ImportQtyRowLine = {
   location_code: string
   /** ISO date YYYY-MM-DD; omit or undefined when no expiry */
   expiry_date?: string | null
-  /** Optional product brand_id from Excel; used for validation/backfill */
+  /** brands.id (UUID) yoki admin dagi brend kodi (masalan 006) — backend ikkalasini ham qabul qiladi */
   brand_id?: string | null
   /** Exceldan — faqat ko‘rinish; API ga yuborilmaydi */
   barcode?: string
