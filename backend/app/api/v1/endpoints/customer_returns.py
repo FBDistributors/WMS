@@ -42,6 +42,13 @@ def _is_missing_reason_code_column_error(exc: Exception) -> bool:
     )
 
 
+def _is_missing_customer_returns_schema_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    is_missing_column = "does not exist" in msg or "unknown column" in msg or "no such column" in msg
+    touches_returns_tables = "customer_returns" in msg or "customer_return_lines" in msg
+    return is_missing_column and touches_returns_tables
+
+
 class CustomerReturnLineCreate(BaseModel):
     product_id: UUID
     location_id: UUID
@@ -217,7 +224,17 @@ async def create_customer_return(
     cust_name = cname_raw[:255] if cust_id else None
 
     doc_no = payload.doc_no.strip() if payload.doc_no else _generate_doc_no()
-    if db.query(CustomerReturnModel).filter(CustomerReturnModel.doc_no == doc_no).first():
+    try:
+        existing_doc = db.query(CustomerReturnModel.id).filter(CustomerReturnModel.doc_no == doc_no).first()
+    except (ProgrammingError, OperationalError) as exc:
+        db.rollback()
+        if _is_missing_customer_returns_schema_error(exc):
+            raise HTTPException(
+                status_code=500,
+                detail="DB migration required: customer_returns schema is outdated. Run alembic upgrade head.",
+            ) from exc
+        raise
+    if existing_doc:
         raise HTTPException(status_code=409, detail="doc_no already exists")
 
     first_of_month = first_day_of_current_month()
@@ -269,10 +286,10 @@ async def create_customer_return(
         db.commit()
     except (ProgrammingError, OperationalError) as exc:
         db.rollback()
-        if _is_missing_reason_code_column_error(exc):
+        if _is_missing_reason_code_column_error(exc) or _is_missing_customer_returns_schema_error(exc):
             raise HTTPException(
                 status_code=500,
-                detail="DB migration required: customer_returns.reason_code column is missing. Run alembic upgrade head.",
+                detail="DB migration required: customer_returns schema is outdated. Run alembic upgrade head.",
             ) from exc
         raise
     db.refresh(cr)
