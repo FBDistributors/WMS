@@ -13,6 +13,7 @@ import '../../inventory/data/models/picker_inventory_models.dart';
 import '../../inventory/data/picker_location_format.dart';
 import '../../inventory/presentation/inventory_providers.dart';
 import '../customer_returns_providers.dart';
+import '../data/customer_return_display_datetime.dart';
 import '../data/customer_return_doc_no_display.dart';
 import '../data/customer_return_expiry_match.dart';
 import '../data/customer_returns_models.dart';
@@ -121,7 +122,8 @@ class _CustomerReturnDetailScreenState
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (Object e, _) => Center(child: Text('$e')),
         data: (CustomerReturn ret) {
-          final String sentAt = _prettyDate(ret.assignedAt ?? ret.updatedAt);
+          final String sentAt =
+              formatCustomerReturnApiDateTime(ret.assignedAt ?? ret.updatedAt);
           final String docDisplay = displayCustomerReturnDocNo(ret.docNo);
           final String customerText = ret.customerName?.trim().isNotEmpty == true
               ? ret.customerName!.trim()
@@ -422,19 +424,6 @@ class _CustomerReturnDetailScreenState
         setState(() => _submitting = false);
       }
     }
-  }
-
-  String _prettyDate(String raw) {
-    final DateTime? dt = DateTime.tryParse(raw);
-    if (dt == null) {
-      return raw;
-    }
-    final DateTime local = dt.toLocal();
-    final String mm = local.month.toString().padLeft(2, '0');
-    final String dd = local.day.toString().padLeft(2, '0');
-    final String hh = local.hour.toString().padLeft(2, '0');
-    final String min = local.minute.toString().padLeft(2, '0');
-    return '${local.year}-$mm-$dd $hh:$min';
   }
 
   TextEditingController _controllerForLine(String lineId) {
@@ -780,7 +769,7 @@ class _ReturnLineCard extends ConsumerWidget {
   }
 }
 
-class _LocationSearchField extends StatelessWidget {
+class _LocationSearchField extends StatefulWidget {
   const _LocationSearchField({
     required this.locations,
     required this.enabled,
@@ -802,27 +791,35 @@ class _LocationSearchField extends StatelessWidget {
   final VoidCallback? onClearLocation;
 
   @override
+  State<_LocationSearchField> createState() => _LocationSearchFieldState();
+}
+
+class _LocationSearchFieldState extends State<_LocationSearchField> {
+  /// Input va overlay’dagi variantlar bir xil guruhdagi `TapRegion` — tashqariga bosilganda yopiladi.
+  final Object _tapRegionGroup = Object();
+
+  @override
   Widget build(BuildContext context) {
     return Autocomplete<PickerLocationOption>(
       displayStringForOption: formatPickerLocationOptionLine,
       optionsBuilder: (TextEditingValue textEditingValue) {
         final String q = textEditingValue.text.trim().toLowerCase();
         if (q.isEmpty) {
-          return locations.take(20);
+          return widget.locations.take(20);
         }
-        return locations.where((PickerLocationOption option) {
+        return widget.locations.where((PickerLocationOption option) {
           final String label = formatPickerLocationOptionLine(option).toLowerCase();
           return label.contains(q);
         }).take(20);
       },
-      onSelected: onSelected,
+      onSelected: widget.onSelected,
       fieldViewBuilder: (
         BuildContext context,
         TextEditingController fieldController,
         FocusNode focusNode,
         VoidCallback onFieldSubmitted,
       ) {
-        final String desiredText = selectedLabel ?? controller.text;
+        final String desiredText = widget.selectedLabel ?? widget.controller.text;
         if (fieldController.text != desiredText) {
           fieldController.value = TextEditingValue(
             text: desiredText,
@@ -830,38 +827,42 @@ class _LocationSearchField extends StatelessWidget {
           );
         }
         final bool showClear =
-            onClearLocation != null && hasSelectedLocation && enabled;
-        return TextFormField(
-          controller: fieldController,
-          focusNode: focusNode,
-          enabled: enabled,
-          decoration: InputDecoration(
-            labelText: 'Lokatsiya qidirish',
-            hintText: 'Lokatsiya kodini yozing...',
-            border: const OutlineInputBorder(),
-            prefixIcon: const Icon(Icons.search),
-            suffixIcon: !showClear
-                ? null
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      if (showClear)
-                        IconButton(
-                          tooltip: clearTooltip ?? '',
-                          icon: const Icon(Icons.close),
-                          onPressed: () {
-                            fieldController.clear();
-                            controller.clear();
-                            onClearLocation?.call();
-                          },
-                        ),
-                    ],
-                  ),
+            widget.onClearLocation != null && widget.hasSelectedLocation && widget.enabled;
+        return TapRegion(
+          groupId: _tapRegionGroup,
+          onTapOutside: (_) => focusNode.unfocus(),
+          child: TextFormField(
+            controller: fieldController,
+            focusNode: focusNode,
+            enabled: widget.enabled,
+            decoration: InputDecoration(
+              labelText: 'Lokatsiya qidirish',
+              hintText: 'Lokatsiya kodini yozing...',
+              border: const OutlineInputBorder(),
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: !showClear
+                  ? null
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        if (showClear)
+                          IconButton(
+                            tooltip: widget.clearTooltip ?? '',
+                            icon: const Icon(Icons.close),
+                            onPressed: () {
+                              fieldController.clear();
+                              widget.controller.clear();
+                              widget.onClearLocation?.call();
+                            },
+                          ),
+                      ],
+                    ),
+            ),
+            onChanged: (String value) {
+              widget.controller.text = value;
+            },
+            onFieldSubmitted: (_) => onFieldSubmitted(),
           ),
-          onChanged: (String value) {
-            controller.text = value;
-          },
-          onFieldSubmitted: (_) => onFieldSubmitted(),
         );
       },
       optionsViewBuilder: (
@@ -869,31 +870,34 @@ class _LocationSearchField extends StatelessWidget {
         AutocompleteOnSelected<PickerLocationOption> onSelected,
         Iterable<PickerLocationOption> options,
       ) {
-        return Align(
-          alignment: Alignment.topLeft,
-          child: Material(
-            elevation: 4,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 240, minWidth: 260),
-              child: ListView.builder(
-                padding: EdgeInsets.zero,
-                shrinkWrap: true,
-                itemCount: options.length,
-                itemBuilder: (BuildContext context, int index) {
-                  final PickerLocationOption option = options.elementAt(index);
-                  return ListTile(
-                    dense: true,
-                    title: Text(formatPickerLocationOptionLine(option)),
-                    onTap: () {
-                      final String label = formatPickerLocationOptionLine(option);
-                      controller.value = TextEditingValue(
-                        text: label,
-                        selection: TextSelection.collapsed(offset: label.length),
-                      );
-                      onSelected(option);
-                    },
-                  );
-                },
+        return TapRegion(
+          groupId: _tapRegionGroup,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: Material(
+              elevation: 4,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 240, minWidth: 260),
+                child: ListView.builder(
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  itemCount: options.length,
+                  itemBuilder: (BuildContext context, int index) {
+                    final PickerLocationOption option = options.elementAt(index);
+                    return ListTile(
+                      dense: true,
+                      title: Text(formatPickerLocationOptionLine(option)),
+                      onTap: () {
+                        final String label = formatPickerLocationOptionLine(option);
+                        widget.controller.value = TextEditingValue(
+                          text: label,
+                          selection: TextSelection.collapsed(offset: label.length),
+                        );
+                        onSelected(option);
+                      },
+                    );
+                  },
+                ),
               ),
             ),
           ),

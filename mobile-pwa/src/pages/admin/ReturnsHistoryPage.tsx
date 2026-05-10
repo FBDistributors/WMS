@@ -13,7 +13,14 @@ import { getCustomerReturnsHistory, type CustomerReturnOut } from '../../service
 
 const PAGE_SIZE = 20
 
-const STATUS_OPTIONS = ['pending', 'approved', 'assigned', 'completed'] as const
+/** Backend `customer_returns.status` qiymatlari bilan mos (pending/assigned noto‘g‘ri filter berardi). */
+const STATUS_OPTIONS = [
+  { value: 'pending_controller', label: 'Kutilmoqda (controller)' },
+  { value: 'approved', label: 'Tasdiqlangan' },
+  { value: 'assigned_to_picker', label: 'Yig‘uvchiga biriktirilgan' },
+  { value: 'completed', label: 'Yakunlangan' },
+  { value: 'cancelled', label: 'Bekor qilingan' },
+] as const
 
 export function ReturnsHistoryPage() {
   const { t } = useTranslation(['admin', 'common'])
@@ -105,8 +112,8 @@ export function ReturnsHistoryPage() {
           >
             <option value="">Barcha statuslar</option>
             {STATUS_OPTIONS.map((item) => (
-              <option key={item} value={item}>
-                {item}
+              <option key={item.value} value={item.value}>
+                {item.label}
               </option>
             ))}
           </select>

@@ -13,6 +13,7 @@ from app.db import get_db
 from app.services.audit_service import ACTION_CREATE, get_client_ip, log_action
 from app.integrations.smartup.products_sync import sync_smartup_products
 from app.models.smartup_sync import SmartupSyncRun
+from app.models.customer_return import CustomerReturn as CustomerReturnModel
 from app.models.product import Product as ProductModel
 from app.models.product import ProductBarcode
 from app.models.receipt import Receipt as ReceiptModel
@@ -395,6 +396,56 @@ async def get_product_history(
                 location_name=location_name,
             )
         )
+
+    # Mijoz qaytarishi: oddiy receipt jadvalidan tashqari stock_movements orqali kirim.
+    return_receipt_movements = (
+        db.query(StockMovementModel)
+        .filter(
+            StockMovementModel.product_id == product_id,
+            StockMovementModel.movement_type == "receipt",
+            StockMovementModel.source_document_type == "customer_return",
+        )
+        .order_by(StockMovementModel.created_at.desc())
+        .all()
+    )
+    cr_doc_ids = {m.source_document_id for m in return_receipt_movements if m.source_document_id}
+    crs_by_id: Dict[UUID, CustomerReturnModel] = {}
+    if cr_doc_ids:
+        for cr_row in db.query(CustomerReturnModel).filter(CustomerReturnModel.id.in_(cr_doc_ids)).all():
+            crs_by_id[cr_row.id] = cr_row
+    rr_user_ids = {m.created_by_user_id for m in return_receipt_movements if m.created_by_user_id}
+    rr_users_by_id: Dict[UUID, UserModel] = {}
+    if rr_user_ids:
+        for u in db.query(UserModel).filter(UserModel.id.in_(rr_user_ids)).all():
+            rr_users_by_id[u.id] = u
+    rr_loc_ids = {m.location_id for m in return_receipt_movements if m.location_id}
+    rr_locs_by_id: Dict[UUID, LocationModel] = {}
+    if rr_loc_ids:
+        for loc in db.query(LocationModel).filter(LocationModel.id.in_(rr_loc_ids)).all():
+            rr_locs_by_id[loc.id] = loc
+    rr_lot_ids = {m.lot_id for m in return_receipt_movements if m.lot_id}
+    rr_lots_by_id: Dict[UUID, StockLotModel] = {}
+    if rr_lot_ids:
+        for lot in db.query(StockLotModel).filter(StockLotModel.id.in_(rr_lot_ids)).all():
+            rr_lots_by_id[lot.id] = lot
+    for mov in return_receipt_movements:
+        cr = crs_by_id.get(mov.source_document_id) if mov.source_document_id else None
+        creator = rr_users_by_id.get(mov.created_by_user_id) if mov.created_by_user_id else None
+        received_by = (creator.full_name or creator.username) if creator else None
+        loc = rr_locs_by_id.get(mov.location_id) if mov.location_id else None
+        lot = rr_lots_by_id.get(mov.lot_id) if mov.lot_id else None
+        batch = (lot.batch or "") if lot else ""
+        receiving.append(
+            ProductHistoryReceiving(
+                date=mov.created_at.isoformat() if mov.created_at else "",
+                received_by=received_by,
+                doc_no=cr.doc_no if cr else "",
+                qty=float(mov.qty_change),
+                batch=batch,
+                location_name=loc.name if loc else None,
+            )
+        )
+    receiving.sort(key=lambda r: r.date, reverse=True)
 
     picks: List[ProductHistoryPick] = []
     movements = (

@@ -21,7 +21,7 @@ val hasReleaseKeystore =
     }
 
 android {
-    namespace = "uz.fbwarehouse.app"
+    namespace = "com.example.mobile_flutter"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -47,7 +47,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "uz.fbwarehouse.app"
+        applicationId = "com.example.mobile_flutter"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

@@ -6,6 +6,7 @@ import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../l10n/string_lookup.dart';
 import '../customer_returns_providers.dart';
+import '../data/customer_return_display_datetime.dart';
 import '../data/customer_returns_models.dart';
 
 class CustomerReturnsQueueScreen extends ConsumerWidget {
@@ -46,7 +47,8 @@ class CustomerReturnsQueueScreen extends ConsumerWidget {
                         c.assignedByUserName!.trim().isNotEmpty)
                     ? c.assignedByUserName!.trim()
                     : (c.assignedByUserId ?? 'Nomaʼlum');
-                final String sentAt = _prettyDate(c.assignedAt ?? c.updatedAt);
+                final String sentAt =
+                    formatCustomerReturnApiDateTime(c.assignedAt ?? c.updatedAt);
                 final String title = custLabel ?? StringLookup.t(loc, 'customerReturns');
                 final String custLine =
                     '${StringLookup.t(loc, 'returnsFieldCustomer')}: ${custLabel ?? 'Mijoz yo‘q'}';
@@ -85,18 +87,5 @@ class CustomerReturnsQueueScreen extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  String _prettyDate(String raw) {
-    final DateTime? dt = DateTime.tryParse(raw);
-    if (dt == null) {
-      return raw;
-    }
-    final DateTime local = dt.toLocal();
-    final String mm = local.month.toString().padLeft(2, '0');
-    final String dd = local.day.toString().padLeft(2, '0');
-    final String hh = local.hour.toString().padLeft(2, '0');
-    final String min = local.minute.toString().padLeft(2, '0');
-    return '${local.year}-$mm-$dd $hh:$min';
   }
 }

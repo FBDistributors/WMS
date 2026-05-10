@@ -1,7 +1,7 @@
 """Mijozdan qaytgan mahsulot: controller tekshiruvi, keyin yig'uvchi joylashtirish (ombor receipt)."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID, uuid4
@@ -133,7 +133,7 @@ class CompleteCustomerReturnBody(BaseModel):
 
 
 def _generate_doc_no() -> str:
-    today = datetime.utcnow().strftime("%Y%m%d")
+    today = datetime.now(timezone.utc).strftime("%Y%m%d")
     token = uuid4().hex[:6].upper()
     return f"CRET-{today}-{token}"
 
@@ -498,7 +498,7 @@ async def assign_picker_customer_return(
         raise HTTPException(status_code=400, detail="Invalid picker user")
     cr.assigned_picker_user_id = payload.picker_user_id
     cr.assigned_by_user_id = user.id
-    cr.assigned_at = datetime.utcnow()
+    cr.assigned_at = datetime.now(timezone.utc)
     cr.status = CUSTOMER_RETURN_STATUS_ASSIGNED
     db.commit()
     db.refresh(cr)
