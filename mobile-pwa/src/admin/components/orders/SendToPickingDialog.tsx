@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '../../../components/ui/button'
 import {
   getPickerUsers,
+  reassignOrderPicker,
   sendOrderToPicking,
   sendMovementToPicking,
   type PickerUser,
@@ -50,6 +51,11 @@ function normalizeSendErrorMessage(msg: string, t: (key: string, options?: Recor
   const lower = msg.toLowerCase()
   if (lower.includes('insufficient stock')) return t('orders:send_to_picking.insufficient_stock')
   if (lower.includes('picking task already created')) return t('orders:send_to_picking.picking_task_exists')
+  if (lower.includes('picking has started')) return t('orders:reassign_picker.error_picking_started')
+  if (lower.includes('sent to controller')) return t('orders:reassign_picker.error_sent_to_controller')
+  if (lower.includes('terminal state') || lower.includes('picked, completed')) {
+    return t('orders:reassign_picker.error_terminal_doc')
+  }
   return msg
 }
 
@@ -64,6 +70,8 @@ type SendToPickingDialogProps = {
   orderIds: string[]
   onOpenChange: (open: boolean) => void
   onSent: () => void
+  /** `reassign`: faqat buyurtma IDlari; `send` bilan bir xil picker tanlash, lekin `reassignOrderPicker` chaqiriladi. */
+  mode?: 'send' | 'reassign'
   /** Agar berilsa, orderIds o'rniga movement dan yuboriladi (sendMovementToPicking). */
   movementPayload?: MovementPayload | null
   /** Bir nechta movement ni yuborish (har biri uchun sendMovementToPicking). */
@@ -75,6 +83,7 @@ export function SendToPickingDialog({
   orderIds,
   onOpenChange,
   onSent,
+  mode = 'send',
   movementPayload,
   movementPayloads,
 }: SendToPickingDialogProps) {
@@ -158,9 +167,18 @@ export function SendToPickingDialog({
           setIsSubmitting(false)
           return
         }
+        if (mode === 'reassign' && validIds.length > 1) {
+          setError(t('orders:reassign_picker.one_order_only'))
+          setIsSubmitting(false)
+          return
+        }
         for (const orderIdStr of validIds) {
           try {
-            await sendOrderToPicking(orderIdStr, selectedStr)
+            if (mode === 'reassign') {
+              await reassignOrderPicker(orderIdStr, selectedStr)
+            } else {
+              await sendOrderToPicking(orderIdStr, selectedStr)
+            }
             successCount += 1
           } catch (err) {
             const msg = formatApiError(err, t) || t('orders:send_to_picking.failed')
@@ -173,7 +191,10 @@ export function SendToPickingDialog({
         onOpenChange(false)
         return
       }
-      setError(failedMessages[0] ?? t('orders:send_to_picking.failed'))
+      setError(
+        failedMessages[0] ??
+          (mode === 'reassign' ? t('orders:reassign_picker.failed') : t('orders:send_to_picking.failed'))
+      )
     } finally {
       setIsSubmitting(false)
     }
@@ -190,13 +211,15 @@ export function SendToPickingDialog({
       <div className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
           <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            {movementsCount > 1
-              ? t('orders:send_selected_to_picking', { count: movementsCount })
-              : isMovementMode
-                ? t('orders:send_to_picking.title')
-                : orderIds.length > 1
-                  ? t('orders:send_selected_to_picking', { count: orderIds.length })
-                  : t('orders:send_to_picking.title')}
+            {!isMovementMode && mode === 'reassign'
+              ? t('orders:reassign_picker.title')
+              : movementsCount > 1
+                ? t('orders:send_selected_to_picking', { count: movementsCount })
+                : isMovementMode
+                  ? t('orders:send_to_picking.title')
+                  : orderIds.length > 1
+                    ? t('orders:send_selected_to_picking', { count: orderIds.length })
+                    : t('orders:send_to_picking.title')}
           </div>
           <Button variant="ghost" className="rounded-full px-3 py-3" onClick={() => onOpenChange(false)}>
             <X size={18} />
@@ -238,7 +261,13 @@ export function SendToPickingDialog({
               {t('common:buttons.cancel')}
             </Button>
             <Button onClick={handleSubmit} disabled={isSubmitting}>
-              {isSubmitting ? t('orders:send_to_picking.sending') : t('orders:send_to_picking.send')}
+              {isSubmitting
+                ? mode === 'reassign'
+                  ? t('orders:reassign_picker.submitting')
+                  : t('orders:send_to_picking.sending')
+                : mode === 'reassign'
+                  ? t('orders:reassign_picker.submit')
+                  : t('orders:send_to_picking.send')}
             </Button>
           </div>
         </div>

@@ -8,6 +8,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from app.auth.deps import require_any_permission, require_permission
@@ -26,6 +27,48 @@ from app.models.user import User
 router = APIRouter()
 
 VALID_ROLES = set(ROLE_PERMISSIONS.keys())
+
+
+def _allocate_next_user_code(db: Session) -> str:
+    """
+    Next user code 001, 002, ... via user_code_seq.
+    If the sequence is missing (migrations not applied on DB), create it and align from existing codes.
+    """
+    try:
+        next_code_val = db.execute(text("SELECT nextval('user_code_seq')")).scalar()
+        return str(int(next_code_val)).zfill(3)
+    except DBAPIError:
+        db.rollback()
+        try:
+            db.execute(text("CREATE SEQUENCE IF NOT EXISTS user_code_seq"))
+            db.execute(
+                text(
+                    """
+                    SELECT setval(
+                        'user_code_seq',
+                        GREATEST(
+                            1,
+                            COALESCE(
+                                (
+                                    SELECT MAX(CAST(code AS INTEGER))
+                                    FROM users
+                                    WHERE code ~ '^[0-9]+$'
+                                ),
+                                0
+                            )
+                        )
+                    )
+                    """
+                )
+            )
+            next_code_val = db.execute(text("SELECT nextval('user_code_seq')")).scalar()
+            return str(int(next_code_val)).zfill(3)
+        except Exception as exc:
+            db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail="Could not allocate user code. Run DB migrations or contact support.",
+            ) from exc
 
 
 def _validate_password(password: str) -> None:
@@ -145,8 +188,7 @@ async def create_user(
         raise HTTPException(status_code=409, detail="Username already exists")
 
     # Kod avtomatik ketma-ket (001, 002, ...), user_id kabi unikal va read-only
-    next_code_val = db.execute(text("SELECT nextval('user_code_seq')")).scalar()
-    new_code = str(next_code_val).zfill(3)
+    new_code = _allocate_next_user_code(db)
 
     new_user = User(
         code=new_code,

@@ -181,7 +181,6 @@ abstract final class StringLookup {
     'kirimNewMainTabByProductHint':
         'Avval mahsulotni skanerlang yoki qidiring — keyin saqlash joyini tanlang.',
     'kirimNewMainContinue': 'Davom et',
-    'kirimNewSelectModeHint': 'Qabul tartibini tanlang',
     'kirimSelectLocationFirst': 'Avval saqlash joyini tanlang yoki qidiring',
     'kirimNewLineReceivedStay': 'Qabul qilindi. Keyingi mahsulotni skanerlang.',
     'kirimChangePutawayLocation': 'Lokatsiyani almashtirish',
@@ -467,7 +466,6 @@ abstract final class StringLookup {
     'kirimNewMainTabByProductHint':
         'Сначала отсканируйте или найдите товар — затем выберите место хранения.',
     'kirimNewMainContinue': 'Продолжить',
-    'kirimNewSelectModeHint': 'Выберите порядок приёмки',
     'kirimSelectLocationFirst': 'Сначала выберите или найдите место хранения',
     'kirimNewLineReceivedStay': 'Принято. Отсканируйте следующий товар.',
     'kirimChangePutawayLocation': 'Сменить ячейку',
@@ -753,7 +751,6 @@ abstract final class StringLookup {
     'kirimNewMainTabByProductHint':
         'Scan or search a product first — then choose the putaway location.',
     'kirimNewMainContinue': 'Continue',
-    'kirimNewSelectModeHint': 'Select receiving order',
     'kirimSelectLocationFirst': 'Select or search a putaway location first',
     'kirimNewLineReceivedStay': 'Received. Scan the next product.',
     'kirimChangePutawayLocation': 'Change location',

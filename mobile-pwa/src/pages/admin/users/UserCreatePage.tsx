@@ -6,8 +6,18 @@ import { RefreshCw } from 'lucide-react'
 import { AdminLayout } from '../../../admin/components/AdminLayout'
 import { Button } from '../../../components/ui/button'
 import { Card } from '../../../components/ui/card'
+import type { ApiError } from '../../../services/apiClient'
 import { createUser } from '../../../services/usersApi'
 import type { UserRole } from '../../../types/users'
+
+function isFetchApiError(err: unknown): err is ApiError {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'code' in err &&
+    ((err as ApiError).code === 'HTTP' || (err as ApiError).code === 'NETWORK')
+  )
+}
 
 function generateStrongPassword(): string {
   const length = 16
@@ -65,7 +75,21 @@ export function UserCreatePage() {
       })
       navigate(`/admin/users/${created.id}`, { replace: true })
     } catch (err) {
-      setError(t('users:messages.create_failed'))
+      if (!isFetchApiError(err)) {
+        setError(t('users:messages.create_failed'))
+      } else if (err.code === 'NETWORK') {
+        setError(t('users:messages.network_error'))
+      } else if (err.status === 409) {
+        setError(t('users:messages.username_exists'))
+      } else if (err.status === 403) {
+        setError(t('users:messages.no_permission'))
+      } else if (err.status === 400 && err.message) {
+        setError(err.message)
+      } else if (err.message) {
+        setError(err.message)
+      } else {
+        setError(t('users:messages.create_failed'))
+      }
     } finally {
       setIsSaving(false)
     }

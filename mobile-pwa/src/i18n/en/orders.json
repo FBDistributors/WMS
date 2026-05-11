@@ -58,6 +58,17 @@
     "network_error": "Could not connect to server. Check your internet and try again.",
     "request_timeout": "Request timed out. Server may be slow, please try again later."
   },
+  "reassign_picker": {
+    "button": "Change picker",
+    "title": "Reassign picker",
+    "submit": "Save",
+    "submitting": "Saving...",
+    "failed": "Could not reassign picker.",
+    "one_order_only": "You can only reassign the picker for one order at a time.",
+    "error_picking_started": "Picking has already started; reassignment is not allowed.",
+    "error_sent_to_controller": "Already sent to controller; reassignment is not allowed.",
+    "error_terminal_doc": "Document is in a terminal state; reassignment is not allowed."
+  },
   "controller_modal": {
     "title": "Under review — select controller",
     "controller_label": "Controller",

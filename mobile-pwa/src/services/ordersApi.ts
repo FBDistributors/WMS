@@ -273,6 +273,16 @@ export async function sendOrderToPicking(orderId: string, assignedToUserId: stri
   )
 }
 
+export async function reassignOrderPicker(orderId: string, assignedToUserId: string) {
+  return fetchJSON<{ pick_task_id: string; assigned_to: string }>(
+    `/api/v1/orders/${orderId}/reassign-picker`,
+    {
+      method: 'POST',
+      body: { assigned_to_user_id: assignedToUserId },
+    }
+  )
+}
+
 /** Backend `MovementPayload` (from-movement API). */
 export function buildMovementApiPayload(movementId: string, movement: MovementItem) {
   const rawItems = (movement.movement_items as MovementItemLine[] | undefined) ?? []

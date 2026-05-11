@@ -58,6 +58,17 @@
     "network_error": "Serverga ulanib bo'lmadi. Internetingizni tekshiring va keyinroq qayta urinib ko'ring.",
     "request_timeout": "So'rov vaqti tugadi. Server sekin ishlayapti, keyinroq qayta urinib ko'ring."
   },
+  "reassign_picker": {
+    "button": "Yig'uvchini o'zgartirish",
+    "title": "Yig'uvchini o'zgartirish",
+    "submit": "Saqlash",
+    "submitting": "Saqlanmoqda...",
+    "failed": "Yig'uvchini almashtirib bo'lmadi.",
+    "one_order_only": "Bir vaqtning o'zida faqat bitta buyurtma uchun yig'uvchini almashtirish mumkin.",
+    "error_picking_started": "Terish boshlangan; yig'uvchini almashtirib bo'lmaydi.",
+    "error_sent_to_controller": "Controllerga yuborilgan; yig'uvchini almashtirib bo'lmaydi.",
+    "error_terminal_doc": "Hujjat yakuniy bosqichda; yig'uvchini almashtirib bo'lmaydi."
+  },
   "controller_modal": {
     "title": "Tekshiruvda — kontrolyor tanlash",
     "controller_label": "Kontrolyor",

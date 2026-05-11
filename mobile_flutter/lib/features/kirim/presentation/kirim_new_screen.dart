@@ -6,7 +6,7 @@ import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../l10n/string_lookup.dart';
 
-/// RN `KirimNewScreen` — asosiy yoki showroom; to‘liq kenglikdagi dropdown, tanlovda darhol forma.
+/// RN `KirimNewScreen` — asosiy yoki showroom; sarlavha bosilganda ostida kartada qabul tartibi.
 class KirimNewScreen extends ConsumerWidget {
   const KirimNewScreen({super.key});
 
@@ -30,46 +30,33 @@ class KirimNewScreen extends ConsumerWidget {
     required AppLocale loc,
     required IconData leadingIcon,
     required String title,
-    required String subtitle,
     required String warehouse,
   }) {
     return Card(
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: ExpansionTile(
+        leading: Icon(leadingIcon, color: const Color(0xFF1A237E)),
+        title: Text(title),
         children: <Widget>[
-          ListTile(
-            leading: Icon(leadingIcon, color: const Color(0xFF1A237E)),
-            title: Text(title),
-            subtitle: Text(subtitle),
-          ),
-          const Divider(height: 1),
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: null,
-                isExpanded: true,
-                hint: Text(
-                  StringLookup.t(loc, 'kirimNewSelectModeHint'),
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                borderRadius: BorderRadius.circular(8),
-                items: <DropdownMenuItem<String>>[
-                  DropdownMenuItem<String>(
-                    value: 'byLocation',
-                    child: Text(StringLookup.t(loc, 'kirimNewMainTabByLocation')),
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            child: Card(
+              margin: EdgeInsets.zero,
+              elevation: 1,
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  ListTile(
+                    title: Text(StringLookup.t(loc, 'kirimNewMainTabByLocation')),
+                    onTap: () => _openKirimForm(context, warehouse: warehouse, newMode: 'byLocation'),
                   ),
-                  DropdownMenuItem<String>(
-                    value: 'byProduct',
-                    child: Text(StringLookup.t(loc, 'kirimNewMainTabByProduct')),
+                  const Divider(height: 1),
+                  ListTile(
+                    title: Text(StringLookup.t(loc, 'kirimNewMainTabByProduct')),
+                    onTap: () => _openKirimForm(context, warehouse: warehouse, newMode: 'byProduct'),
                   ),
                 ],
-                onChanged: (String? v) {
-                  if (v != null) {
-                    _openKirimForm(context, warehouse: warehouse, newMode: v);
-                  }
-                },
               ),
             ),
           ),
@@ -105,7 +92,6 @@ class KirimNewScreen extends ConsumerWidget {
               loc: loc,
               leadingIcon: Icons.warehouse,
               title: StringLookup.t(loc, 'kirimWarehouseMainCardTitle'),
-              subtitle: StringLookup.t(loc, 'kirimWarehouseMainCardSubtitle'),
               warehouse: 'main',
             ),
             const SizedBox(height: 12),
@@ -114,7 +100,6 @@ class KirimNewScreen extends ConsumerWidget {
               loc: loc,
               leadingIcon: Icons.storefront,
               title: StringLookup.t(loc, 'kirimWarehouseShowroomCardTitle'),
-              subtitle: StringLookup.t(loc, 'kirimWarehouseShowroomCardSubtitle'),
               warehouse: 'showroom',
             ),
           ],

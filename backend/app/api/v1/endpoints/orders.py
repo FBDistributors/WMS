@@ -1520,6 +1520,113 @@ async def send_order_to_picking(
     )
 
 
+_REASSIGN_PICKER_BLOCKED_DOC_STATUSES = frozenset(
+    {"picked", "completed", "packed", "shipped", "cancelled", "cancelling"}
+)
+
+
+@router.post(
+    "/{order_id}/reassign-picker",
+    response_model=SendToPickingResponse,
+    summary="Reassign picker before any pick (SO document unchanged)",
+)
+async def reassign_order_picker(
+    request: Request,
+    order_id: UUID,
+    payload: SendToPickingRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("orders:send_to_picking")),
+):
+    """Change assigned picker while no lines have been picked and document not sent to controller."""
+    if "picking:assign" not in get_permissions_for_role(user.role):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    order = (
+        db.query(OrderModel)
+        .options(selectinload(OrderModel.wms_state))
+        .filter(OrderModel.id == order_id)
+        .one_or_none()
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if not order.wms_state:
+        raise HTTPException(status_code=409, detail="Order has no WMS state")
+
+    if order.wms_state.status not in ("allocated", "picking"):
+        raise HTTPException(
+            status_code=409,
+            detail="Picker can only be reassigned while order is allocated or picking with no picks yet",
+        )
+
+    document = (
+        db.query(DocumentModel)
+        .options(selectinload(DocumentModel.lines))
+        .filter(
+            DocumentModel.order_id == order.id,
+            DocumentModel.doc_type == "SO",
+            DocumentModel.status != "cancelled",
+        )
+        .with_for_update()
+        .one_or_none()
+    )
+    if not document:
+        raise HTTPException(status_code=409, detail="No active picking document for this order")
+
+    if document.status in _REASSIGN_PICKER_BLOCKED_DOC_STATUSES:
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot reassign picker: document already in picked, completed, or terminal state",
+        )
+    if document.controlled_by_user_id is not None:
+        raise HTTPException(status_code=409, detail="Cannot reassign after document was sent to controller")
+
+    for line in document.lines:
+        if (line.picked_qty or 0) > 0:
+            raise HTTPException(status_code=409, detail="Cannot reassign after picking has started")
+        if line.skip_reason:
+            raise HTTPException(status_code=409, detail="Cannot reassign: a line was already skipped")
+
+    new_picker = db.query(User).filter(User.id == payload.assigned_to_user_id).one_or_none()
+    if not new_picker or new_picker.role != "picker":
+        raise HTTPException(status_code=400, detail="Invalid picker selection")
+
+    old_id = document.assigned_to_user_id
+    if old_id == payload.assigned_to_user_id:
+        db.commit()
+        return SendToPickingResponse(pick_task_id=document.id, assigned_to=payload.assigned_to_user_id)
+
+    document.assigned_to_user_id = payload.assigned_to_user_id
+    log_action(
+        db,
+        user_id=user.id,
+        action=ACTION_UPDATE,
+        entity_type="order",
+        entity_id=str(order_id),
+        old_data={"assigned_to_user_id": str(old_id) if old_id else None},
+        new_data={
+            "assigned_to_user_id": str(payload.assigned_to_user_id),
+            "document_id": str(document.id),
+            "action": "reassign_picker",
+        },
+        ip_address=get_client_ip(request),
+    )
+    db.commit()
+    db.refresh(document)
+
+    try:
+        send_push_to_user(
+            db,
+            payload.assigned_to_user_id,
+            "Yangi buyurtma",
+            f"Terish buyurtmasi: {document.doc_no}. Ilovani oching.",
+            data={"taskId": str(document.id), "type": "new_pick_task"},
+        )
+    except Exception:
+        pass
+
+    return SendToPickingResponse(pick_task_id=document.id, assigned_to=payload.assigned_to_user_id)
+
+
 @router.post("/{order_id}/pack", response_model=OrderDetails, summary="Mark order as packed")
 async def pack_order(
     request: Request,

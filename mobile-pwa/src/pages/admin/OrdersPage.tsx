@@ -251,6 +251,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set())
   const [sendDialogOrderIds, setSendDialogOrderIds] = useState<string[] | null>(null)
+  const [reassignDialogOrderIds, setReassignDialogOrderIds] = useState<string[] | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
   const [syncResult, setSyncResult] = useState<{
     created: number
@@ -280,6 +281,11 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const eligibleItems = useMemo(
     () => items.filter((o) => ELIGIBLE_PICKING_STATUSES.has(o.status)),
     [items]
+  )
+
+  const canReassignPicker = useCallback(
+    (order: OrderListItem) => canSend && order.has_so && order.status === 'allocated',
+    [canSend]
   )
 
   const load = useCallback(async (background = false, pageOverride?: number, forceRefresh?: boolean) => {
@@ -1060,7 +1066,21 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         case 'picker':
           return (
             <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-              {order.picker_name ?? '—'}
+              <div className="flex flex-col gap-1">
+                <span>{order.picker_name ?? '—'}</span>
+                {canReassignPicker(order) && !visibleColumns.has('send_to_picking') ? (
+                  <button
+                    type="button"
+                    className="text-left text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+                    onClick={() => {
+                      setSendDialogOrderIds(null)
+                      setReassignDialogOrderIds([order.id])
+                    }}
+                  >
+                    {t('orders:reassign_picker.button')}
+                  </button>
+                ) : null}
+              </div>
             </td>
           )
         case 'controller':
@@ -1106,8 +1126,24 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         case 'send_to_picking':
           return (
             <td className="px-4 py-3">
-              {canSend ? (
-                <Button variant="secondary" onClick={() => setSendDialogOrderIds([order.id])}>
+              {canReassignPicker(order) ? (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setSendDialogOrderIds(null)
+                    setReassignDialogOrderIds([order.id])
+                  }}
+                >
+                  {t('orders:reassign_picker.button')}
+                </Button>
+              ) : canSend && canBeSentToPicking(order) ? (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setReassignDialogOrderIds(null)
+                    setSendDialogOrderIds([order.id])
+                  }}
+                >
                   {t('orders:send_to_picking.button')}
                 </Button>
               ) : (
@@ -1174,7 +1210,32 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         </table>
       </TableScrollArea>
     )
-  }, [canEditStatus, canSend, config.columnOrder, config.visibleColumns, dillerTableConfig.config, eligibleItems, error, getMovementRowStatusLabel, isLoading, items, load, location.pathname, location.search, mode, movementPage, movementsData, navigate, orderSource, searchQuery, selectedMovementIds, selectedOrderIds, t, updatingOrderId])
+  }, [
+    canEditStatus,
+    canReassignPicker,
+    canSend,
+    config.columnOrder,
+    config.visibleColumns,
+    dillerTableConfig.config,
+    eligibleItems,
+    error,
+    getMovementRowStatusLabel,
+    isLoading,
+    items,
+    load,
+    location.pathname,
+    location.search,
+    mode,
+    movementPage,
+    movementsData,
+    navigate,
+    orderSource,
+    searchQuery,
+    selectedMovementIds,
+    selectedOrderIds,
+    t,
+    updatingOrderId,
+  ])
 
   return (
     <AdminLayout titleSlot={<OrdersHubTabs />} backTo={mode === 'statuses' ? '/admin' : undefined}>
@@ -1422,7 +1483,10 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                 {t('common:buttons.cancel')}
               </Button>
               <Button
-                onClick={() => setSendDialogOrderIds(Array.from(selectedOrderIds))}
+                onClick={() => {
+                  setReassignDialogOrderIds(null)
+                  setSendDialogOrderIds(Array.from(selectedOrderIds))
+                }}
               >
                 {t('orders:send_to_picking.button')}
               </Button>
@@ -1519,19 +1583,31 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       </Card>
 
       {mode !== 'statuses' ? (
-        <SendToPickingDialog
-          open={sendDialogOrderIds !== null}
-          orderIds={sendDialogOrderIds ?? []}
-          onOpenChange={(open) => !open && setSendDialogOrderIds(null)}
-          onSent={() => {
-            const sentIds = sendDialogOrderIds ?? []
-            setSendDialogOrderIds(null)
-            setSelectedOrderIds(new Set())
-            setItems((prev) => prev.filter((o) => !sentIds.includes(o.id)))
-            setTotal((prev) => Math.max(0, prev - sentIds.length))
-            void load()
-          }}
-        />
+        <>
+          <SendToPickingDialog
+            open={sendDialogOrderIds !== null}
+            orderIds={sendDialogOrderIds ?? []}
+            onOpenChange={(open) => !open && setSendDialogOrderIds(null)}
+            onSent={() => {
+              const sentIds = sendDialogOrderIds ?? []
+              setSendDialogOrderIds(null)
+              setSelectedOrderIds(new Set())
+              setItems((prev) => prev.filter((o) => !sentIds.includes(o.id)))
+              setTotal((prev) => Math.max(0, prev - sentIds.length))
+              void load()
+            }}
+          />
+          <SendToPickingDialog
+            mode="reassign"
+            open={reassignDialogOrderIds !== null}
+            orderIds={reassignDialogOrderIds ?? []}
+            onOpenChange={(open) => !open && setReassignDialogOrderIds(null)}
+            onSent={() => {
+              setReassignDialogOrderIds(null)
+              void load(true)
+            }}
+          />
+        </>
       ) : null}
       {orderSource === 'diller' && (
         <SendToPickingDialog
