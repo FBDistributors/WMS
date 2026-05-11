@@ -8,13 +8,17 @@ class NotificationBellButton extends ConsumerWidget {
   const NotificationBellButton({
     super.key,
     this.iconColor,
+    /// AppHeader sarlavha rangi bilan bir xil — raqamli badge aniq ko‘rinsin.
+    this.badgeLabelColor,
   });
 
   final Color? iconColor;
+  final Color? badgeLabelColor;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final int unread = ref.watch(notificationsUnreadCountProvider);
+    final Color? bl = badgeLabelColor;
     return Stack(
       clipBehavior: Clip.none,
       children: <Widget>[
@@ -30,15 +34,16 @@ class NotificationBellButton extends ConsumerWidget {
             child: Container(
               constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
               padding: const EdgeInsets.symmetric(horizontal: 4),
-              decoration: const BoxDecoration(
-                color: Color(0xFFE53935),
-                borderRadius: BorderRadius.all(Radius.circular(8)),
+              decoration: BoxDecoration(
+                color: bl != null ? bl.withValues(alpha: 0.22) : const Color(0xFFE53935),
+                borderRadius: const BorderRadius.all(Radius.circular(8)),
+                border: bl != null ? Border.all(color: bl, width: 1) : null,
               ),
               child: Center(
                 child: Text(
                   unread > 99 ? '99+' : '$unread',
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: bl ?? Colors.white,
                     fontSize: 9,
                     fontWeight: FontWeight.w600,
                   ),

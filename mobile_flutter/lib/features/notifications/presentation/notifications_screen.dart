@@ -16,18 +16,21 @@ class NotificationsScreen extends ConsumerWidget {
     final AppLocale loc = ref.watch(appLocaleProvider);
     final AsyncValue<List<NotificationItem>> async = ref.watch(notificationsControllerProvider);
 
+    final Color appBarFg =
+        Theme.of(context).appBarTheme.foregroundColor ?? Theme.of(context).colorScheme.onSurface;
     return Scaffold(
       appBar: AppBar(
-        title: Text(StringLookup.t(loc, 'notifications')),
+        foregroundColor: appBarFg,
+        title: Text(
+          StringLookup.t(loc, 'notifications'),
+          style: TextStyle(color: appBarFg),
+        ),
         actions: <Widget>[
           IconButton(
             tooltip: StringLookup.t(loc, 'notificationsMarkAllRead'),
             onPressed: () =>
                 ref.read(notificationsControllerProvider.notifier).markAllRead(),
-            icon: Icon(
-              Icons.done_all_rounded,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
+            icon: const Icon(Icons.done_all_rounded),
           ),
         ],
       ),

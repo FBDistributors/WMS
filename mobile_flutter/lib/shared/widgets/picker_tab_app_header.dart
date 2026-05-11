@@ -34,6 +34,9 @@ class PickerTabAppHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AppLocale loc = ref.watch(appLocaleProvider);
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color resolvedTitleFg =
+        titleColor ?? (isDark ? const Color(0xFFF1F5F9) : Colors.white);
     return AppHeader(
       title: title,
       headerBackgroundColor: headerBackgroundColor,
@@ -48,7 +51,10 @@ class PickerTabAppHeader extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           ...actionsBeforeNotification,
-          NotificationBellButton(iconColor: notificationIconColor),
+          NotificationBellButton(
+            iconColor: notificationIconColor,
+            badgeLabelColor: resolvedTitleFg,
+          ),
         ],
       ),
       onRefresh: onRefresh,

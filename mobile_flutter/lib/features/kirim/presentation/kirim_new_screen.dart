@@ -36,21 +36,113 @@ class KirimNewScreen extends ConsumerWidget {
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: <Widget>[
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.warehouse, color: Color(0xFF1A237E)),
-                title: Text(StringLookup.t(loc, 'kirimWarehouseMainCardTitle')),
-                subtitle: Text(StringLookup.t(loc, 'kirimWarehouseMainCardSubtitle')),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.pushNamed(
-                  'kirimForm',
-                  queryParameters: <String, String>{
-                    'flow': 'new',
-                    'warehouse': 'main',
-                  },
+            DefaultTabController(
+              length: 2,
+              child: Card(
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          const Icon(Icons.warehouse, color: Color(0xFF1A237E)),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  StringLookup.t(loc, 'kirimWarehouseMainCardTitle'),
+                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  StringLookup.t(loc, 'kirimWarehouseMainCardSubtitle'),
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    TabBar(
+                      tabs: <Widget>[
+                        Tab(text: StringLookup.t(loc, 'kirimNewMainTabByLocation')),
+                        Tab(text: StringLookup.t(loc, 'kirimNewMainTabByProduct')),
+                      ],
+                    ),
+                    SizedBox(
+                      height: 228,
+                      child: TabBarView(
+                        children: <Widget>[
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: SingleChildScrollView(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: <Widget>[
+                                  Text(
+                                    StringLookup.t(loc, 'kirimNewMainTabByLocationHint'),
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  FilledButton(
+                                    onPressed: () => context.pushNamed(
+                                      'kirimForm',
+                                      queryParameters: <String, String>{
+                                        'flow': 'new',
+                                        'warehouse': 'main',
+                                        'newMode': 'byLocation',
+                                      },
+                                    ),
+                                    child: Text(StringLookup.t(loc, 'kirimNewMainContinue')),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: SingleChildScrollView(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: <Widget>[
+                                  Text(
+                                    StringLookup.t(loc, 'kirimNewMainTabByProductHint'),
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  FilledButton(
+                                    onPressed: () => context.pushNamed(
+                                      'kirimForm',
+                                      queryParameters: <String, String>{
+                                        'flow': 'new',
+                                        'warehouse': 'main',
+                                        'newMode': 'byProduct',
+                                      },
+                                    ),
+                                    child: Text(StringLookup.t(loc, 'kirimNewMainContinue')),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
+            const SizedBox(height: 12),
             Card(
               child: ListTile(
                 leading: const Icon(Icons.storefront, color: Color(0xFF1A237E)),
