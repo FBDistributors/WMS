@@ -501,6 +501,9 @@ export function ImportInventoryDialog({
         errors: allErrors.slice(0, 50),
       })
       onSuccess()
+      if (allErrors.length === 0) {
+        onOpenChange(false)
+      }
     } catch (err) {
       setFormError(importSubmitErrorMessage(err, t('inventory:import_failed')))
     } finally {
