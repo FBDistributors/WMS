@@ -6,7 +6,7 @@ import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../l10n/string_lookup.dart';
 
-/// RN `KirimNewScreen` — asosiy yoki showroom; band tanlanganda darhol kirim formasi.
+/// RN `KirimNewScreen` — asosiy yoki showroom; to‘liq kenglikdagi dropdown, tanlovda darhol forma.
 class KirimNewScreen extends ConsumerWidget {
   const KirimNewScreen({super.key});
 
@@ -25,7 +25,7 @@ class KirimNewScreen extends ConsumerWidget {
     );
   }
 
-  Widget _warehouseRow({
+  Widget _warehouseCard({
     required BuildContext context,
     required AppLocale loc,
     required IconData leadingIcon,
@@ -35,24 +35,45 @@ class KirimNewScreen extends ConsumerWidget {
   }) {
     return Card(
       clipBehavior: Clip.antiAlias,
-      child: PopupMenuButton<String>(
-        onSelected: (String mode) => _openKirimForm(context, warehouse: warehouse, newMode: mode),
-        itemBuilder: (BuildContext ctx) => <PopupMenuEntry<String>>[
-          PopupMenuItem<String>(
-            value: 'byLocation',
-            child: Text(StringLookup.t(loc, 'kirimNewMainTabByLocation')),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          ListTile(
+            leading: Icon(leadingIcon, color: const Color(0xFF1A237E)),
+            title: Text(title),
+            subtitle: Text(subtitle),
           ),
-          PopupMenuItem<String>(
-            value: 'byProduct',
-            child: Text(StringLookup.t(loc, 'kirimNewMainTabByProduct')),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: null,
+                isExpanded: true,
+                hint: Text(
+                  StringLookup.t(loc, 'kirimNewSelectModeHint'),
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                borderRadius: BorderRadius.circular(8),
+                items: <DropdownMenuItem<String>>[
+                  DropdownMenuItem<String>(
+                    value: 'byLocation',
+                    child: Text(StringLookup.t(loc, 'kirimNewMainTabByLocation')),
+                  ),
+                  DropdownMenuItem<String>(
+                    value: 'byProduct',
+                    child: Text(StringLookup.t(loc, 'kirimNewMainTabByProduct')),
+                  ),
+                ],
+                onChanged: (String? v) {
+                  if (v != null) {
+                    _openKirimForm(context, warehouse: warehouse, newMode: v);
+                  }
+                },
+              ),
+            ),
           ),
         ],
-        child: ListTile(
-          leading: Icon(leadingIcon, color: const Color(0xFF1A237E)),
-          title: Text(title),
-          subtitle: Text(subtitle),
-          trailing: const Icon(Icons.arrow_drop_down_rounded),
-        ),
       ),
     );
   }
@@ -79,7 +100,7 @@ class KirimNewScreen extends ConsumerWidget {
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: <Widget>[
-            _warehouseRow(
+            _warehouseCard(
               context: context,
               loc: loc,
               leadingIcon: Icons.warehouse,
@@ -88,7 +109,7 @@ class KirimNewScreen extends ConsumerWidget {
               warehouse: 'main',
             ),
             const SizedBox(height: 12),
-            _warehouseRow(
+            _warehouseCard(
               context: context,
               loc: loc,
               leadingIcon: Icons.storefront,
