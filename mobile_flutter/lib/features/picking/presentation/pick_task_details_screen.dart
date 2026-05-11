@@ -37,11 +37,20 @@ class _LineGroup {
 
 /// `_groupLinesByProduct` bilan bir xil — aksiya + asosiy qatorlarni bir guruhda sanash.
 String _lineGroupKey(PickingLine l) {
+  if (l.isVipExpiryInformational) {
+    return 'vip_info:${l.id}';
+  }
   if (l.productId != null && l.productId!.isNotEmpty) {
     return 'id:${l.productId}';
   }
   return '${l.productName}|${l.barcode ?? l.sku ?? ''}';
 }
+
+bool _pickingLineEffectivelyDone(PickingLine l) =>
+    l.isVipExpiryInformational || l.qtyPicked >= l.qtyRequired;
+
+bool _lineGroupEffectivelyDone(_LineGroup g) =>
+    g.members.every(_pickingLineEffectivelyDone);
 
 double _aggregateQtyPicked(Iterable<PickingLine> lines) {
   return lines.fold<double>(0, (double s, PickingLine l) => s + l.qtyPicked);
@@ -80,6 +89,8 @@ List<_LineGroup> _groupLinesByProduct(List<PickingLine> lines) {
       skipReason: first.skipReason,
       productId: first.productId,
       alternateLocations: first.alternateLocations,
+      isVipExpiryInformational: first.isVipExpiryInformational,
+      vipExpiryInformationKey: first.vipExpiryInformationKey,
     );
     return _LineGroup(virtual: virtual, members: groupLines);
   }).toList(growable: false);
@@ -99,10 +110,10 @@ List<PickingLine> _membersOfSameCardAs(PickingDocument doc, PickingLine anchor) 
 /// Noyakuniy qatorlar yuqorida, to‘liq terilganlar pastda (nisbiy tartib saqlanadi).
 List<_LineGroup> _orderedLineGroups(List<_LineGroup> groups) {
   final List<_LineGroup> incomplete = groups
-      .where((_LineGroup g) => g.virtual.qtyPicked < g.virtual.qtyRequired)
+      .where((_LineGroup g) => !_lineGroupEffectivelyDone(g))
       .toList();
   final List<_LineGroup> complete = groups
-      .where((_LineGroup g) => g.virtual.qtyPicked >= g.virtual.qtyRequired)
+      .where((_LineGroup g) => _lineGroupEffectivelyDone(g))
       .toList();
   return <_LineGroup>[...incomplete, ...complete];
 }
@@ -126,10 +137,10 @@ List<_LineGroup> _orderedLineGroupsController(
     }
   }
   final List<_LineGroup> pendingInc = pending
-      .where((_LineGroup g) => g.virtual.qtyPicked < g.virtual.qtyRequired)
+      .where((_LineGroup g) => !_lineGroupEffectivelyDone(g))
       .toList();
   final List<_LineGroup> pendingRest = pending
-      .where((_LineGroup g) => g.virtual.qtyPicked >= g.virtual.qtyRequired)
+      .where((_LineGroup g) => _lineGroupEffectivelyDone(g))
       .toList();
   return <_LineGroup>[...pendingInc, ...pendingRest, ...done];
 }
@@ -676,8 +687,9 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
 
     if (profile == PickerProfileParam.picker) {
-      final List<PickingLine> incomplete =
-          doc.lines.where((PickingLine l) => l.qtyPicked < l.qtyRequired).toList();
+      final List<PickingLine> incomplete = doc.lines
+          .where((PickingLine l) => !_pickingLineEffectivelyDone(l))
+          .toList();
       if (incomplete.isNotEmpty) {
         if (!online) {
           final OfflineDatabase? db = await ref.read(offlineDatabaseProvider.future);
@@ -790,8 +802,12 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
         return;
       }
     } else {
-      final List<PickingLine> pickedLines =
-          doc.lines.where((PickingLine l) => l.qtyPicked >= l.qtyRequired).toList();
+      final List<PickingLine> pickedLines = doc.lines
+          .where(
+            (PickingLine l) =>
+                !l.isVipExpiryInformational && l.qtyPicked >= l.qtyRequired,
+          )
+          .toList();
       if (pickedLines.isNotEmpty) {
         final bool allOk = pickedLines.every(
           (PickingLine l) => _verifiedLineIds.contains(l.id),
@@ -853,6 +869,48 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     final AppLocale loc = ref.read(appLocaleProvider);
     final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
     final PickingLine stock = group.members.first;
+
+    if (stock.isVipExpiryInformational) {
+      await showModalBottomSheet<void>(
+        context: context,
+        builder: (BuildContext ctx) => Padding(
+          padding: EdgeInsets.only(bottom: sheetBottomPadding(context)),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Text(
+                  group.virtual.productName,
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _barcodeSkuSubtitle(group.virtual),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  StringLookup.t(ref.read(appLocaleProvider), 'vipExpiryNotPickedDetail'),
+                  style: TextStyle(color: Colors.red.shade800, fontSize: 14),
+                ),
+                const SizedBox(height: 20),
+                FilledButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text(StringLookup.t(ref.read(appLocaleProvider), 'back')),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      return;
+    }
 
     final String? pickerPreset = presetScannedBarcode != null &&
             presetScannedBarcode.trim().isNotEmpty &&
@@ -1526,8 +1584,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                     final bool groupVerified = profile == PickerProfileParam.controller
                         ? g.members.every((PickingLine l) => _verifiedLineIds.contains(l.id))
                         : false;
-                    final bool lineComplete =
-                        g.virtual.qtyPicked >= g.virtual.qtyRequired;
+                    final bool lineComplete = _lineGroupEffectivelyDone(g);
                     final bool useGreenCard = profile == PickerProfileParam.controller
                         ? groupVerified
                         : lineComplete;

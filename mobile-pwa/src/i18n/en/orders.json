@@ -56,7 +56,15 @@
     "insufficient_stock": "Insufficient stock in warehouse. Receive products first or check inventory.",
     "picking_task_exists": "A picking task for this movement has already been created.",
     "network_error": "Could not connect to server. Check your internet and try again.",
-    "request_timeout": "Request timed out. Server may be slow, please try again later."
+    "request_timeout": "Request timed out. Server may be slow, please try again later.",
+    "shortage_modal_title": "Insufficient stock",
+    "shortage_modal_intro": "The following order(s) cannot be sent to picking — required quantity exceeds what can be allocated.",
+    "shortage_col_order": "Order",
+    "shortage_col_sku": "SKU",
+    "shortage_col_barcode": "Barcode",
+    "shortage_col_required": "Required",
+    "shortage_col_allocated": "Allocated",
+    "shortage_modal_close": "Close"
   },
   "reassign_picker": {
     "button": "Change picker",

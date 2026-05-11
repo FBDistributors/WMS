@@ -56,6 +56,8 @@ class PickingLine {
     required this.skipReason,
     required this.productId,
     required this.alternateLocations,
+    this.isVipExpiryInformational = false,
+    this.vipExpiryInformationKey,
   });
 
   final String id;
@@ -70,6 +72,9 @@ class PickingLine {
   final String? skipReason;
   final String? productId;
   final List<PickingAlternateLocation> alternateLocations;
+  /// VIP muddat: faqat ma'lumot, terilmaydi (backend `is_vip_expiry_informational`).
+  final bool isVipExpiryInformational;
+  final String? vipExpiryInformationKey;
 
   factory PickingLine.fromJson(Map<String, Object?> json) {
     final Object? alts = json['alternate_locations'];
@@ -94,6 +99,8 @@ class PickingLine {
       skipReason: json['skip_reason'] as String?,
       productId: json['product_id'] as String?,
       alternateLocations: list,
+      isVipExpiryInformational: json['is_vip_expiry_informational'] == true,
+      vipExpiryInformationKey: json['vip_expiry_information_key'] as String?,
     );
   }
 
@@ -111,6 +118,8 @@ class PickingLine {
         'product_id': productId,
         'alternate_locations':
             alternateLocations.map((PickingAlternateLocation a) => a.toJson()).toList(),
+        'is_vip_expiry_informational': isVipExpiryInformational,
+        'vip_expiry_information_key': vipExpiryInformationKey,
       };
 }
 

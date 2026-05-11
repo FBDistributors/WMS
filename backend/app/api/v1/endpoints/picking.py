@@ -67,6 +67,11 @@ class PickingLine(BaseModel):
     skip_reason: Optional[str] = None
     product_id: Optional[UUID] = None
     alternate_locations: List[PickingAlternateLocation] = Field(default_factory=list)
+    is_vip_expiry_informational: bool = False
+    vip_expiry_information_key: Optional[str] = Field(
+        default=None,
+        description="Mijoz uchun i18n kalit, masalan vip_expiry_not_picked",
+    )
 
 
 class PickingProgress(BaseModel):
@@ -117,6 +122,7 @@ class ConsolidatedLineItem(BaseModel):
     location_code: str
     pick_sequence: Optional[int] = None
     expiry_date: Optional[str] = None
+    is_vip_expiry_informational: bool = False
 
 
 class ConsolidatedProduct(BaseModel):
@@ -267,9 +273,21 @@ class MyPickerStatsResponse(BaseModel):
     by_day: List[MyPickerStatsDay]
 
 
+def _line_is_vip_expiry_informational(line: DocumentLineModel) -> bool:
+    return bool(getattr(line, "is_vip_expiry_informational", False))
+
+
 def _calculate_progress(lines: List[DocumentLineModel]) -> PickingProgress:
-    required = sum(float(line.required_qty) if line.required_qty is not None else 0 for line in lines)
-    picked = sum(float(line.picked_qty) if line.picked_qty is not None else 0 for line in lines)
+    required = 0.0
+    picked = 0.0
+    for line in lines:
+        rq = float(line.required_qty) if line.required_qty is not None else 0.0
+        pq = float(line.picked_qty) if line.picked_qty is not None else 0.0
+        required += rq
+        if _line_is_vip_expiry_informational(line):
+            picked += rq
+        else:
+            picked += pq
     return PickingProgress(picked=picked, required=required)
 
 
@@ -424,6 +442,7 @@ def _to_picking_line(
     *,
     alternate_locations: Optional[List[PickingAlternateLocation]] = None,
 ) -> PickingLine:
+    is_vip_info = _line_is_vip_expiry_informational(line)
     return PickingLine(
         id=line.id,
         product_name=line.product_name or "",
@@ -437,6 +456,8 @@ def _to_picking_line(
         skip_reason=getattr(line, "skip_reason", None),
         product_id=line.product_id,
         alternate_locations=list(alternate_locations or []),
+        is_vip_expiry_informational=is_vip_info,
+        vip_expiry_information_key="vip_expiry_not_picked" if is_vip_info else None,
     )
 
 
@@ -451,13 +472,18 @@ def _picking_lines_with_alternates(
     wh = _picking_warehouse_for_order(order)
     pids = list({ln.product_id for ln in lines if ln.product_id})
     by_pid = _balance_rows_by_product(db, pids, wh)
-    return [
-        _to_picking_line(
-            ln,
-            alternate_locations=_line_alternate_locations(db, ln, by_pid.get(ln.product_id, [])),
-        )
-        for ln in lines
-    ]
+    out: List[PickingLine] = []
+    for ln in lines:
+        if _line_is_vip_expiry_informational(ln):
+            out.append(_to_picking_line(ln, alternate_locations=[]))
+        else:
+            out.append(
+                _to_picking_line(
+                    ln,
+                    alternate_locations=_line_alternate_locations(db, ln, by_pid.get(ln.product_id, [])),
+                )
+            )
+    return out
 
 
 def _picker_name(doc: DocumentModel) -> Optional[str]:
@@ -546,8 +572,14 @@ def _delivery_number(doc: DocumentModel) -> Optional[str]:
 
 def _to_picking_list_item(doc: DocumentModel) -> PickingListItem:
     lines_total = len(doc.lines)
-    lines_done = sum(1 for line in doc.lines if line.picked_qty >= line.required_qty)
-    picked_any = any(line.picked_qty > 0 for line in doc.lines)
+    lines_done = sum(
+        1
+        for line in doc.lines
+        if _line_is_vip_expiry_informational(line) or line.picked_qty >= line.required_qty
+    )
+    picked_any = any(
+        (not _line_is_vip_expiry_informational(line)) and line.picked_qty > 0 for line in doc.lines
+    )
     order = getattr(doc, "order", None)
     wms_status: Optional[str] = None
     if order is not None:
@@ -577,7 +609,13 @@ def _to_picking_list_item(doc: DocumentModel) -> PickingListItem:
 def _refresh_document_status(doc: DocumentModel, lines: List[DocumentLineModel]) -> None:
     if doc.status == "cancelling":
         return
-    if all(line.picked_qty >= line.required_qty for line in lines):
+
+    def _line_satisfied(ln: DocumentLineModel) -> bool:
+        if _line_is_vip_expiry_informational(ln):
+            return True
+        return ln.picked_qty >= ln.required_qty
+
+    if all(_line_satisfied(line) for line in lines):
         doc.status = "in_progress"
     elif any(line.picked_qty > 0 for line in lines):
         doc.status = "in_progress"
@@ -865,7 +903,7 @@ def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedView
         doc_id = line.document_id
         doc_line_stats.setdefault(doc_id, {"total": 0, "done": 0})
         doc_line_stats[doc_id]["total"] += 1
-        if (line.picked_qty or 0) >= (line.required_qty or 0):
+        if _line_is_vip_expiry_informational(line) or (line.picked_qty or 0) >= (line.required_qty or 0):
             doc_line_stats[doc_id]["done"] += 1
         key = (line.barcode or line.sku or str(line.product_id or ""), line.product_name or "", line.sku)
         if key not in groups:
@@ -888,6 +926,7 @@ def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedView
                 location_code=line.location_code or "",
                 pick_sequence=pick_seq_int,
                 expiry_date=_safe_expiry_date(line.expiry_date),
+                is_vip_expiry_informational=_line_is_vip_expiry_informational(line),
             )
         )
     # Fallback barcode from Product when document_line has none
@@ -910,7 +949,9 @@ def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedView
         key = (barcode_or_sku, product_name, sku)
         lines_list = groups[key]
         total_required = sum(l.qty_required for l in lines_list)
-        total_picked = sum(l.qty_picked for l in lines_list)
+        total_picked = sum(
+            (l.qty_required if l.is_vip_expiry_informational else l.qty_picked) for l in lines_list
+        )
         first_barcode, first_sku, first_product_id = first_line_attrs.get(key, (None, None, None))
         barcode = (
             first_barcode if (first_barcode and str(first_barcode).strip()) else
@@ -1008,6 +1049,7 @@ async def consolidated_pick(
         .outerjoin(LocationModel, DocumentLineModel.location_id == LocationModel.id)
         .filter(
             DocumentLineModel.document_id.in_(doc_ids),
+            DocumentLineModel.is_vip_expiry_informational.is_(False),
             or_(
                 DocumentLineModel.barcode == barcode,
                 DocumentLineModel.sku == barcode,
@@ -1347,6 +1389,8 @@ async def change_pick_source(
         )
     if line.skip_reason:
         raise HTTPException(status_code=409, detail="Line is skipped")
+    if _line_is_vip_expiry_informational(line):
+        raise HTTPException(status_code=409, detail="VIP muddat: bu qator faqat ma'lumot, manba almashtirilmaydi")
     if not document.order_id:
         raise HTTPException(
             status_code=409,
@@ -1522,6 +1566,11 @@ def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
         raise HTTPException(
             status_code=409,
             detail="Buyurtma bekor qilinmoqda: avval terilganlarni joyiga qaytaring.",
+        )
+    if _line_is_vip_expiry_informational(line):
+        raise HTTPException(
+            status_code=409,
+            detail="VIP muddat: bu qator faqat ma'lumot uchun, terilmaydi",
         )
 
     next_qty = line.picked_qty + payload.delta
@@ -1840,7 +1889,11 @@ async def complete_picking_document(
         )
         order_map = {lid: i for i, lid in enumerate(ordered_ids)}
         lines = sorted(lines_locked, key=lambda L: order_map[L.id])
-    incomplete = [line.id for line in lines if line.picked_qty < line.required_qty]
+    incomplete = [
+        line.id
+        for line in lines
+        if not _line_is_vip_expiry_informational(line) and line.picked_qty < line.required_qty
+    ]
     incomplete_reason = (body or CompletePickingRequest()).incomplete_reason if body else None
     # Faqat yig'uvchi to'liq yig'maganda sabab talab qilinadi; controller allaqachon sabab bilan yuborilgan hujjatni yakunlaydi
     if incomplete and user.role != "inventory_controller":

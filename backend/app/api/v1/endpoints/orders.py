@@ -346,6 +346,43 @@ class AllocationShortage(BaseModel):
     allocated_qty: float
 
 
+class SendToPickingValidationFailure(BaseModel):
+    order_id: UUID
+    order_number: str = ""
+    code: str
+    message: Optional[str] = None
+    shortages: list[AllocationShortage] = Field(default_factory=list)
+
+
+class ValidateSendToPickingRequest(BaseModel):
+    order_ids: list[UUID] = Field(..., min_length=1, max_length=50)
+
+
+class ValidateSendToPickingResponse(BaseModel):
+    ok: bool
+    failures: list[SendToPickingValidationFailure] = Field(default_factory=list)
+
+
+class _DryRunAllocationEnd(Exception):
+    """begin_nested ichida allocate qilib, savepoint ni rollback qilish uchun."""
+
+    __slots__ = ("shortages", "n_lines")
+
+    def __init__(self, shortages: list[AllocationShortage], n_lines: int) -> None:
+        self.shortages = shortages
+        self.n_lines = n_lines
+
+
+def _dry_run_allocate_for_order(db: Session, order: OrderModel, user_id: UUID) -> tuple[list[AllocationShortage], int]:
+    """_allocate_order ni savepoint ichida chaqiradi, barcha allocate yozuvlarini rollback qiladi."""
+    try:
+        with db.begin_nested():
+            document_lines, shortages = _allocate_order(db, order, user_id)
+            raise _DryRunAllocationEnd(shortages, len(document_lines))
+    except _DryRunAllocationEnd as e:
+        return e.shortages, e.n_lines
+
+
 def _resolve_product_id(db: Session, line: OrderLineModel) -> UUID | None:
     if line.sku:
         product = db.query(ProductModel.id).filter(ProductModel.sku == line.sku).one_or_none()
@@ -412,6 +449,32 @@ def _fefo_available_lots(db: Session, product_id: UUID, min_expiry_date: date | 
         .order_by(StockLotModel.expiry_date.asc().nullslast(), LocationModel.code.asc())
         .all()
     )
+
+
+def _physical_can_cover_remaining(
+    db: Session,
+    product_id: UUID,
+    remaining: Decimal,
+    alloc_scratch: dict[tuple[UUID, UUID], Decimal],
+) -> bool:
+    """VIP filtrsiz (lekin _fefo_available_lots umumiy qoidalari) zaxira `remaining` ni qoplaydimi — scratch o'qiladi, o'zgartirilmaydi."""
+    if remaining <= 0:
+        return True
+    got = Decimal("0")
+    for lot_row in _fefo_available_lots(db, product_id, min_expiry_date=None):
+        available_qty = Decimal(str(lot_row.qty))
+        if available_qty <= 0:
+            continue
+        lk = (lot_row.lot_id, lot_row.location_id)
+        lock_lot_location(db, lk[0], lk[1])
+        room = alloc_scratch[lk] if lk in alloc_scratch else compute_lot_location_available(db, lk[0], lk[1])
+        take = min(available_qty, room)
+        if take <= 0:
+            continue
+        got += take
+        if got >= remaining:
+            return True
+    return False
 
 
 def _to_order_details(order: OrderModel, db: Session) -> OrderDetails:
@@ -513,6 +576,7 @@ def _allocate_order(
                     expiry_date=lot_row.expiry_date,
                     required_qty=float(allocate_qty),
                     picked_qty=0,
+                    is_vip_expiry_informational=False,
                 )
             )
             db.add(
@@ -532,15 +596,37 @@ def _allocate_order(
             remaining -= allocate_qty
 
         if allocated_total < Decimal(str(line.qty)):
-            shortages.append(
-                AllocationShortage(
-                    line_id=line.id,
-                    sku=line.sku,
-                    barcode=line.barcode,
-                    required_qty=line.qty,
-                    allocated_qty=float(allocated_total),
+            remaining_need = Decimal(str(line.qty)) - allocated_total
+            if (
+                vip_months > 0
+                and _physical_can_cover_remaining(db, product_id, remaining_need, alloc_scratch)
+            ):
+                document_lines.append(
+                    DocumentLineModel(
+                        product_id=product_id,
+                        lot_id=None,
+                        location_id=None,
+                        sku=line.sku,
+                        product_name=product_name,
+                        barcode=line.barcode or (product.barcode if product else None),
+                        location_code="",
+                        batch=None,
+                        expiry_date=None,
+                        required_qty=float(remaining_need),
+                        picked_qty=0,
+                        is_vip_expiry_informational=True,
+                    )
                 )
-            )
+            else:
+                shortages.append(
+                    AllocationShortage(
+                        line_id=line.id,
+                        sku=line.sku,
+                        barcode=line.barcode,
+                        required_qty=line.qty,
+                        allocated_qty=float(allocated_total),
+                    )
+                )
 
     return document_lines, shortages
 
@@ -1355,13 +1441,23 @@ async def send_movement_to_picking(
         )
 
         document_lines, shortages = _allocate_order(db, order, user.id)
+        if shortages:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "INSUFFICIENT_STOCK",
+                    "order_id": str(order.id),
+                    "order_number": order.order_number,
+                    "shortages": [s.model_dump(mode="json") for s in shortages],
+                },
+            )
         if not document_lines:
             raise HTTPException(status_code=409, detail="Insufficient stock to allocate")
 
         document = DocumentModel(
             doc_no=order.order_number,
             doc_type="SO",
-            status="partial" if shortages else "new",
+            status="new",
             source="orders",
             source_external_id=order.source_external_id,
             order_id=order.id,
@@ -1411,6 +1507,105 @@ async def send_movement_to_picking(
         expected_status=200,
         run=_run_send,
     )
+
+
+def _validate_one_order_send_to_picking(
+    db: Session,
+    *,
+    user_id: UUID,
+    order_id: UUID,
+) -> SendToPickingValidationFailure | None:
+    """None = yuborish mumkin; aks holda sabab."""
+    order = (
+        db.query(OrderModel)
+        .options(selectinload(OrderModel.lines), selectinload(OrderModel.wms_state))
+        .filter(OrderModel.id == order_id)
+        .one_or_none()
+    )
+    if not order:
+        return SendToPickingValidationFailure(
+            order_id=order_id,
+            order_number="",
+            code="order_not_found",
+            message="Order not found",
+        )
+    if not order.wms_state:
+        return SendToPickingValidationFailure(
+            order_id=order.id,
+            order_number=order.order_number,
+            code="no_wms_state",
+            message="Order has no WMS state",
+        )
+    if not order.lines:
+        return SendToPickingValidationFailure(
+            order_id=order.id,
+            order_number=order.order_number,
+            code="no_order_lines",
+            message="Order has no lines",
+        )
+    existing = (
+        db.query(DocumentModel)
+        .filter(
+            DocumentModel.order_id == order.id,
+            DocumentModel.doc_type == "SO",
+            DocumentModel.status != "cancelled",
+        )
+        .one_or_none()
+    )
+    if existing:
+        return SendToPickingValidationFailure(
+            order_id=order.id,
+            order_number=order.order_number,
+            code="picking_exists",
+            message="Picking task already created",
+        )
+    if get_transition_rule(order.wms_state.status, "allocated") is None:
+        return SendToPickingValidationFailure(
+            order_id=order.id,
+            order_number=order.order_number,
+            code="transition_blocked",
+            message=f"Cannot transition from {order.wms_state.status} to allocated",
+        )
+    shortages, n_lines = _dry_run_allocate_for_order(db, order, user_id)
+    if shortages:
+        return SendToPickingValidationFailure(
+            order_id=order.id,
+            order_number=order.order_number,
+            code="insufficient_stock",
+            shortages=shortages,
+        )
+    if n_lines == 0:
+        return SendToPickingValidationFailure(
+            order_id=order.id,
+            order_number=order.order_number,
+            code="zero_allocated_lines",
+            message="Insufficient stock to allocate",
+        )
+    return None
+
+
+@router.post(
+    "/validate-send-to-picking",
+    response_model=ValidateSendToPickingResponse,
+    summary="Yig'ishga yuborishdan oldin zaxira va holat tekshiruvi",
+)
+async def validate_send_to_picking(
+    payload: ValidateSendToPickingRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("orders:send_to_picking")),
+):
+    if "picking:assign" not in get_permissions_for_role(user.role):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    failures: list[SendToPickingValidationFailure] = []
+    seen: set[UUID] = set()
+    for oid in payload.order_ids:
+        if oid in seen:
+            continue
+        seen.add(oid)
+        fail = _validate_one_order_send_to_picking(db, user_id=user.id, order_id=oid)
+        if fail is not None:
+            failures.append(fail)
+    return ValidateSendToPickingResponse(ok=len(failures) == 0, failures=failures)
 
 
 @router.post("/{order_id}/send-to-picking", response_model=SendToPickingResponse, summary="Send order to picking")
@@ -1463,13 +1658,23 @@ async def send_order_to_picking(
         )
 
         document_lines, shortages = _allocate_order(db, order, user.id)
+        if shortages:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "INSUFFICIENT_STOCK",
+                    "order_id": str(order.id),
+                    "order_number": order.order_number,
+                    "shortages": [s.model_dump(mode="json") for s in shortages],
+                },
+            )
         if not document_lines:
             raise HTTPException(status_code=409, detail="Insufficient stock to allocate")
 
         document = DocumentModel(
             doc_no=order.order_number,
             doc_type="SO",
-            status="partial" if shortages else "new",
+            status="new",
             source="orders",
             source_external_id=order.source_external_id,
             order_id=order.id,

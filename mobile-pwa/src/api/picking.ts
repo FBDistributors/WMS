@@ -8,6 +8,8 @@ export type PickingLine = {
   location_code: string
   qty_required: number
   qty_picked: number
+  is_vip_expiry_informational?: boolean
+  vip_expiry_information_key?: string | null
 }
 
 export type PickingProgress = {

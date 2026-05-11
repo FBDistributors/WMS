@@ -56,7 +56,15 @@
     "insufficient_stock": "Omborxonada yetarli qoldiq yo'q. Avval mahsulotlarni qabul qiling yoki inventarni tekshiring.",
     "picking_task_exists": "Ushbu harakat uchun terish topshirig'i allaqachon yaratilgan.",
     "network_error": "Serverga ulanib bo'lmadi. Internetingizni tekshiring va keyinroq qayta urinib ko'ring.",
-    "request_timeout": "So'rov vaqti tugadi. Server sekin ishlayapti, keyinroq qayta urinib ko'ring."
+    "request_timeout": "So'rov vaqti tugadi. Server sekin ishlayapti, keyinroq qayta urinib ko'ring.",
+    "shortage_modal_title": "Zaxira yetishmayapti",
+    "shortage_modal_intro": "Quyidagi buyurtma(lar) yig‘ishga yuborilmaydi — talab qilingan miqdordan kam mahsulot ajratiladi.",
+    "shortage_col_order": "Buyurtma",
+    "shortage_col_sku": "SKU",
+    "shortage_col_barcode": "Shtrix-kod",
+    "shortage_col_required": "Talab",
+    "shortage_col_allocated": "Ajratilgan",
+    "shortage_modal_close": "Yopish"
   },
   "reassign_picker": {
     "button": "Yig'uvchini o'zgartirish",

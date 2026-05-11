@@ -295,6 +295,8 @@ abstract final class StringLookup {
     'pickerQtyBelowZero': '0 dan kam bo‘lmaydi',
     'pickerNotFound': 'Topilmadi',
     'pickerLineAlreadyFilled': 'Bu pozitsiya to‘ldirilgan',
+    'vipExpiryNotPickedDetail':
+        'Bu mahsulotning muddati VIP talabiga mos kelmaydi, yig‘ilmaydi (faqat ma’lumot).',
     'returnsScanOrCodeRequired': 'Skaner yoki kodni kiriting',
     'returnsNeedInternetRetry':
         'Internet yo‘q. Tarmoq tiklangandan keyin qayta urinib ko‘ring.',
@@ -580,6 +582,8 @@ abstract final class StringLookup {
     'pickerQtyBelowZero': 'Нельзя меньше 0',
     'pickerNotFound': 'Не найдено',
     'pickerLineAlreadyFilled': 'Эта позиция уже заполнена',
+    'vipExpiryNotPickedDetail':
+        'Срок годности не соответствует требованиям VIP, не подбирается (только информация).',
     'returnsScanOrCodeRequired': 'Сканируйте или введите код',
     'returnsNeedInternetRetry':
         'Нет интернета. Попробуйте снова после восстановления сети.',
@@ -865,6 +869,8 @@ abstract final class StringLookup {
     'pickerQtyBelowZero': 'Cannot be less than 0',
     'pickerNotFound': 'Not found',
     'pickerLineAlreadyFilled': 'This line is already complete',
+    'vipExpiryNotPickedDetail':
+        'Expiry does not meet VIP requirements; not picked (information only).',
     'returnsScanOrCodeRequired': 'Scan or enter a code',
     'returnsNeedInternetRetry':
         'No internet connection. Try again after network is restored.',

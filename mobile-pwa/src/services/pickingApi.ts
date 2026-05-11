@@ -36,6 +36,9 @@ export type PickLine = {
   qty_required: number
   qty_picked: number
   status: PickLineStatus
+  /** VIP muddat: faqat ma'lumot, terilmaydi */
+  is_vip_expiry_informational?: boolean
+  vip_expiry_information_key?: string | null
 }
 
 export type PickListDetails = PickList & {
@@ -59,7 +62,8 @@ type BackendPickingListItem = {
 }
 
 type BackendDocumentLine = {
-  line_id: string
+  id?: string
+  line_id?: string
   product_name: string
   location_code: string
   batch?: string | null
@@ -68,6 +72,8 @@ type BackendDocumentLine = {
   sku?: string | null
   qty_required: number
   qty_picked: number
+  is_vip_expiry_informational?: boolean
+  vip_expiry_information_key?: string | null
 }
 
 type BackendPickingDetails = {
@@ -112,14 +118,16 @@ function mapWmsStatusToPickListBadge(wms: string | null | undefined): PickListSt
 }
 
 function mapLineStatus(line: BackendDocumentLine): PickLineStatus {
+  if (line.is_vip_expiry_informational) return 'DONE'
   if (line.qty_picked >= line.qty_required) return 'DONE'
   if (line.qty_picked > 0) return 'IN_PROGRESS'
   return 'NEW'
 }
 
 function mapPickingLineToPickerViewModel(line: BackendDocumentLine): PickLine {
+  const id = line.id ?? line.line_id ?? ''
   return {
-    id: line.line_id,
+    id,
     product_name: line.product_name,
     location_code: line.location_code,
     batch: line.batch ?? null,
@@ -129,6 +137,8 @@ function mapPickingLineToPickerViewModel(line: BackendDocumentLine): PickLine {
     qty_required: line.qty_required,
     qty_picked: line.qty_picked,
     status: mapLineStatus(line),
+    is_vip_expiry_informational: line.is_vip_expiry_informational === true,
+    vip_expiry_information_key: line.vip_expiry_information_key ?? null,
   }
 }
 
@@ -155,7 +165,10 @@ function mapList(item: BackendPickingListItem): PickList {
 
 function mapDetails(doc: BackendPickingDetails): PickListDetails {
   const totalLines = doc.lines.length
-  const pickedLines = doc.lines.filter((line) => line.qty_picked >= line.qty_required).length
+  const pickedLines = doc.lines.filter(
+    (line) =>
+      line.is_vip_expiry_informational === true || line.qty_picked >= line.qty_required
+  ).length
   const raw = doc.status
   return {
     id: doc.id,

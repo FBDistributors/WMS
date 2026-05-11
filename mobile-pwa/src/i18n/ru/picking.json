@@ -41,6 +41,7 @@
   "camera_optional": "Скан камерой (опционально)",
   "loading_camera": "Загрузка камеры...",
   "qty": "Кол-во",
+  "vip_expiry_not_picked": "Срок годности не соответствует требованиям VIP, не подбирается (только информация).",
   "status_label": "Статус",
   "progress_label": "Прогресс",
   "progress_qty": "Прогресс: {{picked}}/{{required}} кол-во",

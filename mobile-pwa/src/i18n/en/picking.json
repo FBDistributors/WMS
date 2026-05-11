@@ -41,6 +41,7 @@
   "camera_optional": "Camera scan (optional)",
   "loading_camera": "Loading camera...",
   "qty": "Qty",
+  "vip_expiry_not_picked": "Expiry does not meet VIP requirements; not picked (information only).",
   "status_label": "Status",
   "progress_label": "Progress",
   "progress_qty": "Progress: {{picked}}/{{required}} qty",

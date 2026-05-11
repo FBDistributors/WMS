@@ -20,11 +20,13 @@ const statusVariant: Record<PickLine['status'], 'neutral' | 'primary' | 'success
 export function PickLineRow({ line, onClick }: PickLineRowProps) {
   const { t } = useTranslation('picking')
   const statusKey = line.status.toLowerCase()
+  const vipInfo = line.is_vip_expiry_informational === true
   return (
     <Card
       className={[
         'flex flex-col gap-2',
-        line.status === 'DONE' ? 'border-green-200 bg-green-50/60' : '',
+        vipInfo ? 'border-red-300 bg-red-50/80 dark:border-red-900/50 dark:bg-red-950/40' : '',
+        !vipInfo && line.status === 'DONE' ? 'border-green-200 bg-green-50/60' : '',
         line.status === 'ERROR' ? 'border-red-200 bg-red-50/60' : '',
       ].join(' ')}
       onClick={onClick}
@@ -43,6 +45,9 @@ export function PickLineRow({ line, onClick }: PickLineRowProps) {
           {line.location_code}
         </span>
       </div>
+      {vipInfo ? (
+        <p className="text-sm text-red-800 dark:text-red-200">{t('vip_expiry_not_picked')}</p>
+      ) : null}
       <div className="flex items-center justify-between text-sm text-slate-700">
         <span>{t('qty')}</span>
         <span className="font-semibold">

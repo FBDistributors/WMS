@@ -41,6 +41,7 @@
   "camera_optional": "Kamera skan (ixtiyoriy)",
   "loading_camera": "Kamera yuklanmoqda...",
   "qty": "Miqdor",
+  "vip_expiry_not_picked": "Bu mahsulotning muddati VIP talabiga mos kelmaydi, yig‘ilmaydi (faqat ma’lumot).",
   "status_label": "Holat",
   "progress_label": "Jarayon",
   "progress_qty": "Jarayon: {{picked}}/{{required}} dona",

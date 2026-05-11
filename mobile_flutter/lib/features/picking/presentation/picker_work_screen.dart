@@ -13,11 +13,14 @@ import '../../../shared/input/input_clear_button.dart';
 import '../data/picking_models.dart';
 import '../picking_providers.dart';
 
+bool _pickerLineVisuallyComplete(PickingLine l) =>
+    l.isVipExpiryInformational || l.qtyPicked >= l.qtyRequired;
+
 List<PickingLine> _orderedPickLines(List<PickingLine> lines) {
   final List<PickingLine> incomplete =
-      lines.where((PickingLine l) => l.qtyPicked < l.qtyRequired).toList();
+      lines.where((PickingLine l) => !_pickerLineVisuallyComplete(l)).toList();
   final List<PickingLine> complete =
-      lines.where((PickingLine l) => l.qtyPicked >= l.qtyRequired).toList();
+      lines.where((PickingLine l) => _pickerLineVisuallyComplete(l)).toList();
   return <PickingLine>[...incomplete, ...complete];
 }
 
@@ -110,6 +113,10 @@ class _PickerWorkScreenState extends ConsumerState<PickerWorkScreen> {
     if (line == null) {
       return;
     }
+    if (line.isVipExpiryInformational) {
+      _toast(_tr('vipExpiryNotPickedDetail'));
+      return;
+    }
     if (delta > 0 && line.qtyPicked >= line.qtyRequired) {
       _toast(_tr('pickerQtyExceeded'));
       return;
@@ -180,6 +187,11 @@ class _PickerWorkScreenState extends ConsumerState<PickerWorkScreen> {
     }
     if (matched == null) {
       _toast(_tr('pickerNotFound'));
+      _barcode.clear();
+      return;
+    }
+    if (matched.isVipExpiryInformational) {
+      _toast(_tr('vipExpiryNotPickedDetail'));
       _barcode.clear();
       return;
     }
@@ -255,14 +267,10 @@ class _PickerWorkScreenState extends ConsumerState<PickerWorkScreen> {
             .toList();
     final List<PickingLine> shown = _orderedPickLines(filtered);
 
-    final double picked = _lines.fold<double>(
-      0,
-      (double s, PickingLine l) => s + l.qtyPicked,
-    );
-    final double required = _lines.fold<double>(
-      0,
-      (double s, PickingLine l) => s + l.qtyRequired,
-    );
+    final double picked = d?.progress.picked ??
+        _lines.fold<double>(0, (double s, PickingLine l) => s + l.qtyPicked);
+    final double required = d?.progress.required ??
+        _lines.fold<double>(0, (double s, PickingLine l) => s + l.qtyRequired);
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF5F5F5),
@@ -332,14 +340,15 @@ class _PickerWorkScreenState extends ConsumerState<PickerWorkScreen> {
               itemCount: shown.length,
               itemBuilder: (BuildContext context, int i) {
                 final PickingLine line = shown[i];
-                final bool lineComplete =
-                    line.qtyPicked >= line.qtyRequired;
+                final bool lineComplete = _pickerLineVisuallyComplete(line);
                 final ColorScheme cs = Theme.of(context).colorScheme;
                 final bool buildDark =
                     Theme.of(context).brightness == Brightness.dark;
-                final Color? cardColor = lineComplete
-                    ? Colors.green.withValues(alpha: buildDark ? 0.20 : 0.14)
-                    : null;
+                final Color? cardColor = line.isVipExpiryInformational
+                    ? Colors.red.withValues(alpha: buildDark ? 0.22 : 0.12)
+                    : lineComplete
+                        ? Colors.green.withValues(alpha: buildDark ? 0.20 : 0.14)
+                        : null;
                 return Card(
                   color: cardColor,
                   child: Padding(
@@ -376,25 +385,30 @@ class _PickerWorkScreenState extends ConsumerState<PickerWorkScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          '${line.locationCode} · ${formatPickQty(line.qtyPicked)}/${formatPickQty(line.qtyRequired)}',
+                          line.isVipExpiryInformational
+                              ? '${StringLookup.t(loc, 'vipExpiryNotPickedDetail')} · ${formatPickQty(line.qtyRequired)}'
+                              : '${line.locationCode} · ${formatPickQty(line.qtyPicked)}/${formatPickQty(line.qtyRequired)}',
                           style: TextStyle(
-                            color: lineComplete
-                                ? Colors.green.shade700
-                                : cs.onSurfaceVariant,
+                            color: line.isVipExpiryInformational
+                                ? Colors.red.shade800
+                                : lineComplete
+                                    ? Colors.green.shade700
+                                    : cs.onSurfaceVariant,
                           ),
                         ),
-                        Row(
-                          children: <Widget>[
-                            IconButton(
-                              onPressed: _lineBusy ? null : () => _applyDelta(line.id, -1),
-                              icon: const Icon(Icons.remove_circle_outline),
-                            ),
-                            IconButton(
-                              onPressed: _lineBusy ? null : () => _applyDelta(line.id, 1),
-                              icon: const Icon(Icons.add_circle_outline),
-                            ),
-                          ],
-                        ),
+                        if (!line.isVipExpiryInformational)
+                          Row(
+                            children: <Widget>[
+                              IconButton(
+                                onPressed: _lineBusy ? null : () => _applyDelta(line.id, -1),
+                                icon: const Icon(Icons.remove_circle_outline),
+                              ),
+                              IconButton(
+                                onPressed: _lineBusy ? null : () => _applyDelta(line.id, 1),
+                                icon: const Icon(Icons.add_circle_outline),
+                              ),
+                            ],
+                          ),
                       ],
                     ),
                   ),

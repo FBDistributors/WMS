@@ -263,6 +263,35 @@ export async function getControllerUsers() {
   return fetchJSON<ControllerUser[]>('/api/v1/orders/controllers')
 }
 
+export type AllocationShortageOut = {
+  line_id: string
+  sku?: string | null
+  barcode?: string | null
+  required_qty: number
+  allocated_qty: number
+}
+
+export type SendToPickingValidationFailureOut = {
+  order_id: string
+  order_number: string
+  code: string
+  message?: string | null
+  shortages: AllocationShortageOut[]
+}
+
+export type ValidateSendToPickingResponse = {
+  ok: boolean
+  failures: SendToPickingValidationFailureOut[]
+}
+
+/** Yig‘ishga yuborishdan oldin zaxira tekshiruvi — DB ga yozilmaydi. */
+export async function validateOrdersSendToPicking(orderIds: string[]) {
+  return fetchJSON<ValidateSendToPickingResponse>('/api/v1/orders/validate-send-to-picking', {
+    method: 'POST',
+    body: { order_ids: orderIds },
+  })
+}
+
 export async function sendOrderToPicking(orderId: string, assignedToUserId: string) {
   return fetchJSON<{ pick_task_id: string; assigned_to: string }>(
     `/api/v1/orders/${orderId}/send-to-picking`,

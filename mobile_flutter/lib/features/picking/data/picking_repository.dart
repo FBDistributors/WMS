@@ -279,6 +279,11 @@ class PickingRepository {
       }
     }
     final int count = qty < 1 ? 1 : qty;
+    if (line.isVipExpiryInformational) {
+      throw Exception(
+        'VIP muddat: bu qator faqat ma\'lumot uchun, terilmaydi',
+      );
+    }
     if (line.qtyPicked + count > line.qtyRequired) {
       throw Exception(
         'Kerakli miqdor: ${line.qtyRequired}, terilgan: ${line.qtyPicked}',

@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Float, ForeignKey, Index, String, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Index, String, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -100,6 +100,12 @@ class DocumentLine(Base):
     required_qty: Mapped[float] = mapped_column(Float, nullable=False)
     picked_qty: Mapped[float] = mapped_column(Float, nullable=False, server_default="0")
     skip_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    is_vip_expiry_informational: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=text("false"),
+    )
 
     document: Mapped[Document] = relationship("Document", back_populates="lines")
 

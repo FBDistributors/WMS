@@ -8,8 +8,10 @@ import {
   reassignOrderPicker,
   sendOrderToPicking,
   sendMovementToPicking,
+  validateOrdersSendToPicking,
   type PickerUser,
   type MovementItem,
+  type SendToPickingValidationFailureOut,
 } from '../../../services/ordersApi'
 import type { ApiError } from '../../../services/apiClient'
 
@@ -45,6 +47,36 @@ function formatApiError(err: unknown, t: (key: string) => string): string {
     if (typeof apiErr.message === 'string') return apiErr.message
   }
   return err instanceof Error ? err.message : 'Error'
+}
+
+function parseInsufficientStockFailure(err: unknown): SendToPickingValidationFailureOut | null {
+  if (!err || typeof err !== 'object' || !('details' in err)) return null
+  const details = (err as ApiError).details
+  if (!details || typeof details !== 'object') return null
+  const detail = (details as { detail?: unknown }).detail
+  if (!detail || typeof detail !== 'object') return null
+  const o = detail as Record<string, unknown>
+  if (o.code !== 'INSUFFICIENT_STOCK') return null
+  const shortagesRaw = Array.isArray(o.shortages) ? o.shortages : []
+  const shortages = shortagesRaw.map((row) => {
+    const r = row as Record<string, unknown>
+    return {
+      line_id: String(r.line_id ?? ''),
+      sku: r.sku != null ? String(r.sku) : null,
+      barcode: r.barcode != null ? String(r.barcode) : null,
+      required_qty:
+        typeof r.required_qty === 'number' ? r.required_qty : Number(r.required_qty) || 0,
+      allocated_qty:
+        typeof r.allocated_qty === 'number' ? r.allocated_qty : Number(r.allocated_qty) || 0,
+    }
+  })
+  return {
+    order_id: String(o.order_id ?? ''),
+    order_number: String(o.order_number ?? ''),
+    code: 'insufficient_stock',
+    message: null,
+    shortages,
+  }
 }
 
 function normalizeSendErrorMessage(msg: string, t: (key: string, options?: Record<string, unknown>) => string): string {
@@ -93,9 +125,13 @@ export function SendToPickingDialog({
   const [isLoadingPickers, setIsLoadingPickers] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [stockBlockFailures, setStockBlockFailures] = useState<SendToPickingValidationFailureOut[] | null>(null)
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      setStockBlockFailures(null)
+      return
+    }
     setError(null)
     setSelected('')
     setIsLoadingPickers(true)
@@ -132,6 +168,8 @@ export function SendToPickingDialog({
       let successCount = 0
       const failedMessages: string[] = []
 
+      const movementInsufficient: SendToPickingValidationFailureOut[] = []
+
       if (movementPayloads?.length) {
         for (const payload of movementPayloads) {
           try {
@@ -143,8 +181,14 @@ export function SendToPickingDialog({
             })
             successCount += 1
           } catch (err) {
-            const msg = formatApiError(err, t) || t('orders:send_to_picking.failed')
-            failedMessages.push(normalizeSendErrorMessage(msg, t))
+            const ins = parseInsufficientStockFailure(err)
+            if (ins) {
+              movementInsufficient.push(ins)
+              failedMessages.push(t('orders:send_to_picking.insufficient_stock'))
+            } else {
+              const msg = formatApiError(err, t) || t('orders:send_to_picking.failed')
+              failedMessages.push(normalizeSendErrorMessage(msg, t))
+            }
           }
         }
       } else if (isMovementMode && movementPayload) {
@@ -157,8 +201,14 @@ export function SendToPickingDialog({
           })
           successCount += 1
         } catch (err) {
-          const msg = formatApiError(err, t) || t('orders:send_to_picking.failed')
-          failedMessages.push(normalizeSendErrorMessage(msg, t))
+          const ins = parseInsufficientStockFailure(err)
+          if (ins) {
+            movementInsufficient.push(ins)
+            failedMessages.push(t('orders:send_to_picking.insufficient_stock'))
+          } else {
+            const msg = formatApiError(err, t) || t('orders:send_to_picking.failed')
+            failedMessages.push(normalizeSendErrorMessage(msg, t))
+          }
         }
       } else {
         const validIds = orderIds.filter((id) => isValidUuid(id))
@@ -172,6 +222,18 @@ export function SendToPickingDialog({
           setIsSubmitting(false)
           return
         }
+        if (mode === 'send') {
+          try {
+            const vr = await validateOrdersSendToPicking(validIds)
+            if (!vr.ok) {
+              setStockBlockFailures(vr.failures)
+              return
+            }
+          } catch (err) {
+            setError(formatApiError(err, t) || t('orders:send_to_picking.failed'))
+            return
+          }
+        }
         for (const orderIdStr of validIds) {
           try {
             if (mode === 'reassign') {
@@ -181,10 +243,23 @@ export function SendToPickingDialog({
             }
             successCount += 1
           } catch (err) {
+            const ins = parseInsufficientStockFailure(err)
+            if (ins) {
+              setStockBlockFailures([ins])
+              return
+            }
             const msg = formatApiError(err, t) || t('orders:send_to_picking.failed')
             failedMessages.push(normalizeSendErrorMessage(msg, t))
           }
         }
+      }
+
+      if (movementInsufficient.length > 0) {
+        setStockBlockFailures(movementInsufficient)
+        if (successCount > 0) {
+          onSent()
+        }
+        return
       }
       if (successCount > 0) {
         onSent()
@@ -202,6 +277,64 @@ export function SendToPickingDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
+      {stockBlockFailures && stockBlockFailures.length > 0 ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4 py-6">
+          <button
+            className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm"
+            type="button"
+            aria-label={t('common:buttons.close')}
+            onClick={() => setStockBlockFailures(null)}
+          />
+          <div className="relative max-h-[85vh] w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+            <div className="border-b border-slate-200 px-6 py-4 dark:border-slate-800">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                {t('orders:send_to_picking.shortage_modal_title')}
+              </h2>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                {t('orders:send_to_picking.shortage_modal_intro')}
+              </p>
+            </div>
+            <div className="max-h-[50vh] overflow-auto px-6 py-4">
+              {stockBlockFailures.map((fail) => (
+                <div key={fail.order_id} className="mb-6 last:mb-0">
+                  <div className="mb-2 text-sm font-medium text-slate-800 dark:text-slate-200">
+                    {t('orders:send_to_picking.shortage_col_order')}: {fail.order_number || fail.order_id}
+                  </div>
+                  {fail.message && (!fail.shortages || fail.shortages.length === 0) ? (
+                    <p className="text-sm text-slate-600 dark:text-slate-400">{fail.message}</p>
+                  ) : (
+                    <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
+                      <thead>
+                        <tr className="border-b border-slate-200 dark:border-slate-700">
+                          <th className="py-1 pr-2 font-medium">{t('orders:send_to_picking.shortage_col_sku')}</th>
+                          <th className="py-1 pr-2 font-medium">{t('orders:send_to_picking.shortage_col_barcode')}</th>
+                          <th className="py-1 pr-2 font-medium">{t('orders:send_to_picking.shortage_col_required')}</th>
+                          <th className="py-1 font-medium">{t('orders:send_to_picking.shortage_col_allocated')}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(fail.shortages ?? []).map((s) => (
+                          <tr key={s.line_id} className="border-b border-slate-100 dark:border-slate-800">
+                            <td className="py-1 pr-2">{s.sku ?? '—'}</td>
+                            <td className="py-1 pr-2">{s.barcode ?? '—'}</td>
+                            <td className="py-1 pr-2">{s.required_qty}</td>
+                            <td className="py-1">{s.allocated_qty}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end border-t border-slate-200 px-6 py-4 dark:border-slate-800">
+              <Button type="button" onClick={() => setStockBlockFailures(null)}>
+                {t('orders:send_to_picking.shortage_modal_close')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <button
         className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm"
         onClick={() => onOpenChange(false)}
