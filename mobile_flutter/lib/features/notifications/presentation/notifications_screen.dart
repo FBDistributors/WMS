@@ -20,10 +20,14 @@ class NotificationsScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text(StringLookup.t(loc, 'notifications')),
         actions: <Widget>[
-          TextButton(
+          IconButton(
+            tooltip: StringLookup.t(loc, 'notificationsMarkAllRead'),
             onPressed: () =>
                 ref.read(notificationsControllerProvider.notifier).markAllRead(),
-            child: Text(StringLookup.t(loc, 'notificationsMarkAllRead')),
+            icon: Icon(
+              Icons.done_all_rounded,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
           ),
         ],
       ),

@@ -2,11 +2,16 @@ import 'dart:async' show unawaited;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/storage/shared_preferences_provider.dart';
 import 'data/notification_item.dart';
 import 'data/notifications_repository.dart';
+import 'data/persisted_notifications_repository.dart';
 
 final notificationsRepositoryProvider = Provider<NotificationsRepository>((Ref ref) {
-  return MockNotificationsRepository();
+  return PersistedNotificationsRepository(
+    ref.watch(sharedPreferencesProvider),
+    MockNotificationsRepository(),
+  );
 });
 
 class NotificationsController extends StateNotifier<AsyncValue<List<NotificationItem>>> {
