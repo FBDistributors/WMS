@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 import { useAuth } from '../../../rbac/AuthProvider'
 
-/** Buyurtmalar segmenti: /admin/orders, /admin/order-statuses, /admin/orders/:id — boshqa hub tablari emas */
+/** Buyurtmalar segmenti: /admin/orders, /admin/orders/:id — picking alohida tab; order-statuses redirect */
 function isOrdersHubOrdersActive(pathname: string): boolean {
   if (pathname.startsWith('/admin/orders-diller')) return false
   if (pathname.startsWith('/admin/orders-orikzor')) return false

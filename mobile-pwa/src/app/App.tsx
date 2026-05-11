@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useSearchParams } from 'react-router-dom'
 
 import { RequirePermission } from '../rbac/RequirePermission'
 import { RequireAuth } from '../rbac/RequireAuth'
@@ -59,6 +59,19 @@ import { ControllerProfilePage } from '../pages/controller/ControllerProfilePage
 import { LoginPage } from '../pages/LoginPage'
 import { NotAuthorizedPage as AppNotAuthorizedPage } from '../pages/NotAuthorizedPage'
 import { LoadingOverlay } from '../components/ui/LoadingOverlay'
+
+/** Eski `/admin/order-statuses?group=…` havolalarini Jarayon (picking) ga yo'naltirish. */
+function OrderStatusesToPickingRedirect() {
+  const [params] = useSearchParams()
+  const g = (params.get('group') || '').trim()
+  if (!g || g === 'all') {
+    return <Navigate to="/admin/picking" replace />
+  }
+  if (g === 'yakunlangan') {
+    return <Navigate to="/admin/picking/archive?group=yakunlangan" replace />
+  }
+  return <Navigate to={`/admin/picking?group=${encodeURIComponent(g)}`} replace />
+}
 
 function SmartRedirect() {
   const { user, isLoading } = useAuth()
@@ -289,8 +302,8 @@ export function App() {
           path="/admin/order-statuses"
           element={
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">
-              <RequirePermission permission="orders:read">
-                <OrdersPage mode="statuses" />
+              <RequirePermission permission="picking:read">
+                <OrderStatusesToPickingRedirect />
               </RequirePermission>
             </RequirePermission>
           }

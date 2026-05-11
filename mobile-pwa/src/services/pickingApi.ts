@@ -5,6 +5,8 @@ export type PickListStatus = 'NEW' | 'IN_PROGRESS' | 'REVIEW' | 'DONE' | 'ERROR'
 export type PickList = {
   id: string
   document_no: string
+  /** Buyurtma ID (WMS status / yig'uvchini almashtirish uchun). */
+  order_id?: string | null
   order_number?: string | null
   delivery_number?: string | null
   created_at?: string
@@ -43,6 +45,7 @@ export type PickListDetails = PickList & {
 type BackendPickingListItem = {
   id: string
   reference_number: string
+  order_id?: string | null
   order_number?: string | null
   delivery_number?: string | null
   status: string
@@ -135,6 +138,7 @@ function mapList(item: BackendPickingListItem): PickList {
   return {
     id: item.id,
     document_no: item.reference_number,
+    order_id: item.order_id ?? undefined,
     order_number: item.order_number ?? undefined,
     delivery_number: item.delivery_number?.trim() || undefined,
     document_status: raw,
@@ -168,6 +172,8 @@ function mapDetails(doc: BackendPickingDetails): PickListDetails {
 export type ListPickListsOptions = {
   /** Admin Jarayon / Arxiv: backend filtrlash; mobil yig'uvchi/controller uchun yuborilmaydi. */
   processScope?: 'active' | 'archived' | 'cancelled'
+  /** Dashboard guruhi: backend `wms_group`; picker/controller uchun server e'tiborsiz. */
+  wmsGroup?: 'yigishda' | 'tekshiruvda' | 'yakunlangan'
 }
 
 export async function listPickLists(
@@ -181,6 +187,7 @@ export async function listPickLists(
       limit,
       offset,
       ...(options.processScope ? { process_scope: options.processScope } : {}),
+      ...(options.wmsGroup ? { wms_group: options.wmsGroup } : {}),
     },
     signal,
   })

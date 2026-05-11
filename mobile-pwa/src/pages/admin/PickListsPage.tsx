@@ -1,16 +1,18 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { FileText, RefreshCw, XCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { OrdersHubTabs } from '../../admin/components/orders/OrdersHubTabs'
+import { OrderWmsStatusCell } from '../../admin/components/orders/OrderWmsStatusCell'
+import { SendToPickingDialog } from '../../admin/components/orders/SendToPickingDialog'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { TableScrollArea } from '../../components/TableScrollArea'
-import { listPickLists, cancelPickList, type PickList, type PickListStatus } from '../../services/pickingApi'
+import { listPickLists, cancelPickList, type PickList, type PickListStatus, type ListPickListsOptions } from '../../services/pickingApi'
 import { useAuth } from '../../rbac/AuthProvider'
 
 const PAGE_SIZE = 200
@@ -44,15 +46,33 @@ function formatActivity(iso: string | undefined, locale: string): string {
   }
 }
 
+const DASHBOARD_WMS_GROUPS = new Set(['yigishda', 'tekshiruvda', 'yakunlangan'])
+
 export function PickListsPage() {
   const { t, i18n } = useTranslation(['picking', 'common', 'orders'])
   const navigate = useNavigate()
   const { pathname } = useLocation()
+  const [searchParams] = useSearchParams()
   const archive = pathname.endsWith('/picking/archive')
   const cancelled = pathname.endsWith('/picking/cancelled')
-  const { has } = useAuth()
+  const { has, isWarehouseAdmin } = useAuth()
 
   const processScope = cancelled ? ('cancelled' as const) : archive ? ('archived' as const) : ('active' as const)
+
+  const groupParam = (searchParams.get('group') || '').trim()
+  const wmsGroupFromUrl = DASHBOARD_WMS_GROUPS.has(groupParam)
+    ? (groupParam as 'yigishda' | 'tekshiruvda' | 'yakunlangan')
+    : undefined
+
+  const wmsGroupForApi = useMemo((): ListPickListsOptions['wmsGroup'] => {
+    if (!wmsGroupFromUrl) return undefined
+    if (cancelled) return undefined
+    if (archive) {
+      return wmsGroupFromUrl === 'yakunlangan' ? 'yakunlangan' : undefined
+    }
+    if (wmsGroupFromUrl === 'yakunlangan') return undefined
+    return wmsGroupFromUrl
+  }, [archive, cancelled, wmsGroupFromUrl])
 
   const [items, setItems] = useState<PickList[]>([])
   const [hasMore, setHasMore] = useState(false)
@@ -62,11 +82,17 @@ export function PickListsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [reassignDialogOrderIds, setReassignDialogOrderIds] = useState<string[] | null>(null)
 
   /** Keyingi sahifa uchun offset (yuklangan qatorlar soni) */
   const nextOffsetRef = useRef(0)
 
   const canCancel = has('documents:edit_status')
+  const canReassignPickerRow = useCallback(
+    (item: PickList) =>
+      Boolean(item.order_id) && has('orders:write') && item.order_wms_status === 'allocated',
+    [has]
+  )
 
   const load = useCallback(
     async (opts: { background?: boolean; append?: boolean } = {}) => {
@@ -81,7 +107,8 @@ export function PickListsPage() {
       }
       try {
         const offset = append ? nextOffsetRef.current : 0
-        const data = await listPickLists(PAGE_SIZE, offset, { processScope })
+        const listOpts: ListPickListsOptions = { processScope, ...(wmsGroupForApi ? { wmsGroup: wmsGroupForApi } : {}) }
+        const data = await listPickLists(PAGE_SIZE, offset, listOpts)
         if (append) {
           setItems((prev) => [...prev, ...data])
           nextOffsetRef.current += data.length
@@ -104,13 +131,13 @@ export function PickListsPage() {
         }
       }
     },
-    [processScope, t]
+    [processScope, t, wmsGroupForApi]
   )
 
   useEffect(() => {
     nextOffsetRef.current = 0
     void load()
-  }, [load, archive])
+  }, [load, archive, cancelled, wmsGroupForApi])
 
   const filtered = useMemo(() => {
     if (!query.trim()) return items
@@ -254,6 +281,8 @@ export function PickListsPage() {
               <th className="px-4 py-3 text-left">{t('picking:document_label')}</th>
               <th className="px-4 py-3 text-left">{t('picking:column_delivery_number')}</th>
               <th className="px-4 py-3 text-left">{t('picking:status_label')}</th>
+              <th className="px-4 py-3 text-left">{t('orders:columns.so_document_status')}</th>
+              <th className="px-4 py-3 text-left">{t('orders:columns.change_status')}</th>
               <th className="px-4 py-3 text-left">{t('picking:total_lines')}</th>
               <th className="px-4 py-3 text-left">{t('picking:column_picker')}</th>
               <th className="px-4 py-3 text-left">{t('picking:column_controller')}</th>
@@ -284,11 +313,44 @@ export function PickListsPage() {
                     {pipelineStatusLabel(item)}
                   </span>
                 </td>
+                <td className="px-4 py-3 text-slate-600 dark:text-slate-300" onClick={(e) => e.stopPropagation()}>
+                  {docStatusLabel(item.document_status)}
+                </td>
+                {item.order_id ? (
+                  <OrderWmsStatusCell
+                    orderId={item.order_id}
+                    orderNumber={item.order_number ?? item.document_no}
+                    status={item.order_wms_status ?? 'imported'}
+                    canEdit={isWarehouseAdmin}
+                    onAfterSave={() => load({ background: true })}
+                  />
+                ) : (
+                  <td className="px-4 py-3 text-slate-400 dark:text-slate-600" onClick={(e) => e.stopPropagation()}>
+                    —
+                  </td>
+                )}
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                   {item.picked_lines}/{item.total_lines}
                 </td>
-                <td className="max-w-[140px] truncate px-4 py-3 text-slate-600 dark:text-slate-300" title={item.picker_name ?? ''}>
-                  {item.picker_name ?? '—'}
+                <td
+                  className="max-w-[160px] truncate px-4 py-3 text-slate-600 dark:text-slate-300"
+                  title={item.picker_name ?? ''}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex flex-col gap-1">
+                    <span>{item.picker_name ?? '—'}</span>
+                    {canReassignPickerRow(item) ? (
+                      <button
+                        type="button"
+                        className="text-left text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+                        onClick={() => {
+                          setReassignDialogOrderIds([item.order_id as string])
+                        }}
+                      >
+                        {t('orders:reassign_picker.button')}
+                      </button>
+                    ) : null}
+                  </div>
                 </td>
                 <td className="max-w-[140px] truncate px-4 py-3 text-slate-600 dark:text-slate-300" title={item.controller_name ?? ''}>
                   {item.controller_name ?? '—'}
@@ -331,9 +393,12 @@ export function PickListsPage() {
       </TableScrollArea>
     )
   }, [
+    archive,
     canCancel,
+    canReassignPickerRow,
     cancellingId,
     docStatusLabel,
+    isWarehouseAdmin,
     pipelineStatusLabel,
     error,
     filtered,
@@ -396,6 +461,19 @@ export function PickListsPage() {
             </Button>
           </div>
         )}
+
+        {reassignDialogOrderIds !== null ? (
+          <SendToPickingDialog
+            mode="reassign"
+            open
+            orderIds={reassignDialogOrderIds}
+            onOpenChange={(open) => !open && setReassignDialogOrderIds(null)}
+            onSent={() => {
+              setReassignDialogOrderIds(null)
+              void load({ background: true })
+            }}
+          />
+        ) : null}
       </Card>
     </AdminLayout>
   )

@@ -239,19 +239,19 @@ export function DashboardPage() {
               title={t('admin:dashboard.status_yigishda')}
               value={isLoading ? '—' : counts.yigishda}
               icon={ClipboardList}
-              href="/admin/order-statuses?group=yigishda"
+              href="/admin/picking?group=yigishda"
             />
             <KpiCard
               title={t('admin:dashboard.status_tekshiruvda')}
               value={isLoading ? '—' : counts.tekshiruvda}
               icon={SearchCheck}
-              href="/admin/order-statuses?group=tekshiruvda"
+              href="/admin/picking?group=tekshiruvda"
             />
             <KpiCard
               title={t('admin:dashboard.status_yakunlangan')}
               value={isLoading ? '—' : counts.yakunlangan}
               icon={PackageCheck}
-              href="/admin/order-statuses?group=yakunlangan"
+              href="/admin/picking/archive?group=yakunlangan"
             />
             <KpiCard
               title={t('admin:dashboard.status_barcha')}
@@ -321,7 +321,9 @@ export function DashboardPage() {
                       const path =
                         row.key === 'xom'
                           ? '/admin/orders?group=xom'
-                          : `/admin/order-statuses?group=${row.key}`
+                          : row.key === 'yakunlangan'
+                            ? '/admin/picking/archive?group=yakunlangan'
+                            : `/admin/picking?group=${row.key}`
                       return (
                         <tr
                           key={row.key}

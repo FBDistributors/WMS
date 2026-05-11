@@ -15,7 +15,12 @@ import { Card } from '../../components/ui/card'
 import { DateInput } from '../../components/DateInput'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
-import { getMovements, getOrders, getOrdersCheck, syncSmartupOrders, updateOrderStatus, getControllerUsers, type MovementItem, type OrderListItem, type MovementsResponse, type ControllerUser, type OrderCheckResponse } from '../../services/ordersApi'
+import { getMovements, getOrders, getOrdersCheck, syncSmartupOrders, type MovementItem, type OrderListItem, type MovementsResponse, type OrderCheckResponse } from '../../services/ordersApi'
+import {
+  OrderWmsStatusCell,
+  SIMPLE_STATUS_OPTIONS,
+  backendStatusToSimple,
+} from '../../admin/components/orders/OrderWmsStatusCell'
 import { getBrands, type Brand } from '../../services/brandsApi'
 import { useAuth } from '../../rbac/AuthProvider'
 import { getFilialNameByCode } from '../../constants/filialCodes'
@@ -42,23 +47,6 @@ const COLUMN_OPTIONS = [
 ]
 
 const COLUMN_OPTIONS_DEFAULT = COLUMN_OPTIONS.filter((c) => c.id !== 'status')
-
-// Dropdown: buyurtma WMS statusi (backend ga to'g'ridan-to'g'ri mos keladigan qiymatlar, faqat warehouse_admin PATCH qila oladi)
-const SIMPLE_STATUS_OPTIONS = [
-  { value: 'picking', labelKey: 'orders:status_simple.yigishda' },
-  { value: 'picked', labelKey: 'orders:status_simple.tekshiruvda' },
-  { value: 'completed', labelKey: 'orders:status_simple.yakunlash' },
-  { value: 'cancelled', labelKey: 'orders:status_simple.cancelled' },
-] as const
-
-type SimpleOrderStatus = (typeof SIMPLE_STATUS_OPTIONS)[number]['value']
-
-function backendStatusToSimple(status: string): SimpleOrderStatus {
-  if (status === 'cancelled') return 'cancelled'
-  if (['imported', 'allocated', 'picking'].includes(status)) return 'picking'
-  if (status === 'picked') return 'picked'
-  return 'completed' // completed, packed, shipped
-}
 
 // Buyurtma statuslari sahifasi: faqat ma'lumot, yig'ishga yuborish yo'q; yig'uvchi va kontrolyor ustunlari
 const COLUMN_OPTIONS_STATUSES = [
@@ -201,7 +189,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const canSync = has('orders:write')
   const canSend = has('orders:write')
   const canEditStatus = isWarehouseAdmin
-  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null)
   const toMovementStatusLabel = useCallback(
     (rawStatus: unknown): string => {
       const raw = String(rawStatus ?? '').trim().toUpperCase()
@@ -264,13 +251,8 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const [movementPage, setMovementPage] = useState(0)
   const [selectedMovementIds, setSelectedMovementIds] = useState<Set<string>>(new Set())
   const [sendMovementDialogOpen, setSendMovementDialogOpen] = useState(false)
-  const [controllerModalOrder, setControllerModalOrder] = useState<OrderListItem | null>(null)
-  const [controllers, setControllers] = useState<ControllerUser[]>([])
   const [checkResult, setCheckResult] = useState<OrderCheckResponse | null>(null)
   const [checkLoading, setCheckLoading] = useState(false)
-  const [controllerModalLoading, setControllerModalLoading] = useState(false)
-  const [selectedControllerId, setSelectedControllerId] = useState('')
-  const [controllerModalSubmitting, setControllerModalSubmitting] = useState(false)
 
   const ordersLoadAbortRef = useRef<AbortController | null>(null)
   const ordersLoadGenRef = useRef(0)
@@ -1009,60 +991,16 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             </td>
           )
         case 'change_status':
-          if (!canEditStatus)
-            return (
-              <td className="px-4 py-3 text-slate-400 dark:text-slate-600">—</td>
-            )
-          {
-            const isUpdating = updatingOrderId === order.id
-            const simpleValue = backendStatusToSimple(order.status)
-            return (
-              <td className="px-4 py-3">
-                <select
-                  value={simpleValue}
-                  disabled={isUpdating}
-                  onChange={async (e) => {
-                    const newSimple = e.target.value as SimpleOrderStatus
-                    const backendStatus = newSimple
-                    if (backendStatus === order.status) return
-                    if (backendStatus === 'cancelled') {
-                      const ok = window.confirm(t('orders:confirm_cancel_order'))
-                      if (!ok) return
-                    }
-                    if (backendStatus === 'picked') {
-                      setControllerModalOrder(order)
-                      setSelectedControllerId('')
-                      setControllerModalLoading(true)
-                      try {
-                        const list = await getControllerUsers()
-                        setControllers(list)
-                      } catch {
-                        setControllers([])
-                      } finally {
-                        setControllerModalLoading(false)
-                      }
-                      return
-                    }
-                    setUpdatingOrderId(order.id)
-                    try {
-                      await updateOrderStatus(order.id, backendStatus)
-                      await load()
-                    } finally {
-                      setUpdatingOrderId(null)
-                    }
-                  }}
-                  className="min-w-[140px] rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 disabled:opacity-60"
-                  aria-label={t('orders:columns.change_status')}
-                >
-                  {SIMPLE_STATUS_OPTIONS.map((s) => (
-                    <option key={s.value} value={s.value}>
-                      {t(s.labelKey)}
-                    </option>
-                  ))}
-                </select>
-              </td>
-            )
-          }
+          return (
+            <OrderWmsStatusCell
+              key={`wms-${order.id}`}
+              orderId={order.id}
+              orderNumber={order.order_number}
+              status={order.status}
+              canEdit={canEditStatus}
+              onAfterSave={() => load()}
+            />
+          )
         case 'picker':
           return (
             <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
@@ -1234,7 +1172,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     selectedMovementIds,
     selectedOrderIds,
     t,
-    updatingOrderId,
   ])
 
   return (
@@ -1625,76 +1562,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             void load(true)
           }}
         />
-      )}
-      {controllerModalOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
-          <button
-            type="button"
-            className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm"
-            onClick={() => setControllerModalOrder(null)}
-            aria-label={t('common:buttons.close')}
-          />
-          <div className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
-              <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                {t('orders:controller_modal.title')}
-              </div>
-              <Button variant="ghost" className="rounded-full px-3 py-3" onClick={() => setControllerModalOrder(null)}>
-                <X size={18} />
-              </Button>
-            </div>
-            <div className="space-y-4 px-6 py-5">
-              <p className="text-sm text-slate-600 dark:text-slate-300">
-                {controllerModalOrder.order_number}
-              </p>
-              <label className="block text-sm text-slate-600 dark:text-slate-300">
-                {t('orders:controller_modal.controller_label')}
-                <select
-                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-                  value={selectedControllerId}
-                  onChange={(e) => setSelectedControllerId(e.target.value)}
-                  disabled={controllerModalLoading}
-                >
-                  <option value="">
-                    {controllerModalLoading
-                      ? t('orders:controller_modal.loading')
-                      : t('orders:controller_modal.controller_skip')}
-                  </option>
-                  {controllers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="flex items-center justify-end gap-2">
-                <Button variant="ghost" onClick={() => setControllerModalOrder(null)} disabled={controllerModalSubmitting}>
-                  {t('common:buttons.cancel')}
-                </Button>
-                <Button
-                  disabled={controllerModalSubmitting}
-                  onClick={async () => {
-                    if (!controllerModalOrder) return
-                    setControllerModalSubmitting(true)
-                    try {
-                      await updateOrderStatus(
-                        controllerModalOrder.id,
-                        'picked',
-                        selectedControllerId.trim() || undefined
-                      )
-                      setControllerModalOrder(null)
-                      void load()
-                    } finally {
-                      setControllerModalSubmitting(false)
-                    }
-                  }}
-                >
-                  {controllerModalSubmitting ? t('common:loading') : t('orders:controller_modal.confirm')}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
       )}
       <OrdersTableSettings
         open={isSettingsOpen}

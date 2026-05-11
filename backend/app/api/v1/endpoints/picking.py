@@ -99,6 +99,7 @@ class PickingListItem(BaseModel):
     controlled_by_user_name: Optional[str] = None
     assigned_to_user_id: Optional[UUID] = None
     assigned_to_user_name: Optional[str] = None
+    order_id: Optional[UUID] = None
     order_number: Optional[str] = None
     delivery_number: Optional[str] = None
     order_wms_status: Optional[str] = None
@@ -564,6 +565,7 @@ def _to_picking_list_item(doc: DocumentModel) -> PickingListItem:
         controlled_by_user_name=_controller_name(doc),
         assigned_to_user_id=doc.assigned_to_user_id,
         assigned_to_user_name=_picker_name(doc),
+        order_id=order.id if order is not None else None,
         order_number=_order_number(doc),
         delivery_number=_delivery_number(doc),
         order_wms_status=wms_status,
@@ -688,6 +690,14 @@ async def list_picking_documents(
             "picker/inventory_controller uchun e'tiborsiz."
         ),
     ),
+    wms_group: Optional[Literal["yigishda", "tekshiruvda", "yakunlangan"]] = Query(
+        default=None,
+        description=(
+            "Dashboard drill-down: buyurtma WMS statusi bo'yicha qo'shimcha filtr "
+            "(yigishda=allocated|picking, tekshiruvda=picked, yakunlangan=completed|packed|shipped). "
+            "picker/inventory_controller uchun e'tiborsiz."
+        ),
+    ),
     db: Session = Depends(get_db),
     user=Depends(require_permission("picking:read")),
 ):
@@ -699,6 +709,10 @@ async def list_picking_documents(
     effective_scope: Optional[str] = process_scope
     if user.role in ("picker", "inventory_controller"):
         effective_scope = None
+
+    effective_wms_group: Optional[str] = wms_group
+    if user.role in ("picker", "inventory_controller"):
+        effective_wms_group = None
 
     query = (
         db.query(DocumentModel)
@@ -756,6 +770,12 @@ async def list_picking_documents(
         )
     if not include_cancelled and effective_scope != "cancelled":
         query = query.filter(DocumentModel.status != "cancelled")
+    if effective_wms_group == "yigishda":
+        query = query.filter(OrderWmsStateModel.status.in_(("allocated", "picking")))
+    elif effective_wms_group == "tekshiruvda":
+        query = query.filter(OrderWmsStateModel.status == "picked")
+    elif effective_wms_group == "yakunlangan":
+        query = query.filter(OrderWmsStateModel.status.in_(("completed", "packed", "shipped")))
     try:
         docs = query.order_by(DocumentModel.created_at.desc()).offset(offset).limit(limit).all()
         return [_to_picking_list_item(doc) for doc in docs]
