@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { FileText, Filter, Loader2, Settings, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -14,23 +14,14 @@ import { Card } from '../../components/ui/card'
 import { DateInput } from '../../components/DateInput'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
-import { getOrikzorMovements, type MovementItem } from '../../services/ordersApi'
+import { getOrders, syncSmartupOrders, type OrderListItem, type SmartupSyncResult } from '../../services/ordersApi'
 import { useAuth } from '../../rbac/AuthProvider'
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10)
-}
-function daysAgoISO(days: number) {
-  const d = new Date()
-  d.setDate(d.getDate() - days)
-  return d.toISOString().slice(0, 10)
-}
 
 const PAGE_SIZE = 50
 
 const COLUMNS_ORIKZOR = [
   { id: 'select', labelKey: 'orders:columns.select' },
-  { id: 'movement_number', labelKey: 'orders:columns_diller.movement_number' },
+  { id: 'order_number', labelKey: 'orders:columns_diller.movement_number' },
   { id: 'movement_note', labelKey: 'orders:columns_diller.movement_note' },
   { id: 'status', labelKey: 'orders:columns_diller.status' },
   { id: 'lines', labelKey: 'orders:columns_diller.lines' },
@@ -39,7 +30,7 @@ const COLUMNS_ORIKZOR = [
 ] as const
 
 const ORIKZOR_SEARCH_FIELD_OPTIONS = [
-  { id: 'movement_number', labelKey: 'orders:columns_diller.movement_number' },
+  { id: 'order_number', labelKey: 'orders:columns_diller.movement_number' },
   { id: 'movement_note', labelKey: 'orders:columns_diller.movement_note' },
   { id: 'status', labelKey: 'orders:columns_diller.status' },
 ]
@@ -50,50 +41,49 @@ export function OrikzorHarakatlariPage() {
   const { t } = useTranslation(['orders', 'common', 'admin'])
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const dateFrom = searchParams.get('date_from') ?? daysAgoISO(30)
-  const dateTo = searchParams.get('date_to') ?? todayISO()
-  const movementPage = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10) / PAGE_SIZE)
-  const [movementsData, setMovementsData] = useState<{ movement: MovementItem[]; total?: number } | null>(null)
+  const offset = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10))
+  const searchQuery = searchParams.get('q') ?? ''
+  const dateFrom = searchParams.get('date_from') ?? ''
+  const dateTo = searchParams.get('date_to') ?? ''
+
+  const [items, setItems] = useState<OrderListItem[]>([])
+  const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [syncError, setSyncError] = useState<string | null>(null)
+  const [syncResult, setSyncResult] = useState<SmartupSyncResult | null>(null)
   const [filterPanelOpen, setFilterPanelOpen] = useState(false)
   const [filterDateFrom, setFilterDateFrom] = useState(dateFrom)
   const [filterDateTo, setFilterDateTo] = useState(dateTo)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const { has: hasPermission } = useAuth()
   const canSendToPicking = hasPermission('orders:send_to_picking')
-  const [selectedMovementIds, setSelectedMovementIds] = useState<Set<string>>(new Set())
-  const [sendDialogOpen, setSendDialogOpen] = useState(false)
+  const canSync = hasPermission('orders:sync')
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set())
+  const [sendDialogOrderIds, setSendDialogOrderIds] = useState<string[] | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const orikzorTableConfig = useOrikzorTableConfig()
 
   const load = useCallback(
-    async (background = false, pageOverride?: number, forceRefresh = false) => {
+    async (background = false) => {
       if (!background) setIsLoading(true)
       else setIsRefreshing(true)
       setError(null)
-      const page = pageOverride ?? movementPage
-      const from = dateFrom.trim() || daysAgoISO(30)
-      const to = dateTo.trim() || todayISO()
       try {
-        const data = await getOrikzorMovements({
-          begin_created_on: from,
-          end_created_on: to,
-          begin_modified_on: from,
-          end_modified_on: to,
+        const data = await getOrders({
+          order_source: 'orikzor',
+          status: 'imported',
+          q: searchQuery.trim() || undefined,
+          date_from: dateFrom.trim() || undefined,
+          date_to: dateTo.trim() || undefined,
           limit: PAGE_SIZE,
-          offset: page * PAGE_SIZE,
-          refresh: forceRefresh,
+          offset,
+          filial_id: 'all',
         })
-        setMovementsData(data)
-        if (pageOverride !== undefined) {
-          setSearchParams((prev) => {
-            const next = new URLSearchParams(prev)
-            next.set('offset', String(page * PAGE_SIZE))
-            return next
-          })
-        }
+        setItems(data.items)
+        setTotal(data.total)
       } catch (err) {
         if (!background) {
           setError(err instanceof Error ? err.message : t('orders:load_failed'))
@@ -103,7 +93,7 @@ export function OrikzorHarakatlariPage() {
         else setIsRefreshing(false)
       }
     },
-    [dateFrom, dateTo, movementPage, setSearchParams, t]
+    [dateFrom, dateTo, offset, searchQuery, t],
   )
 
   useEffect(() => {
@@ -117,47 +107,58 @@ export function OrikzorHarakatlariPage() {
     }
   }, [filterPanelOpen, dateFrom, dateTo])
 
-  const searchQuery = searchParams.get('q') ?? ''
-  const movementListRaw = movementsData?.movement ?? []
-  const movementList = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-    if (!q) return movementListRaw
-    return movementListRaw.filter((m) => {
-      const movementNum = String((m.movement_number as string) ?? (m.movement_id as string) ?? '').toLowerCase()
-      const mid = String((m.movement_id as string) ?? '').toLowerCase()
-      const note = String((m.note as string) ?? '').toLowerCase()
-      const status = String((m.status as string) ?? '').toLowerCase()
-      return movementNum.includes(q) || mid.includes(q) || note.includes(q) || status.includes(q)
-    })
-  }, [movementListRaw, searchQuery])
-  const movementTotal = movementsData?.total ?? 0
+  const handleSync = useCallback(async () => {
+    setIsSyncing(true)
+    setSyncError(null)
+    setSyncResult(null)
+    try {
+      try {
+        const result = await syncSmartupOrders({ order_source: 'orikzor' })
+        setSyncResult(result)
+      } catch (syncErr) {
+        const errStatus = syncErr && typeof syncErr === 'object' && 'status' in syncErr ? (syncErr as { status: number }).status : 0
+        if (errStatus === 409) {
+          setSyncError(t('orders:sync_busy'))
+        } else {
+          const message =
+            (syncErr && typeof syncErr === 'object' && 'message' in syncErr && typeof (syncErr as { message: unknown }).message === 'string')
+              ? (syncErr as { message: string }).message
+              : syncErr instanceof Error
+                ? syncErr.message
+                : t('orders:sync_failed')
+          setSyncError(message)
+        }
+      }
+      await load(false)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t('orders:sync_failed')
+      setSyncError(message)
+    } finally {
+      setIsSyncing(false)
+    }
+  }, [load, t])
+
   const columnLabels = useMemo(
     () => new Map(COLUMNS_ORIKZOR.map((c) => [c.id, t(c.labelKey)])),
-    [t]
+    [t],
   )
 
-  const renderCell = (columnId: OrikzorColumnId, m: MovementItem) => {
-    const mid = (m.movement_id as string) ?? '—'
-    const movementNum = (m.movement_number as string) ?? mid
-    const note = (m.note as string) ?? '—'
-    const status = (m.status as string) ?? '—'
-    const items = (m.movement_items as unknown[]) ?? []
-    const fromTime = (m.from_time as string) ?? (m.from_movement_date as string) ?? '—'
+  const renderCell = (columnId: OrikzorColumnId, order: OrderListItem) => {
     switch (columnId) {
       case 'select':
         if (!canSendToPicking) return null
         {
-          const checked = selectedMovementIds.has(mid)
+          const checked = selectedOrderIds.has(order.id)
           return (
             <td className="px-4 py-3">
               <input
                 type="checkbox"
                 checked={checked}
                 onChange={() => {
-                  setSelectedMovementIds((prev) => {
+                  setSelectedOrderIds((prev) => {
                     const next = new Set(prev)
-                    if (next.has(mid)) next.delete(mid)
-                    else next.add(mid)
+                    if (next.has(order.id)) next.delete(order.id)
+                    else next.add(order.id)
                     return next
                   })
                 }}
@@ -167,27 +168,31 @@ export function OrikzorHarakatlariPage() {
             </td>
           )
         }
-      case 'movement_number':
+      case 'order_number':
         return (
-          <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">{movementNum}</td>
+          <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">
+            {order.order_number}
+          </td>
         )
       case 'movement_note':
         return (
-          <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300" title={note}>
-            {note}
+          <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300" title={order.movement_note ?? ''}>
+            {order.movement_note ?? '—'}
           </td>
         )
       case 'status':
         return (
-          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{status}</td>
+          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{order.status}</td>
         )
       case 'lines':
         return (
-          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{items.length}</td>
+          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{order.lines_total}</td>
         )
       case 'delivery_date':
         return (
-          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{fromTime}</td>
+          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+            {order.delivery_date ?? order.created_at?.slice(0, 10) ?? '—'}
+          </td>
         )
       case 'view_details':
         return (
@@ -195,11 +200,7 @@ export function OrikzorHarakatlariPage() {
             <button
               type="button"
               className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-              onClick={() =>
-                navigate(`/admin/orders-orikzor/${encodeURIComponent(mid)}`, {
-                  state: { movement: m, listPath: '/admin/orders-orikzor', listQuery: searchParams.toString() },
-                })
-              }
+              onClick={() => navigate(`/admin/orders/${order.id}`)}
               aria-label={t('orders:view_details')}
             >
               <FileText size={18} />
@@ -228,12 +229,12 @@ export function OrikzorHarakatlariPage() {
         />
       )
     }
-    if (movementList.length === 0) {
+    if (items.length === 0) {
       return (
         <EmptyState
-          title={searchQuery.trim() ? t('orders:search_no_results', 'Qidiruv bo\'yicha natija topilmadi') : t('orders:empty')}
-          description={searchQuery.trim() ? t('orders:search_no_results_hint', 'Boshqa so\'z yoki filterni sinab ko\'ring.') : t('orders:empty_desc')}
-          actionLabel={searchQuery.trim() ? t('common:buttons.refresh') : t('common:buttons.refresh')}
+          title={searchQuery.trim() ? t('orders:search_no_results', "Qidiruv bo'yicha natija topilmadi") : t('orders:empty')}
+          description={searchQuery.trim() ? t('orders:search_no_results_hint', "Boshqa so'z yoki filterni sinab ko'ring.") : t('orders:empty_desc')}
+          actionLabel={t('common:buttons.refresh')}
           onAction={() => (searchQuery.trim() ? setSearchParams((p) => { const n = new URLSearchParams(p); n.delete('q'); return n }) : load())}
         />
       )
@@ -251,18 +252,18 @@ export function OrikzorHarakatlariPage() {
                     {colId === 'select' && canSendToPicking ? (
                       <input
                         type="checkbox"
-                        checked={movementList.length > 0 && movementList.every((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))}
+                        checked={items.length > 0 && items.every((o) => selectedOrderIds.has(o.id))}
                         ref={(el) => {
                           if (el) {
-                            const some = movementList.some((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))
-                            el.indeterminate = some && !movementList.every((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))
+                            const some = items.some((o) => selectedOrderIds.has(o.id))
+                            el.indeterminate = some && !items.every((o) => selectedOrderIds.has(o.id))
                           }
                         }}
                         onChange={() =>
-                          setSelectedMovementIds(
-                            movementList.every((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))
+                          setSelectedOrderIds(
+                            items.every((o) => selectedOrderIds.has(o.id))
                               ? new Set()
-                              : new Set(movementList.map((m) => (m.movement_id as string) ?? ''))
+                              : new Set(items.map((o) => o.id)),
                           )
                         }
                         aria-label={t('orders:select_all')}
@@ -272,20 +273,22 @@ export function OrikzorHarakatlariPage() {
                       columnLabels.get(colId)
                     )}
                   </th>
-                ) : null
+                ) : null,
               )}
             </tr>
           </thead>
           <tbody>
-            {movementList.map((m) => (
+            {items.map((order) => (
               <tr
-                key={(m.movement_id as string) ?? String(m.barcode ?? '')}
+                key={order.id}
                 className="border-b border-slate-100 dark:border-slate-800"
               >
                 {orderedCols.map((colId) =>
                   visibleCols.has(colId) ? (
-                    <Fragment key={colId}>{renderCell(colId, m)}</Fragment>
-                  ) : null
+                    <td key={colId} className="contents">
+                      {renderCell(colId, order)}
+                    </td>
+                  ) : null,
                 )}
               </tr>
             ))}
@@ -293,16 +296,8 @@ export function OrikzorHarakatlariPage() {
         </table>
       </TableScrollArea>
     )
-  }, [canSendToPicking, error, isLoading, movementList, movementTotal, load, columnLabels, navigate, orikzorTableConfig.config, searchParams, selectedMovementIds, setSelectedMovementIds, t])
-
-  const handleSmartupSync = useCallback(() => {
-    void load(true, 0, true)
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev)
-      next.delete('offset')
-      return next
-    })
-  }, [load, setSearchParams])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canSendToPicking, error, isLoading, items, total, load, columnLabels, navigate, orikzorTableConfig.config, searchParams, selectedOrderIds, t])
 
   return (
     <AdminLayout titleSlot={<OrdersHubTabs />}>
@@ -381,9 +376,6 @@ export function OrikzorHarakatlariPage() {
                         />
                       </label>
                     </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      {t('orders:sync_date_hint', "Smartup'dagi from_movement_date shu oraliqda bo'lishi kerak.")}
-                    </p>
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button
@@ -432,44 +424,56 @@ export function OrikzorHarakatlariPage() {
           >
             <Settings size={18} />
           </Button>
-          <Button className="shrink-0" onClick={handleSmartupSync} disabled={isRefreshing}>
-            {isRefreshing ? t('orders:syncing') : t('orders:sync')}
-          </Button>
+          {canSync ? (
+            <Button className="shrink-0" onClick={handleSync} disabled={isSyncing}>
+              {isSyncing ? t('orders:syncing') : t('orders:sync')}
+            </Button>
+          ) : null}
         </div>
 
-        {(isRefreshing || movementTotal > 0) ? (
+        {syncError ? (
+          <div className="flex items-center justify-between gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-900/30">
+            <span className="text-sm text-amber-800 dark:text-amber-200 break-words flex-1">{syncError}</span>
+            <Button variant="ghost" className="shrink-0 p-2" onClick={() => setSyncError(null)} aria-label={t('common:buttons.close')}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : null}
+
+        {(isRefreshing || syncResult) ? (
           <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
             {isRefreshing ? (
               <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
                 {t('orders:refreshing')}
               </span>
             ) : null}
-            {movementTotal > 0 ? (
+            {syncResult ? (
               <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
-                {t('orders:movements_loaded', { count: movementTotal })}
+                {t('orders:sync_result', { created: syncResult.created, updated: syncResult.updated, skipped: syncResult.skipped })}
               </span>
             ) : null}
           </div>
         ) : null}
 
-        {canSendToPicking && selectedMovementIds.size > 0 ? (
+        {canSendToPicking && selectedOrderIds.size > 0 ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/50">
             <span className="text-sm text-slate-600 dark:text-slate-300">
-              {t('orders:send_selected_to_picking', { count: selectedMovementIds.size })}
+              {t('orders:send_selected_to_picking', { count: selectedOrderIds.size })}
             </span>
             <div className="flex gap-2">
-              <Button variant="ghost" onClick={() => setSelectedMovementIds(new Set())}>
+              <Button variant="ghost" onClick={() => setSelectedOrderIds(new Set())}>
                 {t('common:buttons.cancel')}
               </Button>
-              <Button onClick={() => setSendDialogOpen(true)}>
+              <Button onClick={() => setSendDialogOrderIds([...selectedOrderIds])}>
                 {t('orders:send_to_picking.button')}
               </Button>
             </div>
           </div>
         ) : null}
+
         <div className="relative max-h-[calc(100vh-320px)] min-h-0 overflow-auto">
           {content}
-          {isRefreshing && (
+          {isSyncing && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 dark:bg-slate-900/60 backdrop-blur-[2px]">
               <div className="inline-flex items-center gap-2 rounded-full bg-blue-100 px-4 py-2.5 text-sm font-medium text-blue-800 dark:bg-blue-900/50 dark:text-blue-200">
                 <Loader2 size={20} className="animate-spin shrink-0" />
@@ -480,20 +484,14 @@ export function OrikzorHarakatlariPage() {
         </div>
 
         <SendToPickingDialog
-          open={sendDialogOpen}
-          orderIds={[]}
-          onOpenChange={setSendDialogOpen}
+          open={sendDialogOrderIds !== null}
+          orderIds={sendDialogOrderIds ?? []}
+          onOpenChange={(open) => !open && setSendDialogOrderIds(null)}
           onSent={() => {
-            setSelectedMovementIds(new Set())
-            void load(true)
+            setSendDialogOrderIds(null)
+            setSelectedOrderIds(new Set())
+            void load(false)
           }}
-          movementPayloads={movementList
-            .filter((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))
-            .map((m) => ({
-              source: 'orikzor' as const,
-              movement_id: (m.movement_id as string) ?? '',
-              movement: m,
-            }))}
         />
 
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-4 dark:border-slate-800">
@@ -502,17 +500,17 @@ export function OrikzorHarakatlariPage() {
           </Button>
           <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
             <span>
-              {movementTotal > 0
-                ? `${movementPage * PAGE_SIZE + 1}–${Math.min((movementPage + 1) * PAGE_SIZE, movementTotal)} / ${movementTotal}`
+              {total > 0
+                ? `${offset + 1}–${Math.min(offset + PAGE_SIZE, total)} / ${total}`
                 : '0 / 0'}
             </span>
             <Button
               variant="secondary"
-              disabled={movementPage === 0}
+              disabled={offset === 0}
               onClick={() => {
                 setSearchParams((prev) => {
                   const next = new URLSearchParams(prev)
-                  next.set('offset', String((movementPage - 1) * PAGE_SIZE))
+                  next.set('offset', String(Math.max(0, offset - PAGE_SIZE)))
                   return next
                 })
               }}
@@ -521,16 +519,16 @@ export function OrikzorHarakatlariPage() {
             </Button>
             <Button
               variant="secondary"
-              disabled={(movementPage + 1) * PAGE_SIZE >= movementTotal}
+              disabled={offset + PAGE_SIZE >= total}
               onClick={() => {
                 setSearchParams((prev) => {
                   const next = new URLSearchParams(prev)
-                  next.set('offset', String((movementPage + 1) * PAGE_SIZE))
+                  next.set('offset', String(offset + PAGE_SIZE))
                   return next
                 })
               }}
             >
-              {t('orders:pagination.next', 'Keyingi')}
+              {t('common:buttons.next')}
             </Button>
           </div>
         </div>

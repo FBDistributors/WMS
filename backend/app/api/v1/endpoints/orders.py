@@ -33,7 +33,9 @@ from app.services.push_notifications import send_push_to_user
 from app.services.safe_cancel_return_service import initiate_safe_cancel_return
 from app.integrations.smartup.client import SmartupClient
 from app.integrations.smartup.importer import delete_stale_orders, import_orders
-from app.integrations.smartup.sync_lock import smartup_sync_lock
+from app.integrations.smartup.mfm_movement import export_mfm_movements
+from app.integrations.smartup.orikzor import export_movements_from_smartup
+from app.integrations.smartup.sync_lock import diller_sync_lock, orikzor_sync_lock, smartup_sync_lock
 from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
 from app.models.order import Order as OrderModel
@@ -1294,17 +1296,16 @@ async def sync_orders_from_smartup(
     db: Session = Depends(get_db),
     _user=Depends(require_permission("orders:sync")),
 ):
-    if payload.order_source == "orikzor":
-        raise HTTPException(
-            status_code=400,
-            detail="O'rikzor harakatlari alohida API. GET /api/v1/movements-orikzor dan foydalaning. Sync buyurtmalar jadvaliga yozilmaydi.",
-        )
-    if payload.order_source == "diller":
-        raise HTTPException(
-            status_code=400,
-            detail="Tashkiliy harakatlar uchun GET /api/v1/movements dan foydalaning. Sync buyurtmalar jadvaliga yozilmaydi.",
-        )
+    source = (payload.order_source or "").strip().lower()
 
+    if source == "diller":
+        return await _sync_diller(db, payload)
+    if source == "orikzor":
+        return await _sync_orikzor(db, payload)
+    return await _sync_asosiy(db, payload)
+
+
+async def _sync_asosiy(db: Session, payload: SmartupSyncRequest) -> SmartupSyncResponse:
     with smartup_sync_lock(db) as acquired:
         if not acquired:
             raise HTTPException(
@@ -1312,7 +1313,6 @@ async def sync_orders_from_smartup(
                 detail="SmartUp sync already in progress (worker or another request). Try again later.",
             )
         try:
-            # order$export: sana maydonlari yuborilmaydi (SmartUp sinovi); status=B#W client default.
             client = SmartupClient(filial_id=(payload.filial_id or "").strip() or None)
             response = client.export_orders(filial_code=payload.filial_code)
             filial_override = (payload.filial_id or "").strip() or None
@@ -1329,22 +1329,7 @@ async def sync_orders_from_smartup(
             )
             delete_stale_orders(db, list(items_to_import))
             skipped += filtered_out
-            completed_match_skipped = int(skipped_by_reason.get("completed_match_skipped", 0))
-            detail = import_errors[0].reason if import_errors else None
-            if not detail and completed_match_skipped > 0:
-                detail = (
-                    f"Skipped {completed_match_skipped} finalized orders: "
-                    "incoming payload fully matched existing completed/packed/shipped lines."
-                )
-            errors_count = len(import_errors) if import_errors else None
-            return SmartupSyncResponse(
-                created=created,
-                updated=updated,
-                skipped=skipped,
-                detail=detail,
-                errors_count=errors_count,
-                debug={"skipped_by_reason": skipped_by_reason},
-            )
+            return _build_sync_response(created, updated, skipped, import_errors, skipped_by_reason)
         except RuntimeError as exc:
             msg = str(exc)
             if "400" in msg or "не найдена" in msg or "organization" in msg.lower():
@@ -1352,6 +1337,75 @@ async def sync_orders_from_smartup(
             raise HTTPException(status_code=500, detail=msg) from exc
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(status_code=500, detail=f"Smartup export failed: {exc}") from exc
+
+
+async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncResponse:
+    with diller_sync_lock(db) as acquired:
+        if not acquired:
+            raise HTTPException(
+                status_code=409,
+                detail="Diller sync already in progress (worker or another request). Try again later.",
+            )
+        try:
+            response = export_mfm_movements()
+            items = response.items
+            logger.info("sync-smartup(diller): %d ta harakat (mfm movement$export)", len(items))
+            created, updated, skipped, import_errors, skipped_by_reason = import_orders(
+                db, items, order_source="diller"
+            )
+            return _build_sync_response(created, updated, skipped, import_errors, skipped_by_reason)
+        except RuntimeError as exc:
+            msg = str(exc)
+            if "400" in msg or "не найдена" in msg or "organization" in msg.lower():
+                raise HTTPException(status_code=400, detail=msg) from exc
+            raise HTTPException(status_code=500, detail=msg) from exc
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=500, detail=f"Diller sync failed: {exc}") from exc
+
+
+async def _sync_orikzor(db: Session, payload: SmartupSyncRequest) -> SmartupSyncResponse:
+    with orikzor_sync_lock(db) as acquired:
+        if not acquired:
+            raise HTTPException(
+                status_code=409,
+                detail="O'rikzor sync already in progress (worker or another request). Try again later.",
+            )
+        try:
+            response = export_movements_from_smartup()
+            items = response.items
+            logger.info("sync-smartup(orikzor): %d ta harakat (mkw movement$export)", len(items))
+            created, updated, skipped, import_errors, skipped_by_reason = import_orders(
+                db, items, order_source="orikzor"
+            )
+            return _build_sync_response(created, updated, skipped, import_errors, skipped_by_reason)
+        except RuntimeError as exc:
+            msg = str(exc)
+            if "400" in msg or "не найдена" in msg or "organization" in msg.lower():
+                raise HTTPException(status_code=400, detail=msg) from exc
+            raise HTTPException(status_code=500, detail=msg) from exc
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=500, detail=f"O'rikzor sync failed: {exc}") from exc
+
+
+def _build_sync_response(
+    created: int, updated: int, skipped: int, import_errors: list, skipped_by_reason: dict
+) -> SmartupSyncResponse:
+    completed_match_skipped = int(skipped_by_reason.get("completed_match_skipped", 0))
+    detail = import_errors[0].reason if import_errors else None
+    if not detail and completed_match_skipped > 0:
+        detail = (
+            f"Skipped {completed_match_skipped} finalized orders: "
+            "incoming payload fully matched existing completed/packed/shipped lines."
+        )
+    errors_count = len(import_errors) if import_errors else None
+    return SmartupSyncResponse(
+        created=created,
+        updated=updated,
+        skipped=skipped,
+        detail=detail,
+        errors_count=errors_count,
+        debug={"skipped_by_reason": skipped_by_reason},
+    )
 
 
 def _get_or_create_order_from_movement(

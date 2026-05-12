@@ -14,8 +14,10 @@ from app.db import SessionLocal
 from app.integrations.smartup.client import SmartupClient
 from app.integrations.smartup.importer import delete_stale_orders, import_orders
 from app.integrations.smartup.inventory_client import SmartupInventoryExportClient
+from app.integrations.smartup.mfm_movement import export_mfm_movements
+from app.integrations.smartup.orikzor import export_movements_from_smartup
 from app.integrations.smartup.products_sync import _sync_products
-from app.integrations.smartup.sync_lock import smartup_sync_lock
+from app.integrations.smartup.sync_lock import diller_sync_lock, orikzor_sync_lock, smartup_sync_lock
 from app.models.smartup_sync import SmartupSyncRun
 
 logger = logging.getLogger(__name__)
@@ -102,6 +104,62 @@ def sync_orders() -> Tuple[int, str | None, list]:
         return 0, str(exc), []
 
 
+def sync_diller_movements() -> Tuple[int, str | None, list]:
+    """
+    Fetch cross-organizational (diller) movements from SmartUp mfm/movement$export
+    and upsert into orders table with order_source='diller'.
+    """
+    try:
+        response = export_mfm_movements()
+        items = response.items
+        logger.info("Diller movements sync: %d ta harakat (mfm movement$export)", len(items))
+
+        db = SessionLocal()
+        try:
+            created, updated, skipped, errors, _ = import_orders(db, items, order_source="diller")
+            count = created + updated
+            if errors:
+                logger.warning("Diller sync: %d errors (first: %s)", len(errors), errors[0].reason)
+            logger.info(
+                "Diller sync: created=%d updated=%d skipped=%d errors=%d",
+                created, updated, skipped, len(errors),
+            )
+            return count, None, [e.__dict__ for e in errors]
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.exception("Diller movements sync failed: %s", exc)
+        return 0, str(exc), []
+
+
+def sync_orikzor_movements() -> Tuple[int, str | None, list]:
+    """
+    Fetch O'rikzor movements from SmartUp mkw/movement$export
+    and upsert into orders table with order_source='orikzor'.
+    """
+    try:
+        response = export_movements_from_smartup()
+        items = response.items
+        logger.info("O'rikzor movements sync: %d ta harakat (mkw movement$export)", len(items))
+
+        db = SessionLocal()
+        try:
+            created, updated, skipped, errors, _ = import_orders(db, items, order_source="orikzor")
+            count = created + updated
+            if errors:
+                logger.warning("O'rikzor sync: %d errors (first: %s)", len(errors), errors[0].reason)
+            logger.info(
+                "O'rikzor sync: created=%d updated=%d skipped=%d errors=%d",
+                created, updated, skipped, len(errors),
+            )
+            return count, None, [e.__dict__ for e in errors]
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.exception("O'rikzor movements sync failed: %s", exc)
+        return 0, str(exc), []
+
+
 def run_full_sync() -> SmartupSyncRun | None:
     """
     Run full SmartUp sync: products, then orders.
@@ -153,12 +211,46 @@ def run_full_sync() -> SmartupSyncRun | None:
                     orders_errors = []
                     logger.exception("Orders sync raised: %s", exc)
 
-                if products_error and orders_error:
+                # Diller movements (separate lock)
+                diller_count = 0
+                diller_error: str | None = None
+                diller_errors: list = []
+                diller_lock_db = SessionLocal()
+                try:
+                    with diller_sync_lock(diller_lock_db) as diller_acquired:
+                        if diller_acquired:
+                            try:
+                                diller_count, diller_error, diller_errors = sync_diller_movements()
+                            except Exception as exc:
+                                diller_error = str(exc)
+                                logger.exception("Diller sync raised: %s", exc)
+                finally:
+                    diller_lock_db.close()
+
+                # O'rikzor movements (separate lock)
+                orikzor_count = 0
+                orikzor_error: str | None = None
+                orikzor_errors: list = []
+                orikzor_lock_db = SessionLocal()
+                try:
+                    with orikzor_sync_lock(orikzor_lock_db) as orikzor_acquired:
+                        if orikzor_acquired:
+                            try:
+                                orikzor_count, orikzor_error, orikzor_errors = sync_orikzor_movements()
+                            except Exception as exc:
+                                orikzor_error = str(exc)
+                                logger.exception("O'rikzor sync raised: %s", exc)
+                finally:
+                    orikzor_lock_db.close()
+
+                step_errors = [products_error, orders_error, diller_error, orikzor_error]
+                failed_count = sum(1 for e in step_errors if e)
+                if failed_count == len(step_errors):
                     status = STATUS_FAILED
-                    error_message = f"Products: {products_error}; Orders: {orders_error}"
-                elif products_error or orders_error:
+                    error_message = "; ".join(f for f in step_errors if f)
+                elif failed_count > 0:
                     status = STATUS_PARTIAL
-                    error_message = products_error or orders_error or ""
+                    error_message = "; ".join(f for f in step_errors if f)
                 else:
                     status = STATUS_SUCCESS
                     error_message = None
@@ -172,6 +264,14 @@ def run_full_sync() -> SmartupSyncRun | None:
                     all_errors.append({"step": "orders", "reason": orders_error})
                 for e in orders_errors:
                     all_errors.append({"step": "orders", "external_id": e.get("external_id"), "reason": e.get("reason")})
+                if diller_error:
+                    all_errors.append({"step": "diller", "reason": diller_error})
+                for e in diller_errors:
+                    all_errors.append({"step": "diller", "external_id": e.get("external_id"), "reason": e.get("reason")})
+                if orikzor_error:
+                    all_errors.append({"step": "orikzor", "reason": orikzor_error})
+                for e in orikzor_errors:
+                    all_errors.append({"step": "orikzor", "external_id": e.get("external_id"), "reason": e.get("reason")})
 
                 db = SessionLocal()
                 try:
@@ -181,20 +281,22 @@ def run_full_sync() -> SmartupSyncRun | None:
                         run.status = status
                         run.error_message = error_message[:512] if error_message else None
                         run.synced_products_count = products_count
-                        run.synced_orders_count = orders_count
+                        run.synced_orders_count = orders_count + diller_count + orikzor_count
                         run.inserted_count = products_count
-                        run.updated_count = orders_count
-                        run.success_count = products_count + orders_count
+                        run.updated_count = orders_count + diller_count + orikzor_count
+                        run.success_count = products_count + orders_count + diller_count + orikzor_count
                         run.error_count = len(all_errors)
                         run.errors_json = all_errors
                         db.add(run)
                         db.commit()
                         duration_sec = (run.finished_at - start_time).total_seconds()
                         logger.info(
-                            "SmartUp full sync finished: status=%s products=%d orders=%d duration_sec=%.1f",
+                            "SmartUp full sync finished: status=%s products=%d orders=%d diller=%d orikzor=%d duration_sec=%.1f",
                             status,
                             products_count,
                             orders_count,
+                            diller_count,
+                            orikzor_count,
                             duration_sec,
                         )
                         return run

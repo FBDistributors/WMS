@@ -285,32 +285,25 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     }
     try {
       if (orderSource === 'diller') {
-        const end = new Date()
-        const begin = new Date()
-        begin.setDate(begin.getDate() - 30)
-        const defaultBegin = begin.toISOString().slice(0, 10)
-        const defaultEnd = end.toISOString().slice(0, 10)
-        const beginStr = dateFrom.trim() || defaultBegin
-        const endStr = dateTo.trim() || defaultEnd
         const page = pageOverride ?? movementPage
-        const query: Record<string, string | number | boolean> = {
-          begin_created_on: beginStr,
-          end_created_on: endStr,
-          begin_modified_on: beginStr,
-          end_modified_on: endStr,
-          limit: MOVEMENT_PAGE_SIZE,
-          offset: page * MOVEMENT_PAGE_SIZE,
-        }
-        const filialId = (import.meta.env.VITE_DEFAULT_FILIAL_ID as string)?.trim()
-        if (filialId) query.filial_id = filialId
-        if (forceRefresh) query.refresh = true
-        query.wms_status = movementWmsStatusQuery
-        const data = await getMovements(query, { signal })
+        const data = await getOrders(
+          {
+            order_source: 'diller',
+            status: 'imported',
+            q: searchQuery.trim() || undefined,
+            date_from: dateFrom.trim() || undefined,
+            date_to: dateTo.trim() || undefined,
+            limit: MOVEMENT_PAGE_SIZE,
+            offset: page * MOVEMENT_PAGE_SIZE,
+            filial_id: 'all',
+          },
+          { signal },
+        )
         if (gen !== ordersLoadGenRef.current) return
-        setMovementsData(data)
+        setItems(data.items)
+        setTotal(data.total)
         if (pageOverride !== undefined) setMovementPage(pageOverride)
-        setItems([])
-        setTotal(0)
+        setMovementsData(null)
         return
       }
       const loadAllBS =
@@ -462,9 +455,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       if (!isMainOrdersSimple && mode === 'default' && !orderSource) {
         setFilterOrderGroup(ORDER_GROUP_FILTER_VALUES.has(group) ? group : 'yangi')
       }
-      if (orderSource === 'diller') {
-        setFilterWmsStatus(movementWmsStatusQuery)
-      }
+      
     }
   }, [
     filterPanelOpen,
@@ -488,7 +479,24 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     setSyncResult(null)
     try {
       if (orderSource === 'diller') {
-        await load(false, undefined, true)
+        try {
+          const result = await syncSmartupOrders({ order_source: 'diller' })
+          setSyncResult(result)
+        } catch (syncErr) {
+          const errStatus = syncErr && typeof syncErr === 'object' && 'status' in syncErr ? (syncErr as { status: number }).status : 0
+          if (errStatus === 409) {
+            setSyncError(t('orders:sync_busy'))
+          } else {
+            const message =
+              (syncErr && typeof syncErr === 'object' && 'message' in syncErr && typeof (syncErr as { message: unknown }).message === 'string')
+                ? (syncErr as { message: string }).message
+                : syncErr instanceof Error
+                  ? syncErr.message
+                  : t('orders:sync_failed')
+            setSyncError(message)
+          }
+        }
+        await load(false)
         return
       }
       const today = new Date()
@@ -547,292 +555,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         <EmptyState title={error} actionLabel={t('common:buttons.retry')} onAction={load} />
       )
     }
-    if (orderSource === 'diller') {
-      const movementListRaw = movementsData?.movement ?? []
-      const q = searchQuery.trim().toLowerCase()
-      const movementList = q
-        ? movementListRaw.filter((m: MovementItem) => {
-            const mid = String((m.movement_id as string) ?? '').toLowerCase()
-            const deliveryNo = String((m.delivery_number as string) ?? '').toLowerCase()
-            const toFilialCode = String((m.to_filial_code as string) ?? '').toLowerCase()
-            const toFilialName = getFilialNameByCode(m.to_filial_code as string).toLowerCase()
-            const note = String((m.note as string) ?? '').toLowerCase()
-            const statusRaw = String((m.status as string) ?? '').toLowerCase()
-            const statusLabel = getMovementRowStatusLabel(m).toLowerCase()
-            const statusSearch = `${statusRaw} ${statusLabel}`
-            const searchFields = dillerTableConfig.config.searchFields
-            const matchField = (id: string) => {
-              if (id === 'order_number') return mid.includes(q)
-              if (id === 'external_id') return deliveryNo.includes(q)
-              if (id === 'status') return statusSearch.includes(q)
-              if (id === 'to_filial') return toFilialCode.includes(q) || toFilialName.includes(q)
-              if (id === 'movement_note') return note.includes(q)
-              return false
-            }
-            if (searchFields.length === 0) {
-              return (
-                mid.includes(q) ||
-                deliveryNo.includes(q) ||
-                statusSearch.includes(q) ||
-                toFilialCode.includes(q) ||
-                toFilialName.includes(q) ||
-                note.includes(q)
-              )
-            }
-            return searchFields.some(matchField)
-          })
-        : movementListRaw
-      const columnLabelsDiller = new Map(
-        COLUMN_OPTIONS_DILLER.map((c) => [c.id, t(c.labelKey)])
-      )
-      const renderMovementCell = (columnId: string, m: MovementItem) => {
-        const mid = (m.movement_id as string) ?? '—'
-        const deliveryNo = (m.delivery_number as string) ?? '—'
-        const note = (m.note as string) ?? '—'
-        const amount = m.amount != null ? String(m.amount) : '—'
-        const items = (m.movement_items as unknown[]) ?? []
-        const fromTime = (m.from_time as string) ?? '—'
-        switch (columnId) {
-          case 'select':
-            if (!canSend) return null
-            {
-              const checked = selectedMovementIds.has(mid)
-              return (
-                <td className="px-4 py-3">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => {
-                      setSelectedMovementIds((prev) => {
-                        const next = new Set(prev)
-                        if (next.has(mid)) next.delete(mid)
-                        else next.add(mid)
-                        return next
-                      })
-                    }}
-                    aria-label={t('orders:select_all')}
-                    className="h-4 w-4 rounded border-slate-300"
-                  />
-                </td>
-              )
-            }
-          case 'order_number':
-            return (
-              <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">
-                {mid}
-              </td>
-            )
-          case 'external_id':
-            return (
-              <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                {deliveryNo}
-              </td>
-            )
-          case 'status': {
-            const st = getMovementRowStatusLabel(m)
-            return (
-              <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800 dark:text-slate-200" title={st}>
-                {st}
-              </td>
-            )
-          }
-          case 'to_filial':
-            return (
-              <td className="px-4 py-3 text-slate-600 dark:text-slate-300" title={getFilialNameByCode(m.to_filial_code as string)}>
-                {getFilialNameByCode(m.to_filial_code as string)}
-              </td>
-            )
-          case 'movement_note':
-            return (
-              <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300" title={note}>
-                {note}
-              </td>
-            )
-          case 'total_amount':
-            return (
-              <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                {amount === '—' ? '—' : Number(amount).toLocaleString()}
-              </td>
-            )
-          case 'lines':
-            return (
-              <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                {items.length}
-              </td>
-            )
-          case 'delivery_date':
-            return (
-              <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                {fromTime}
-              </td>
-            )
-          case 'view_details':
-            return (
-              <td className="px-4 py-3">
-                <button
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-                  onClick={() =>
-                    navigate(`/admin/orders-diller/${encodeURIComponent(mid)}`, {
-                      state: { movement: m, listPath: location.pathname, listQuery: location.search },
-                    })
-                  }
-                  aria-label={t('orders:view_details')}
-                >
-                  <FileText size={18} />
-                </button>
-              </td>
-            )
-          default:
-            return null
-        }
-      }
-      if (movementList.length === 0) {
-        const isSearch = searchQuery.trim().length > 0
-        const runCheck = async () => {
-          if (!searchQuery.trim()) return
-          setCheckLoading(true)
-          setCheckResult(null)
-          try {
-            const res = await getOrdersCheck({ q: searchQuery.trim() })
-            setCheckResult(res)
-          } catch {
-            setCheckResult(null)
-          } finally {
-            setCheckLoading(false)
-          }
-        }
-        return (
-          <div className="space-y-3">
-            <EmptyState
-              title={isSearch ? t('orders:search_no_results', "Qidiruv bo'yicha natija topilmadi") : t('orders:empty')}
-              description={
-                isSearch
-                  ? t('orders:search_no_results_hint', "Boshqa so'z yoki filterni sinab ko'ring.") +
-                    ' ' +
-                    t('orders:search_try_deal_id', "Agar buyurtma SmartUp da delivery_number bo'lsa, deal_id (masalan 233898517) orqali ham qidirib ko'ring.")
-                  : t('orders:empty_desc')
-              }
-              actionLabel={t('common:buttons.refresh')}
-              onAction={load}
-            />
-            {isSearch && (
-              <div className="flex flex-col gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={checkLoading}
-                  onClick={runCheck}
-                  className="self-center"
-                >
-                  {checkLoading ? t('orders:check_loading', 'Tekshirilmoqda...') : t('orders:check_db_button', 'Bazani tekshirish')}
-                </Button>
-                {checkResult && (
-                  <Card className="p-4 text-sm">
-                    <p className="font-medium text-slate-700 dark:text-slate-200 mb-2">
-                      {t('orders:check_result_title', 'Baza natijasi')}
-                    </p>
-                    <p className="text-slate-600 dark:text-slate-300">
-                      {t('orders:check_total_b_s', 'B#W bazada (filial bo\'yicha): {{count}} ta', { count: checkResult.total_b_s })}
-                      {' · '}
-                      {t('orders:check_total_all', 'Barcha filial: {{count}} ta', { count: checkResult.total_b_s_all_filial })}
-                    </p>
-                    {(checkResult.match_by_order_number.length > 0 ||
-                      checkResult.match_by_source_external_id.length > 0 ||
-                      checkResult.match_by_so_doc_no.length > 0) ? (
-                      <p className="mt-2 text-green-600 dark:text-green-400">
-                        {t('orders:check_found', "«{{q}}» topildi:", { q: searchQuery.trim() })}
-                        {checkResult.match_by_order_number.length > 0 &&
-                          ` order_number: ${checkResult.match_by_order_number.map((m) => m.order_number).join(', ')}`}
-                        {checkResult.match_by_source_external_id.length > 0 &&
-                          ` source_external_id: ${checkResult.match_by_source_external_id.map((m) => m.source_external_id || m.order_number).join(', ')}`}
-                        {checkResult.match_by_so_doc_no.length > 0 &&
-                          ` SO doc_no: ${checkResult.match_by_so_doc_no.map((m) => m.doc_no).join(', ')}`}
-                      </p>
-                    ) : (
-                      <p className="mt-2 text-amber-600 dark:text-amber-400">
-                        {t('orders:check_not_found', "«{{q}}» bazada B#W buyurtmalar orasida topilmadi.", { q: searchQuery.trim() })}
-                      </p>
-                    )}
-                  </Card>
-                )}
-              </div>
-            )}
-          </div>
-        )
-      }
-      const dillerVisible = new Set(dillerTableConfig.config.visibleColumns.filter((id) => COLUMN_OPTIONS_DILLER.some((c) => c.id === id)))
-      const dillerOrdered = dillerTableConfig.config.columnOrder.filter((id) => COLUMN_OPTIONS_DILLER.some((c) => c.id === id))
-      return (
-        <div className="space-y-3">
-          {canSend && selectedMovementIds.size > 0 && (
-            <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/50">
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                {t('orders:send_selected_to_picking', { count: selectedMovementIds.size })}
-              </span>
-              <Button variant="outline" onClick={() => setSelectedMovementIds(new Set())}>
-                {t('common:buttons.cancel')}
-              </Button>
-              <Button onClick={() => setSendMovementDialogOpen(true)}>
-                {t('orders:send_to_picking.button')}
-              </Button>
-            </div>
-          )}
-          <TableScrollArea inline>
-            <table className="w-max min-w-[600px] table-auto text-sm">
-              <thead className="text-xs uppercase text-slate-500">
-                <tr className="border-b border-slate-200 dark:border-slate-800">
-                  {dillerOrdered.map((colId) =>
-                    dillerVisible.has(colId) ? (
-                      <th key={colId} className="px-4 py-3 text-left">
-                        {colId === 'select' && canSend ? (
-                          <input
-                            type="checkbox"
-                            checked={movementList.length > 0 && movementList.every((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))}
-                            ref={(el) => {
-                              if (el) {
-                                const some = movementList.some((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))
-                                el.indeterminate = some && !movementList.every((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))
-                              }
-                            }}
-                            onChange={() =>
-                              setSelectedMovementIds(
-                                movementList.every((m) => selectedMovementIds.has((m.movement_id as string) ?? ''))
-                                  ? new Set()
-                                  : new Set(movementList.map((m) => (m.movement_id as string) ?? ''))
-                              )
-                            }
-                            aria-label={t('orders:select_all')}
-                            className="h-4 w-4 rounded border-slate-300"
-                          />
-                        ) : (
-                          columnLabelsDiller.get(colId)
-                        )}
-                      </th>
-                    ) : null
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {movementList.map((m) => (
-                  <tr
-                    key={(m.movement_id as string) ?? String(m.barcode ?? '')}
-                    className="border-b border-slate-100 dark:border-slate-800"
-                  >
-                    {dillerOrdered.map((colId) =>
-                      dillerVisible.has(colId) ? (
-                        <React.Fragment key={colId}>
-                          {renderMovementCell(colId, m)}
-                        </React.Fragment>
-                      ) : null
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableScrollArea>
-        </div>
-      )
-    }
+    
     if (items.length === 0) {
       return (
         <EmptyState
@@ -1276,30 +999,12 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                         />
                       </label>
                     </div>
-                    {orderSource === 'diller' ? (
-                      <label className="block text-sm text-slate-600 dark:text-slate-400">
-                        {t('orders:filters.smartup_movement_status')}
-                        <select
-                          value={filterWmsStatus}
-                          onChange={(e) => setFilterWmsStatus(e.target.value as MovementWmsFilter)}
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                          aria-label={t('orders:filters.smartup_movement_status')}
-                        >
-                          <option value="new">{t('orders:filters.wms_status_new')}</option>
-                          <option value="picking">{t('orders:filters.wms_status_picking')}</option>
-                          <option value="review">{t('orders:filters.wms_status_review')}</option>
-                          <option value="completed">{t('orders:filters.wms_status_completed')}</option>
-                          <option value="cancelled">{t('orders:filters.wms_status_cancelled')}</option>
-                          <option value="all">{t('orders:filters.wms_status_all')}</option>
-                        </select>
-                      </label>
-                    ) : null}
+                    
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button
                       variant="secondary"
                       onClick={() => {
-                        if (orderSource === 'diller') setFilterWmsStatus('new')
                         if (!isMainOrdersSimple && mode === 'default' && !orderSource) setFilterOrderGroup('yangi')
                         setSearchParams((prev) => {
                           const next = new URLSearchParams(prev)
@@ -1309,10 +1014,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                           next.delete('offset')
                           if (!isMainOrdersSimple && mode === 'default' && !orderSource) {
                             next.delete('group')
-                          }
-                          if (orderSource === 'diller') {
-                            next.delete('wms_status')
-                            next.delete('smartup_status')
                           }
                           return next
                         })
@@ -1338,10 +1039,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                           if (!isMainOrdersSimple && mode === 'default' && !orderSource) {
                             if (filterOrderGroup === 'yangi') next.delete('group')
                             else next.set('group', filterOrderGroup)
-                          }
-                          if (orderSource === 'diller') {
-                            next.set('wms_status', filterWmsStatus)
-                            next.delete('smartup_status')
                           }
                           return next
                         })
@@ -1382,7 +1079,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             </Button>
           </div>
         ) : null}
-        {((!isMainOrdersSimple && group && group !== 'all') || isRefreshing || (orderSource === 'diller' && movementsData != null) || syncResult) ? (
+        {((!isMainOrdersSimple && group && group !== 'all') || isRefreshing || syncResult) ? (
           <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
             {!isMainOrdersSimple && group && group !== 'all' ? (
               <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/50 dark:text-blue-200">
@@ -1398,11 +1095,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                 {t('orders:refreshing')}
               </span>
             ) : null}
-            {orderSource === 'diller' && movementsData != null ? (
-              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
-                {t('orders:movements_loaded', { count: movementsData.movement?.length ?? 0 })}
-              </span>
-            ) : syncResult ? (
+            {syncResult ? (
               <span className="flex flex-col gap-1">
                 <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
                   {t('orders:sync_result', { created: syncResult.created, updated: syncResult.updated, skipped: syncResult.skipped })}
@@ -1455,29 +1148,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         </div>
 
         <div className="flex items-center justify-end gap-2">
-          {orderSource === 'diller' ? (
-            <>
-              <span className="text-sm text-slate-600 dark:text-slate-400">
-                {(movementsData?.total ?? 0) > 0
-                  ? `${movementPage * MOVEMENT_PAGE_SIZE + 1}–${Math.min((movementPage + 1) * MOVEMENT_PAGE_SIZE, movementsData?.total ?? 0)} / ${movementsData?.total ?? 0}`
-                  : '0 / 0'}
-              </span>
-              <Button
-                variant="secondary"
-                disabled={movementPage === 0}
-                onClick={() => load(false, movementPage - 1)}
-              >
-                {t('common:buttons.back')}
-              </Button>
-              <Button
-                variant="secondary"
-                disabled={(movementPage + 1) * MOVEMENT_PAGE_SIZE >= (movementsData?.total ?? 0)}
-                onClick={() => load(false, movementPage + 1)}
-              >
-                {t('common:buttons.next')}
-              </Button>
-            </>
-          ) : (
             <>
                 {(() => {
                 const isAllBSLoaded =
@@ -1526,7 +1196,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                 )
               })()}
             </>
-          )}
         </div>
       </Card>
 
@@ -1557,37 +1226,21 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
           />
         </>
       ) : null}
-      {orderSource === 'diller' && (
-        <SendToPickingDialog
-          open={sendMovementDialogOpen}
-          orderIds={[]}
-          movementPayloads={sendMovementDialogOpen
-            ? (movementsData?.movement ?? [])
-                .filter((m: MovementItem) => selectedMovementIds.has((m.movement_id as string) ?? ''))
-                .map((m) => ({ source: 'diller' as const, movement_id: (m.movement_id as string) ?? '', movement: m }))
-            : null}
-          onOpenChange={(open) => !open && setSendMovementDialogOpen(false)}
-          onSent={() => {
-            setSendMovementDialogOpen(false)
-            setSelectedMovementIds(new Set())
-            void load(true)
-          }}
-        />
-      )}
+      
       <OrdersTableSettings
         open={isSettingsOpen}
         onOpenChange={setIsSettingsOpen}
-        config={orderSource === 'diller' ? dillerTableConfig.config : config}
-        columns={(orderSource === 'diller' ? COLUMN_OPTIONS_DILLER : mode === 'statuses' ? COLUMN_OPTIONS_STATUSES : mode === 'default' ? COLUMN_OPTIONS_DEFAULT : COLUMN_OPTIONS).map((column) => ({
+        config={config}
+        columns={(mode === 'statuses' ? COLUMN_OPTIONS_STATUSES : mode === 'default' ? COLUMN_OPTIONS_DEFAULT : COLUMN_OPTIONS).map((column) => ({
           id: column.id,
           label: t(column.labelKey),
         }))}
-        searchFields={(orderSource === 'diller' ? DILLER_SEARCH_FIELD_OPTIONS : SEARCH_FIELD_OPTIONS).map((field) => ({
+        searchFields={SEARCH_FIELD_OPTIONS.map((field) => ({
           id: field.id,
           label: t(field.labelKey),
         }))}
-        onSave={orderSource === 'diller' ? dillerTableConfig.updateConfig : updateConfig}
-        onReset={orderSource === 'diller' ? dillerTableConfig.resetConfig : resetConfig}
+        onSave={updateConfig}
+        onReset={resetConfig}
       />
     </AdminLayout>
   )
