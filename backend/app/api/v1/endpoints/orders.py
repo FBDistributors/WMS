@@ -400,7 +400,15 @@ def _resolve_product_id(db: Session, line: OrderLineModel) -> UUID | None:
     return None
 
 
-def _fefo_available_lots(db: Session, product_id: UUID, min_expiry_date: date | None = None):
+def _fefo_available_lots(
+    db: Session,
+    product_id: UUID,
+    min_expiry_date: date | None = None,
+    zone_types: list[str] | None = None,
+    skip_expiry_floor: bool = False,
+):
+    if zone_types is None:
+        zone_types = ["NORMAL"]
     on_hand_expr = func.sum(
         case(
             (
@@ -418,10 +426,13 @@ def _fefo_available_lots(db: Session, product_id: UUID, min_expiry_date: date | 
     )
     filters = [
         StockLotModel.product_id == product_id,
-        LocationModel.zone_type == "NORMAL",
+        LocationModel.zone_type.in_(zone_types),
         LocationModel.is_active.is_(True),
-        (StockLotModel.expiry_date.is_(None) | (StockLotModel.expiry_date >= first_day_of_current_month())),
     ]
+    if not skip_expiry_floor:
+        filters.append(
+            (StockLotModel.expiry_date.is_(None) | (StockLotModel.expiry_date >= first_day_of_current_month()))
+        )
     if min_expiry_date is not None:
         filters.append(
             (StockLotModel.expiry_date.is_(None) | (StockLotModel.expiry_date >= min_expiry_date))
@@ -545,55 +556,68 @@ def _allocate_order(
 
         remaining = Decimal(str(line.qty))
         allocated_total = Decimal("0")
-        available_lots = _fefo_available_lots(db, product_id, min_expiry_date=min_expiry_date)
+        is_promo = (getattr(line, "line_source", None) or "product") in ("gift", "action")
 
-        for lot_row in available_lots:
+        if is_promo:
+            lot_phases = [
+                _fefo_available_lots(db, product_id, min_expiry_date=min_expiry_date, zone_types=["EXPIRED"], skip_expiry_floor=True),
+                _fefo_available_lots(db, product_id, min_expiry_date=min_expiry_date),
+            ]
+        else:
+            lot_phases = [
+                _fefo_available_lots(db, product_id, min_expiry_date=min_expiry_date),
+            ]
+
+        for available_lots in lot_phases:
             if remaining <= 0:
                 break
-            available_qty = Decimal(str(lot_row.qty))
-            if available_qty <= 0:
-                continue
-            lk = (lot_row.lot_id, lot_row.location_id)
-            lock_lot_location(db, lk[0], lk[1])
-            if lk not in alloc_scratch:
-                alloc_scratch[lk] = compute_lot_location_available(db, lk[0], lk[1])
-            room = alloc_scratch[lk]
-            allocate_qty = min(available_qty, remaining, room)
-            if allocate_qty <= 0:
-                continue
-            alloc_scratch[lk] -= allocate_qty
+            for lot_row in available_lots:
+                if remaining <= 0:
+                    break
+                available_qty = Decimal(str(lot_row.qty))
+                if available_qty <= 0:
+                    continue
+                lk = (lot_row.lot_id, lot_row.location_id)
+                lock_lot_location(db, lk[0], lk[1])
+                if lk not in alloc_scratch:
+                    alloc_scratch[lk] = compute_lot_location_available(db, lk[0], lk[1])
+                room = alloc_scratch[lk]
+                allocate_qty = min(available_qty, remaining, room)
+                if allocate_qty <= 0:
+                    continue
+                alloc_scratch[lk] -= allocate_qty
 
-            document_lines.append(
-                DocumentLineModel(
-                    product_id=product_id,
-                    lot_id=lot_row.lot_id,
-                    location_id=lot_row.location_id,
-                    sku=line.sku,
-                    product_name=product_name,
-                    barcode=line.barcode or (product.barcode if product else None),
-                    location_code=lot_row.location_code or "",
-                    batch=lot_row.batch,
-                    expiry_date=lot_row.expiry_date,
-                    required_qty=float(allocate_qty),
-                    picked_qty=0,
-                    is_vip_expiry_informational=False,
+                document_lines.append(
+                    DocumentLineModel(
+                        product_id=product_id,
+                        lot_id=lot_row.lot_id,
+                        location_id=lot_row.location_id,
+                        sku=line.sku,
+                        product_name=product_name,
+                        barcode=line.barcode or (product.barcode if product else None),
+                        location_code=lot_row.location_code or "",
+                        batch=lot_row.batch,
+                        expiry_date=lot_row.expiry_date,
+                        required_qty=float(allocate_qty),
+                        picked_qty=0,
+                        is_vip_expiry_informational=False,
+                    )
                 )
-            )
-            db.add(
-                StockMovementModel(
-                    product_id=product_id,
-                    lot_id=lot_row.lot_id,
-                    location_id=lot_row.location_id,
-                    qty_change=allocate_qty,
-                    movement_type="allocate",
-                    source_document_type="order",
-                    source_document_id=order.id,
-                    created_by_user_id=user_id,
+                db.add(
+                    StockMovementModel(
+                        product_id=product_id,
+                        lot_id=lot_row.lot_id,
+                        location_id=lot_row.location_id,
+                        qty_change=allocate_qty,
+                        movement_type="allocate",
+                        source_document_type="order",
+                        source_document_id=order.id,
+                        created_by_user_id=user_id,
+                    )
                 )
-            )
 
-            allocated_total += allocate_qty
-            remaining -= allocate_qty
+                allocated_total += allocate_qty
+                remaining -= allocate_qty
 
         if allocated_total < Decimal(str(line.qty)):
             remaining_need = Decimal(str(line.qty)) - allocated_total

@@ -99,6 +99,7 @@ class OrderLine(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     qty: Mapped[float] = mapped_column(Float, nullable=False, default=0)
     uom: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    line_source: Mapped[str | None] = mapped_column(String(16), nullable=True, default="product")
     raw_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     order: Mapped[Order] = relationship("Order", back_populates="lines")

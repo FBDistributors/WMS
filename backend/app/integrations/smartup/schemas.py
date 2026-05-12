@@ -13,6 +13,7 @@ class SmartupOrderLine(BaseModel):
     name: Optional[str] = Field(default=None, alias="name")
     qty: float = Field(0, alias="quantity")
     uom: Optional[str] = Field(default=None, alias="uom")
+    line_source: str = Field(default="product")
 
     @root_validator(pre=True)
     def _normalize_qty(cls, values):  # noqa: N805
@@ -119,11 +120,15 @@ class SmartupOrder(BaseModel):
             if key in values and isinstance(values[key], list):
                 base = list(values[key])
                 break
-        # Aksiya mahsulotlari: order_gifts va order_actions ni ham qatorlar ro'yxatiga qo'shamiz
-        for key in ("order_gifts", "order_actions"):
+        for item in base:
+            if isinstance(item, dict) and "line_source" not in item:
+                item["line_source"] = "product"
+        _PROMO_KEYS = {"order_gifts": "gift", "order_actions": "action"}
+        for key, source_tag in _PROMO_KEYS.items():
             if key in values and isinstance(values[key], list):
                 for item in values[key]:
                     if isinstance(item, dict):
+                        item.setdefault("line_source", source_tag)
                         base.append(item)
         values["lines"] = base
         if "customer_id" not in values:

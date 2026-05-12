@@ -17,6 +17,7 @@ class OrderLinePayload:
     qty: float
     uom: Optional[str]
     raw_json: Optional[dict]
+    line_source: str = "product"
 
 
 @dataclass
@@ -52,6 +53,7 @@ def map_order_to_wms_order(order: SmartupOrder) -> OrderPayload:
             qty=line.qty or 0,
             uom=line.uom,
             raw_json=line.model_dump(by_alias=True),
+            line_source=line.line_source or "product",
         )
         for line in order.lines
     ]

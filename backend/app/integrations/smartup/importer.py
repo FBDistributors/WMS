@@ -176,6 +176,7 @@ def _process_one_order(
                 name=line.name,
                 qty=line.qty,
                 uom=line.uom,
+                line_source=line.line_source,
                 raw_json=line.raw_json,
             )
             for line in payload.lines
@@ -317,7 +318,7 @@ def import_orders(
     return created, updated, skipped, errors, skipped_by_reason
 
 
-def _line_key(line: OrderLine) -> Tuple[str, str, str, str]:
+def _line_key(line: OrderLine) -> Tuple[str, str, str, str, str]:
     """
     Upsert kaliti. SmartUp `product_unit_id` -> SmartupOrderLine.uom -> OrderLine.uom;
     bir xil SKU/barcode/nomdagi asosiy qator (order_products) va aksiya (order_actions) alohida saqlanadi.
@@ -327,15 +328,17 @@ def _line_key(line: OrderLine) -> Tuple[str, str, str, str]:
         (line.barcode or "").strip(),
         (line.name or "").strip(),
         (line.uom or "").strip(),
+        (line.line_source or "product").strip(),
     )
 
 
-def _payload_key(payload_line: OrderLinePayload) -> Tuple[str, str, str, str]:
+def _payload_key(payload_line: OrderLinePayload) -> Tuple[str, str, str, str, str]:
     return (
         (payload_line.sku or "").strip(),
         (payload_line.barcode or "").strip(),
         (payload_line.name or "").strip(),
         (payload_line.uom or "").strip(),
+        (payload_line.line_source or "product").strip(),
     )
 
 
@@ -408,6 +411,7 @@ def _upsert_lines(order: Order, payload_lines) -> None:
             line.name = payload.name
             line.qty = payload.qty
             line.uom = payload.uom
+            line.line_source = payload.line_source
             line.raw_json = payload.raw_json
             continue
         order.lines.append(
@@ -417,6 +421,7 @@ def _upsert_lines(order: Order, payload_lines) -> None:
                 name=payload.name,
                 qty=payload.qty,
                 uom=payload.uom,
+                line_source=payload.line_source,
                 raw_json=payload.raw_json,
             )
         )
