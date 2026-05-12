@@ -72,6 +72,7 @@
   "back_to_list": "Назад к спискам",
   "inventory_link": "Инвентарь",
   "cancel_document": "Отменить документ",
+  "cancel_confirm_title": "Отменить документ",
   "cancel_confirm": "Отменить документ {{doc}}? Он будет удалён из списка.",
   "cancel_error": "Не удалось отменить. Попробуйте снова.",
   "cancelling": "Отмена...",

@@ -72,6 +72,7 @@
   "back_to_list": "Pick listga qaytish",
   "inventory_link": "Inventar",
   "cancel_document": "Bekor qilish",
+  "cancel_confirm_title": "Hujjatni bekor qilish",
   "cancel_confirm": "{{doc}} hujjatini bekor qilishni xohlaysizmi? Ro'yxatdan o'chiriladi.",
   "cancel_error": "Bekor qilish amalga oshmadi. Qayta urinib ko'ring.",
   "cancelling": "Bekor qilinmoqda...",

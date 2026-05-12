@@ -11,6 +11,7 @@ import { SendToPickingDialog } from '../../admin/components/orders/SendToPicking
 import { usePickListsTableConfig, PICKLISTS_COLUMN_IDS } from '../../admin/hooks/usePickListsTableConfig'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { TableScrollArea } from '../../components/TableScrollArea'
@@ -104,6 +105,7 @@ export function PickListsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [cancelTarget, setCancelTarget] = useState<PickList | null>(null)
   const [reassignDialogOrderIds, setReassignDialogOrderIds] = useState<string[] | null>(null)
   const [filterPanelOpen, setFilterPanelOpen] = useState(false)
   const filterPanelRef = useRef<HTMLDivElement>(null)
@@ -253,9 +255,10 @@ export function PickListsPage() {
     [archive, cancelled, t, docStatusLabel]
   )
 
-  const handleCancel = useCallback(
-    async (item: PickList) => {
-      if (!confirm(t('picking:cancel_confirm', { doc: item.document_no }))) return
+  const confirmCancel = useCallback(
+    async () => {
+      if (!cancelTarget) return
+      const item = cancelTarget
       setCancellingId(item.id)
       try {
         if (item.order_id) {
@@ -269,9 +272,10 @@ export function PickListsPage() {
         setError(t('picking:cancel_error'))
       } finally {
         setCancellingId(null)
+        setCancelTarget(null)
       }
     },
-    [load, t]
+    [cancelTarget, load, t]
   )
 
   const content = useMemo(() => {
@@ -454,10 +458,10 @@ export function PickListsPage() {
                   <td className="px-4 py-3">
                     <Button
                       variant="outline"
-                      className="h-8 border-red-200 px-2 text-xs text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/30"
+                      className="h-8 border-red-200 bg-red-50 px-2 text-xs text-red-700 hover:bg-red-100 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400 dark:hover:bg-red-900/40"
                       onClick={(e: React.MouseEvent) => {
                         e.stopPropagation()
-                        void handleCancel(item)
+                        setCancelTarget(item)
                       }}
                       disabled={cancellingId === item.id}
                     >
@@ -482,7 +486,6 @@ export function PickListsPage() {
     pipelineStatusLabel,
     error,
     filtered,
-    handleCancel,
     query,
     tableRows,
     i18n.language,
@@ -660,6 +663,18 @@ export function PickListsPage() {
           searchFields={[]}
           onSave={(next) => updateTableConfig({ visibleColumns: next.visibleColumns, columnOrder: next.columnOrder })}
           onReset={resetTableConfig}
+        />
+
+        <ConfirmDialog
+          open={cancelTarget !== null}
+          title={t('picking:cancel_confirm_title')}
+          message={t('picking:cancel_confirm', { doc: cancelTarget?.document_no ?? '' })}
+          confirmLabel={t('picking:cancel_document')}
+          cancelLabel={t('common:buttons.cancel')}
+          variant="danger"
+          loading={cancellingId !== null}
+          onConfirm={confirmCancel}
+          onCancel={() => setCancelTarget(null)}
         />
 
         {reassignDialogOrderIds !== null ? (
