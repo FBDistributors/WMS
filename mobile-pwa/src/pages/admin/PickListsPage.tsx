@@ -15,6 +15,7 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { listPickLists, cancelPickList, type PickList, type PickListStatus, type ListPickListsOptions } from '../../services/pickingApi'
+import { updateOrderStatus } from '../../services/ordersApi'
 import { useAuth } from '../../rbac/AuthProvider'
 
 const PAGE_SIZE = 200
@@ -222,7 +223,11 @@ export function PickListsPage() {
       if (!confirm(t('picking:cancel_confirm', { doc: item.document_no }))) return
       setCancellingId(item.id)
       try {
-        await cancelPickList(item.id)
+        if (item.order_id) {
+          await updateOrderStatus(item.order_id, 'cancelled')
+        } else {
+          await cancelPickList(item.id)
+        }
         nextOffsetRef.current = 0
         void load({ background: true })
       } catch {

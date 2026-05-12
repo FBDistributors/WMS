@@ -11,14 +11,12 @@ export const SIMPLE_STATUS_OPTIONS = [
   { value: 'picking', labelKey: 'orders:status_simple.yigishda' },
   { value: 'picked', labelKey: 'orders:status_simple.tekshiruvda' },
   { value: 'completed', labelKey: 'orders:status_simple.yakunlash' },
-  { value: 'cancelled', labelKey: 'orders:status_simple.cancelled' },
 ] as const
 
 export type SimpleOrderStatus = (typeof SIMPLE_STATUS_OPTIONS)[number]['value']
 
 export function backendStatusToSimple(status: string): SimpleOrderStatus {
-  if (status === 'cancelled') return 'cancelled'
-  if (['imported', 'allocated', 'picking'].includes(status)) return 'picking'
+  if (['imported', 'allocated', 'picking', 'cancelling_in_progress', 'cancelled'].includes(status)) return 'picking'
   if (status === 'picked') return 'picked'
   return 'completed'
 }
@@ -136,10 +134,6 @@ export function OrderWmsStatusCell({ orderId, orderNumber, status, canEdit, onAf
             const newSimple = e.target.value as SimpleOrderStatus
             const backendStatus = newSimple
             if (backendStatus === status) return
-            if (backendStatus === 'cancelled') {
-              const ok = window.confirm(t('orders:confirm_cancel_order'))
-              if (!ok) return
-            }
             if (backendStatus === 'picked') {
               setControllerModalOpen(true)
               setSelectedControllerId('')

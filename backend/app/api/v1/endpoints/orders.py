@@ -1170,15 +1170,35 @@ async def update_order_status(
                 .one()
             )
             return _to_order_details(order, db)
-        _reject_transition(
+        _enforce_transition_or_reject(
             request=request,
             db=db,
             user_id=user.id,
             order_id=order_id,
             from_status=old_status,
-            to_status=normalized_status,
-            reason="Use safe cancel flow (picking -> cancelling_in_progress -> cancelled)",
+            to_status="cancelled",
         )
+        order.wms_state.status = "cancelled"
+        if doc_so and doc_so.status != "cancelled":
+            doc_so.status = "cancelled"
+        log_action(
+            db,
+            user_id=user.id,
+            action=ACTION_UPDATE,
+            entity_type="order",
+            entity_id=str(order_id),
+            old_data={"status": old_status},
+            new_data={"status": "cancelled", "note": "direct_cancel_no_picked_qty"},
+            ip_address=get_client_ip(request),
+        )
+        db.commit()
+        order = (
+            db.query(OrderModel)
+            .options(selectinload(OrderModel.lines), selectinload(OrderModel.wms_state))
+            .filter(OrderModel.id == order_id)
+            .one()
+        )
+        return _to_order_details(order, db)
 
     _enforce_transition_or_reject(
         request=request,

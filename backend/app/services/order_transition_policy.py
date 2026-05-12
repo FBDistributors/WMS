@@ -33,7 +33,9 @@ _RULES: tuple[TransitionRule, ...] = (
     TransitionRule("picked", "packed", "noop"),
     TransitionRule("completed", "packed", "noop"),
     TransitionRule("packed", "shipped", "noop"),
+    TransitionRule("allocated", "cancelled", "unallocate"),
     TransitionRule("picking", "cancelling_in_progress", "noop"),
+    TransitionRule("picking", "cancelled", "unallocate"),
     TransitionRule("cancelling_in_progress", "cancelled", "unallocate"),
 )
 
