@@ -500,24 +500,34 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         ? { order_source: orderSource, begin_deal_date: beginDealStr, end_deal_date: endDeal }
         : { begin_deal_date: beginDealStr, end_deal_date: endDeal }
       const syncStartedAt = new Date().toISOString()
-      const result = await syncSmartupOrders(payload)
-      setSyncResult(result)
-      if (isMainOrdersSimple && result.created > 0) {
-        setSearchParams((prev) => {
-          const next = new URLSearchParams(prev)
-          next.set('synced_from', syncStartedAt)
-          next.delete('offset')
-          return next
-        })
+      try {
+        const result = await syncSmartupOrders(payload)
+        setSyncResult(result)
+        if (isMainOrdersSimple && result.created > 0) {
+          setSearchParams((prev) => {
+            const next = new URLSearchParams(prev)
+            next.set('synced_from', syncStartedAt)
+            next.delete('offset')
+            return next
+          })
+        }
+      } catch (syncErr) {
+        const status = syncErr && typeof syncErr === 'object' && 'status' in syncErr ? (syncErr as { status: number }).status : 0
+        if (status === 409) {
+          setSyncError(t('orders:sync_busy'))
+        } else {
+          const message =
+            (syncErr && typeof syncErr === 'object' && 'message' in syncErr && typeof (syncErr as { message: unknown }).message === 'string')
+              ? (syncErr as { message: string }).message
+              : syncErr instanceof Error
+                ? syncErr.message
+                : t('orders:sync_failed')
+          setSyncError(message)
+        }
       }
       await load(false)
     } catch (err) {
-      const message =
-        (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string')
-          ? (err as { message: string }).message
-          : err instanceof Error
-            ? err.message
-            : t('orders:sync_failed')
+      const message = err instanceof Error ? err.message : t('orders:sync_failed')
       setSyncError(message)
     } finally {
       setIsSyncing(false)

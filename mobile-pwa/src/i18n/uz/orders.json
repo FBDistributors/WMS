@@ -15,6 +15,7 @@
   "syncing": "Sinxronlanmoqda...",
   "refreshing": "Yangilanmoqda...",
   "sync_failed": "Smartup sinxronlash muvaffaqiyatsiz.",
+  "sync_busy": "Fon sinxronlash jarayonda — ma'lumot bazadan yangilandi.",
   "sync_result": "Yuklandi: {{created}} qo'shildi, {{updated}} yangilandi, {{skipped}} o'tkazib yuborildi",
   "movements_loaded": "Smartupdan yuklandi: {{count}} ta harakat",
   "pack": "Qadoqlash",

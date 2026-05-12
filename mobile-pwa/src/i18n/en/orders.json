@@ -15,6 +15,7 @@
   "syncing": "Syncing...",
   "refreshing": "Refreshing...",
   "sync_failed": "Smartup sync failed.",
+  "sync_busy": "Background sync in progress — data refreshed from database.",
   "sync_result": "Synced: {{created}} created, {{updated}} updated, {{skipped}} skipped",
   "movements_loaded": "Loaded from Smartup: {{count}} movement(s)",
   "pack": "Pack",
