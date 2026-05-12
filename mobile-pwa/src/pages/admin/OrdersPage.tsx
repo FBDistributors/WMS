@@ -1122,7 +1122,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
           </div>
         ) : null}
 
-        <div className="relative max-h-[calc(100vh-320px)] min-h-[calc(100vh-430px)] overflow-auto">
+        <div className="relative min-h-[calc(100vh-320px)] overflow-auto">
           {content}
           {isSyncing && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 dark:bg-slate-900/60 backdrop-blur-[2px]">

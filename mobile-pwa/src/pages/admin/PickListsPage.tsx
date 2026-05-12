@@ -346,13 +346,13 @@ export function PickListsPage() {
               {vis.has('delivery_number') && <th className="px-4 py-3 text-left">{t('picking:column_delivery_number')}</th>}
               {vis.has('pipeline_status') && <th className="px-4 py-3 text-left">{t('picking:status_label')}</th>}
               {vis.has('doc_status') && <th className="px-4 py-3 text-left">{t('orders:columns.so_document_status')}</th>}
-              {vis.has('change_status') && <th className="px-4 py-3 text-left">{t('orders:columns.change_status')}</th>}
+              {vis.has('change_status') && !cancelled && <th className="px-4 py-3 text-left">{t('orders:columns.change_status')}</th>}
               {vis.has('total_lines') && <th className="px-4 py-3 text-left">{t('picking:total_lines')}</th>}
               {vis.has('picker') && <th className="px-4 py-3 text-left">{t('picking:column_picker')}</th>}
               {vis.has('controller') && <th className="px-4 py-3 text-left">{t('picking:column_controller')}</th>}
               {vis.has('last_activity') && <th className="px-4 py-3 text-left">{t('picking:last_activity')}</th>}
               {vis.has('view') && <th className="px-4 py-3"></th>}
-              {canCancel && vis.has('cancel') && <th className="px-4 py-3"></th>}
+              {canCancel && !cancelled && vis.has('cancel') && <th className="px-4 py-3"></th>}
             </tr>
           </thead>
           <tbody>
@@ -386,7 +386,7 @@ export function PickListsPage() {
                     {docStatusLabel(item.document_status)}
                   </td>
                 )}
-                {vis.has('change_status') && (
+                {vis.has('change_status') && !cancelled && (
                   <>
                     {item.order_id ? (
                       <OrderWmsStatusCell
@@ -454,7 +454,7 @@ export function PickListsPage() {
                     </Button>
                   </td>
                 )}
-                {canCancel && !archive && vis.has('cancel') && (
+                {canCancel && !archive && !cancelled && vis.has('cancel') && (
                   <td className="px-4 py-3">
                     <Button
                       variant="outline"
@@ -479,6 +479,7 @@ export function PickListsPage() {
   }, [
     archive,
     canCancel,
+    cancelled,
     canReassignPickerRow,
     cancellingId,
     docStatusLabel,
@@ -642,7 +643,7 @@ export function PickListsPage() {
           </div>
         </div>
 
-        <div className="max-h-[calc(100vh-200px)] min-h-0 overflow-auto">{content}</div>
+        <div className="min-h-[calc(100vh-320px)] overflow-auto">{content}</div>
 
         {hasMore && !isLoading && items.length > 0 && (
           <div className="flex justify-center pb-2">
