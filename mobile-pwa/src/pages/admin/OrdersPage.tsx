@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Filter, Settings, FileText, X, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -15,7 +15,7 @@ import { Card } from '../../components/ui/card'
 import { DateInput } from '../../components/DateInput'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
-import { getMovements, getOrders, getOrdersCheck, syncSmartupOrders, type MovementItem, type OrderListItem, type MovementsResponse, type OrderCheckResponse } from '../../services/ordersApi'
+import { getOrders, syncSmartupOrders, type MovementItem, type OrderListItem, type MovementsResponse, type OrderCheckResponse } from '../../services/ordersApi'
 import {
   OrderWmsStatusCell,
   SIMPLE_STATUS_OPTIONS,
@@ -23,7 +23,6 @@ import {
 } from '../../admin/components/orders/OrderWmsStatusCell'
 import { getBrands, type Brand } from '../../services/brandsApi'
 import { useAuth } from '../../rbac/AuthProvider'
-import { getFilialNameByCode } from '../../constants/filialCodes'
 
 const PAGE_SIZE = 50
 const MOVEMENT_PAGE_SIZE = 50
@@ -78,14 +77,6 @@ const COLUMN_OPTIONS_DILLER = [
   { id: 'lines', labelKey: 'orders:columns_diller.lines' },
   { id: 'delivery_date', labelKey: 'orders:columns_diller.delivery_date' },
   { id: 'view_details', labelKey: 'orders:columns_diller.view_details' },
-]
-
-const DILLER_SEARCH_FIELD_OPTIONS = [
-  { id: 'order_number', labelKey: 'orders:columns_diller.order_number' },
-  { id: 'external_id', labelKey: 'orders:columns_diller.external_id' },
-  { id: 'status', labelKey: 'orders:columns_diller.status' },
-  { id: 'to_filial', labelKey: 'orders:columns_diller.to_filial' },
-  { id: 'movement_note', labelKey: 'orders:columns_diller.movement_note' },
 ]
 
 const SEARCH_FIELD_OPTIONS = [
@@ -228,8 +219,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const [filterDateFrom, setFilterDateFrom] = useState('')
   const [filterDateTo, setFilterDateTo] = useState('')
   const [filterOrderGroup, setFilterOrderGroup] = useState('yangi')
-  const [filterWmsStatus, setFilterWmsStatus] = useState<MovementWmsFilter>('new')
-
   const [items, setItems] = useState<OrderListItem[]>([])
   const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
@@ -249,10 +238,8 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   } | null>(null)
   const [movementsData, setMovementsData] = useState<MovementsResponse | null>(null)
   const [movementPage, setMovementPage] = useState(0)
-  const [selectedMovementIds, setSelectedMovementIds] = useState<Set<string>>(new Set())
-  const [sendMovementDialogOpen, setSendMovementDialogOpen] = useState(false)
-  const [checkResult, setCheckResult] = useState<OrderCheckResponse | null>(null)
-  const [checkLoading, setCheckLoading] = useState(false)
+  const [selectedMovementIds] = useState<Set<string>>(new Set())
+  const [, setCheckResult] = useState<OrderCheckResponse | null>(null)
 
   const ordersLoadAbortRef = useRef<AbortController | null>(null)
   const ordersLoadGenRef = useRef(0)
@@ -270,7 +257,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     [canSend]
   )
 
-  const load = useCallback(async (background = false, pageOverride?: number, forceRefresh?: boolean) => {
+  const load = useCallback(async (background = false, pageOverride?: number, _forceRefresh?: boolean) => {
     ordersLoadAbortRef.current?.abort()
     const ac = new AbortController()
     ordersLoadAbortRef.current = ac

@@ -60,7 +60,7 @@ export function OrikzorHarakatlariPage() {
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const { has: hasPermission } = useAuth()
   const canSendToPicking = hasPermission('orders:send_to_picking')
-  const canSync = hasPermission('orders:sync')
+  const canSync = hasPermission('orders:write')
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set())
   const [sendDialogOrderIds, setSendDialogOrderIds] = useState<string[] | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
