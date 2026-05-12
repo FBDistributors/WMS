@@ -51,6 +51,12 @@ class _ReturnItemsScreenState extends ConsumerState<ReturnItemsScreen> {
     try {
       final SafeCancelReturnSession s =
           await ref.read(pickingRepositoryProvider).getReturnSession(widget.sessionId);
+      if (s.status == 'completed') {
+        await ReturnSessionStorage.clear(ref.read(sharedPreferencesProvider));
+        if (!mounted) return;
+        context.goNamed('pickerHome', queryParameters: const <String, String>{'profile': 'picker'});
+        return;
+      }
       await ReturnSessionStorage.save(ref.read(sharedPreferencesProvider), s.id);
       if (!mounted) {
         return;
@@ -159,9 +165,18 @@ class _ReturnItemsScreenState extends ConsumerState<ReturnItemsScreen> {
       context.goNamed('pickerHome', queryParameters: const <String, String>{'profile': 'picker'});
     } on Exception catch (e) {
       if (mounted) {
+        final String msg = '$e';
+        final bool alreadyDone = msg.contains('yopilgan') || msg.contains('409');
+        if (alreadyDone) {
+          await ReturnSessionStorage.clear(ref.read(sharedPreferencesProvider));
+          if (!mounted) return;
+          showAppSnackBar(context, SnackBar(content: Text(_tr('returnsFinished'))));
+          context.goNamed('pickerHome', queryParameters: const <String, String>{'profile': 'picker'});
+          return;
+        }
         showAppSnackBar(
           context,
-          SnackBar(content: Text('$e'), backgroundColor: Colors.red.shade800),
+          SnackBar(content: Text(msg), backgroundColor: Colors.red.shade800),
         );
       }
     } finally {

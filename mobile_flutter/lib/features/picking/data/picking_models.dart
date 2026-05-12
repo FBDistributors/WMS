@@ -276,6 +276,7 @@ class SafeCancelReturnSession {
     required this.documentId,
     required this.referenceNumber,
     required this.orderNumber,
+    required this.status,
     required this.lines,
     required this.allLinesComplete,
   });
@@ -284,6 +285,7 @@ class SafeCancelReturnSession {
   final String documentId;
   final String referenceNumber;
   final String? orderNumber;
+  final String status;
   final List<SafeCancelReturnLine> lines;
   final bool allLinesComplete;
 
@@ -301,6 +303,7 @@ class SafeCancelReturnSession {
       documentId: json['document_id']! as String,
       referenceNumber: json['reference_number']! as String,
       orderNumber: json['order_number'] as String?,
+      status: (json['status'] as String?) ?? 'returns_pending',
       lines: lines,
       allLinesComplete: json['all_lines_complete'] == true,
     );

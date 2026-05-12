@@ -258,6 +258,7 @@ class SafeCancelReturnSessionOut(BaseModel):
     document_id: UUID
     reference_number: str
     order_number: Optional[str] = None
+    status: str = "returns_pending"
     lines: List[SafeCancelReturnLineOut]
     all_lines_complete: bool
 
@@ -1968,6 +1969,7 @@ def _safe_cancel_session_to_out(db: Session, session: SafeCancelReturnSessionMod
         document_id=session.document_id,
         reference_number=ref,
         order_number=_order_number(doc) if doc else None,
+        status=session.status or "returns_pending",
         lines=lines_out,
         all_lines_complete=all_done,
     )
