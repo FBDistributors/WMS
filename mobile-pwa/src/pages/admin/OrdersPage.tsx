@@ -502,7 +502,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       const syncStartedAt = new Date().toISOString()
       const result = await syncSmartupOrders(payload)
       setSyncResult(result)
-      if (isMainOrdersSimple) {
+      if (isMainOrdersSimple && result.created > 0) {
         setSearchParams((prev) => {
           const next = new URLSearchParams(prev)
           next.set('synced_from', syncStartedAt)
