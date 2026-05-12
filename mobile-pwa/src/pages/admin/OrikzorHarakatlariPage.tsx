@@ -4,7 +4,7 @@ import { FileText, Filter, Loader2, Settings, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
-import { OrdersHubTabs } from '../../admin/components/orders/OrdersHubTabs'
+import { OrdersHubTabs, OrdersSourceSubTabs } from '../../admin/components/orders/OrdersHubTabs'
 import { OrdersTableSettings } from '../../admin/components/orders/OrdersTableSettings'
 import { SendToPickingDialog } from '../../admin/components/orders/SendToPickingDialog'
 import { useOrikzorTableConfig } from '../../admin/hooks/useMovementsTableConfig'
@@ -307,6 +307,7 @@ export function OrikzorHarakatlariPage() {
   return (
     <AdminLayout titleSlot={<OrdersHubTabs />}>
       <Card className="space-y-4">
+        <OrdersSourceSubTabs />
         <div className="flex flex-nowrap items-end gap-3">
           <label className="min-w-[180px] flex-1 max-w-md text-sm text-slate-600 dark:text-slate-300">
             <span className="sr-only">{t('orders:filters.search')}</span>

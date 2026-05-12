@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { TableScrollArea } from '../../components/TableScrollArea'
-import { OrdersHubTabs } from '../../admin/components/orders/OrdersHubTabs'
+import { OrdersHubTabs, OrdersSourceSubTabs } from '../../admin/components/orders/OrdersHubTabs'
 import { SendToPickingDialog } from '../../admin/components/orders/SendToPickingDialog'
 import { OrdersTableSettings } from '../../admin/components/orders/OrdersTableSettings'
 import { useDillerTableConfig } from '../../admin/hooks/useMovementsTableConfig'
@@ -1177,6 +1177,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   return (
     <AdminLayout titleSlot={<OrdersHubTabs />} backTo={mode === 'statuses' ? '/admin' : undefined}>
       <Card className="space-y-4">
+        <OrdersSourceSubTabs />
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <label className="flex-1 min-w-[180px] max-w-md text-sm text-slate-600 dark:text-slate-300">
             <span className="sr-only">{t('orders:filters.search')}</span>
