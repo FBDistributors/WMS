@@ -5,8 +5,11 @@ export type PickListsTableConfig = {
   columnOrder: string[]
 }
 
-const STORAGE_KEY_ACTIVE = 'wms_picklists_table_config'
-const STORAGE_KEY_ARCHIVE = 'wms_picklists_archive_table_config'
+const STORAGE_KEYS: Record<string, string> = {
+  active: 'wms_picklists_table_config',
+  cancelled: 'wms_picklists_cancelled_table_config',
+  archive: 'wms_picklists_archive_table_config',
+}
 
 export const PICKLISTS_COLUMN_IDS = [
   'document_no',
@@ -85,9 +88,9 @@ function loadConfig(key: string, defaultVisible: string[]): PickListsTableConfig
   }
 }
 
-export function usePickListsTableConfig(archive: boolean) {
-  const storageKey = archive ? STORAGE_KEY_ARCHIVE : STORAGE_KEY_ACTIVE
-  const defaultVisible = archive ? DEFAULT_VISIBLE_ARCHIVE : DEFAULT_VISIBLE_ACTIVE
+export function usePickListsTableConfig(scope: 'active' | 'cancelled' | 'archive') {
+  const storageKey = STORAGE_KEYS[scope]
+  const defaultVisible = scope === 'archive' ? DEFAULT_VISIBLE_ARCHIVE : DEFAULT_VISIBLE_ACTIVE
 
   const [config, setConfig] = useState<PickListsTableConfig>(() => loadConfig(storageKey, defaultVisible))
 

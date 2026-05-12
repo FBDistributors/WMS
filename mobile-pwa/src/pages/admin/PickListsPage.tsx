@@ -73,8 +73,9 @@ export function PickListsPage() {
   const archive = pathname.endsWith('/picking/archive')
   const cancelled = pathname.endsWith('/picking/cancelled')
   const { has, isWarehouseAdmin } = useAuth()
+  const tableScope = cancelled ? 'cancelled' : archive ? 'archive' : 'active'
   const { config: tableConfig, updateConfig: updateTableConfig, resetConfig: resetTableConfig } =
-    usePickListsTableConfig(archive)
+    usePickListsTableConfig(tableScope)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const vis = useMemo(() => new Set(tableConfig.visibleColumns), [tableConfig.visibleColumns])
 
@@ -638,7 +639,7 @@ export function PickListsPage() {
           </div>
         </div>
 
-        <div className="max-h-[calc(100vh-320px)] min-h-0 overflow-auto">{content}</div>
+        <div className="max-h-[calc(100vh-200px)] min-h-0 overflow-auto">{content}</div>
 
         {hasMore && !isLoading && items.length > 0 && (
           <div className="flex justify-center pb-2">
