@@ -99,5 +99,15 @@
   "column_controller": "Kontrolyor",
   "column_delivery_number": "Yetkazib berish raqami",
   "delivery_number_short": "Yetkazib: {{number}}",
-  "last_activity": "Oxirgi faollik"
+  "last_activity": "Oxirgi faollik",
+  "search_input_placeholder": "Qidirish...",
+  "filter_btn": "Filter",
+  "filter_title": "Filtrlash",
+  "filter_all": "Barchasi",
+  "filter_pipeline_status": "Holat",
+  "filter_doc_status": "Hujjat holati",
+  "filter_picker": "Yig'uvchi",
+  "filter_controller": "Kontrolyor",
+  "filter_clear": "Tozalash",
+  "filter_apply": "Qo'llash"
 }

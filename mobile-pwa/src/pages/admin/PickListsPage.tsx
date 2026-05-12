@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { FileText, RefreshCw, Settings, XCircle } from 'lucide-react'
+import { FileText, Filter, RefreshCw, Settings, X, XCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -104,6 +104,12 @@ export function PickListsPage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [reassignDialogOrderIds, setReassignDialogOrderIds] = useState<string[] | null>(null)
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
+  const [filterStatus, setFilterStatus] = useState('')
+  const [filterDocStatus, setFilterDocStatus] = useState('')
+  const [filterPicker, setFilterPicker] = useState('')
+  const [filterController, setFilterController] = useState('')
 
   /** Keyingi sahifa uchun offset (yuklangan qatorlar soni) */
   const nextOffsetRef = useRef(0)
@@ -160,23 +166,51 @@ export function PickListsPage() {
     void load()
   }, [load, archive, cancelled, wmsGroupForApi])
 
+  const uniquePickers = useMemo(
+    () => [...new Set(items.map((i) => i.picker_name).filter(Boolean))] as string[],
+    [items]
+  )
+  const uniqueControllers = useMemo(
+    () => [...new Set(items.map((i) => i.controller_name).filter(Boolean))] as string[],
+    [items]
+  )
+  const uniqueStatuses = useMemo(
+    () => [...new Set(items.map((i) => i.status))],
+    [items]
+  )
+  const uniqueDocStatuses = useMemo(
+    () => [...new Set(items.map((i) => i.document_status))],
+    [items]
+  )
+  const activeFilterCount = useMemo(
+    () => [filterStatus, filterDocStatus, filterPicker, filterController].filter(Boolean).length,
+    [filterStatus, filterDocStatus, filterPicker, filterController]
+  )
+
   const filtered = useMemo(() => {
-    if (!query.trim()) return items
-    const term = query.toLowerCase()
-    return items.filter((item) => {
-      const parts = [
-        item.document_no,
-        item.order_number ?? '',
-        item.delivery_number ?? '',
-        item.order_wms_status ?? '',
-        item.picker_name ?? '',
-        item.controller_name ?? '',
-      ]
-        .join(' ')
-        .toLowerCase()
-      return parts.includes(term)
-    })
-  }, [items, query])
+    let result = items
+    if (query.trim()) {
+      const term = query.toLowerCase()
+      result = result.filter((item) => {
+        const parts = [
+          item.document_no,
+          item.order_number ?? '',
+          item.delivery_number ?? '',
+          item.order_wms_status ?? '',
+          item.picker_name ?? '',
+          item.controller_name ?? '',
+        ]
+          .join(' ')
+          .toLowerCase()
+        return parts.includes(term)
+      })
+    }
+    if (filterStatus) result = result.filter((i) => i.status === filterStatus)
+    if (filterDocStatus) result = result.filter((i) => i.document_status === filterDocStatus)
+    if (filterPicker) result = result.filter((i) => i.picker_name === filterPicker)
+    if (filterController) result = result.filter((i) => i.controller_name === filterController)
+    return result
+  }, [items, query, filterStatus, filterDocStatus, filterPicker, filterController])
 
   const tableRows = useMemo(() => {
     if (archive || cancelled) return filtered
@@ -463,19 +497,125 @@ export function PickListsPage() {
     <AdminLayout titleSlot={<OrdersHubTabs />}>
       <Card className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              {t('picking:list_title')}
-            </div>
-            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-              {isRefreshing && (
-                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
-                  {t('picking:refresh')}
-                </span>
-              )}
-            </div>
+          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            {t('picking:list_title')}
+            {isRefreshing && (
+              <span className="ml-2 inline-flex rounded-full bg-blue-100 px-2 py-0.5 align-middle text-xs font-normal text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+                {t('picking:refresh')}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
+            <input
+              className="w-full max-w-[220px] rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+              placeholder={t('picking:search_input_placeholder')}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            <div className="relative" ref={filterPanelRef}>
+              <Button
+                variant="outline"
+                className="relative gap-1.5"
+                onClick={() => setFilterPanelOpen((o) => !o)}
+                aria-label={t('picking:filter_btn')}
+                aria-expanded={filterPanelOpen}
+              >
+                <Filter size={18} />
+                {activeFilterCount > 0 && (
+                  <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </Button>
+              {filterPanelOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" aria-hidden onClick={() => setFilterPanelOpen(false)} />
+                  <div className="absolute right-0 top-full z-50 mt-2 w-full min-w-[280px] max-w-sm rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                    <div className="mb-3 flex items-center justify-between">
+                      <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('picking:filter_title')}</span>
+                      <button
+                        type="button"
+                        onClick={() => setFilterPanelOpen(false)}
+                        className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 dark:hover:text-slate-400 dark:hover:bg-slate-800"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
+                        {t('picking:filter_pipeline_status')}
+                        <select
+                          value={filterStatus}
+                          onChange={(e) => setFilterStatus(e.target.value)}
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                        >
+                          <option value="">{t('picking:filter_all')}</option>
+                          {uniqueStatuses.map((s) => (
+                            <option key={s} value={s}>{t(`picking:status.${s.toLowerCase()}`, { defaultValue: s })}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
+                        {t('picking:filter_doc_status')}
+                        <select
+                          value={filterDocStatus}
+                          onChange={(e) => setFilterDocStatus(e.target.value)}
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                        >
+                          <option value="">{t('picking:filter_all')}</option>
+                          {uniqueDocStatuses.map((s) => (
+                            <option key={s} value={s}>{docStatusLabel(s)}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
+                        {t('picking:filter_picker')}
+                        <select
+                          value={filterPicker}
+                          onChange={(e) => setFilterPicker(e.target.value)}
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                        >
+                          <option value="">{t('picking:filter_all')}</option>
+                          {uniquePickers.map((n) => (
+                            <option key={n} value={n}>{n}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
+                        {t('picking:filter_controller')}
+                        <select
+                          value={filterController}
+                          onChange={(e) => setFilterController(e.target.value)}
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                        >
+                          <option value="">{t('picking:filter_all')}</option>
+                          {uniqueControllers.map((n) => (
+                            <option key={n} value={n}>{n}</option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                    <div className="mt-4 flex items-center justify-end gap-2">
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          setFilterStatus('')
+                          setFilterDocStatus('')
+                          setFilterPicker('')
+                          setFilterController('')
+                          setFilterPanelOpen(false)
+                        }}
+                      >
+                        {t('picking:filter_clear')}
+                      </Button>
+                      <Button onClick={() => setFilterPanelOpen(false)}>
+                        {t('picking:filter_apply')}
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
             <Button
               variant="ghost"
               className="rounded-full px-3 py-3"
@@ -497,16 +637,6 @@ export function PickListsPage() {
             </Button>
           </div>
         </div>
-
-        <label className="block text-sm text-slate-600 dark:text-slate-300">
-          {t('picking:search_placeholder')}
-          <input
-            className="mt-1 w-full max-w-xs rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-            placeholder={t('picking:search_placeholder')}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </label>
 
         <div className="max-h-[calc(100vh-320px)] min-h-0 overflow-auto">{content}</div>
 

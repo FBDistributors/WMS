@@ -99,5 +99,15 @@
   "column_controller": "Контролёр",
   "column_delivery_number": "Номер доставки",
   "delivery_number_short": "Доставка: {{number}}",
-  "last_activity": "Последняя активность"
+  "last_activity": "Последняя активность",
+  "search_input_placeholder": "Поиск...",
+  "filter_btn": "Фильтр",
+  "filter_title": "Фильтры",
+  "filter_all": "Все",
+  "filter_pipeline_status": "Статус",
+  "filter_doc_status": "Статус документа",
+  "filter_picker": "Сборщик",
+  "filter_controller": "Контролёр",
+  "filter_clear": "Сбросить",
+  "filter_apply": "Применить"
 }

@@ -99,5 +99,15 @@
   "column_controller": "Controller",
   "column_delivery_number": "Delivery number",
   "delivery_number_short": "Delivery: {{number}}",
-  "last_activity": "Last activity"
+  "last_activity": "Last activity",
+  "search_input_placeholder": "Search...",
+  "filter_btn": "Filter",
+  "filter_title": "Filters",
+  "filter_all": "All",
+  "filter_pipeline_status": "Status",
+  "filter_doc_status": "Document status",
+  "filter_picker": "Picker",
+  "filter_controller": "Controller",
+  "filter_clear": "Clear",
+  "filter_apply": "Apply"
 }
