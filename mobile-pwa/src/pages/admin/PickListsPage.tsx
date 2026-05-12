@@ -319,7 +319,7 @@ export function PickListsPage() {
                     orderId={item.order_id}
                     orderNumber={item.order_number ?? item.document_no}
                     status={item.order_wms_status ?? 'imported'}
-                    canEdit={isWarehouseAdmin}
+                    canEdit={isWarehouseAdmin && !archive}
                     onAfterSave={() => load({ background: true })}
                   />
                 ) : (
@@ -337,7 +337,7 @@ export function PickListsPage() {
                 >
                   <div className="flex flex-col gap-1">
                     <span>{item.picker_name ?? '—'}</span>
-                    {canReassignPickerRow(item) ? (
+                    {!archive && canReassignPickerRow(item) ? (
                       <button
                         type="button"
                         className="text-left text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
@@ -368,7 +368,7 @@ export function PickListsPage() {
                     <FileText size={18} />
                   </Button>
                 </td>
-                {canCancel && (
+                {canCancel && !archive && (
                   <td className="px-4 py-3">
                     <Button
                       variant="outline"
