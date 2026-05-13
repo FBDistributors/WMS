@@ -18,7 +18,6 @@ export const PICKLISTS_COLUMN_IDS = [
   'customer_name',
   'pipeline_status',
   'doc_status',
-  'change_status',
   'total_lines',
   'picker',
   'controller',
