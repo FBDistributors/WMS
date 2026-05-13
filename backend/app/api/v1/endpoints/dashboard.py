@@ -193,6 +193,9 @@ async def get_orders_by_status(
         ACTIVE_PIPELINE_ORDER_STATUSES = ("allocated", "picking", "picked")
         ACTIVE_DOCUMENT_STATUSES = ("draft", "confirmed", "new", "partial", "in_progress", "picked")
 
+        for _pipeline_status in ACTIVE_PIPELINE_ORDER_STATUSES:
+            by_status[_pipeline_status] = 0
+
         jarayon_doc_filter = and_(
             or_(
                 OrderModel.id.is_(None),
