@@ -465,7 +465,7 @@ export function PickListsPage() {
           )
         case 'doc_status':
           return (
-            <td key={colId} className="px-4 py-3 text-slate-600 dark:text-slate-300" onClick={(e) => e.stopPropagation()}>
+            <td key={colId} className="px-4 py-3 text-slate-600 dark:text-slate-300">
               {docStatusLabel(item.document_status)}
             </td>
           )
@@ -481,7 +481,6 @@ export function PickListsPage() {
               key={colId}
               className="max-w-[160px] truncate px-4 py-3 text-slate-600 dark:text-slate-300"
               title={item.picker_name ?? ''}
-              onClick={(e) => e.stopPropagation()}
             >
               <div className="flex flex-col gap-1">
                 <span>{item.picker_name ?? '—'}</span>
@@ -489,7 +488,8 @@ export function PickListsPage() {
                   <button
                     type="button"
                     className="text-left text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation()
                       setReassignDialogOrderIds([item.order_id as string])
                     }}
                   >
