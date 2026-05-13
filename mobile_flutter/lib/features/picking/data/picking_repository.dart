@@ -66,14 +66,6 @@ class PickingRepository {
     }
   }
 
-  Future<void> cancelPickDocument(String documentId) async {
-    try {
-      await _dio.post<Object?>('$_p/documents/$documentId/cancel');
-    } on DioException catch (e) {
-      throw Exception(mapDioExceptionToMessage(e));
-    }
-  }
-
   Future<PickingDocument> getTaskById(String documentId) async {
     try {
       final Response<Object?> res =

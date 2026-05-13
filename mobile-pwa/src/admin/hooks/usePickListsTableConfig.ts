@@ -34,7 +34,6 @@ export const DEFAULT_VISIBLE_ACTIVE: string[] = [
   'customer_name',
   'pipeline_status',
   'doc_status',
-  'change_status',
   'total_lines',
   'picker',
   'controller',

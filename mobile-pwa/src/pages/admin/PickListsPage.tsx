@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { OrdersHubTabs } from '../../admin/components/orders/OrdersHubTabs'
-import { OrderWmsStatusCell } from '../../admin/components/orders/OrderWmsStatusCell'
 import { OrdersTableSettings } from '../../admin/components/orders/OrdersTableSettings'
 import { SendToPickingDialog } from '../../admin/components/orders/SendToPickingDialog'
 import { usePickListsTableConfig, PICKLISTS_COLUMN_IDS } from '../../admin/hooks/usePickListsTableConfig'
@@ -75,7 +74,7 @@ export function PickListsPage() {
   const [searchParams] = useSearchParams()
   const archive = pathname.endsWith('/picking/archive')
   const cancelled = pathname.endsWith('/picking/cancelled')
-  const { has, isWarehouseAdmin } = useAuth()
+  const { has } = useAuth()
   const tableScope = cancelled ? 'cancelled' : archive ? 'archive' : 'active'
   const { config: tableConfig, updateConfig: updateTableConfig, resetConfig: resetTableConfig } =
     usePickListsTableConfig(tableScope)
@@ -261,6 +260,18 @@ export function PickListsPage() {
   )
 
   /** Jarayon: ustuvor buyurtma WMS bosqichi; buyurtmasiz hujjatda hujjat holati. */
+  /** `change_status` ustuni: buyurtma WMS holati matn (faqat o'qish). */
+  const changeStatusLabel = useCallback(
+    (item: PickList) => {
+      if (!item.order_id) return '—'
+      const wms = item.order_wms_status
+      if (wms == null || String(wms).trim() === '') return '—'
+      const k = String(wms).toLowerCase().replace(/-/g, '_')
+      return t(`orders:status.${k}`, { defaultValue: wms })
+    },
+    [t]
+  )
+
   const pipelineStatusLabel = useCallback(
     (item: PickList) => {
       if (archive) {
@@ -493,18 +504,9 @@ export function PickListsPage() {
             </td>
           )
         case 'change_status':
-          return item.order_id ? (
-            <OrderWmsStatusCell
-              key={colId}
-              orderId={item.order_id}
-              orderNumber={item.order_number ?? item.document_no}
-              status={item.order_wms_status ?? 'imported'}
-              canEdit={isWarehouseAdmin && !archive}
-              onAfterSave={() => load({ background: true })}
-            />
-          ) : (
-            <td key={colId} className="px-4 py-3 text-slate-400 dark:text-slate-600" onClick={(e) => e.stopPropagation()}>
-              —
+          return (
+            <td key={colId} className="px-4 py-3 text-slate-600 dark:text-slate-300" onClick={(e) => e.stopPropagation()}>
+              {changeStatusLabel(item)}
             </td>
           )
         case 'total_lines':
@@ -618,8 +620,8 @@ export function PickListsPage() {
     cancelled,
     canReassignPickerRow,
     cancellingId,
+    changeStatusLabel,
     docStatusLabel,
-    isWarehouseAdmin,
     pipelineStatusLabel,
     error,
     filtered,

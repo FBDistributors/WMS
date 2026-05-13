@@ -6,19 +6,15 @@ import { useTranslation } from 'react-i18next'
 import { AppHeader } from '../components/layout/AppHeader'
 import { PickListCard } from '../components/picking/PickListCard'
 import { EmptyState } from '../components/ui/EmptyState'
-import { useAuth } from '../rbac/AuthProvider'
-import { listPickLists, cancelPickList, isTerminalPickListStatus, type PickList } from '../services/pickingApi'
+import { listPickLists, isTerminalPickListStatus, type PickList } from '../services/pickingApi'
 
 export function PickListPage() {
   const navigate = useNavigate()
   const { t } = useTranslation('picking')
-  const { has } = useAuth()
-  const canCancelDocuments = has('documents:edit_status')
   const [items, setItems] = useState<PickList[]>([])
   const [query, setQuery] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [cancellingId, setCancellingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -51,22 +47,6 @@ export function PickListPage() {
       return hay.includes(term)
     })
   }, [items, query])
-
-  const handleCancel = useCallback(
-    async (item: PickList) => {
-      if (!confirm(t('cancel_confirm', { doc: item.document_no }))) return
-      setCancellingId(item.id)
-      try {
-        await cancelPickList(item.id)
-        await load()
-      } catch {
-        setError(t('cancel_error'))
-      } finally {
-        setCancellingId(null)
-      }
-    },
-    [load, t]
-  )
 
   if (isLoading) {
     return (
@@ -133,15 +113,6 @@ export function PickListPage() {
                   ? navigate(`/picking/view/${item.id}`)
                   : navigate(`/picking/mobile-pwa/${item.id}`)
               }
-              onCancel={
-                canCancelDocuments
-                  ? (e) => {
-                      e.stopPropagation()
-                      void handleCancel(item)
-                    }
-                  : undefined
-              }
-              isCancelling={cancellingId === item.id}
             />
           ))}
         </div>

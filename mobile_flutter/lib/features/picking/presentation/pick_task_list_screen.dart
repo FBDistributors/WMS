@@ -29,23 +29,6 @@ bool _pickerEligibleBulkSend(PickingListItem item, PickerProfileParam profile) {
 bool _isFullyPickedLines(PickingListItem d) =>
     d.linesTotal > 0 && d.linesDone >= d.linesTotal;
 
-bool _pickerCanCancelOrderRow(PickingListItem item) {
-  if (item.pickedAny) {
-    return false;
-  }
-  if (item.controlledByUserId != null) {
-    return false;
-  }
-  const Set<String> blocked = <String>{
-    'cancelled',
-    'completed',
-    'packed',
-    'shipped',
-    'picked',
-  };
-  return !blocked.contains(item.status);
-}
-
 class PickTaskListScreen extends ConsumerStatefulWidget {
   const PickTaskListScreen({super.key});
 
@@ -335,48 +318,6 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
         );
       },
     );
-  }
-
-  Future<void> _onCancelOrderPressed(PickingListItem item) async {
-    final AppLocale loc = ref.read(appLocaleProvider);
-    final bool? confirm = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext ctx) => AlertDialog(
-        title: Text(StringLookup.t(loc, 'cancelOrder')),
-        content: Text(StringLookup.t(loc, 'cancelOrderConfirm')),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(StringLookup.t(loc, 'cancelOrderDialogNo')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(StringLookup.t(loc, 'cancelOrderDialogYes')),
-          ),
-        ],
-      ),
-    );
-    if (confirm != true || !mounted) {
-      return;
-    }
-    try {
-      await ref.read(pickingRepositoryProvider).cancelPickDocument(item.id);
-      if (!mounted) {
-        return;
-      }
-      unawaited(ref.read(openPickTasksProvider.notifier).refreshFromNetwork());
-      showAppSnackBar(
-        context,
-        SnackBar(content: Text(StringLookup.t(loc, 'cancelOrderSuccess'))),
-      );
-    } on Exception catch (e) {
-      if (mounted) {
-        showAppSnackBar(
-          context,
-          SnackBar(content: Text('$e')),
-        );
-      }
-    }
   }
 
   Future<void> _sendSingleDocumentToControllerForBulk(
@@ -970,10 +911,6 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
                                   onSendToController: profile == PickerProfileParam.picker
                                       ? () => _onSendToControllerPress(item)
                                       : null,
-                                  onCancelOrder: profile == PickerProfileParam.picker &&
-                                          _pickerCanCancelOrderRow(item)
-                                      ? () => _onCancelOrderPressed(item)
-                                      : null,
                                 );
                               },
                             ),
@@ -1071,7 +1008,6 @@ class _TaskCard extends StatelessWidget {
     this.eligibleForSelection = false,
     this.onToggleSelected,
     this.onSendToController,
-    this.onCancelOrder,
   });
 
   final PickingListItem item;
@@ -1087,7 +1023,6 @@ class _TaskCard extends StatelessWidget {
   final bool eligibleForSelection;
   final VoidCallback? onToggleSelected;
   final void Function()? onSendToController;
-  final VoidCallback? onCancelOrder;
 
   @override
   Widget build(BuildContext context) {
@@ -1209,18 +1144,6 @@ class _TaskCard extends StatelessWidget {
             ),
           ),
         ),
-        if (onCancelOrder != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: OutlinedButton(
-              onPressed: onCancelOrder,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: cs.error,
-                side: BorderSide(color: cs.error.withValues(alpha: 0.65)),
-              ),
-              child: Text(StringLookup.t(loc, 'cancelOrder')),
-            ),
-          ),
         if (showSend && onSendToController != null)
           Padding(
             padding: const EdgeInsets.only(top: 8),

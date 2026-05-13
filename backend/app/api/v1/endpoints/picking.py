@@ -686,63 +686,21 @@ async def get_picking_document(
     return _to_picking_document_with_lines(document, lines, db)
 
 
-_PICKER_CANCEL_BLOCKED_STATUSES = frozenset({"cancelled", "completed", "packed", "shipped", "picked"})
-
-
 @router.post(
     "/documents/{document_id}/cancel",
     response_model=PickingListItem,
-    summary="Picker cancels assigned document if nothing has been picked yet",
+    summary="Picker document cancel (disabled)",
 )
 async def cancel_picker_document(
-    request: Request,
     document_id: UUID,
-    db: Session = Depends(get_db),
     user=Depends(require_permission("picking:pick")),
 ):
-    if user.role != "picker":
-        raise HTTPException(status_code=403, detail="Only pickers can cancel picking tasks")
-    document = (
-        db.query(DocumentModel)
-        .options(
-            selectinload(DocumentModel.lines),
-            selectinload(DocumentModel.assigned_to_user),
-            selectinload(DocumentModel.controlled_by_user),
-            selectinload(DocumentModel.order).selectinload(OrderModel.wms_state),
-        )
-        .filter(DocumentModel.id == document_id)
-        .one_or_none()
+    """Yig'uvchi ilovadan hujjatni bekor qilish o'chirilgan; bekor faqat ombor/admin oqimi orqali."""
+    _ = (document_id, user)
+    raise HTTPException(
+        status_code=403,
+        detail="Picker document cancel is disabled; cancel via warehouse admin.",
     )
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-    if document.assigned_to_user_id != user.id:
-        raise HTTPException(status_code=403, detail="Document not assigned to you")
-    if document.controlled_by_user_id is not None:
-        raise HTTPException(status_code=409, detail="Document already sent to controller")
-    if document.status in _PICKER_CANCEL_BLOCKED_STATUSES:
-        raise HTTPException(status_code=409, detail="Cannot cancel document in this status")
-    if any(line.picked_qty > 0 for line in document.lines):
-        raise HTTPException(status_code=409, detail="Cannot cancel after picking has started")
-
-    old_status = document.status
-    document.status = "cancelled"
-    order = document.order
-    if order is not None and order.wms_state is not None:
-        order.wms_state.status = "cancelled"
-
-    log_action(
-        db,
-        user_id=user.id,
-        action=ACTION_UPDATE,
-        entity_type="document",
-        entity_id=str(document_id),
-        old_data={"status": old_status},
-        new_data={"status": "cancelled", "cancelled_by": "picker"},
-        ip_address=get_client_ip(request),
-    )
-    db.commit()
-    db.refresh(document)
-    return _to_picking_list_item(document)
 
 
 @router.get("/documents", response_model=List[PickingListItem], summary="Picking documents")

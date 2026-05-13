@@ -1,7 +1,6 @@
-import { CalendarDays, ClipboardList, ChevronRight, XCircle } from 'lucide-react'
+import { CalendarDays, ClipboardList, ChevronRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '../ui/badge'
-import { Button } from '../ui/button'
 import { Card } from '../ui/card'
 import type { PickList } from '../../services/pickingApi'
 
@@ -17,11 +16,9 @@ const statusVariant: Record<PickList['status'], 'neutral' | 'primary' | 'success
 type PickListCardProps = {
   item: PickList
   onClick?: () => void
-  onCancel?: (e: React.MouseEvent) => void
-  isCancelling?: boolean
 }
 
-export function PickListCard({ item, onClick, onCancel, isCancelling }: PickListCardProps) {
+export function PickListCard({ item, onClick }: PickListCardProps) {
   const { t } = useTranslation('picking')
   const progressText = `${item.picked_lines}/${item.total_lines}`
   const statusKey = item.status.toLowerCase() as 'new' | 'in_progress' | 'review' | 'done' | 'error' | 'unknown'
@@ -53,21 +50,6 @@ export function PickListCard({ item, onClick, onCancel, isCancelling }: PickList
             <ClipboardList size={14} />
             <span>{progressText} {t('total_lines')}</span>
           </div>
-          {onCancel && (
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isCancelling}
-              className="mt-2 w-fit px-3 py-2 text-xs border-red-200 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/30"
-              onClick={(e) => {
-                e.stopPropagation()
-                onCancel(e)
-              }}
-            >
-              <XCircle size={14} className="mr-1" />
-              {isCancelling ? t('cancelling') : t('cancel_document')}
-            </Button>
-          )}
         </div>
         <div className="flex items-center gap-2">
           <Badge variant={statusVariant[item.status]}>
