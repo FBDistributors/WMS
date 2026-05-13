@@ -97,6 +97,9 @@ type BackendPickingDetails = {
   }
   customer_id?: string | null
   customer_name?: string | null
+  order_wms_status?: string | null
+  assigned_to_user_name?: string | null
+  controlled_by_user_name?: string | null
 }
 
 const STATUS_MAP: Record<string, PickListStatus> = {
@@ -188,9 +191,12 @@ function mapDetails(doc: BackendPickingDetails): PickListDetails {
     document_no: doc.reference_number,
     order_number: doc.order_number ?? undefined,
     document_status: raw,
+    order_wms_status: doc.order_wms_status ?? undefined,
     status: mapStatus(raw),
     total_lines: totalLines,
     picked_lines: pickedLines,
+    picker_name: doc.assigned_to_user_name?.trim() || undefined,
+    controller_name: doc.controlled_by_user_name?.trim() || undefined,
     lines: doc.lines.map(mapPickingLineToPickerViewModel),
     customer_id: doc.customer_id?.trim() || undefined,
     customer_name: doc.customer_name?.trim() || undefined,

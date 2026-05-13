@@ -14,7 +14,7 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { TableScrollArea } from '../../components/TableScrollArea'
-import { listPickLists, cancelPickList, isTerminalPickListStatus, type PickList, type PickListStatus, type ListPickListsOptions } from '../../services/pickingApi'
+import { listPickLists, cancelPickList, type PickList, type PickListStatus, type ListPickListsOptions } from '../../services/pickingApi'
 import { updateOrderStatus } from '../../services/ordersApi'
 import { useAuth } from '../../rbac/AuthProvider'
 
@@ -135,14 +135,9 @@ export function PickListsPage() {
 
   const openPickDetail = useCallback(
     (item: PickList) => {
-      const readOnly = archive || cancelled || isTerminalPickListStatus(item.status)
-      if (readOnly) {
-        navigate(`/admin/picking/${item.id}`, { state: { backTo: `${pathname}${search}` } })
-      } else {
-        navigate(`/picking/mobile-pwa/${item.id}`)
-      }
+      navigate(`/admin/picking/${item.id}`, { state: { backTo: `${pathname}${search}` } })
     },
-    [archive, cancelled, navigate, pathname, search]
+    [navigate, pathname, search]
   )
 
   const load = useCallback(

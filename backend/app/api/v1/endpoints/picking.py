@@ -88,6 +88,8 @@ class PickingDocument(BaseModel):
     incomplete_reason: Optional[str] = None
     assigned_to_user_id: Optional[UUID] = None
     assigned_to_user_name: Optional[str] = None
+    controlled_by_user_id: Optional[UUID] = None
+    controlled_by_user_name: Optional[str] = None
     order_number: Optional[str] = None
     order_wms_status: Optional[str] = None
     customer_id: Optional[str] = None
@@ -530,6 +532,8 @@ def _to_picking_document(doc: DocumentModel, db: Optional[Session] = None) -> Pi
         incomplete_reason=getattr(doc, "incomplete_reason", None),
         assigned_to_user_id=doc.assigned_to_user_id,
         assigned_to_user_name=_picker_name(doc),
+        controlled_by_user_id=doc.controlled_by_user_id,
+        controlled_by_user_name=_controller_name(doc),
         order_number=_order_number(doc),
         order_wms_status=wms,
         customer_id=_customer_id(doc),
@@ -558,6 +562,8 @@ def _to_picking_document_with_lines(
         incomplete_reason=getattr(doc, "incomplete_reason", None),
         assigned_to_user_id=doc.assigned_to_user_id,
         assigned_to_user_name=_picker_name(doc),
+        controlled_by_user_id=doc.controlled_by_user_id,
+        controlled_by_user_name=_controller_name(doc),
         order_number=_order_number(doc),
         order_wms_status=wms,
         customer_id=_customer_id(doc),
@@ -664,6 +670,7 @@ async def get_picking_document(
         db.query(DocumentModel)
         .options(
             selectinload(DocumentModel.assigned_to_user),
+            selectinload(DocumentModel.controlled_by_user),
             selectinload(DocumentModel.order),
         )
         .filter(DocumentModel.id == document_id)

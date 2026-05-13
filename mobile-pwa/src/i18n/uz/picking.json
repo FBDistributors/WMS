@@ -14,6 +14,7 @@
   "empty_archive_desc": "Yakunlangan pick listlar shu yerda ko‘rinadi.",
   "details_title": "Hujjat tafsilotlari",
   "order_number_display": "Buyurtma #{{number}}",
+  "order_title_plain": "Buyurtma {{number}}",
   "document_not_found": "Hujjat topilmadi",
   "document_id_missing": "Hujjat ID topilmadi.",
   "load_failed": "Hujjat yuklanmadi. Qayta urinib ko‘ring.",
