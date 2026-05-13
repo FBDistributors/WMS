@@ -80,7 +80,6 @@ export function PickListsPage() {
   const { config: tableConfig, updateConfig: updateTableConfig, resetConfig: resetTableConfig } =
     usePickListsTableConfig(tableScope)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const vis = useMemo(() => new Set(tableConfig.visibleColumns), [tableConfig.visibleColumns])
 
   const processScope = cancelled ? ('cancelled' as const) : archive ? ('archived' as const) : ('active' as const)
 
@@ -120,6 +119,20 @@ export function PickListsPage() {
   const nextOffsetRef = useRef(0)
 
   const canCancel = has('documents:edit_status')
+  const orderedPickTableColumns = useMemo(() => {
+    const rawOrder = tableConfig.columnOrder.filter((id) => PICKLISTS_COLUMN_IDS.includes(id))
+    const mergedOrder =
+      rawOrder.length > 0
+        ? [...rawOrder, ...PICKLISTS_COLUMN_IDS.filter((id) => !rawOrder.includes(id))]
+        : [...PICKLISTS_COLUMN_IDS]
+    const visible = new Set(tableConfig.visibleColumns)
+    return mergedOrder.filter((id) => {
+      if (!visible.has(id)) return false
+      if (id === 'change_status' && cancelled) return false
+      if (id === 'cancel' && (!canCancel || cancelled || archive)) return false
+      return true
+    })
+  }, [tableConfig.columnOrder, tableConfig.visibleColumns, cancelled, archive, canCancel])
   const canReassignPickerRow = useCallback(
     (item: PickList) =>
       Boolean(item.order_id) && has('orders:write') && item.order_wms_status === 'allocated',
@@ -353,24 +366,236 @@ export function PickListsPage() {
         />
       )
     }
+    const pickHeader = (colId: string): React.ReactNode => {
+      switch (colId) {
+        case 'document_no':
+          return (
+            <th key={colId} className="px-4 py-3 text-left">
+              {t('picking:document_label')}
+            </th>
+          )
+        case 'delivery_number':
+          return (
+            <th key={colId} className="px-4 py-3 text-left">
+              {t('picking:column_delivery_number')}
+            </th>
+          )
+        case 'customer_id':
+          return (
+            <th key={colId} className="px-4 py-3 text-left">
+              {t('picking:column_customer_id')}
+            </th>
+          )
+        case 'customer_name':
+          return (
+            <th key={colId} className="px-4 py-3 text-left">
+              {t('picking:column_customer_name')}
+            </th>
+          )
+        case 'pipeline_status':
+          return (
+            <th key={colId} className="px-4 py-3 text-left">
+              {t('picking:status_label')}
+            </th>
+          )
+        case 'doc_status':
+          return (
+            <th key={colId} className="px-4 py-3 text-left">
+              {t('orders:columns.so_document_status')}
+            </th>
+          )
+        case 'change_status':
+          return (
+            <th key={colId} className="px-4 py-3 text-left">
+              {t('orders:columns.change_status')}
+            </th>
+          )
+        case 'total_lines':
+          return (
+            <th key={colId} className="px-4 py-3 text-left">
+              {t('picking:total_lines')}
+            </th>
+          )
+        case 'picker':
+          return (
+            <th key={colId} className="px-4 py-3 text-left">
+              {t('picking:column_picker')}
+            </th>
+          )
+        case 'controller':
+          return (
+            <th key={colId} className="px-4 py-3 text-left">
+              {t('picking:column_controller')}
+            </th>
+          )
+        case 'last_activity':
+          return (
+            <th key={colId} className="px-4 py-3 text-left">
+              {t('picking:last_activity')}
+            </th>
+          )
+        case 'view':
+        case 'cancel':
+          return <th key={colId} className="px-4 py-3" />
+        default:
+          return null
+      }
+    }
+
+    const pickCell = (colId: string, item: PickList): React.ReactNode => {
+      switch (colId) {
+        case 'document_no':
+          return (
+            <td key={colId} className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">
+              {item.order_number?.trim() ? item.order_number.trim() : item.document_no}
+            </td>
+          )
+        case 'delivery_number':
+          return (
+            <td key={colId} className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300">
+              {item.delivery_number ?? '—'}
+            </td>
+          )
+        case 'customer_id':
+          return (
+            <td
+              key={colId}
+              className="max-w-[120px] truncate px-4 py-3 font-mono text-xs text-slate-700 dark:text-slate-300"
+              title={item.customer_id ?? ''}
+            >
+              {item.customer_id?.trim() ? item.customer_id.trim() : '—'}
+            </td>
+          )
+        case 'customer_name':
+          return (
+            <td
+              key={colId}
+              className="max-w-[200px] truncate px-4 py-3 text-slate-700 dark:text-slate-200"
+              title={item.customer_name ?? ''}
+            >
+              {item.customer_name?.trim() ? item.customer_name.trim() : '—'}
+            </td>
+          )
+        case 'pipeline_status':
+          return (
+            <td key={colId} className="px-4 py-3">
+              <span
+                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(item.status)}`}
+              >
+                {pipelineStatusLabel(item)}
+              </span>
+            </td>
+          )
+        case 'doc_status':
+          return (
+            <td key={colId} className="px-4 py-3 text-slate-600 dark:text-slate-300" onClick={(e) => e.stopPropagation()}>
+              {docStatusLabel(item.document_status)}
+            </td>
+          )
+        case 'change_status':
+          return item.order_id ? (
+            <OrderWmsStatusCell
+              key={colId}
+              orderId={item.order_id}
+              orderNumber={item.order_number ?? item.document_no}
+              status={item.order_wms_status ?? 'imported'}
+              canEdit={isWarehouseAdmin && !archive}
+              onAfterSave={() => load({ background: true })}
+            />
+          ) : (
+            <td key={colId} className="px-4 py-3 text-slate-400 dark:text-slate-600" onClick={(e) => e.stopPropagation()}>
+              —
+            </td>
+          )
+        case 'total_lines':
+          return (
+            <td key={colId} className="px-4 py-3 text-slate-600 dark:text-slate-300">
+              {item.picked_lines}/{item.total_lines}
+            </td>
+          )
+        case 'picker':
+          return (
+            <td
+              key={colId}
+              className="max-w-[160px] truncate px-4 py-3 text-slate-600 dark:text-slate-300"
+              title={item.picker_name ?? ''}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex flex-col gap-1">
+                <span>{item.picker_name ?? '—'}</span>
+                {!archive && canReassignPickerRow(item) ? (
+                  <button
+                    type="button"
+                    className="text-left text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+                    onClick={() => {
+                      setReassignDialogOrderIds([item.order_id as string])
+                    }}
+                  >
+                    {t('orders:reassign_picker.button')}
+                  </button>
+                ) : null}
+              </div>
+            </td>
+          )
+        case 'controller':
+          return (
+            <td
+              key={colId}
+              className="max-w-[140px] truncate px-4 py-3 text-slate-600 dark:text-slate-300"
+              title={item.controller_name ?? ''}
+            >
+              {item.controller_name ?? '—'}
+            </td>
+          )
+        case 'last_activity':
+          return (
+            <td key={colId} className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300">
+              {formatActivity(item.updated_at, i18n.language)}
+            </td>
+          )
+        case 'view':
+          return (
+            <td key={colId} className="px-4 py-3">
+              <Button
+                variant="ghost"
+                className="h-8 w-8 p-0"
+                onClick={(e: React.MouseEvent) => {
+                  e.stopPropagation()
+                  openPickDetail(item)
+                }}
+              >
+                <FileText size={18} />
+              </Button>
+            </td>
+          )
+        case 'cancel':
+          return (
+            <td key={colId} className="px-4 py-3">
+              <Button
+                variant="outline"
+                className="h-8 border-red-200 bg-red-50 px-2 text-xs text-red-700 hover:bg-red-100 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400 dark:hover:bg-red-900/40"
+                onClick={(e: React.MouseEvent) => {
+                  e.stopPropagation()
+                  setCancelTarget(item)
+                }}
+                disabled={cancellingId === item.id}
+              >
+                <XCircle size={14} className="mr-1" />
+                {cancellingId === item.id ? t('picking:cancelling') : t('picking:cancel_document')}
+              </Button>
+            </td>
+          )
+        default:
+          return null
+      }
+    }
+
     return (
       <TableScrollArea inline>
         <table className="w-max min-w-full text-sm">
           <thead className="text-xs uppercase text-slate-500">
             <tr className="border-b border-slate-200 dark:border-slate-800">
-              {vis.has('document_no') && <th className="px-4 py-3 text-left">{t('picking:document_label')}</th>}
-              {vis.has('delivery_number') && <th className="px-4 py-3 text-left">{t('picking:column_delivery_number')}</th>}
-              {vis.has('customer_id') && <th className="px-4 py-3 text-left">{t('picking:column_customer_id')}</th>}
-              {vis.has('customer_name') && <th className="px-4 py-3 text-left">{t('picking:column_customer_name')}</th>}
-              {vis.has('pipeline_status') && <th className="px-4 py-3 text-left">{t('picking:status_label')}</th>}
-              {vis.has('doc_status') && <th className="px-4 py-3 text-left">{t('orders:columns.so_document_status')}</th>}
-              {vis.has('change_status') && !cancelled && <th className="px-4 py-3 text-left">{t('orders:columns.change_status')}</th>}
-              {vis.has('total_lines') && <th className="px-4 py-3 text-left">{t('picking:total_lines')}</th>}
-              {vis.has('picker') && <th className="px-4 py-3 text-left">{t('picking:column_picker')}</th>}
-              {vis.has('controller') && <th className="px-4 py-3 text-left">{t('picking:column_controller')}</th>}
-              {vis.has('last_activity') && <th className="px-4 py-3 text-left">{t('picking:last_activity')}</th>}
-              {vis.has('view') && <th className="px-4 py-3"></th>}
-              {canCancel && !cancelled && vis.has('cancel') && <th className="px-4 py-3"></th>}
+              {orderedPickTableColumns.map((colId) => pickHeader(colId))}
             </tr>
           </thead>
           <tbody>
@@ -380,124 +605,7 @@ export function PickListsPage() {
                 className="cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
                 onClick={() => openPickDetail(item)}
               >
-                {vis.has('document_no') && (
-                  <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">
-                    {item.order_number?.trim() ? item.order_number.trim() : item.document_no}
-                  </td>
-                )}
-                {vis.has('delivery_number') && (
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300">
-                    {item.delivery_number ?? '—'}
-                  </td>
-                )}
-                {vis.has('customer_id') && (
-                  <td className="max-w-[120px] truncate px-4 py-3 font-mono text-xs text-slate-700 dark:text-slate-300" title={item.customer_id ?? ''}>
-                    {item.customer_id?.trim() ? item.customer_id.trim() : '—'}
-                  </td>
-                )}
-                {vis.has('customer_name') && (
-                  <td className="max-w-[200px] truncate px-4 py-3 text-slate-700 dark:text-slate-200" title={item.customer_name ?? ''}>
-                    {item.customer_name?.trim() ? item.customer_name.trim() : '—'}
-                  </td>
-                )}
-                {vis.has('pipeline_status') && (
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(item.status)}`}
-                    >
-                      {pipelineStatusLabel(item)}
-                    </span>
-                  </td>
-                )}
-                {vis.has('doc_status') && (
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300" onClick={(e) => e.stopPropagation()}>
-                    {docStatusLabel(item.document_status)}
-                  </td>
-                )}
-                {vis.has('change_status') && !cancelled && (
-                  <>
-                    {item.order_id ? (
-                      <OrderWmsStatusCell
-                        orderId={item.order_id}
-                        orderNumber={item.order_number ?? item.document_no}
-                        status={item.order_wms_status ?? 'imported'}
-                        canEdit={isWarehouseAdmin && !archive}
-                        onAfterSave={() => load({ background: true })}
-                      />
-                    ) : (
-                      <td className="px-4 py-3 text-slate-400 dark:text-slate-600" onClick={(e) => e.stopPropagation()}>
-                        —
-                      </td>
-                    )}
-                  </>
-                )}
-                {vis.has('total_lines') && (
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                    {item.picked_lines}/{item.total_lines}
-                  </td>
-                )}
-                {vis.has('picker') && (
-                  <td
-                    className="max-w-[160px] truncate px-4 py-3 text-slate-600 dark:text-slate-300"
-                    title={item.picker_name ?? ''}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="flex flex-col gap-1">
-                      <span>{item.picker_name ?? '—'}</span>
-                      {!archive && canReassignPickerRow(item) ? (
-                        <button
-                          type="button"
-                          className="text-left text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
-                          onClick={() => {
-                            setReassignDialogOrderIds([item.order_id as string])
-                          }}
-                        >
-                          {t('orders:reassign_picker.button')}
-                        </button>
-                      ) : null}
-                    </div>
-                  </td>
-                )}
-                {vis.has('controller') && (
-                  <td className="max-w-[140px] truncate px-4 py-3 text-slate-600 dark:text-slate-300" title={item.controller_name ?? ''}>
-                    {item.controller_name ?? '—'}
-                  </td>
-                )}
-                {vis.has('last_activity') && (
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300">
-                    {formatActivity(item.updated_at, i18n.language)}
-                  </td>
-                )}
-                {vis.has('view') && (
-                  <td className="px-4 py-3">
-                    <Button
-                      variant="ghost"
-                      className="h-8 w-8 p-0"
-                      onClick={(e: React.MouseEvent) => {
-                        e.stopPropagation()
-                        openPickDetail(item)
-                      }}
-                    >
-                      <FileText size={18} />
-                    </Button>
-                  </td>
-                )}
-                {canCancel && !archive && !cancelled && vis.has('cancel') && (
-                  <td className="px-4 py-3">
-                    <Button
-                      variant="outline"
-                      className="h-8 border-red-200 bg-red-50 px-2 text-xs text-red-700 hover:bg-red-100 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400 dark:hover:bg-red-900/40"
-                      onClick={(e: React.MouseEvent) => {
-                        e.stopPropagation()
-                        setCancelTarget(item)
-                      }}
-                      disabled={cancellingId === item.id}
-                    >
-                      <XCircle size={14} className="mr-1" />
-                      {cancellingId === item.id ? t('picking:cancelling') : t('picking:cancel_document')}
-                    </Button>
-                  </td>
-                )}
+                {orderedPickTableColumns.map((colId) => pickCell(colId, item))}
               </tr>
             ))}
           </tbody>
@@ -522,8 +630,8 @@ export function PickListsPage() {
     items.length,
     load,
     openPickDetail,
+    orderedPickTableColumns,
     t,
-    vis,
   ])
 
   return (
