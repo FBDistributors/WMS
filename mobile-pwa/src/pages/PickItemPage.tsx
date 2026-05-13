@@ -8,6 +8,7 @@ import { Button } from '../components/ui/button'
 import { EmptyState } from '../components/ui/EmptyState'
 import {
   getPickListDetailsForPicker,
+  isTerminalPickListStatus,
   pickLineDelta,
   type PickLine,
 } from '../services/pickingApi'
@@ -46,6 +47,10 @@ export function PickItemPage() {
     setError(null)
     try {
       const details = await getPickListDetailsForPicker(documentId)
+      if (isTerminalPickListStatus(details.status)) {
+        navigate(`/picking/view/${documentId}`, { replace: true })
+        return
+      }
       const found = details.lines.find((item) => item.id === lineId) ?? null
       setLine(found)
       if (!found) {
@@ -56,7 +61,7 @@ export function PickItemPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [documentId, lineId, t])
+  }, [documentId, lineId, navigate, t])
 
   useEffect(() => {
     void load()

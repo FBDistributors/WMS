@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 
 import { AppHeader } from '../../components/layout/AppHeader'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
-import { listPickLists, type PickList } from '../../services/pickingApi'
+import { listPickLists, type PickList, isTerminalPickListStatus } from '../../services/pickingApi'
 
 export function ControllerDocumentsPage() {
   const { t, i18n } = useTranslation(['controller', 'common', 'picking'])
@@ -66,7 +66,13 @@ export function ControllerDocumentsPage() {
               <button
                 key={doc.id}
                 type="button"
-                onClick={() => navigate(`/picking/mobile-pwa/${doc.id}`)}
+                onClick={() =>
+                  isTerminalPickListStatus(doc.status)
+                    ? navigate(`/controller/documents/view/${doc.id}`, {
+                        state: { backTo: '/controller/documents' },
+                      })
+                    : navigate(`/picking/mobile-pwa/${doc.id}`)
+                }
                 className="flex w-full items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm dark:border-slate-700 dark:bg-slate-800"
               >
                 <div className="min-w-0 flex-1">

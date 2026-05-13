@@ -110,5 +110,10 @@
   "filter_picker": "Сборщик",
   "filter_controller": "Контролёр",
   "filter_clear": "Сбросить",
-  "filter_apply": "Применить"
+  "filter_apply": "Применить",
+  "readonly_badge": "Только просмотр",
+  "readonly_doc_status": "Статус документа: {{status}}",
+  "readonly_back": "Назад",
+  "readonly_page_title": "Pick list (просмотр)",
+  "column_sku": "SKU"
 }

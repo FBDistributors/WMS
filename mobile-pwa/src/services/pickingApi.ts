@@ -2,6 +2,11 @@ import { fetchJSON } from './apiClient'
 
 export type PickListStatus = 'NEW' | 'IN_PROGRESS' | 'REVIEW' | 'DONE' | 'ERROR' | 'UNKNOWN'
 
+/** Yakunlangan yoki bekor — mobil terish oqimi o‘rniga faqat ko‘rish. */
+export function isTerminalPickListStatus(status: PickListStatus): boolean {
+  return status === 'DONE' || status === 'ERROR'
+}
+
 export type PickList = {
   id: string
   document_no: string

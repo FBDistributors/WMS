@@ -15,7 +15,7 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { TableScrollArea } from '../../components/TableScrollArea'
-import { listPickLists, cancelPickList, type PickList, type PickListStatus, type ListPickListsOptions } from '../../services/pickingApi'
+import { listPickLists, cancelPickList, isTerminalPickListStatus, type PickList, type PickListStatus, type ListPickListsOptions } from '../../services/pickingApi'
 import { updateOrderStatus } from '../../services/ordersApi'
 import { useAuth } from '../../rbac/AuthProvider'
 
@@ -69,7 +69,7 @@ const PICKLISTS_COLUMN_LABEL_KEYS: Record<string, string> = {
 export function PickListsPage() {
   const { t, i18n } = useTranslation(['picking', 'common', 'orders'])
   const navigate = useNavigate()
-  const { pathname } = useLocation()
+  const { pathname, search } = useLocation()
   const [searchParams] = useSearchParams()
   const archive = pathname.endsWith('/picking/archive')
   const cancelled = pathname.endsWith('/picking/cancelled')
@@ -122,6 +122,18 @@ export function PickListsPage() {
     (item: PickList) =>
       Boolean(item.order_id) && has('orders:write') && item.order_wms_status === 'allocated',
     [has]
+  )
+
+  const openPickDetail = useCallback(
+    (item: PickList) => {
+      const readOnly = archive || cancelled || isTerminalPickListStatus(item.status)
+      if (readOnly) {
+        navigate(`/admin/picking/${item.id}`, { state: { backTo: `${pathname}${search}` } })
+      } else {
+        navigate(`/picking/mobile-pwa/${item.id}`)
+      }
+    },
+    [archive, cancelled, navigate, pathname, search]
   )
 
   const load = useCallback(
@@ -360,7 +372,7 @@ export function PickListsPage() {
               <tr
                 key={item.id}
                 className="cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
-                onClick={() => navigate(`/picking/mobile-pwa/${item.id}`)}
+                onClick={() => openPickDetail(item)}
               >
                 {vis.has('document_no') && (
                   <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">
@@ -447,7 +459,7 @@ export function PickListsPage() {
                       className="h-8 w-8 p-0"
                       onClick={(e: React.MouseEvent) => {
                         e.stopPropagation()
-                        navigate(`/picking/mobile-pwa/${item.id}`)
+                        openPickDetail(item)
                       }}
                     >
                       <FileText size={18} />
@@ -493,7 +505,7 @@ export function PickListsPage() {
     isLoading,
     items.length,
     load,
-    navigate,
+    openPickDetail,
     t,
     vis,
   ])

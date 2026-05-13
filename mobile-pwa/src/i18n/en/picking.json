@@ -110,5 +110,10 @@
   "filter_picker": "Picker",
   "filter_controller": "Controller",
   "filter_clear": "Clear",
-  "filter_apply": "Apply"
+  "filter_apply": "Apply",
+  "readonly_badge": "View only",
+  "readonly_doc_status": "Document status: {{status}}",
+  "readonly_back": "Back",
+  "readonly_page_title": "Pick list (view)",
+  "column_sku": "SKU"
 }

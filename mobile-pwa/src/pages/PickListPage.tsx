@@ -7,7 +7,7 @@ import { AppHeader } from '../components/layout/AppHeader'
 import { PickListCard } from '../components/picking/PickListCard'
 import { EmptyState } from '../components/ui/EmptyState'
 import { useAuth } from '../rbac/AuthProvider'
-import { listPickLists, cancelPickList, type PickList } from '../services/pickingApi'
+import { listPickLists, cancelPickList, isTerminalPickListStatus, type PickList } from '../services/pickingApi'
 
 export function PickListPage() {
   const navigate = useNavigate()
@@ -128,7 +128,11 @@ export function PickListPage() {
             <PickListCard
               key={item.id}
               item={item}
-              onClick={() => navigate(`/picking/mobile-pwa/${item.id}`)}
+              onClick={() =>
+                isTerminalPickListStatus(item.status)
+                  ? navigate(`/picking/view/${item.id}`)
+                  : navigate(`/picking/mobile-pwa/${item.id}`)
+              }
               onCancel={
                 canCancelDocuments
                   ? (e) => {

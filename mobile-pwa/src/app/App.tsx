@@ -38,7 +38,9 @@ import { ReturnsHistoryPage } from '../pages/admin/ReturnsHistoryPage'
 import { ReturnDetailsPage } from '../pages/admin/ReturnDetailsPage'
 import { MahsulotYoqQilishPage } from '../pages/admin/MahsulotYoqQilishPage'
 import { PickListsPage } from '../pages/admin/PickListsPage'
+import { AdminPickListDetailPage } from '../pages/admin/AdminPickListDetailPage'
 import { OfflineQueuePage } from '../pages/offline/OfflineQueuePage'
+import { PickingViewReadOnlyPage } from '../pages/picking/PickingViewReadOnlyPage'
 import { PickCompletePage } from '../pages/PickCompletePage'
 import { PickDetailsPage } from '../pages/PickDetailsPage'
 import { PickItemPage } from '../pages/PickItemPage'
@@ -52,6 +54,7 @@ import { PickerSettingsPage } from '../pages/picker/PickerSettingsPage'
 import { PickerProfilePage } from '../pages/picker/PickerProfilePage'
 import { ControllerHomePage } from '../pages/controller/ControllerHomePage'
 import { ControllerDocumentsPage } from '../pages/controller/ControllerDocumentsPage'
+import { ControllerPickListReadOnlyPage } from '../pages/controller/ControllerPickListReadOnlyPage'
 import { ControllerProductsPage } from '../pages/controller/ControllerProductsPage'
 import { ControllerProductDetailPage } from '../pages/controller/ControllerProductDetailPage'
 import { ControllerSettingsPage } from '../pages/controller/ControllerSettingsPage'
@@ -141,6 +144,14 @@ export function App() {
           }
         />
         <Route
+          path="/picking/view/:documentId"
+          element={
+            <RequireRoleOrPermission permission="picking:read">
+              <PickingViewReadOnlyPage />
+            </RequireRoleOrPermission>
+          }
+        />
+        <Route
           path="/picker/inventory"
           element={
             <RequireRoleOrPermission permissions={['picking:read', 'inventory:read']}>
@@ -197,6 +208,18 @@ export function App() {
             <RequireRoleOrPermission permissions={['documents:read', 'products:read']}>
               <ControllerLayout>
                 <ControllerDocumentsPage />
+              </ControllerLayout>
+            </RequireRoleOrPermission>
+          }
+        />
+        <Route
+          path="/controller/documents/view/:documentId"
+          element={
+            <RequireRoleOrPermission permissions={['documents:read', 'products:read']}>
+              <ControllerLayout>
+                <RequireRoleOrPermission permission="picking:read">
+                  <ControllerPickListReadOnlyPage />
+                </RequireRoleOrPermission>
               </ControllerLayout>
             </RequireRoleOrPermission>
           }
@@ -394,6 +417,16 @@ export function App() {
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">
               <RequirePermission permission="picking:read">
                 <PickListsPage />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/picking/:documentId"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="picking:read">
+                <AdminPickListDetailPage />
               </RequirePermission>
             </RequirePermission>
           }

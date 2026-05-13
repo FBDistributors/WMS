@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, Navigate } from 'react-router-dom'
 import { CheckCircle2, PackageSearch } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -14,6 +14,7 @@ import { Separator } from '../components/ui/separator'
 import {
   completePick,
   getPickListDetailsForPicker,
+  isTerminalPickListStatus,
   type PickListDetails,
   type PickLine,
 } from '../services/pickingApi'
@@ -96,6 +97,10 @@ export function PickDetailsPage() {
         />
       </div>
     )
+  }
+
+  if (documentId && isTerminalPickListStatus(data.status)) {
+    return <Navigate to={`/picking/view/${documentId}`} replace />
   }
 
   const allPicked = progress.total > 0 && progress.picked >= progress.total
