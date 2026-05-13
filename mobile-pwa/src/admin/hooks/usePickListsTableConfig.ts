@@ -14,6 +14,8 @@ const STORAGE_KEYS: Record<string, string> = {
 export const PICKLISTS_COLUMN_IDS = [
   'document_no',
   'delivery_number',
+  'customer_id',
+  'customer_name',
   'pipeline_status',
   'doc_status',
   'change_status',
@@ -28,6 +30,8 @@ export const PICKLISTS_COLUMN_IDS = [
 export const DEFAULT_VISIBLE_ACTIVE: string[] = [
   'document_no',
   'delivery_number',
+  'customer_id',
+  'customer_name',
   'pipeline_status',
   'doc_status',
   'change_status',
@@ -41,6 +45,8 @@ export const DEFAULT_VISIBLE_ACTIVE: string[] = [
 
 export const DEFAULT_VISIBLE_ARCHIVE: string[] = [
   'document_no',
+  'customer_id',
+  'customer_name',
   'pipeline_status',
   'doc_status',
   'total_lines',
@@ -51,6 +57,9 @@ export const DEFAULT_VISIBLE_ARCHIVE: string[] = [
 ]
 
 const dedupe = (values: string[]) => Array.from(new Set(values))
+
+/** Saqlangan sozlamaga yangi ustunlar avtomatik qo‘shiladi (bir marta). */
+const PICKLISTS_COLUMNS_AUTO_APPEND: string[] = ['customer_id', 'customer_name']
 
 function makeDefault(visible: string[]): PickListsTableConfig {
   return { visibleColumns: visible, columnOrder: PICKLISTS_COLUMN_IDS }
@@ -72,8 +81,15 @@ function normalize(value: PickListsTableConfig | null, defaultVisible: string[])
     )
   )
 
+  const mergedVisible = dedupe([
+    ...visibleColumns,
+    ...PICKLISTS_COLUMNS_AUTO_APPEND.filter(
+      (id) => PICKLISTS_COLUMN_IDS.includes(id) && defaultVisible.includes(id) && !visibleColumns.includes(id)
+    ),
+  ])
+
   return {
-    visibleColumns: visibleColumns.length > 0 ? visibleColumns : defaultVisible,
+    visibleColumns: mergedVisible.length > 0 ? mergedVisible : defaultVisible,
     columnOrder: ordered,
   }
 }

@@ -120,6 +120,22 @@ export function PickListReadOnlyDetail({ documentId }: PickListReadOnlyDetailPro
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
             {t('picking:readonly_doc_status', { status: docStatusLabel(data.document_status) })}
           </p>
+          {(data.customer_id || data.customer_name) && (
+            <div className="mt-3 grid gap-2 rounded-xl border border-slate-200 bg-slate-50/90 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-900/50 sm:grid-cols-2">
+              <div className="min-w-0">
+                <span className="text-slate-500 dark:text-slate-400">{t('picking:column_customer_id')}: </span>
+                <span className="font-mono text-slate-900 dark:text-slate-100">
+                  {data.customer_id?.trim() || '—'}
+                </span>
+              </div>
+              <div className="min-w-0">
+                <span className="text-slate-500 dark:text-slate-400">{t('picking:column_customer_name')}: </span>
+                <span className="break-words text-slate-900 dark:text-slate-100">
+                  {data.customer_name?.trim() || '—'}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
         <span
           className={`inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${pipelineBadgeClass(data.status)}`}

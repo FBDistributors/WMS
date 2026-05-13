@@ -115,5 +115,7 @@
   "readonly_doc_status": "Document status: {{status}}",
   "readonly_back": "Back",
   "readonly_page_title": "Pick list (view)",
-  "column_sku": "SKU"
+  "column_sku": "SKU",
+  "column_customer_id": "Customer ID",
+  "column_customer_name": "Customer name"
 }

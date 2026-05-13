@@ -26,6 +26,8 @@ export type PickList = {
   picker_name?: string | null
   controller_name?: string | null
   updated_at?: string
+  customer_id?: string | null
+  customer_name?: string | null
 }
 
 export type PickLineStatus = 'NEW' | 'IN_PROGRESS' | 'DONE' | 'ERROR'
@@ -64,6 +66,8 @@ type BackendPickingListItem = {
   assigned_to_user_name?: string | null
   controlled_by_user_name?: string | null
   updated_at?: string
+  customer_id?: string | null
+  customer_name?: string | null
 }
 
 type BackendDocumentLine = {
@@ -91,6 +95,8 @@ type BackendPickingDetails = {
     picked: number
     required: number
   }
+  customer_id?: string | null
+  customer_name?: string | null
 }
 
 const STATUS_MAP: Record<string, PickListStatus> = {
@@ -165,6 +171,8 @@ function mapList(item: BackendPickingListItem): PickList {
     picker_name: item.assigned_to_user_name ?? undefined,
     controller_name: item.controlled_by_user_name ?? undefined,
     updated_at: item.updated_at,
+    customer_id: item.customer_id?.trim() || undefined,
+    customer_name: item.customer_name?.trim() || undefined,
   }
 }
 
@@ -184,6 +192,8 @@ function mapDetails(doc: BackendPickingDetails): PickListDetails {
     total_lines: totalLines,
     picked_lines: pickedLines,
     lines: doc.lines.map(mapPickingLineToPickerViewModel),
+    customer_id: doc.customer_id?.trim() || undefined,
+    customer_name: doc.customer_name?.trim() || undefined,
   }
 }
 

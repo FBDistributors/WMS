@@ -115,5 +115,7 @@
   "readonly_doc_status": "Статус документа: {{status}}",
   "readonly_back": "Назад",
   "readonly_page_title": "Pick list (просмотр)",
-  "column_sku": "SKU"
+  "column_sku": "SKU",
+  "column_customer_id": "ID клиента",
+  "column_customer_name": "Имя клиента"
 }

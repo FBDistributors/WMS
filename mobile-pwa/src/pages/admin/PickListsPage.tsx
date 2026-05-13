@@ -55,6 +55,8 @@ const DASHBOARD_WMS_GROUPS = new Set(['yigishda', 'tekshiruvda', 'yakunlangan'])
 const PICKLISTS_COLUMN_LABEL_KEYS: Record<string, string> = {
   document_no: 'picking:document_label',
   delivery_number: 'picking:column_delivery_number',
+  customer_id: 'picking:column_customer_id',
+  customer_name: 'picking:column_customer_name',
   pipeline_status: 'picking:status_label',
   doc_status: 'orders:columns.so_document_status',
   change_status: 'orders:columns.change_status',
@@ -211,6 +213,8 @@ export function PickListsPage() {
           item.document_no,
           item.order_number ?? '',
           item.delivery_number ?? '',
+          item.customer_id ?? '',
+          item.customer_name ?? '',
           item.order_wms_status ?? '',
           item.picker_name ?? '',
           item.controller_name ?? '',
@@ -356,6 +360,8 @@ export function PickListsPage() {
             <tr className="border-b border-slate-200 dark:border-slate-800">
               {vis.has('document_no') && <th className="px-4 py-3 text-left">{t('picking:document_label')}</th>}
               {vis.has('delivery_number') && <th className="px-4 py-3 text-left">{t('picking:column_delivery_number')}</th>}
+              {vis.has('customer_id') && <th className="px-4 py-3 text-left">{t('picking:column_customer_id')}</th>}
+              {vis.has('customer_name') && <th className="px-4 py-3 text-left">{t('picking:column_customer_name')}</th>}
               {vis.has('pipeline_status') && <th className="px-4 py-3 text-left">{t('picking:status_label')}</th>}
               {vis.has('doc_status') && <th className="px-4 py-3 text-left">{t('orders:columns.so_document_status')}</th>}
               {vis.has('change_status') && !cancelled && <th className="px-4 py-3 text-left">{t('orders:columns.change_status')}</th>}
@@ -382,6 +388,16 @@ export function PickListsPage() {
                 {vis.has('delivery_number') && (
                   <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300">
                     {item.delivery_number ?? '—'}
+                  </td>
+                )}
+                {vis.has('customer_id') && (
+                  <td className="max-w-[120px] truncate px-4 py-3 font-mono text-xs text-slate-700 dark:text-slate-300" title={item.customer_id ?? ''}>
+                    {item.customer_id?.trim() ? item.customer_id.trim() : '—'}
+                  </td>
+                )}
+                {vis.has('customer_name') && (
+                  <td className="max-w-[200px] truncate px-4 py-3 text-slate-700 dark:text-slate-200" title={item.customer_name ?? ''}>
+                    {item.customer_name?.trim() ? item.customer_name.trim() : '—'}
                   </td>
                 )}
                 {vis.has('pipeline_status') && (

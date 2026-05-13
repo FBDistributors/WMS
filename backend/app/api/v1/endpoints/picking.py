@@ -90,6 +90,8 @@ class PickingDocument(BaseModel):
     assigned_to_user_name: Optional[str] = None
     order_number: Optional[str] = None
     order_wms_status: Optional[str] = None
+    customer_id: Optional[str] = None
+    customer_name: Optional[str] = None
     safe_cancel_return_session_id: Optional[UUID] = None
 
 
@@ -107,6 +109,8 @@ class PickingListItem(BaseModel):
     order_id: Optional[UUID] = None
     order_number: Optional[str] = None
     delivery_number: Optional[str] = None
+    customer_id: Optional[str] = None
+    customer_name: Optional[str] = None
     order_wms_status: Optional[str] = None
     sent_to_controller_at: Optional[datetime] = None
     updated_at: datetime
@@ -528,6 +532,8 @@ def _to_picking_document(doc: DocumentModel, db: Optional[Session] = None) -> Pi
         assigned_to_user_name=_picker_name(doc),
         order_number=_order_number(doc),
         order_wms_status=wms,
+        customer_id=_customer_id(doc),
+        customer_name=_customer_name(doc),
         safe_cancel_return_session_id=sid,
     )
 
@@ -554,6 +560,8 @@ def _to_picking_document_with_lines(
         assigned_to_user_name=_picker_name(doc),
         order_number=_order_number(doc),
         order_wms_status=wms,
+        customer_id=_customer_id(doc),
+        customer_name=_customer_name(doc),
         safe_cancel_return_session_id=sid,
     )
 
@@ -569,6 +577,28 @@ def _delivery_number(doc: DocumentModel) -> Optional[str]:
         return None
     dn = getattr(order, "delivery_number", None)
     return (dn or "").strip() or None
+
+
+def _customer_id(doc: DocumentModel) -> Optional[str]:
+    order = getattr(doc, "order", None)
+    if not order:
+        return None
+    cid = getattr(order, "customer_id", None)
+    if cid is None:
+        return None
+    s = str(cid).strip()
+    return s or None
+
+
+def _customer_name(doc: DocumentModel) -> Optional[str]:
+    order = getattr(doc, "order", None)
+    if not order:
+        return None
+    cn = getattr(order, "customer_name", None)
+    if cn is None:
+        return None
+    s = str(cn).strip()
+    return s or None
 
 
 def _to_picking_list_item(doc: DocumentModel) -> PickingListItem:
@@ -601,6 +631,8 @@ def _to_picking_list_item(doc: DocumentModel) -> PickingListItem:
         order_id=order.id if order is not None else None,
         order_number=_order_number(doc),
         delivery_number=_delivery_number(doc),
+        customer_id=_customer_id(doc),
+        customer_name=_customer_name(doc),
         order_wms_status=wms_status,
         sent_to_controller_at=doc.sent_to_controller_at,
         updated_at=doc.updated_at,
