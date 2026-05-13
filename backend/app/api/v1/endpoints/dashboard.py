@@ -9,7 +9,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import and_, case, func
+from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Session, selectinload
 
 logger = logging.getLogger(__name__)
@@ -185,6 +185,45 @@ async def get_orders_by_status(
             .all()
         )
         by_status = {r[0]: r[1] for r in rows}
+
+        # Admin Jarayon (GET /picking/documents?process_scope=active) bilan moslik:
+        # allocated / picking / picked sonlari faqat shu ro'yxatga tushadigan hujjatlardan.
+        # Aks holda buyurtma WMS kechiksa, hujjat allaqachon completed bo'lsa KPI > 0, jadval bo'sh bo'lardi.
+        ORDER_HIDDEN_STATUSES = ("completed", "packed", "shipped", "cancelled")
+        ACTIVE_PIPELINE_ORDER_STATUSES = ("allocated", "picking", "picked")
+        ACTIVE_DOCUMENT_STATUSES = ("draft", "confirmed", "new", "partial", "in_progress", "picked")
+
+        jarayon_doc_filter = and_(
+            or_(
+                OrderModel.id.is_(None),
+                OrderWmsStateModel.status.in_(ACTIVE_PIPELINE_ORDER_STATUSES),
+                DocumentModel.status.in_(ACTIVE_DOCUMENT_STATUSES),
+            ),
+            DocumentModel.status.notin_(("completed", "packed", "shipped")),
+            or_(
+                OrderModel.id.is_(None),
+                OrderWmsStateModel.status.is_(None),
+                OrderWmsStateModel.status.notin_(ORDER_HIDDEN_STATUSES),
+            ),
+        )
+
+        doc_rows = (
+            db.query(OrderWmsStateModel.status, func.count(DocumentModel.id))
+            .select_from(DocumentModel)
+            .outerjoin(OrderModel, DocumentModel.order_id == OrderModel.id)
+            .outerjoin(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
+            .filter(
+                OrderWmsStateModel.status.in_(ACTIVE_PIPELINE_ORDER_STATUSES),
+                jarayon_doc_filter,
+                DocumentModel.status != "cancelled",
+            )
+            .group_by(OrderWmsStateModel.status)
+            .all()
+        )
+        for status, cnt in doc_rows:
+            if status in ACTIVE_PIPELINE_ORDER_STATUSES:
+                by_status[status] = cnt
+
         items = [
             OrdersByStatusRow(status=s, count=by_status.get(s, 0))
             for s in ORDER_STATUSES_FOR_COUNTS

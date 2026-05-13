@@ -20,9 +20,6 @@ import { useAuth } from '../../rbac/AuthProvider'
 
 const PAGE_SIZE = 200
 
-/** Jarayon: hujjat yakunlangan (controllerdan keyin) — mapStatus emas, chunki boshqa holatlar DONE ga tushishi mumkin. */
-const JARAYON_HIDDEN_DOCUMENT_STATUSES = new Set(['completed', 'packed', 'shipped'])
-
 function statusBadgeClass(status: PickListStatus): string {
   switch (status) {
     case 'DONE':
@@ -241,13 +238,7 @@ export function PickListsPage() {
     return result
   }, [items, query, filterStatus, filterDocStatus, filterPicker, filterController])
 
-  const tableRows = useMemo(() => {
-    if (archive || cancelled) return filtered
-    return filtered.filter((item) => {
-      const s = item.document_status.toLowerCase().replace(/-/g, '_')
-      return !JARAYON_HIDDEN_DOCUMENT_STATUSES.has(s)
-    })
-  }, [archive, cancelled, filtered])
+  const tableRows = filtered
 
   const docStatusLabel = useCallback(
     (raw: string) => {
@@ -599,7 +590,6 @@ export function PickListsPage() {
     error,
     filtered,
     query,
-    tableRows,
     i18n.language,
     isLoading,
     items.length,
