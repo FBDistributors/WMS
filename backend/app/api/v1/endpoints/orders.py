@@ -1408,7 +1408,7 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                         err.external_id,
                         err.reason,
                     )
-            return _build_sync_response(
+            resp = _build_sync_response(
                 created,
                 updated,
                 skipped,
@@ -1423,6 +1423,22 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                     "import_skipped_by_reason": breakdown,
                 },
             )
+            if not items and not resp.detail and not import_errors:
+                return SmartupSyncResponse(
+                    created=resp.created,
+                    updated=resp.updated,
+                    skipped=resp.skipped,
+                    detail=(
+                        f"SmartUp mfm: 0 ta qator keldi (sana {begin}..{end}, "
+                        f"filial={filial_override or 'env SMARTUP_FILIAL_ID'}, "
+                        f"omit_dates={_mfm_movement_export_omit_dates()}). "
+                        "VPS: journalctl -u wms-api -n 200 — matnda WMS diller yoki mfm movement qidiring"
+                    ),
+                    errors_count=resp.errors_count,
+                    error=resp.error,
+                    debug=resp.debug,
+                )
+            return resp
         except RuntimeError as exc:
             msg = str(exc)
             if "400" in msg or "не найдена" in msg or "organization" in msg.lower():
