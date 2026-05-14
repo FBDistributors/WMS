@@ -38,6 +38,16 @@ def _mfm_send_status_in_export_body() -> bool:
     return v in ("1", "true", "yes", "on")
 
 
+def _mfm_row_status_client_filter_enabled() -> bool:
+    """
+    strict (default): qatorda status bo'lsa va SMARTUP_MFM_MOVEMENT_EXPORT_STATUS (odatda W) bilan
+    mos kelmasa — qator importdan oldin tashlanadi.
+    off: client tomonda status solishtirilmaydi (yuborilgan / kelgan barcha statuslar DB ga tushishi mumkin).
+    """
+    v = (os.getenv("SMARTUP_MFM_ROW_STATUS_FILTER") or "strict").strip().lower()
+    return v not in ("0", "false", "off", "no", "any", "all", "none")
+
+
 def _mfm_export_fill_created_date_range() -> bool:
     """
     Postman / SmartUp UI odatda begin_created_on/end_created_on ni bo'sh qoldirib,
@@ -54,6 +64,8 @@ def _mfm_row_matches_export_status(row: dict) -> bool:
     status maydoni bo'lmasa yoki bo'sh bo'lsa — True (API so'rovidagi status filtriga ishonamiz);
     aks holda faqat SMARTUP_MFM_MOVEMENT_EXPORT_STATUS ga mos qatorlar.
     """
+    if not _mfm_row_status_client_filter_enabled():
+        return True
     want = _mfm_export_request_status().strip().upper()
     if not want:
         return True
@@ -297,6 +309,7 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
         logger.info("mfm movement$export: %s ta order (movement-level)", len(orders))
 
     parse_summary["orders_out"] = len(orders)
+    parse_summary["row_status_filter"] = _mfm_row_status_client_filter_enabled()
     logger.info("mfm movement$export parse summary: %s", parse_summary)
     logger.info("mfm movement$export parse: smartup_orders_out=%s", len(orders))
     logging.getLogger("uvicorn").info("WMS mfm parse: %s", parse_summary)
