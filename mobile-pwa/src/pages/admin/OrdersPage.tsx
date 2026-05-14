@@ -15,7 +15,7 @@ import { Card } from '../../components/ui/card'
 import { DateInput } from '../../components/DateInput'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
-import { getOrders, syncSmartupOrders, type MovementItem, type OrderListItem, type MovementsResponse, type OrderCheckResponse } from '../../services/ordersApi'
+import { getOrders, syncSmartupOrders, type MovementItem, type OrderListItem, type OrderCheckResponse } from '../../services/ordersApi'
 import {
   OrderWmsStatusCell,
   SIMPLE_STATUS_OPTIONS,
@@ -25,7 +25,6 @@ import { getBrands, type Brand } from '../../services/brandsApi'
 import { useAuth } from '../../rbac/AuthProvider'
 
 const PAGE_SIZE = 50
-const MOVEMENT_PAGE_SIZE = 50
 /** Yangi navbat (imported) barchasini yuklashda API dan har safar olinadigan maksimum (backend max 500) */
 const BULK_PAGE_SIZE = 500
 const COLUMN_OPTIONS = [
@@ -236,8 +235,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     detail?: string | null
     errors_count?: number | null
   } | null>(null)
-  const [movementsData, setMovementsData] = useState<MovementsResponse | null>(null)
-  const [movementPage, setMovementPage] = useState(0)
   const [selectedMovementIds] = useState<Set<string>>(new Set())
   const [, setCheckResult] = useState<OrderCheckResponse | null>(null)
 
@@ -257,7 +254,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     [canSend]
   )
 
-  const load = useCallback(async (background = false, pageOverride?: number, _forceRefresh?: boolean) => {
+  const load = useCallback(async (background = false, _forceRefresh?: boolean) => {
     ordersLoadAbortRef.current?.abort()
     const ac = new AbortController()
     ordersLoadAbortRef.current = ac
@@ -272,25 +269,23 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     }
     try {
       if (orderSource === 'diller') {
-        const page = pageOverride ?? movementPage
-        const data = await getOrders(
-          {
-            order_source: 'diller',
-            status: 'imported',
-            q: searchQuery.trim() || undefined,
-            date_from: dateFrom.trim() || undefined,
-            date_to: dateTo.trim() || undefined,
-            limit: MOVEMENT_PAGE_SIZE,
-            offset: page * MOVEMENT_PAGE_SIZE,
-            filial_id: 'all',
-          },
-          { signal },
-        )
+        const query: Record<string, string | number | undefined> = {
+          order_source: 'diller',
+          q: searchQuery.trim() || undefined,
+          brand_ids: brandFilter.trim() ? brandFilter.trim() : undefined,
+          date_from: dateFrom.trim() || undefined,
+          date_to: dateTo.trim() || undefined,
+          search_fields:
+            config.searchFields.length > 0 ? config.searchFields.join(',') : undefined,
+          limit: PAGE_SIZE,
+          offset,
+          filial_id: 'all',
+        }
+        if (statusParam) query.status = statusParam
+        const data = await getOrders(query, { signal })
         if (gen !== ordersLoadGenRef.current) return
         setItems(data.items)
         setTotal(data.total)
-        if (pageOverride !== undefined) setMovementPage(pageOverride)
-        setMovementsData(null)
         return
       }
       const loadAllBS =
@@ -379,7 +374,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     config.searchFields,
     group,
     mode,
-    movementPage,
     mainOrdersSource,
     offset,
     orderSource,
@@ -439,7 +433,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       setFilterBrandId(brandFilter)
       setFilterDateFrom(dateFrom)
       setFilterDateTo(dateTo)
-      if (!isMainOrdersSimple && mode === 'default' && !orderSource) {
+      if (!isMainOrdersSimple && mode === 'default' && (!orderSource || orderSource === 'diller')) {
         setFilterOrderGroup(ORDER_GROUP_FILTER_VALUES.has(group) ? group : 'yangi')
       }
       
@@ -467,7 +461,25 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     try {
       if (orderSource === 'diller') {
         try {
-          const result = await syncSmartupOrders({ order_source: 'diller' })
+          const df = dateFrom.trim()
+          const dt = dateTo.trim()
+          let beginDealStr: string
+          let endDealStr: string
+          if (df && dt) {
+            beginDealStr = df
+            endDealStr = dt
+          } else {
+            const today = new Date()
+            endDealStr = today.toISOString().slice(0, 10)
+            const beginDeal = new Date(today)
+            beginDeal.setDate(beginDeal.getDate() - 7)
+            beginDealStr = beginDeal.toISOString().slice(0, 10)
+          }
+          const result = await syncSmartupOrders({
+            order_source: 'diller',
+            begin_deal_date: beginDealStr,
+            end_deal_date: endDealStr,
+          })
           setSyncResult(result)
         } catch (syncErr) {
           const errStatus = syncErr && typeof syncErr === 'object' && 'status' in syncErr ? (syncErr as { status: number }).status : 0
@@ -884,8 +896,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     location.pathname,
     location.search,
     mode,
-    movementPage,
-    movementsData,
     navigate,
     orderSource,
     searchQuery,
@@ -966,6 +976,22 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                         ))}
                       </select>
                     </label>
+                    {!isMainOrdersSimple && mode === 'default' && (!orderSource || orderSource === 'diller') ? (
+                      <label className="block text-sm text-slate-600 dark:text-slate-400">
+                        {t('orders:filters.order_status_group')}
+                        <select
+                          value={filterOrderGroup}
+                          onChange={(e) => setFilterOrderGroup(e.target.value)}
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                        >
+                          {ORDER_GROUP_FILTER_OPTIONS.map((o) => (
+                            <option key={o.value} value={o.value}>
+                              {t(o.labelKey)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
                     <div className="grid grid-cols-2 gap-2">
                       <label className="block text-sm text-slate-600 dark:text-slate-400">
                         {t('orders:filters.delivery_date_from')}
@@ -992,14 +1018,14 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                     <Button
                       variant="secondary"
                       onClick={() => {
-                        if (!isMainOrdersSimple && mode === 'default' && !orderSource) setFilterOrderGroup('yangi')
+                        if (!isMainOrdersSimple && mode === 'default' && (!orderSource || orderSource === 'diller')) setFilterOrderGroup('yangi')
                         setSearchParams((prev) => {
                           const next = new URLSearchParams(prev)
                           next.delete('brand_id')
                           next.delete('date_from')
                           next.delete('date_to')
                           next.delete('offset')
-                          if (!isMainOrdersSimple && mode === 'default' && !orderSource) {
+                          if (!isMainOrdersSimple && mode === 'default' && (!orderSource || orderSource === 'diller')) {
                             next.delete('group')
                           }
                           return next
@@ -1023,7 +1049,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                           if (dt) next.set('date_to', dt)
                           else next.delete('date_to')
                           next.delete('offset')
-                          if (!isMainOrdersSimple && mode === 'default' && !orderSource) {
+                          if (!isMainOrdersSimple && mode === 'default' && (!orderSource || orderSource === 'diller')) {
                             if (filterOrderGroup === 'yangi') next.delete('group')
                             else next.set('group', filterOrderGroup)
                           }
