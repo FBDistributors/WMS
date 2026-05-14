@@ -299,6 +299,7 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
     parse_summary["orders_out"] = len(orders)
     logger.info("mfm movement$export parse summary: %s", parse_summary)
     logger.info("mfm movement$export parse: smartup_orders_out=%s", len(orders))
+    logging.getLogger("uvicorn").info("WMS mfm parse: %s", parse_summary)
     return SmartupOrderExportResponse(items=orders)
 
 

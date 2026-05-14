@@ -1371,12 +1371,27 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                 end,
                 filial_override or "-",
             )
+            logging.getLogger("uvicorn").info(
+                "WMS diller: mfm_items=%s dates=%s..%s filial=%s",
+                len(items),
+                begin,
+                end,
+                filial_override or "-",
+            )
             created, updated, skipped, import_errors, skipped_by_reason = import_orders(
                 db, items, order_source="diller"
             )
             breakdown = {k: v for k, v in skipped_by_reason.items() if v}
             logger.info(
                 "sync-smartup(diller): import_orders natija created=%s updated=%s skipped=%s errors=%s skipped_by=%s",
+                created,
+                updated,
+                skipped,
+                len(import_errors),
+                breakdown,
+            )
+            logging.getLogger("uvicorn").info(
+                "WMS diller: import created=%s updated=%s skipped=%s errors=%s skipped_by=%s",
                 created,
                 updated,
                 skipped,
