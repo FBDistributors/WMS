@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Iterable, Tuple
 
 from sqlalchemy.exc import IntegrityError
@@ -266,6 +267,7 @@ def sync_smartup_products(
         run.errors_json = [error.__dict__ for error in errors]
         run.success_count = inserted + updated
         run.status = "success"
+        run.finished_at = datetime.now(timezone.utc)
         db.add(run)
         db.commit()
         db.refresh(run)
@@ -273,6 +275,7 @@ def sync_smartup_products(
     except Exception as exc:  # noqa: BLE001
         db.rollback()
         run.status = "failed"
+        run.finished_at = datetime.now(timezone.utc)
         run.error_message = str(exc)
         run.error_count = 1
         run.errors_json = [{"external_id": "smartup", "reason": str(exc)}]
