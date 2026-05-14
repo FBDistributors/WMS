@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.deps import require_permission
 from app.db import get_db
-from app.integrations.smartup.mfm_movement import fetch_mfm_movements_raw
+from app.integrations.smartup.mfm_movement import fetch_mfm_movements_raw, resolve_movement_export_date_range
 from app.models.order import Order as OrderModel
 from app.models.order import OrderWmsState as OrderWmsStateModel
 
@@ -90,7 +90,8 @@ def _fetch_movements_sync(
     status_allowed: frozenset[str] | None = None,
 ) -> list[Any]:
     """Smartup dan to'liq ro'yxat. status_allowed None bo'lsa status bo'yicha filtr yo'q; aks holda IN jadvali."""
-    raw = fetch_mfm_movements_raw(filial_id=filial_id)
+    begin, end = resolve_movement_export_date_range(None, None)
+    raw = fetch_mfm_movements_raw(begin, end, filial_id=filial_id)
     movement_list = raw.get("movement") if isinstance(raw.get("movement"), list) else []
     if status_allowed is None:
         return [m for m in movement_list if isinstance(m, dict)]
@@ -102,9 +103,25 @@ def _fetch_movements_sync(
     ]
 
 
-def _movement_external_id(movement_id: str) -> str:
-    """Order.source_external_id bilan bir xil (max 128)."""
-    return f"movement:{movement_id.strip()}"[:128]
+def _diller_source_external_id_candidates(m: dict) -> list[str]:
+    """
+    Import (mfm) bilan bir xil kalitlar: SmartUp external_id, yoki mfm:{movement_id}, yoki movement:{id} (legacy).
+    """
+    mid = str(m.get("movement_id") or m.get("movement_number") or "").strip()
+    ext = str(m.get("external_id") or "").strip()
+    out: list[str] = []
+    if ext:
+        out.append(ext)
+    if mid:
+        out.append(f"mfm:{mid}")
+        out.append(f"movement:{mid}")
+    seen: set[str] = set()
+    dedup: list[str] = []
+    for x in out:
+        if x and x not in seen:
+            seen.add(x)
+            dedup.append(x)
+    return dedup
 
 
 def _enrich_movements_chunk_with_wms(db: Session, chunk: list[Any]) -> list[Any]:
@@ -117,9 +134,8 @@ def _enrich_movements_chunk_with_wms(db: Session, chunk: list[Any]) -> list[Any]
     ext_ids: set[str] = set()
     for m in chunk:
         if isinstance(m, dict):
-            mid = str(m.get("movement_id") or "").strip()
-            if mid:
-                ext_ids.add(_movement_external_id(mid))
+            for c in _diller_source_external_id_candidates(m):
+                ext_ids.add(c)
     status_by_ext: dict[str, str] = {}
     if ext_ids:
         rows = (
@@ -134,9 +150,12 @@ def _enrich_movements_chunk_with_wms(db: Session, chunk: list[Any]) -> list[Any]
         if not isinstance(m, dict):
             out.append(m)
             continue
-        mid = str(m.get("movement_id") or "").strip()
-        ext = _movement_external_id(mid) if mid else ""
-        wms = status_by_ext.get(ext) if ext else None
+        wms = None
+        if isinstance(m, dict):
+            for c in _diller_source_external_id_candidates(m):
+                if c in status_by_ext:
+                    wms = status_by_ext[c]
+                    break
         out.append({**m, "wms_order_status": wms})
     return out
 

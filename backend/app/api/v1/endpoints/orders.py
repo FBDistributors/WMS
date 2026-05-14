@@ -36,6 +36,7 @@ from app.integrations.smartup.importer import delete_stale_orders, import_orders
 from app.integrations.smartup.mfm_movement import (
     export_mfm_movements,
     resolve_movement_export_date_range,
+    _mfm_movement_export_omit_dates,
     _mfm_send_status_in_export_body,
 )
 from app.integrations.smartup.orikzor import export_movements_from_smartup
@@ -1351,19 +1352,34 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                 detail="Diller sync already in progress (worker or another request). Try again later.",
             )
         try:
+            begin, end = resolve_movement_export_date_range(
+                payload.begin_deal_date,
+                payload.end_deal_date,
+            )
+            if begin > end:
+                raise HTTPException(
+                    status_code=400,
+                    detail="begin_deal_date must be <= end_deal_date",
+                )
             filial_override = (payload.filial_id or "").strip() or None
-            response = export_mfm_movements(filial_id=filial_override)
+            response = export_mfm_movements(begin, end, filial_id=filial_override)
             items = response.items
             logger.info(
                 "sync-smartup(diller): mfm javobdan %s ta order import qilishga yuboriladi "
-                "(mfm sana filtri yo'q; filial_override=%s)",
+                "(sana=%s..%s filial_override=%s omit_dates=%s)",
                 len(items),
+                begin,
+                end,
                 filial_override or "-",
+                _mfm_movement_export_omit_dates(),
             )
             logging.getLogger("uvicorn").info(
-                "WMS diller: mfm_items=%s filial=%s",
+                "WMS diller: mfm_items=%s dates=%s..%s filial=%s omit_dates=%s",
                 len(items),
+                begin,
+                end,
                 filial_override or "-",
+                _mfm_movement_export_omit_dates(),
             )
             created, updated, skipped, import_errors, skipped_by_reason = import_orders(
                 db, items, order_source="diller"
@@ -1400,7 +1416,9 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                 skipped_by_reason,
                 extra_debug={
                     "diller_items_from_smartup": len(items),
-                    "mfm_date_filter": "none",
+                    "diller_begin_date": str(begin),
+                    "diller_end_date": str(end),
+                    "mfm_omit_dates": _mfm_movement_export_omit_dates(),
                     "mfm_send_status_in_body": _mfm_send_status_in_export_body(),
                     "import_skipped_by_reason": breakdown,
                 },
