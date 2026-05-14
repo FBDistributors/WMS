@@ -84,6 +84,59 @@ def resolve_movement_export_date_range(
     return begin, end
 
 
+def mfm_sync_lookback_days() -> int:
+    """MFM modified_on uchun default kunlar (min 14, max 730)."""
+    raw = (os.getenv("SMARTUP_MFM_SYNC_LOOKBACK_DAYS") or "120").strip()
+    try:
+        return max(14, min(int(raw), 730))
+    except ValueError:
+        return 120
+
+
+def resolve_mfm_sync_date_range(
+    begin: date | None,
+    end: date | None,
+) -> tuple[date, date]:
+    """
+    mfm/movement$export uchun sana oralig'i (asosan modified_on).
+    Ikkala sana bo'sh bo'lsa — bugundan mfm_sync_lookback_days() kun oldingi.
+    """
+    today = date.today()
+    lb = mfm_sync_lookback_days()
+    if begin is None and end is None:
+        return today - timedelta(days=lb), today
+    if begin is None:
+        assert end is not None
+        return end - timedelta(days=lb), end
+    if end is None:
+        return begin, begin + timedelta(days=lb)
+    return begin, end
+
+
+def apply_mfm_export_date_policy(begin: date, end: date) -> tuple[date, date]:
+    """
+    Diller HTTP sinxron: juda eski end uchun default oralik;
+    juda qisqa modified oralig'ini kengaytirish (30 kun ichida tahrir bo'lmasa 0 qator).
+    """
+    today = date.today()
+    if (today - end).days > 365:
+        return resolve_mfm_sync_date_range(None, None)
+    lb = mfm_sync_lookback_days()
+    if (end - begin).days < 60:
+        min_begin = end - timedelta(days=lb)
+        if begin > min_begin:
+            logger.info(
+                "mfm export date policy: modified_on oralig'i %s..%s dan %s..%s ga kengaytirildi (lb=%s kun)",
+                begin,
+                end,
+                min_begin,
+                end,
+                lb,
+            )
+            begin = min_begin
+    return begin, end
+
+
 def _extract_rows_list(data: Any) -> list | None:
     """Extract list of rows from API response (dict or list)."""
     if isinstance(data, list) and data:
@@ -117,7 +170,14 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
     data = json.loads(body)
     rows = _extract_rows_list(data)
     if not rows:
-        logger.warning("mfm movement$export: javobda ro'yxat topilmadi (body_len=%s)", len(body))
+        keys = list(data.keys()) if isinstance(data, dict) else []
+        preview = (body[:500] if body else "").replace("\n", " ")
+        logger.warning(
+            "mfm movement$export: javobda ro'yxat topilmadi (body_len=%s keys=%s preview=%s)",
+            len(body),
+            keys,
+            preview,
+        )
         return SmartupOrderExportResponse(items=[])
 
     first = rows[0] if rows else {}

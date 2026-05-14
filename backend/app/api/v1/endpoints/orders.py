@@ -34,8 +34,11 @@ from app.services.safe_cancel_return_service import initiate_safe_cancel_return
 from app.integrations.smartup.client import SmartupClient
 from app.integrations.smartup.importer import delete_stale_orders, import_orders
 from app.integrations.smartup.mfm_movement import (
+    apply_mfm_export_date_policy,
     export_mfm_movements,
+    mfm_sync_lookback_days,
     resolve_movement_export_date_range,
+    resolve_mfm_sync_date_range,
     _mfm_movement_export_omit_dates,
     _mfm_send_status_in_export_body,
 )
@@ -1352,7 +1355,7 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                 detail="Diller sync already in progress (worker or another request). Try again later.",
             )
         try:
-            begin, end = resolve_movement_export_date_range(
+            begin, end = resolve_mfm_sync_date_range(
                 payload.begin_deal_date,
                 payload.end_deal_date,
             )
@@ -1361,14 +1364,7 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                     status_code=400,
                     detail="begin_deal_date must be <= end_deal_date",
                 )
-            today = date.today()
-            if (today - end).days > 365:
-                logger.warning(
-                    "sync-smartup(diller): end_deal_date juda eski (%s, bugun %s), default 30 kun oralig'i ishlatiladi",
-                    end,
-                    today,
-                )
-                begin, end = resolve_movement_export_date_range(None, None)
+            begin, end = apply_mfm_export_date_policy(begin, end)
             filial_override = (payload.filial_id or "").strip() or None
             response = export_mfm_movements(begin, end, filial_id=filial_override)
             items = response.items
@@ -1426,8 +1422,8 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                     "diller_items_from_smartup": len(items),
                     "diller_begin_date": str(begin),
                     "diller_end_date": str(end),
+                    "mfm_sync_lookback_days": mfm_sync_lookback_days(),
                     "mfm_omit_dates": _mfm_movement_export_omit_dates(),
-                    "mfm_send_status_in_body": _mfm_send_status_in_export_body(),
                     "import_skipped_by_reason": breakdown,
                 },
             )
@@ -1437,9 +1433,11 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                     updated=resp.updated,
                     skipped=resp.skipped,
                     detail=(
-                        f"SmartUp mfm: 0 ta qator keldi (sana {begin}..{end}, "
+                        f"SmartUp mfm: 0 ta qator (modified_on {begin}..{end}; "
                         f"filial={filial_override or 'env SMARTUP_FILIAL_ID'}, "
                         f"omit_dates={_mfm_movement_export_omit_dates()}). "
+                        "Agar harakatlar uzoq vaqt tahrirlanmagan bo'lsa SMARTUP_MFM_SYNC_LOOKBACK_DAYS ni oshiring (masalan 365). "
+                        "Javob tuzilmasi: logda mfm movement$export keys=... "
                         "Brauzerda date_from/date_to eski bo'lsa Filter → Tozalash. "
                         "VPS: journalctl -u wms-api -n 200 — matnda WMS diller yoki mfm movement qidiring"
                     ),

@@ -461,11 +461,11 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     try {
       if (orderSource === 'diller') {
         try {
-          // SmartUp MFM: har doim oxirgi 30 kun (filtr panelidagi date_from/date_to faqat DB ro'yxati uchun)
+          // SmartUp MFM modified_on: qisqa 30 kun ichida tahrir bo'lmasa 0 qator; server qisqa oralikni kengaytiradi.
           const today = new Date()
           const endDealStr = today.toISOString().slice(0, 10)
           const beginDeal = new Date(today)
-          beginDeal.setDate(beginDeal.getDate() - 30)
+          beginDeal.setDate(beginDeal.getDate() - 120)
           const beginDealStr = beginDeal.toISOString().slice(0, 10)
           const result = await syncSmartupOrders({
             order_source: 'diller',

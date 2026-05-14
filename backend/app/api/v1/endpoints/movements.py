@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.deps import require_permission
 from app.db import get_db
-from app.integrations.smartup.mfm_movement import fetch_mfm_movements_raw, resolve_movement_export_date_range
+from app.integrations.smartup.mfm_movement import fetch_mfm_movements_raw, resolve_mfm_sync_date_range
 from app.models.order import Order as OrderModel
 from app.models.order import OrderWmsState as OrderWmsStateModel
 
@@ -90,7 +90,7 @@ def _fetch_movements_sync(
     status_allowed: frozenset[str] | None = None,
 ) -> list[Any]:
     """Smartup dan to'liq ro'yxat. status_allowed None bo'lsa status bo'yicha filtr yo'q; aks holda IN jadvali."""
-    begin, end = resolve_movement_export_date_range(None, None)
+    begin, end = resolve_mfm_sync_date_range(None, None)
     raw = fetch_mfm_movements_raw(begin, end, filial_id=filial_id)
     movement_list = raw.get("movement") if isinstance(raw.get("movement"), list) else []
     if status_allowed is None:
