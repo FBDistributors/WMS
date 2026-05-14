@@ -133,7 +133,8 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const [searchParams, setSearchParams] = useSearchParams()
   const isMainOrdersSimple = mode === 'default' && !orderSource
   const rawGroup = searchParams.get('group')
-  const group = rawGroup ?? (mode === 'statuses' ? 'all' : 'yangi')
+  const group =
+    rawGroup ?? (mode === 'statuses' ? 'all' : orderSource === 'diller' ? 'all' : 'yangi')
   const syncedFrom = searchParams.get('synced_from') ?? ''
   const searchQuery = searchParams.get('q') ?? ''
   const brandFilter = searchParams.get('brand_id') ?? ''
@@ -217,7 +218,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const [filterBrandId, setFilterBrandId] = useState('')
   const [filterDateFrom, setFilterDateFrom] = useState('')
   const [filterDateTo, setFilterDateTo] = useState('')
-  const [filterOrderGroup, setFilterOrderGroup] = useState('yangi')
+  const [filterOrderGroup, setFilterOrderGroup] = useState(() => (orderSource === 'diller' ? 'all' : 'yangi'))
   const [items, setItems] = useState<OrderListItem[]>([])
   const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
@@ -434,7 +435,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       setFilterDateFrom(dateFrom)
       setFilterDateTo(dateTo)
       if (!isMainOrdersSimple && mode === 'default' && (!orderSource || orderSource === 'diller')) {
-        setFilterOrderGroup(ORDER_GROUP_FILTER_VALUES.has(group) ? group : 'yangi')
+        setFilterOrderGroup(ORDER_GROUP_FILTER_VALUES.has(group) ? group : orderSource === 'diller' ? 'all' : 'yangi')
       }
       
     }
@@ -1020,7 +1021,11 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                     <Button
                       variant="secondary"
                       onClick={() => {
-                        if (!isMainOrdersSimple && mode === 'default' && (!orderSource || orderSource === 'diller')) setFilterOrderGroup('yangi')
+                        if (!isMainOrdersSimple && mode === 'default' && orderSource === 'diller') {
+                          setFilterOrderGroup('all')
+                        } else if (!isMainOrdersSimple && mode === 'default' && !orderSource) {
+                          setFilterOrderGroup('yangi')
+                        }
                         setSearchParams((prev) => {
                           const next = new URLSearchParams(prev)
                           next.delete('brand_id')
@@ -1052,7 +1057,8 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                           else next.delete('date_to')
                           next.delete('offset')
                           if (!isMainOrdersSimple && mode === 'default' && (!orderSource || orderSource === 'diller')) {
-                            if (filterOrderGroup === 'yangi') next.delete('group')
+                            const defaultGroup = orderSource === 'diller' ? 'all' : 'yangi'
+                            if (filterOrderGroup === defaultGroup) next.delete('group')
                             else next.set('group', filterOrderGroup)
                           }
                           return next
