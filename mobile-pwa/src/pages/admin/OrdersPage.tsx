@@ -133,8 +133,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const [searchParams, setSearchParams] = useSearchParams()
   const isMainOrdersSimple = mode === 'default' && !orderSource
   const rawGroup = searchParams.get('group')
-  const group =
-    rawGroup ?? (mode === 'statuses' ? 'all' : orderSource === 'diller' ? 'all' : 'yangi')
+  const group = rawGroup ?? (mode === 'statuses' ? 'all' : 'yangi')
   const syncedFrom = searchParams.get('synced_from') ?? ''
   const searchQuery = searchParams.get('q') ?? ''
   const brandFilter = searchParams.get('brand_id') ?? ''
@@ -218,7 +217,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const [filterBrandId, setFilterBrandId] = useState('')
   const [filterDateFrom, setFilterDateFrom] = useState('')
   const [filterDateTo, setFilterDateTo] = useState('')
-  const [filterOrderGroup, setFilterOrderGroup] = useState(() => (orderSource === 'diller' ? 'all' : 'yangi'))
+  const [filterOrderGroup, setFilterOrderGroup] = useState('yangi')
   const [items, setItems] = useState<OrderListItem[]>([])
   const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
@@ -435,7 +434,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       setFilterDateFrom(dateFrom)
       setFilterDateTo(dateTo)
       if (!isMainOrdersSimple && mode === 'default' && (!orderSource || orderSource === 'diller')) {
-        setFilterOrderGroup(ORDER_GROUP_FILTER_VALUES.has(group) ? group : orderSource === 'diller' ? 'all' : 'yangi')
+        setFilterOrderGroup(ORDER_GROUP_FILTER_VALUES.has(group) ? group : 'yangi')
       }
       
     }
@@ -462,25 +461,8 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     try {
       if (orderSource === 'diller') {
         try {
-          const df = dateFrom.trim()
-          const dt = dateTo.trim()
-          let beginDealStr: string
-          let endDealStr: string
-          if (df && dt) {
-            beginDealStr = df
-            endDealStr = dt
-          } else {
-            const today = new Date()
-            endDealStr = today.toISOString().slice(0, 10)
-            const beginDeal = new Date(today)
-            // Worker/smartup_sync.resolve_movement_export_date_range bilan mos: sanalar bo‘lmasa 30 kun
-            beginDeal.setDate(beginDeal.getDate() - 30)
-            beginDealStr = beginDeal.toISOString().slice(0, 10)
-          }
           const result = await syncSmartupOrders({
             order_source: 'diller',
-            begin_deal_date: beginDealStr,
-            end_deal_date: endDealStr,
           })
           setSyncResult(result)
         } catch (syncErr) {
@@ -1021,11 +1003,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                     <Button
                       variant="secondary"
                       onClick={() => {
-                        if (!isMainOrdersSimple && mode === 'default' && orderSource === 'diller') {
-                          setFilterOrderGroup('all')
-                        } else if (!isMainOrdersSimple && mode === 'default' && !orderSource) {
-                          setFilterOrderGroup('yangi')
-                        }
+                        if (!isMainOrdersSimple && mode === 'default' && (!orderSource || orderSource === 'diller')) setFilterOrderGroup('yangi')
                         setSearchParams((prev) => {
                           const next = new URLSearchParams(prev)
                           next.delete('brand_id')
@@ -1057,8 +1035,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                           else next.delete('date_to')
                           next.delete('offset')
                           if (!isMainOrdersSimple && mode === 'default' && (!orderSource || orderSource === 'diller')) {
-                            const defaultGroup = orderSource === 'diller' ? 'all' : 'yangi'
-                            if (filterOrderGroup === defaultGroup) next.delete('group')
+                            if (filterOrderGroup === 'yangi') next.delete('group')
                             else next.set('group', filterOrderGroup)
                           }
                           return next

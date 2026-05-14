@@ -1351,31 +1351,18 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                 detail="Diller sync already in progress (worker or another request). Try again later.",
             )
         try:
-            begin, end = resolve_movement_export_date_range(
-                payload.begin_deal_date,
-                payload.end_deal_date,
-            )
-            if begin > end:
-                raise HTTPException(
-                    status_code=400,
-                    detail="begin_deal_date must be <= end_deal_date",
-                )
             filial_override = (payload.filial_id or "").strip() or None
-            response = export_mfm_movements(begin, end, filial_id=filial_override)
+            response = export_mfm_movements(filial_id=filial_override)
             items = response.items
             logger.info(
                 "sync-smartup(diller): mfm javobdan %s ta order import qilishga yuboriladi "
-                "(sana=%s..%s filial_override=%s)",
+                "(mfm sana filtri yo'q; filial_override=%s)",
                 len(items),
-                begin,
-                end,
                 filial_override or "-",
             )
             logging.getLogger("uvicorn").info(
-                "WMS diller: mfm_items=%s dates=%s..%s filial=%s",
+                "WMS diller: mfm_items=%s filial=%s",
                 len(items),
-                begin,
-                end,
                 filial_override or "-",
             )
             created, updated, skipped, import_errors, skipped_by_reason = import_orders(
@@ -1413,8 +1400,7 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                 skipped_by_reason,
                 extra_debug={
                     "diller_items_from_smartup": len(items),
-                    "diller_begin_date": str(begin),
-                    "diller_end_date": str(end),
+                    "mfm_date_filter": "none",
                     "mfm_send_status_in_body": _mfm_send_status_in_export_body(),
                     "import_skipped_by_reason": breakdown,
                 },

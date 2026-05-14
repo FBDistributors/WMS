@@ -38,16 +38,6 @@ def _mfm_send_status_in_export_body() -> bool:
     return v in ("1", "true", "yes", "on")
 
 
-def _mfm_export_fill_created_date_range() -> bool:
-    """
-    Postman / SmartUp UI odatda begin_created_on/end_created_on ni bo'sh qoldirib,
-    faqat begin_modified_on/end_modified_on bilan filtrlashadi.
-    Default: bo'sh (Postman bilan bir xil). Eski xatti-harakat: SMARTUP_MFM_EXPORT_FILL_CREATED_RANGE=true
-    """
-    v = (os.getenv("SMARTUP_MFM_EXPORT_FILL_CREATED_RANGE") or "").strip().lower()
-    return v in ("1", "true", "yes", "on")
-
-
 def _normalize_movement_row_status(raw: Any) -> str:
     if raw is None:
         return normalize_order_wms_status_for_storage(None)
@@ -61,8 +51,9 @@ def resolve_movement_export_date_range(
     end: date | None,
 ) -> tuple[date, date]:
     """
-    SmartUp movement$export uchun sana oralig'i.
-    GET /movements bilan bir xil: ikkalasi ham bo'sh bo'lsa — bugundan 30 kun oldingi.
+    SmartUp mkw movement$export (o'rikzor) uchun sana oralig'i.
+    MFM tashkiliy harakat (mfm/movement$export) SmartUp ga sana yubormaydi.
+    Ikkala sana ham bo'sh bo'lsa — bugundan 30 kun oldingi.
     """
     today = date.today()
     if begin is None and end is None:
@@ -279,16 +270,10 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
     return SmartupOrderExportResponse(items=orders)
 
 
-def _request_mfm_export(
-    begin_date: date,
-    end_date: date,
-    filial_id: str | None = None,
-    begin_modified_on: date | None = None,
-    end_modified_on: date | None = None,
-) -> str:
+def _request_mfm_export(filial_id: str | None = None) -> str:
     """
     Call SmartUp mfm movement$export, return raw response body (JSON string).
-    begin_modified_on/end_modified_on berilsa faqat o'sha vaqtda o'zgartirilgan yozuvlar so'raladi (delta sync).
+    Sana maydonlari bo'sh yuboriladi — filtrlashni SmartUp o'zi qiladi (Postman bilan bir xil).
     """
     url = (os.getenv("SMARTUP_MFM_MOVEMENT_EXPORT_URL") or DEFAULT_MFM_URL).strip()
     project_code = (os.getenv("SMARTUP_PROJECT_CODE") or "trade").strip()
@@ -300,26 +285,15 @@ def _request_mfm_export(
             "Cross-organizational movement sync uchun SMARTUP_BASIC_USER va SMARTUP_BASIC_PASS ni to'ldiring."
         )
 
-    begin_str = begin_date.strftime("%d.%m.%Y")
-    end_str = end_date.strftime("%d.%m.%Y")
-    mod_begin = begin_modified_on.strftime("%d.%m.%Y") if begin_modified_on else begin_str
-    mod_end = end_modified_on.strftime("%d.%m.%Y") if end_modified_on else end_str
-    if _mfm_export_fill_created_date_range():
-        created_begin = begin_str
-        created_end = end_str
-    else:
-        # Postman namunasiga mos: yaratilgan sana filtri yo'q, faqat modified oralig'i
-        created_begin = ""
-        created_end = ""
     payload: dict[str, Any] = {
         "filial_codes": [{"filial_code": ""}],
         "filial_code": "",
         "external_id": "",
         "movement_id": "",
-        "begin_created_on": created_begin,
-        "end_created_on": created_end,
-        "begin_modified_on": mod_begin,
-        "end_modified_on": mod_end,
+        "begin_created_on": "",
+        "end_created_on": "",
+        "begin_modified_on": "",
+        "end_modified_on": "",
     }
     if _mfm_send_status_in_export_body():
         payload["status"] = _mfm_export_request_status()
@@ -335,11 +309,8 @@ def _request_mfm_export(
     }
 
     logger.info(
-        "mfm movement$export: url=%s modified_on=%s..%s created_on_filled=%s send_status_in_body=%s status_value=%s",
+        "mfm movement$export: url=%s date_fields=empty send_status_in_body=%s status_value=%s",
         url.split("?")[0],
-        mod_begin,
-        mod_end,
-        _mfm_export_fill_created_date_range(),
         _mfm_send_status_in_export_body(),
         _mfm_export_request_status() if _mfm_send_status_in_export_body() else "-",
     )
@@ -360,43 +331,18 @@ def _request_mfm_export(
         raise RuntimeError(f"Smartup mfm movement$export failed: {exc}") from exc
 
 
-def fetch_mfm_movements_raw(
-    begin_date: date,
-    end_date: date,
-    filial_id: str | None = None,
-    begin_modified_on: date | None = None,
-    end_modified_on: date | None = None,
-) -> dict:
+def fetch_mfm_movements_raw(filial_id: str | None = None) -> dict:
     """
     Call SmartUp mfm movement$export and return raw JSON as dict (e.g. {"movement": [...]}).
-    begin_modified_on/end_modified_on orqali delta sync (faqat o'zgarishlar) qilish mumkin.
     """
-    body = _request_mfm_export(
-        begin_date=begin_date,
-        end_date=end_date,
-        filial_id=filial_id,
-        begin_modified_on=begin_modified_on,
-        end_modified_on=end_modified_on,
-    )
+    body = _request_mfm_export(filial_id=filial_id)
     return json.loads(body)
 
 
-def export_mfm_movements(
-    begin_date: date,
-    end_date: date,
-    filial_id: str | None = None,
-    begin_modified_on: date | None = None,
-    end_modified_on: date | None = None,
-) -> SmartupOrderExportResponse:
+def export_mfm_movements(filial_id: str | None = None) -> SmartupOrderExportResponse:
     """
     Call SmartUp mfm movement$export (Cross-organizational movement), return SmartupOrder list.
     """
-    body = _request_mfm_export(
-        begin_date=begin_date,
-        end_date=end_date,
-        filial_id=filial_id,
-        begin_modified_on=begin_modified_on,
-        end_modified_on=end_modified_on,
-    )
+    body = _request_mfm_export(filial_id=filial_id)
     logger.info("export_mfm_movements: HTTP body_len=%s", len(body))
     return _parse_mfm_response(body)

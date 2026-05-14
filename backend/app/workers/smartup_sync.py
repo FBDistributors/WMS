@@ -110,8 +110,7 @@ def sync_diller_movements() -> Tuple[int, str | None, list]:
     and upsert into orders table with order_source='diller'.
     """
     try:
-        begin, end = resolve_movement_export_date_range(None, None)
-        response = export_mfm_movements(begin, end)
+        response = export_mfm_movements()
         items = response.items
         logger.info("Diller movements sync: %d ta harakat (mfm movement$export)", len(items))
 
