@@ -461,20 +461,12 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     try {
       if (orderSource === 'diller') {
         try {
-          const df = dateFrom.trim()
-          const dt = dateTo.trim()
-          let beginDealStr: string
-          let endDealStr: string
-          if (df && dt) {
-            beginDealStr = df
-            endDealStr = dt
-          } else {
-            const today = new Date()
-            endDealStr = today.toISOString().slice(0, 10)
-            const beginDeal = new Date(today)
-            beginDeal.setDate(beginDeal.getDate() - 30)
-            beginDealStr = beginDeal.toISOString().slice(0, 10)
-          }
+          // SmartUp MFM: har doim oxirgi 30 kun (filtr panelidagi date_from/date_to faqat DB ro'yxati uchun)
+          const today = new Date()
+          const endDealStr = today.toISOString().slice(0, 10)
+          const beginDeal = new Date(today)
+          beginDeal.setDate(beginDeal.getDate() - 30)
+          const beginDealStr = beginDeal.toISOString().slice(0, 10)
           const result = await syncSmartupOrders({
             order_source: 'diller',
             begin_deal_date: beginDealStr,

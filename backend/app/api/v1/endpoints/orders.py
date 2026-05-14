@@ -1361,6 +1361,14 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                     status_code=400,
                     detail="begin_deal_date must be <= end_deal_date",
                 )
+            today = date.today()
+            if (today - end).days > 365:
+                logger.warning(
+                    "sync-smartup(diller): end_deal_date juda eski (%s, bugun %s), default 30 kun oralig'i ishlatiladi",
+                    end,
+                    today,
+                )
+                begin, end = resolve_movement_export_date_range(None, None)
             filial_override = (payload.filial_id or "").strip() or None
             response = export_mfm_movements(begin, end, filial_id=filial_override)
             items = response.items
@@ -1432,6 +1440,7 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                         f"SmartUp mfm: 0 ta qator keldi (sana {begin}..{end}, "
                         f"filial={filial_override or 'env SMARTUP_FILIAL_ID'}, "
                         f"omit_dates={_mfm_movement_export_omit_dates()}). "
+                        "Brauzerda date_from/date_to eski bo'lsa Filter → Tozalash. "
                         "VPS: journalctl -u wms-api -n 200 — matnda WMS diller yoki mfm movement qidiring"
                     ),
                     errors_count=resp.errors_count,
