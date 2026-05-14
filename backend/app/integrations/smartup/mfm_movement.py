@@ -47,6 +47,20 @@ def _mfm_export_fill_created_date_range() -> bool:
     return v in ("1", "true", "yes", "on")
 
 
+def mfm_date_filter_mode() -> str:
+    """
+    mfm/movement$export sanalar qaysi maydonga yoziladi.
+    modified — begin_modified_on/end_modified_on (default).
+    created — faqat begin_created_on/end_created_on; modified bo'sh qator.
+    both — ikkala juft ham bir xil DD.MM.YYYY oralig'i (sinov).
+    SMARTUP_MFM_DATE_FILTER_MODE
+    """
+    v = (os.getenv("SMARTUP_MFM_DATE_FILTER_MODE") or "modified").strip().lower()
+    if v in ("created", "both", "modified"):
+        return v
+    return "modified"
+
+
 def _mfm_movement_export_omit_dates() -> bool:
     """
     True bo'lsa begin_* / end_* sanalari bo'sh yuboriladi (ba'zi SmartUp konfiguratsiyalari bo'sh javob berishi mumkin).
@@ -385,14 +399,24 @@ def _request_mfm_export(
     else:
         begin_str = begin_date.strftime("%d.%m.%Y")
         end_str = end_date.strftime("%d.%m.%Y")
-        mod_begin = begin_modified_on.strftime("%d.%m.%Y") if begin_modified_on else begin_str
-        mod_end = end_modified_on.strftime("%d.%m.%Y") if end_modified_on else end_str
-        if _mfm_export_fill_created_date_range():
-            created_begin = begin_str
-            created_end = end_str
+        mode = mfm_date_filter_mode()
+        if mode == "created":
+            created_begin, created_end = begin_str, end_str
+            mod_begin = ""
+            mod_end = ""
+        elif mode == "both":
+            created_begin, created_end = begin_str, end_str
+            mod_begin = begin_modified_on.strftime("%d.%m.%Y") if begin_modified_on else begin_str
+            mod_end = end_modified_on.strftime("%d.%m.%Y") if end_modified_on else end_str
         else:
-            created_begin = ""
-            created_end = ""
+            mod_begin = begin_modified_on.strftime("%d.%m.%Y") if begin_modified_on else begin_str
+            mod_end = end_modified_on.strftime("%d.%m.%Y") if end_modified_on else end_str
+            if _mfm_export_fill_created_date_range():
+                created_begin = begin_str
+                created_end = end_str
+            else:
+                created_begin = ""
+                created_end = ""
         payload = {
             "filial_codes": [{"filial_code": ""}],
             "filial_code": "",
@@ -417,12 +441,14 @@ def _request_mfm_export(
     }
 
     logger.info(
-        "mfm movement$export: url=%s omit_dates=%s modified_on=%s..%s created_on_filled=%s send_status_in_body=%s status_value=%s",
+        "mfm movement$export: url=%s omit_dates=%s date_mode=%s created_on=%s..%s modified_on=%s..%s send_status_in_body=%s status_value=%s",
         url.split("?")[0],
         _mfm_movement_export_omit_dates(),
+        mfm_date_filter_mode(),
+        created_begin,
+        created_end,
         mod_begin,
         mod_end,
-        _mfm_export_fill_created_date_range(),
         _mfm_send_status_in_export_body(),
         _mfm_export_request_status() if _mfm_send_status_in_export_body() else "-",
     )

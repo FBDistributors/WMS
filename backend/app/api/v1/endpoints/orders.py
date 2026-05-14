@@ -36,6 +36,7 @@ from app.integrations.smartup.importer import delete_stale_orders, import_orders
 from app.integrations.smartup.mfm_movement import (
     apply_mfm_export_date_policy,
     export_mfm_movements,
+    mfm_date_filter_mode,
     mfm_sync_lookback_days,
     resolve_movement_export_date_range,
     resolve_mfm_sync_date_range,
@@ -1422,6 +1423,7 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                     "diller_items_from_smartup": len(items),
                     "diller_begin_date": str(begin),
                     "diller_end_date": str(end),
+                    "mfm_date_filter_mode": mfm_date_filter_mode(),
                     "mfm_sync_lookback_days": mfm_sync_lookback_days(),
                     "mfm_omit_dates": _mfm_movement_export_omit_dates(),
                     "import_skipped_by_reason": breakdown,
@@ -1433,10 +1435,12 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                     updated=resp.updated,
                     skipped=resp.skipped,
                     detail=(
-                        f"SmartUp mfm: 0 ta qator (modified_on {begin}..{end}; "
+                        f"SmartUp mfm: 0 ta qator (mode={mfm_date_filter_mode()}, "
+                        f"sana {begin}..{end}; "
                         f"filial={filial_override or 'env SMARTUP_FILIAL_ID'}, "
                         f"omit_dates={_mfm_movement_export_omit_dates()}). "
-                        "Agar harakatlar uzoq vaqt tahrirlanmagan bo'lsa SMARTUP_MFM_SYNC_LOOKBACK_DAYS ni oshiring (masalan 365). "
+                        "Yaratilgan sana bilan sinash: SMARTUP_MFM_DATE_FILTER_MODE=created. "
+                        "Agar harakatlar uzoq vaqt tahrirlanmagan bo'lsa SMARTUP_MFM_SYNC_LOOKBACK_DAYS ni oshiring. "
                         "Javob tuzilmasi: logda mfm movement$export keys=... "
                         "Brauzerda date_from/date_to eski bo'lsa Filter → Tozalash. "
                         "VPS: journalctl -u wms-api -n 200 — matnda WMS diller yoki mfm movement qidiring"
