@@ -5,7 +5,8 @@
 #
 # Muhit o‘zgaruvchilari (ixtiyoriy):
 #   WMS_DEPLOY_DIR     — backend katalogi (default: joriy katalog)
-#   WMS_VENV_BIN       — venv ichidagi bin (default: $WMS_DEPLOY_DIR/.venv/bin)
+#   WMS_VENV_BIN       — venv ichidagi bin (default: $WMS_DEPLOY_DIR/.venv/bin;
+#                        topilmasa: backend/venv, ildiz/venv, ildiz/.venv qarab chiqiladi)
 #   WMS_DEPLOY_USER    — linux user (default: www-data)
 #   WMS_PORT           — API port (default: 8000)
 #   WMS_SKIP_WORKER    — 1 bo‘lsa faqat API unit yoziladi
@@ -27,8 +28,23 @@ if [[ "$(id -u)" -ne 0 ]]; then
 fi
 
 if [[ ! -x "$WMS_VENV_BIN/uvicorn" ]]; then
-  echo "uvicorn topilmadi: $WMS_VENV_BIN/uvicorn — WMS_VENV_BIN yoki venv ni tekshiring." >&2
-  exit 1
+  _repo_root="$(cd "$WMS_DEPLOY_DIR/.." && pwd)"
+  _found=""
+  for _c in "$WMS_DEPLOY_DIR/.venv/bin" "$WMS_DEPLOY_DIR/venv/bin" "$_repo_root/venv/bin" "$_repo_root/.venv/bin"; do
+    if [[ -x "$_c/uvicorn" ]]; then
+      _found="$_c"
+      break
+    fi
+  done
+  if [[ -n "$_found" ]]; then
+    echo "Eslatma: uvicorn $WMS_VENV_BIN da yo'q, ishlatiladi: $_found" >&2
+    WMS_VENV_BIN="$_found"
+  else
+    echo "uvicorn topilmadi. Quyidagilardan birini bajaring:" >&2
+    echo "  1) cd $WMS_DEPLOY_DIR && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt" >&2
+    echo "  2) yoki: export WMS_VENV_BIN=/to'g'ri/venv/bin && sudo bash $0" >&2
+    exit 1
+  fi
 fi
 
 if [[ ! -x "$WMS_VENV_BIN/python" ]]; then

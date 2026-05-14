@@ -7,6 +7,8 @@
 #   export WMS_PORT=8000
 #   ./install-systemd-units.sh
 #
+# Oldin: backend/.venv yoki repo ildizida venv — ichida uvicorn bo'lishi kerak.
+# O'rnatish: sudo bash deploy/vps/install-systemd-units.sh (venv yo'li avtomatik qidiriladi).
 # Loglar: journalctl -u wms-api -f
 # Yoki faylga yozish uchun quyidagi ikki qatorni [Service] ichida yoqing (log papkasini oldin yarating):
 #   StandardOutput=append:/var/log/wms/api.log
