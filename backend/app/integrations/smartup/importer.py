@@ -295,25 +295,38 @@ def import_orders(
                 updated += u
                 skipped += s
 
-    if orders_list and (created + updated) > 0:
-        for i, order in enumerate(orders_list[:3]):
+    label = (order_source or "smartup").strip() or "smartup"
+    preview_reason = (
+        label in ("diller", "orikzor")
+        or len(orders_list) <= 30
+        or (len(orders_list) > 0 and created == 0 and updated == 0)
+    )
+    if orders_list and preview_reason:
+        for i, order in enumerate(orders_list[:5]):
             ext = _resolve_external_id(order)
             logger.info(
-                "O'rikzor import preview [%s]: external_id=%s order_no=%s status=%s lines=%s",
+                "import_orders preview [%s] source=%s: external_id=%s order_no=%s status=%s lines=%s",
                 i,
+                label,
                 ext,
                 order.order_no,
                 order.status,
                 len(order.lines) if order.lines else 0,
             )
 
+    skipped_breakdown = {k: v for k, v in skipped_by_reason.items() if v}
+    if skipped_breakdown:
+        logger.info("import_orders skipped_by_reason source=%s: %s", label, skipped_breakdown)
+
     logger.info(
-        "import_orders done: created=%s updated=%s skipped=%s errors=%s batch_size=%s",
+        "import_orders done source=%s: created=%s updated=%s skipped=%s errors=%s batch_size=%s in=%s",
+        label,
         created,
         updated,
         skipped,
         len(errors),
         batch_size,
+        len(orders_list),
     )
     return created, updated, skipped, errors, skipped_by_reason
 

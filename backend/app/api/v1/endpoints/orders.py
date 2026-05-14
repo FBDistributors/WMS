@@ -1363,10 +1363,33 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
             filial_override = (payload.filial_id or "").strip() or None
             response = export_mfm_movements(begin, end, filial_id=filial_override)
             items = response.items
-            logger.info("sync-smartup(diller): %d ta harakat (mfm movement$export)", len(items))
+            logger.info(
+                "sync-smartup(diller): mfm javobdan %s ta order import qilishga yuboriladi "
+                "(sana=%s..%s filial_override=%s)",
+                len(items),
+                begin,
+                end,
+                filial_override or "-",
+            )
             created, updated, skipped, import_errors, skipped_by_reason = import_orders(
                 db, items, order_source="diller"
             )
+            breakdown = {k: v for k, v in skipped_by_reason.items() if v}
+            logger.info(
+                "sync-smartup(diller): import_orders natija created=%s updated=%s skipped=%s errors=%s skipped_by=%s",
+                created,
+                updated,
+                skipped,
+                len(import_errors),
+                breakdown,
+            )
+            if import_errors:
+                for err in import_errors[:10]:
+                    logger.warning(
+                        "sync-smartup(diller) import xato: external_id=%s reason=%s",
+                        err.external_id,
+                        err.reason,
+                    )
             return _build_sync_response(
                 created,
                 updated,
@@ -1378,6 +1401,7 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                     "diller_begin_date": str(begin),
                     "diller_end_date": str(end),
                     "mfm_send_status_in_body": _mfm_send_status_in_export_body(),
+                    "import_skipped_by_reason": breakdown,
                 },
             )
         except RuntimeError as exc:

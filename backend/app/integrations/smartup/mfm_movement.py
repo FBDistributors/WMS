@@ -142,22 +142,28 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
     )
 
     orders: list[SmartupOrder] = []
+    parse_summary: dict[str, int | bool | str] = {"is_flat": is_flat, "raw_rows": len(rows)}
     if is_flat:
         # Group by movement_id or load_id
         groups: dict[str, list[dict]] = defaultdict(list)
+        skip_status = skip_no_gid = non_dict = 0
         for r in rows:
             if not isinstance(r, dict):
+                non_dict += 1
                 continue
             if not _mfm_row_matches_export_status(r):
+                skip_status += 1
                 continue
             gid = (
                 str(r.get("movement_id") or r.get("movement_number") or r.get("load_id") or "")
             ).strip() or str(r.get("movement_unit_id") or "")
             if not gid:
+                skip_no_gid += 1
                 continue
             groups[gid].append(r)
 
         default_filial = (os.getenv("DEFAULT_WAREHOUSE_CODE") or os.getenv("SMARTUP_DEFAULT_FILIAL") or "MAIN").strip()
+        skip_empty_lines = validation_failed = 0
         for group_id, unit_rows in groups.items():
             lines = []
             filial = default_filial
@@ -182,6 +188,7 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
                 if ext:
                     external_id = ext
             if not lines:
+                skip_empty_lines += 1
                 continue
             order_dict = {
                 "external_id": external_id or f"mfm:{group_id}",
@@ -195,20 +202,38 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
             try:
                 orders.append(SmartupOrder.model_validate(order_dict))
             except PydanticValidationError as exc:
+                validation_failed += 1
                 logger.warning("mfm movement to order skip group_id=%s: %s", group_id, exc)
             except Exception as exc:  # noqa: BLE001
+                validation_failed += 1
                 logger.warning("mfm movement to order skip group_id=%s: %s", group_id, exc)
+        parse_summary.update(
+            {
+                "groups": len(groups),
+                "skip_row_status": skip_status,
+                "skip_row_no_gid": skip_no_gid,
+                "skip_non_dict": non_dict,
+                "skip_empty_lines_group": skip_empty_lines,
+                "validation_failed": validation_failed,
+                "want_status": _mfm_export_request_status(),
+                "send_status_in_body": str(_mfm_send_status_in_export_body()),
+            }
+        )
         logger.info("mfm movement$export: %s ta guruh -> %s ta order (flat)", len(groups), len(orders))
     else:
         # Movement-level: movement_id, movement_items, from_warehouse_code, to_warehouse_code, note (sklad-sklad)
         default_filial = (os.getenv("DEFAULT_WAREHOUSE_CODE") or os.getenv("SMARTUP_DEFAULT_FILIAL") or "MAIN").strip()
+        skip_status = skip_no_mid = non_dict = validation_failed = 0
         for m in rows:
             if not isinstance(m, dict):
+                non_dict += 1
                 continue
             if not _mfm_row_matches_export_status(m):
+                skip_status += 1
                 continue
             movement_id = (m.get("movement_id") or m.get("movement_number") or "").strip()
             if not movement_id:
+                skip_no_mid += 1
                 continue
             items = m.get("movement_items") or m.get("movement_itens") or m.get("movementItems") or []
             if not isinstance(items, list):
@@ -254,11 +279,25 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
             try:
                 orders.append(SmartupOrder.model_validate(order_dict))
             except PydanticValidationError as exc:
+                validation_failed += 1
                 logger.warning("mfm movement skip movement_id=%s: %s", movement_id, exc)
             except Exception as exc:  # noqa: BLE001
+                validation_failed += 1
                 logger.warning("mfm movement skip movement_id=%s: %s", movement_id, exc)
+        parse_summary.update(
+            {
+                "skip_row_status": skip_status,
+                "skip_row_no_movement_id": skip_no_mid,
+                "skip_non_dict": non_dict,
+                "validation_failed": validation_failed,
+                "want_status": _mfm_export_request_status(),
+                "send_status_in_body": str(_mfm_send_status_in_export_body()),
+            }
+        )
         logger.info("mfm movement$export: %s ta order (movement-level)", len(orders))
 
+    parse_summary["orders_out"] = len(orders)
+    logger.info("mfm movement$export parse summary: %s", parse_summary)
     logger.info("mfm movement$export parse: smartup_orders_out=%s", len(orders))
     return SmartupOrderExportResponse(items=orders)
 

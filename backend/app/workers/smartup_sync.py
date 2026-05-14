@@ -117,13 +117,26 @@ def sync_diller_movements() -> Tuple[int, str | None, list]:
 
         db = SessionLocal()
         try:
-            created, updated, skipped, errors, _ = import_orders(db, items, order_source="diller")
+            created, updated, skipped, errors, skipped_by_reason = import_orders(
+                db, items, order_source="diller"
+            )
             count = created + updated
+            breakdown = {k: v for k, v in skipped_by_reason.items() if v}
             if errors:
                 logger.warning("Diller sync: %d errors (first: %s)", len(errors), errors[0].reason)
+                for err in errors[:10]:
+                    logger.warning(
+                        "Diller sync import xato: external_id=%s reason=%s",
+                        err.external_id,
+                        err.reason,
+                    )
             logger.info(
-                "Diller sync: created=%d updated=%d skipped=%d errors=%d",
-                created, updated, skipped, len(errors),
+                "Diller sync: created=%d updated=%d skipped=%d errors=%d skipped_by=%s",
+                created,
+                updated,
+                skipped,
+                len(errors),
+                breakdown,
             )
             return count, None, [e.__dict__ for e in errors]
         finally:
