@@ -1,0 +1,26 @@
+# SmartUp sinxron worker — VPS uchun systemd unit namunasi.
+# Loglar: journalctl -u wms-smartup-worker -f
+
+[Unit]
+Description=WMS SmartUp sync worker
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=@WMS_DEPLOY_USER@
+Group=@WMS_DEPLOY_USER@
+WorkingDirectory=@WMS_DEPLOY_DIR@
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=-/etc/wms/api.env
+
+ExecStart=@WMS_VENV_BIN@/python worker.py
+Restart=on-failure
+RestartSec=10
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=wms-smartup-worker
+
+[Install]
+WantedBy=multi-user.target

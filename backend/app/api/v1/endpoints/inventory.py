@@ -1658,7 +1658,7 @@ async def reserve_stuck_summary(
             sample=[],
         )
 
-    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    now_utc = datetime.now(timezone.utc)
 
     doc_reserve = aliased(DocumentModel)
     order_id_resolved = case(
@@ -1778,7 +1778,14 @@ async def reserve_stuck_summary(
     oldest_hours = 0
 
     for r in raw_rows:
-        age = now_utc - r.last_movement_at
+        last_at = r.last_movement_at
+        if last_at is None:
+            continue
+        if last_at.tzinfo is None:
+            last_at = last_at.replace(tzinfo=timezone.utc)
+        else:
+            last_at = last_at.astimezone(timezone.utc)
+        age = now_utc - last_at
         age_h = int(age.total_seconds() // 3600)
         if age_h < age_hours:
             continue

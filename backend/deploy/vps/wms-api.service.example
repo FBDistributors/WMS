@@ -1,0 +1,40 @@
+# WMS FastAPI (uvicorn) — VPS uchun systemd unit namunasi.
+#
+# O‘rnatish (root):
+#   export WMS_DEPLOY_DIR=/opt/wms/backend
+#   export WMS_VENV_BIN=/opt/wms/venv/bin
+#   export WMS_DEPLOY_USER=www-data
+#   export WMS_PORT=8000
+#   ./install-systemd-units.sh
+#
+# Loglar: journalctl -u wms-api -f
+# Yoki faylga yozish uchun quyidagi ikki qatorni [Service] ichida yoqing (log papkasini oldin yarating):
+#   StandardOutput=append:/var/log/wms/api.log
+#   StandardError=append:/var/log/wms/api.err.log
+
+[Unit]
+Description=WMS API (FastAPI / uvicorn)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=@WMS_DEPLOY_USER@
+Group=@WMS_DEPLOY_USER@
+WorkingDirectory=@WMS_DEPLOY_DIR@
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=-/etc/wms/api.env
+# Agar .env fayl ishlatsangiz (xavfsizlik: fayl ruxsatlari 600):
+# EnvironmentFile=-@WMS_DEPLOY_DIR@/.env
+
+ExecStart=@WMS_VENV_BIN@/uvicorn app.main:app --host 0.0.0.0 --port @WMS_PORT@ --proxy-headers --forwarded-allow-ips='*'
+Restart=on-failure
+RestartSec=5
+
+# Loglar systemd journal orqali (default)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=wms-api
+
+[Install]
+WantedBy=multi-user.target
