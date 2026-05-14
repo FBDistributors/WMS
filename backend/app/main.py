@@ -133,6 +133,8 @@ def on_startup() -> None:
     url = make_url(get_database_url())
     safe_target = f"{url.drivername}://{url.host}:{url.port}/{url.database}"
     logging.getLogger("uvicorn").info("Database configured: %s", safe_target)
+    # Uvicorn ba'zida faqat o'z loglarini INFO qiladi; SmartUp/MFM diagnostika app.* da
+    logging.getLogger("app").setLevel(logging.INFO)
 
 # Keyinchalik shu yerga routerlar ulanadi:
 # from app.api.v1.router import router as api_router
