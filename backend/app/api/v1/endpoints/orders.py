@@ -33,7 +33,7 @@ from app.services.push_notifications import send_push_to_user
 from app.services.safe_cancel_return_service import initiate_safe_cancel_return
 from app.integrations.smartup.client import SmartupClient
 from app.integrations.smartup.importer import delete_stale_orders, import_orders
-from app.integrations.smartup.mfm_movement import export_mfm_movements
+from app.integrations.smartup.mfm_movement import export_mfm_movements, resolve_movement_export_date_range
 from app.integrations.smartup.orikzor import export_movements_from_smartup
 from app.integrations.smartup.sync_lock import diller_sync_lock, orikzor_sync_lock, smartup_sync_lock
 from app.models.document import Document as DocumentModel
@@ -1347,7 +1347,17 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                 detail="Diller sync already in progress (worker or another request). Try again later.",
             )
         try:
-            response = export_mfm_movements()
+            begin, end = resolve_movement_export_date_range(
+                payload.begin_deal_date,
+                payload.end_deal_date,
+            )
+            if begin > end:
+                raise HTTPException(
+                    status_code=400,
+                    detail="begin_deal_date must be <= end_deal_date",
+                )
+            filial_override = (payload.filial_id or "").strip() or None
+            response = export_mfm_movements(begin, end, filial_id=filial_override)
             items = response.items
             logger.info("sync-smartup(diller): %d ta harakat (mfm movement$export)", len(items))
             created, updated, skipped, import_errors, skipped_by_reason = import_orders(
@@ -1371,7 +1381,16 @@ async def _sync_orikzor(db: Session, payload: SmartupSyncRequest) -> SmartupSync
                 detail="O'rikzor sync already in progress (worker or another request). Try again later.",
             )
         try:
-            response = export_movements_from_smartup()
+            begin, end = resolve_movement_export_date_range(
+                payload.begin_deal_date,
+                payload.end_deal_date,
+            )
+            if begin > end:
+                raise HTTPException(
+                    status_code=400,
+                    detail="begin_deal_date must be <= end_deal_date",
+                )
+            response = export_movements_from_smartup(begin, end)
             items = response.items
             logger.info("sync-smartup(orikzor): %d ta harakat (mkw movement$export)", len(items))
             created, updated, skipped, import_errors, skipped_by_reason = import_orders(

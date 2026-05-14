@@ -9,7 +9,7 @@ import os
 import urllib.error
 import urllib.request
 from collections import defaultdict
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 from pydantic import ValidationError as PydanticValidationError
@@ -27,6 +27,25 @@ def _normalize_movement_row_status(raw: Any) -> str:
     return normalize_order_wms_status_for_storage(str(raw).strip())
 
 DEFAULT_MFM_URL = "https://smartup.online/b/anor/mxsx/mfm/movement$export"
+
+
+def resolve_movement_export_date_range(
+    begin: date | None,
+    end: date | None,
+) -> tuple[date, date]:
+    """
+    SmartUp movement$export uchun sana oralig'i.
+    GET /movements bilan bir xil: ikkalasi ham bo'sh bo'lsa — bugundan 30 kun oldingi.
+    """
+    today = date.today()
+    if begin is None and end is None:
+        return today - timedelta(days=30), today
+    if begin is None:
+        assert end is not None
+        return end - timedelta(days=30), end
+    if end is None:
+        return begin, begin + timedelta(days=30)
+    return begin, end
 
 
 def _extract_rows_list(data: Any) -> list | None:

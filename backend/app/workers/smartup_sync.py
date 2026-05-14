@@ -14,7 +14,7 @@ from app.db import SessionLocal
 from app.integrations.smartup.client import SmartupClient
 from app.integrations.smartup.importer import delete_stale_orders, import_orders
 from app.integrations.smartup.inventory_client import SmartupInventoryExportClient
-from app.integrations.smartup.mfm_movement import export_mfm_movements
+from app.integrations.smartup.mfm_movement import export_mfm_movements, resolve_movement_export_date_range
 from app.integrations.smartup.orikzor import export_movements_from_smartup
 from app.integrations.smartup.products_sync import _sync_products
 from app.integrations.smartup.sync_lock import diller_sync_lock, orikzor_sync_lock, smartup_sync_lock
@@ -110,7 +110,8 @@ def sync_diller_movements() -> Tuple[int, str | None, list]:
     and upsert into orders table with order_source='diller'.
     """
     try:
-        response = export_mfm_movements()
+        begin, end = resolve_movement_export_date_range(None, None)
+        response = export_mfm_movements(begin, end)
         items = response.items
         logger.info("Diller movements sync: %d ta harakat (mfm movement$export)", len(items))
 
@@ -138,7 +139,8 @@ def sync_orikzor_movements() -> Tuple[int, str | None, list]:
     and upsert into orders table with order_source='orikzor'.
     """
     try:
-        response = export_movements_from_smartup()
+        begin, end = resolve_movement_export_date_range(None, None)
+        response = export_movements_from_smartup(begin, end)
         items = response.items
         logger.info("O'rikzor movements sync: %d ta harakat (mkw movement$export)", len(items))
 
