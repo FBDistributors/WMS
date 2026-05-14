@@ -33,7 +33,11 @@ from app.services.push_notifications import send_push_to_user
 from app.services.safe_cancel_return_service import initiate_safe_cancel_return
 from app.integrations.smartup.client import SmartupClient
 from app.integrations.smartup.importer import delete_stale_orders, import_orders
-from app.integrations.smartup.mfm_movement import export_mfm_movements, resolve_movement_export_date_range
+from app.integrations.smartup.mfm_movement import (
+    export_mfm_movements,
+    resolve_movement_export_date_range,
+    _mfm_send_status_in_export_body,
+)
 from app.integrations.smartup.orikzor import export_movements_from_smartup
 from app.integrations.smartup.sync_lock import diller_sync_lock, orikzor_sync_lock, smartup_sync_lock
 from app.models.document import Document as DocumentModel
@@ -1363,7 +1367,19 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
             created, updated, skipped, import_errors, skipped_by_reason = import_orders(
                 db, items, order_source="diller"
             )
-            return _build_sync_response(created, updated, skipped, import_errors, skipped_by_reason)
+            return _build_sync_response(
+                created,
+                updated,
+                skipped,
+                import_errors,
+                skipped_by_reason,
+                extra_debug={
+                    "diller_items_from_smartup": len(items),
+                    "diller_begin_date": str(begin),
+                    "diller_end_date": str(end),
+                    "mfm_send_status_in_body": _mfm_send_status_in_export_body(),
+                },
+            )
         except RuntimeError as exc:
             msg = str(exc)
             if "400" in msg or "не найдена" in msg or "organization" in msg.lower():
@@ -1407,7 +1423,12 @@ async def _sync_orikzor(db: Session, payload: SmartupSyncRequest) -> SmartupSync
 
 
 def _build_sync_response(
-    created: int, updated: int, skipped: int, import_errors: list, skipped_by_reason: dict
+    created: int,
+    updated: int,
+    skipped: int,
+    import_errors: list,
+    skipped_by_reason: dict,
+    extra_debug: dict | None = None,
 ) -> SmartupSyncResponse:
     completed_match_skipped = int(skipped_by_reason.get("completed_match_skipped", 0))
     detail = import_errors[0].reason if import_errors else None
@@ -1417,13 +1438,16 @@ def _build_sync_response(
             "incoming payload fully matched existing completed/packed/shipped lines."
         )
     errors_count = len(import_errors) if import_errors else None
+    debug: dict = {"skipped_by_reason": skipped_by_reason}
+    if extra_debug:
+        debug.update(extra_debug)
     return SmartupSyncResponse(
         created=created,
         updated=updated,
         skipped=skipped,
         detail=detail,
         errors_count=errors_count,
-        debug={"skipped_by_reason": skipped_by_reason},
+        debug=debug,
     )
 
 

@@ -29,6 +29,15 @@ def _mfm_export_request_status() -> str:
     return s if s else DEFAULT_MFM_EXPORT_STATUS
 
 
+def _mfm_send_status_in_export_body() -> bool:
+    """
+    Ba'zi SmartUp versiyalari JSON da \"status\" kaliti bo'lsa bo'sh ro'yxat qaytaradi.
+    Default: yuborilmaydi. Yoqish: SMARTUP_MFM_MOVEMENT_EXPORT_SEND_STATUS=true
+    """
+    v = (os.getenv("SMARTUP_MFM_MOVEMENT_EXPORT_SEND_STATUS") or "").strip().lower()
+    return v in ("1", "true", "yes", "on")
+
+
 def _mfm_row_matches_export_status(row: dict) -> bool:
     """
     SmartUp qatorini saqlashdan oldin tekshirish.
@@ -105,7 +114,7 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
     data = json.loads(body)
     rows = _extract_rows_list(data)
     if not rows:
-        logger.warning("mfm movement$export: javobda ro'yxat topilmadi")
+        logger.warning("mfm movement$export: javobda ro'yxat topilmadi (body_len=%s)", len(body))
         return SmartupOrderExportResponse(items=[])
 
     first = rows[0] if rows else {}
@@ -114,6 +123,12 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
         isinstance(first, dict)
         and (first.get("movement_unit_id") is not None or first.get("product_code") is not None)
         and not (first.get("movement_items") or first.get("movement_itens") or first.get("movementItems"))
+    )
+    logger.info(
+        "mfm movement$export parse: body_len=%s extracted_rows=%s is_flat=%s",
+        len(body),
+        len(rows),
+        is_flat,
     )
 
     orders: list[SmartupOrder] = []
@@ -234,6 +249,7 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
                 logger.warning("mfm movement skip movement_id=%s: %s", movement_id, exc)
         logger.info("mfm movement$export: %s ta order (movement-level)", len(orders))
 
+    logger.info("mfm movement$export parse: smartup_orders_out=%s", len(orders))
     return SmartupOrderExportResponse(items=orders)
 
 
@@ -262,17 +278,18 @@ def _request_mfm_export(
     end_str = end_date.strftime("%d.%m.%Y")
     mod_begin = begin_modified_on.strftime("%d.%m.%Y") if begin_modified_on else begin_str
     mod_end = end_modified_on.strftime("%d.%m.%Y") if end_modified_on else end_str
-    payload = {
+    payload: dict[str, Any] = {
         "filial_codes": [{"filial_code": ""}],
         "filial_code": "",
         "external_id": "",
         "movement_id": "",
-        "status": _mfm_export_request_status(),
         "begin_created_on": begin_str,
         "end_created_on": end_str,
         "begin_modified_on": mod_begin,
         "end_modified_on": mod_end,
     }
+    if _mfm_send_status_in_export_body():
+        payload["status"] = _mfm_export_request_status()
     data = json.dumps(payload).encode("utf-8")
     credentials = f"{username}:{password}"
     basic_token = base64.b64encode(credentials.encode("utf-8")).decode("utf-8")
@@ -285,11 +302,12 @@ def _request_mfm_export(
     }
 
     logger.info(
-        "mfm movement$export: url=%s sana=%s..%s status=%s",
+        "mfm movement$export: url=%s sana=%s..%s send_status_in_body=%s status_value=%s",
         url.split("?")[0],
         begin_str,
         end_str,
-        _mfm_export_request_status(),
+        _mfm_send_status_in_export_body(),
+        _mfm_export_request_status() if _mfm_send_status_in_export_body() else "-",
     )
 
     request = urllib.request.Request(url, data=data, headers=headers, method="POST")
@@ -346,4 +364,5 @@ def export_mfm_movements(
         begin_modified_on=begin_modified_on,
         end_modified_on=end_modified_on,
     )
+    logger.info("export_mfm_movements: HTTP body_len=%s", len(body))
     return _parse_mfm_response(body)
