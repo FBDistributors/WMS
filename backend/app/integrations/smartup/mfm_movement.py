@@ -20,6 +20,20 @@ from app.integrations.smartup.schemas import SmartupOrder, SmartupOrderExportRes
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_MFM_EXPORT_STATUS = "W"
+
+
+def _mfm_export_request_status() -> str:
+    """SmartUp mfm/movement$export body uchun status (default: W — yangi)."""
+    s = (os.getenv("SMARTUP_MFM_MOVEMENT_EXPORT_STATUS") or DEFAULT_MFM_EXPORT_STATUS).strip()
+    return s if s else DEFAULT_MFM_EXPORT_STATUS
+
+
+def _mfm_row_matches_export_status(row: dict) -> bool:
+    want = _mfm_export_request_status().strip().upper()
+    got = str(row.get("status") or "").strip().upper()
+    return got == want
+
 
 def _normalize_movement_row_status(raw: Any) -> str:
     if raw is None:
@@ -99,6 +113,8 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
         for r in rows:
             if not isinstance(r, dict):
                 continue
+            if not _mfm_row_matches_export_status(r):
+                continue
             gid = (
                 str(r.get("movement_id") or r.get("movement_number") or r.get("load_id") or "")
             ).strip() or str(r.get("movement_unit_id") or "")
@@ -153,6 +169,8 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
         default_filial = (os.getenv("DEFAULT_WAREHOUSE_CODE") or os.getenv("SMARTUP_DEFAULT_FILIAL") or "MAIN").strip()
         for m in rows:
             if not isinstance(m, dict):
+                continue
+            if not _mfm_row_matches_export_status(m):
                 continue
             movement_id = (m.get("movement_id") or m.get("movement_number") or "").strip()
             if not movement_id:
@@ -239,6 +257,7 @@ def _request_mfm_export(
         "filial_code": "",
         "external_id": "",
         "movement_id": "",
+        "status": _mfm_export_request_status(),
         "begin_created_on": begin_str,
         "end_created_on": end_str,
         "begin_modified_on": mod_begin,
@@ -256,10 +275,11 @@ def _request_mfm_export(
     }
 
     logger.info(
-        "mfm movement$export: url=%s sana=%s..%s",
+        "mfm movement$export: url=%s sana=%s..%s status=%s",
         url.split("?")[0],
         begin_str,
         end_str,
+        _mfm_export_request_status(),
     )
 
     request = urllib.request.Request(url, data=data, headers=headers, method="POST")
