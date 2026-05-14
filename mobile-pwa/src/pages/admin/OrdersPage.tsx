@@ -472,7 +472,8 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             const today = new Date()
             endDealStr = today.toISOString().slice(0, 10)
             const beginDeal = new Date(today)
-            beginDeal.setDate(beginDeal.getDate() - 7)
+            // Worker/smartup_sync.resolve_movement_export_date_range bilan mos: sanalar bo‘lmasa 30 kun
+            beginDeal.setDate(beginDeal.getDate() - 30)
             beginDealStr = beginDeal.toISOString().slice(0, 10)
           }
           const result = await syncSmartupOrders({
