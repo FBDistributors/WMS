@@ -30,8 +30,18 @@ def _mfm_export_request_status() -> str:
 
 
 def _mfm_row_matches_export_status(row: dict) -> bool:
+    """
+    SmartUp qatorini saqlashdan oldin tekshirish.
+    status maydoni bo'lmasa yoki bo'sh bo'lsa — True (API so'rovidagi status filtriga ishonamiz);
+    aks holda faqat SMARTUP_MFM_MOVEMENT_EXPORT_STATUS ga mos qatorlar.
+    """
     want = _mfm_export_request_status().strip().upper()
-    got = str(row.get("status") or "").strip().upper()
+    if not want:
+        return True
+    raw = row.get("status")
+    if raw is None or str(raw).strip() == "":
+        return True
+    got = str(raw).strip().upper()
     return got == want
 
 
