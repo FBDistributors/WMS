@@ -133,7 +133,13 @@ def on_startup() -> None:
     url = make_url(get_database_url())
     safe_target = f"{url.drivername}://{url.host}:{url.port}/{url.database}"
     logging.getLogger("uvicorn").info("Database configured: %s", safe_target)
-    # Uvicorn ba'zida faqat o'z loglarini INFO qiladi; SmartUp/MFM diagnostika app.* da
+    # Uvicorn ko'pincha faqat access logni chiqaradi; app.* (MFM/diller) uchun root handler kerak
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    if not root.handlers:
+        _h = logging.StreamHandler()
+        _h.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
+        root.addHandler(_h)
     logging.getLogger("app").setLevel(logging.INFO)
 
 # Keyinchalik shu yerga routerlar ulanadi:
