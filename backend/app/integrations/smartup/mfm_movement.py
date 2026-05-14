@@ -38,6 +38,16 @@ def _mfm_send_status_in_export_body() -> bool:
     return v in ("1", "true", "yes", "on")
 
 
+def _mfm_export_fill_created_date_range() -> bool:
+    """
+    Postman / SmartUp UI odatda begin_created_on/end_created_on ni bo'sh qoldirib,
+    faqat begin_modified_on/end_modified_on bilan filtrlashadi.
+    Default: bo'sh (Postman bilan bir xil). Eski xatti-harakat: SMARTUP_MFM_EXPORT_FILL_CREATED_RANGE=true
+    """
+    v = (os.getenv("SMARTUP_MFM_EXPORT_FILL_CREATED_RANGE") or "").strip().lower()
+    return v in ("1", "true", "yes", "on")
+
+
 def _mfm_row_matches_export_status(row: dict) -> bool:
     """
     SmartUp qatorini saqlashdan oldin tekshirish.
@@ -278,13 +288,20 @@ def _request_mfm_export(
     end_str = end_date.strftime("%d.%m.%Y")
     mod_begin = begin_modified_on.strftime("%d.%m.%Y") if begin_modified_on else begin_str
     mod_end = end_modified_on.strftime("%d.%m.%Y") if end_modified_on else end_str
+    if _mfm_export_fill_created_date_range():
+        created_begin = begin_str
+        created_end = end_str
+    else:
+        # Postman namunasiga mos: yaratilgan sana filtri yo'q, faqat modified oralig'i
+        created_begin = ""
+        created_end = ""
     payload: dict[str, Any] = {
         "filial_codes": [{"filial_code": ""}],
         "filial_code": "",
         "external_id": "",
         "movement_id": "",
-        "begin_created_on": begin_str,
-        "end_created_on": end_str,
+        "begin_created_on": created_begin,
+        "end_created_on": created_end,
         "begin_modified_on": mod_begin,
         "end_modified_on": mod_end,
     }
@@ -302,10 +319,11 @@ def _request_mfm_export(
     }
 
     logger.info(
-        "mfm movement$export: url=%s sana=%s..%s send_status_in_body=%s status_value=%s",
+        "mfm movement$export: url=%s modified_on=%s..%s created_on_filled=%s send_status_in_body=%s status_value=%s",
         url.split("?")[0],
-        begin_str,
-        end_str,
+        mod_begin,
+        mod_end,
+        _mfm_export_fill_created_date_range(),
         _mfm_send_status_in_export_body(),
         _mfm_export_request_status() if _mfm_send_status_in_export_body() else "-",
     )
