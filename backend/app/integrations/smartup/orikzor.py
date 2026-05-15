@@ -79,7 +79,7 @@ def _parse_movement_response(
         logger.exception("O'rikzor parse: JSON yoki _extract_movements_list xatosi: %s", e)
         skipped_by_reason["exception"] = 1
         return SmartupOrderExportResponse(
-            items=[],
+            order=[],
             parse_warning=f"Parse boshlashda xato: {e!s}",
             debug_raw_count=0,
             debug_dict_count=0,
@@ -374,7 +374,7 @@ def _parse_movement_response(
         parse_warning = f"{len(movements)} ta movementdan 0 ta order. Birinchi xato: {first_validation_error}"
 
     return SmartupOrderExportResponse(
-        items=orders,
+        order=orders,
         parse_warning=parse_warning,
         debug_raw_count=raw_count,
         debug_dict_count=dict_count,

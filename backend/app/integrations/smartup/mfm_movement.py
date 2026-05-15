@@ -190,7 +190,7 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
             extract_source,
             preview,
         )
-        return SmartupOrderExportResponse(items=[])
+        return SmartupOrderExportResponse(order=[])
 
     first = rows[0] if rows else {}
     # Flat rows: each item has movement_unit_id, product_code (no nested movement_items)
@@ -364,10 +364,18 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
         logger.info("mfm movement$export: %s ta order (movement-level)", len(orders))
 
     parse_summary["orders_out"] = len(orders)
+    _last_mfm_export_meta["orders_parsed"] = len(orders)
     logger.info("mfm movement$export parse summary: %s", parse_summary)
     logger.info("mfm movement$export parse: smartup_orders_out=%s", len(orders))
     logging.getLogger("uvicorn").info("WMS mfm parse: %s", parse_summary)
-    return SmartupOrderExportResponse(items=orders)
+    response = SmartupOrderExportResponse(order=orders)
+    if orders and not response.items:
+        logger.error(
+            "mfm movement$export: parse %s order lekin response.items bo'sh (alias); qayta yig'ilmoqda",
+            len(orders),
+        )
+        response = SmartupOrderExportResponse(order=orders)
+    return response
 
 
 def _request_mfm_export(
@@ -558,7 +566,7 @@ def export_mfm_movements_for_sync(
             modes_to_try.append(candidate)
 
     attempts: list[dict[str, Any]] = []
-    last_response = SmartupOrderExportResponse(items=[])
+    last_response = SmartupOrderExportResponse(order=[])
     effective_mode = configured
 
     for try_mode in modes_to_try:

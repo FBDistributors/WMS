@@ -21,7 +21,7 @@ def test_smartup_order_export_response_accepts_items_kwarg() -> None:
         status="imported",
         lines=[{"sku": "A", "name": "Item", "quantity": 1}],
     )
-    resp = SmartupOrderExportResponse(items=[order])
+    resp = SmartupOrderExportResponse(order=[order])
     assert len(resp.items) == 1
 
 
@@ -83,8 +83,8 @@ def test_export_mfm_movements_for_sync_retries_modes(monkeypatch) -> None:
                 status="imported",
                 lines=[{"sku": "A", "name": "Item", "quantity": 1}],
             )
-            return SmartupOrderExportResponse(items=[order])
-        return SmartupOrderExportResponse(items=[])
+            return SmartupOrderExportResponse(order=[order])
+        return SmartupOrderExportResponse(order=[])
 
     monkeypatch.setenv("SMARTUP_MFM_DATE_FILTER_MODE", "modified")
     monkeypatch.setattr(
