@@ -14,21 +14,15 @@ from typing import Any
 
 from pydantic import ValidationError as PydanticValidationError
 
+from app.integrations.smartup.movement_rows import (
+    extract_movement_rows,
+    flatten_movement_list as _flatten_movement_list,
+    parse_movement_date as _parse_movement_date,
+)
 from app.integrations.smartup.schemas import SmartupOrder, SmartupOrderExportResponse
 
 
 logger = logging.getLogger(__name__)
-
-
-def _flatten_movement_list(lst: list) -> list:
-    """Ro'yxat ichida ro'yxat bo'lsa (list of lists) bitta ro'yxatga yoyadi."""
-    out: list = []
-    for x in lst:
-        if isinstance(x, list):
-            out.extend(x)
-        else:
-            out.append(x)
-    return out
 
 
 def _structure_summary(obj, depth: int = 0, max_depth: int = 4):
@@ -52,183 +46,10 @@ ALLOWED_MOVEMENT_STATUSES: set[str] = (
 )
 
 
-def _parse_movement_date(value: str | int | float | None) -> datetime | None:
-    """Smartup from_movement_date: DD.MM.YYYY HH:MM:SS, DD.MM.YYYY, ISO, Unix timestamp (s/ms)."""
-    if value is None:
-        return None
-    if isinstance(value, (int, float)):
-        try:
-            if value > 1e12:
-                value = value / 1000.0
-            return datetime.fromtimestamp(value)
-        except (ValueError, OSError):
-            return None
-    if not isinstance(value, str):
-        return None
-    raw = value.strip()
-    if not raw or raw.lower() in ("none", "null"):
-        return None
-    formats = [
-        "%d.%m.%Y %H:%M:%S",
-        "%d.%m.%Y",
-        "%Y-%m-%dT%H:%M:%S",
-        "%Y-%m-%dT%H:%M:%S.%f",
-        "%Y-%m-%d %H:%M:%S",
-        "%Y-%m-%d",
-        "%m/%d/%Y %H:%M:%S",
-        "%m/%d/%Y",
-    ]
-    for fmt in formats:
-        try:
-            return datetime.strptime(raw, fmt)
-        except (ValueError, TypeError):
-            continue
-    return None
-
-
 def _extract_movements_list(data: Any) -> list:
     """Parse qilingan JSON dan movement ro'yxatini chiqaradi (raw list of dicts)."""
-    movements: list = []
-
-    if isinstance(data, list):
-        movements = data
-    elif isinstance(data, dict):
-        if data.get("movement_id") is not None or data.get("movement_number") is not None:
-            movements = [data]
-        elif isinstance(data.get("movement"), list):
-            movements = _flatten_movement_list(data["movement"])
-            logger.info("Smartup movement$export: data['movement'] dan %s ta olindi", len(movements))
-        else:
-            raw = (
-                data.get("movement")
-                or data.get("movements")
-                or data.get("Movement")
-                or data.get("MovementList")
-                or data.get("data")
-                or data.get("items")
-                or data.get("result")
-                or data.get("response")
-                or data.get("export")
-                or data.get("list")
-                or data.get("rows")
-            )
-
-            def _is_movement_dict(d):
-                return isinstance(d, dict) and (
-                    d.get("movement_id") is not None or d.get("movement_number") is not None
-                )
-
-            def _take_raw_from_list(lst):
-                if not isinstance(lst, list) or not lst:
-                    return None
-                first = lst[0]
-                if isinstance(first, dict) and _is_movement_dict(first):
-                    return lst
-                if isinstance(first, list) and first and isinstance(first[0], dict):
-                    return _flatten_movement_list(lst)
-                return None
-
-            if raw is None and isinstance(data, dict):
-                for v in data.values():
-                    if isinstance(v, dict) and _is_movement_dict(v):
-                        raw = v
-                        break
-                    candidate = _take_raw_from_list(v)
-                    if candidate is not None:
-                        raw = candidate
-                        break
-            if raw is None and isinstance(data, dict):
-                for k, v in data.items():
-                    candidate = _take_raw_from_list(v)
-                    if candidate is not None:
-                        raw = candidate
-                        logger.info("Smartup movement$export: ro'yxat '%s' kalitida topildi (len=%s)", k, len(raw))
-                        break
-            if raw is None and isinstance(data, dict):
-                for wrap in ("response", "data", "result", "export"):
-                    inner = data.get(wrap)
-                    if isinstance(inner, dict):
-                        inner_list = inner.get("movement") or inner.get("movements") or inner.get("items")
-                        candidate = _take_raw_from_list(inner_list) if isinstance(inner_list, list) else None
-                        if candidate is not None:
-                            raw = candidate
-                            logger.info(
-                                "Smartup movement$export: ro'yxat '%s.%s' ichida topildi (len=%s)",
-                                wrap, "movement|movements|items", len(raw),
-                            )
-                            break
-                    if raw is not None:
-                        break
-            if raw is None and isinstance(data, dict) and len(data) == 1:
-                single_val = next(iter(data.values()), None)
-                candidate = _take_raw_from_list(single_val) if single_val is not None else None
-                if candidate is not None:
-                    raw = candidate
-                    logger.info("Smartup movement$export: bitta kalit ostidagi ro'yxat ishlatildi (len=%s)", len(raw))
-            if raw is not None:
-                if isinstance(raw, list):
-                    movements = raw
-                elif isinstance(raw, dict):
-                    if raw.get("movement_id") is not None or raw.get("movement_number") is not None:
-                        movements = [raw]
-                    else:
-                        inner = raw.get("movement") or raw.get("movements")
-                        movements = inner if isinstance(inner, list) else [inner] if inner else []
-                elif isinstance(raw, str):
-                    try:
-                        parsed = json.loads(raw)
-                        movements = parsed if isinstance(parsed, list) else [parsed] if parsed else []
-                    except (TypeError, ValueError, json.JSONDecodeError):
-                        movements = []
-                else:
-                    movements = [raw] if raw else []
-
-    if not isinstance(movements, list):
-        movements = [movements] if movements else []
-
-    normalized: list = []
-    for x in movements:
-        if isinstance(x, dict):
-            normalized.append(x)
-        elif isinstance(x, list):
-            normalized.extend(_flatten_movement_list(x))
-        elif isinstance(x, str):
-            try:
-                p = json.loads(x)
-                normalized.extend(p) if isinstance(p, list) else normalized.append(p)
-            except (TypeError, ValueError, json.JSONDecodeError):
-                pass
-    movements = normalized
-
-    expanded: list = []
-    for x in movements:
-        if isinstance(x, dict) and (
-            x.get("movement_id") is not None or x.get("movement_number") is not None
-        ):
-            expanded.append(x)
-        elif isinstance(x, dict):
-            inner = x.get("movement") or x.get("movements") or x.get("Movement")
-            if isinstance(inner, list):
-                expanded.extend(inner)
-            elif isinstance(inner, dict):
-                expanded.append(inner)
-            else:
-                expanded.append(x)
-        else:
-            expanded.append(x)
-    flattened: list = []
-    for m in expanded:
-        if not isinstance(m, dict):
-            continue
-        if m.get("movement_id") is not None or m.get("movement_number") is not None:
-            flattened.append(m)
-        else:
-            inner = m.get("movement") or m.get("movements") or m.get("Movement")
-            if isinstance(inner, list):
-                flattened.extend(inner)
-            elif isinstance(inner, dict):
-                flattened.append(inner)
-    return [m for m in flattened if isinstance(m, dict)]
+    rows, _ = extract_movement_rows(data)
+    return rows
 
 
 def _parse_movement_response(

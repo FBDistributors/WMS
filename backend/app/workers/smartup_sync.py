@@ -14,7 +14,11 @@ from app.db import SessionLocal
 from app.integrations.smartup.client import SmartupClient
 from app.integrations.smartup.importer import delete_stale_orders, import_orders
 from app.integrations.smartup.inventory_client import SmartupInventoryExportClient
-from app.integrations.smartup.mfm_movement import export_mfm_movements, resolve_mfm_sync_date_range, resolve_movement_export_date_range
+from app.integrations.smartup.mfm_movement import (
+    export_mfm_movements_for_sync,
+    resolve_mfm_sync_date_range,
+    resolve_movement_export_date_range,
+)
 from app.integrations.smartup.orikzor import export_movements_from_smartup
 from app.integrations.smartup.products_sync import _sync_products
 from app.integrations.smartup.sync_lock import diller_sync_lock, orikzor_sync_lock, smartup_sync_lock
@@ -111,7 +115,7 @@ def sync_diller_movements() -> Tuple[int, str | None, list]:
     """
     try:
         begin, end = resolve_mfm_sync_date_range(None, None)
-        response = export_mfm_movements(begin, end)
+        response, _effective_mode = export_mfm_movements_for_sync(begin, end)
         items = response.items
         logger.info("Diller movements sync: %d ta harakat (mfm movement$export)", len(items))
 

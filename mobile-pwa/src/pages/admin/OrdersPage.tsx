@@ -15,7 +15,14 @@ import { Card } from '../../components/ui/card'
 import { DateInput } from '../../components/DateInput'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
-import { getOrders, syncSmartupOrders, type MovementItem, type OrderListItem, type OrderCheckResponse } from '../../services/ordersApi'
+import {
+  getOrders,
+  syncSmartupOrders,
+  type MovementItem,
+  type OrderListItem,
+  type OrderCheckResponse,
+  type SmartupSyncResult,
+} from '../../services/ordersApi'
 import {
   OrderWmsStatusCell,
   SIMPLE_STATUS_OPTIONS,
@@ -234,6 +241,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     skipped: number
     detail?: string | null
     errors_count?: number | null
+    debug?: SmartupSyncResult['debug']
   } | null>(null)
   const [selectedMovementIds] = useState<Set<string>>(new Set())
   const [, setCheckResult] = useState<OrderCheckResponse | null>(null)
@@ -1110,6 +1118,25 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                   <span className="max-w-xl rounded bg-amber-100 px-2 py-1 text-xs text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 break-words">
                     {syncResult.errors_count ? `${syncResult.errors_count} ta xato. ` : ''}
                     {syncResult.detail ?? ''}
+                  </span>
+                ) : null}
+                {orderSource === 'diller' && syncResult.debug ? (
+                  <span className="max-w-xl rounded bg-slate-100 px-2 py-1 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300 break-words">
+                    {typeof syncResult.debug.diller_items_from_smartup === 'number'
+                      ? `SmartUp: ${syncResult.debug.diller_items_from_smartup} ta. `
+                      : ''}
+                    {syncResult.debug.mfm_date_filter_mode
+                      ? `mode=${syncResult.debug.mfm_date_filter_mode}. `
+                      : ''}
+                    {typeof syncResult.debug.diller_extracted_rows === 'number'
+                      ? `extracted=${syncResult.debug.diller_extracted_rows}. `
+                      : ''}
+                    {syncResult.debug.diller_extract_source
+                      ? `manba=${syncResult.debug.diller_extract_source}. `
+                      : ''}
+                    {Array.isArray(syncResult.debug.diller_raw_keys) && syncResult.debug.diller_raw_keys.length > 0
+                      ? `keys=${syncResult.debug.diller_raw_keys.join(', ')}`
+                      : ''}
                   </span>
                 ) : null}
               </span>

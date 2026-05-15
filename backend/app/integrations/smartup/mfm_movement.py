@@ -15,10 +15,17 @@ from typing import Any
 from pydantic import ValidationError as PydanticValidationError
 
 from app.constants.order_wms_status import normalize_order_wms_status_for_storage
+from app.integrations.smartup.movement_rows import extract_movement_rows, movement_delivery_datetime
 from app.integrations.smartup.schemas import SmartupOrder, SmartupOrderExportResponse
 
 
 logger = logging.getLogger(__name__)
+
+_last_mfm_export_meta: dict[str, Any] = {}
+
+
+def get_last_mfm_export_meta() -> dict[str, Any]:
+    return dict(_last_mfm_export_meta)
 
 DEFAULT_MFM_EXPORT_STATUS = "W"
 
@@ -151,45 +158,28 @@ def apply_mfm_export_date_policy(begin: date, end: date) -> tuple[date, date]:
     return begin, end
 
 
-def _extract_rows_list(data: Any) -> list | None:
-    """Extract list of rows from API response (dict or list)."""
-    if isinstance(data, list) and data:
-        return data
-    if not isinstance(data, dict):
-        return None
-    for key in (
-        "movement",
-        "movements",
-        "Movement",
-        "MovementList",
-        "data",
-        "items",
-        "result",
-        "response",
-        "export",
-        "list",
-        "rows",
-    ):
-        raw = data.get(key)
-        if isinstance(raw, list) and raw:
-            return raw
-    return None
-
-
 def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
     """
     Parse mfm movement$export response into SmartupOrderExportResponse.
     Handles both: (1) movement-level objects with movement_items, (2) flat rows with movement_unit_id/product_code.
     """
+    global _last_mfm_export_meta
     data = json.loads(body)
-    rows = _extract_rows_list(data)
+    rows, extract_source = extract_movement_rows(data)
+    keys = list(data.keys()) if isinstance(data, dict) else []
+    _last_mfm_export_meta = {
+        "http_body_len": len(body),
+        "raw_keys": keys,
+        "extracted_rows": len(rows),
+        "extract_source": extract_source,
+    }
     if not rows:
-        keys = list(data.keys()) if isinstance(data, dict) else []
         preview = (body[:500] if body else "").replace("\n", " ")
         logger.warning(
-            "mfm movement$export: javobda ro'yxat topilmadi (body_len=%s keys=%s preview=%s)",
+            "mfm movement$export: javobda ro'yxat topilmadi (body_len=%s keys=%s extract_source=%s preview=%s)",
             len(body),
             keys,
+            extract_source,
             preview,
         )
         return SmartupOrderExportResponse(items=[])
@@ -254,6 +244,11 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
             if not lines:
                 skip_empty_lines += 1
                 continue
+            delivery_dt = None
+            for u in unit_rows:
+                delivery_dt = movement_delivery_datetime(u)
+                if delivery_dt is not None:
+                    break
             order_dict = {
                 "external_id": external_id or f"mfm:{group_id}",
                 "deal_id": group_id,
@@ -263,6 +258,8 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
                 "filial_code": filial,
                 "lines": lines,
             }
+            if delivery_dt is not None:
+                order_dict["delivery_date"] = delivery_dt
             try:
                 orders.append(SmartupOrder.model_validate(order_dict))
             except PydanticValidationError as exc:
@@ -323,6 +320,7 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
                     amount = str(amount).replace(" ", "").replace(",", ".")
                 except Exception:
                     amount = None
+            delivery_dt = movement_delivery_datetime(m)
             order_dict = {
                 "external_id": (m.get("external_id") or "").strip() or f"mfm:{movement_id}",
                 "deal_id": movement_id,
@@ -336,6 +334,8 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
                 "note": note,
                 "lines": lines,
             }
+            if delivery_dt is not None:
+                order_dict["delivery_date"] = delivery_dt
             try:
                 orders.append(SmartupOrder.model_validate(order_dict))
             except PydanticValidationError as exc:
@@ -368,6 +368,7 @@ def _request_mfm_export(
     filial_id: str | None = None,
     begin_modified_on: date | None = None,
     end_modified_on: date | None = None,
+    date_filter_mode_override: str | None = None,
 ) -> str:
     """
     Call SmartUp mfm movement$export, return raw response body (JSON string).
@@ -399,7 +400,9 @@ def _request_mfm_export(
     else:
         begin_str = begin_date.strftime("%d.%m.%Y")
         end_str = end_date.strftime("%d.%m.%Y")
-        mode = mfm_date_filter_mode()
+        mode = (date_filter_mode_override or mfm_date_filter_mode()).strip().lower()
+        if mode not in ("created", "both", "modified"):
+            mode = "modified"
         if mode == "created":
             created_begin, created_end = begin_str, end_str
             mod_begin = ""
@@ -440,11 +443,16 @@ def _request_mfm_export(
         "filial_id": header_filial,
     }
 
+    effective_mode = (
+        "omit"
+        if _mfm_movement_export_omit_dates()
+        else (date_filter_mode_override or mfm_date_filter_mode())
+    )
     logger.info(
         "mfm movement$export: url=%s omit_dates=%s date_mode=%s created_on=%s..%s modified_on=%s..%s send_status_in_body=%s status_value=%s",
         url.split("?")[0],
         _mfm_movement_export_omit_dates(),
-        mfm_date_filter_mode(),
+        effective_mode,
         created_begin,
         created_end,
         mod_begin,
@@ -475,6 +483,7 @@ def fetch_mfm_movements_raw(
     filial_id: str | None = None,
     begin_modified_on: date | None = None,
     end_modified_on: date | None = None,
+    date_filter_mode_override: str | None = None,
 ) -> dict:
     """
     Call SmartUp mfm movement$export and return raw JSON as dict (e.g. {"movement": [...]}).
@@ -486,6 +495,7 @@ def fetch_mfm_movements_raw(
         filial_id=filial_id,
         begin_modified_on=begin_modified_on,
         end_modified_on=end_modified_on,
+        date_filter_mode_override=date_filter_mode_override,
     )
     return json.loads(body)
 
@@ -496,16 +506,51 @@ def export_mfm_movements(
     filial_id: str | None = None,
     begin_modified_on: date | None = None,
     end_modified_on: date | None = None,
+    date_filter_mode_override: str | None = None,
 ) -> SmartupOrderExportResponse:
     """
     Call SmartUp mfm movement$export (Cross-organizational movement), return SmartupOrder list.
     """
+    mode_used = date_filter_mode_override or mfm_date_filter_mode()
     body = _request_mfm_export(
         begin_date=begin_date,
         end_date=end_date,
         filial_id=filial_id,
         begin_modified_on=begin_modified_on,
         end_modified_on=end_modified_on,
+        date_filter_mode_override=date_filter_mode_override,
     )
-    logger.info("export_mfm_movements: HTTP body_len=%s", len(body))
-    return _parse_mfm_response(body)
+    logger.info("export_mfm_movements: HTTP body_len=%s date_mode=%s", len(body), mode_used)
+    result = _parse_mfm_response(body)
+    _last_mfm_export_meta.update(
+        {"date_filter_mode": mode_used, "orders_parsed": len(result.items)}
+    )
+    return result
+
+
+def export_mfm_movements_for_sync(
+    begin_date: date,
+    end_date: date,
+    filial_id: str | None = None,
+) -> tuple[SmartupOrderExportResponse, str]:
+    """
+    Diller sinxron: modified bo'sh qaytarsa bir marta created rejimida qayta so'raydi.
+    Qaytadi: (response, effective_date_filter_mode).
+    """
+    mode = mfm_date_filter_mode()
+    response = export_mfm_movements(begin_date, end_date, filial_id=filial_id)
+    if (
+        not response.items
+        and mode == "modified"
+        and not _mfm_movement_export_omit_dates()
+    ):
+        logger.info("mfm export: modified returned 0 rows, retry with created date filter")
+        response = export_mfm_movements(
+            begin_date,
+            end_date,
+            filial_id=filial_id,
+            date_filter_mode_override="created",
+        )
+        mode = "created"
+        _last_mfm_export_meta["date_filter_mode_retry"] = True
+    return response, mode

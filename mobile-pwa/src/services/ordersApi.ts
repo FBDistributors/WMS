@@ -208,6 +208,12 @@ export type SmartupSyncResult = {
     updated_count?: number
     skipped_count?: number
     skipped_by_reason?: Record<string, number>
+    diller_items_from_smartup?: number
+    mfm_date_filter_mode?: string
+    diller_http_body_len?: number
+    diller_raw_keys?: string[]
+    diller_extracted_rows?: number
+    diller_extract_source?: string | null
     preview?: Array<{
       movement_id?: string
       status?: string

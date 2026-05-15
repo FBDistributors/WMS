@@ -214,6 +214,8 @@ class SmartupOrderExportResponse(BaseModel):
 
     @root_validator(pre=True)
     def _normalize_order_list(cls, values):  # noqa: N805
+        if "items" in values and "order" not in values:
+            values["order"] = values["items"]
         if "order" in values and isinstance(values["order"], dict):
             values["order"] = [values["order"]]
         if "order" not in values and "data" in values:
@@ -222,5 +224,6 @@ class SmartupOrderExportResponse(BaseModel):
 
     class Config:
         extra = "allow"
+        populate_by_name = True
 
     # TODO: Confirm Smartup response shape and extend schema once payload is stable.

@@ -1,0 +1,22 @@
+{
+  "movement": [
+    {
+      "movement_id": "MV-1001",
+      "movement_number": "MV-1001",
+      "delivery_number": "DN-1001",
+      "status": "W",
+      "from_warehouse_code": "WH-A",
+      "to_warehouse_code": "WH-B",
+      "note": "Test movement",
+      "created_on": "15.03.2026",
+      "delivery_date": "20.03.2026",
+      "movement_items": [
+        {
+          "product_code": "SKU-001",
+          "quantity": 5,
+          "product_article_code": "Article 1"
+        }
+      ]
+    }
+  ]
+}

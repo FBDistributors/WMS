@@ -35,7 +35,8 @@ from app.integrations.smartup.client import SmartupClient
 from app.integrations.smartup.importer import delete_stale_orders, import_orders
 from app.integrations.smartup.mfm_movement import (
     apply_mfm_export_date_policy,
-    export_mfm_movements,
+    export_mfm_movements_for_sync,
+    get_last_mfm_export_meta,
     mfm_date_filter_mode,
     mfm_sync_lookback_days,
     resolve_movement_export_date_range,
@@ -1367,8 +1368,11 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                 )
             begin, end = apply_mfm_export_date_policy(begin, end)
             filial_override = (payload.filial_id or "").strip() or None
-            response = export_mfm_movements(begin, end, filial_id=filial_override)
+            response, effective_mfm_mode = export_mfm_movements_for_sync(
+                begin, end, filial_id=filial_override
+            )
             items = response.items
+            mfm_meta = get_last_mfm_export_meta()
             logger.info(
                 "sync-smartup(diller): mfm javobdan %s ta order import qilishga yuboriladi "
                 "(sana=%s..%s filial_override=%s omit_dates=%s)",
@@ -1423,22 +1427,28 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                     "diller_items_from_smartup": len(items),
                     "diller_begin_date": str(begin),
                     "diller_end_date": str(end),
-                    "mfm_date_filter_mode": mfm_date_filter_mode(),
+                    "mfm_date_filter_mode": effective_mfm_mode,
                     "mfm_sync_lookback_days": mfm_sync_lookback_days(),
                     "mfm_omit_dates": _mfm_movement_export_omit_dates(),
+                    "diller_http_body_len": mfm_meta.get("http_body_len"),
+                    "diller_raw_keys": mfm_meta.get("raw_keys"),
+                    "diller_extracted_rows": mfm_meta.get("extracted_rows"),
+                    "diller_extract_source": mfm_meta.get("extract_source"),
                     "import_skipped_by_reason": breakdown,
                 },
             )
             if not items and not resp.detail and not import_errors:
+                raw_keys = mfm_meta.get("raw_keys") or []
                 return SmartupSyncResponse(
                     created=resp.created,
                     updated=resp.updated,
                     skipped=resp.skipped,
                     detail=(
-                        f"SmartUp mfm: 0 ta qator (mode={mfm_date_filter_mode()}, "
+                        f"SmartUp mfm: 0 ta qator (mode={effective_mfm_mode}, "
                         f"sana {begin}..{end}; "
                         f"filial={filial_override or 'env SMARTUP_FILIAL_ID'}, "
-                        f"omit_dates={_mfm_movement_export_omit_dates()}). "
+                        f"omit_dates={_mfm_movement_export_omit_dates()}, "
+                        f"body_len={mfm_meta.get('http_body_len')}, keys={raw_keys}). "
                         "Yaratilgan sana bilan sinash: SMARTUP_MFM_DATE_FILTER_MODE=created. "
                         "Agar harakatlar uzoq vaqt tahrirlanmagan bo'lsa SMARTUP_MFM_SYNC_LOOKBACK_DAYS ni oshiring. "
                         "Javob tuzilmasi: logda mfm movement$export keys=... "
