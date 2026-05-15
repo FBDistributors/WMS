@@ -1135,7 +1135,16 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                       ? `manba=${syncResult.debug.diller_extract_source}. `
                       : ''}
                     {Array.isArray(syncResult.debug.diller_raw_keys) && syncResult.debug.diller_raw_keys.length > 0
-                      ? `keys=${syncResult.debug.diller_raw_keys.join(', ')}`
+                      ? `keys=${syncResult.debug.diller_raw_keys.join(', ')}. `
+                      : ''}
+                    {syncResult.debug.mfm_request_filial_id
+                      ? `filial=${syncResult.debug.mfm_request_filial_id}. `
+                      : ''}
+                    {syncResult.debug.mfm_request_project_code
+                      ? `project=${syncResult.debug.mfm_request_project_code}. `
+                      : ''}
+                    {Array.isArray(syncResult.debug.mfm_sync_attempts) && syncResult.debug.mfm_sync_attempts.length > 0
+                      ? `attempts=${JSON.stringify(syncResult.debug.mfm_sync_attempts)}`
                       : ''}
                   </span>
                 ) : null}

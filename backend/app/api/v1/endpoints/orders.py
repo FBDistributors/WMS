@@ -38,6 +38,8 @@ from app.integrations.smartup.mfm_movement import (
     export_mfm_movements_for_sync,
     get_last_mfm_export_meta,
     mfm_date_filter_mode,
+    mfm_resolved_filial_id,
+    mfm_resolved_project_code,
     mfm_sync_lookback_days,
     resolve_movement_export_date_range,
     resolve_mfm_sync_date_range,
@@ -1434,11 +1436,17 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                     "diller_raw_keys": mfm_meta.get("raw_keys"),
                     "diller_extracted_rows": mfm_meta.get("extracted_rows"),
                     "diller_extract_source": mfm_meta.get("extract_source"),
+                    "mfm_sync_attempts": mfm_meta.get("sync_attempts"),
+                    "mfm_request_filial_id": mfm_meta.get("request_filial_id"),
+                    "mfm_request_project_code": mfm_meta.get("request_project_code"),
                     "import_skipped_by_reason": breakdown,
                 },
             )
             if not items and not resp.detail and not import_errors:
                 raw_keys = mfm_meta.get("raw_keys") or []
+                resolved_filial = mfm_resolved_filial_id(filial_override)
+                resolved_project = mfm_resolved_project_code()
+                attempts = mfm_meta.get("sync_attempts") or []
                 return SmartupSyncResponse(
                     created=resp.created,
                     updated=resp.updated,
@@ -1446,14 +1454,14 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                     detail=(
                         f"SmartUp mfm: 0 ta qator (mode={effective_mfm_mode}, "
                         f"sana {begin}..{end}; "
-                        f"filial={filial_override or 'env SMARTUP_FILIAL_ID'}, "
+                        f"filial={resolved_filial}, project_code={resolved_project}, "
                         f"omit_dates={_mfm_movement_export_omit_dates()}, "
-                        f"body_len={mfm_meta.get('http_body_len')}, keys={raw_keys}). "
-                        "Yaratilgan sana bilan sinash: SMARTUP_MFM_DATE_FILTER_MODE=created. "
-                        "Agar harakatlar uzoq vaqt tahrirlanmagan bo'lsa SMARTUP_MFM_SYNC_LOOKBACK_DAYS ni oshiring. "
-                        "Javob tuzilmasi: logda mfm movement$export keys=... "
+                        f"body_len={mfm_meta.get('http_body_len')}, keys={raw_keys}, "
+                        f"attempts={attempts}). "
+                        "Postman bilan solishtiring: filial_id, project_code, begin_created_on/modified_on. "
+                        "VPS: git pull && sudo systemctl restart wms-api. "
                         "Brauzerda date_from/date_to eski bo'lsa Filter → Tozalash. "
-                        "VPS: journalctl -u wms-api -n 200 — matnda WMS diller yoki mfm movement qidiring"
+                        "Log: journalctl -u wms-api -n 200 | grep -i mfm"
                     ),
                     errors_count=resp.errors_count,
                     error=resp.error,

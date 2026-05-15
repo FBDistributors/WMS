@@ -27,6 +27,14 @@ _last_mfm_export_meta: dict[str, Any] = {}
 def get_last_mfm_export_meta() -> dict[str, Any]:
     return dict(_last_mfm_export_meta)
 
+
+def mfm_resolved_filial_id(filial_override: str | None = None) -> str:
+    return (filial_override or os.getenv("SMARTUP_FILIAL_ID") or "3788131").strip()
+
+
+def mfm_resolved_project_code() -> str:
+    return (os.getenv("SMARTUP_PROJECT_CODE") or "trade").strip()
+
 DEFAULT_MFM_EXPORT_STATUS = "W"
 
 
@@ -376,8 +384,10 @@ def _request_mfm_export(
     SMARTUP_MFM_MOVEMENT_EXPORT_OMIT_DATES=true bo'lsa barcha sana maydonlari bo'sh (ba'zi serverlar bo'sh javob beradi).
     """
     url = (os.getenv("SMARTUP_MFM_MOVEMENT_EXPORT_URL") or DEFAULT_MFM_URL).strip()
-    project_code = (os.getenv("SMARTUP_PROJECT_CODE") or "trade").strip()
-    header_filial = (filial_id or os.getenv("SMARTUP_FILIAL_ID") or "3788131").strip()
+    header_filial = mfm_resolved_filial_id(filial_id)
+    project_code = mfm_resolved_project_code()
+    _last_mfm_export_meta["request_filial_id"] = header_filial
+    _last_mfm_export_meta["request_project_code"] = project_code
     username = (os.getenv("SMARTUP_BASIC_USER") or "").strip() or None
     password = (os.getenv("SMARTUP_BASIC_PASS") or "").strip() or None
     if not username or not password:
@@ -534,23 +544,53 @@ def export_mfm_movements_for_sync(
     filial_id: str | None = None,
 ) -> tuple[SmartupOrderExportResponse, str]:
     """
-    Diller sinxron: modified bo'sh qaytarsa bir marta created rejimida qayta so'raydi.
+    Diller sinxron: bo'sh javobda created va both rejimlarida qayta urinadi.
     Qaytadi: (response, effective_date_filter_mode).
     """
-    mode = mfm_date_filter_mode()
-    response = export_mfm_movements(begin_date, end_date, filial_id=filial_id)
-    if (
-        not response.items
-        and mode == "modified"
-        and not _mfm_movement_export_omit_dates()
-    ):
-        logger.info("mfm export: modified returned 0 rows, retry with created date filter")
-        response = export_mfm_movements(
+    if _mfm_movement_export_omit_dates():
+        response = export_mfm_movements(begin_date, end_date, filial_id=filial_id)
+        return response, "omit"
+
+    configured = mfm_date_filter_mode()
+    modes_to_try: list[str] = []
+    for candidate in (configured, "created", "both"):
+        if candidate not in modes_to_try:
+            modes_to_try.append(candidate)
+
+    attempts: list[dict[str, Any]] = []
+    last_response = SmartupOrderExportResponse(items=[])
+    effective_mode = configured
+
+    for try_mode in modes_to_try:
+        override = try_mode if try_mode != configured else None
+        logger.info("mfm export for_sync: attempt mode=%s", try_mode)
+        last_response = export_mfm_movements(
             begin_date,
             end_date,
             filial_id=filial_id,
-            date_filter_mode_override="created",
+            date_filter_mode_override=override,
         )
-        mode = "created"
-        _last_mfm_export_meta["date_filter_mode_retry"] = True
-    return response, mode
+        meta = get_last_mfm_export_meta()
+        attempts.append(
+            {
+                "mode": try_mode,
+                "extracted_rows": meta.get("extracted_rows"),
+                "orders_parsed": len(last_response.items),
+                "http_body_len": meta.get("http_body_len"),
+                "raw_keys": meta.get("raw_keys"),
+            }
+        )
+        effective_mode = try_mode
+        if last_response.items:
+            _last_mfm_export_meta["sync_attempts"] = attempts
+            _last_mfm_export_meta["date_filter_mode"] = try_mode
+            return last_response, try_mode
+
+    _last_mfm_export_meta["sync_attempts"] = attempts
+    logger.warning(
+        "mfm export for_sync: barcha rejimlarda 0 order (attempts=%s filial=%s project=%s)",
+        attempts,
+        mfm_resolved_filial_id(filial_id),
+        mfm_resolved_project_code(),
+    )
+    return last_response, effective_mode

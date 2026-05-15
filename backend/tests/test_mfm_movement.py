@@ -1,7 +1,11 @@
 import json
 from pathlib import Path
 
-from app.integrations.smartup.mfm_movement import _parse_mfm_response
+from app.integrations.smartup.mfm_movement import (
+    _parse_mfm_response,
+    export_mfm_movements_for_sync,
+)
+from app.integrations.smartup.schemas import SmartupOrderExportResponse
 from app.integrations.smartup.movement_rows import extract_movement_rows, movement_delivery_datetime
 from app.integrations.smartup.schemas import SmartupOrder, SmartupOrderExportResponse
 
@@ -64,6 +68,39 @@ def test_movement_delivery_datetime_prefers_delivery_date() -> None:
     assert dt is not None
     assert dt.day == 1
     assert dt.month == 4
+
+
+def test_export_mfm_movements_for_sync_retries_modes(monkeypatch) -> None:
+    calls: list[str | None] = []
+
+    def fake_export(begin, end, filial_id=None, date_filter_mode_override=None, **kwargs):
+        calls.append(date_filter_mode_override)
+        if date_filter_mode_override == "created":
+            order = SmartupOrder(
+                external_id="mfm:1",
+                deal_id="1",
+                order_no="1",
+                status="imported",
+                lines=[{"sku": "A", "name": "Item", "quantity": 1}],
+            )
+            return SmartupOrderExportResponse(items=[order])
+        return SmartupOrderExportResponse(items=[])
+
+    monkeypatch.setenv("SMARTUP_MFM_DATE_FILTER_MODE", "modified")
+    monkeypatch.setattr(
+        "app.integrations.smartup.mfm_movement.export_mfm_movements",
+        fake_export,
+    )
+    monkeypatch.setattr(
+        "app.integrations.smartup.mfm_movement._mfm_movement_export_omit_dates",
+        lambda: False,
+    )
+    from datetime import date
+
+    resp, mode = export_mfm_movements_for_sync(date(2026, 1, 1), date(2026, 5, 1))
+    assert len(resp.items) == 1
+    assert mode == "created"
+    assert calls == [None, "created"]
 
 
 def test_parse_mfm_flat_rows() -> None:
