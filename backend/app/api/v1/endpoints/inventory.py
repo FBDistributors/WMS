@@ -79,6 +79,31 @@ def _location_ids_for_warehouse(db: Session, warehouse: Optional[str]) -> Option
     return [r[0] for r in rows]
 
 
+def _product_ids_with_positive_net_reserved(
+    db: Session, location_ids: Optional[List[UUID]]
+) -> set[UUID]:
+    """
+    Mahsulot bo'yicha allocate/unallocate yig'indisi > 0 bo'lgan product_id lar.
+    list_reserve_by_order va reserve_stuck_summary bir xil filtr — aks holda "soxta" qatorlar
+    (bir buyurtmada +, boshqasida - yig'indisi 0) bannerda qolib ketadi.
+    """
+    tot_q = (
+        db.query(
+            StockMovementModel.product_id,
+            func.sum(StockMovementModel.qty_change).label("reserved_total"),
+        )
+        .filter(StockMovementModel.movement_type.in_(("allocate", "unallocate")))
+    )
+    if location_ids is not None:
+        tot_q = tot_q.filter(StockMovementModel.location_id.in_(location_ids))
+    out: set[UUID] = set()
+    for pr in tot_q.group_by(StockMovementModel.product_id).all():
+        rt = pr.reserved_total
+        if rt is not None and rt > 0:
+            out.add(pr.product_id)
+    return out
+
+
 def _resolve_product_by_sku_or_barcode(db: Session, code: str) -> Optional[ProductModel]:
     """SKU (exact) first, then primary/extra barcodes (exact). Active products only."""
     code = (code or "").strip()
@@ -1578,23 +1603,7 @@ async def list_reserve_by_order(
 
     raw_rows = q.all()
 
-    # Mahsulot bo'yicha jami allocate/unallocate (ombor lokatsiyalari) — summary bilan bir xil.
-    # Aks holda (product, order_A) net > 0, (product, order_B) net < 0 yig'indisi 0 bo'lsa,
-    # faqat A qatori chiqib "rezerv bor" ko'rinadi (soxta qator).
-    tot_q = (
-        db.query(
-            StockMovementModel.product_id,
-            func.sum(StockMovementModel.qty_change).label("reserved_total"),
-        )
-        .filter(StockMovementModel.movement_type.in_(("allocate", "unallocate")))
-    )
-    if location_ids is not None:
-        tot_q = tot_q.filter(StockMovementModel.location_id.in_(location_ids))
-    product_has_reserve: set[UUID] = set()
-    for pr in tot_q.group_by(StockMovementModel.product_id).all():
-        rt = pr.reserved_total
-        if rt is not None and rt > 0:
-            product_has_reserve.add(pr.product_id)
+    product_has_reserve = _product_ids_with_positive_net_reserved(db, location_ids)
 
     user_ids = {r.last_movement_by_user_id for r in raw_rows if r.last_movement_by_user_id}
     creator_map: dict[UUID, str] = {}
@@ -1760,6 +1769,9 @@ async def reserve_stuck_summary(
         .join(OrderModel, OrderModel.id == agg.c.order_id)
         .all()
     )
+
+    product_has_reserve = _product_ids_with_positive_net_reserved(db, location_ids)
+    raw_rows = [r for r in raw_rows if r.product_id in product_has_reserve]
 
     user_ids = {r.last_movement_by_user_id for r in raw_rows if r.last_movement_by_user_id}
     creator_map: dict[UUID, str] = {}

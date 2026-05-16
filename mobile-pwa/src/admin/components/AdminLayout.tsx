@@ -53,20 +53,11 @@ export function AdminLayout({ title, titleSlot, backTo, actionSlot, children }: 
     let mounted = true
     const loadStuck = async () => {
       try {
-        const [main, showroom] = await Promise.all([
-          getReserveStuckSummary({ warehouse: 'main', age_hours: 48, sample_limit: 3 }),
-          getReserveStuckSummary({ warehouse: 'showroom', age_hours: 48, sample_limit: 3 }),
-        ])
+        // Faqat asosiy ombor — reserve-health default (?warehouse=main) bilan mos;
+        // showroom alohida tekshiriladi (yig'indi buyurtmani ikki marta sanashi mumkin edi).
+        const main = await getReserveStuckSummary({ warehouse: 'main', age_hours: 48, sample_limit: 5 })
         if (!mounted) return
-        setStuckSummary({
-          warehouse: 'main',
-          age_hours: 48,
-          stuck_orders_count: main.stuck_orders_count + showroom.stuck_orders_count,
-          stuck_products_count: main.stuck_products_count + showroom.stuck_products_count,
-          stuck_rows_count: main.stuck_rows_count + showroom.stuck_rows_count,
-          oldest_hours: Math.max(main.oldest_hours, showroom.oldest_hours),
-          sample: [...main.sample, ...showroom.sample].slice(0, 5),
-        })
+        setStuckSummary(main)
       } catch {
         if (mounted) setStuckSummary(null)
       }
@@ -74,10 +65,17 @@ export function AdminLayout({ title, titleSlot, backTo, actionSlot, children }: 
     void loadStuck()
     const timer = window.setInterval(() => {
       void loadStuck()
-    }, 90_000)
+    }, 60_000)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void loadStuck()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
     return () => {
       mounted = false
       window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
     }
   }, [])
 
