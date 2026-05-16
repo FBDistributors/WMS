@@ -42,17 +42,8 @@ export function OrderDetailsPage() {
   const [deleteTarget, setDeleteTarget] = useState<OrderLine | null>(null)
   const [deleteSubmitting, setDeleteSubmitting] = useState(false)
 
-  const SIMPLIFIED_STATUSES = [
-    { value: 'picking', labelKey: 'orders:status_simple.yigishda' },
-    { value: 'picked', labelKey: 'orders:status_simple.tekshiruvda' },
-    { value: 'completed', labelKey: 'orders:status_simple.yakunlash' },
-  ] as const
-
-  const backendToSimple = (status: string): string => {
-    if (['imported', 'allocated', 'picking'].includes(status)) return 'picking'
-    if (status === 'picked') return 'picked'
-    return 'completed'
-  }
+  const orderStatusLabel = (status: string) =>
+    t(`orders:status.${status}`, { defaultValue: status })
 
   const load = useCallback(async () => {
     if (!id) {
@@ -186,7 +177,7 @@ export function OrderDetailsPage() {
           <div>
             <div className="text-xs text-slate-500">{t('orders:columns.status')}</div>
             <div className="text-sm text-slate-700 dark:text-slate-200">
-              {t(SIMPLIFIED_STATUSES.find((x) => x.value === backendToSimple(order.status))?.labelKey ?? 'orders:status_simple.yakunlash')}
+              {orderStatusLabel(order.status)}
             </div>
           </div>
           <div>

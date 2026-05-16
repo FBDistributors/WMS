@@ -191,7 +191,13 @@ export function MovementDetailsPage() {
   const barcode = (movement.barcode as string) ?? '—'
   const note = (movement.note as string) ?? '—'
   const amount = movement.amount != null ? Number(movement.amount).toLocaleString() : '—'
-  const status = (movement.status as string) ?? '—'
+  /** SmartUp qatori; DB bilan bog'langan buyurtma bo'lsa WMS status bazadan ko'rsatiladi */
+  const smartupStatus = (movement.status as string) ?? '—'
+  const wmsStatusFromDb = linkedOrder?.status?.trim()
+  const statusDisplay =
+    wmsStatusFromDb != null && wmsStatusFromDb !== ''
+      ? t(`orders:status.${wmsStatusFromDb}`, { defaultValue: wmsStatusFromDb })
+      : smartupStatus
   const fromWh = (movement.from_warehouse_code as string) ?? '—'
   const toWh = (movement.to_warehouse_code as string) ?? '—'
   const fromTime = (movement.from_time as string) ?? '—'
@@ -264,7 +270,7 @@ export function MovementDetailsPage() {
           </div>
           <div>
             <div className="text-xs text-slate-500">{t('orders:columns_diller.status')}</div>
-            <div className="text-sm text-slate-700 dark:text-slate-200">{status}</div>
+            <div className="text-sm text-slate-700 dark:text-slate-200">{statusDisplay}</div>
           </div>
           <div>
             <div className="text-xs text-slate-500">{t('orders:movement_delivery_number')}</div>

@@ -526,7 +526,9 @@ def _to_order_details(order: OrderModel, db: Session) -> OrderDetails:
         id=order.id,
         order_number=order.order_number,
         source_external_id=order.source_external_id,
-        status=order.wms_state.status,
+        status=normalize_order_wms_status_for_storage(order.wms_state.status)
+        if order.wms_state
+        else "imported",
         filial_id=order.filial_id,
         customer_id=order.customer_id,
         customer_name=order.customer_name,
@@ -877,7 +879,9 @@ async def list_orders(
                 id=order.id,
                 order_number=order.order_number,
                 source_external_id=order.source_external_id,
-                status=order.wms_state.status,
+                status=normalize_order_wms_status_for_storage(order.wms_state.status)
+                if order.wms_state
+                else "imported",
                 filial_id=order.filial_id,
                 customer_id=order.customer_id,
                 customer_name=order.customer_name,
