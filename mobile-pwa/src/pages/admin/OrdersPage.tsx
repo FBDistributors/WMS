@@ -249,7 +249,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const ordersLoadAbortRef = useRef<AbortController | null>(null)
   const ordersLoadGenRef = useRef(0)
 
-  const ELIGIBLE_PICKING_STATUSES = new Set(['imported', 'allocated'])
+  const ELIGIBLE_PICKING_STATUSES = new Set(['imported', 'W', 'allocated'])
   const canBeSentToPicking = (order: OrderListItem) =>
     canSend && ELIGIBLE_PICKING_STATUSES.has(order.status)
   const eligibleItems = useMemo(

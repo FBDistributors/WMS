@@ -40,6 +40,7 @@ def test_parse_mfm_response_movement_level() -> None:
     assert len(result.items) == 1
     order = result.items[0]
     assert order.external_id == "mfm:MV-1001"
+    assert order.status == "W"
     assert order.from_warehouse_code == "WH-A"
     assert order.to_warehouse_code == "WH-B"
     assert order.delivery_date is not None
@@ -126,4 +127,5 @@ def test_parse_mfm_flat_rows() -> None:
     result = _parse_mfm_response(body)
     assert len(result.items) == 1
     assert len(result.items[0].lines) == 2
+    assert result.items[0].status == "W"
     assert result.items[0].delivery_date is not None

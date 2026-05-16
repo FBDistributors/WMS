@@ -1,7 +1,7 @@
 """Canonical order WMS statuses (order_wms_state.status).
 
 Legacy values B#W, B#S, ready_for_picking are normalized on write and on list filters.
-SmartUp HTTP export may still use status=B#W — that is external only, not DB storage.
+SmartUp asosiy eksportdagi B#W tashqi; mfm tashkiliy harakatda yangi qatorlar DB da "W" saqlanishi mumkin.
 """
 
 from __future__ import annotations
@@ -9,6 +9,7 @@ from __future__ import annotations
 CANONICAL_ORDER_WMS_STATUSES: frozenset[str] = frozenset(
     {
         "imported",
+        "W",  # SmartUp tashkiliy harakat (mfm) yangi qator — DB da saqlanadi
         "allocated",
         "picking",
         "picked",
@@ -24,6 +25,8 @@ CANONICAL_ORDER_WMS_STATUSES: frozenset[str] = frozenset(
 def normalize_order_wms_status_for_storage(value: str | None) -> str:
     """Map SmartUp / legacy / empty to a single canonical status for DB."""
     s = (value or "").strip()
+    if s.lower() == "w":
+        return "W"
     if not s or s in ("B#W", "B#S"):
         return "imported"
     if s == "ready_for_picking":
@@ -36,6 +39,8 @@ def normalize_order_wms_status_for_storage(value: str | None) -> str:
 def normalize_list_status_filter_token(token: str) -> str:
     """GET /orders?status= legacy tokens → canonical token used in ORDER_STATUSES."""
     t = (token or "").strip()
+    if t.lower() == "w":
+        return "W"
     if t in ("B#S", "B#W"):
         return "imported"
     if t == "ready_for_picking":

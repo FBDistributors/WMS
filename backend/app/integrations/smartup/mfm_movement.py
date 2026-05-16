@@ -87,8 +87,9 @@ def _mfm_movement_export_omit_dates() -> bool:
 
 
 def _normalize_movement_row_status(raw: Any) -> str:
-    if raw is None:
-        return normalize_order_wms_status_for_storage(None)
+    """SmartUp qatorida status bo'lmasa — eksport so'rovidagi default (odatda W)."""
+    if raw is None or str(raw).strip() == "":
+        return _mfm_export_request_status()
     return normalize_order_wms_status_for_storage(str(raw).strip())
 
 DEFAULT_MFM_URL = "https://smartup.online/b/anor/mxsx/mfm/movement$export"
@@ -261,7 +262,7 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
                 "external_id": external_id or f"mfm:{group_id}",
                 "deal_id": group_id,
                 "order_no": group_id,
-                "status": "imported",
+                "status": _mfm_export_request_status(),
                 "filial_id": filial,
                 "filial_code": filial,
                 "lines": lines,

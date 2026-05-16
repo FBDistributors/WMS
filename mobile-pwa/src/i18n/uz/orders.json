@@ -142,6 +142,7 @@
     "agent": "Agent"
   },
   "status": {
+    "W": "Yangi (W)",
     "imported": "Navbatda (import)",
     "allocated": "Yig'uvchiga yuborilgan",
     "ready_for_picking": "Navbatda (import)",

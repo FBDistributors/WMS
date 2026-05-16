@@ -16,7 +16,7 @@ export const SIMPLE_STATUS_OPTIONS = [
 export type SimpleOrderStatus = (typeof SIMPLE_STATUS_OPTIONS)[number]['value']
 
 export function backendStatusToSimple(status: string): SimpleOrderStatus {
-  if (['imported', 'allocated', 'picking', 'cancelling_in_progress', 'cancelled'].includes(status)) return 'picking'
+  if (['imported', 'W', 'allocated', 'picking', 'cancelling_in_progress', 'cancelled'].includes(status)) return 'picking'
   if (status === 'picked') return 'picked'
   return 'completed'
 }

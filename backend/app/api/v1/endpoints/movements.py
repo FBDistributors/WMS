@@ -161,14 +161,14 @@ def _enrich_movements_chunk_with_wms(db: Session, chunk: list[Any]) -> list[Any]
 
 
 def _movement_is_wms_new(wms_order_status: Any) -> bool:
-    """Yig'ishga yuborilmagan: WMS yozuvi yo'q yoki imported (legacy B#W migratsiyadan keyin ham imported)."""
+    """Yig'ishga yuborilmagan: WMS yozuvi yo'q yoki imported / W (SmartUp yangi)."""
     if wms_order_status is None:
         return True
     s = str(wms_order_status).strip()
     if not s:
         return True
     low = s.lower()
-    return low in ("imported", "b#w")
+    return low in ("imported", "b#w", "w")
 
 
 def _filter_movements_wms_new(enriched: list[Any]) -> list[Any]:

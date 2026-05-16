@@ -156,6 +156,7 @@ async def get_dashboard_summary(
 
 ORDER_STATUSES_FOR_COUNTS = (
     "imported",
+    "W",
     "allocated",
     "picking",
     "cancelling_in_progress",

@@ -202,7 +202,7 @@ def _process_one_order(
         return 0, 0, 1
 
 
-STALE_ORDER_STATUSES = ("imported",)
+STALE_ORDER_STATUSES = ("imported", "W")
 
 
 def delete_stale_orders(
@@ -210,7 +210,7 @@ def delete_stale_orders(
     orders_from_smartup: List[SmartupOrder],
 ) -> int:
     """
-    7 kunlik modified_on javobida kelmagan va hali workflow da bo'lmagan (imported) buyurtmalarni o'chiradi.
+    7 kunlik modified_on javobida kelmagan va hali workflow da bo'lmagan (imported yoki W) buyurtmalarni o'chiradi.
     Picking, allocated, picked, completed va boshqa statusdagilar o'chirilmaydi.
     """
     external_ids_to_keep = {_resolve_external_id(o) for o in orders_from_smartup}
@@ -230,7 +230,7 @@ def delete_stale_orders(
         return 0
     deleted = db.query(Order).filter(Order.id.in_(ids_to_delete)).delete(synchronize_session=False)
     db.commit()
-    logger.info("delete_stale_orders: %d ta eski buyurtma o'chirildi (faqat imported)", deleted)
+    logger.info("delete_stale_orders: %d ta eski buyurtma o'chirildi (imported/W)", deleted)
     return deleted
 
 

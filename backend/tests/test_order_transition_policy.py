@@ -87,6 +87,7 @@ def _seed_allocatable_order(db: Session) -> tuple[Order, User]:
 
 def test_policy_allows_core_transitions() -> None:
     assert get_transition_rule("imported", "allocated") is not None
+    assert get_transition_rule("W", "allocated") is not None
     assert get_transition_rule("picking", "cancelling_in_progress") is not None
     assert get_transition_rule("cancelling_in_progress", "cancelled") is not None
 

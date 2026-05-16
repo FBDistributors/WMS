@@ -347,6 +347,22 @@ def _expand_status_filters(status_values: list[str]) -> list[str]:
     return list({(s or "").strip() for s in status_values if (s or "").strip()})
 
 
+def _expand_movement_source_status_filters(
+    order_source: str | None, status_values: list[str]
+) -> list[str]:
+    """
+    Tashkiliy / O'rikzor: UI 'yangi' guruhida status=imported yuboriladi.
+    Yangi mfm importlari order_wms_state.status='W' bo'lsa, shu qatorlarni ham qo'shamiz.
+    """
+    src = (order_source or "").strip().lower()
+    if src not in ("diller", "orikzor"):
+        return status_values
+    out = list(status_values)
+    if "imported" in out and "W" not in out:
+        out.append("W")
+    return list({(s or "").strip() for s in out if (s or "").strip()})
+
+
 class PickerUser(BaseModel):
     id: UUID
     name: str
@@ -699,6 +715,7 @@ async def list_orders(
         if not valid:
             raise HTTPException(status_code=400, detail="Invalid status")
         valid = _expand_status_filters(valid)
+        valid = _expand_movement_source_status_filters(order_source, valid)
         filter_finalized_so_for_main = (
             bool(order_source and order_source.strip().lower() == "smartup")
             and "imported" in valid
