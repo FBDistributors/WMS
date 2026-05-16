@@ -45,6 +45,23 @@ def test_parse_mfm_response_movement_level() -> None:
     assert order.delivery_date is not None
 
 
+def test_parse_mfm_movement_level_b_hash_w_maps_to_w_not_imported() -> None:
+    body = json.dumps(
+        {
+            "movement": [
+                {
+                    "movement_id": "MV-BW",
+                    "status": "B#W",
+                    "movement_items": [{"product_code": "P1", "quantity": 1}],
+                }
+            ]
+        }
+    )
+    result = _parse_mfm_response(body)
+    assert len(result.items) == 1
+    assert result.items[0].status == "W"
+
+
 def test_extract_nested_response_wrapper() -> None:
     data = {
         "response": {

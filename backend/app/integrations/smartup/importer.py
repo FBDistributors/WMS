@@ -31,6 +31,36 @@ WORKFLOW_LOCKED_STATUSES = frozenset(
 FINAL_FROZEN_STATUSES = frozenset({"completed", "packed", "shipped"})
 
 
+def _diller_import_wms_status(order: SmartupOrder) -> str:
+    """
+    Tashkiliy harakat (mfm): yangi qatorlar DB da doim W (Yangi).
+    Parser allaqachon imported qilib yuborgan bo'lsa ham shu yerda W ga aylanadi.
+    Yig'ish/jarayondagi buyurtmalar (allocated, picking, ...) saqlanadi.
+    """
+    raw = (order.status or "").strip()
+    normalized = normalize_order_wms_status_for_storage(raw) if raw else "imported"
+    if normalized in WORKFLOW_LOCKED_STATUSES:
+        return normalized
+    return "W"
+
+
+def reconcile_diller_imported_status_to_w(db: Session) -> int:
+    """Eski sinxronlardan qolgan source=diller, status=imported yozuvlarni W ga yangilaydi."""
+    rows = (
+        db.query(OrderWmsState)
+        .join(Order, Order.id == OrderWmsState.order_id)
+        .filter(Order.source == "diller", OrderWmsState.status == "imported")
+        .all()
+    )
+    if not rows:
+        return 0
+    for ows in rows:
+        ows.status = "W"
+    db.commit()
+    logger.info("reconcile_diller_imported_status_to_w: %s ta yozuv imported -> W", len(rows))
+    return len(rows)
+
+
 def _enrich_order_line_names_from_products(db: Session, lines: List[OrderLinePayload]) -> None:
     """Order line nomi bo'sh yoki faqat SKU bo'lsa, products jadvalidan SKU bo'yicha to'liq nomni olib to'ldiradi."""
     for line in lines:
@@ -89,16 +119,12 @@ def _process_one_order(
         .one_or_none()
     )
     payload = map_order_to_wms_order(order)
-    raw_status = (order.status or "").strip()
-    if raw_status:
-        payload.status = normalize_order_wms_status_for_storage(raw_status)
-    elif (order_source or "").strip().lower() == "diller":
-        # Tashkiliy harakat (mfm): SmartUp qatorida status bo'lmasa — "imported" emas, W (Yangi)
-        payload.status = "W"
-    if (order_source or "").strip().lower() == "diller" and payload.status == "imported":
-        ru = (order.status or "").strip().upper()
-        if ru in ("B#W", "READY_FOR_PICKING"):
-            payload.status = "W"
+    if (order_source or "").strip().lower() == "diller":
+        payload.status = _diller_import_wms_status(order)
+    else:
+        raw_status = (order.status or "").strip()
+        if raw_status:
+            payload.status = normalize_order_wms_status_for_storage(raw_status)
     if override and not (payload.filial_id or "").strip():
         payload.filial_id = override
     if override and external_id != payload.source_external_id:

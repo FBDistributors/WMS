@@ -32,7 +32,11 @@ from app.services.audit_service import ACTION_CREATE, ACTION_DELETE, ACTION_UPDA
 from app.services.push_notifications import send_push_to_user
 from app.services.safe_cancel_return_service import initiate_safe_cancel_return
 from app.integrations.smartup.client import SmartupClient
-from app.integrations.smartup.importer import delete_stale_orders, import_orders
+from app.integrations.smartup.importer import (
+    delete_stale_orders,
+    import_orders,
+    reconcile_diller_imported_status_to_w,
+)
 from app.integrations.smartup.mfm_movement import (
     apply_mfm_export_date_policy,
     export_mfm_movements_for_sync,
@@ -1416,6 +1420,7 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
             created, updated, skipped, import_errors, skipped_by_reason = import_orders(
                 db, items, order_source="diller"
             )
+            reconciled_w = reconcile_diller_imported_status_to_w(db)
             breakdown = {k: v for k, v in skipped_by_reason.items() if v}
             logger.info(
                 "sync-smartup(diller): import_orders natija created=%s updated=%s skipped=%s errors=%s skipped_by=%s",
@@ -1461,6 +1466,7 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                     "mfm_request_filial_id": mfm_meta.get("request_filial_id"),
                     "mfm_request_project_code": mfm_meta.get("request_project_code"),
                     "import_skipped_by_reason": breakdown,
+                    "diller_reconciled_imported_to_w": reconciled_w,
                 },
             )
             if not items and not resp.detail and not import_errors:

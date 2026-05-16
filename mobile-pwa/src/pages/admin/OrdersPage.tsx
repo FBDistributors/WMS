@@ -169,13 +169,15 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const statusParam = normalizeOrderListStatusParam(
     isMainOrdersSimple
       ? 'imported'
-      : orderSource
-      ? (GROUP_TO_STATUS[group] ?? undefined)
-      : mode === 'default' && group === 'all'
-        ? undefined
-        : mode === 'statuses' && group === 'all'
-          ? undefined
-          : (GROUP_TO_STATUS[group] ?? GROUP_TO_STATUS.all)
+      : orderSource === 'diller' && group === 'yangi'
+        ? 'W'
+        : orderSource
+          ? (GROUP_TO_STATUS[group] ?? undefined)
+          : mode === 'default' && group === 'all'
+            ? undefined
+            : mode === 'statuses' && group === 'all'
+              ? undefined
+              : (GROUP_TO_STATUS[group] ?? GROUP_TO_STATUS.all)
   )
   const mainOrdersSource = isMainOrdersSimple ? 'smartup' : orderSource
 

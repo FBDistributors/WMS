@@ -157,7 +157,11 @@ def _normalize_movement_row_status(raw: Any) -> str:
     """SmartUp qatorida status bo'lmasa — eksport so'rovidagi default (odatda W)."""
     if raw is None or str(raw).strip() == "":
         return _mfm_export_request_status()
-    return normalize_order_wms_status_for_storage(str(raw).strip())
+    normalized = normalize_order_wms_status_for_storage(str(raw).strip())
+    # B#W/B#S asosiy buyurtmada imported; mfm tashkiliy harakatda yangi = W
+    if normalized == "imported":
+        return _mfm_export_request_status()
+    return normalized
 
 DEFAULT_MFM_URL = "https://smartup.online/b/anor/mxsx/mfm/movement$export"
 
