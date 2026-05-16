@@ -92,6 +92,13 @@ def _process_one_order(
     raw_status = (order.status or "").strip()
     if raw_status:
         payload.status = normalize_order_wms_status_for_storage(raw_status)
+    elif (order_source or "").strip().lower() == "diller":
+        # Tashkiliy harakat (mfm): SmartUp qatorida status bo'lmasa — "imported" emas, W (Yangi)
+        payload.status = "W"
+    if (order_source or "").strip().lower() == "diller" and payload.status == "imported":
+        ru = (order.status or "").strip().upper()
+        if ru in ("B#W", "READY_FOR_PICKING"):
+            payload.status = "W"
     if override and not (payload.filial_id or "").strip():
         payload.filial_id = override
     if override and external_id != payload.source_external_id:
