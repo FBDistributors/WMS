@@ -29,8 +29,8 @@ from app.models.safe_cancel_return import SafeCancelReturnSession as SafeCancelR
 from app.models.user_fcm_token import UserFCMToken
 from app.models.stock import StockLot as StockLotModel
 from app.api.v1.endpoints.picker_inventory import _get_lot_level_balances, _location_ids_for_warehouse
-from app.services.stock_availability import require_sufficient_available
-from app.services.audit_service import ACTION_UPDATE, get_client_ip, log_action
+from app.services.stock_availability import require_sufficient_available, require_sufficient_reserved
+from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_ip, log_action
 from app.services.safe_cancel_return_service import (
     active_return_session_id_for_document,
     finish_safe_cancel_return,
@@ -241,6 +241,53 @@ class CompletePickingRequest(BaseModel):
         json_schema_extra = {
             "example": {"incomplete_reason": "out_of_stock"},
         }
+
+
+def _release_unpicked_reserve_on_controller_complete(
+    db: Session,
+    document: DocumentModel,
+    lines: list[DocumentLineModel],
+    user_id: UUID,
+) -> int:
+    """
+    Controller hujjatni completed qilganda: terilmagan qism uchun rezervni yechish.
+    Har terishda pick+unallocate bo'lgani kabi, bu yerda faqat unallocate (ombor joyida qoldiq qoladi).
+    """
+    released_lines = 0
+    for line in lines:
+        if _line_is_vip_expiry_informational(line):
+            continue
+        if getattr(line, "skip_reason", None):
+            continue
+        if not line.product_id or not line.lot_id or not line.location_id:
+            continue
+        req = Decimal(str(line.required_qty or 0))
+        picked = Decimal(str(line.picked_qty or 0))
+        rem = req - picked
+        if rem <= 0:
+            continue
+        require_sufficient_reserved(
+            db,
+            line.product_id,
+            line.lot_id,
+            line.location_id,
+            rem,
+            lock=True,
+        )
+        db.add(
+            StockMovementModel(
+                product_id=line.product_id,
+                lot_id=line.lot_id,
+                location_id=line.location_id,
+                qty_change=-rem,
+                movement_type="unallocate",
+                source_document_type="document",
+                source_document_id=document.id,
+                created_by_user_id=user_id,
+            )
+        )
+        released_lines += 1
+    return released_lines
 
 
 class ReturnScanBody(BaseModel):
@@ -1848,6 +1895,7 @@ async def skip_line(
     summary="Complete picking document (picker: -> picked; controller: -> completed)",
 )
 async def complete_picking_document(
+    request: Request,
     document_id: UUID,
     body: Optional[CompletePickingRequest] = Body(None),
     db: Session = Depends(get_db),
@@ -1911,6 +1959,34 @@ async def complete_picking_document(
             return response
         if document.status != "picked":
             raise HTTPException(status_code=409, detail="Document must be in picked status")
+        if incomplete:
+            eff = (incomplete_reason or "").strip() or (
+                (getattr(document, "incomplete_reason", None) or "").strip()
+            )
+            if eff not in INCOMPLETE_REASON_CODES:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        "To'liq terilmagan hujjat: incomplete_reason talab qilinadi "
+                        f"({', '.join(INCOMPLETE_REASON_CODES)}) — yig'uvchi kiritgan yoki body da yuboring."
+                    ),
+                )
+            if incomplete_reason and incomplete_reason.strip() in INCOMPLETE_REASON_CODES:
+                document.incomplete_reason = incomplete_reason.strip()
+        released = _release_unpicked_reserve_on_controller_complete(db, document, lines, user.id)
+        if released:
+            log_action(
+                db,
+                user_id=user.id,
+                action=ACTION_CREATE,
+                entity_type="picking_document",
+                entity_id=str(document.id),
+                new_data={
+                    "event": "controller_complete_released_unpicked_reserve",
+                    "lines_with_unallocate": released,
+                },
+                ip_address=get_client_ip(request),
+            )
         document.status = "completed"
         if document.order_id:
             order = (
