@@ -94,6 +94,14 @@ const SEARCH_FIELD_OPTIONS = [
   { id: 'agent', labelKey: 'orders:search_fields.agent' },
 ]
 
+const SEARCH_FIELD_OPTIONS_DILLER = [
+  { id: 'order_number', labelKey: 'orders:columns_diller.order_number' },
+  { id: 'external_id', labelKey: 'orders:columns_diller.external_id' },
+  { id: 'status', labelKey: 'orders:columns_diller.status' },
+  { id: 'to_filial', labelKey: 'orders:columns_diller.to_filial' },
+  { id: 'movement_note', labelKey: 'orders:columns_diller.movement_note' },
+]
+
 /** Eski bookmark: B#S / B#W / ready_for_picking → imported */
 function normalizeOrderListStatusParam(s: string | undefined): string | undefined {
   if (s == null || s === '') return undefined
@@ -287,7 +295,9 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
           date_from: dateFrom.trim() || undefined,
           date_to: dateTo.trim() || undefined,
           search_fields:
-            config.searchFields.length > 0 ? config.searchFields.join(',') : undefined,
+            dillerTableConfig.config.searchFields.length > 0
+              ? dillerTableConfig.config.searchFields.join(',')
+              : undefined,
           limit: PAGE_SIZE,
           offset,
           filial_id: 'all',
@@ -384,6 +394,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     }
   }, [
     config.searchFields,
+    dillerTableConfig.config.searchFields,
     group,
     mode,
     mainOrdersSource,
@@ -1253,17 +1264,28 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
       <OrdersTableSettings
         open={isSettingsOpen}
         onOpenChange={setIsSettingsOpen}
-        config={config}
-        columns={(mode === 'statuses' ? COLUMN_OPTIONS_STATUSES : mode === 'default' ? COLUMN_OPTIONS_DEFAULT : COLUMN_OPTIONS).map((column) => ({
-          id: column.id,
-          label: t(column.labelKey),
-        }))}
-        searchFields={SEARCH_FIELD_OPTIONS.map((field) => ({
-          id: field.id,
-          label: t(field.labelKey),
-        }))}
-        onSave={updateConfig}
-        onReset={resetConfig}
+        config={orderSource === 'diller' ? dillerTableConfig.config : config}
+        columns={
+          (orderSource === 'diller'
+            ? COLUMN_OPTIONS_DILLER
+            : mode === 'statuses'
+              ? COLUMN_OPTIONS_STATUSES
+              : mode === 'default'
+                ? COLUMN_OPTIONS_DEFAULT
+                : COLUMN_OPTIONS
+          ).map((column) => ({
+            id: column.id,
+            label: t(column.labelKey),
+          }))
+        }
+        searchFields={(orderSource === 'diller' ? SEARCH_FIELD_OPTIONS_DILLER : SEARCH_FIELD_OPTIONS).map(
+          (field) => ({
+            id: field.id,
+            label: t(field.labelKey),
+          })
+        )}
+        onSave={orderSource === 'diller' ? dillerTableConfig.updateConfig : updateConfig}
+        onReset={orderSource === 'diller' ? dillerTableConfig.resetConfig : resetConfig}
       />
     </AdminLayout>
   )
