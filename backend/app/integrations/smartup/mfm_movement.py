@@ -36,6 +36,8 @@ def mfm_resolved_project_code() -> str:
     return (os.getenv("SMARTUP_PROJECT_CODE") or "trade").strip()
 
 DEFAULT_MFM_EXPORT_STATUS = "W"
+# Diller sinxron: asosiy buyurtmalardagi B#W kabi — faqat yangi (W).
+DILLER_SYNC_MFM_EXPORT_STATUS = "W"
 
 
 def _mfm_export_request_status() -> str:
@@ -88,6 +90,20 @@ def _filter_mfm_movement_rows_for_export(rows: list[Any]) -> tuple[list[Any], in
         else:
             skipped += 1
     return kept, skipped
+
+
+def filter_mfm_orders_for_diller_w_sync(
+    items: list[SmartupOrder],
+) -> tuple[list[SmartupOrder], int]:
+    """
+    Diller sinxron: asosiy buyurtmalardagi B#W filtri kabi — faqat SmartUp status W.
+    """
+    kept = [
+        item
+        for item in items
+        if (item.status or "").strip().upper() == DILLER_SYNC_MFM_EXPORT_STATUS
+    ]
+    return kept, max(0, len(items) - len(kept))
 
 
 def _mfm_export_fill_created_date_range() -> bool:
@@ -290,19 +306,17 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
     rows_before_status = len(rows)
     rows, status_filtered_out = _filter_mfm_movement_rows_for_export(rows)
     keys = list(data.keys()) if isinstance(data, dict) else []
-    _last_mfm_export_meta = {
-        "http_body_len": len(body),
-        "raw_keys": keys,
-        "extracted_rows": len(rows),
-        "extract_source": extract_source,
-        "rows_before_status_filter": rows_before_status,
-        "rows_status_filtered_out": status_filtered_out,
-        "status_in_export_body": _mfm_send_status_in_export_body(),
-        "export_status_value": _mfm_export_request_status()
-        if _mfm_send_status_in_export_body()
-        else None,
-        "post_fetch_status_filter": _mfm_post_fetch_status_filter_enabled(),
-    }
+    _last_mfm_export_meta.update(
+        {
+            "http_body_len": len(body),
+            "raw_keys": keys,
+            "extracted_rows": len(rows),
+            "extract_source": extract_source,
+            "rows_before_status_filter": rows_before_status,
+            "rows_status_filtered_out": status_filtered_out,
+            "post_fetch_status_filter": _mfm_post_fetch_status_filter_enabled(),
+        }
+    )
     if not rows:
         preview = (body[:500] if body else "").replace("\n", " ")
         logger.warning(
@@ -517,6 +531,7 @@ def _request_mfm_export(
     begin_modified_on: date | None = None,
     end_modified_on: date | None = None,
     date_filter_mode_override: str | None = None,
+    export_status: str | None = None,
 ) -> str:
     """
     Call SmartUp mfm movement$export, return raw response body (JSON string).
@@ -580,8 +595,13 @@ def _request_mfm_export(
             "begin_modified_on": mod_begin,
             "end_modified_on": mod_end,
         }
-    if _mfm_send_status_in_export_body():
+    status_for_body = (export_status or "").strip()
+    if status_for_body:
+        payload["status"] = status_for_body
+    elif _mfm_send_status_in_export_body():
         payload["status"] = _mfm_export_request_status()
+    _last_mfm_export_meta["status_in_export_body"] = "status" in payload
+    _last_mfm_export_meta["export_status_value"] = payload.get("status")
     data = json.dumps(payload).encode("utf-8")
     credentials = f"{username}:{password}"
     basic_token = base64.b64encode(credentials.encode("utf-8")).decode("utf-8")
@@ -607,8 +627,8 @@ def _request_mfm_export(
         created_end,
         mod_begin,
         mod_end,
-        _mfm_send_status_in_export_body(),
-        _mfm_export_request_status() if _mfm_send_status_in_export_body() else "-",
+        _last_mfm_export_meta.get("status_in_export_body"),
+        _last_mfm_export_meta.get("export_status_value") or "-",
     )
 
     request = urllib.request.Request(url, data=data, headers=headers, method="POST")
@@ -657,6 +677,7 @@ def export_mfm_movements(
     begin_modified_on: date | None = None,
     end_modified_on: date | None = None,
     date_filter_mode_override: str | None = None,
+    export_status: str | None = None,
 ) -> SmartupOrderExportResponse:
     """
     Call SmartUp mfm movement$export (Cross-organizational movement), return SmartupOrder list.
@@ -669,6 +690,7 @@ def export_mfm_movements(
         begin_modified_on=begin_modified_on,
         end_modified_on=end_modified_on,
         date_filter_mode_override=date_filter_mode_override,
+        export_status=export_status,
     )
     logger.info("export_mfm_movements: HTTP body_len=%s date_mode=%s", len(body), mode_used)
     result = _parse_mfm_response(body)
@@ -682,13 +704,17 @@ def export_mfm_movements_for_sync(
     begin_date: date,
     end_date: date,
     filial_id: str | None = None,
+    export_status: str | None = DILLER_SYNC_MFM_EXPORT_STATUS,
 ) -> tuple[SmartupOrderExportResponse, str]:
     """
     Diller sinxron: bo'sh javobda created va both rejimlarida qayta urinadi.
+    export_status default W — asosiy order$export dagi B#W kabi SmartUp body filtri.
     Qaytadi: (response, effective_date_filter_mode).
     """
     if _mfm_movement_export_omit_dates():
-        response = export_mfm_movements(begin_date, end_date, filial_id=filial_id)
+        response = export_mfm_movements(
+            begin_date, end_date, filial_id=filial_id, export_status=export_status
+        )
         return response, "omit"
 
     configured = mfm_date_filter_mode()
@@ -704,16 +730,16 @@ def export_mfm_movements_for_sync(
     for try_mode in modes_to_try:
         override = try_mode if try_mode != configured else None
         logger.info(
-            "mfm export for_sync: attempt mode=%s send_status=%s status=%s",
+            "mfm export for_sync: attempt mode=%s export_status=%s",
             try_mode,
-            _mfm_send_status_in_export_body(),
-            _mfm_export_request_status() if _mfm_send_status_in_export_body() else "-",
+            export_status or "-",
         )
         last_response = export_mfm_movements(
             begin_date,
             end_date,
             filial_id=filial_id,
             date_filter_mode_override=override,
+            export_status=export_status,
         )
         meta = get_last_mfm_export_meta()
         attempts.append(

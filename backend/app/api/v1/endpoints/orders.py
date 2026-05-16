@@ -34,8 +34,10 @@ from app.services.safe_cancel_return_service import initiate_safe_cancel_return
 from app.integrations.smartup.client import SmartupClient
 from app.integrations.smartup.importer import delete_stale_orders, import_orders
 from app.integrations.smartup.mfm_movement import (
+    DILLER_SYNC_MFM_EXPORT_STATUS,
     apply_mfm_export_date_policy,
     export_mfm_movements_for_sync,
+    filter_mfm_orders_for_diller_w_sync,
     get_last_mfm_export_meta,
     mfm_date_filter_mode,
     mfm_resolved_filial_id,
@@ -44,7 +46,6 @@ from app.integrations.smartup.mfm_movement import (
     resolve_movement_export_date_range,
     resolve_mfm_sync_date_range,
     _mfm_movement_export_omit_dates,
-    _mfm_send_status_in_export_body,
 )
 from app.integrations.smartup.orikzor import export_movements_from_smartup
 from app.integrations.smartup.sync_lock import diller_sync_lock, orikzor_sync_lock, smartup_sync_lock
@@ -1420,29 +1421,39 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
             response, effective_mfm_mode = export_mfm_movements_for_sync(
                 begin, end, filial_id=filial_override
             )
-            items = response.items
+            items_all = response.items
+            items_to_import, filtered_out_status = filter_mfm_orders_for_diller_w_sync(items_all)
+            if filtered_out_status:
+                logger.info(
+                    "sync-smartup(diller): skipped non-%s items=%s",
+                    DILLER_SYNC_MFM_EXPORT_STATUS,
+                    filtered_out_status,
+                )
             mfm_meta = get_last_mfm_export_meta()
             logger.info(
-                "sync-smartup(diller): mfm javobdan %s ta order import qilishga yuboriladi "
+                "sync-smartup(diller): mfm javobdan %s ta (W filtridan keyin %s) import "
                 "(sana=%s..%s filial_override=%s omit_dates=%s)",
-                len(items),
+                len(items_all),
+                len(items_to_import),
                 begin,
                 end,
                 filial_override or "-",
                 _mfm_movement_export_omit_dates(),
             )
             logging.getLogger("uvicorn").info(
-                "WMS diller: mfm_items=%s dates=%s..%s filial=%s omit_dates=%s",
-                len(items),
+                "WMS diller: mfm_items=%s w_items=%s filtered_out=%s dates=%s..%s filial=%s",
+                len(items_all),
+                len(items_to_import),
+                filtered_out_status,
                 begin,
                 end,
                 filial_override or "-",
-                _mfm_movement_export_omit_dates(),
             )
             created, updated, skipped, import_errors, skipped_by_reason = import_orders(
-                db, items, order_source="diller"
+                db, items_to_import, order_source="diller"
             )
-            stale_deleted = delete_stale_orders(db, items, order_source="diller")
+            stale_deleted = delete_stale_orders(db, items_to_import, order_source="diller")
+            skipped += filtered_out_status
             breakdown = {k: v for k, v in skipped_by_reason.items() if v}
             logger.info(
                 "sync-smartup(diller): import_orders natija created=%s updated=%s skipped=%s errors=%s skipped_by=%s",
@@ -1474,7 +1485,9 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                 import_errors,
                 skipped_by_reason,
                 extra_debug={
-                    "diller_items_from_smartup": len(items),
+                    "diller_items_from_smartup": len(items_all),
+                    "diller_items_w_after_filter": len(items_to_import),
+                    "diller_filtered_non_w": filtered_out_status,
                     "diller_begin_date": str(begin),
                     "diller_end_date": str(end),
                     "mfm_date_filter_mode": effective_mfm_mode,
@@ -1488,6 +1501,8 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                     "mfm_rows_status_filtered_out": mfm_meta.get("rows_status_filtered_out"),
                     "mfm_status_in_export_body": mfm_meta.get("status_in_export_body"),
                     "mfm_export_status_value": mfm_meta.get("export_status_value"),
+                    "body_status": mfm_meta.get("export_status_value"),
+                    "statusdan_tashlandi": filtered_out_status,
                     "mfm_sync_attempts": mfm_meta.get("sync_attempts"),
                     "mfm_request_filial_id": mfm_meta.get("request_filial_id"),
                     "mfm_request_project_code": mfm_meta.get("request_project_code"),
@@ -1495,7 +1510,7 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                     "diller_stale_deleted": stale_deleted,
                 },
             )
-            if not items and not resp.detail and not import_errors:
+            if not items_to_import and not resp.detail and not import_errors:
                 raw_keys = mfm_meta.get("raw_keys") or []
                 resolved_filial = mfm_resolved_filial_id(filial_override)
                 resolved_project = mfm_resolved_project_code()

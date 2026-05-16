@@ -46,6 +46,22 @@ def test_parse_mfm_response_movement_level() -> None:
     assert order.delivery_date is not None
 
 
+def test_filter_mfm_orders_for_diller_w_sync_strict_w() -> None:
+    from app.integrations.smartup.mfm_movement import filter_mfm_orders_for_diller_w_sync
+    from app.integrations.smartup.schemas import SmartupOrder
+
+    items = [
+        SmartupOrder(external_id="a", deal_id="1", order_no="1", status="W", lines=[]),
+        SmartupOrder(external_id="b", deal_id="2", order_no="2", status="C", lines=[]),
+        SmartupOrder(external_id="c", deal_id="3", order_no="3", status="B#W", lines=[]),
+        SmartupOrder(external_id="d", deal_id="4", order_no="4", status=None, lines=[]),
+    ]
+    kept, filtered = filter_mfm_orders_for_diller_w_sync(items)
+    assert len(kept) == 1
+    assert kept[0].external_id == "a"
+    assert filtered == 3
+
+
 def test_filter_mfm_rows_keeps_w_skips_other_statuses(monkeypatch) -> None:
     monkeypatch.setenv("SMARTUP_MFM_POST_FETCH_STATUS_FILTER", "true")
     rows = [
