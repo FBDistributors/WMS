@@ -22,18 +22,31 @@ def test_diller_import_without_smartup_status_stores_w(db_session) -> None:
     assert row.wms_state.status == "W"
 
 
-def test_diller_import_parser_imported_status_stores_w(db_session) -> None:
-    """MFM parser B#W ni imported qilib yuborsa ham diller import W saqlaydi."""
+def test_diller_import_smartup_c_stores_picking(db_session) -> None:
+    """SmartUp C (yig'ish) DB da picking — Yangi tabda ko'rinmaydi."""
     order = SmartupOrder(
-        external_id="mfm:parser-imported-1",
+        external_id="mfm:status-c-1",
         deal_id="MV-9",
         order_no="MV-9",
+        status="C",
+        lines=[{"sku": "SKU-E", "name": "Item", "quantity": 1}],
+    )
+    import_orders(db_session, [order], order_source="diller")
+    row = db_session.query(Order).filter(Order.source_external_id == "mfm:status-c-1").one()
+    assert row.wms_state.status == "picking"
+
+
+def test_diller_import_legacy_imported_token_stays_imported(db_session) -> None:
+    order = SmartupOrder(
+        external_id="mfm:parser-imported-1",
+        deal_id="MV-10",
+        order_no="MV-10",
         status="imported",
         lines=[{"sku": "SKU-E", "name": "Item", "quantity": 1}],
     )
     import_orders(db_session, [order], order_source="diller")
     row = db_session.query(Order).filter(Order.source_external_id == "mfm:parser-imported-1").one()
-    assert row.wms_state.status == "W"
+    assert row.wms_state.status == "imported"
 
 
 def test_diller_import_b_hash_w_maps_to_w(db_session) -> None:

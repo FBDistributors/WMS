@@ -8,7 +8,10 @@ from typing import Dict, Iterable, List, Tuple
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.constants.order_wms_status import normalize_order_wms_status_for_storage
+from app.constants.order_wms_status import (
+    normalize_order_wms_status_for_storage,
+    smartup_movement_status_for_wms_storage,
+)
 from app.integrations.smartup.mapper import OrderLinePayload, _resolve_external_id, map_order_to_wms_order
 from app.integrations.smartup.schemas import SmartupOrder
 from app.models.order import Order, OrderLine, OrderWmsState
@@ -29,19 +32,6 @@ WORKFLOW_LOCKED_STATUSES = frozenset(
     }
 )
 FINAL_FROZEN_STATUSES = frozenset({"completed", "packed", "shipped"})
-
-
-def _diller_import_wms_status(order: SmartupOrder) -> str:
-    """
-    Tashkiliy harakat (mfm): yangi qatorlar DB da doim W (Yangi).
-    Parser allaqachon imported qilib yuborgan bo'lsa ham shu yerda W ga aylanadi.
-    Yig'ish/jarayondagi buyurtmalar (allocated, picking, ...) saqlanadi.
-    """
-    raw = (order.status or "").strip()
-    normalized = normalize_order_wms_status_for_storage(raw) if raw else "imported"
-    if normalized in WORKFLOW_LOCKED_STATUSES:
-        return normalized
-    return "W"
 
 
 def reconcile_diller_imported_status_to_w(db: Session) -> int:
@@ -120,7 +110,7 @@ def _process_one_order(
     )
     payload = map_order_to_wms_order(order)
     if (order_source or "").strip().lower() == "diller":
-        payload.status = _diller_import_wms_status(order)
+        payload.status = smartup_movement_status_for_wms_storage(order.status)
     else:
         raw_status = (order.status or "").strip()
         if raw_status:

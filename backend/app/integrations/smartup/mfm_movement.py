@@ -46,22 +46,17 @@ def _mfm_export_request_status() -> str:
 
 def _mfm_send_status_in_export_body() -> bool:
     """
-    Postman kabi body ga status (odatda W) yuborish — server tomonda filtrlash.
-    Ba'zi SmartUp versiyalari status bilan bo'sh javob berishi mumkin; o'chirish:
-    SMARTUP_MFM_MOVEMENT_EXPORT_SEND_STATUS=false
+    body ga status yuborish (odatda kerak emas — to'liq eksport DB ga, filtr admin panelda).
+    Yoqish: SMARTUP_MFM_MOVEMENT_EXPORT_SEND_STATUS=true
     """
-    v = (os.getenv("SMARTUP_MFM_MOVEMENT_EXPORT_SEND_STATUS") or "true").strip().lower()
-    if v in ("0", "false", "no", "off"):
-        return False
-    return v in ("1", "true", "yes", "on", "")
+    v = (os.getenv("SMARTUP_MFM_MOVEMENT_EXPORT_SEND_STATUS") or "").strip().lower()
+    return v in ("1", "true", "yes", "on")
 
 
 def _mfm_post_fetch_status_filter_enabled() -> bool:
-    """Javobdan W bo'lmagan qatorlarni tashlash (server filtri e'tiborsiz qolsa)."""
-    v = (os.getenv("SMARTUP_MFM_POST_FETCH_STATUS_FILTER") or "true").strip().lower()
-    if v in ("0", "false", "no", "off"):
-        return False
-    return True
+    """Importdan oldin javobni status bo'yicha qisqartirish (default o'chiq — hammasi DB ga)."""
+    v = (os.getenv("SMARTUP_MFM_POST_FETCH_STATUS_FILTER") or "").strip().lower()
+    return v in ("1", "true", "yes", "on")
 
 
 def _movement_row_smartup_status(row: dict) -> str:
@@ -195,15 +190,16 @@ def _dedupe_mfm_orders_by_external_id(orders: list[SmartupOrder]) -> list[Smartu
     return out
 
 
-def _normalize_movement_row_status(raw: Any) -> str:
-    """SmartUp qatorida status bo'lmasa — eksport so'rovidagi default (odatda W)."""
-    if raw is None or str(raw).strip() == "":
-        return _mfm_export_request_status()
-    normalized = normalize_order_wms_status_for_storage(str(raw).strip())
-    # B#W/B#S asosiy buyurtmada imported; mfm tashkiliy harakatda yangi = W
-    if normalized == "imported":
-        return _mfm_export_request_status()
-    return normalized
+def _raw_status_from_movement_row(row: dict) -> str:
+    return str(row.get("status") or row.get("movement_status") or "").strip()
+
+
+def _raw_status_from_movement_rows(rows: list[dict]) -> str:
+    for u in rows:
+        s = _raw_status_from_movement_row(u)
+        if s:
+            return s
+    return ""
 
 DEFAULT_MFM_URL = "https://smartup.online/b/anor/mxsx/mfm/movement$export"
 
@@ -390,7 +386,7 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
                 "external_id": external_id or f"mfm:{group_id}",
                 "deal_id": group_id,
                 "order_no": group_id,
-                "status": _mfm_export_request_status(),
+                "status": _raw_status_from_movement_rows(unit_rows) or None,
                 "filial_id": filial,
                 "filial_code": filial,
                 "lines": lines,
@@ -465,7 +461,7 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
                 "external_id": (m.get("external_id") or "").strip() or f"mfm:{movement_id}",
                 "deal_id": movement_id,
                 "order_no": (m.get("delivery_number") or m.get("movement_number") or movement_id) or movement_id,
-                "status": _normalize_movement_row_status(m.get("status")),
+                "status": _raw_status_from_movement_row(m) or None,
                 "filial_id": filial,
                 "filial_code": filial,
                 "total_amount": amount,

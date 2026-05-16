@@ -81,7 +81,7 @@ def test_parse_mfm_response_filters_non_w_rows(monkeypatch) -> None:
     assert result.items[0].deal_id == "OK"
 
 
-def test_parse_mfm_movement_level_b_hash_w_maps_to_w_not_imported() -> None:
+def test_parse_mfm_movement_level_preserves_raw_smartup_status() -> None:
     body = json.dumps(
         {
             "movement": [
@@ -95,7 +95,7 @@ def test_parse_mfm_movement_level_b_hash_w_maps_to_w_not_imported() -> None:
     )
     result = _parse_mfm_response(body)
     assert len(result.items) == 1
-    assert result.items[0].status == "W"
+    assert result.items[0].status == "B#W"
 
 
 def test_extract_nested_response_wrapper() -> None:
@@ -229,5 +229,5 @@ def test_parse_mfm_flat_rows() -> None:
     result = _parse_mfm_response(body)
     assert len(result.items) == 1
     assert len(result.items[0].lines) == 2
-    assert result.items[0].status == "W"
+    assert result.items[0].status in (None, "")
     assert result.items[0].delivery_date is not None

@@ -36,6 +36,28 @@ def normalize_order_wms_status_for_storage(value: str | None) -> str:
     return "imported"
 
 
+def smartup_movement_status_for_wms_storage(value: str | None) -> str:
+    """
+    SmartUp tashkiliy harakat qatori holati -> order_wms_state (DB).
+    Sinxron: barcha holatlar saqlanadi; admin Yangi tab GET /orders?status=W bilan filtrlaydi.
+    """
+    s = (value or "").strip()
+    if not s:
+        return "W"
+    ru = s.upper()
+    if ru in ("W", "B#W", "N"):
+        return "W"
+    if ru == "C":
+        return "picking"
+    if ru in ("L", "P", "PICKED", "REVIEW", "CHECK"):
+        return "picked"
+    if ru in ("S", "B#S", "SHIPPED", "DELIVERED"):
+        return "completed"
+    if ru in ("A", "CANCELLED"):
+        return "cancelled"
+    return normalize_order_wms_status_for_storage(s)
+
+
 def normalize_list_status_filter_token(token: str) -> str:
     """GET /orders?status= legacy tokens → canonical token used in ORDER_STATUSES."""
     t = (token or "").strip()
