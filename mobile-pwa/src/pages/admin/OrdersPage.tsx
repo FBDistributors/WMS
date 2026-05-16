@@ -16,6 +16,7 @@ import { DateInput } from '../../components/DateInput'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import {
+  formatSourceExternalIdDisplay,
   getOrders,
   syncSmartupOrders,
   type MovementItem,
@@ -659,7 +660,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         case 'external_id':
           return (
             <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-              {order.source_external_id}
+              {formatSourceExternalIdDisplay(order.source_external_id) || '—'}
             </td>
           )
         case 'customer':

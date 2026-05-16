@@ -14,6 +14,7 @@ import { useAuth } from '../../rbac/AuthProvider'
 import {
   addOrderLine,
   deleteOrderLine,
+  formatSourceExternalIdDisplay,
   getOrder,
   type OrderDetails,
   type OrderLine,
@@ -172,7 +173,7 @@ export function OrderDetailsPage() {
           </div>
           <div>
             <div className="text-xs text-slate-500">{t('orders:columns.external_id')}</div>
-            <div className="text-sm text-slate-700 dark:text-slate-200">{order.source_external_id}</div>
+            <div className="text-sm text-slate-700 dark:text-slate-200">{formatSourceExternalIdDisplay(order.source_external_id) || '—'}</div>
           </div>
           <div>
             <div className="text-xs text-slate-500">{t('orders:columns.status')}</div>

@@ -1,5 +1,16 @@
 import { fetchJSON } from './apiClient'
 
+/** Admin UI: mfm:720044 → 720044 (DB source_external_id o'zgarmaydi). */
+export function formatSourceExternalIdDisplay(
+  sourceExternalId: string | null | undefined
+): string {
+  if (sourceExternalId == null) return ''
+  const s = sourceExternalId.trim()
+  if (!s) return ''
+  if (s.toLowerCase().startsWith('mfm:')) return s.slice(4)
+  return s
+}
+
 /** Smartup movement$export raw item (movement_id, barcode, delivery_number, note, movement_items, ...). */
 /** Smartup movement qatori; backend WMS boyitishi: yig'ishga yuborilgan buyurtma holati */
 export type MovementItem = Record<string, unknown> & {
