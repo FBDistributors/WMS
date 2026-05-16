@@ -1128,41 +1128,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                     {syncResult.detail ?? ''}
                   </span>
                 ) : null}
-                {orderSource === 'diller' && syncResult.debug ? (
-                  <span className="max-w-xl rounded bg-slate-100 px-2 py-1 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300 break-words">
-                    {typeof syncResult.debug.diller_items_from_smartup === 'number'
-                      ? `SmartUp: ${syncResult.debug.diller_items_from_smartup} ta. `
-                      : ''}
-                    {syncResult.debug.mfm_date_filter_mode
-                      ? `mode=${syncResult.debug.mfm_date_filter_mode}. `
-                      : ''}
-                    {typeof syncResult.debug.diller_extracted_rows === 'number'
-                      ? `extracted=${syncResult.debug.diller_extracted_rows}. `
-                      : ''}
-                    {typeof syncResult.debug.mfm_rows_status_filtered_out === 'number' &&
-                    syncResult.debug.mfm_rows_status_filtered_out > 0
-                      ? `statusdan_tashlandi=${syncResult.debug.mfm_rows_status_filtered_out}. `
-                      : ''}
-                    {syncResult.debug.mfm_status_in_export_body === true
-                      ? `body_status=${syncResult.debug.mfm_export_status_value ?? 'W'}. `
-                      : ''}
-                    {syncResult.debug.diller_extract_source
-                      ? `manba=${syncResult.debug.diller_extract_source}. `
-                      : ''}
-                    {Array.isArray(syncResult.debug.diller_raw_keys) && syncResult.debug.diller_raw_keys.length > 0
-                      ? `keys=${syncResult.debug.diller_raw_keys.join(', ')}. `
-                      : ''}
-                    {syncResult.debug.mfm_request_filial_id
-                      ? `filial=${syncResult.debug.mfm_request_filial_id}. `
-                      : ''}
-                    {syncResult.debug.mfm_request_project_code
-                      ? `project=${syncResult.debug.mfm_request_project_code}. `
-                      : ''}
-                    {Array.isArray(syncResult.debug.mfm_sync_attempts) && syncResult.debug.mfm_sync_attempts.length > 0
-                      ? `attempts=${JSON.stringify(syncResult.debug.mfm_sync_attempts)}`
-                      : ''}
-                  </span>
-                ) : null}
               </span>
             ) : null}
           </div>

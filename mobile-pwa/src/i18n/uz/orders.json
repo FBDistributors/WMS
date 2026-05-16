@@ -111,7 +111,7 @@
     "filter_apply": "Qo'llash",
     "order_status_group": "Buyurtma holati (WMS)",
     "smartup_movement_status": "Smartup harakat holati",
-    "smartup_status_w": "Yangi (W)",
+    "smartup_status_w": "Yangi",
     "smartup_status_new": "Yangi (N)",
     "smartup_status_all": "Barcha statuslar",
     "wms_status_new": "Yangi",
@@ -142,7 +142,7 @@
     "agent": "Agent"
   },
   "status": {
-    "W": "Yangi (W)",
+    "W": "Yangi",
     "imported": "Navbatda (import)",
     "allocated": "Yig'uvchiga yuborilgan",
     "ready_for_picking": "Navbatda (import)",

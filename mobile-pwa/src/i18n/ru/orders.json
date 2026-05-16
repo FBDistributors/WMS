@@ -109,7 +109,7 @@
     "filter_apply": "Применить",
     "order_status_group": "Статус заказа (WMS)",
     "smartup_movement_status": "Статус движения Smartup",
-    "smartup_status_w": "Новый (W)",
+    "smartup_status_w": "Новый",
     "smartup_status_new": "Новый (N)",
     "smartup_status_all": "Все статусы",
     "wms_status_new": "Новый",
@@ -140,7 +140,7 @@
     "agent": "Агент"
   },
   "status": {
-    "W": "Новый (W)",
+    "W": "Новый",
     "imported": "В очереди (импорт)",
     "allocated": "Отправлено сборщику",
     "ready_for_picking": "В очереди (импорт)",
