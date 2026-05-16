@@ -244,22 +244,29 @@ STALE_ORDER_STATUSES = ("imported", "W")
 def delete_stale_orders(
     db: Session,
     orders_from_smartup: List[SmartupOrder],
+    *,
+    order_source: str | None = None,
 ) -> int:
     """
-    7 kunlik modified_on javobida kelmagan va hali workflow da bo'lmagan (imported yoki W) buyurtmalarni o'chiradi.
+    SmartUp eksportida kelmagan va hali workflow da bo'lmagan (imported yoki W) buyurtmalarni o'chiradi.
     Picking, allocated, picked, completed va boshqa statusdagilar o'chirilmaydi.
+    order_source berilsa — faqat shu manba (masalan diller) yozuvlari.
     """
     external_ids_to_keep = {_resolve_external_id(o) for o in orders_from_smartup}
     if not external_ids_to_keep:
         logger.warning("delete_stale_orders: SmartUp javobi bo'sh, o'chirish o'tkazilmaydi")
         return 0
+    filters = [
+        OrderWmsState.status.in_(STALE_ORDER_STATUSES),
+        Order.source_external_id.notin_(external_ids_to_keep),
+    ]
+    src = (order_source or "").strip()
+    if src:
+        filters.append(Order.source == src)
     subq = (
         db.query(Order.id)
         .join(OrderWmsState, Order.id == OrderWmsState.order_id)
-        .filter(
-            OrderWmsState.status.in_(STALE_ORDER_STATUSES),
-            Order.source_external_id.notin_(external_ids_to_keep),
-        )
+        .filter(*filters)
     )
     ids_to_delete = [row[0] for row in subq.all()]
     if not ids_to_delete:

@@ -367,6 +367,23 @@ def _expand_movement_source_status_filters(
     return list({(s or "").strip() for s in out if (s or "").strip()})
 
 
+def _resolve_diller_list_status_filter(
+    order_source: str | None, status_param: str | None, valid: list[str]
+) -> list[str]:
+    """
+    Tashkiliy harakatlar (diller) Yangi tab: faqat order_wms_state.status='W'.
+    imported (Navbatda) aralashmasin — frontend ham status=W yuboradi.
+    """
+    if (order_source or "").strip().lower() != "diller":
+        return valid
+    raw = (status_param or "").strip()
+    if raw.upper() == "W" or raw.lower() == "w":
+        return ["W"]
+    if valid == ["W"]:
+        return ["W"]
+    return valid
+
+
 class PickerUser(BaseModel):
     id: UUID
     name: str
@@ -712,8 +729,12 @@ async def list_orders(
     query = db.query(OrderModel).options(selectinload(OrderModel.wms_state))
     filter_finalized_so_for_main = False
 
-    if order_source and order_source.strip():
-        query = query.filter(OrderModel.source == order_source.strip())
+    order_src = (order_source or "").strip()
+    if order_src:
+        query = query.filter(OrderModel.source == order_src)
+    if order_src.lower() == "diller" and not status:
+        # Tashkiliy harakatlar: status berilmasa default faqat yangi (W)
+        status = "W"
 
     if status:
         statuses = [normalize_list_status_filter_token(s) for s in status.split(",") if s.strip()]
@@ -722,6 +743,7 @@ async def list_orders(
             raise HTTPException(status_code=400, detail="Invalid status")
         valid = _expand_status_filters(valid)
         valid = _expand_movement_source_status_filters(order_source, valid)
+        valid = _resolve_diller_list_status_filter(order_source, status, valid)
         filter_finalized_so_for_main = (
             bool(order_source and order_source.strip().lower() == "smartup")
             and "imported" in valid
@@ -883,9 +905,13 @@ async def list_orders(
                 id=order.id,
                 order_number=order.order_number,
                 source_external_id=order.source_external_id,
-                status=normalize_order_wms_status_for_storage(order.wms_state.status)
-                if order.wms_state
-                else "imported",
+                status=(
+                    order.wms_state.status
+                    if order.wms_state and order.wms_state.status in ORDER_STATUSES
+                    else normalize_order_wms_status_for_storage(
+                        order.wms_state.status if order.wms_state else None
+                    )
+                ),
                 filial_id=order.filial_id,
                 customer_id=order.customer_id,
                 customer_name=order.customer_name,
@@ -1421,6 +1447,7 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                 db, items, order_source="diller"
             )
             reconciled_w = reconcile_diller_imported_status_to_w(db)
+            stale_deleted = delete_stale_orders(db, items, order_source="diller")
             breakdown = {k: v for k, v in skipped_by_reason.items() if v}
             logger.info(
                 "sync-smartup(diller): import_orders natija created=%s updated=%s skipped=%s errors=%s skipped_by=%s",
@@ -1471,6 +1498,7 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                     "mfm_request_project_code": mfm_meta.get("request_project_code"),
                     "import_skipped_by_reason": breakdown,
                     "diller_reconciled_imported_to_w": reconciled_w,
+                    "diller_stale_deleted": stale_deleted,
                 },
             )
             if not items and not resp.detail and not import_errors:

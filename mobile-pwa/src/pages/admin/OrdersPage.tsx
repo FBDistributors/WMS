@@ -291,7 +291,8 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
           offset,
           filial_id: 'all',
         }
-        if (statusParam) query.status = statusParam
+        // DB: GET /orders?order_source=diller&status=W — faqat yangi tashkiliy harakatlar
+        query.status = group === 'yangi' ? 'W' : statusParam || 'W'
         const data = await getOrders(query, { signal })
         if (gen !== ordersLoadGenRef.current) return
         setItems(data.items)
