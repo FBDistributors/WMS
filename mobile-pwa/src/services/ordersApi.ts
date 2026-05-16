@@ -214,6 +214,11 @@ export type SmartupSyncResult = {
     diller_raw_keys?: string[]
     diller_extracted_rows?: number
     diller_extract_source?: string | null
+    mfm_rows_before_status_filter?: number
+    mfm_rows_status_filtered_out?: number
+    mfm_status_in_export_body?: boolean
+    mfm_export_status_value?: string | null
+    diller_reconciled_imported_to_w?: number
     mfm_sync_attempts?: Array<{
       mode?: string
       extracted_rows?: number
