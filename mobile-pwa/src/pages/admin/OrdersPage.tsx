@@ -471,12 +471,17 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     try {
       if (orderSource === 'diller') {
         try {
-          // SmartUp MFM modified_on: qisqa 30 kun ichida tahrir bo'lmasa 0 qator; server qisqa oralikni kengaytiradi.
+          // Postman: status=W + modified_on. Filter sanalari bo'lsa ular, aks holda 30 kun.
           const today = new Date()
-          const endDealStr = today.toISOString().slice(0, 10)
-          const beginDeal = new Date(today)
-          beginDeal.setDate(beginDeal.getDate() - 120)
-          const beginDealStr = beginDeal.toISOString().slice(0, 10)
+          const endDealStr = dateTo.trim() || today.toISOString().slice(0, 10)
+          const beginDeal = dateFrom.trim()
+            ? new Date(`${dateFrom.trim()}T12:00:00`)
+            : (() => {
+                const d = new Date(today)
+                d.setDate(d.getDate() - 30)
+                return d
+              })()
+          const beginDealStr = dateFrom.trim() || beginDeal.toISOString().slice(0, 10)
           const result = await syncSmartupOrders({
             order_source: 'diller',
             begin_deal_date: beginDealStr,
@@ -1132,6 +1137,13 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                       : ''}
                     {typeof syncResult.debug.diller_extracted_rows === 'number'
                       ? `extracted=${syncResult.debug.diller_extracted_rows}. `
+                      : ''}
+                    {typeof syncResult.debug.mfm_rows_status_filtered_out === 'number' &&
+                    syncResult.debug.mfm_rows_status_filtered_out > 0
+                      ? `statusdan_tashlandi=${syncResult.debug.mfm_rows_status_filtered_out}. `
+                      : ''}
+                    {syncResult.debug.mfm_status_in_export_body === true
+                      ? `body_status=${syncResult.debug.mfm_export_status_value ?? 'W'}. `
                       : ''}
                     {syncResult.debug.diller_extract_source
                       ? `manba=${syncResult.debug.diller_extract_source}. `

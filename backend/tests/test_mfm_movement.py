@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from app.integrations.smartup.mfm_movement import (
+    _filter_mfm_movement_rows_for_export,
     _parse_mfm_response,
     export_mfm_movements_for_sync,
 )
@@ -43,6 +44,41 @@ def test_parse_mfm_response_movement_level() -> None:
     assert order.from_warehouse_code == "WH-A"
     assert order.to_warehouse_code == "WH-B"
     assert order.delivery_date is not None
+
+
+def test_filter_mfm_rows_keeps_w_skips_other_statuses(monkeypatch) -> None:
+    monkeypatch.setenv("SMARTUP_MFM_POST_FETCH_STATUS_FILTER", "true")
+    rows = [
+        {"movement_id": "1", "status": "W"},
+        {"movement_id": "2", "status": "C"},
+        {"movement_id": "3", "status": "B#W"},
+    ]
+    kept, skipped = _filter_mfm_movement_rows_for_export(rows)
+    assert len(kept) == 2
+    assert skipped == 1
+
+
+def test_parse_mfm_response_filters_non_w_rows(monkeypatch) -> None:
+    monkeypatch.setenv("SMARTUP_MFM_POST_FETCH_STATUS_FILTER", "true")
+    body = json.dumps(
+        {
+            "movement": [
+                {
+                    "movement_id": "OK",
+                    "status": "W",
+                    "movement_items": [{"product_code": "A", "quantity": 1}],
+                },
+                {
+                    "movement_id": "SKIP",
+                    "status": "C",
+                    "movement_items": [{"product_code": "B", "quantity": 1}],
+                },
+            ]
+        }
+    )
+    result = _parse_mfm_response(body)
+    assert len(result.items) == 1
+    assert result.items[0].deal_id == "OK"
 
 
 def test_parse_mfm_movement_level_b_hash_w_maps_to_w_not_imported() -> None:

@@ -46,11 +46,53 @@ def _mfm_export_request_status() -> str:
 
 def _mfm_send_status_in_export_body() -> bool:
     """
-    Ba'zi SmartUp versiyalari JSON da \"status\" kaliti bo'lsa bo'sh ro'yxat qaytaradi.
-    Default: yuborilmaydi. Yoqish: SMARTUP_MFM_MOVEMENT_EXPORT_SEND_STATUS=true
+    Postman kabi body ga status (odatda W) yuborish — server tomonda filtrlash.
+    Ba'zi SmartUp versiyalari status bilan bo'sh javob berishi mumkin; o'chirish:
+    SMARTUP_MFM_MOVEMENT_EXPORT_SEND_STATUS=false
     """
-    v = (os.getenv("SMARTUP_MFM_MOVEMENT_EXPORT_SEND_STATUS") or "").strip().lower()
-    return v in ("1", "true", "yes", "on")
+    v = (os.getenv("SMARTUP_MFM_MOVEMENT_EXPORT_SEND_STATUS") or "true").strip().lower()
+    if v in ("0", "false", "no", "off"):
+        return False
+    return v in ("1", "true", "yes", "on", "")
+
+
+def _mfm_post_fetch_status_filter_enabled() -> bool:
+    """Javobdan W bo'lmagan qatorlarni tashlash (server filtri e'tiborsiz qolsa)."""
+    v = (os.getenv("SMARTUP_MFM_POST_FETCH_STATUS_FILTER") or "true").strip().lower()
+    if v in ("0", "false", "no", "off"):
+        return False
+    return True
+
+
+def _movement_row_smartup_status(row: dict) -> str:
+    return str(row.get("status") or row.get("movement_status") or "").strip().upper()
+
+
+def _filter_mfm_movement_rows_for_export(rows: list[Any]) -> tuple[list[Any], int]:
+    """
+    SmartUp movement$export javobidagi qatorlarni so'ralgan status (default W) bo'yicha filtrlash.
+    Status bo'sh qatorlar — yangi harakat deb qabul qilinadi.
+    """
+    if not _mfm_post_fetch_status_filter_enabled():
+        return rows, 0
+    want = _mfm_export_request_status().strip().upper()
+    allowed_new = frozenset({"", "W", "B#W", "N", "IMPORTED", "READY_FOR_PICKING"})
+    if want not in allowed_new:
+        allowed = allowed_new | {want}
+    else:
+        allowed = allowed_new
+    kept: list[Any] = []
+    skipped = 0
+    for r in rows:
+        if not isinstance(r, dict):
+            skipped += 1
+            continue
+        s = _movement_row_smartup_status(r)
+        if s in allowed:
+            kept.append(r)
+        else:
+            skipped += 1
+    return kept, skipped
 
 
 def _mfm_export_fill_created_date_range() -> bool:
@@ -222,8 +264,11 @@ def apply_mfm_export_date_policy(begin: date, end: date) -> tuple[date, date]:
     today = date.today()
     if (today - end).days > 365:
         return resolve_mfm_sync_date_range(None, None)
-    lb = mfm_sync_lookback_days()
-    if (end - begin).days < 60:
+    requested_days = (end - begin).days
+    # Faqat juda qisqa oralik (<14 kun) bo'lsa lookback ga kengaytirish (0 qator muammosi).
+    # 30–120 kunlik so'rovlar Postman kabi qoladi, 237 ta ortiqcha yuklanmaydi.
+    if requested_days < 14:
+        lb = mfm_sync_lookback_days()
         min_begin = end - timedelta(days=lb)
         if begin > min_begin:
             logger.info(
@@ -246,12 +291,21 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
     global _last_mfm_export_meta
     data = json.loads(body)
     rows, extract_source = extract_movement_rows(data)
+    rows_before_status = len(rows)
+    rows, status_filtered_out = _filter_mfm_movement_rows_for_export(rows)
     keys = list(data.keys()) if isinstance(data, dict) else []
     _last_mfm_export_meta = {
         "http_body_len": len(body),
         "raw_keys": keys,
         "extracted_rows": len(rows),
         "extract_source": extract_source,
+        "rows_before_status_filter": rows_before_status,
+        "rows_status_filtered_out": status_filtered_out,
+        "status_in_export_body": _mfm_send_status_in_export_body(),
+        "export_status_value": _mfm_export_request_status()
+        if _mfm_send_status_in_export_body()
+        else None,
+        "post_fetch_status_filter": _mfm_post_fetch_status_filter_enabled(),
     }
     if not rows:
         preview = (body[:500] if body else "").replace("\n", " ")
@@ -653,7 +707,12 @@ def export_mfm_movements_for_sync(
 
     for try_mode in modes_to_try:
         override = try_mode if try_mode != configured else None
-        logger.info("mfm export for_sync: attempt mode=%s", try_mode)
+        logger.info(
+            "mfm export for_sync: attempt mode=%s send_status=%s status=%s",
+            try_mode,
+            _mfm_send_status_in_export_body(),
+            _mfm_export_request_status() if _mfm_send_status_in_export_body() else "-",
+        )
         last_response = export_mfm_movements(
             begin_date,
             end_date,
