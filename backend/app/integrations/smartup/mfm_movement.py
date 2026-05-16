@@ -16,7 +16,7 @@ from pydantic import ValidationError as PydanticValidationError
 
 from app.constants.order_wms_status import normalize_order_wms_status_for_storage
 from app.integrations.smartup.movement_rows import extract_movement_rows, movement_delivery_datetime
-from app.integrations.smartup.schemas import SmartupOrder, SmartupOrderExportResponse
+from app.integrations.smartup.schemas import SmartupOrder, SmartupOrderExportResponse, SmartupOrderLine
 
 
 logger = logging.getLogger(__name__)
@@ -84,6 +84,73 @@ def _mfm_movement_export_omit_dates() -> bool:
     """
     v = (os.getenv("SMARTUP_MFM_MOVEMENT_EXPORT_OMIT_DATES") or "").strip().lower()
     return v in ("1", "true", "yes", "on")
+
+
+def _mfm_flat_row_group_keys() -> tuple[str, ...]:
+    """
+    Flat export: qatorlarni qaysi maydon bo'yicha guruhlash.
+    SMARTUP_MFM_FLAT_GROUP_BY_KEYS=delivery_number,external_id,movement_id,... (vergul bilan).
+    Bir harakat bir nechta ichki movement_id bilan kelsa — delivery_number birinchi qo'yish mumkin.
+    """
+    raw = (os.getenv("SMARTUP_MFM_FLAT_GROUP_BY_KEYS") or "").strip()
+    if raw:
+        return tuple(k.strip() for k in raw.split(",") if k.strip())
+    return (
+        "movement_id",
+        "movement_number",
+        "load_id",
+        "external_id",
+        "delivery_number",
+        "deliveryNumber",
+        "deal_id",
+        "order_id",
+        "movement_unit_id",
+    )
+
+
+def _flat_row_group_id(r: dict) -> str:
+    for key in _mfm_flat_row_group_keys():
+        v = str(r.get(key) or "").strip()
+        if v:
+            return v
+    return ""
+
+
+def _dedupe_mfm_orders_by_external_id(orders: list[SmartupOrder]) -> list[SmartupOrder]:
+    """Bir xil import kaliti (external_id) takrorlansa — bitta SmartupOrder, qatorlar qo'shiladi."""
+    from collections import OrderedDict
+
+    from app.integrations.smartup.mapper import _resolve_external_id
+
+    buckets: OrderedDict[str, list[SmartupOrder]] = OrderedDict()
+    for o in orders:
+        buckets.setdefault(_resolve_external_id(o), []).append(o)
+    out: list[SmartupOrder] = []
+    merged_extra = 0
+    for grp in buckets.values():
+        if len(grp) == 1:
+            out.append(grp[0])
+            continue
+        merged_extra += len(grp) - 1
+        base = grp[0]
+        by_sku: dict[str, SmartupOrderLine] = {}
+        for o in grp:
+            for ln in o.lines:
+                sku = (ln.sku or "").strip() or "__empty__"
+                if sku in by_sku:
+                    prev = by_sku[sku]
+                    by_sku[sku] = prev.model_copy(update={"qty": (prev.qty or 0) + (ln.qty or 0)})
+                else:
+                    by_sku[sku] = ln
+        bd = base.model_dump()
+        bd["lines"] = [x.model_dump() for x in by_sku.values()]
+        out.append(SmartupOrder.model_validate(bd))
+    if merged_extra:
+        logger.info(
+            "mfm movement$export: bir xil external_id uchun %s ta takror buyurtma bitta qatorga yig'ildi",
+            merged_extra,
+        )
+    return out
 
 
 def _normalize_movement_row_status(raw: Any) -> str:
@@ -217,9 +284,7 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
             if not isinstance(r, dict):
                 non_dict += 1
                 continue
-            gid = (
-                str(r.get("movement_id") or r.get("movement_number") or r.get("load_id") or "")
-            ).strip() or str(r.get("movement_unit_id") or "")
+            gid = _flat_row_group_id(r)
             if not gid:
                 skip_no_gid += 1
                 continue
@@ -258,6 +323,11 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
                 delivery_dt = movement_delivery_datetime(u)
                 if delivery_dt is not None:
                     break
+            dn_row = ""
+            for u in unit_rows:
+                dn_row = str(u.get("delivery_number") or u.get("deliveryNumber") or "").strip()
+                if dn_row:
+                    break
             order_dict = {
                 "external_id": external_id or f"mfm:{group_id}",
                 "deal_id": group_id,
@@ -267,6 +337,8 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
                 "filial_code": filial,
                 "lines": lines,
             }
+            if dn_row:
+                order_dict["delivery_number"] = dn_row[:64]
             if delivery_dt is not None:
                 order_dict["delivery_date"] = delivery_dt
             try:
@@ -286,6 +358,7 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
                 "validation_failed": validation_failed,
                 "want_status": _mfm_export_request_status(),
                 "send_status_in_body": str(_mfm_send_status_in_export_body()),
+                "flat_group_key_order": ",".join(_mfm_flat_row_group_keys()),
             }
         )
         logger.info("mfm movement$export: %s ta guruh -> %s ta order (flat)", len(groups), len(orders))
@@ -343,6 +416,9 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
                 "note": note,
                 "lines": lines,
             }
+            dn_m = str(m.get("delivery_number") or m.get("deliveryNumber") or "").strip()
+            if dn_m:
+                order_dict["delivery_number"] = dn_m[:64]
             if delivery_dt is not None:
                 order_dict["delivery_date"] = delivery_dt
             try:
@@ -364,6 +440,7 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
         )
         logger.info("mfm movement$export: %s ta order (movement-level)", len(orders))
 
+    orders = _dedupe_mfm_orders_by_external_id(orders)
     parse_summary["orders_out"] = len(orders)
     _last_mfm_export_meta["orders_parsed"] = len(orders)
     logger.info("mfm movement$export parse summary: %s", parse_summary)

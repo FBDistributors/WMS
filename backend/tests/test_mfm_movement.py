@@ -5,7 +5,6 @@ from app.integrations.smartup.mfm_movement import (
     _parse_mfm_response,
     export_mfm_movements_for_sync,
 )
-from app.integrations.smartup.schemas import SmartupOrderExportResponse
 from app.integrations.smartup.movement_rows import extract_movement_rows, movement_delivery_datetime
 from app.integrations.smartup.schemas import SmartupOrder, SmartupOrderExportResponse
 
@@ -102,6 +101,56 @@ def test_export_mfm_movements_for_sync_retries_modes(monkeypatch) -> None:
     assert len(resp.items) == 1
     assert mode == "created"
     assert calls == [None, "created"]
+
+
+def test_parse_mfm_movement_level_dedupe_same_external_id() -> None:
+    body = json.dumps(
+        {
+            "movement": [
+                {
+                    "movement_id": "M1",
+                    "external_id": "EXT-SAME",
+                    "movement_items": [{"product_code": "A", "quantity": 1}],
+                },
+                {
+                    "movement_id": "M2",
+                    "external_id": "EXT-SAME",
+                    "movement_items": [{"product_code": "B", "quantity": 2}],
+                },
+            ]
+        }
+    )
+    result = _parse_mfm_response(body)
+    assert len(result.items) == 1
+    assert len(result.items[0].lines) == 2
+
+
+def test_parse_mfm_flat_group_by_delivery_number_first(monkeypatch) -> None:
+    monkeypatch.setenv("SMARTUP_MFM_FLAT_GROUP_BY_KEYS", "delivery_number,movement_id")
+    body = json.dumps(
+        {
+            "movement": [
+                {
+                    "movement_id": "94919",
+                    "movement_unit_id": "u1",
+                    "delivery_number": "DEL-99",
+                    "product_code": "X",
+                    "quantity": 1,
+                },
+                {
+                    "movement_id": "94920",
+                    "movement_unit_id": "u2",
+                    "delivery_number": "DEL-99",
+                    "product_code": "Y",
+                    "quantity": 2,
+                },
+            ]
+        }
+    )
+    result = _parse_mfm_response(body)
+    assert len(result.items) == 1
+    assert result.items[0].delivery_number == "DEL-99"
+    assert len(result.items[0].lines) == 2
 
 
 def test_parse_mfm_flat_rows() -> None:

@@ -37,6 +37,7 @@ class OrderPayload:
     to_warehouse_code: Optional[str] = None
     movement_note: Optional[str] = None
     delivery_date: Optional[datetime] = None
+    delivery_number: Optional[str] = None
 
 
 def map_order_to_wms_order(order: SmartupOrder) -> OrderPayload:
@@ -58,6 +59,8 @@ def map_order_to_wms_order(order: SmartupOrder) -> OrderPayload:
         for line in order.lines
     ]
     wms_status = normalize_order_wms_status_for_storage(order.status)
+    _dn = (str(order.delivery_number).strip() if order.delivery_number is not None else "")
+    dn = _dn[:64] if _dn else None
     return OrderPayload(
         source="smartup",
         source_external_id=external_id,
@@ -74,6 +77,7 @@ def map_order_to_wms_order(order: SmartupOrder) -> OrderPayload:
         to_warehouse_code=getattr(order, "to_warehouse_code", None) or None,
         movement_note=getattr(order, "note", None) or None,
         delivery_date=order.delivery_date,
+        delivery_number=dn,
     )
 
 

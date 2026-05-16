@@ -133,6 +133,8 @@ def _process_one_order(
                 existing.movement_note = payload.movement_note
             if getattr(payload, "delivery_date", None) is not None:
                 existing.delivery_date = payload.delivery_date
+            if getattr(payload, "delivery_number", None) is not None:
+                existing.delivery_number = getattr(payload, "delivery_number", None)
             if existing.wms_state:
                 incoming_status = normalize_order_wms_status_for_storage(payload.status)
                 if current_status in WORKFLOW_LOCKED_STATUSES:
@@ -167,6 +169,7 @@ def _process_one_order(
             to_warehouse_code=getattr(payload, "to_warehouse_code", None),
             movement_note=getattr(payload, "movement_note", None),
             delivery_date=getattr(payload, "delivery_date", None),
+            delivery_number=getattr(payload, "delivery_number", None),
         )
         record.wms_state = OrderWmsState(status=normalize_order_wms_status_for_storage(payload.status))
         record.lines = [
