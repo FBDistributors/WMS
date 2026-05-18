@@ -303,8 +303,8 @@ export function OrikzorHarakatlariPage() {
     <AdminLayout titleSlot={<OrdersHubTabs />}>
       <Card className="space-y-4">
         <OrdersSourceSubTabs />
-        <div className="flex flex-nowrap items-end gap-3">
-          <label className="min-w-[180px] flex-1 max-w-md text-sm text-slate-600 dark:text-slate-300">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <label className="flex-1 min-w-[180px] max-w-md text-sm text-slate-600 dark:text-slate-300">
             <span className="sr-only">{t('orders:filters.search')}</span>
             <input
               type="search"
@@ -323,7 +323,7 @@ export function OrikzorHarakatlariPage() {
               placeholder={t('orders:filters.search_placeholder_orikzor')}
             />
           </label>
-          <div className="relative shrink-0" ref={filterPanelRef}>
+          <div className="relative" ref={filterPanelRef}>
             <Button
               variant="outline"
               onClick={() => setFilterPanelOpen((o) => !o)}
@@ -416,19 +416,21 @@ export function OrikzorHarakatlariPage() {
               </>
             )}
           </div>
-          <Button
-            variant="ghost"
-            className="shrink-0 rounded-full px-3 py-3"
-            onClick={() => setIsSettingsOpen(true)}
-            aria-label={t('orders:table.settings_title')}
-          >
-            <Settings size={18} />
-          </Button>
-          {canSync ? (
-            <Button className="shrink-0" onClick={handleSync} disabled={isSyncing}>
-              {isSyncing ? t('orders:syncing') : t('orders:sync')}
+          <div className="flex flex-1 items-center justify-end gap-2 min-w-0">
+            <Button
+              variant="ghost"
+              className="rounded-full px-3 py-3 shrink-0"
+              onClick={() => setIsSettingsOpen(true)}
+              aria-label={t('orders:table.settings_title')}
+            >
+              <Settings size={18} />
             </Button>
-          ) : null}
+            {canSync ? (
+              <Button className="shrink-0" onClick={handleSync} disabled={isSyncing}>
+                {isSyncing ? t('orders:syncing') : t('orders:sync')}
+              </Button>
+            ) : null}
+          </div>
         </div>
 
         {syncError ? (
