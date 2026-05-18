@@ -60,8 +60,32 @@ export const FILIAL_CODE_TO_NAME: Record<string, string> = {
  * Kod 3 xonali formatda bo'lmasa (masalan "21") avval normalize qilinadi.
  * Topilmasa: kod bo'sh emas bo'lsa o'zi, aks holda "—".
  */
+const FILIAL_ID_TO_NAME = Object.fromEntries(FILIAL_LIST.map((f) => [f.id, f.name]))
+
+export function getFilialNameById(id: string | null | undefined): string | null {
+  if (id == null || String(id).trim() === '') return null
+  return FILIAL_ID_TO_NAME[String(id).trim()] ?? null
+}
+
 export function getFilialNameByCode(code: string | null | undefined): string {
   if (code == null || String(code).trim() === '') return '—'
   const normalized = String(code).trim().padStart(3, '0')
   return FILIAL_CODE_TO_NAME[normalized] ?? code
+}
+
+/** Tashkiliy harakat jadvali: to_filial_code / filial_id → nom */
+export function formatDillerFilialDisplay(order: {
+  to_warehouse_code?: string | null
+  filial_id?: string | null
+}): string {
+  const toWh = order.to_warehouse_code?.trim()
+  if (toWh) {
+    const byCode = getFilialNameByCode(toWh)
+    return byCode !== '—' ? byCode : toWh
+  }
+  const fid = order.filial_id?.trim()
+  if (fid) {
+    return getFilialNameById(fid) ?? fid
+  }
+  return '—'
 }

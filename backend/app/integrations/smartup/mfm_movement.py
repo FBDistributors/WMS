@@ -206,6 +206,18 @@ def _dedupe_mfm_orders_by_external_id(orders: list[SmartupOrder]) -> list[Smartu
     return out
 
 
+def _first_row_field(rows: list[dict], *keys: str) -> str | None:
+    """Guruhlangan flat qatorlardan birinchi bo'sh bo'lmagan maydon."""
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        for key in keys:
+            val = row.get(key)
+            if val is not None and str(val).strip():
+                return str(val).strip()
+    return None
+
+
 def _raw_status_from_movement_row(row: dict) -> str:
     return str(row.get("status") or row.get("movement_status") or "").strip()
 
@@ -362,7 +374,6 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
         skip_empty_lines = validation_failed = 0
         for group_id, unit_rows in groups.items():
             lines = []
-            filial = default_filial
             external_id = ""
             for u in unit_rows:
                 try:
@@ -377,12 +388,29 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
                         "quantity": qty,
                         "name": u.get("product_article_code") or u.get("productArticleCode") or pc or "",
                     })
-                fid = u.get("filial_code") or u.get("from_warehouse_code") or u.get("to_warehouse_code")
-                if fid and str(fid).strip():
-                    filial = str(fid).strip()
                 ext = (u.get("external_id") or "").strip()
                 if ext:
                     external_id = ext
+            from_wh = _first_row_field(
+                unit_rows,
+                "from_warehouse_code",
+                "fromWarehouseCode",
+                "from_filial_code",
+                "fromFilialCode",
+            )
+            to_wh = _first_row_field(
+                unit_rows,
+                "to_warehouse_code",
+                "toWarehouseCode",
+                "to_filial_code",
+                "toFilialCode",
+                "to_filial",
+                "toFilial",
+                "filial_code",
+                "filialCode",
+            )
+            note = _first_row_field(unit_rows, "note", "movement_note", "movementNote")
+            filial = to_wh or from_wh or default_filial
             if not lines:
                 skip_empty_lines += 1
                 continue
@@ -403,6 +431,9 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
                 "status": _raw_status_from_movement_rows(unit_rows) or None,
                 "filial_id": filial,
                 "filial_code": filial,
+                "from_warehouse_code": from_wh,
+                "to_warehouse_code": to_wh,
+                "note": note,
                 "lines": lines,
             }
             if dn_row:

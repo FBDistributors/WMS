@@ -222,6 +222,26 @@ def test_parse_mfm_flat_group_by_delivery_number_first(monkeypatch) -> None:
     assert len(result.items[0].lines) == 2
 
 
+def test_parse_mfm_flat_rows_to_filial_code() -> None:
+    body = json.dumps(
+        {
+            "movement": [
+                {
+                    "movement_id": "MV-FIL",
+                    "movement_unit_id": "U1",
+                    "to_filial_code": "014",
+                    "product_code": "SKU-X",
+                    "quantity": 1,
+                },
+            ]
+        }
+    )
+    result = _parse_mfm_response(body)
+    assert len(result.items) == 1
+    assert result.items[0].to_warehouse_code == "014"
+    assert result.items[0].filial_id == "014"
+
+
 def test_parse_mfm_flat_rows() -> None:
     body = json.dumps(
         {

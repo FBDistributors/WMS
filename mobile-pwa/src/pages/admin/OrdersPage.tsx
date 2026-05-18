@@ -30,6 +30,7 @@ import {
   backendStatusToSimple,
 } from '../../admin/components/orders/OrderWmsStatusCell'
 import { getBrands, type Brand } from '../../services/brandsApi'
+import { formatDillerFilialDisplay } from '../../constants/filialCodes'
 import { useAuth } from '../../rbac/AuthProvider'
 
 const PAGE_SIZE = 50
@@ -702,7 +703,9 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         case 'to_warehouse_code':
           return (
             <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-              {order.to_warehouse_code ?? '—'}
+              {orderSource === 'diller'
+                ? formatDillerFilialDisplay(order)
+                : (order.to_warehouse_code ?? '—')}
             </td>
           )
         case 'movement_note':
