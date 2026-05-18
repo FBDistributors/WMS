@@ -69,23 +69,31 @@ export function getFilialNameById(id: string | null | undefined): string | null 
 
 export function getFilialNameByCode(code: string | null | undefined): string {
   if (code == null || String(code).trim() === '') return '—'
-  const normalized = String(code).trim().padStart(3, '0')
-  return FILIAL_CODE_TO_NAME[normalized] ?? code
+  const raw = String(code).trim()
+  const normalized = raw.padStart(3, '0')
+  return FILIAL_CODE_TO_NAME[normalized] ?? FILIAL_CODE_TO_NAME[raw] ?? raw
 }
 
-/** Tashkiliy harakat jadvali: to_filial_code / filial_id → nom */
+/**
+ * SmartUp filial_id (3788131) yoki filial kodi (001–021) → yuridik nom.
+ */
+export function resolveFilialLabel(codeOrId: string | null | undefined): string {
+  if (codeOrId == null || String(codeOrId).trim() === '') return '—'
+  const v = String(codeOrId).trim()
+  const byId = getFilialNameById(v)
+  if (byId) return byId
+  const byCode = getFilialNameByCode(v)
+  return byCode !== '—' ? byCode : v
+}
+
+/** Tashkiliy harakat jadvali: to_filial_code / filial_id → nom (kod emas) */
 export function formatDillerFilialDisplay(order: {
   to_warehouse_code?: string | null
   filial_id?: string | null
 }): string {
   const toWh = order.to_warehouse_code?.trim()
-  if (toWh) {
-    const byCode = getFilialNameByCode(toWh)
-    return byCode !== '—' ? byCode : toWh
-  }
+  if (toWh) return resolveFilialLabel(toWh)
   const fid = order.filial_id?.trim()
-  if (fid) {
-    return getFilialNameById(fid) ?? fid
-  }
+  if (fid) return resolveFilialLabel(fid)
   return '—'
 }
