@@ -118,5 +118,7 @@
   "readonly_page_title": "Pick list (просмотр)",
   "column_sku": "SKU",
   "column_customer_id": "ID клиента",
-  "column_customer_name": "Имя клиента"
+  "column_customer_name": "Имя клиента",
+  "sent_to_controller_at": "Отправлено контролёру",
+  "controller_completed_at": "Завершено контролёром"
 }

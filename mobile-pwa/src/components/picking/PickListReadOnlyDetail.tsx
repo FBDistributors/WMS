@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import i18n from 'i18next'
 import { PackageSearch } from 'lucide-react'
 
 import { TableScrollArea } from '../TableScrollArea'
@@ -69,6 +70,13 @@ export function PickListReadOnlyDetail({ documentId }: PickListReadOnlyDetailPro
   const pipelineLabel = (status: PickListStatus) =>
     t(`picking:status.${String(status).toLowerCase()}`, { defaultValue: status })
 
+  const formatDateTime = (iso?: string | null) => {
+    if (!iso?.trim()) return '—'
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return '—'
+    return d.toLocaleString(i18n.language, { dateStyle: 'short', timeStyle: 'short' })
+  }
+
   if (isLoading) {
     return (
       <div className="relative min-h-[240px]">
@@ -96,7 +104,9 @@ export function PickListReadOnlyDetail({ documentId }: PickListReadOnlyDetailPro
     Boolean(data.customer_id?.trim()) ||
     Boolean(data.customer_name?.trim()) ||
     Boolean(data.picker_name?.trim()) ||
-    Boolean(data.controller_name?.trim())
+    Boolean(data.controller_name?.trim()) ||
+    Boolean(data.sent_to_controller_at?.trim()) ||
+    Boolean(data.completed_at?.trim())
 
   return (
     <div className="space-y-4">
@@ -124,6 +134,16 @@ export function PickListReadOnlyDetail({ documentId }: PickListReadOnlyDetailPro
               <div className="min-w-0">
                 <span className="text-slate-500 dark:text-slate-400">{t('picking:column_controller')}: </span>
                 <span className="text-slate-900 dark:text-slate-100">{data.controller_name?.trim() || '—'}</span>
+              </div>
+              <div className="min-w-0">
+                <span className="text-slate-500 dark:text-slate-400">{t('picking:sent_to_controller_at')}: </span>
+                <span className="text-slate-900 dark:text-slate-100">
+                  {formatDateTime(data.sent_to_controller_at)}
+                </span>
+              </div>
+              <div className="min-w-0">
+                <span className="text-slate-500 dark:text-slate-400">{t('picking:controller_completed_at')}: </span>
+                <span className="text-slate-900 dark:text-slate-100">{formatDateTime(data.completed_at)}</span>
               </div>
             </div>
           ) : null}

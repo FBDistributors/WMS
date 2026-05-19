@@ -95,6 +95,8 @@ class PickingDocument(BaseModel):
     customer_id: Optional[str] = None
     customer_name: Optional[str] = None
     safe_cancel_return_session_id: Optional[UUID] = None
+    sent_to_controller_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
 
 
 class PickingListItem(BaseModel):
@@ -115,6 +117,7 @@ class PickingListItem(BaseModel):
     customer_name: Optional[str] = None
     order_wms_status: Optional[str] = None
     sent_to_controller_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
     updated_at: datetime
 
 
@@ -586,6 +589,8 @@ def _to_picking_document(doc: DocumentModel, db: Optional[Session] = None) -> Pi
         customer_id=_customer_id(doc),
         customer_name=_customer_name(doc),
         safe_cancel_return_session_id=sid,
+        sent_to_controller_at=doc.sent_to_controller_at,
+        completed_at=doc.completed_at,
     )
 
 
@@ -616,6 +621,8 @@ def _to_picking_document_with_lines(
         customer_id=_customer_id(doc),
         customer_name=_customer_name(doc),
         safe_cancel_return_session_id=sid,
+        sent_to_controller_at=doc.sent_to_controller_at,
+        completed_at=doc.completed_at,
     )
 
 
@@ -688,6 +695,7 @@ def _to_picking_list_item(doc: DocumentModel) -> PickingListItem:
         customer_name=_customer_name(doc),
         order_wms_status=wms_status,
         sent_to_controller_at=doc.sent_to_controller_at,
+        completed_at=doc.completed_at,
         updated_at=doc.updated_at,
     )
 
@@ -1990,6 +1998,8 @@ async def complete_picking_document(
                 ip_address=get_client_ip(request),
             )
         document.status = "completed"
+        if document.completed_at is None:
+            document.completed_at = datetime.now(timezone.utc)
         if document.order_id:
             order = (
                 db.query(OrderModel)

@@ -16,6 +16,7 @@ export type PickList = {
   delivery_number?: string | null
   created_at?: string
   completed_at?: string | null
+  sent_to_controller_at?: string | null
   /** Backend document status string (for labels). */
   document_status: string
   /** Buyurtma WMS bosqichi (buyurtma bo'lsa); badge va oqim yorlig'i uchun. */
@@ -63,6 +64,7 @@ type BackendPickingListItem = {
   lines_total: number
   lines_done: number
   completed_at?: string | null
+  sent_to_controller_at?: string | null
   assigned_to_user_name?: string | null
   controlled_by_user_name?: string | null
   updated_at?: string
@@ -100,6 +102,8 @@ type BackendPickingDetails = {
   order_wms_status?: string | null
   assigned_to_user_name?: string | null
   controlled_by_user_name?: string | null
+  sent_to_controller_at?: string | null
+  completed_at?: string | null
 }
 
 const STATUS_MAP: Record<string, PickListStatus> = {
@@ -171,6 +175,7 @@ function mapList(item: BackendPickingListItem): PickList {
     total_lines: item.lines_total,
     picked_lines: item.lines_done,
     completed_at: item.completed_at ?? undefined,
+    sent_to_controller_at: item.sent_to_controller_at ?? undefined,
     picker_name: item.assigned_to_user_name ?? undefined,
     controller_name: item.controlled_by_user_name ?? undefined,
     updated_at: item.updated_at,
@@ -197,6 +202,8 @@ function mapDetails(doc: BackendPickingDetails): PickListDetails {
     picked_lines: pickedLines,
     picker_name: doc.assigned_to_user_name?.trim() || undefined,
     controller_name: doc.controlled_by_user_name?.trim() || undefined,
+    sent_to_controller_at: doc.sent_to_controller_at ?? undefined,
+    completed_at: doc.completed_at ?? undefined,
     lines: doc.lines.map(mapPickingLineToPickerViewModel),
     customer_id: doc.customer_id?.trim() || undefined,
     customer_name: doc.customer_name?.trim() || undefined,
