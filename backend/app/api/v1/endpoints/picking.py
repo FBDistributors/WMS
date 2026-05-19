@@ -29,7 +29,7 @@ from app.models.safe_cancel_return import SafeCancelReturnSession as SafeCancelR
 from app.models.user_fcm_token import UserFCMToken
 from app.models.stock import StockLot as StockLotModel
 from app.api.v1.endpoints.picker_inventory import _get_lot_level_balances, _location_ids_for_warehouse
-from app.services.stock_availability import require_sufficient_available, require_sufficient_reserved
+from app.services.stock_availability import require_sufficient_reserved
 from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_ip, log_action
 from app.services.safe_cancel_return_service import (
     active_return_session_id_for_document,
@@ -1135,7 +1135,8 @@ async def consolidated_pick(
                     status_code=400,
                     detail="Pick only from NORMAL zone. Line location is not NORMAL.",
                 )
-            require_sufficient_available(
+            # Ajratilgan (reserved) zaxiradan teriladi — available=0 bo‘lishi mumkin (waves pick bilan bir xil).
+            require_sufficient_reserved(
                 db,
                 line.product_id,
                 line.lot_id,
@@ -1675,7 +1676,8 @@ def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
         )
 
     if qty_delta > 0:
-        require_sufficient_available(
+        # Yig'ishga yuborilganda allocate qilingan — terish reserved dan, available emas.
+        require_sufficient_reserved(
             db,
             line.product_id,
             line.lot_id,

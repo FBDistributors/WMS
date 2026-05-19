@@ -22,6 +22,7 @@ from app.services.stock_availability import (
     compute_lot_location_balances,
     compute_lot_location_available,
     require_sufficient_available,
+    require_sufficient_reserved,
 )
 
 
@@ -111,6 +112,51 @@ def test_compute_available_matches_ledger_formula(
     )
     db_session.commit()
     assert compute_lot_location_available(db_session, lot.id, bin_loc.id) == Decimal("7")
+
+
+def test_fully_allocated_stock_has_zero_available_but_reserved_for_pick(
+    db_session: Session, prod: Product, bin_loc: Location
+) -> None:
+    """Yig'ishga ajratilganda available=0, lekin terish reserved bo'yicha mumkin."""
+    lot = StockLot(product_id=prod.id, batch="B-ALLOC", expiry_date=None)
+    db_session.add(lot)
+    db_session.flush()
+    db_session.add(
+        StockMovement(
+            product_id=prod.id,
+            lot_id=lot.id,
+            location_id=bin_loc.id,
+            qty_change=Decimal("4"),
+            movement_type="receipt",
+        )
+    )
+    db_session.add(
+        StockMovement(
+            product_id=prod.id,
+            lot_id=lot.id,
+            location_id=bin_loc.id,
+            qty_change=Decimal("4"),
+            movement_type="allocate",
+        )
+    )
+    db_session.commit()
+
+    on_hand, reserved, available = compute_lot_location_balances(db_session, lot.id, bin_loc.id)
+    assert on_hand == Decimal("4")
+    assert reserved == Decimal("4")
+    assert available == Decimal("0")
+
+    require_sufficient_reserved(
+        db_session, prod.id, lot.id, bin_loc.id, Decimal("1"), lock=False
+    )
+
+    from fastapi import HTTPException
+
+    with pytest.raises(HTTPException) as exc:
+        require_sufficient_available(
+            db_session, prod.id, lot.id, bin_loc.id, Decimal("1"), lock=False
+        )
+    assert exc.value.status_code == status.HTTP_409_CONFLICT
 
 
 def test_require_sufficient_available_raises_409(
