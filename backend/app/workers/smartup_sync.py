@@ -181,164 +181,171 @@ def sync_orikzor_movements() -> Tuple[int, str | None, list]:
 
 def run_full_sync() -> SmartupSyncRun | None:
     """
-    Run full SmartUp sync: products, then orders.
-    Uses advisory lock so only one full/orders sync runs at a time (worker vs HTTP).
+    Run full SmartUp sync: products, then orders (asosiy), diller, orikzor.
+    Advisory lock 70000 faqat asosiy buyurtmalar bosqichida — HTTP «Smartupni sinxronlash»
+    mahsulotlar/diller/orikzor fon ishida bloklanmasin.
     """
     run_id = None
     start_time = datetime.now(timezone.utc)
-    lock_db = SessionLocal()
     try:
-        with smartup_sync_lock(lock_db) as acquired:
-            if not acquired:
-                return None
+        db = SessionLocal()
+        try:
+            run = SmartupSyncRun(
+                run_type="full",
+                request_payload={"started_at": start_time.isoformat()},
+                params_json={},
+                status="running",
+            )
+            db.add(run)
+            db.commit()
+            db.refresh(run)
+            run_id = run.id
+        finally:
+            db.close()
+
+        logger.info("SmartUp full sync started", extra={"run_id": str(run_id)})
+
+        products_count = 0
+        orders_count = 0
+        products_error = None
+        orders_error = None
+        products_errors: list = []
+        orders_errors: list = []
+
+        try:
+            products_count, products_error, products_errors = sync_products()
+        except Exception as exc:
+            products_error = str(exc)
+            products_errors = []
+            logger.exception("Products sync raised: %s", exc)
+
+        orders_lock_db = SessionLocal()
+        try:
+            with smartup_sync_lock(orders_lock_db) as acquired:
+                if not acquired:
+                    orders_error = "SmartUp orders lock busy (HTTP sync or another worker step)"
+                    logger.warning("Orders sync skipped: %s", orders_error)
+                else:
+                    try:
+                        orders_count, orders_error, orders_errors = sync_orders()
+                    except Exception as exc:
+                        orders_error = str(exc)
+                        orders_errors = []
+                        logger.exception("Orders sync raised: %s", exc)
+        finally:
+            orders_lock_db.close()
+
+        diller_count = 0
+        diller_error: str | None = None
+        diller_errors: list = []
+        diller_lock_db = SessionLocal()
+        try:
+            with diller_sync_lock(diller_lock_db) as diller_acquired:
+                if diller_acquired:
+                    try:
+                        diller_count, diller_error, diller_errors = sync_diller_movements()
+                    except Exception as exc:
+                        diller_error = str(exc)
+                        logger.exception("Diller sync raised: %s", exc)
+                else:
+                    diller_error = "Diller lock busy"
+                    logger.warning("Diller sync skipped: lock not acquired")
+        finally:
+            diller_lock_db.close()
+
+        orikzor_count = 0
+        orikzor_error: str | None = None
+        orikzor_errors: list = []
+        orikzor_lock_db = SessionLocal()
+        try:
+            with orikzor_sync_lock(orikzor_lock_db) as orikzor_acquired:
+                if orikzor_acquired:
+                    try:
+                        orikzor_count, orikzor_error, orikzor_errors = sync_orikzor_movements()
+                    except Exception as exc:
+                        orikzor_error = str(exc)
+                        logger.exception("O'rikzor sync raised: %s", exc)
+                else:
+                    orikzor_error = "O'rikzor lock busy"
+                    logger.warning("O'rikzor sync skipped: lock not acquired")
+        finally:
+            orikzor_lock_db.close()
+
+        step_errors = [products_error, orders_error, diller_error, orikzor_error]
+        failed_count = sum(1 for e in step_errors if e)
+        if failed_count == len(step_errors):
+            status = STATUS_FAILED
+            error_message = "; ".join(f for f in step_errors if f)
+        elif failed_count > 0:
+            status = STATUS_PARTIAL
+            error_message = "; ".join(f for f in step_errors if f)
+        else:
+            status = STATUS_SUCCESS
+            error_message = None
+
+        all_errors = []
+        if products_error:
+            all_errors.append({"step": "products", "reason": products_error})
+        for e in products_errors:
+            all_errors.append({"step": "products", "external_id": e.get("external_id"), "reason": e.get("reason")})
+        if orders_error:
+            all_errors.append({"step": "orders", "reason": orders_error})
+        for e in orders_errors:
+            all_errors.append({"step": "orders", "external_id": e.get("external_id"), "reason": e.get("reason")})
+        if diller_error:
+            all_errors.append({"step": "diller", "reason": diller_error})
+        for e in diller_errors:
+            all_errors.append({"step": "diller", "external_id": e.get("external_id"), "reason": e.get("reason")})
+        if orikzor_error:
+            all_errors.append({"step": "orikzor", "reason": orikzor_error})
+        for e in orikzor_errors:
+            all_errors.append({"step": "orikzor", "external_id": e.get("external_id"), "reason": e.get("reason")})
+
+        db = SessionLocal()
+        try:
+            run = db.get(SmartupSyncRun, run_id)
+            if run:
+                run.finished_at = datetime.now(timezone.utc)
+                run.status = status
+                run.error_message = error_message[:512] if error_message else None
+                run.synced_products_count = products_count
+                run.synced_orders_count = orders_count + diller_count + orikzor_count
+                run.inserted_count = products_count
+                run.updated_count = orders_count + diller_count + orikzor_count
+                run.success_count = products_count + orders_count + diller_count + orikzor_count
+                run.error_count = len(all_errors)
+                run.errors_json = all_errors
+                db.add(run)
+                db.commit()
+                duration_sec = (run.finished_at - start_time).total_seconds()
+                logger.info(
+                    "SmartUp full sync finished: status=%s products=%d orders=%d diller=%d orikzor=%d duration_sec=%.1f",
+                    status,
+                    products_count,
+                    orders_count,
+                    diller_count,
+                    orikzor_count,
+                    duration_sec,
+                )
+                return run
+        finally:
+            db.close()
+        return None
+    except Exception as exc:
+        logger.exception("SmartUp full sync failed: %s", exc)
+        if run_id is not None:
+            db = SessionLocal()
             try:
-                db = SessionLocal()
-                try:
-                    run = SmartupSyncRun(
-                        run_type="full",
-                        request_payload={"started_at": start_time.isoformat()},
-                        params_json={},
-                        status="running",
-                    )
+                run = db.get(SmartupSyncRun, run_id)
+                if run:
+                    run.finished_at = datetime.now(timezone.utc)
+                    run.status = STATUS_FAILED
+                    run.error_message = str(exc)[:512]
                     db.add(run)
                     db.commit()
-                    db.refresh(run)
-                    run_id = run.id
-                finally:
-                    db.close()
-
-                logger.info("SmartUp full sync started", extra={"run_id": str(run_id)})
-
-                products_count = 0
-                orders_count = 0
-                products_error = None
-                orders_error = None
-                products_errors = []
-                orders_errors = []
-
-                try:
-                    products_count, products_error, products_errors = sync_products()
-                except Exception as exc:
-                    products_error = str(exc)
-                    products_errors = []
-                    logger.exception("Products sync raised: %s", exc)
-
-                try:
-                    orders_count, orders_error, orders_errors = sync_orders()
-                except Exception as exc:
-                    orders_error = str(exc)
-                    orders_errors = []
-                    logger.exception("Orders sync raised: %s", exc)
-
-                # Diller movements (separate lock)
-                diller_count = 0
-                diller_error: str | None = None
-                diller_errors: list = []
-                diller_lock_db = SessionLocal()
-                try:
-                    with diller_sync_lock(diller_lock_db) as diller_acquired:
-                        if diller_acquired:
-                            try:
-                                diller_count, diller_error, diller_errors = sync_diller_movements()
-                            except Exception as exc:
-                                diller_error = str(exc)
-                                logger.exception("Diller sync raised: %s", exc)
-                finally:
-                    diller_lock_db.close()
-
-                # O'rikzor movements (separate lock)
-                orikzor_count = 0
-                orikzor_error: str | None = None
-                orikzor_errors: list = []
-                orikzor_lock_db = SessionLocal()
-                try:
-                    with orikzor_sync_lock(orikzor_lock_db) as orikzor_acquired:
-                        if orikzor_acquired:
-                            try:
-                                orikzor_count, orikzor_error, orikzor_errors = sync_orikzor_movements()
-                            except Exception as exc:
-                                orikzor_error = str(exc)
-                                logger.exception("O'rikzor sync raised: %s", exc)
-                finally:
-                    orikzor_lock_db.close()
-
-                step_errors = [products_error, orders_error, diller_error, orikzor_error]
-                failed_count = sum(1 for e in step_errors if e)
-                if failed_count == len(step_errors):
-                    status = STATUS_FAILED
-                    error_message = "; ".join(f for f in step_errors if f)
-                elif failed_count > 0:
-                    status = STATUS_PARTIAL
-                    error_message = "; ".join(f for f in step_errors if f)
-                else:
-                    status = STATUS_SUCCESS
-                    error_message = None
-
-                all_errors = []
-                if products_error:
-                    all_errors.append({"step": "products", "reason": products_error})
-                for e in products_errors:
-                    all_errors.append({"step": "products", "external_id": e.get("external_id"), "reason": e.get("reason")})
-                if orders_error:
-                    all_errors.append({"step": "orders", "reason": orders_error})
-                for e in orders_errors:
-                    all_errors.append({"step": "orders", "external_id": e.get("external_id"), "reason": e.get("reason")})
-                if diller_error:
-                    all_errors.append({"step": "diller", "reason": diller_error})
-                for e in diller_errors:
-                    all_errors.append({"step": "diller", "external_id": e.get("external_id"), "reason": e.get("reason")})
-                if orikzor_error:
-                    all_errors.append({"step": "orikzor", "reason": orikzor_error})
-                for e in orikzor_errors:
-                    all_errors.append({"step": "orikzor", "external_id": e.get("external_id"), "reason": e.get("reason")})
-
-                db = SessionLocal()
-                try:
-                    run = db.get(SmartupSyncRun, run_id)
-                    if run:
-                        run.finished_at = datetime.now(timezone.utc)
-                        run.status = status
-                        run.error_message = error_message[:512] if error_message else None
-                        run.synced_products_count = products_count
-                        run.synced_orders_count = orders_count + diller_count + orikzor_count
-                        run.inserted_count = products_count
-                        run.updated_count = orders_count + diller_count + orikzor_count
-                        run.success_count = products_count + orders_count + diller_count + orikzor_count
-                        run.error_count = len(all_errors)
-                        run.errors_json = all_errors
-                        db.add(run)
-                        db.commit()
-                        duration_sec = (run.finished_at - start_time).total_seconds()
-                        logger.info(
-                            "SmartUp full sync finished: status=%s products=%d orders=%d diller=%d orikzor=%d duration_sec=%.1f",
-                            status,
-                            products_count,
-                            orders_count,
-                            diller_count,
-                            orikzor_count,
-                            duration_sec,
-                        )
-                        return run
-                finally:
-                    db.close()
-                return None
-            except Exception as exc:
-                logger.exception("SmartUp full sync failed: %s", exc)
-                if run_id is not None:
-                    db = SessionLocal()
-                    try:
-                        run = db.get(SmartupSyncRun, run_id)
-                        if run:
-                            run.finished_at = datetime.now(timezone.utc)
-                            run.status = STATUS_FAILED
-                            run.error_message = str(exc)[:512]
-                            db.add(run)
-                            db.commit()
-                            return run
-                    except Exception as commit_exc:
-                        logger.exception("Failed to update sync run: %s", commit_exc)
-                    finally:
-                        db.close()
-                return None
-    finally:
-        lock_db.close()
+                    return run
+            except Exception as commit_exc:
+                logger.exception("Failed to update sync run: %s", commit_exc)
+            finally:
+                db.close()
+        return None
