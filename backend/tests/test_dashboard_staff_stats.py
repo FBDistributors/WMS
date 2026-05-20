@@ -3,7 +3,13 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from app.api.v1.endpoints.dashboard import _aggregate_staff_by_user_column
+from datetime import date
+
+from app.api.v1.endpoints.dashboard import (
+    _aggregate_staff_by_user_column,
+    _count_completed_documents,
+    _resolve_stats_period,
+)
 from app.models.document import Document, DocumentLine
 from app.models.user import User
 from app.auth.security import get_password_hash
@@ -110,11 +116,59 @@ def test_aggregate_respects_date_filter(db_session):
         )
     db_session.commit()
 
-    from datetime import date
-
     rows = _aggregate_staff_by_user_column(
         db_session, Document.assigned_to_user_id, date(2026, 5, 1), date(2026, 6, 30)
     )
     assert len(rows) == 1
     assert rows[0].documents_count == 1
     assert rows[0].total_picked_qty == 2.0
+
+
+def test_count_completed_documents_and_period(db_session):
+    u = User(
+        username="picker_cnt",
+        password_hash=get_password_hash("x"),
+        role="picker",
+        full_name="P",
+        is_active=True,
+    )
+    db_session.add(u)
+    db_session.flush()
+
+    d1 = Document(
+        doc_no="SO-C1",
+        doc_type="SO",
+        status="completed",
+        assigned_to_user_id=u.id,
+        completed_at=datetime(2026, 6, 1, 10, 0, 0, tzinfo=timezone.utc),
+        updated_at=datetime(2026, 6, 1, 10, 0, 0, tzinfo=timezone.utc),
+    )
+    d2 = Document(
+        doc_no="SO-C2",
+        doc_type="SO",
+        status="completed",
+        assigned_to_user_id=u.id,
+        completed_at=datetime(2026, 6, 3, 10, 0, 0, tzinfo=timezone.utc),
+        updated_at=datetime(2026, 6, 3, 10, 0, 0, tzinfo=timezone.utc),
+    )
+    d3 = Document(
+        doc_no="SO-C3",
+        doc_type="SO",
+        status="completed",
+        assigned_to_user_id=u.id,
+        completed_at=datetime(2026, 6, 10, 10, 0, 0, tzinfo=timezone.utc),
+        updated_at=datetime(2026, 6, 10, 10, 0, 0, tzinfo=timezone.utc),
+    )
+    db_session.add_all([d1, d2, d3])
+    db_session.commit()
+
+    assert _count_completed_documents(db_session, date(2026, 6, 1), date(2026, 6, 3)) == 2
+    assert _count_completed_documents(db_session, date(2026, 6, 1), date(2026, 6, 10)) == 3
+
+    eff_from, eff_to, days = _resolve_stats_period(date(2026, 6, 1), date(2026, 6, 3))
+    assert eff_from == date(2026, 6, 1)
+    assert eff_to == date(2026, 6, 3)
+    assert days == 3
+    period_count = _count_completed_documents(db_session, eff_from, eff_to)
+    assert period_count == 2
+    assert round(period_count / days, 1) == round(2 / 3, 1)

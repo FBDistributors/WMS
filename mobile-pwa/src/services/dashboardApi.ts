@@ -116,6 +116,25 @@ export async function getPickingStaffStats(params?: {
   return fetchJSON<PickingStaffStatsResponse>('/api/v1/dashboard/picking-staff-stats', { query })
 }
 
+export type PickingOrderStats = {
+  date_from: string
+  date_to: string
+  completed_today: number
+  completed_in_period: number
+  days_in_period: number
+  avg_completed_per_day: number
+}
+
+export async function getPickingOrderStats(params?: {
+  date_from?: string
+  date_to?: string
+}): Promise<PickingOrderStats> {
+  const query: Record<string, string> = {}
+  if (params?.date_from) query.date_from = params.date_from
+  if (params?.date_to) query.date_to = params.date_to
+  return fetchJSON<PickingOrderStats>('/api/v1/dashboard/picking-order-stats', { query })
+}
+
 export async function getPickDocuments(params?: {
   limit?: number
   offset?: number

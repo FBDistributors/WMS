@@ -74,8 +74,54 @@ class PickingStaffStatsResponse(BaseModel):
     controllers: List[PickingStaffStatsRow]
 
 
+class PickingOrderStatsResponse(BaseModel):
+    date_from: date
+    date_to: date
+    completed_today: int
+    completed_in_period: int
+    days_in_period: int
+    avg_completed_per_day: float
+
+
 def _today_utc() -> date:
     return datetime.now(timezone.utc).date()
+
+
+def _document_completed_at_expr():
+    """Controller yakunlagan vaqt; eski yozuvlar uchun updated_at."""
+    return func.coalesce(DocumentModel.completed_at, DocumentModel.updated_at)
+
+
+def _resolve_stats_period(
+    date_from: Optional[date],
+    date_to: Optional[date],
+) -> tuple[date, date, int]:
+    today = _today_utc()
+    effective_from = date_from if date_from is not None else today
+    effective_to = date_to if date_to is not None else today
+    if effective_from > effective_to:
+        raise HTTPException(status_code=400, detail="date_from must be on or before date_to")
+    days_in_period = (effective_to - effective_from).days + 1
+    return effective_from, effective_to, max(days_in_period, 1)
+
+
+def _count_completed_documents(
+    db: Session,
+    range_from: date,
+    range_to: date,
+) -> int:
+    completed_at = _document_completed_at_expr()
+    return int(
+        db.query(func.count(DocumentModel.id))
+        .filter(
+            DocumentModel.doc_type == "SO",
+            DocumentModel.status == "completed",
+            func.date(completed_at) >= range_from,
+            func.date(completed_at) <= range_to,
+        )
+        .scalar()
+        or 0
+    )
 
 
 @router.get("/summary", response_model=DashboardSummaryResponse, summary="Dashboard summary")
@@ -303,10 +349,11 @@ def _aggregate_staff_by_user_column(
         DocumentModel.status == "completed",
         user_id_column.isnot(None),
     ]
+    completed_at = _document_completed_at_expr()
     if date_from is not None:
-        filters.append(func.date(DocumentModel.updated_at) >= date_from)
+        filters.append(func.date(completed_at) >= date_from)
     if date_to is not None:
-        filters.append(func.date(DocumentModel.updated_at) <= date_to)
+        filters.append(func.date(completed_at) <= date_to)
 
     per_doc = (
         db.query(
@@ -358,8 +405,12 @@ def _aggregate_staff_by_user_column(
     summary="Completed SO documents: picker vs controller stats (orders, lines, qty)",
 )
 async def get_picking_staff_stats(
-    date_from: Optional[date] = Query(None, description="Filter documents.updated_at (UTC date) from"),
-    date_to: Optional[date] = Query(None, description="Filter documents.updated_at (UTC date) to"),
+    date_from: Optional[date] = Query(
+        None, description="Filter completed_at (or updated_at) UTC date from"
+    ),
+    date_to: Optional[date] = Query(
+        None, description="Filter completed_at (or updated_at) UTC date to"
+    ),
     db: Session = Depends(get_db),
     _user=Depends(require_any_permission(["reports:read", "audit:read", "admin:access"])),
 ):
@@ -372,3 +423,29 @@ async def get_picking_staff_stats(
         db, DocumentModel.controlled_by_user_id, date_from, date_to
     )
     return PickingStaffStatsResponse(pickers=pickers, controllers=controllers)
+
+
+@router.get(
+    "/picking-order-stats",
+    response_model=PickingOrderStatsResponse,
+    summary="Completed SO documents: today, period count, average per day",
+)
+async def get_picking_order_stats(
+    date_from: Optional[date] = Query(None, description="Period start (UTC date); default today"),
+    date_to: Optional[date] = Query(None, description="Period end (UTC date); default today"),
+    db: Session = Depends(get_db),
+    _user=Depends(require_any_permission(["reports:read", "audit:read", "admin:access"])),
+):
+    effective_from, effective_to, days_in_period = _resolve_stats_period(date_from, date_to)
+    today = _today_utc()
+    completed_today = _count_completed_documents(db, today, today)
+    completed_in_period = _count_completed_documents(db, effective_from, effective_to)
+    avg = round(completed_in_period / days_in_period, 1)
+    return PickingOrderStatsResponse(
+        date_from=effective_from,
+        date_to=effective_to,
+        completed_today=completed_today,
+        completed_in_period=completed_in_period,
+        days_in_period=days_in_period,
+        avg_completed_per_day=avg,
+    )

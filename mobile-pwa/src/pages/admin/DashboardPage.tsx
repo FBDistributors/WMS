@@ -1,7 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { Package, ClipboardList, SearchCheck, PackageCheck, LayoutGrid, FileSpreadsheet, Loader2 } from 'lucide-react'
+import {
+  Package,
+  ClipboardList,
+  SearchCheck,
+  PackageCheck,
+  LayoutGrid,
+  FileSpreadsheet,
+  Loader2,
+  CalendarRange,
+  TrendingUp,
+} from 'lucide-react'
 import * as XLSX from 'xlsx'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -10,7 +20,13 @@ import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
-import { getOrdersByStatus, getPickingStaffStats, type PickingStaffStatsRow } from '../../services/dashboardApi'
+import {
+  getOrdersByStatus,
+  getPickingOrderStats,
+  getPickingStaffStats,
+  type PickingOrderStats,
+  type PickingStaffStatsRow,
+} from '../../services/dashboardApi'
 import { getReserveStuckSummary } from '../../services/inventoryApi'
 import { writeExcelFile } from '../../utils/exportExcel'
 
@@ -39,6 +55,15 @@ function aggregateByFourGroups(
 function formatQty(n: number): string {
   if (Number.isInteger(n)) return String(n)
   return n.toLocaleString(undefined, { maximumFractionDigits: 3 })
+}
+
+function todayIsoDate(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function formatAvgPerDay(n: number): string {
+  if (Number.isInteger(n)) return String(n)
+  return n.toLocaleString(undefined, { maximumFractionDigits: 1 })
 }
 
 /** Excel worksheet name: max 31 chars, no \\ / ? * [ ] : */
@@ -116,8 +141,9 @@ export function DashboardPage() {
   const [controllerRows, setControllerRows] = useState<PickingStaffStatsRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+  const [dateFrom, setDateFrom] = useState(todayIsoDate)
+  const [dateTo, setDateTo] = useState(todayIsoDate)
+  const [pickingOrderStats, setPickingOrderStats] = useState<PickingOrderStats | null>(null)
   const [isExporting, setIsExporting] = useState(false)
   const [stuckRowsCount, setStuckRowsCount] = useState(0)
   const [stuckOrdersCount, setStuckOrdersCount] = useState(0)
@@ -130,12 +156,18 @@ export function DashboardPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const [ordersByStatusData, staffData, stuckMain, stuckShowroom] = await Promise.all([
+      const dateFromQ = dateFrom.trim() || undefined
+      const dateToQ = dateTo.trim() || undefined
+      const [ordersByStatusData, staffData, pickingStats, stuckMain, stuckShowroom] = await Promise.all([
         getOrdersByStatus().catch(() => []),
         getPickingStaffStats({
-          date_from: dateFrom.trim() || undefined,
-          date_to: dateTo.trim() || undefined,
+          date_from: dateFromQ,
+          date_to: dateToQ,
         }).catch(() => ({ pickers: [], controllers: [] })),
+        getPickingOrderStats({
+          date_from: dateFromQ,
+          date_to: dateToQ,
+        }).catch(() => null),
         getReserveStuckSummary({ warehouse: 'main', age_hours: 48, sample_limit: 3 }).catch(
           () => null,
         ),
@@ -146,6 +178,7 @@ export function DashboardPage() {
       setOrdersByStatus(Array.isArray(ordersByStatusData) ? ordersByStatusData : [])
       setPickerRows(Array.isArray(staffData?.pickers) ? staffData.pickers : [])
       setControllerRows(Array.isArray(staffData?.controllers) ? staffData.controllers : [])
+      setPickingOrderStats(pickingStats)
       const stuckTotal = (stuckMain?.stuck_rows_count ?? 0) + (stuckShowroom?.stuck_rows_count ?? 0)
       const stuckOrders =
         (stuckMain?.stuck_orders_count ?? 0) + (stuckShowroom?.stuck_orders_count ?? 0)
@@ -158,10 +191,17 @@ export function DashboardPage() {
       setStuckRowsCount(0)
       setStuckOrdersCount(0)
       setStuckOldestHours(0)
+      setPickingOrderStats(null)
     } finally {
       setIsLoading(false)
     }
   }, [t, dateFrom, dateTo])
+
+  const resetStatsDatesToToday = () => {
+    const today = todayIsoDate()
+    setDateFrom(today)
+    setDateTo(today)
+  }
 
   useEffect(() => {
     void load()
@@ -259,6 +299,75 @@ export function DashboardPage() {
               icon={LayoutGrid}
             />
           </div>
+          <Card className="mt-6">
+            <div className="text-base font-semibold text-slate-900 dark:text-slate-100">
+              {t('admin:dashboard.picking_stats_title')}
+            </div>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              {t('admin:dashboard.picking_stats_hint')}
+            </p>
+            <div className="mt-3 flex flex-wrap items-end gap-3">
+              <label className="flex flex-col gap-1 text-xs text-slate-600 dark:text-slate-400">
+                <span>{t('admin:dashboard.staff_stats_date_from')}</span>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-slate-600 dark:text-slate-400">
+                <span>{t('admin:dashboard.staff_stats_date_to')}</span>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                />
+              </label>
+              <Button type="button" variant="secondary" className="shrink-0" onClick={resetStatsDatesToToday}>
+                {t('admin:dashboard.staff_stats_clear')}
+              </Button>
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <KpiCard
+                title={t('admin:dashboard.picking_stats_today')}
+                value={isLoading ? '—' : (pickingOrderStats?.completed_today ?? 0)}
+                icon={PackageCheck}
+                href="/admin/picking/archive?group=yakunlangan"
+              />
+              <KpiCard
+                title={t('admin:dashboard.picking_stats_period')}
+                value={isLoading ? '—' : (pickingOrderStats?.completed_in_period ?? 0)}
+                delta={
+                  pickingOrderStats
+                    ? t('admin:dashboard.picking_stats_period_range', {
+                        from: pickingOrderStats.date_from,
+                        to: pickingOrderStats.date_to,
+                      })
+                    : undefined
+                }
+                icon={CalendarRange}
+              />
+              <KpiCard
+                title={t('admin:dashboard.picking_stats_avg_per_day')}
+                value={
+                  isLoading
+                    ? '—'
+                    : formatAvgPerDay(pickingOrderStats?.avg_completed_per_day ?? 0)
+                }
+                delta={
+                  pickingOrderStats
+                    ? t('admin:dashboard.picking_stats_avg_days', {
+                        days: pickingOrderStats.days_in_period,
+                      })
+                    : undefined
+                }
+                icon={TrendingUp}
+              />
+            </div>
+          </Card>
+
           {stuckRowsCount > 0 ? (
             <Card className="mt-4 border-rose-200 bg-rose-50 dark:border-rose-900/60 dark:bg-rose-950/30">
               <button
@@ -357,37 +466,10 @@ export function DashboardPage() {
             <div className="text-base font-semibold text-slate-900 dark:text-slate-100">
               {t('admin:dashboard.staff_stats_title')}
             </div>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('admin:dashboard.staff_stats_hint')}</p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              {t('admin:dashboard.staff_stats_uses_period_hint')}
+            </p>
             <div className="mt-3 flex flex-wrap items-end gap-3">
-              <label className="flex flex-col gap-1 text-xs text-slate-600 dark:text-slate-400">
-                <span>{t('admin:dashboard.staff_stats_date_from')}</span>
-                <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-slate-600 dark:text-slate-400">
-                <span>{t('admin:dashboard.staff_stats_date_to')}</span>
-                <input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                />
-              </label>
-              <Button
-                type="button"
-                variant="secondary"
-                className="shrink-0"
-                onClick={() => {
-                  setDateFrom('')
-                  setDateTo('')
-                }}
-              >
-                {t('admin:dashboard.staff_stats_clear')}
-              </Button>
               <Button
                 type="button"
                 variant="secondary"
