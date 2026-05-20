@@ -28,8 +28,11 @@ export function PickItemCard({
     NEW: 'neutral',
     IN_PROGRESS: 'primary',
     DONE: 'success',
+    NOT_PICKED: 'danger',
     ERROR: 'danger',
   }
+  const statusLabel =
+    status === 'NOT_PICKED' ? t('status.not_picked') : t(`status.${status.toLowerCase()}`)
 
   return (
     <Card className="p-5">
@@ -53,7 +56,7 @@ export function PickItemCard({
       </div>
       <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
         <div>{t('picked_progress', { picked: qtyPicked, required: qtyRequired })}</div>
-        <Badge variant={statusVariant[status]}>{t(`status.${status.toLowerCase()}`)}</Badge>
+        <Badge variant={statusVariant[status]}>{statusLabel}</Badge>
       </div>
     </Card>
   )

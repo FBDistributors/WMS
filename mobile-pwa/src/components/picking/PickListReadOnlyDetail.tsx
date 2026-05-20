@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import i18n from 'i18next'
 import { PackageSearch } from 'lucide-react'
 
@@ -24,7 +25,7 @@ const lineStatusVariant: Record<PickLine['status'], 'neutral' | 'primary' | 'suc
   ERROR: 'danger',
 }
 
-function lineReasonNote(line: PickLine, t: (key: string, opts?: Record<string, string>) => string): string | null {
+function lineReasonNote(line: PickLine, t: TFunction): string | null {
   if (line.is_vip_expiry_informational) return null
   if (line.skip_reason?.trim()) {
     const reason = formatPickingSkipReason(line.skip_reason, t) ?? line.skip_reason
