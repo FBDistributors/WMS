@@ -306,9 +306,6 @@ export function DashboardPage() {
             <div className="text-base font-semibold text-slate-900 dark:text-slate-100">
               {t('admin:dashboard.picking_stats_title')}
             </div>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {t('admin:dashboard.picking_stats_hint')}
-            </p>
             {pickingStatsUnavailable ? (
               <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
                 {t('admin:dashboard.picking_stats_unavailable')}
