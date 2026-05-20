@@ -95,7 +95,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   PickerLocationOption? _destLocation;
   String _receivingLocationCode = '';
   String? _receivingLocationId;
-  final TextEditingController _batchNew = TextEditingController();
   final TextEditingController _kirimPutawaySearch = TextEditingController();
   bool _sending = false;
   String? _handledProductId;
@@ -133,7 +132,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     _customerSearchController.dispose();
     _invLocSearch.dispose();
     _invScanActualQty.dispose();
-    _batchNew.dispose();
     _kirimPutawaySearch.dispose();
     _returnManualBatch.dispose();
     _qty.dispose();
@@ -195,7 +193,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         _kirimPutawaySearch.clear();
       }
       _expiry = null;
-      _batchNew.clear();
       if (!preservePutaway) {
         _returnManualBatch.clear();
       }
@@ -505,7 +502,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     setState(() {
       _product = null;
       _qty.clear();
-      _batchNew.clear();
       _expiry = null;
       _productError = null;
       _loadingProduct = false;
@@ -560,7 +556,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     );
   }
 
-  Widget _kirimNewExpiryBatchQtyCard(AppLocale appLoc) {
+  Widget _kirimNewExpiryQtyCard(AppLocale appLoc) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -570,20 +566,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             ExpiryDatePickerField(
               value: _expiry,
               onChanged: (String? v) => setState(() => _expiry = v),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _batchNew,
-              textCapitalization: TextCapitalization.characters,
-              decoration: InputDecoration(
-                labelText: StringLookup.t(appLoc, 'kirimBatchLabel'),
-                border: const OutlineInputBorder(),
-                suffixIcon: buildInputClearButton(
-                  visible: _batchNew.text.trim().isNotEmpty,
-                  onPressed: () => setState(() => _batchNew.clear()),
-                ),
-              ),
-              onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -719,7 +701,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     final PickerProductDetailResponse? p = _product;
     final PickerLocationOption? loc = _destLocation;
     final int q = int.tryParse(_qty.text.trim()) ?? 0;
-    final String batchTrim = _batchNew.text.trim();
     final String? exp = _expiry?.trim();
 
     if (p == null || loc == null) {
@@ -730,16 +711,11 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       showFillAll();
       return;
     }
-    if (batchTrim.isEmpty) {
-      showFillAll();
-      return;
-    }
     if (_qty.text.trim().isEmpty || q < 1) {
       showFillAll();
       return;
     }
 
-    final String batch = batchTrim;
     setState(() => _sending = true);
     try {
       final receipt = await ref.read(receivingRepositoryProvider).createReceipt(
@@ -747,7 +723,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
               ReceiptLineCreate(
                 productId: p.productId,
                 qty: q,
-                batch: batch,
                 locationId: loc.id,
                 expiryDate: _expiry,
               ),
@@ -1787,7 +1762,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                               const SizedBox(height: 16),
                               const Divider(height: 1),
                               const SizedBox(height: 16),
-                              _kirimNewExpiryBatchQtyCard(appLoc),
+                              _kirimNewExpiryQtyCard(appLoc),
                             ],
                           ),
                         ),
@@ -1934,7 +1909,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                               const SizedBox(height: 16),
                               const Divider(height: 1),
                               const SizedBox(height: 16),
-                              _kirimNewExpiryBatchQtyCard(appLoc),
+                              _kirimNewExpiryQtyCard(appLoc),
                             ],
                           ),
                         ),

@@ -2,22 +2,23 @@ class ReceiptLineCreate {
   const ReceiptLineCreate({
     required this.productId,
     required this.qty,
-    required this.batch,
     required this.locationId,
+    this.batch,
     this.expiryDate,
   });
 
   final String productId;
   final int qty;
-  final String batch;
+  /// Bo‘sh yoki null — server avtomatik partiya yaratadi.
+  final String? batch;
   final String locationId;
   final String? expiryDate;
 
   Map<String, Object?> toJson() => <String, Object?>{
         'product_id': productId,
         'qty': qty,
-        'batch': batch,
         'location_id': locationId,
+        if (batch != null && batch!.trim().isNotEmpty) 'batch': batch!.trim(),
         if (expiryDate != null) 'expiry_date': expiryDate,
       };
 }
