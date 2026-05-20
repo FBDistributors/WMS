@@ -126,7 +126,7 @@
     "order_statuses_title": "Order statuses",
     "load_error": "Failed to load dashboard. Please try again.",
     "picking_stats_title": "Picking statistics (controller completed)",
-    "picking_stats_hint": "Count of completed pick documents (SO). Date is controller completion day (UTC).",
+    "picking_stats_hint": "Completed pick documents (SO). Dates use Uzbekistan time (Tashkent), aligned with archive last activity.",
     "picking_stats_today": "Completed today",
     "picking_stats_period": "In selected period",
     "picking_stats_period_range": "{{from}} — {{to}}",

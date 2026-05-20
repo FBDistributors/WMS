@@ -1,9 +1,10 @@
 """Dashboard summary API - real counts from database."""
 
 import os
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import List, Optional
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import logging
 
@@ -24,6 +25,20 @@ from app.models.user import User as UserModel
 
 router = APIRouter()
 DEFAULT_FILIAL_ID = os.getenv("WMS_DEFAULT_FILIAL_ID", "3788131").strip()
+def _load_business_tz():
+    key = os.getenv("WMS_BUSINESS_TIMEZONE", "Asia/Tashkent")
+    try:
+        return ZoneInfo(key)
+    except ZoneInfoNotFoundError:
+        # Windows dev without tzdata; O'zbekiston doimiy UTC+5
+        if key in ("Asia/Tashkent", "Asia/Samarkand"):
+            return timezone(timedelta(hours=5), name=key)
+        raise
+
+
+# Ombor kuni — UI (arxiv updated_at) bilan mos; UTC emas.
+BUSINESS_TZ = _load_business_tz()
+COMPLETED_DOC_STATUSES = ("completed", "packed", "shipped")
 
 
 class PickDocumentListItem(BaseModel):
@@ -87,16 +102,42 @@ def _today_utc() -> date:
     return datetime.now(timezone.utc).date()
 
 
+def _today_business() -> date:
+    return datetime.now(BUSINESS_TZ).date()
+
+
 def _document_completed_at_expr():
     """Controller yakunlagan vaqt; eski yozuvlar uchun updated_at."""
     return func.coalesce(DocumentModel.completed_at, DocumentModel.updated_at)
+
+
+def _day_bounds_in_tz(day: date) -> tuple[datetime, datetime]:
+    """Inclusive calendar day in BUSINESS_TZ as aware UTC datetimes for DB compare."""
+    start = datetime.combine(day, time.min, tzinfo=BUSINESS_TZ)
+    end = datetime.combine(day, time.max, tzinfo=BUSINESS_TZ)
+    return start, end
+
+
+def _completed_documents_filters(
+    range_from: date,
+    range_to: date,
+) -> list:
+    col = _document_completed_at_expr()
+    start, _ = _day_bounds_in_tz(range_from)
+    _, end = _day_bounds_in_tz(range_to)
+    return [
+        DocumentModel.doc_type == "SO",
+        DocumentModel.status.in_(COMPLETED_DOC_STATUSES),
+        col >= start,
+        col <= end,
+    ]
 
 
 def _resolve_stats_period(
     date_from: Optional[date],
     date_to: Optional[date],
 ) -> tuple[date, date, int]:
-    today = _today_utc()
+    today = _today_business()
     effective_from = date_from if date_from is not None else today
     effective_to = date_to if date_to is not None else today
     if effective_from > effective_to:
@@ -110,15 +151,9 @@ def _count_completed_documents(
     range_from: date,
     range_to: date,
 ) -> int:
-    completed_at = _document_completed_at_expr()
     return int(
         db.query(func.count(DocumentModel.id))
-        .filter(
-            DocumentModel.doc_type == "SO",
-            DocumentModel.status == "completed",
-            func.date(completed_at) >= range_from,
-            func.date(completed_at) <= range_to,
-        )
+        .filter(and_(*_completed_documents_filters(range_from, range_to)))
         .scalar()
         or 0
     )
@@ -346,14 +381,19 @@ def _aggregate_staff_by_user_column(
 ) -> List[PickingStaffStatsRow]:
     filters = [
         DocumentModel.doc_type == "SO",
-        DocumentModel.status == "completed",
+        DocumentModel.status.in_(COMPLETED_DOC_STATUSES),
         user_id_column.isnot(None),
     ]
-    completed_at = _document_completed_at_expr()
-    if date_from is not None:
-        filters.append(func.date(completed_at) >= date_from)
-    if date_to is not None:
-        filters.append(func.date(completed_at) <= date_to)
+    if date_from is not None and date_to is not None:
+        filters.extend(_completed_documents_filters(date_from, date_to))
+    elif date_from is not None:
+        col = _document_completed_at_expr()
+        start, _ = _day_bounds_in_tz(date_from)
+        filters.append(col >= start)
+    elif date_to is not None:
+        col = _document_completed_at_expr()
+        _, end = _day_bounds_in_tz(date_to)
+        filters.append(col <= end)
 
     per_doc = (
         db.query(
@@ -437,7 +477,7 @@ async def get_picking_order_stats(
     _user=Depends(require_any_permission(["reports:read", "audit:read", "admin:access"])),
 ):
     effective_from, effective_to, days_in_period = _resolve_stats_period(date_from, date_to)
-    today = _today_utc()
+    today = _today_business()
     completed_today = _count_completed_documents(db, today, today)
     completed_in_period = _count_completed_documents(db, effective_from, effective_to)
     avg = round(completed_in_period / days_in_period, 1)

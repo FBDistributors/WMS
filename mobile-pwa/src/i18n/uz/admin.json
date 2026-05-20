@@ -126,7 +126,7 @@
     "order_statuses_title": "Buyurtma statuslari",
     "load_error": "Dashboard yuklanmadi. Qayta urinib ko‘ring.",
     "picking_stats_title": "Yig‘ish statistikasi (controller yakunlagan)",
-    "picking_stats_hint": "Yakunlangan terish hujjatlari (SO) soni. Sana — controller yakunlagan kun (UTC).",
+    "picking_stats_hint": "Yakunlangan terish hujjatlari (SO). Sana — O‘zbekiston vaqti (Toshkent), arxivdagi «Oxirgi faollik» bilan mos.",
     "picking_stats_today": "Bugun yakunlangan",
     "picking_stats_period": "Tanlangan oralikda",
     "picking_stats_period_range": "{{from}} — {{to}}",

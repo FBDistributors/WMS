@@ -167,7 +167,7 @@ export function DashboardPage() {
         getPickingOrderStats({
           date_from: dateFromQ,
           date_to: dateToQ,
-        }).catch(() => null),
+        }),
         getReserveStuckSummary({ warehouse: 'main', age_hours: 48, sample_limit: 3 }).catch(
           () => null,
         ),
