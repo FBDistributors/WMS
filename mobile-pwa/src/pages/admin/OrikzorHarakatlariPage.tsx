@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { FileText, Filter, Loader2, Settings, X } from 'lucide-react'
+import { FileText, Filter, Loader2, RefreshCw, Settings, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -424,6 +424,15 @@ export function OrikzorHarakatlariPage() {
               aria-label={t('orders:table.settings_title')}
             >
               <Settings size={18} />
+            </Button>
+            <Button
+              variant="secondary"
+              className="shrink-0"
+              onClick={() => void load(true)}
+              disabled={isRefreshing || isLoading || isSyncing}
+            >
+              <RefreshCw size={18} className={isRefreshing ? 'animate-spin shrink-0' : 'shrink-0'} />
+              {t('common:buttons.refresh')}
             </Button>
             {canSync ? (
               <Button className="shrink-0" onClick={handleSync} disabled={isSyncing}>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Filter, Settings, FileText, X, Loader2 } from 'lucide-react'
+import { Filter, Settings, FileText, X, Loader2, RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -477,6 +477,10 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   useEffect(() => {
     setCheckResult(null)
   }, [searchQuery])
+
+  const handleRefresh = () => {
+    void load(true)
+  }
 
   const handleSync = async () => {
     setIsSyncing(true)
@@ -1098,6 +1102,17 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
                 aria-label={t('orders:table.settings_title')}
               >
                 <Settings size={18} />
+              </Button>
+            ) : null}
+            {mode !== 'statuses' ? (
+              <Button
+                variant="secondary"
+                className="shrink-0"
+                onClick={handleRefresh}
+                disabled={isRefreshing || isLoading || isSyncing}
+              >
+                <RefreshCw size={18} className={isRefreshing ? 'animate-spin shrink-0' : 'shrink-0'} />
+                {t('common:buttons.refresh')}
               </Button>
             ) : null}
             {canSync && mode !== 'statuses' ? (
