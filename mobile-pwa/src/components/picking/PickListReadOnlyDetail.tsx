@@ -12,13 +12,26 @@ import {
   type PickListDetails,
   type PickLine,
   type PickListStatus,
+  formatPickingSkipReason,
+  lineStatusBadgeLabel,
 } from '../../services/pickingApi'
 
 const lineStatusVariant: Record<PickLine['status'], 'neutral' | 'primary' | 'success' | 'danger'> = {
   NEW: 'neutral',
   IN_PROGRESS: 'primary',
   DONE: 'success',
+  NOT_PICKED: 'danger',
   ERROR: 'danger',
+}
+
+function lineReasonNote(line: PickLine, t: (key: string, opts?: Record<string, string>) => string): string | null {
+  if (line.is_vip_expiry_informational) return null
+  if (line.skip_reason?.trim()) {
+    const reason = formatPickingSkipReason(line.skip_reason, t) ?? line.skip_reason
+    return t('picking:line_skip_reason', { reason })
+  }
+  if (line.status === 'NOT_PICKED') return t('picking:line_not_picked_hint')
+  return null
 }
 
 type PickListReadOnlyDetailProps = {
@@ -172,12 +185,17 @@ export function PickListReadOnlyDetail({ documentId }: PickListReadOnlyDetailPro
               </tr>
             </thead>
             <tbody>
-              {data.lines.map((line) => (
+              {data.lines.map((line) => {
+                const reasonNote = lineReasonNote(line, t)
+                return (
                 <tr key={line.id} className="border-b border-slate-100 dark:border-slate-800">
                   <td className="max-w-[min(360px,40vw)] px-3 py-3 text-slate-900 dark:text-slate-100 sm:px-4">
                     <div className="font-medium">{line.product_name}</div>
                     {line.is_vip_expiry_informational ? (
                       <p className="mt-1 text-xs text-red-700 dark:text-red-300">{t('picking:vip_expiry_not_picked')}</p>
+                    ) : null}
+                    {reasonNote ? (
+                      <p className="mt-1 text-xs text-amber-800 dark:text-amber-200">{reasonNote}</p>
                     ) : null}
                   </td>
                   <td className="whitespace-nowrap px-3 py-3 font-mono text-xs text-slate-700 dark:text-slate-300 sm:px-4">
@@ -197,13 +215,11 @@ export function PickListReadOnlyDetail({ documentId }: PickListReadOnlyDetailPro
                   </td>
                   <td className="whitespace-nowrap px-3 py-3 sm:px-4">
                     <Badge variant={lineStatusVariant[line.status]}>
-                      {t(`picking:status.${String(line.status).toLowerCase()}`, {
-                        defaultValue: line.status,
-                      })}
+                      {lineStatusBadgeLabel(line, t)}
                     </Badge>
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </TableScrollArea>

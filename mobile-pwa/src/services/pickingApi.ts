@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next'
 import { fetchJSON } from './apiClient'
 
 export type PickListStatus = 'NEW' | 'IN_PROGRESS' | 'REVIEW' | 'DONE' | 'ERROR' | 'UNKNOWN'
@@ -31,7 +32,7 @@ export type PickList = {
   customer_name?: string | null
 }
 
-export type PickLineStatus = 'NEW' | 'IN_PROGRESS' | 'DONE' | 'ERROR'
+export type PickLineStatus = 'NEW' | 'IN_PROGRESS' | 'DONE' | 'ERROR' | 'NOT_PICKED'
 
 export type PickLine = {
   id: string
@@ -44,6 +45,7 @@ export type PickLine = {
   qty_required: number
   qty_picked: number
   status: PickLineStatus
+  skip_reason?: string | null
   /** VIP muddat: faqat ma'lumot, terilmaydi */
   is_vip_expiry_informational?: boolean
   vip_expiry_information_key?: string | null
@@ -83,6 +85,7 @@ type BackendDocumentLine = {
   sku?: string | null
   qty_required: number
   qty_picked: number
+  skip_reason?: string | null
   is_vip_expiry_informational?: boolean
   vip_expiry_information_key?: string | null
 }
@@ -137,8 +140,10 @@ function mapWmsStatusToPickListBadge(wms: string | null | undefined): PickListSt
 
 function mapLineStatus(line: BackendDocumentLine): PickLineStatus {
   if (line.is_vip_expiry_informational) return 'DONE'
+  if (line.skip_reason?.trim()) return 'NOT_PICKED'
   if (line.qty_picked >= line.qty_required) return 'DONE'
   if (line.qty_picked > 0) return 'IN_PROGRESS'
+  if (line.qty_required > 0 && line.qty_picked <= 0) return 'NOT_PICKED'
   return 'NEW'
 }
 
@@ -155,6 +160,7 @@ function mapPickingLineToPickerViewModel(line: BackendDocumentLine): PickLine {
     qty_required: line.qty_required,
     qty_picked: line.qty_picked,
     status: mapLineStatus(line),
+    skip_reason: line.skip_reason?.trim() || null,
     is_vip_expiry_informational: line.is_vip_expiry_informational === true,
     vip_expiry_information_key: line.vip_expiry_information_key ?? null,
   }
@@ -242,6 +248,23 @@ export async function getPickListDetails(id: string) {
 
 export async function getPickListDetailsForPicker(id: string) {
   return getPickListDetails(id)
+}
+
+/** Yig'uvchi skip_reason kalitini tarjima qiladi (masalan out_of_stock). */
+export function formatPickingSkipReason(
+  skipReason: string | null | undefined,
+  t: TFunction
+): string | null {
+  const key = skipReason?.trim()
+  if (!key) return null
+  return t(`picking:reason_${key}`, { defaultValue: key })
+}
+
+export function lineStatusBadgeLabel(line: PickLine, t: TFunction): string {
+  if (line.status === 'NOT_PICKED') {
+    return formatPickingSkipReason(line.skip_reason, t) ?? t('picking:status.not_picked')
+  }
+  return t(`picking:status.${String(line.status).toLowerCase()}`, { defaultValue: line.status })
 }
 
 function createRequestId() {

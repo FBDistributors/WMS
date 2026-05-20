@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Badge } from '../ui/badge'
 import { Card } from '../ui/card'
 import type { PickLine } from '../../services/pickingApi'
+import { formatPickingSkipReason, lineStatusBadgeLabel } from '../../services/pickingApi'
 
 type PickLineRowProps = {
   line: PickLine
@@ -14,13 +15,17 @@ const statusVariant: Record<PickLine['status'], 'neutral' | 'primary' | 'success
     NEW: 'neutral',
     IN_PROGRESS: 'primary',
     DONE: 'success',
+    NOT_PICKED: 'danger',
     ERROR: 'danger',
   }
 
 export function PickLineRow({ line, onClick }: PickLineRowProps) {
   const { t } = useTranslation('picking')
-  const statusKey = line.status.toLowerCase()
   const vipInfo = line.is_vip_expiry_informational === true
+  const reasonText =
+    !vipInfo && line.skip_reason?.trim()
+      ? formatPickingSkipReason(line.skip_reason, t)
+      : null
   return (
     <Card
       className={[
@@ -37,7 +42,7 @@ export function PickLineRow({ line, onClick }: PickLineRowProps) {
         <div>
           <div className="text-base font-semibold text-slate-900">{line.product_name}</div>
         </div>
-        <Badge variant={statusVariant[line.status]}>{t(`status.${statusKey}`)}</Badge>
+        <Badge variant={statusVariant[line.status]}>{lineStatusBadgeLabel(line, t)}</Badge>
       </div>
       <div className="flex items-center gap-2 text-sm text-slate-600">
         <MapPin size={14} />
@@ -47,6 +52,13 @@ export function PickLineRow({ line, onClick }: PickLineRowProps) {
       </div>
       {vipInfo ? (
         <p className="text-sm text-red-800 dark:text-red-200">{t('vip_expiry_not_picked')}</p>
+      ) : null}
+      {reasonText ? (
+        <p className="text-sm text-amber-800 dark:text-amber-200">
+          {t('line_skip_reason', { reason: reasonText })}
+        </p>
+      ) : line.status === 'NOT_PICKED' ? (
+        <p className="text-sm text-amber-800 dark:text-amber-200">{t('line_not_picked_hint')}</p>
       ) : null}
       <div className="flex items-center justify-between text-sm text-slate-700">
         <span>{t('qty')}</span>
