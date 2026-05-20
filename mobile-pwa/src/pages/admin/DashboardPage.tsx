@@ -144,6 +144,7 @@ export function DashboardPage() {
   const [dateFrom, setDateFrom] = useState(todayIsoDate)
   const [dateTo, setDateTo] = useState(todayIsoDate)
   const [pickingOrderStats, setPickingOrderStats] = useState<PickingOrderStats | null>(null)
+  const [pickingStatsUnavailable, setPickingStatsUnavailable] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [stuckRowsCount, setStuckRowsCount] = useState(0)
   const [stuckOrdersCount, setStuckOrdersCount] = useState(0)
@@ -167,7 +168,7 @@ export function DashboardPage() {
         getPickingOrderStats({
           date_from: dateFromQ,
           date_to: dateToQ,
-        }),
+        }).catch(() => null),
         getReserveStuckSummary({ warehouse: 'main', age_hours: 48, sample_limit: 3 }).catch(
           () => null,
         ),
@@ -179,6 +180,7 @@ export function DashboardPage() {
       setPickerRows(Array.isArray(staffData?.pickers) ? staffData.pickers : [])
       setControllerRows(Array.isArray(staffData?.controllers) ? staffData.controllers : [])
       setPickingOrderStats(pickingStats)
+      setPickingStatsUnavailable(pickingStats == null)
       const stuckTotal = (stuckMain?.stuck_rows_count ?? 0) + (stuckShowroom?.stuck_rows_count ?? 0)
       const stuckOrders =
         (stuckMain?.stuck_orders_count ?? 0) + (stuckShowroom?.stuck_orders_count ?? 0)
@@ -192,6 +194,7 @@ export function DashboardPage() {
       setStuckOrdersCount(0)
       setStuckOldestHours(0)
       setPickingOrderStats(null)
+      setPickingStatsUnavailable(false)
     } finally {
       setIsLoading(false)
     }
@@ -306,6 +309,11 @@ export function DashboardPage() {
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               {t('admin:dashboard.picking_stats_hint')}
             </p>
+            {pickingStatsUnavailable ? (
+              <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                {t('admin:dashboard.picking_stats_unavailable')}
+              </p>
+            ) : null}
             <div className="mt-3 flex flex-wrap items-end gap-3">
               <label className="flex flex-col gap-1 text-xs text-slate-600 dark:text-slate-400">
                 <span>{t('admin:dashboard.staff_stats_date_from')}</span>

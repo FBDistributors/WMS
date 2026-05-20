@@ -127,6 +127,7 @@
     "load_error": "Failed to load dashboard. Please try again.",
     "picking_stats_title": "Picking statistics (controller completed)",
     "picking_stats_hint": "Completed pick documents (SO). Dates use Uzbekistan time (Tashkent), aligned with archive last activity.",
+    "picking_stats_unavailable": "Picking statistics could not be loaded (API may need an update). The rest of the dashboard is still shown.",
     "picking_stats_today": "Completed today",
     "picking_stats_period": "In selected period",
     "picking_stats_period_range": "{{from}} — {{to}}",
