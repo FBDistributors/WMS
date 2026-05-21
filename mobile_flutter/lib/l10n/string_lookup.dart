@@ -29,7 +29,7 @@ abstract final class StringLookup {
     'error': 'Xato',
     'enterLoginPassword': 'Login va parolni kiriting',
     'loginError': 'Kirish xatosi',
-    'invalidCredentialsError': "Login yoki parol noto'g'ri",
+    'invalidCredentialsError': 'Login yoki parol xato',
     'loading': 'Yuklanmoqda…',
     'langUz': 'O‘zbek',
     'langRu': 'Русский',

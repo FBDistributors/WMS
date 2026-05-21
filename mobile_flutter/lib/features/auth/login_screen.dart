@@ -99,8 +99,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
     final String msg;
     if (err != null) {
-      final String raw = err;
-      final bool badCreds = raw.contains(unauthorizedMessage);
+      final String raw = err.replaceFirst(RegExp(r'^Exception:\s*'), '');
+      final String lower = raw.toLowerCase();
+      final bool badCreds = raw.contains(unauthorizedMessage) ||
+          lower.contains('invalid credentials');
       msg = badCreds ? StringLookup.t(loc, 'invalidCredentialsError') : raw;
     } else {
       msg = StringLookup.t(loc, 'loginError');

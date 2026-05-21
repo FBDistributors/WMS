@@ -57,6 +57,10 @@ final appDioProvider = Provider<Dio>((Ref ref) {
 String mapDioExceptionToMessage(DioException err) {
   final int? status = err.response?.statusCode;
 
+  if (status == 401) {
+    return unauthorizedMessage;
+  }
+
   final Object? data = err.response?.data;
   if (data is Map<String, Object?>) {
     final Object? detail = data['detail'];
@@ -79,9 +83,6 @@ String mapDioExceptionToMessage(DioException err) {
     }
   }
 
-  if (status == 401) {
-    return unauthorizedMessage;
-  }
   if (status == 404) {
     final String url =
         '${err.requestOptions.baseUrl}${err.requestOptions.path}';
