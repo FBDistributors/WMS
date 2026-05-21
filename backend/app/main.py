@@ -118,9 +118,17 @@ async def health_db_check():
             lines = connection.execute(
                 text("SELECT to_regclass('public.document_lines')")
             ).scalar()
+            work_zones = connection.execute(
+                text("SELECT to_regclass('public.work_zones')")
+            ).scalar()
         if not documents or not lines:
             raise HTTPException(status_code=500, detail="Database tables missing")
-        return {"status": "ok", "documents": True, "document_lines": True}
+        return {
+            "status": "ok",
+            "documents": True,
+            "document_lines": True,
+            "work_zones": bool(work_zones),
+        }
     except Exception as exc:  # pragma: no cover - safety net
         logging.getLogger("uvicorn").warning("Database health check failed: %s", exc)
         raise HTTPException(status_code=500, detail="Database unavailable") from exc

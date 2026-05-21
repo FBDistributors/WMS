@@ -8,6 +8,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import or_
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 
 from app.auth.deps import require_any_permission, require_permission
@@ -22,6 +23,23 @@ from app.services.audit_service import (
 )
 
 router = APIRouter()
+
+_MIGRATION_HINT = "DB migration required: run `alembic upgrade head` (revision 20260521_0074 work_zones)."
+
+
+def _is_missing_work_zones_table(exc: BaseException) -> bool:
+    msg = str(exc).lower()
+    return "work_zones" in msg and (
+        "does not exist" in msg
+        or "no such table" in msg
+        or "undefinedtable" in msg
+        or "relation" in msg and "exist" in msg
+    )
+
+
+def _raise_if_schema_error(exc: BaseException) -> None:
+    if isinstance(exc, (ProgrammingError, OperationalError)) and _is_missing_work_zones_table(exc):
+        raise HTTPException(status_code=503, detail=_MIGRATION_HINT) from exc
 
 
 class WorkZoneOut(BaseModel):
@@ -59,17 +77,22 @@ async def list_work_zones(
     db: Session = Depends(get_db),
     _user=Depends(require_any_permission(["orders:read", "receiving:write", "admin:access"])),
 ):
-    query = db.query(WorkZoneModel)
-    if search:
-        term = f"%{search.strip()}%"
-        query = query.filter(
-            or_(
-                WorkZoneModel.room_id.ilike(term),
-                WorkZoneModel.name.ilike(term),
+    try:
+        query = db.query(WorkZoneModel)
+        if search:
+            term = f"%{search.strip()}%"
+            query = query.filter(
+                or_(
+                    WorkZoneModel.room_id.ilike(term),
+                    WorkZoneModel.name.ilike(term),
+                )
             )
-        )
-    items = query.order_by(WorkZoneModel.room_id.asc()).offset(offset).limit(limit).all()
-    return [_to_out(i) for i in items]
+        items = query.order_by(WorkZoneModel.room_id.asc()).offset(offset).limit(limit).all()
+        return [_to_out(i) for i in items]
+    except (ProgrammingError, OperationalError) as exc:
+        db.rollback()
+        _raise_if_schema_error(exc)
+        raise
 
 
 @router.post("", response_model=WorkZoneOut, status_code=status.HTTP_201_CREATED)
@@ -81,26 +104,34 @@ async def create_work_zone(
     user=Depends(require_permission("orders:read")),
 ):
     rid = payload.room_id.strip()
-    existing = db.query(WorkZoneModel).filter(WorkZoneModel.room_id == rid).one_or_none()
-    if existing:
-        raise HTTPException(status_code=409, detail="Work zone with this room_id already exists")
-    item = WorkZoneModel(
-        room_id=rid,
-        name=payload.name.strip() if payload.name else None,
-    )
-    db.add(item)
-    log_action(
-        db,
-        user_id=user.id,
-        action=ACTION_CREATE,
-        entity_type="work_zone",
-        entity_id=str(item.id),
-        new_data={"room_id": item.room_id, "name": item.name},
-        ip_address=get_client_ip(request),
-    )
-    db.commit()
-    db.refresh(item)
-    return _to_out(item)
+    try:
+        existing = db.query(WorkZoneModel).filter(WorkZoneModel.room_id == rid).one_or_none()
+        if existing:
+            raise HTTPException(status_code=409, detail="Work zone with this room_id already exists")
+        item = WorkZoneModel(
+            room_id=rid,
+            name=payload.name.strip() if payload.name else None,
+        )
+        db.add(item)
+        db.flush()
+        log_action(
+            db,
+            user_id=user.id,
+            action=ACTION_CREATE,
+            entity_type="work_zone",
+            entity_id=str(item.id),
+            new_data={"room_id": item.room_id, "name": item.name},
+            ip_address=get_client_ip(request),
+        )
+        db.commit()
+        db.refresh(item)
+        return _to_out(item)
+    except HTTPException:
+        raise
+    except (ProgrammingError, OperationalError) as exc:
+        db.rollback()
+        _raise_if_schema_error(exc)
+        raise
 
 
 @router.put("/{item_id}", response_model=WorkZoneOut)
@@ -111,36 +142,43 @@ async def update_work_zone(
     db: Session = Depends(get_db),
     user=Depends(require_permission("orders:read")),
 ):
-    item = db.query(WorkZoneModel).filter(WorkZoneModel.id == item_id).one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Work zone not found")
-    old_data = {"room_id": item.room_id, "name": item.name}
-    if payload.room_id is not None:
-        rid = payload.room_id.strip()
-        if rid != item.room_id:
-            conflict = (
-                db.query(WorkZoneModel)
-                .filter(WorkZoneModel.room_id == rid, WorkZoneModel.id != item_id)
-                .one_or_none()
-            )
-            if conflict:
-                raise HTTPException(status_code=409, detail="Work zone with this room_id already exists")
-            item.room_id = rid
-    if payload.name is not None:
-        item.name = payload.name.strip() if payload.name else None
-    log_action(
-        db,
-        user_id=user.id,
-        action=ACTION_UPDATE,
-        entity_type="work_zone",
-        entity_id=str(item_id),
-        old_data=old_data,
-        new_data={"room_id": item.room_id, "name": item.name},
-        ip_address=get_client_ip(request),
-    )
-    db.commit()
-    db.refresh(item)
-    return _to_out(item)
+    try:
+        item = db.query(WorkZoneModel).filter(WorkZoneModel.id == item_id).one_or_none()
+        if not item:
+            raise HTTPException(status_code=404, detail="Work zone not found")
+        old_data = {"room_id": item.room_id, "name": item.name}
+        if payload.room_id is not None:
+            rid = payload.room_id.strip()
+            if rid != item.room_id:
+                conflict = (
+                    db.query(WorkZoneModel)
+                    .filter(WorkZoneModel.room_id == rid, WorkZoneModel.id != item_id)
+                    .one_or_none()
+                )
+                if conflict:
+                    raise HTTPException(status_code=409, detail="Work zone with this room_id already exists")
+                item.room_id = rid
+        if payload.name is not None:
+            item.name = payload.name.strip() if payload.name else None
+        log_action(
+            db,
+            user_id=user.id,
+            action=ACTION_UPDATE,
+            entity_type="work_zone",
+            entity_id=str(item_id),
+            old_data=old_data,
+            new_data={"room_id": item.room_id, "name": item.name},
+            ip_address=get_client_ip(request),
+        )
+        db.commit()
+        db.refresh(item)
+        return _to_out(item)
+    except HTTPException:
+        raise
+    except (ProgrammingError, OperationalError) as exc:
+        db.rollback()
+        _raise_if_schema_error(exc)
+        raise
 
 
 @router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -150,17 +188,24 @@ async def delete_work_zone(
     db: Session = Depends(get_db),
     user=Depends(require_permission("orders:read")),
 ):
-    item = db.query(WorkZoneModel).filter(WorkZoneModel.id == item_id).one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Work zone not found")
-    log_action(
-        db,
-        user_id=user.id,
-        action=ACTION_DELETE,
-        entity_type="work_zone",
-        entity_id=str(item_id),
-        old_data={"room_id": item.room_id, "name": item.name},
-        ip_address=get_client_ip(request),
-    )
-    db.delete(item)
-    db.commit()
+    try:
+        item = db.query(WorkZoneModel).filter(WorkZoneModel.id == item_id).one_or_none()
+        if not item:
+            raise HTTPException(status_code=404, detail="Work zone not found")
+        log_action(
+            db,
+            user_id=user.id,
+            action=ACTION_DELETE,
+            entity_type="work_zone",
+            entity_id=str(item_id),
+            old_data={"room_id": item.room_id, "name": item.name},
+            ip_address=get_client_ip(request),
+        )
+        db.delete(item)
+        db.commit()
+    except HTTPException:
+        raise
+    except (ProgrammingError, OperationalError) as exc:
+        db.rollback()
+        _raise_if_schema_error(exc)
+        raise

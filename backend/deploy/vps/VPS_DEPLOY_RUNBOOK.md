@@ -109,6 +109,23 @@ Loyiha endpointlari **prefixsiz**:
 
 ---
 
+## Work zone — PWA «Saqlab bo'lmadi» / CORS + 500
+
+**Belgilar:** brauzerda CORS xatosi + `POST /api/v1/work-zones` → 500.
+
+**Asosiy sabab:** `work_zones` jadvali yo'q (migratsiya ishlamagan).
+
+**Tekshirish:**
+
+```bash
+curl -s https://api.fbwarehouse.uz/health/db
+# work_zones: false bo'lsa — migratsiya kerak
+```
+
+**Tuzatish:** yuqoridagi `sync-api-env-from-dotenv.sh` + `alembic upgrade head`, keyin `systemctl restart wms-api`.
+
+---
+
 ## Work zone funksiyasi
 
 Migratsiya `20260521_0074` (`work_zones` jadvali) muvaffaqiyatdan keyin:
