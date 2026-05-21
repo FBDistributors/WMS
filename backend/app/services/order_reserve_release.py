@@ -26,12 +26,11 @@ def release_document_reserve_on_cancel(
     """
     Har qator uchun rem = required_qty - picked_qty bo'yicha unallocate (-) yozadi.
     Controller complete dagi terilmagan qism yechish bilan bir xil formula.
+    skip_reason qatorlarida picked_qty=0 — to'liq required_qty rezervdan yechiladi.
     """
     released_lines = 0
     for line in lines:
         if _line_is_vip_expiry_informational(line):
-            continue
-        if getattr(line, "skip_reason", None):
             continue
         if not line.product_id or not line.lot_id or not line.location_id:
             continue
