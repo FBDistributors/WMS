@@ -34,7 +34,6 @@ const MENU_ITEMS: Array<MenuItem & { key: string }> = [
   { key: 'brands', label: 'Brands', path: '/admin/brands', icon: Tag, required: 'brands:manage' },
   { key: 'orders', label: 'Orders', path: '/admin/orders', icon: ClipboardList, required: 'orders:read' },
   { key: 'returns_history', label: 'Qaytganlar', path: '/admin/returns-history', icon: Undo2, required: 'orders:read' },
-  { key: 'settings', label: 'Sozlamalar', path: '/admin/settings', icon: Settings, required: 'orders:read' },
   { key: 'locations', label: 'Locations', path: '/admin/locations', icon: MapPin, required: 'locations:manage' },
   { key: 'inventory', label: 'Qoldiq', path: '/admin/inventory', icon: Boxes, required: 'inventory:read' },
   { key: 'movement', label: 'Movement', path: '/admin/movement', icon: ArrowLeftRight, required: 'inventory:adjust' },
@@ -42,6 +41,7 @@ const MENU_ITEMS: Array<MenuItem & { key: string }> = [
   { key: 'users', label: 'Users & Access', path: '/admin/users', icon: Users, required: 'users:manage' },
   { key: 'audit', label: 'Audit Logs', path: '/admin/audit', icon: History, required: 'audit:read' },
   { key: 'kamomat', label: 'Inventarizatsiya', path: '/admin/kamomat', icon: ClipboardCheck, required: 'movements:read' },
+  { key: 'settings', label: 'Sozlamalar', path: '/admin/settings', icon: Settings, required: 'orders:read' },
 ]
 
 type SidebarProps = {
