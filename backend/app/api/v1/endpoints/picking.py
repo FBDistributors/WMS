@@ -29,6 +29,7 @@ from app.models.safe_cancel_return import SafeCancelReturnSession as SafeCancelR
 from app.models.user_fcm_token import UserFCMToken
 from app.models.stock import StockLot as StockLotModel
 from app.api.v1.endpoints.picker_inventory import _get_lot_level_balances, _location_ids_for_warehouse
+from app.services.order_reserve_release import release_document_reserve_on_cancel
 from app.services.stock_availability import require_sufficient_reserved
 from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_ip, log_action
 from app.services.safe_cancel_return_service import (
@@ -256,41 +257,7 @@ def _release_unpicked_reserve_on_controller_complete(
     Controller hujjatni completed qilganda: terilmagan qism uchun rezervni yechish.
     Har terishda pick+unallocate bo'lgani kabi, bu yerda faqat unallocate (ombor joyida qoldiq qoladi).
     """
-    released_lines = 0
-    for line in lines:
-        if _line_is_vip_expiry_informational(line):
-            continue
-        if getattr(line, "skip_reason", None):
-            continue
-        if not line.product_id or not line.lot_id or not line.location_id:
-            continue
-        req = Decimal(str(line.required_qty or 0))
-        picked = Decimal(str(line.picked_qty or 0))
-        rem = req - picked
-        if rem <= 0:
-            continue
-        require_sufficient_reserved(
-            db,
-            line.product_id,
-            line.lot_id,
-            line.location_id,
-            rem,
-            lock=True,
-        )
-        db.add(
-            StockMovementModel(
-                product_id=line.product_id,
-                lot_id=line.lot_id,
-                location_id=line.location_id,
-                qty_change=-rem,
-                movement_type="unallocate",
-                source_document_type="document",
-                source_document_id=document.id,
-                created_by_user_id=user_id,
-            )
-        )
-        released_lines += 1
-    return released_lines
+    return release_document_reserve_on_cancel(db, document, lines, user_id)
 
 
 class ReturnScanBody(BaseModel):

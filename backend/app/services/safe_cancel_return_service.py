@@ -20,6 +20,7 @@ from app.models.order import OrderWmsState as OrderWmsStateModel
 from app.models.product import ProductBarcode
 from app.models.safe_cancel_return import SafeCancelReturnLine, SafeCancelReturnSession
 from app.models.stock import StockMovement as StockMovementModel
+from app.services.order_reserve_release import release_document_reserve_on_cancel
 from app.services.order_transition_policy import require_transition_rule
 
 
@@ -350,6 +351,8 @@ def finish_safe_cancel_return(db: Session, *, session_id: UUID, picker_user_id: 
             )
         )
         dline.picked_qty = 0.0
+
+    release_document_reserve_on_cancel(db, document, document.lines, picker_user_id)
 
     require_transition_rule(order.wms_state.status, "cancelled")
     session.status = "completed"

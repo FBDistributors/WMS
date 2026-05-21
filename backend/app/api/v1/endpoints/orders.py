@@ -67,6 +67,7 @@ from app.constants.order_wms_status import (
     normalize_list_status_filter_token,
     normalize_order_wms_status_for_storage,
 )
+from app.services.order_reserve_release import release_document_reserve_on_cancel
 from app.services.order_transition_policy import get_transition_rule
 
 router = APIRouter()
@@ -1256,7 +1257,7 @@ async def update_order_status(
                 .one()
             )
             return _to_order_details(order, db)
-        _enforce_transition_or_reject(
+        cancel_rule = _enforce_transition_or_reject(
             request=request,
             db=db,
             user_id=user.id,
@@ -1264,6 +1265,11 @@ async def update_order_status(
             from_status=old_status,
             to_status="cancelled",
         )
+        released_reserve_lines = 0
+        if doc_so and cancel_rule.reserve_action == "unallocate":
+            released_reserve_lines = release_document_reserve_on_cancel(
+                db, doc_so, doc_so.lines, user.id
+            )
         order.wms_state.status = "cancelled"
         if doc_so and doc_so.status != "cancelled":
             doc_so.status = "cancelled"
@@ -1274,7 +1280,11 @@ async def update_order_status(
             entity_type="order",
             entity_id=str(order_id),
             old_data={"status": old_status},
-            new_data={"status": "cancelled", "note": "direct_cancel_no_picked_qty"},
+            new_data={
+                "status": "cancelled",
+                "note": "direct_cancel_no_picked_qty",
+                "released_reserve_lines": released_reserve_lines,
+            },
             ip_address=get_client_ip(request),
         )
         db.commit()
