@@ -92,20 +92,30 @@ elif command -v alembic >/dev/null 2>&1; then
   ALEMBIC_CMD="alembic"
 fi
 
+read_dotenv_key_safe() {
+  local dotenv="$1" key="$2"
+  local line raw
+  [[ -f "$dotenv" ]] || return 1
+  line=$(grep -E "^[[:space:]]*(export[[:space:]]+)?${key}=" "$dotenv" 2>/dev/null | tail -1) || return 1
+  raw="${line#*=}"
+  raw="${raw#"${raw%%[![:space:]]*}"}"
+  raw="${raw%"${raw##*[![:space:]]}"}"
+  printf '%s' "$raw"
+}
+
 load_deploy_env() {
   if [[ -f /etc/wms/api.env ]]; then
     set -a
+    set +u
     # shellcheck source=/dev/null
     source /etc/wms/api.env
     set +a
     echo "env: /etc/wms/api.env yuklandi"
   fi
   if [[ -z "${DATABASE_URL:-}" && -f "$BACKEND_DIR/.env" ]]; then
-    set -a
-    # shellcheck source=/dev/null
-    source "$BACKEND_DIR/.env"
-    set +a
-    echo "env: DATABASE_URL yo'q edi — $BACKEND_DIR/.env ham yuklandi"
+    DATABASE_URL="$(read_dotenv_key_safe "$BACKEND_DIR/.env" DATABASE_URL || true)"
+    export DATABASE_URL
+    echo "env: DATABASE_URL $BACKEND_DIR/.env dan o'qildi (source emas)"
   fi
   if [[ -z "${DATABASE_URL:-}" ]]; then
     echo "env: DATABASE_URL topilmadi (api.env va .env)"

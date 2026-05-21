@@ -44,8 +44,10 @@ sudo cp /etc/wms/api.env /etc/wms/api.env.bak.$(date +%Y%m%d) 2>/dev/null || tru
 
 ```bash
 cd /var/www/wms/backend
-bash deploy/vps/sync-api-env-from-dotenv.sh
+sudo bash deploy/vps/sync-api-env-from-dotenv.sh
 ```
+
+Agar `export: unbound variable` chiqsa — eski skript `.env` ni `source` qilgan; `git pull` qilib yangi skriptni ishlating (faqat `KEY=value` o‘qiydi).
 
 yoki qo‘lda: `/etc/wms/api.env` ichiga `backend/.env` dagi kamida quyidagilar:
 

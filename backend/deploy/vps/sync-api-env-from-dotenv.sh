@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # backend/.env dagi kalitlarni /etc/wms/api.env ga yozadi (systemd + alembic + worker uchun).
+# .env ni "source" qilmaydi — faqat KEY=value qatorlarini o'qiydi (export/unbound xatolardan qochish).
+#
 # Ishlatish (root):
 #   cd /var/www/wms/backend
 #   sudo bash deploy/vps/sync-api-env-from-dotenv.sh
-#
-# Mavjud /etc/wms/api.env zaxiralanadi. Faqat ro'yxatdagi kalitlar yangilanadi.
 
-set -euo pipefail
+set -eo pipefail
 
 BACKEND_DIR="${WMS_BACKEND_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 DOTENV="$BACKEND_DIR/.env"
@@ -32,6 +32,22 @@ KEYS=(
   SYNC_INTERVAL_SECONDS
 )
 
+# .env dan bitta kalit qiymati (birinchi mos qator, oxirgi ustunlik)
+read_dotenv_key() {
+  local key="$1"
+  local line raw
+  line=$(grep -E "^[[:space:]]*(export[[:space:]]+)?${key}=" "$DOTENV" 2>/dev/null | tail -1) || return 1
+  raw="${line#*=}"
+  raw="${raw#"${raw%%[![:space:]]*}"}"
+  raw="${raw%"${raw##*[![:space:]]}"}"
+  if [[ "$raw" == \"*\" && "$raw" == *\" ]]; then
+    raw="${raw:1:${#raw}-2}"
+  elif [[ "$raw" == \'*\' && "$raw" == *\' ]]; then
+    raw="${raw:1:${#raw}-2}"
+  fi
+  printf '%s' "$raw"
+}
+
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Root bilan ishga tushiring: sudo bash $0" >&2
   exit 1
@@ -48,30 +64,27 @@ if [[ -f "$API_ENV" ]]; then
   echo "Zaxira: ${API_ENV}.bak.*"
 fi
 
-# shellcheck disable=SC1090
-set -a
-source "$DOTENV"
-set +a
-
-if [[ -z "${DATABASE_URL:-}" ]]; then
-  echo "DATABASE_URL .env da yo'q — to'xtatildi." >&2
+db_url="$(read_dotenv_key DATABASE_URL || true)"
+if [[ -z "$db_url" ]]; then
+  echo "DATABASE_URL .env da topilmadi — to'xtatildi." >&2
   exit 1
 fi
 
 touch "$API_ENV"
 chmod 600 "$API_ENV"
 
+written=0
 for key in "${KEYS[@]}"; do
-  val="${!key:-}"
+  val="$(read_dotenv_key "$key" || true)"
   [[ -n "$val" ]] || continue
-  # Mavjud qatorni o'chirish, oxiriga yangi qo'shish
   if grep -q "^[[:space:]]*${key}=" "$API_ENV" 2>/dev/null; then
     sed -i "/^[[:space:]]*${key}=/d" "$API_ENV"
   fi
   printf '%s=%s\n' "$key" "$val" >>"$API_ENV"
+  written=$((written + 1))
 done
 
-echo "Yozildi: $API_ENV (kalitlar: ${#KEYS[@]} ro'yxatdan mavjudlari)"
+echo "Yozildi: $API_ENV ($written ta kalit, jumladan DATABASE_URL)"
 echo "Keyin:"
 echo "  cd $BACKEND_DIR && set -a && source $API_ENV && set +a && .venv/bin/alembic upgrade head"
 echo "  sudo systemctl restart wms-api wms-smartup-worker"
