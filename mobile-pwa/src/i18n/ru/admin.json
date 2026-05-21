@@ -7,6 +7,7 @@
     "returns_history": "Возвраты",
     "vip_customers": "VIP клиенты",
     "work_zones": "Work zone",
+    "settings": "Настройки",
     "orders_diller": "Межорганизационное движение",
     "orders_orikzor": "Движения O'rikzor",
     "locations": "Локации",
@@ -68,6 +69,13 @@
     "move_entire_location_success": "Перемещено {{count}} позиций",
     "move_entire_location_error": "Ошибка перемещения",
     "move_entire_location_empty": "В этой локации нет товаров для перемещения"
+  },
+  "settings_hub": {
+    "title": "Настройки",
+    "tabs": {
+      "vip_customers": "VIP клиенты",
+      "work_zones": "Work zone"
+    }
   },
   "settings": {
     "title": "Настройки",

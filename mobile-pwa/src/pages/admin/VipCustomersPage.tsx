@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from 'react'
 import { Loader2, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -51,7 +51,12 @@ function formatVipBrandExpirySummary(v: VipCustomer, monthsLabel: string): strin
   return `${mn}–${mx} ${monthsLabel}`
 }
 
-export function VipCustomersPage() {
+export type VipCustomersSectionProps = {
+  embedded?: boolean
+  setHeaderAction?: (node: ReactNode | null) => void
+}
+
+export function VipCustomersSection({ embedded = false, setHeaderAction }: VipCustomersSectionProps) {
   const { t } = useTranslation(['vipCustomers', 'admin', 'common'])
   const { has } = useAuth()
   const canManage = has('orders:read')
@@ -147,25 +152,32 @@ export function VipCustomersPage() {
 
   const actionLabel = tab === 'vip' ? t('vipCustomers:add') : t('vipCustomers:add_general')
 
-  return (
-    <AdminLayout
-      title={t('vipCustomers:title')}
-      actionSlot={
-        canManage ? (
-          <Button
-            onClick={() =>
-              tab === 'vip'
-                ? setVipDialog({ open: true, mode: 'create' })
-                : setGeneralDialog({ open: true, mode: 'create' })
-            }
-            className="shrink-0"
-          >
-            <Plus size={16} />
-            <span className="hidden sm:inline">{actionLabel}</span>
-          </Button>
-        ) : null
-      }
-    >
+  const addButton = useMemo(
+    () =>
+      canManage ? (
+        <Button
+          onClick={() =>
+            tab === 'vip'
+              ? setVipDialog({ open: true, mode: 'create' })
+              : setGeneralDialog({ open: true, mode: 'create' })
+          }
+          className="shrink-0"
+        >
+          <Plus size={16} />
+          <span className="hidden sm:inline">{actionLabel}</span>
+        </Button>
+      ) : null,
+    [actionLabel, canManage, tab],
+  )
+
+  useEffect(() => {
+    if (!embedded || !setHeaderAction) return
+    setHeaderAction(addButton)
+    return () => setHeaderAction(null)
+  }, [embedded, setHeaderAction, addButton])
+
+  const body = (
+    <>
       <Card className="space-y-4">
         <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3 dark:border-slate-800">
           <Button type="button" variant={tab === 'vip' ? 'default' : 'secondary'} onClick={() => setTab('vip')}>
@@ -248,6 +260,16 @@ export function VipCustomersPage() {
         }}
         onCancel={() => setConfirmDeleteId(null)}
       />
+    </>
+  )
+
+  if (embedded) {
+    return body
+  }
+
+  return (
+    <AdminLayout title={t('vipCustomers:title')} actionSlot={addButton}>
+      {body}
     </AdminLayout>
   )
 }

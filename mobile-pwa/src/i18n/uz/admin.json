@@ -7,6 +7,7 @@
     "returns_history": "Qaytganlar",
     "vip_customers": "VIP mijozlar",
     "work_zones": "Work zone",
+    "settings": "Sozlamalar",
     "orders_diller": "Tashkiliy harakatlar",
     "orders_orikzor": "O'rikzor harakatlari",
     "locations": "Joylashuvlar",
@@ -68,6 +69,13 @@
     "move_entire_location_success": "{{count}} ta pozitsiya ko'chirildi",
     "move_entire_location_error": "Ko'chirishda xato",
     "move_entire_location_empty": "Bu joyda ko'chiriladigan mahsulot yo'q"
+  },
+  "settings_hub": {
+    "title": "Sozlamalar",
+    "tabs": {
+      "vip_customers": "VIP mijozlar",
+      "work_zones": "Work zone"
+    }
   },
   "settings": {
     "title": "Sozlamalar",

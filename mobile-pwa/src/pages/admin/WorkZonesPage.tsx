@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -20,7 +20,12 @@ import { useAuth } from '../../rbac/AuthProvider'
 
 type DialogState = { open: boolean; mode: 'create' | 'edit'; target?: WorkZone }
 
-export function WorkZonesPage() {
+export type WorkZonesSectionProps = {
+  embedded?: boolean
+  setHeaderAction?: (node: ReactNode | null) => void
+}
+
+export function WorkZonesSection({ embedded = false, setHeaderAction }: WorkZonesSectionProps) {
   const { t } = useTranslation(['workZones', 'common'])
   const { has } = useAuth()
   const canManage = has('orders:read')
@@ -73,18 +78,25 @@ export function WorkZonesPage() {
     }
   }
 
-  return (
-    <AdminLayout
-      title={t('workZones:title')}
-      actionSlot={
-        canManage ? (
-          <Button onClick={() => setDialog({ open: true, mode: 'create' })} className="shrink-0">
-            <Plus size={16} />
-            <span className="hidden sm:inline">{t('workZones:add')}</span>
-          </Button>
-        ) : null
-      }
-    >
+  const addButton = useMemo(
+    () =>
+      canManage ? (
+        <Button onClick={() => setDialog({ open: true, mode: 'create' })} className="shrink-0">
+          <Plus size={16} />
+          <span className="hidden sm:inline">{t('workZones:add')}</span>
+        </Button>
+      ) : null,
+    [canManage, t],
+  )
+
+  useEffect(() => {
+    if (!embedded || !setHeaderAction) return
+    setHeaderAction(addButton)
+    return () => setHeaderAction(null)
+  }, [embedded, setHeaderAction, addButton])
+
+  const body = (
+    <>
       <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">{t('workZones:subtitle')}</p>
 
       <Card className="relative space-y-4 p-4">
@@ -177,6 +189,16 @@ export function WorkZonesPage() {
         onCancel={() => setConfirmDelete(null)}
         onConfirm={handleDelete}
       />
+    </>
+  )
+
+  if (embedded) {
+    return body
+  }
+
+  return (
+    <AdminLayout title={t('workZones:title')} actionSlot={addButton}>
+      {body}
     </AdminLayout>
   )
 }

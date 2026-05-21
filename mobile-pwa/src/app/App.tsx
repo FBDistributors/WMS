@@ -11,8 +11,7 @@ import { ProfilePage } from '../pages/admin/ProfilePage'
 import { ProductDetailsPage } from '../pages/admin/ProductDetailsPage'
 import { ProductsPage } from '../pages/admin/ProductsPage'
 import { BrandsPage } from '../pages/admin/BrandsPage'
-import { VipCustomersPage } from '../pages/admin/VipCustomersPage'
-import { WorkZonesPage } from '../pages/admin/WorkZonesPage'
+import { AdminSettingsPage } from '../pages/admin/AdminSettingsPage'
 import { OrdersPage } from '../pages/admin/OrdersPage'
 import { OrikzorHarakatlariPage } from '../pages/admin/OrikzorHarakatlariPage'
 import { MovementDetailsPage } from '../pages/admin/MovementDetailsPage'
@@ -383,24 +382,22 @@ export function App() {
           }
         />
         <Route
-          path="/admin/vip-customers"
+          path="/admin/settings"
           element={
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">
               <RequirePermission permission="orders:read">
-                <VipCustomersPage />
+                <AdminSettingsPage />
               </RequirePermission>
             </RequirePermission>
           }
         />
         <Route
+          path="/admin/vip-customers"
+          element={<Navigate to="/admin/settings?tab=vip-customers" replace />}
+        />
+        <Route
           path="/admin/work-zones"
-          element={
-            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
-              <RequirePermission permission="orders:read">
-                <WorkZonesPage />
-              </RequirePermission>
-            </RequirePermission>
-          }
+          element={<Navigate to="/admin/settings?tab=work-zones" replace />}
         />
         <Route
           path="/admin/picking"

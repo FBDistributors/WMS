@@ -7,6 +7,7 @@
     "returns_history": "Returns",
     "vip_customers": "VIP customers",
     "work_zones": "Work zone",
+    "settings": "Settings",
     "orders_diller": "Cross-organizational movement",
     "orders_orikzor": "O'rikzor movements",
     "locations": "Locations",
@@ -68,6 +69,13 @@
     "move_entire_location_success": "{{count}} item(s) moved",
     "move_entire_location_error": "Move failed",
     "move_entire_location_empty": "No products to move at this location"
+  },
+  "settings_hub": {
+    "title": "Settings",
+    "tabs": {
+      "vip_customers": "VIP customers",
+      "work_zones": "Work zone"
+    }
   },
   "settings": {
     "title": "Settings",

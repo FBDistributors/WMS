@@ -4,8 +4,7 @@ import {
   Package,
   Boxes,
   ClipboardList,
-  Crown,
-  Layers,
+  Settings,
   Users,
   UserCircle2,
   Inbox,
@@ -35,8 +34,7 @@ const MENU_ITEMS: Array<MenuItem & { key: string }> = [
   { key: 'brands', label: 'Brands', path: '/admin/brands', icon: Tag, required: 'brands:manage' },
   { key: 'orders', label: 'Orders', path: '/admin/orders', icon: ClipboardList, required: 'orders:read' },
   { key: 'returns_history', label: 'Qaytganlar', path: '/admin/returns-history', icon: Undo2, required: 'orders:read' },
-  { key: 'vip_customers', label: 'VIP mijozlar', path: '/admin/vip-customers', icon: Crown, required: 'orders:read' },
-  { key: 'work_zones', label: 'Work zone', path: '/admin/work-zones', icon: Layers, required: 'orders:read' },
+  { key: 'settings', label: 'Sozlamalar', path: '/admin/settings', icon: Settings, required: 'orders:read' },
   { key: 'locations', label: 'Locations', path: '/admin/locations', icon: MapPin, required: 'locations:manage' },
   { key: 'inventory', label: 'Qoldiq', path: '/admin/inventory', icon: Boxes, required: 'inventory:read' },
   { key: 'movement', label: 'Movement', path: '/admin/movement', icon: ArrowLeftRight, required: 'inventory:adjust' },
@@ -114,7 +112,12 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
                   location.pathname.startsWith('/admin/orders-orikzor') ||
                   location.pathname.startsWith('/admin/orders/') ||
                   location.pathname.startsWith('/admin/picking')
-                : location.pathname === path || (path !== '/admin' && location.pathname.startsWith(path))
+                : path === '/admin/settings'
+                  ? location.pathname === '/admin/settings' ||
+                    location.pathname.startsWith('/admin/settings') ||
+                    location.pathname === '/admin/vip-customers' ||
+                    location.pathname === '/admin/work-zones'
+                  : location.pathname === path || (path !== '/admin' && location.pathname.startsWith(path))
             const content = (
               <Link
                 key={path}
