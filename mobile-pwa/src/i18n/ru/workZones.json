@@ -1,0 +1,28 @@
+{
+  "title": "Work zone",
+  "subtitle": "Заказы с этими room_id не импортируются при основной синхронизации SmartUp.",
+  "add": "Добавить work zone",
+  "edit": "Изменить",
+  "confirm_delete_title": "Удаление",
+  "confirm_delete": "Удалить «{{name}}» (room_id: {{roomId}})?",
+  "confirm_yes": "Да, удалить",
+  "save": "Сохранить",
+  "saving": "Сохранение...",
+  "load_failed": "Не удалось загрузить work zone.",
+  "save_failed": "Не удалось сохранить.",
+  "empty": "Work zone не найдены",
+  "empty_desc": "Добавьте room_id, чтобы исключить заказы из основного импорта SmartUp.",
+  "search": "Поиск",
+  "validation": {
+    "room_id_required": "Room id обязателен."
+  },
+  "fields": {
+    "room_id": "Room id (SmartUp)",
+    "name": "Название work zone"
+  },
+  "columns": {
+    "room_id": "Room id",
+    "name": "Название",
+    "actions": "Действия"
+  }
+}

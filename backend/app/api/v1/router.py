@@ -23,6 +23,7 @@ from app.api.v1.endpoints import (
     scanner,
     users,
     vip_customers,
+    work_zones,
 )
 
 router = APIRouter()
@@ -47,5 +48,6 @@ router.include_router(products.router, prefix="/products", tags=["products"])
 router.include_router(integrations.router, prefix="/integrations", tags=["integrations"])
 router.include_router(users.router, prefix="/users", tags=["users"])
 router.include_router(vip_customers.router, prefix="/vip-customers", tags=["vip-customers"])
+router.include_router(work_zones.router, prefix="/work-zones", tags=["work-zones"])
 router.include_router(scanner.router, prefix="/scanner", tags=["scanner"])
 router.include_router(waves.router, prefix="/waves", tags=["waves"])

@@ -73,6 +73,7 @@ class SmartupOrder(BaseModel):
     from_warehouse_code: Optional[str] = Field(default=None, alias="from_warehouse_code")
     to_warehouse_code: Optional[str] = Field(default=None, alias="to_warehouse_code")
     note: Optional[str] = Field(default=None, alias="note")
+    room_id: Optional[str] = Field(default=None, alias="room_id")
 
     @field_validator("deal_time", "delivery_date", "created_on", "modified_on", mode="before")
     @classmethod
@@ -190,6 +191,14 @@ class SmartupOrder(BaseModel):
                 if key in values and values.get(key) is not None:
                     values["total_amount"] = values.get(key)
                     break
+        if "room_id" not in values or values.get("room_id") in (None, ""):
+            for key in ("room_id", "room_code", "work_zone_id", "zone_id"):
+                if key in values and values.get(key) not in (None, ""):
+                    raw = values.get(key)
+                    values["room_id"] = str(raw).strip() if raw is not None else None
+                    break
+        elif values.get("room_id") is not None and not isinstance(values.get("room_id"), str):
+            values["room_id"] = str(values["room_id"]).strip() or None
         return values
 
     @property

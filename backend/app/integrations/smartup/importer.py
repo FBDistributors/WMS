@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-from typing import Dict, Iterable, List, Tuple
+from typing import Dict, FrozenSet, Iterable, List, Tuple
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
@@ -16,6 +16,7 @@ from app.integrations.smartup.mapper import OrderLinePayload, _resolve_external_
 from app.integrations.smartup.schemas import SmartupOrder
 from app.models.order import Order, OrderLine, OrderWmsState
 from app.models.product import Product as ProductModel
+from app.models.work_zone import WorkZone
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +86,12 @@ def _classify_import_error(exc: BaseException) -> str:
     return "db_error"
 
 
+def load_excluded_room_ids(db: Session) -> FrozenSet[str]:
+    """room_id values configured in work_zones (main SmartUp import exclusions)."""
+    rows = db.query(WorkZone.room_id).all()
+    return frozenset((str(r[0]).strip() for r in rows if r[0] and str(r[0]).strip()))
+
+
 def _process_one_order(
     db: Session,
     order: SmartupOrder,
@@ -93,8 +100,14 @@ def _process_one_order(
     skipped_by_reason: Dict[str, int],
     errors: List[ImportError],
     do_commit: bool,
+    excluded_room_ids: FrozenSet[str] | None = None,
 ) -> Tuple[int, int, int]:
     """Process a single order. Returns (created_inc, updated_inc, skipped_inc). On exception: rollback if do_commit, append to errors, return (0,0,1)."""
+    if excluded_room_ids:
+        rid = (order.room_id or "").strip()
+        if rid and rid in excluded_room_ids:
+            skipped_by_reason["work_zone_excluded"] = skipped_by_reason.get("work_zone_excluded", 0) + 1
+            return 0, 0, 1
     external_id = _resolve_external_id(order)
     if not (external_id or "").strip():
         skipped_by_reason["missing_key"] = skipped_by_reason.get("missing_key", 0) + 1
@@ -273,6 +286,7 @@ def import_orders(
     order_source: str | None = None,
     filial_id_override: str | None = None,
     batch_size: int = 50,
+    exclude_work_zones: bool = False,
 ) -> Tuple[int, int, int, List[ImportError], Dict[str, int]]:
     created = 0
     updated = 0
@@ -289,7 +303,11 @@ def import_orders(
         "duplicate_conflict": 0,
         "exception": 0,
         "completed_match_skipped": 0,
+        "work_zone_excluded": 0,
     }
+    excluded_room_ids: FrozenSet[str] | None = None
+    if exclude_work_zones:
+        excluded_room_ids = load_excluded_room_ids(db)
     override = (filial_id_override or "").strip() or None
     orders_list = list(orders)
     batch_size = max(1, min(batch_size, 200))
@@ -300,7 +318,14 @@ def import_orders(
         try:
             for order in chunk:
                 c, u, s = _process_one_order(
-                    db, order, override, order_source, skipped_by_reason, errors, do_commit=False
+                    db,
+                    order,
+                    override,
+                    order_source,
+                    skipped_by_reason,
+                    errors,
+                    do_commit=False,
+                    excluded_room_ids=excluded_room_ids,
                 )
                 batch_created += c
                 batch_updated += u
@@ -322,7 +347,14 @@ def import_orders(
             logger.warning("import_orders batch failed at start=%s, falling back to per-order: %s", start, exc)
             for order in chunk:
                 c, u, s = _process_one_order(
-                    db, order, override, order_source, skipped_by_reason, errors, do_commit=True
+                    db,
+                    order,
+                    override,
+                    order_source,
+                    skipped_by_reason,
+                    errors,
+                    do_commit=True,
+                    excluded_room_ids=excluded_room_ids,
                 )
                 created += c
                 updated += u

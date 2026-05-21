@@ -1,0 +1,28 @@
+{
+  "title": "Work zone",
+  "subtitle": "Orders with these room_id values are not imported on main SmartUp sync.",
+  "add": "Add work zone",
+  "edit": "Edit",
+  "confirm_delete_title": "Delete",
+  "confirm_delete": "Delete «{{name}}» (room_id: {{roomId}})?",
+  "confirm_yes": "Yes, delete",
+  "save": "Save",
+  "saving": "Saving...",
+  "load_failed": "Failed to load work zones.",
+  "save_failed": "Could not save.",
+  "empty": "No work zones",
+  "empty_desc": "Add a room_id to exclude orders from main SmartUp import.",
+  "search": "Search",
+  "validation": {
+    "room_id_required": "Room id is required."
+  },
+  "fields": {
+    "room_id": "Room id (SmartUp)",
+    "name": "Work zone name"
+  },
+  "columns": {
+    "room_id": "Room id",
+    "name": "Name",
+    "actions": "Actions"
+  }
+}

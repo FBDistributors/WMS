@@ -1395,7 +1395,11 @@ async def _sync_asosiy(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                 logger.info("sync-smartup: skipped non-B#W items=%s", filtered_out)
             items_to_import = items_b_w
             created, updated, skipped, import_errors, skipped_by_reason = import_orders(
-                db, items_to_import, order_source=payload.order_source, filial_id_override=filial_override
+                db,
+                items_to_import,
+                order_source=payload.order_source,
+                filial_id_override=filial_override,
+                exclude_work_zones=True,
             )
             delete_stale_orders(db, list(items_to_import))
             skipped += filtered_out

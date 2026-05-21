@@ -87,7 +87,7 @@ def sync_orders() -> Tuple[int, str | None, list]:
 
         db = SessionLocal()
         try:
-            created, updated, skipped, errors, _ = import_orders(db, items)
+            created, updated, skipped, errors, _ = import_orders(db, items, exclude_work_zones=True)
             stale_deleted = delete_stale_orders(db, items)
             count = created + updated
             if errors:

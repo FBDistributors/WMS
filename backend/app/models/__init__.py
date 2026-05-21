@@ -19,6 +19,7 @@ from app.models.user_fcm_token import UserFCMToken
 from app.models.user_session import UserSession
 from app.models.vip_customer import VipCustomer
 from app.models.vip_customer_brand_limit import VipCustomerBrandLimit
+from app.models.work_zone import WorkZone
 from app.models.wave import (
     SortingBin,
     SortingScan,
@@ -59,6 +60,7 @@ __all__ = [
     "UserSession",
     "VipCustomer",
     "VipCustomerBrandLimit",
+    "WorkZone",
     "Wave",
     "WaveOrder",
     "WaveLine",
