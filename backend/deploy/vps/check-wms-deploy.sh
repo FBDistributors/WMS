@@ -92,30 +92,34 @@ elif command -v alembic >/dev/null 2>&1; then
   ALEMBIC_CMD="alembic"
 fi
 
-run_alembic() {
-  if [[ -z "$ALEMBIC_CMD" ]]; then
-    echo "alembic: ishga tushirilmadi (venv yo'q)"
-    return 1
-  fi
+load_deploy_env() {
   if [[ -f /etc/wms/api.env ]]; then
     set -a
     # shellcheck source=/dev/null
     source /etc/wms/api.env
     set +a
     echo "env: /etc/wms/api.env yuklandi"
-  elif [[ -f "$BACKEND_DIR/.env" ]]; then
+  fi
+  if [[ -z "${DATABASE_URL:-}" && -f "$BACKEND_DIR/.env" ]]; then
     set -a
     # shellcheck source=/dev/null
     source "$BACKEND_DIR/.env"
     set +a
-    echo "env: $BACKEND_DIR/.env yuklandi"
-  else
-    echo "env: hech qanday fayl yuklanmadi — xato kutiladi"
+    echo "env: DATABASE_URL yo'q edi — $BACKEND_DIR/.env ham yuklandi"
   fi
   if [[ -z "${DATABASE_URL:-}" ]]; then
-    echo "DATABASE_URL: hali yo'q — alembic ishlamaydi"
+    echo "env: DATABASE_URL topilmadi (api.env va .env)"
     return 1
   fi
+  return 0
+}
+
+run_alembic() {
+  if [[ -z "$ALEMBIC_CMD" ]]; then
+    echo "alembic: ishga tushirilmadi (venv yo'q)"
+    return 1
+  fi
+  load_deploy_env || return 1
   echo "DATABASE_URL: $(mask_url "$DATABASE_URL")"
   echo "--- alembic current ---"
   $ALEMBIC_CMD current 2>&1 || true
@@ -137,7 +141,7 @@ else
 fi
 
 if [[ -n "$PY" ]]; then
-  if [[ -f /etc/wms/api.env ]]; then set -a; source /etc/wms/api.env; set +a; fi
+  load_deploy_env 2>/dev/null || true
   $PY <<'PYEOF' 2>&1
 import os
 import sys
@@ -170,12 +174,22 @@ else
 fi
 
 section "9. API health (localhost)"
-for port in 8000 10000; do
-  if command -v curl >/dev/null 2>&1; then
-    code=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:${port}/api/v1/health" 2>/dev/null || echo "000")
-    echo "GET :${port}/api/v1/health -> HTTP $code"
-  fi
-done
+if command -v curl >/dev/null 2>&1; then
+  for port in 8000 10000; do
+    code=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:${port}/health" 2>/dev/null || echo "000")
+    echo "GET :${port}/health -> HTTP $code"
+    code_db=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:${port}/health/db" 2>/dev/null || echo "000")
+    echo "GET :${port}/health/db -> HTTP $code_db"
+  done
+fi
+
+section "9b. Ogohlantirishlar"
+if [[ -f /etc/wms/api.env ]] && ! grep -q '^[[:space:]]*DATABASE_URL=' /etc/wms/api.env 2>/dev/null; then
+  echo "WARN: /etc/wms/api.env da DATABASE_URL yo'q — alembic/worker uchun: bash deploy/vps/sync-api-env-from-dotenv.sh"
+fi
+if systemctl is-active wms.service &>/dev/null && systemctl is-active wms-api.service &>/dev/null; then
+  echo "WARN: wms va wms-api ikkalasi ham active — bittasini disable qiling (tavsiya: faqat wms-api)"
+fi
 
 section "10. Oxirgi API log (10 qator)"
 for unit in wms-api wms; do
