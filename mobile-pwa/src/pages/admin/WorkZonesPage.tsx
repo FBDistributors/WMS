@@ -76,11 +76,11 @@ export function WorkZonesPage() {
   return (
     <AdminLayout
       title={t('workZones:title')}
-      action={
+      actionSlot={
         canManage ? (
-          <Button onClick={() => setDialog({ open: true, mode: 'create' })}>
-            <Plus size={16} className="mr-2" />
-            {t('workZones:add')}
+          <Button onClick={() => setDialog({ open: true, mode: 'create' })} className="shrink-0">
+            <Plus size={16} />
+            <span className="hidden sm:inline">{t('workZones:add')}</span>
           </Button>
         ) : null
       }
@@ -170,10 +170,12 @@ export function WorkZonesPage() {
           name: confirmDelete?.name?.trim() || confirmDelete?.room_id || '—',
           roomId: confirmDelete?.room_id ?? '',
         })}
-        onCancel={() => setConfirmDelete(null)}
-        onConfirm={() => void handleDelete()}
         confirmLabel={t('workZones:confirm_yes')}
-        isLoading={isDeleting}
+        cancelLabel={t('common:buttons.cancel')}
+        variant="danger"
+        loading={isDeleting}
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={handleDelete}
       />
     </AdminLayout>
   )
