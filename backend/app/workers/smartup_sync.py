@@ -12,7 +12,7 @@ from typing import Tuple
 
 from app.db import SessionLocal
 from app.integrations.smartup.client import SmartupClient
-from app.integrations.smartup.importer import delete_stale_orders, import_orders
+from app.integrations.smartup.importer import delete_stale_orders, import_orders, load_excluded_room_ids
 from app.integrations.smartup.inventory_client import SmartupInventoryExportClient
 from app.integrations.smartup.mfm_movement import (
     export_mfm_movements_for_sync,
@@ -87,8 +87,9 @@ def sync_orders() -> Tuple[int, str | None, list]:
 
         db = SessionLocal()
         try:
+            excluded_rooms = load_excluded_room_ids(db)
             created, updated, skipped, errors, _ = import_orders(db, items, exclude_work_zones=True)
-            stale_deleted = delete_stale_orders(db, items)
+            stale_deleted = delete_stale_orders(db, items, excluded_room_ids=excluded_rooms)
             count = created + updated
             if errors:
                 logger.warning("Orders sync: %d errors (first: %s)", len(errors), errors[0].reason)

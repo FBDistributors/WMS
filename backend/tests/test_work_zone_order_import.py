@@ -3,9 +3,9 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from app.integrations.smartup.importer import import_orders
+from app.integrations.smartup.importer import delete_stale_orders, import_orders
 from app.integrations.smartup.schemas import SmartupOrder
-from app.models.order import Order
+from app.models.order import Order, OrderWmsState
 from app.models.work_zone import WorkZone
 
 
@@ -68,6 +68,39 @@ def test_import_without_exclude_imports_room_id(db_session) -> None:
     assert (created, updated, skipped, len(errors)) == (1, 0, 0, 0)
     assert skipped_by_reason.get("work_zone_excluded", 0) == 0
     assert db_session.query(Order).filter(Order.source_external_id == "wz-allow").count() == 1
+
+
+def test_delete_stale_removes_existing_excluded_work_zone_order(db_session) -> None:
+    db_session.add(WorkZone(room_id="82462", name="Orikzor"))
+    db_session.commit()
+
+    ext = "246266891:3788131"
+    order = Order(
+        source="smartup",
+        source_external_id=ext,
+        order_number="95588",
+        customer_name="2 76 KIYIM",
+    )
+    order.wms_state = OrderWmsState(status="imported")
+    db_session.add(order)
+    db_session.commit()
+
+    smartup_row = SmartupOrder(
+        deal_id="246266891",
+        filial_id="3788131",
+        delivery_number="95588",
+        status="B#W",
+        room_id="82462",
+        customer_name="2 76 KIYIM",
+        lines=[{"sku": "SKU-1", "quantity": 1, "uom": "PCS"}],
+    )
+    deleted = delete_stale_orders(
+        db_session,
+        [smartup_row],
+        excluded_room_ids=frozenset({"82462"}),
+    )
+    assert deleted == 1
+    assert db_session.query(Order).filter(Order.source_external_id == ext).count() == 0
 
 
 def test_import_other_room_id_not_skipped(db_session) -> None:

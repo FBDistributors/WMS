@@ -32,7 +32,7 @@ from app.services.audit_service import ACTION_CREATE, ACTION_DELETE, ACTION_UPDA
 from app.services.push_notifications import send_push_to_user
 from app.services.safe_cancel_return_service import initiate_safe_cancel_return
 from app.integrations.smartup.client import SmartupClient
-from app.integrations.smartup.importer import delete_stale_orders, import_orders
+from app.integrations.smartup.importer import delete_stale_orders, import_orders, load_excluded_room_ids
 from app.integrations.smartup.mfm_movement import (
     DILLER_SYNC_MFM_EXPORT_STATUS,
     apply_mfm_export_date_policy,
@@ -1394,6 +1394,7 @@ async def _sync_asosiy(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
             if filtered_out:
                 logger.info("sync-smartup: skipped non-B#W items=%s", filtered_out)
             items_to_import = items_b_w
+            excluded_rooms = load_excluded_room_ids(db)
             created, updated, skipped, import_errors, skipped_by_reason = import_orders(
                 db,
                 items_to_import,
@@ -1401,7 +1402,7 @@ async def _sync_asosiy(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                 filial_id_override=filial_override,
                 exclude_work_zones=True,
             )
-            delete_stale_orders(db, list(items_to_import))
+            delete_stale_orders(db, list(items_to_import), excluded_room_ids=excluded_rooms)
             skipped += filtered_out
             return _build_sync_response(created, updated, skipped, import_errors, skipped_by_reason)
         except RuntimeError as exc:

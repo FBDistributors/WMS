@@ -244,21 +244,96 @@ def _process_one_order(
 STALE_ORDER_STATUSES = ("imported", "W")
 
 
+def _external_ids_to_keep_from_smartup(
+    orders_from_smartup: Iterable[SmartupOrder],
+    excluded_room_ids: FrozenSet[str] | None = None,
+) -> set[str]:
+    """Work zone chiqarilgan buyurtmalar keep ro'yxatiga kirmaydi."""
+    keep: set[str] = set()
+    for order in orders_from_smartup:
+        rid = (order.room_id or "").strip()
+        if excluded_room_ids and rid and rid in excluded_room_ids:
+            continue
+        ext = (_resolve_external_id(order) or "").strip()
+        if ext:
+            keep.add(ext)
+    return keep
+
+
+def _external_ids_excluded_work_zones(
+    orders_from_smartup: Iterable[SmartupOrder],
+    excluded_room_ids: FrozenSet[str] | None,
+) -> set[str]:
+    if not excluded_room_ids:
+        return set()
+    out: set[str] = set()
+    for order in orders_from_smartup:
+        rid = (order.room_id or "").strip()
+        if rid and rid in excluded_room_ids:
+            ext = (_resolve_external_id(order) or "").strip()
+            if ext:
+                out.add(ext)
+    return out
+
+
+def _delete_imported_orders_by_external_ids(
+    db: Session,
+    external_ids: set[str],
+    *,
+    order_source: str | None = None,
+) -> int:
+    if not external_ids:
+        return 0
+    filters = [
+        OrderWmsState.status.in_(STALE_ORDER_STATUSES),
+        Order.source_external_id.in_(external_ids),
+    ]
+    src = (order_source or "").strip()
+    if src:
+        filters.append(Order.source == src)
+    ids_to_delete = [
+        row[0]
+        for row in db.query(Order.id)
+        .join(OrderWmsState, Order.id == OrderWmsState.order_id)
+        .filter(*filters)
+        .all()
+    ]
+    if not ids_to_delete:
+        return 0
+    return db.query(Order).filter(Order.id.in_(ids_to_delete)).delete(synchronize_session=False)
+
+
 def delete_stale_orders(
     db: Session,
     orders_from_smartup: List[SmartupOrder],
     *,
     order_source: str | None = None,
+    excluded_room_ids: FrozenSet[str] | None = None,
 ) -> int:
     """
     SmartUp eksportida kelmagan va hali workflow da bo'lmagan (imported yoki W) buyurtmalarni o'chiradi.
     Picking, allocated, picked, completed va boshqa statusdagilar o'chirilmaydi.
     order_source berilsa — faqat shu manba (masalan diller) yozuvlari.
+    excluded_room_ids: work zone — import skip + yangi/yangi holatdagi yozuvlar sinxron da o'chiriladi.
     """
-    external_ids_to_keep = {_resolve_external_id(o) for o in orders_from_smartup}
-    if not external_ids_to_keep:
+    if not orders_from_smartup:
         logger.warning("delete_stale_orders: SmartUp javobi bo'sh, o'chirish o'tkazilmaydi")
         return 0
+
+    external_ids_to_keep = _external_ids_to_keep_from_smartup(orders_from_smartup, excluded_room_ids)
+    excluded_ext = _external_ids_excluded_work_zones(orders_from_smartup, excluded_room_ids)
+
+    deleted = 0
+    if excluded_ext:
+        n = _delete_imported_orders_by_external_ids(db, excluded_ext, order_source=order_source)
+        if n:
+            logger.info("delete_stale_orders: work_zone excluded %d ta buyurtma o'chirildi", n)
+        deleted += n
+
+    if not external_ids_to_keep:
+        db.commit()
+        return deleted
+
     filters = [
         OrderWmsState.status.in_(STALE_ORDER_STATUSES),
         Order.source_external_id.notin_(external_ids_to_keep),
@@ -266,17 +341,17 @@ def delete_stale_orders(
     src = (order_source or "").strip()
     if src:
         filters.append(Order.source == src)
-    subq = (
-        db.query(Order.id)
+    ids_to_delete = [
+        row[0]
+        for row in db.query(Order.id)
         .join(OrderWmsState, Order.id == OrderWmsState.order_id)
         .filter(*filters)
-    )
-    ids_to_delete = [row[0] for row in subq.all()]
-    if not ids_to_delete:
-        return 0
-    deleted = db.query(Order).filter(Order.id.in_(ids_to_delete)).delete(synchronize_session=False)
+        .all()
+    ]
+    if ids_to_delete:
+        deleted += db.query(Order).filter(Order.id.in_(ids_to_delete)).delete(synchronize_session=False)
+        logger.info("delete_stale_orders: %d ta eski buyurtma o'chirildi (imported/W)", len(ids_to_delete))
     db.commit()
-    logger.info("delete_stale_orders: %d ta eski buyurtma o'chirildi (imported/W)", deleted)
     return deleted
 
 
