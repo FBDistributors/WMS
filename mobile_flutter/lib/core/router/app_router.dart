@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/account/presentation/account_screen.dart';
+import '../../features/account/presentation/change_password_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/presentation/auth_providers.dart';
 import '../../features/inventory/presentation/inventory_barcode_resolve_extra.dart';
@@ -128,6 +129,14 @@ final goRouterProvider = Provider<GoRouter>((Ref ref) {
         path: '/account',
         name: 'account',
         builder: (BuildContext context, GoRouterState state) => const AccountScreen(),
+        routes: <RouteBase>[
+          GoRoute(
+            path: 'change-password',
+            name: 'changePassword',
+            builder: (BuildContext context, GoRouterState state) =>
+                const ChangePasswordScreen(),
+          ),
+        ],
       ),
       GoRoute(
         path: '/notifications',

@@ -38,6 +38,11 @@ class AccountScreen extends ConsumerWidget {
             subtitle: Text(_langLabel(loc)),
             onTap: () => _pickLang(context, ref),
           ),
+          ListTile(
+            leading: const Icon(Icons.lock_outline),
+            title: Text(StringLookup.t(loc, 'changePassword')),
+            onTap: () => context.pushNamed('changePassword'),
+          ),
           SwitchListTile(
             secondary: const Icon(Icons.dark_mode_outlined),
             title: Text(StringLookup.t(loc, 'theme_label')),

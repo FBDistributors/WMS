@@ -93,4 +93,14 @@ class AuthController extends AsyncNotifier<AuthSession> {
       return AuthSession.authenticated(me);
     });
   }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await ref.read(authRepositoryProvider).changePassword(
+          currentPassword: currentPassword,
+          newPassword: newPassword,
+        );
+  }
 }
