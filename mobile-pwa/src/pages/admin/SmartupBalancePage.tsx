@@ -104,9 +104,28 @@ export function SmartupBalanceView({ warehouseCode, filialId, customHeaderSlot }
         setIsLoading(false)
         return
       }
-      setData(null)
-      setCachedAt(null)
-      setIsLoading(false)
+      setIsLoading(true)
+      setError(null)
+      try {
+        const res = await getSmartupBalance({
+          warehouse_code: warehouseCode,
+          filial_id: filialId ?? undefined,
+        })
+        const rows = normalizeToRows(res)
+        if (rows.length === 0) {
+          setData(null)
+          setCachedAt(null)
+          return
+        }
+        setData(res)
+        setCachedAt(writeSmartupBalanceRawCache(warehouseCode, filialId, res))
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t('inventory:load_failed'))
+        setData(null)
+        setCachedAt(null)
+      } finally {
+        setIsLoading(false)
+      }
       return
     }
 

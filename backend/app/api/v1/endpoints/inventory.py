@@ -43,6 +43,10 @@ from app.models.stock import StockLot as StockLotModel
 from app.models.stock import StockMovement as StockMovementModel
 from app.models.user import User as UserModel
 from app.integrations.smartup import balance_export as smartup_balance_export
+from app.integrations.smartup.balance_disk_cache import (
+    read_balance_cache as read_smartup_balance_disk_cache,
+    write_balance_cache as write_smartup_balance_disk_cache,
+)
 from app.integrations.smartup.filial_list import FILIAL_LIST, get_filial_ids
 
 router = APIRouter()
@@ -3550,6 +3554,10 @@ async def get_smartup_balance(
     if not refresh:
         if cache_key in _smartup_balance_cache:
             return _smartup_balance_cache[cache_key]
+        disk_hit = read_smartup_balance_disk_cache(today_str, wh, fid_param)
+        if disk_hit is not None:
+            _smartup_balance_cache[cache_key] = disk_hit
+            return disk_hit
         return {"balance": []}
 
     try:
@@ -3575,6 +3583,7 @@ async def get_smartup_balance(
 
     if isinstance(result, dict):
         _smartup_balance_cache[cache_key] = result
+        write_smartup_balance_disk_cache(today_str, wh, fid_param, result)
     return result
 
 

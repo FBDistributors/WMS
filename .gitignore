@@ -22,6 +22,9 @@ dist/
 # Tauri / Rust
 mobile-pwa/src-tauri/target/
 
+# SmartUP balance API disk cache (server)
+backend/data/smartup_balance_cache/
+
 # SQLite (local / dev databases)
 test.db
 **/test.db

@@ -12,6 +12,9 @@ export type SmartupBalanceCacheEntry = {
 export type SmartupSummaryCachePayload = {
   q001: Record<string, number>
   q002: Record<string, number>
+  /** Shtrix kod bo'yicha (ixtiyoriy, eski keshda bo'lmasligi mumkin). */
+  q001_barcode?: Record<string, number>
+  q002_barcode?: Record<string, number>
   loaded_at: string
 }
 
@@ -104,6 +107,8 @@ export function writeSmartupBalanceRawCache(
 export function readSmartupSummaryCache(): {
   q001: Map<string, number>
   q002: Map<string, number>
+  q001Barcode: Map<string, number>
+  q002Barcode: Map<string, number>
   loadedAt: string
 } | null {
   const s = readStore().summary
@@ -111,6 +116,8 @@ export function readSmartupSummaryCache(): {
   return {
     q001: recordToMap(s.q001),
     q002: recordToMap(s.q002),
+    q001Barcode: recordToMap(s.q001_barcode),
+    q002Barcode: recordToMap(s.q002_barcode),
     loadedAt: s.loaded_at,
   }
 }
@@ -118,6 +125,8 @@ export function readSmartupSummaryCache(): {
 export function writeSmartupSummaryCache(
   q001: Map<string, number>,
   q002: Map<string, number>,
+  q001Barcode?: Map<string, number>,
+  q002Barcode?: Map<string, number>,
 ): string {
   const loadedAt = new Date().toISOString()
   const store = readStore()
@@ -126,6 +135,8 @@ export function writeSmartupSummaryCache(
     summary: {
       q001: mapToRecord(q001),
       q002: mapToRecord(q002),
+      q001_barcode: mapToRecord(q001Barcode ?? new Map()),
+      q002_barcode: mapToRecord(q002Barcode ?? new Map()),
       loaded_at: loadedAt,
     },
   })

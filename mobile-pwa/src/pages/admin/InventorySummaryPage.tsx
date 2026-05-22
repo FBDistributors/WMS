@@ -40,6 +40,11 @@ import {
   readSmartupSummaryCache,
   writeSmartupSummaryCache,
 } from '../../lib/smartupBalanceLocalCache'
+import {
+  buildSmartupSummaryMaps,
+  getSmartupTotalsForRow,
+  hasSmartupMapData,
+} from '../../lib/smartupBalanceMaps'
 
 const COLUMN_OPTIONS = [
   { id: 'code', labelKey: 'inventory:columns.code' },
@@ -66,46 +71,24 @@ function formatInt(value: unknown): string {
   return NUMBER_FORMATTER.format(Math.round(n))
 }
 
-/** SmartUP balance$export javobidan mahsulot kodi → jami miqdor map. */
-function buildSmartupQtyByProductCode(raw: unknown): Map<string, number> {
-  const result = new Map<string, number>()
-  if (!raw || typeof raw !== 'object') return result
-  const obj = raw as Record<string, unknown>
-  const listSources = ['balance', 'items', 'data', 'movement', 'export']
-  let rows: unknown[] = []
-  if (Array.isArray(raw)) {
-    rows = raw
-  } else {
-    for (const key of listSources) {
-      const val = obj[key]
-      if (Array.isArray(val)) {
-        rows = val
-        break
-      }
+function readInitialSmartupState() {
+  const cached = readSmartupSummaryCache()
+  if (!cached) {
+    return {
+      q001: new Map<string, number>(),
+      q002: new Map<string, number>(),
+      q001Barcode: new Map<string, number>(),
+      q002Barcode: new Map<string, number>(),
+      loadedAt: null as string | null,
     }
   }
-  for (const row of rows) {
-    if (!row || typeof row !== 'object') continue
-    const rec = row as Record<string, unknown>
-    const keys = Object.keys(rec)
-    const productKey =
-      keys.find((k) => k.toLowerCase() === 'product_code') ??
-      keys.find((k) => k.toLowerCase().includes('product') && k.toLowerCase().includes('code'))
-    const qtyKey =
-      keys.find((k) => k.toLowerCase() === 'quantity') ??
-      keys.find((k) => k.toLowerCase().startsWith('qty'))
-    if (!productKey || !qtyKey) continue
-    const codeRaw = rec[productKey]
-    const qtyRaw = rec[qtyKey]
-    if (codeRaw == null || qtyRaw == null) continue
-    const code = String(codeRaw).trim()
-    if (!code) continue
-    const qtyNum = Number(qtyRaw)
-    if (!Number.isFinite(qtyNum)) continue
-    const prev = result.get(code) ?? 0
-    result.set(code, prev + qtyNum)
+  return {
+    q001: cached.q001,
+    q002: cached.q002,
+    q001Barcode: cached.q001Barcode,
+    q002Barcode: cached.q002Barcode,
+    loadedAt: cached.loadedAt,
   }
-  return result
 }
 
 export function InventorySummaryPage() {
@@ -134,11 +117,14 @@ export function InventorySummaryPage() {
   const [brandFilterLoading, setBrandFilterLoading] = useState(false)
   const [selectedBrandIds, setSelectedBrandIds] = useState<string[]>([])
   const excelMenuRef = useRef<HTMLDivElement>(null)
-  const [smartupQoldiqByCode, setSmartupQoldiqByCode] = useState<Map<string, number>>(new Map())
-  const [smartupBronByCode, setSmartupBronByCode] = useState<Map<string, number>>(new Map())
+  const initialSmartup = useMemo(() => readInitialSmartupState(), [])
+  const [smartupQoldiqByCode, setSmartupQoldiqByCode] = useState(initialSmartup.q001)
+  const [smartupBronByCode, setSmartupBronByCode] = useState(initialSmartup.q002)
+  const [smartupQoldiqByBarcode, setSmartupQoldiqByBarcode] = useState(initialSmartup.q001Barcode)
+  const [smartupBronByBarcode, setSmartupBronByBarcode] = useState(initialSmartup.q002Barcode)
   const [isSmartupSyncing, setIsSmartupSyncing] = useState(false)
   const [smartupSyncError, setSmartupSyncError] = useState<string | null>(null)
-  const [smartupCachedAt, setSmartupCachedAt] = useState<string | null>(null)
+  const [smartupCachedAt, setSmartupCachedAt] = useState<string | null>(initialSmartup.loadedAt)
   const [exportSuccessAt, setExportSuccessAt] = useState<number | null>(null)
   const [exportSavedPath, setExportSavedPath] = useState<string | null>(null)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
@@ -148,13 +134,22 @@ export function InventorySummaryPage() {
     return () => clearTimeout(timer)
   }, [search])
 
-  useEffect(() => {
-    const cached = readSmartupSummaryCache()
-    if (!cached) return
-    setSmartupQoldiqByCode(cached.q001)
-    setSmartupBronByCode(cached.q002)
-    setSmartupCachedAt(cached.loadedAt)
-  }, [])
+  const applySmartupMaps = useCallback(
+    (
+      q001: Map<string, number>,
+      q002: Map<string, number>,
+      q001Barcode: Map<string, number>,
+      q002Barcode: Map<string, number>,
+      loadedAt: string,
+    ) => {
+      setSmartupQoldiqByCode(q001)
+      setSmartupBronByCode(q002)
+      setSmartupQoldiqByBarcode(q001Barcode)
+      setSmartupBronByBarcode(q002Barcode)
+      setSmartupCachedAt(loadedAt)
+    },
+    [],
+  )
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -193,6 +188,7 @@ export function InventorySummaryPage() {
   const syncSmartupFromSource = useCallback(async () => {
     setIsSmartupSyncing(true)
     setSmartupSyncError(null)
+    const prev = readSmartupSummaryCache()
     const settled = await Promise.allSettled([
       getSmartupBalance({ warehouse_code: '001', refresh: true }),
       getSmartupBalance({ warehouse_code: '002', refresh: true }),
@@ -200,35 +196,92 @@ export function InventorySummaryPage() {
     const q001 = settled[0]
     const q002 = settled[1]
     const errs: string[] = []
-    let q001Map = new Map<string, number>()
-    let q002Map = new Map<string, number>()
+    let q001Map = prev?.q001 ?? new Map<string, number>()
+    let q002Map = prev?.q002 ?? new Map<string, number>()
+    let q001Bc = prev?.q001Barcode ?? new Map<string, number>()
+    let q002Bc = prev?.q002Barcode ?? new Map<string, number>()
     if (q001.status === 'fulfilled') {
-      q001Map = buildSmartupQtyByProductCode(q001.value)
-      setSmartupQoldiqByCode(q001Map)
+      const built = buildSmartupSummaryMaps(q001.value)
+      q001Map = built.byCode
+      q001Bc = built.byBarcode
     } else {
-      setSmartupQoldiqByCode(new Map())
       errs.push(
         q001.reason instanceof Error ? q001.reason.message : String(q001.reason ?? '')
       )
     }
     if (q002.status === 'fulfilled') {
-      q002Map = buildSmartupQtyByProductCode(q002.value)
-      setSmartupBronByCode(q002Map)
+      const built = buildSmartupSummaryMaps(q002.value)
+      q002Map = built.byCode
+      q002Bc = built.byBarcode
     } else {
-      setSmartupBronByCode(new Map())
       errs.push(
         q002.reason instanceof Error ? q002.reason.message : String(q002.reason ?? '')
       )
     }
-    if (errs.length === 0) {
-      const loadedAt = writeSmartupSummaryCache(q001Map, q002Map)
-      setSmartupCachedAt(loadedAt)
+    const hasData =
+      hasSmartupMapData(q001Map) ||
+      hasSmartupMapData(q002Map) ||
+      hasSmartupMapData(q001Bc) ||
+      hasSmartupMapData(q002Bc)
+    if (hasData) {
+      const loadedAt = writeSmartupSummaryCache(q001Map, q002Map, q001Bc, q002Bc)
+      applySmartupMaps(q001Map, q002Map, q001Bc, q002Bc, loadedAt)
     }
     if (errs.length > 0) {
       setSmartupSyncError(errs.filter(Boolean).join(' · ') || t('inventory:smartup_sync_failed'))
     }
     setIsSmartupSyncing(false)
-  }, [t])
+  }, [applySmartupMaps, t])
+
+  useEffect(() => {
+    if (
+      hasSmartupMapData(smartupQoldiqByCode) ||
+      hasSmartupMapData(smartupBronByCode) ||
+      hasSmartupMapData(smartupQoldiqByBarcode) ||
+      hasSmartupMapData(smartupBronByBarcode)
+    ) {
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      const settled = await Promise.allSettled([
+        getSmartupBalance({ warehouse_code: '001' }),
+        getSmartupBalance({ warehouse_code: '002' }),
+      ])
+      if (cancelled) return
+      let q001Map = new Map<string, number>()
+      let q002Map = new Map<string, number>()
+      let q001Bc = new Map<string, number>()
+      let q002Bc = new Map<string, number>()
+      if (settled[0].status === 'fulfilled') {
+        const built = buildSmartupSummaryMaps(settled[0].value)
+        q001Map = built.byCode
+        q001Bc = built.byBarcode
+      }
+      if (settled[1].status === 'fulfilled') {
+        const built = buildSmartupSummaryMaps(settled[1].value)
+        q002Map = built.byCode
+        q002Bc = built.byBarcode
+      }
+      const hasData =
+        hasSmartupMapData(q001Map) ||
+        hasSmartupMapData(q002Map) ||
+        hasSmartupMapData(q001Bc) ||
+        hasSmartupMapData(q002Bc)
+      if (!hasData) return
+      const loadedAt = writeSmartupSummaryCache(q001Map, q002Map, q001Bc, q002Bc)
+      applySmartupMaps(q001Map, q002Map, q001Bc, q002Bc, loadedAt)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [
+    applySmartupMaps,
+    smartupQoldiqByCode,
+    smartupBronByCode,
+    smartupQoldiqByBarcode,
+    smartupBronByBarcode,
+  ])
 
   const prevSearchRef = useRef(debouncedSearch)
   const prevOnlyRef = useRef(onlyAvailable)
@@ -350,9 +403,14 @@ export function InventorySummaryPage() {
           ]
           const rows = (res.items ?? []).map((row) => {
             const jami = Math.round(Number(row.total_qty))
-            const q001 = Number(smartupQoldiqByCode.get(row.product_code) ?? 0)
-            const q002 = Number(smartupBronByCode.get(row.product_code) ?? 0)
-            const smartupQoldiq = q001 + q002
+            const { total: smartupQoldiq } = getSmartupTotalsForRow(
+              smartupQoldiqByCode,
+              smartupQoldiqByBarcode,
+              smartupBronByCode,
+              smartupBronByBarcode,
+              row.product_code,
+              row.barcode,
+            )
             const farq = jami - smartupQoldiq
             return [
               row.product_code,
@@ -507,17 +565,27 @@ export function InventorySummaryPage() {
                         {columnId === 'total_qty' && formatInt(row.total_qty)}
                         {columnId === 'smartup_qoldiq' &&
                           (() => {
-                            const q001 = Number(smartupQoldiqByCode.get(row.product_code) ?? 0)
-                            const q002 = Number(smartupBronByCode.get(row.product_code) ?? 0)
-                            const sum = q001 + q002
-                            return q001 === 0 && q002 === 0 ? '—' : formatInt(sum)
+                            const { q001, q002, total } = getSmartupTotalsForRow(
+                              smartupQoldiqByCode,
+                              smartupQoldiqByBarcode,
+                              smartupBronByCode,
+                              smartupBronByBarcode,
+                              row.product_code,
+                              row.barcode,
+                            )
+                            return q001 === 0 && q002 === 0 ? '—' : formatInt(total)
                           })()}
                         {columnId === 'smartup_bron' &&
                           (() => {
                             const jami = Math.round(Number(row.total_qty))
-                            const q001 = Number(smartupQoldiqByCode.get(row.product_code) ?? 0)
-                            const q002 = Number(smartupBronByCode.get(row.product_code) ?? 0)
-                            const smartupQoldiq = q001 + q002
+                            const { total: smartupQoldiq } = getSmartupTotalsForRow(
+                              smartupQoldiqByCode,
+                              smartupQoldiqByBarcode,
+                              smartupBronByCode,
+                              smartupBronByBarcode,
+                              row.product_code,
+                              row.barcode,
+                            )
                             const farq = jami - smartupQoldiq
                             if (farq === 0) return 0
                             const formatted = formatInt(farq)
@@ -569,7 +637,9 @@ export function InventorySummaryPage() {
     load,
     navigate,
     smartupQoldiqByCode,
+    smartupQoldiqByBarcode,
     smartupBronByCode,
+    smartupBronByBarcode,
     t,
   ])
 
