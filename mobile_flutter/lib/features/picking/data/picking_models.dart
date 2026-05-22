@@ -585,9 +585,14 @@ class ConsolidatedViewResponse {
       };
 }
 
-/// React Native `consolidatedProductKey` bilan bir xil.
-String consolidatedProductKey(ConsolidatedProduct p) =>
-    '${p.productName}-${p.barcode ?? p.sku ?? ''}';
+/// React Native `consolidatedProductKey` bilan bir xil (product_id ustuvor).
+String consolidatedProductKey(ConsolidatedProduct p) {
+  final String? pid = p.productId?.trim();
+  if (pid != null && pid.isNotEmpty) {
+    return 'id:$pid';
+  }
+  return '${p.productName}-${p.barcode ?? p.sku ?? ''}';
+}
 
 /// Umumiy yig‘ish: shtrix yoki SKU bilan aniq moslik (trim, RN ConsolidatedPickContent).
 bool consolidatedScanMatchesProduct(String raw, ConsolidatedProduct p) {

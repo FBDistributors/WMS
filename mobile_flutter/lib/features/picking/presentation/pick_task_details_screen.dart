@@ -52,6 +52,32 @@ bool _pickingLineEffectivelyDone(PickingLine l) =>
 bool _lineGroupEffectivelyDone(_LineGroup g) =>
     g.members.every(_pickingLineEffectivelyDone);
 
+/// Yig‘ish uchun keyingi ochiq qator (bir nechta joy/lot bo‘lsa).
+PickingLine _activePickMember(_LineGroup g) {
+  for (final PickingLine l in g.members) {
+    if (!l.isVipExpiryInformational && l.qtyPicked < l.qtyRequired) {
+      return l;
+    }
+  }
+  return g.members.first;
+}
+
+String _groupLocationQtyLine(_LineGroup g) {
+  final List<PickingLine> physical = g.members
+      .where((PickingLine l) => !l.isVipExpiryInformational)
+      .toList();
+  if (physical.length <= 1) {
+    final PickingLine l = physical.isNotEmpty ? physical.first : g.members.first;
+    return '${l.locationCode} · ${formatPickQty(g.virtual.qtyPicked)}/${formatPickQty(g.virtual.qtyRequired)}';
+  }
+  return physical
+      .map(
+        (PickingLine l) =>
+            '${l.locationCode}: ${formatPickQty(l.qtyPicked)}/${formatPickQty(l.qtyRequired)}',
+      )
+      .join(' · ');
+}
+
 double _aggregateQtyPicked(Iterable<PickingLine> lines) {
   return lines.fold<double>(0, (double s, PickingLine l) => s + l.qtyPicked);
 }
@@ -489,10 +515,23 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       );
       return;
     }
+    final PickingLine resolvedLine = line;
     _topScan.clear();
+    final List<_LineGroup> groups = _groupLinesByProduct(doc.lines);
+    _LineGroup? group;
+    for (final _LineGroup g in groups) {
+      if (g.members.any((PickingLine m) => m.id == resolvedLine.id)) {
+        group = g;
+        break;
+      }
+    }
     await _openLineSheet(
       doc,
-      _LineGroup(virtual: line, members: <PickingLine>[line]),
+      group ??
+          _LineGroup(
+            virtual: resolvedLine,
+            members: <PickingLine>[resolvedLine],
+          ),
       PickerProfileParam.picker,
       presetScannedBarcode: normalized,
     );
@@ -868,9 +907,9 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
   }) async {
     final AppLocale loc = ref.read(appLocaleProvider);
     final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
-    final PickingLine stock = group.members.first;
+    final List<PickingLine> pickTargetHolder = <PickingLine>[_activePickMember(group)];
 
-    if (stock.isVipExpiryInformational) {
+    if (pickTargetHolder[0].isVipExpiryInformational) {
       await showModalBottomSheet<void>(
         context: context,
         builder: (BuildContext ctx) => Padding(
@@ -917,7 +956,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
             profile == PickerProfileParam.picker
         ? presetScannedBarcode.trim()
         : null;
-    final double remPick = stock.qtyRequired - stock.qtyPicked;
+    final double remPick =
+        pickTargetHolder[0].qtyRequired - pickTargetHolder[0].qtyPicked;
     final String presetQtyText = pickerPreset != null
         ? (remPick >= 1 ? formatPickQty(remPick) : '0')
         : '';
@@ -927,15 +967,16 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     String? scannedForQty = pickerPreset;
     bool sheetBusy = false;
     String? selectedLocationId;
-    for (final PickingAlternateLocation a in stock.alternateLocations) {
+    for (final PickingAlternateLocation a in pickTargetHolder[0].alternateLocations) {
       if (a.isPrimary) {
         selectedLocationId = a.locationId;
         break;
       }
     }
     if (selectedLocationId == null) {
-      for (final PickingAlternateLocation a in stock.alternateLocations) {
-        if (a.locationCode.trim().toLowerCase() == stock.locationCode.trim().toLowerCase()) {
+      for (final PickingAlternateLocation a in pickTargetHolder[0].alternateLocations) {
+        if (a.locationCode.trim().toLowerCase() ==
+            pickTargetHolder[0].locationCode.trim().toLowerCase()) {
           selectedLocationId = a.locationId;
           break;
         }
@@ -972,12 +1013,26 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${stock.locationCode} · ${formatPickQty(group.virtual.qtyPicked)}/${formatPickQty(group.virtual.qtyRequired)}',
+                      _groupLocationQtyLine(group),
                       style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                     ),
-                    if (stock.skipReason != null && stock.skipReason!.isNotEmpty) ...<Widget>[
+                    if (group.members.length > 1 &&
+                        profile == PickerProfileParam.picker) ...<Widget>[
+                      const SizedBox(height: 6),
+                      Text(
+                        StringLookup.t(loc, 'pickMultiLocationHint'),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                    if (pickTargetHolder[0].skipReason != null &&
+                        pickTargetHolder[0].skipReason!.isNotEmpty) ...<Widget>[
                       const SizedBox(height: 8),
-                      Text('${StringLookup.t(loc, 'incompleteReasonLabel')} ${stock.skipReason}'),
+                      Text(
+                        '${StringLookup.t(loc, 'incompleteReasonLabel')} ${pickTargetHolder[0].skipReason}',
+                      ),
                     ],
                     if (profile == PickerProfileParam.controller) ...<Widget>[
                       const SizedBox(height: 16),
@@ -1033,7 +1088,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                   lineId: profile == PickerProfileParam.controller &&
                                           group.members.length > 1
                                       ? null
-                                      : stock.id,
+                                      : pickTargetHolder[0].id,
                                   profileType: profile,
                                 ),
                               );
@@ -1115,18 +1170,29 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                               ),
                               onChanged: (_) => setM(() {}),
                               onSubmitted: (String v) {
-                                if (_barcodeMatchesLine(v, stock)) {
+                                PickingLine? matched;
+                                for (final PickingLine m in group.members) {
+                                  if (_barcodeMatchesLine(v, m)) {
+                                    matched = m;
+                                    break;
+                                  }
+                                }
+                                if (matched != null) {
                                   setM(() {
+                                    pickTargetHolder[0] = matched!;
                                     scannedForQty = v.trim();
-                                    final double rem = stock.qtyRequired - stock.qtyPicked;
-                                    qty.text = rem >= 1 ? formatPickQty(rem) : '0';
+                                    final double rem =
+                                        pickTargetHolder[0].qtyRequired -
+                                        pickTargetHolder[0].qtyPicked;
+                                    qty.text =
+                                        rem >= 1 ? formatPickQty(rem) : '0';
                                   });
                                 } else {
                                   _rejectScanHaptic();
                                   showAppSnackBar(context,
                                     SnackBar(
                                       content: Text(
-                                        '${StringLookup.t(loc, 'wrongBarcodeMessage')}${stock.barcode ?? stock.sku ?? '—'}',
+                                        '${StringLookup.t(loc, 'wrongBarcodeMessage')}${pickTargetHolder[0].barcode ?? pickTargetHolder[0].sku ?? '—'}',
                                       ),
                                     ),
                                   );
@@ -1143,7 +1209,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                 extra: ScannerArgs(
                                   returnToPick: true,
                                   taskId: widget.taskId,
-                                  lineId: stock.id,
+                                  lineId: pickTargetHolder[0].id,
                                   profileType: profile,
                                 ),
                               );
@@ -1175,7 +1241,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                               ? null
                               : () async {
                             final int delta = int.tryParse(qty.text.trim()) ?? 0;
-                              final double rem = stock.qtyRequired - stock.qtyPicked;
+                              final double rem = pickTargetHolder[0].qtyRequired -
+                                  pickTargetHolder[0].qtyPicked;
                             if (delta < 1 || delta > rem) {
                               _rejectScanHaptic();
                               showAppSnackBar(context,
@@ -1196,9 +1263,9 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                               if (online) {
                                 final PickLineResponse res =
                                     await ref.read(pickingRepositoryProvider).pickLine(
-                                      stock.id,
+                                      pickTargetHolder[0].id,
                                       delta,
-                                      'scan-${widget.taskId}-${stock.id}-${DateTime.now().millisecondsSinceEpoch}',
+                                      'scan-${widget.taskId}-${pickTargetHolder[0].id}-${DateTime.now().millisecondsSinceEpoch}',
                                     );
                                 await ref
                                     .read(pickTaskDetailProvider(widget.taskId).notifier)
@@ -1212,7 +1279,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                     'PICK_CONFIRM_ITEM',
                                     <String, Object?>{
                                       'taskId': widget.taskId,
-                                      'itemId': stock.id,
+                                      'itemId': pickTargetHolder[0].id,
                                       'qty': delta,
                                       'ts': DateTime.now().millisecondsSinceEpoch,
                                     },
@@ -1242,7 +1309,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                           TextButton(
                             onPressed: () async {
                               Navigator.of(ctx).pop();
-                              await _showSkipReasonSheet(stock);
+                              await _showSkipReasonSheet(pickTargetHolder[0]);
                             },
                             child: Text(StringLookup.t(loc, 'lineReasonModalTitle')),
                           ),
@@ -1250,13 +1317,15 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                       ],
                       if (group.members.length == 1 &&
                           online &&
-                          stock.alternateLocations.isNotEmpty) ...<Widget>[
+                          pickTargetHolder[0].alternateLocations.isNotEmpty) ...<Widget>[
                         const SizedBox(height: 16),
                         Text(
                           StringLookup.t(loc, 'alternateLocations'),
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
-                        ...mergeAlternateLocationsForDisplay(stock.alternateLocations).map((
+                        ...mergeAlternateLocationsForDisplay(
+                          pickTargetHolder[0].alternateLocations,
+                        ).map((
                           MergedAlternateLocationRow row,
                         ) {
                           final String rowLocationId = row.representative.locationId;
@@ -1284,7 +1353,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                 final PickingAlternateLocation a = row.representative;
                                 final PickLineResponse res =
                                     await ref.read(pickingRepositoryProvider).changePickSource(
-                                      stock.id,
+                                      pickTargetHolder[0].id,
                                       locationId: a.locationId,
                                       lotId: a.lotId,
                                     );
@@ -1480,11 +1549,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       ),
       body: docAsync.when(
         data: (PickingDocument d) {
-          final List<_LineGroup> groups = profile == PickerProfileParam.controller
-              ? _groupLinesByProduct(d.lines)
-              : d.lines
-                  .map((PickingLine l) => _LineGroup(virtual: l, members: <PickingLine>[l]))
-                  .toList(growable: false);
+          final List<_LineGroup> groups = _groupLinesByProduct(d.lines);
           final List<_LineGroup> orderedGroups = profile == PickerProfileParam.controller
               ? _orderedLineGroupsController(groups, _verifiedLineIds)
               : _orderedLineGroups(groups);
@@ -1660,22 +1725,25 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      '${g.members.first.locationCode} · ${formatPickQty(g.virtual.qtyPicked)}/${formatPickQty(g.virtual.qtyRequired)}',
+                                      _groupLocationQtyLine(g),
                                       style: TextStyle(
                                         fontSize: 13,
                                         color: cs.onSurfaceVariant,
                                       ),
+                                      maxLines: 4,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ],
                                 ),
                               ),
                               if (profile == PickerProfileParam.picker &&
                                   (ref.watch(networkOnlineProvider).valueOrNull ?? true) &&
-                                  g.members.length == 1)
+                                  !_lineGroupEffectivelyDone(g))
                                 IconButton(
                                   icon: const Icon(Icons.flag_rounded),
                                   tooltip: StringLookup.t(loc, 'lineReasonModalTitle'),
-                                  onPressed: () => _showSkipReasonSheet(g.members.first),
+                                  onPressed: () =>
+                                      _showSkipReasonSheet(_activePickMember(g)),
                                 ),
                             ],
                           ),

@@ -891,6 +891,23 @@ async def get_consolidated(
         ) from e
 
 
+def _consolidated_product_group_key(line: DocumentLineModel) -> tuple:
+    """Group key for umumiy yig'ish — bir mahsulot FEFO bo'lib 2+ qator bo'lsa ham bitta qator.
+
+    Eski kalit (barcode/sku/nom) qatorlarda barcode bo'sh yoki farq qilsa bir xil product_id
+    ikki marta chiqishi mumkin edi (masalan 10 + 20 alohida kartochkalar).
+    """
+    if line.product_id is not None:
+        return ("product_id", str(line.product_id))
+    first = (line.barcode or line.sku or "").strip()
+    return (
+        "fallback",
+        first,
+        (line.product_name or "").strip(),
+        (line.sku or "").strip(),
+    )
+
+
 def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedViewResponse:
     """Build consolidated view response (shared by GET and after POST). doc_ids must be non-empty."""
     # Fresh query for doc_no/status to avoid touching expired attributes after consolidated_pick commit (500 fix)
@@ -913,7 +930,7 @@ def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedView
         .order_by(*_picking_route_order_by(urgency_cutoff_date=cutoff))
         .all()
     )
-    # Group by product key (barcode or sku+product_name); preserve order of first occurrence
+    # Group by product (product_id ustuvor); preserve order of first occurrence
     # Also build per-document line counts from lines_with_loc to avoid touching d.lines after commit (500 fix)
     product_order: List[tuple] = []  # (barcode_or_key, product_name, sku, expiry_display)
     groups: dict = {}
@@ -925,7 +942,7 @@ def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedView
         doc_line_stats[doc_id]["total"] += 1
         if _line_is_vip_expiry_informational(line) or (line.picked_qty or 0) >= (line.required_qty or 0):
             doc_line_stats[doc_id]["done"] += 1
-        key = (line.barcode or line.sku or str(line.product_id or ""), line.product_name or "", line.sku)
+        key = _consolidated_product_group_key(line)
         if key not in groups:
             groups[key] = []
             first_line_attrs[key] = (line.barcode, line.sku, line.product_id)

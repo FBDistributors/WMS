@@ -33,7 +33,14 @@ import { playSuccessBeep } from '../utils/playBeep';
 
 type Nav = StackNavigationProp<RootStackParamList, 'ConsolidatedPick'>;
 
-export function consolidatedProductKey(prod: { product_name: string; barcode?: string | null; sku?: string | null }): string {
+export function consolidatedProductKey(prod: {
+  product_name: string;
+  barcode?: string | null;
+  sku?: string | null;
+  product_id?: string | null;
+}): string {
+  const pid = prod.product_id?.trim();
+  if (pid) return `id:${pid}`;
   return `${prod.product_name}-${prod.barcode ?? prod.sku ?? ''}`;
 }
 

@@ -163,6 +163,8 @@ abstract final class StringLookup {
     'consolidatedEmptyRows': 'Hozircha qatorlar yo‘q',
     'consolidatedPickSuccess': 'Yig‘ildi',
     'consolidatedNothingToPick': 'Bu mahsulot uchun yig‘ish qoldig‘i yo‘q.',
+    'pickMultiLocationHint':
+        'Bir nechta joydan yig‘iladi — skaner qiling, keyin shu joydagi qoldiq miqdorini kiriting.',
     'controllerPositionVerified': 'Pozitsiya tekshirildi',
     'productNotInOrder': 'Bu mahsulot ushbu buyurtmada yo‘q.',
     'success': 'Muvaffaqiyat',
@@ -459,6 +461,8 @@ abstract final class StringLookup {
     'consolidatedEmptyRows': 'Пока нет строк',
     'consolidatedPickSuccess': 'Собрано',
     'consolidatedNothingToPick': 'Для этого товара нечего собирать.',
+    'pickMultiLocationHint':
+        'Сбор с нескольких ячеек — отсканируйте и введите количество для текущей ячейки.',
     'controllerPositionVerified': 'Позиция проверена',
     'productNotInOrder': 'Этого товара нет в данном заказе.',
     'success': 'Успешно',
@@ -755,6 +759,8 @@ abstract final class StringLookup {
     'consolidatedEmptyRows': 'No lines yet',
     'consolidatedPickSuccess': 'Recorded',
     'consolidatedNothingToPick': 'Nothing left to pick for this product.',
+    'pickMultiLocationHint':
+        'Picked from multiple locations — scan, then enter qty for the current location.',
     'controllerPositionVerified': 'Position verified',
     'productNotInOrder': 'This product is not in this order.',
     'success': 'Success',

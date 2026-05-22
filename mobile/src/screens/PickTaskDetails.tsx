@@ -224,7 +224,7 @@ export function PickTaskDetails() {
     }, [route.params?.scannedBarcode, route.params?.lineId, doc, navigation, t, isController])
   );
 
-  const openLineScan = useCallback((line: PickingLine) => {
+  const openLineScan = useCallback((line: PickingLine, _display?: PickingLine) => {
     setSelectedLine(line);
     setScannedBarcodeForQty(null);
     setQtyInput('');
@@ -239,7 +239,22 @@ export function PickTaskDetails() {
   const handleLineScanSubmit = useCallback(
     (value: string) => {
       if (!selectedLine) return;
-      if (barcodeMatchesLine(value, selectedLine)) {
+      const groupLines = groupLinesByProduct(doc?.lines ?? []).find((g) =>
+        g.groupLines.some((l) => l.id === selectedLine.id)
+      )?.groupLines;
+      const matchInGroup =
+        groupLines?.find((l) => barcodeMatchesLine(value, l)) ?? null;
+      if (matchInGroup) {
+        void playSuccessBeep();
+        setSelectedLine(matchInGroup);
+        setScannedBarcodeForQty(value.trim());
+        if (isController) {
+          setQtyInput(String(matchInGroup.qty_picked));
+        } else {
+          const remaining = matchInGroup.qty_required - matchInGroup.qty_picked;
+          setQtyInput(remaining >= 1 ? String(remaining) : '0');
+        }
+      } else if (barcodeMatchesLine(value, selectedLine)) {
         void playSuccessBeep();
         setScannedBarcodeForQty(value.trim());
         if (isController) {
@@ -255,7 +270,7 @@ export function PickTaskDetails() {
         );
       }
     },
-    [selectedLine, t, isController]
+    [selectedLine, doc?.lines, t, isController]
   );
 
   const handleLineQtySubmit = useCallback(async () => {
@@ -519,19 +534,19 @@ export function PickTaskDetails() {
         keyboardShouldPersistTaps="handled"
       >
         <Text style={[styles.sectionTitle, isDark && styles.sectionTitleDark]}>{t('positions')}</Text>
-        {(isController && doc?.lines?.length
-          ? groupLinesByProduct(doc.lines)
-          : (doc?.lines ?? []).filter(Boolean).map((line) => ({ virtualLine: line as PickingLine, groupLines: [line as PickingLine] }))
-        ).map(({ virtualLine, groupLines }, index) => {
+        {(doc?.lines?.length ? groupLinesByProduct(doc.lines) : []).map(({ virtualLine, groupLines }, index) => {
           const allGroupVerified = groupLines.every((l) => controllerVerifiedLineIds.has(String(l.id)));
-          const stockLine = groupLines[0] ?? virtualLine;
+          const stockLine =
+            groupLines.find((l) => !l.is_vip_expiry_informational && l.qty_picked < l.qty_required) ??
+            groupLines[0] ??
+            virtualLine;
           const allowAlternatePick = !isController && groupLines.length === 1;
           return (
             <LineCard
               key={virtualLine.id ?? `line-${index}`}
               line={virtualLine}
               stockLine={stockLine}
-              onPress={() => openLineScan(virtualLine)}
+              onPress={() => openLineScan(stockLine, virtualLine)}
               onReportReason={!isController && isOnline ? openLineReasonModal : undefined}
               isOnline={isOnline}
               t={t}
