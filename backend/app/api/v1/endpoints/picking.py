@@ -932,7 +932,7 @@ def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedView
     )
     # Group by product (product_id ustuvor); preserve order of first occurrence
     # Also build per-document line counts from lines_with_loc to avoid touching d.lines after commit (500 fix)
-    product_order: List[tuple] = []  # (barcode_or_key, product_name, sku, expiry_display)
+    product_order: List[tuple] = []  # (group_key, product_name, sku, expiry_display)
     groups: dict = {}
     first_line_attrs: dict = {}  # key -> (barcode, sku, product_id) from first line in group
     doc_line_stats: dict = {}  # doc_id -> {"total": int, "done": int}
@@ -982,8 +982,7 @@ def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedView
     # Picker consolidated alternates should never suggest showroom bins by default.
     by_pid_consolidated = _balance_rows_by_product(db, all_pids, "main")
     products = []
-    for (barcode_or_sku, product_name, sku), _name, _sku, expiry_display in product_order:
-        key = (barcode_or_sku, product_name, sku)
+    for key, product_name, sku, expiry_display in product_order:
         lines_list = groups[key]
         total_required = sum(l.qty_required for l in lines_list)
         total_picked = sum(

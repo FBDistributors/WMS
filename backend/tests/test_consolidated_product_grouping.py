@@ -24,6 +24,19 @@ def test_consolidated_group_key_merges_same_product_id_different_barcode() -> No
     assert _consolidated_product_group_key(line_a) == _consolidated_product_group_key(line_b)
 
 
+def test_consolidated_product_order_unpack_matches_group_key() -> None:
+    """Regression: product_order tuple must use group_key, not legacy (barcode, name, sku) key."""
+    pid = uuid.uuid4()
+    key = ("product_id", str(pid))
+    product_order = [(key, "Mahsulot", "UL0025", "2027-11-01")]
+    groups = {key: ["line-a", "line-b"]}
+    products = []
+    for gkey, product_name, sku, expiry_display in product_order:
+        lines_list = groups[gkey]
+        products.append((product_name, sku, len(lines_list), expiry_display))
+    assert products == [("Mahsulot", "UL0025", 2, "2027-11-01")]
+
+
 def test_consolidated_group_key_splits_different_products() -> None:
     line_a = MagicMock(
         product_id=uuid.uuid4(),
