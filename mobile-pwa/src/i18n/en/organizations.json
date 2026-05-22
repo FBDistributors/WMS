@@ -1,0 +1,28 @@
+{
+  "title": "Organization",
+  "subtitle": "Reference list of organizations — enter id and name yourself.",
+  "add": "Add organization",
+  "edit": "Edit",
+  "confirm_delete_title": "Delete",
+  "confirm_delete": "Delete «{{name}}» (id: {{orgId}})?",
+  "confirm_yes": "Yes, delete",
+  "save": "Save",
+  "saving": "Saving...",
+  "load_failed": "Failed to load organizations.",
+  "save_failed": "Could not save.",
+  "empty": "No organizations",
+  "empty_desc": "Add a new organization.",
+  "search": "Search",
+  "validation": {
+    "org_id_required": "Id is required."
+  },
+  "fields": {
+    "org_id": "Id",
+    "name": "Organization name"
+  },
+  "columns": {
+    "org_id": "Id",
+    "name": "Organization name",
+    "actions": "Actions"
+  }
+}

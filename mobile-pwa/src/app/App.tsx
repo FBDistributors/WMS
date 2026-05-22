@@ -400,6 +400,10 @@ export function App() {
           element={<Navigate to="/admin/settings?tab=work-zones" replace />}
         />
         <Route
+          path="/admin/organizations"
+          element={<Navigate to="/admin/settings?tab=organizations" replace />}
+        />
+        <Route
           path="/admin/picking"
           element={
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">

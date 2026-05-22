@@ -74,7 +74,8 @@
     "title": "Sozlamalar",
     "tabs": {
       "vip_customers": "VIP mijozlar",
-      "work_zones": "Work zone"
+      "work_zones": "Work zone",
+      "organizations": "Organizatsiya"
     }
   },
   "settings": {

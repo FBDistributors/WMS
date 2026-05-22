@@ -74,7 +74,8 @@
     "title": "Настройки",
     "tabs": {
       "vip_customers": "VIP клиенты",
-      "work_zones": "Work zone"
+      "work_zones": "Work zone",
+      "organizations": "Организация"
     }
   },
   "settings": {

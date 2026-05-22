@@ -1,0 +1,28 @@
+{
+  "title": "Organizatsiya",
+  "subtitle": "Tashkilotlar ro'yxati — id va nomni o'zingiz to'ldirasiz.",
+  "add": "Organizatsiya qo'shish",
+  "edit": "Tahrirlash",
+  "confirm_delete_title": "O'chirish",
+  "confirm_delete": "«{{name}}» (id: {{orgId}}) o'chirilsinmi?",
+  "confirm_yes": "Ha, o'chirish",
+  "save": "Saqlash",
+  "saving": "Saqlanmoqda...",
+  "load_failed": "Organizatsiyalar ro'yxati yuklanmadi.",
+  "save_failed": "Saqlab bo'lmadi.",
+  "empty": "Organizatsiya topilmadi",
+  "empty_desc": "Yangi tashkilot qo'shing.",
+  "search": "Qidiruv",
+  "validation": {
+    "org_id_required": "Id majburiy."
+  },
+  "fields": {
+    "org_id": "Id",
+    "name": "Organizatsiya nomi"
+  },
+  "columns": {
+    "org_id": "Id",
+    "name": "Organizatsiya nomi",
+    "actions": "Amallar"
+  }
+}

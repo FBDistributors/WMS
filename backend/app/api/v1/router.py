@@ -23,6 +23,7 @@ from app.api.v1.endpoints import (
     scanner,
     users,
     vip_customers,
+    settings_organizations,
     work_zones,
 )
 
@@ -49,5 +50,10 @@ router.include_router(integrations.router, prefix="/integrations", tags=["integr
 router.include_router(users.router, prefix="/users", tags=["users"])
 router.include_router(vip_customers.router, prefix="/vip-customers", tags=["vip-customers"])
 router.include_router(work_zones.router, prefix="/work-zones", tags=["work-zones"])
+router.include_router(
+    settings_organizations.router,
+    prefix="/settings-organizations",
+    tags=["settings-organizations"],
+)
 router.include_router(scanner.router, prefix="/scanner", tags=["scanner"])
 router.include_router(waves.router, prefix="/waves", tags=["waves"])

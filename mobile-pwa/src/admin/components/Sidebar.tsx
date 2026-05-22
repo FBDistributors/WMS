@@ -116,7 +116,8 @@ export function Sidebar({ collapsed, onToggleCollapse, onNavigate }: SidebarProp
                   ? location.pathname === '/admin/settings' ||
                     location.pathname.startsWith('/admin/settings') ||
                     location.pathname === '/admin/vip-customers' ||
-                    location.pathname === '/admin/work-zones'
+                    location.pathname === '/admin/work-zones' ||
+                    location.pathname === '/admin/organizations'
                   : location.pathname === path || (path !== '/admin' && location.pathname.startsWith(path))
             const content = (
               <Link
