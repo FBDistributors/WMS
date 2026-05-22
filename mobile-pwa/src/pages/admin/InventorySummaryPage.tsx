@@ -35,6 +35,11 @@ import {
 import { getBrands, type Brand } from '../../services/brandsApi'
 import { useAuth } from '../../rbac/AuthProvider'
 import { writeExcelFile } from '../../utils/exportExcel'
+import {
+  formatSmartupCacheTime,
+  readSmartupSummaryCache,
+  writeSmartupSummaryCache,
+} from '../../lib/smartupBalanceLocalCache'
 
 const COLUMN_OPTIONS = [
   { id: 'code', labelKey: 'inventory:columns.code' },
@@ -107,7 +112,7 @@ export function InventorySummaryPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const warehouse: WarehouseFilter = (searchParams.get('warehouse') as WarehouseFilter) || 'main'
-  const { t } = useTranslation(['inventory', 'common'])
+  const { t, i18n } = useTranslation(['inventory', 'common'])
   const { has } = useAuth()
   const canAdjustInventory = has('inventory:adjust')
   const { config, updateConfig, resetConfig } = useInventoryTableConfig()
@@ -133,6 +138,7 @@ export function InventorySummaryPage() {
   const [smartupBronByCode, setSmartupBronByCode] = useState<Map<string, number>>(new Map())
   const [isSmartupSyncing, setIsSmartupSyncing] = useState(false)
   const [smartupSyncError, setSmartupSyncError] = useState<string | null>(null)
+  const [smartupCachedAt, setSmartupCachedAt] = useState<string | null>(null)
   const [exportSuccessAt, setExportSuccessAt] = useState<number | null>(null)
   const [exportSavedPath, setExportSavedPath] = useState<string | null>(null)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
@@ -141,6 +147,14 @@ export function InventorySummaryPage() {
     const timer = setTimeout(() => setDebouncedSearch(search), DEBOUNCE_MS)
     return () => clearTimeout(timer)
   }, [search])
+
+  useEffect(() => {
+    const cached = readSmartupSummaryCache()
+    if (!cached) return
+    setSmartupQoldiqByCode(cached.q001)
+    setSmartupBronByCode(cached.q002)
+    setSmartupCachedAt(cached.loadedAt)
+  }, [])
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -159,25 +173,9 @@ export function InventorySummaryPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : t('inventory:load_failed'))
       setData({ items: [], total: 0 })
-      setSmartupQoldiqByCode(new Map())
-      setSmartupBronByCode(new Map())
+    } finally {
       setIsLoading(false)
-      return
     }
-
-    const settled = await Promise.allSettled([
-      getSmartupBalance({ warehouse_code: '001' }),
-      getSmartupBalance({ warehouse_code: '002' }),
-    ])
-    const q001 = settled[0]
-    const q002 = settled[1]
-    setSmartupQoldiqByCode(
-      q001.status === 'fulfilled' ? buildSmartupQtyByProductCode(q001.value) : new Map()
-    )
-    setSmartupBronByCode(
-      q002.status === 'fulfilled' ? buildSmartupQtyByProductCode(q002.value) : new Map()
-    )
-    setIsLoading(false)
   }, [debouncedSearch, selectedBrandIds, onlyAvailable, offset, warehouse, t])
 
   const loadBrands = useCallback(async () => {
@@ -202,8 +200,11 @@ export function InventorySummaryPage() {
     const q001 = settled[0]
     const q002 = settled[1]
     const errs: string[] = []
+    let q001Map = new Map<string, number>()
+    let q002Map = new Map<string, number>()
     if (q001.status === 'fulfilled') {
-      setSmartupQoldiqByCode(buildSmartupQtyByProductCode(q001.value))
+      q001Map = buildSmartupQtyByProductCode(q001.value)
+      setSmartupQoldiqByCode(q001Map)
     } else {
       setSmartupQoldiqByCode(new Map())
       errs.push(
@@ -211,12 +212,17 @@ export function InventorySummaryPage() {
       )
     }
     if (q002.status === 'fulfilled') {
-      setSmartupBronByCode(buildSmartupQtyByProductCode(q002.value))
+      q002Map = buildSmartupQtyByProductCode(q002.value)
+      setSmartupBronByCode(q002Map)
     } else {
       setSmartupBronByCode(new Map())
       errs.push(
         q002.reason instanceof Error ? q002.reason.message : String(q002.reason ?? '')
       )
+    }
+    if (errs.length === 0) {
+      const loadedAt = writeSmartupSummaryCache(q001Map, q002Map)
+      setSmartupCachedAt(loadedAt)
     }
     if (errs.length > 0) {
       setSmartupSyncError(errs.filter(Boolean).join(' · ') || t('inventory:smartup_sync_failed'))
@@ -385,16 +391,10 @@ export function InventorySummaryPage() {
   )
 
   const content = useMemo(() => {
-    if (isLoading || isSmartupSyncing) {
+    if (isLoading) {
       return (
         <div className="relative min-h-[min(60vh,480px)]">
-          <LoadingOverlay
-            label={
-              isLoading
-                ? t('common:messages.loading')
-                : t('inventory:smartup_sync_loading')
-            }
-          />
+          <LoadingOverlay label={t('common:messages.loading')} />
         </div>
       )
     }
@@ -422,6 +422,15 @@ export function InventorySummaryPage() {
     )
 
     return (
+      <div className="relative">
+        {isSmartupSyncing ? (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/60 dark:bg-slate-950/50">
+            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <Loader2 size={18} className="animate-spin shrink-0" />
+              {t('inventory:smartup_sync_loading')}
+            </div>
+          </div>
+        ) : null}
       <TableScrollArea inline>
         <table className="w-max min-w-full text-sm">
           <thead className="text-xs uppercase text-slate-500">
@@ -548,6 +557,7 @@ export function InventorySummaryPage() {
           </tbody>
         </table>
       </TableScrollArea>
+      </div>
     )
   }, [
     config.columnOrder,
@@ -710,6 +720,18 @@ export function InventorySummaryPage() {
             {t('common:buttons.refresh')}
           </Button>
         </div>
+
+        {smartupCachedAt ? (
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {t('inventory:smartup_cache_hint', {
+              time: formatSmartupCacheTime(smartupCachedAt, i18n.language),
+            })}
+          </p>
+        ) : (
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {t('inventory:smartup_cache_empty_hint')}
+          </p>
+        )}
 
         {smartupSyncError ? (
           <div

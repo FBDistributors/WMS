@@ -13,6 +13,11 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { getSmartupBalance } from '../../services/inventoryApi'
 import { writeExcelFile } from '../../utils/exportExcel'
+import {
+  formatSmartupCacheTime,
+  readSmartupBalanceRawCache,
+  writeSmartupBalanceRawCache,
+} from '../../lib/smartupBalanceLocalCache'
 
 const HIDDEN_COLUMNS = new Set(['inventory_kind', 'product_id', 'batch_number', 'groups', 'warehouse_code', 'date'])
 const NUMBER_COLUMNS = new Set(['quantity', 'input_price'])
@@ -73,7 +78,7 @@ type SmartupBalanceViewProps = {
 }
 
 export function SmartupBalanceView({ warehouseCode, filialId, customHeaderSlot }: SmartupBalanceViewProps) {
-  const { t } = useTranslation(['inventory', 'common'])
+  const { t, i18n } = useTranslation(['inventory', 'common'])
   const [searchParams, setSearchParams] = useSearchParams()
   const searchQuery = searchParams.get('q') ?? ''
   const todayLabel = useMemo(
@@ -81,24 +86,41 @@ export function SmartupBalanceView({ warehouseCode, filialId, customHeaderSlot }
     []
   )
   const [data, setData] = useState<unknown>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [visibleCount, setVisibleCount] = useState(INITIAL_PAGE_SIZE)
   const [isExporting, setIsExporting] = useState(false)
   const [exportSuccessAt, setExportSuccessAt] = useState<number | null>(null)
   const [exportSavedPath, setExportSavedPath] = useState<string | null>(null)
+  const [cachedAt, setCachedAt] = useState<string | null>(null)
 
   const load = useCallback(async (forceRefresh = false) => {
+    if (!forceRefresh) {
+      const cached = readSmartupBalanceRawCache(warehouseCode, filialId)
+      if (cached) {
+        setData(cached.raw)
+        setCachedAt(cached.loadedAt)
+        setError(null)
+        setIsLoading(false)
+        return
+      }
+      setData(null)
+      setCachedAt(null)
+      setIsLoading(false)
+      return
+    }
+
     setIsLoading(true)
     setError(null)
-    if (forceRefresh) setVisibleCount(INITIAL_PAGE_SIZE)
+    setVisibleCount(INITIAL_PAGE_SIZE)
     try {
       const res = await getSmartupBalance({
-        refresh: forceRefresh,
+        refresh: true,
         warehouse_code: warehouseCode,
         filial_id: filialId ?? undefined,
       })
       setData(res)
+      setCachedAt(writeSmartupBalanceRawCache(warehouseCode, filialId, res))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('inventory:load_failed'))
     } finally {
@@ -259,6 +281,13 @@ export function SmartupBalanceView({ warehouseCode, filialId, customHeaderSlot }
           <div className="flex flex-col gap-1 text-sm text-slate-800 dark:text-slate-100">
             <span className="font-semibold">Основной склад - НОВЫЙ</span>
             <span className="text-xs text-slate-500 dark:text-slate-400">{todayLabel}</span>
+            {cachedAt ? (
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                {t('inventory:smartup_tab_cache_hint', {
+                  time: formatSmartupCacheTime(cachedAt, i18n.language),
+                })}
+              </span>
+            ) : null}
           </div>
           <div className="flex flex-1 flex-wrap items-center gap-2 justify-end">
             <input
@@ -294,7 +323,7 @@ export function SmartupBalanceView({ warehouseCode, filialId, customHeaderSlot }
             </Button>
             <Button variant="secondary" onClick={() => load(true)} disabled={isLoading} className="inline-flex items-center gap-2">
               {isLoading ? <Loader2 size={16} className="animate-spin shrink-0" /> : null}
-              {t('common:buttons.refresh')}
+              {t('inventory:smartup_balance_load_btn')}
             </Button>
           </div>
         </div>
