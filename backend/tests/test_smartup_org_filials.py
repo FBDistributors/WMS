@@ -1,38 +1,37 @@
-from app.constants.smartup_org_filials import resolve_org_filial_id_from_note
-from app.services.organization_labels import resolve_org_display
+from app.services.organization_labels import (
+    resolve_org_display,
+    resolve_org_filial_id_from_note,
+)
+
+SETTINGS_MAP = {
+    "19191043": "Дилер Фергана (Тавакал) Проф",
+    "12398877": "Дилер Бухара (Жамшид)",
+    "18640963": "Дилер Жиззах (Мунаввар) Проф",
+    "8109104": "Дилер Таш обл (Мейрлан) Проф",
+    "3964966": "Дилер Ипподром (Иззат)",
+}
 
 
-def test_resolve_org_filial_id_from_note_tash_obl() -> None:
+def test_resolve_org_filial_id_from_note_uses_settings_id() -> None:
     assert (
-        resolve_org_filial_id_from_note("Заказ Дилер Таш обл (Мейрлан)")
+        resolve_org_filial_id_from_note("Заказ Дилер Таш обл (Мейрлан)", SETTINGS_MAP)
         == "8109104"
     )
 
 
-def test_resolve_org_filial_id_from_note_ippodrom() -> None:
-    assert resolve_org_filial_id_from_note("Заказ Дилер Ипподром") == "3964966"
+def test_resolve_org_filial_id_from_xayitlik_uses_settings_id() -> None:
+    assert resolve_org_filial_id_from_note("XAYITLIK FARGONA TAVA", SETTINGS_MAP) == "19191043"
 
 
-def test_resolve_org_display_from_note_when_db_filial_empty() -> None:
-    name = resolve_org_display(
-        None,
-        {},
-        movement_note="Заказ Дилер Таш обл",
+def test_resolve_org_display_by_settings_org_id() -> None:
+    assert (
+        resolve_org_display("12398877", SETTINGS_MAP, to_filial_code="12398877")
+        == "Дилер Бухара (Жамшид)"
     )
-    assert name == "Дилер Таш обл (Мейрлан) Проф"
 
 
-def test_resolve_org_filial_id_from_xayitlik_fargona() -> None:
-    assert resolve_org_filial_id_from_note("XAYITLIK FARGONA TAVA") == "8109101"
-
-
-def test_resolve_org_filial_id_from_xayitlik_termiz() -> None:
-    assert resolve_org_filial_id_from_note("XAYITLIK TERMIZ GAYRAT") == "8109111"
-
-
-def test_resolve_org_filial_id_from_xayitlik_jizzax_munav() -> None:
-    assert resolve_org_filial_id_from_note("XAYITLIK JIZZAX MUNAV") == "8109116"
-
-
-def test_resolve_org_filial_id_from_xayitlik_qarshi() -> None:
-    assert resolve_org_filial_id_from_note("XAYITLIK QARSHI ULUG") == "8109110"
+def test_resolve_org_display_from_note_settings_name() -> None:
+    assert (
+        resolve_org_display(None, SETTINGS_MAP, movement_note="XAYITLIK JIZZAX MUNAV")
+        == "Дилер Жиззах (Мунаввар) Проф"
+    )

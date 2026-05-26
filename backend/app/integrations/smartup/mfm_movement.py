@@ -15,10 +15,7 @@ from typing import Any
 from pydantic import ValidationError as PydanticValidationError
 
 from app.constants.order_wms_status import normalize_order_wms_status_for_storage
-from app.constants.smartup_org_filials import (
-    normalize_smartup_org_filial_id,
-    resolve_org_filial_id_from_note,
-)
+from app.constants.smartup_org_filials import normalize_smartup_org_filial_id
 from app.integrations.smartup.movement_rows import extract_movement_rows, movement_delivery_datetime
 from app.integrations.smartup.schemas import SmartupOrder, SmartupOrderExportResponse, SmartupOrderLine
 
@@ -253,7 +250,8 @@ def _raw_status_from_movement_rows(rows: list[dict]) -> str:
 
 
 def _resolve_to_filial_from_row(row: dict, note: str | None = None) -> str | None:
-    """SmartUP organizatsiya ID (to_filial_code); ombor kodi (001) emas."""
+    """SmartUP to_filial_code (organizatsiya ID); izoh importda settings orqali."""
+    _ = note
     raw = _row_field(
         row,
         "to_filial_code",
@@ -267,11 +265,7 @@ def _resolve_to_filial_from_row(row: dict, note: str | None = None) -> str | Non
         "to_filial_id",
         "toFilialId",
     )
-    org = normalize_smartup_org_filial_id(raw)
-    if org:
-        return org
-    row_note = note or _row_field(row, "note", "movement_note", "movementNote")
-    return resolve_org_filial_id_from_note(row_note)
+    return normalize_smartup_org_filial_id(raw)
 
 DEFAULT_MFM_URL = "https://smartup.online/b/anor/mxsx/mfm/movement$export"
 
@@ -450,8 +444,6 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
                 to_filial = _resolve_to_filial_from_row(u, note=note)
                 if to_filial:
                     break
-            if not to_filial:
-                to_filial = resolve_org_filial_id_from_note(note)
             filial = to_filial
             if not lines:
                 skip_empty_lines += 1

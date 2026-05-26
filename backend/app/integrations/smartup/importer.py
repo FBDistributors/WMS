@@ -12,10 +12,8 @@ from app.constants.order_wms_status import (
     normalize_order_wms_status_for_storage,
     smartup_movement_status_for_wms_storage,
 )
-from app.constants.smartup_org_filials import (
-    normalize_smartup_org_filial_id,
-    resolve_org_filial_id_from_note,
-)
+from app.constants.smartup_org_filials import normalize_smartup_org_filial_id
+from app.services.organization_labels import load_org_name_map, resolve_org_filial_id_from_note
 from app.integrations.smartup.mapper import (
     OrderLinePayload,
     OrderPayload,
@@ -101,13 +99,17 @@ def load_excluded_room_ids(db: Session) -> FrozenSet[str]:
     return frozenset((str(r[0]).strip() for r in rows if r[0] and str(r[0]).strip()))
 
 
-def _apply_order_filial_fields(order: Order, payload: OrderPayload) -> None:
-    """SmartUP to_filial_code (organizatsiya ID) → DB; ombor kodi (001) saqlanmasin."""
-    org_id = (
-        normalize_smartup_org_filial_id(getattr(payload, "to_filial_code", None))
-        or normalize_smartup_org_filial_id(payload.filial_id)
-        or resolve_org_filial_id_from_note(getattr(payload, "movement_note", None))
+def _apply_order_filial_fields(
+    order: Order,
+    payload: OrderPayload,
+    org_name_map: dict[str, str] | None = None,
+) -> None:
+    """SmartUP to_filial_code → settings org_id; ombor kodi (001) saqlanmasin."""
+    org_id = normalize_smartup_org_filial_id(getattr(payload, "to_filial_code", None)) or normalize_smartup_org_filial_id(
+        payload.filial_id
     )
+    if not org_id and org_name_map:
+        org_id = resolve_org_filial_id_from_note(getattr(payload, "movement_note", None), org_name_map)
     if not org_id:
         return
     order.to_filial_code = org_id
@@ -123,6 +125,7 @@ def _process_one_order(
     errors: List[ImportError],
     do_commit: bool,
     excluded_room_ids: FrozenSet[str] | None = None,
+    org_name_map: dict[str, str] | None = None,
 ) -> Tuple[int, int, int]:
     """Process a single order. Returns (created_inc, updated_inc, skipped_inc). On exception: rollback if do_commit, append to errors, return (0,0,1)."""
     if excluded_room_ids:
@@ -146,6 +149,16 @@ def _process_one_order(
     payload = map_order_to_wms_order(order)
     if (order_source or "").strip().lower() == "diller":
         payload.status = smartup_movement_status_for_wms_storage(order.status)
+        if org_name_map and not normalize_smartup_org_filial_id(
+            getattr(payload, "to_filial_code", None) or payload.filial_id
+        ):
+            inferred = resolve_org_filial_id_from_note(
+                getattr(order, "note", None) or getattr(payload, "movement_note", None),
+                org_name_map,
+            )
+            if inferred:
+                payload.to_filial_code = inferred
+                payload.filial_id = inferred
     else:
         raw_status = (order.status or "").strip()
         if raw_status:
@@ -175,7 +188,7 @@ def _process_one_order(
                     current_status,
                 )
                 filial_before = (existing.to_filial_code or existing.filial_id or "").strip()
-                _apply_order_filial_fields(existing, payload)
+                _apply_order_filial_fields(existing, payload, org_name_map)
                 filial_after = (existing.to_filial_code or existing.filial_id or "").strip()
                 if getattr(payload, "from_warehouse_code", None) is not None:
                     existing.from_warehouse_code = payload.from_warehouse_code
@@ -188,7 +201,7 @@ def _process_one_order(
                 return 0, 0, 1
             existing.source = source
             existing.order_number = payload.order_number
-            _apply_order_filial_fields(existing, payload)
+            _apply_order_filial_fields(existing, payload, org_name_map)
             existing.customer_id = payload.customer_id
             existing.customer_name = payload.customer_name
             existing.agent_id = payload.agent_id
@@ -240,7 +253,7 @@ def _process_one_order(
             delivery_date=getattr(payload, "delivery_date", None),
             delivery_number=getattr(payload, "delivery_number", None),
         )
-        _apply_order_filial_fields(record, payload)
+        _apply_order_filial_fields(record, payload, org_name_map)
         record.wms_state = OrderWmsState(status=normalize_order_wms_status_for_storage(payload.status))
         record.lines = [
             OrderLine(
@@ -420,6 +433,14 @@ def import_orders(
     override = (filial_id_override or "").strip() or None
     orders_list = list(orders)
     batch_size = max(1, min(batch_size, 200))
+    org_name_map: dict[str, str] | None = None
+    if (order_source or "").strip().lower() == "diller":
+        org_name_map = load_org_name_map(db)
+        if not org_name_map:
+            logger.warning(
+                "import_orders(diller): settings_organizations bo'sh — "
+                "Filial nomlari Sozlamalar → Organizatsiya dan to'ldiring"
+            )
 
     for start in range(0, len(orders_list), batch_size):
         chunk = orders_list[start : start + batch_size]
@@ -435,6 +456,7 @@ def import_orders(
                     errors,
                     do_commit=False,
                     excluded_room_ids=excluded_room_ids,
+                    org_name_map=org_name_map,
                 )
                 batch_created += c
                 batch_updated += u
@@ -464,6 +486,7 @@ def import_orders(
                     errors,
                     do_commit=True,
                     excluded_room_ids=excluded_room_ids,
+                    org_name_map=org_name_map,
                 )
                 created += c
                 updated += u
