@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 ORG_FILIAL_ID_TO_NAME: dict[str, str] = {
     "3788131": "Головной Офис",
     "3964966": "Дилер Ипподром (Иззат)",
@@ -38,3 +40,36 @@ def normalize_smartup_org_filial_id(value: str | None) -> str | None:
     if is_smartup_org_filial_id(k):
         return k
     return None
+
+
+def _dealer_keyword_from_org_name(name: str) -> str:
+    """«Дилер Таш обл (Мейрлан) Проф» → «таш обл»."""
+    n = (name or "").strip().lower()
+    m = re.search(r"дилер\s+([^()]+)", n, flags=re.IGNORECASE)
+    if m:
+        return re.sub(r"\s+", " ", m.group(1)).strip()
+    return n
+
+
+def resolve_org_filial_id_from_note(note: str | None) -> str | None:
+    """
+    SmartUP movement note: «Заказ Дилер Таш обл…» → org ID.
+    Flat eksportda to_filial_code bo'lmasa ishlatiladi.
+    """
+    text = (note or "").strip().lower()
+    if not text or "дилер" not in text:
+        return None
+    best_id: str | None = None
+    best_score = 0
+    for org_id, name in ORG_FILIAL_ID_TO_NAME.items():
+        if org_id == "3788131":
+            continue
+        keyword = _dealer_keyword_from_org_name(name)
+        if len(keyword) < 4:
+            continue
+        if keyword in text:
+            score = len(keyword)
+            if score > best_score:
+                best_score = score
+                best_id = org_id
+    return best_id

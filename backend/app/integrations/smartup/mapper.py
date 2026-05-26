@@ -6,7 +6,10 @@ from decimal import Decimal
 from typing import List, Optional
 
 from app.constants.order_wms_status import normalize_order_wms_status_for_storage
-from app.constants.smartup_org_filials import normalize_smartup_org_filial_id
+from app.constants.smartup_org_filials import (
+    normalize_smartup_org_filial_id,
+    resolve_org_filial_id_from_note,
+)
 from app.integrations.smartup.schemas import SmartupOrder
 
 
@@ -63,7 +66,7 @@ def map_order_to_wms_order(order: SmartupOrder) -> OrderPayload:
     wms_status = normalize_order_wms_status_for_storage(order.status)
     org_filial = normalize_smartup_org_filial_id(
         getattr(order, "to_filial_code", None) or order.filial_id
-    )
+    ) or resolve_org_filial_id_from_note(getattr(order, "note", None))
     _dn = (str(order.delivery_number).strip() if order.delivery_number is not None else "")
     dn = _dn[:64] if _dn else None
     return OrderPayload(

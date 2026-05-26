@@ -8,6 +8,7 @@ from app.constants.smartup_org_filials import (
     ORG_FILIAL_ID_TO_NAME,
     is_smartup_org_filial_id,
     normalize_smartup_org_filial_id,
+    resolve_org_filial_id_from_note,
 )
 from app.models.settings_organization import SettingsOrganization as SettingsOrganizationModel
 
@@ -48,8 +49,9 @@ def resolve_org_display(
     *,
     to_filial_code: str | None = None,
     to_warehouse_code: str | None = None,
+    movement_note: str | None = None,
 ) -> str | None:
-    """SmartUP to_filial_code (organizatsiya ID) bo'yicha nom."""
+    """SmartUP to_filial_code (organizatsiya ID) yoki movement note bo'yicha nom."""
     _ = to_warehouse_code
     for key in _org_lookup_keys(filial_id, to_filial_code):
         hit = name_map.get(key)
@@ -58,4 +60,7 @@ def resolve_org_display(
         fallback = ORG_FILIAL_ID_TO_NAME.get(key)
         if fallback:
             return fallback
+    inferred = resolve_org_filial_id_from_note(movement_note)
+    if inferred:
+        return name_map.get(inferred) or ORG_FILIAL_ID_TO_NAME.get(inferred)
     return None

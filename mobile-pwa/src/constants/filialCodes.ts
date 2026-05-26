@@ -67,6 +67,24 @@ export function getFilialNameById(id: string | null | undefined): string | null 
   return FILIAL_ID_TO_NAME[String(id).trim()] ?? null
 }
 
+/** SmartUP izoh: «Заказ Дилер Таш обл…» → filial nomi (flat eksportda to_filial_code bo'lmasa). */
+export function resolveFilialNameFromNote(note: string | null | undefined): string | null {
+  const text = (note ?? '').trim().toLowerCase()
+  if (!text || !text.includes('дилер')) return null
+  let best: { name: string; score: number } | null = null
+  for (const { id, name } of FILIAL_LIST) {
+    if (id === '3788131') continue
+    const m = name.toLowerCase().match(/дилер\s+([^()]+)/i)
+    const keyword = (m?.[1] ?? name).trim().replace(/\s+/g, ' ')
+    if (keyword.length < 4) continue
+    if (text.includes(keyword)) {
+      const score = keyword.length
+      if (!best || score > best.score) best = { name, score }
+    }
+  }
+  return best?.name ?? null
+}
+
 export function getFilialNameByCode(code: string | null | undefined): string {
   if (code == null || String(code).trim() === '') return '—'
   const raw = String(code).trim()
@@ -100,9 +118,12 @@ export function formatDillerFilialDisplay(order: {
   to_filial_code?: string | null
   filial_id?: string | null
   from_warehouse_code?: string | null
+  movement_note?: string | null
 }): string {
   const named = order.filial_display_name?.trim()
   if (named) return named
+  const fromNote = resolveFilialNameFromNote(order.movement_note)
+  if (fromNote) return fromNote
   const toFilial = order.to_filial_code?.trim()
   if (toFilial) {
     const label = getFilialNameById(toFilial)

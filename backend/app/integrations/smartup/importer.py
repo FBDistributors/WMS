@@ -12,7 +12,10 @@ from app.constants.order_wms_status import (
     normalize_order_wms_status_for_storage,
     smartup_movement_status_for_wms_storage,
 )
-from app.constants.smartup_org_filials import normalize_smartup_org_filial_id
+from app.constants.smartup_org_filials import (
+    normalize_smartup_org_filial_id,
+    resolve_org_filial_id_from_note,
+)
 from app.integrations.smartup.mapper import (
     OrderLinePayload,
     OrderPayload,
@@ -100,8 +103,10 @@ def load_excluded_room_ids(db: Session) -> FrozenSet[str]:
 
 def _apply_order_filial_fields(order: Order, payload: OrderPayload) -> None:
     """SmartUP to_filial_code (organizatsiya ID) → DB; ombor kodi (001) saqlanmasin."""
-    org_id = normalize_smartup_org_filial_id(getattr(payload, "to_filial_code", None)) or normalize_smartup_org_filial_id(
-        payload.filial_id
+    org_id = (
+        normalize_smartup_org_filial_id(getattr(payload, "to_filial_code", None))
+        or normalize_smartup_org_filial_id(payload.filial_id)
+        or resolve_org_filial_id_from_note(getattr(payload, "movement_note", None))
     )
     if not org_id:
         return

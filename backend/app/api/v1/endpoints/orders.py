@@ -926,6 +926,7 @@ async def list_orders(
                     order.filial_id,
                     org_name_map,
                     to_filial_code=getattr(order, "to_filial_code", None),
+                    movement_note=getattr(order, "movement_note", None),
                 ),
                 to_filial_code=getattr(order, "to_filial_code", None),
                 customer_id=order.customer_id,
