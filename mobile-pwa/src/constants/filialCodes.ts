@@ -86,20 +86,29 @@ export function resolveFilialLabel(codeOrId: string | null | undefined): string 
   return byCode !== '—' ? byCode : v
 }
 
+/** Ombor kodi (001) — organizatsiya ID emas */
+function isWarehouseFilialCode(code: string): boolean {
+  return /^\d{1,3}$/.test(code)
+}
+
 /**
- * Tashkiliy harakat jadvali: SmartUP to_filial_code (= orders.filial_id) → Organizatsiya sozlamalari nomi.
- * Qattiq FILIAL_CODE_TO_NAME fallback ishlatilmaydi.
+ * Tashkiliy harakat jadvali: SmartUP to_filial_code → Organizatsiya sozlamalari nomi.
+ * from_warehouse_code (001) ko'rsatilmaydi.
  */
 export function formatDillerFilialDisplay(order: {
   filial_display_name?: string | null
+  to_filial_code?: string | null
   filial_id?: string | null
-  to_warehouse_code?: string | null
+  from_warehouse_code?: string | null
 }): string {
   const named = order.filial_display_name?.trim()
   if (named) return named
+  const toFilial = order.to_filial_code?.trim()
+  if (toFilial) return toFilial
   const fid = order.filial_id?.trim()
-  if (fid) return fid
-  const toWh = order.to_warehouse_code?.trim()
-  if (toWh) return toWh
+  if (fid && !isWarehouseFilialCode(fid)) return fid
+  if (fid && isWarehouseFilialCode(fid) && fid === order.from_warehouse_code?.trim()) {
+    return '—'
+  }
   return '—'
 }

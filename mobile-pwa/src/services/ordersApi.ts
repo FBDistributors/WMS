@@ -72,6 +72,8 @@ export type OrderListItem = {
   filial_id?: string | null
   /** settings_organizations nomi (SmartUP to_filial_code / filial_id bo'yicha) */
   filial_display_name?: string | null
+  /** SmartUP to_filial_code (organizatsiya ID) */
+  to_filial_code?: string | null
   customer_id?: string | null
   customer_name?: string | null
   agent_id?: string | null

@@ -267,6 +267,7 @@ def test_parse_mfm_movement_level_to_filial_code_postman() -> None:
     assert len(result.items) == 1
     order = result.items[0]
     assert order.filial_id == "3964966"
+    assert order.to_filial_code == "3964966"
     assert order.from_warehouse_code == "001"
     assert order.to_warehouse_code is None
 

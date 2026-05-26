@@ -59,6 +59,7 @@ class SmartupOrder(BaseModel):
     status: Optional[str] = Field(default=None, alias="status")
     filial_id: Optional[str] = Field(default=None, alias="filial_id")
     filial_code: Optional[str] = Field(default=None, alias="filial_code")
+    to_filial_code: Optional[str] = Field(default=None, alias="to_filial_code")
     deal_time: Optional[datetime] = Field(default=None, alias="deal_time")
     delivery_date: Optional[datetime] = Field(default=None, alias="delivery_date")
     created_on: Optional[datetime] = Field(default=None, alias="created_on")

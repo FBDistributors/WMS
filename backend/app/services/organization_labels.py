@@ -20,20 +20,34 @@ def load_org_name_map(db: Session) -> dict[str, str]:
     return out
 
 
+def _org_lookup_keys(
+    filial_id: str | None,
+    to_filial_code: str | None,
+) -> list[str]:
+    """Ombor kodi (001) emas, faqat organizatsiya ID (odatda 7+ raqam)."""
+    keys: list[str] = []
+    for raw in (to_filial_code, filial_id):
+        if raw is None:
+            continue
+        k = str(raw).strip()
+        if not k or k in keys:
+            continue
+        if len(k) >= 7 and k.isdigit():
+            keys.append(k)
+    return keys
+
+
 def resolve_org_display(
     filial_id: str | None,
     name_map: dict[str, str],
     *,
+    to_filial_code: str | None = None,
     to_warehouse_code: str | None = None,
 ) -> str | None:
-    """filial_id (SmartUP to_filial_code) bo'yicha nom; zaxira: to_warehouse_code."""
-    for key in (filial_id, to_warehouse_code):
-        if key is None:
-            continue
-        k = str(key).strip()
-        if not k:
-            continue
-        hit = name_map.get(k)
+    """SmartUP to_filial_code (organizatsiya ID) bo'yicha nom."""
+    _ = to_warehouse_code
+    for key in _org_lookup_keys(filial_id, to_filial_code):
+        hit = name_map.get(key)
         if hit:
             return hit
     return None

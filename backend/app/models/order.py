@@ -46,6 +46,7 @@ class Order(Base):
     source_external_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
     order_number: Mapped[str] = mapped_column(String(64), nullable=False)
     filial_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    to_filial_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
     customer_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     customer_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     agent_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -84,6 +85,7 @@ class Order(Base):
         Index("ix_orders_order_number", "order_number"),
         Index("ix_orders_source", "source"),
         Index("ix_orders_filial_id", "filial_id"),
+        Index("ix_orders_to_filial_code", "to_filial_code"),
     )
 
 

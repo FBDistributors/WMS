@@ -12,7 +12,12 @@ from app.constants.order_wms_status import (
     normalize_order_wms_status_for_storage,
     smartup_movement_status_for_wms_storage,
 )
-from app.integrations.smartup.mapper import OrderLinePayload, _resolve_external_id, map_order_to_wms_order
+from app.integrations.smartup.mapper import (
+    OrderLinePayload,
+    OrderPayload,
+    _resolve_external_id,
+    map_order_to_wms_order,
+)
 from app.integrations.smartup.schemas import SmartupOrder
 from app.models.order import Order, OrderLine, OrderWmsState
 from app.models.product import Product as ProductModel
@@ -92,6 +97,19 @@ def load_excluded_room_ids(db: Session) -> FrozenSet[str]:
     return frozenset((str(r[0]).strip() for r in rows if r[0] and str(r[0]).strip()))
 
 
+def _apply_order_filial_fields(order: Order, payload: OrderPayload) -> None:
+    """SmartUP to_filial_code → DB; from_warehouse_code (001) filial sifatida saqlanmasin."""
+    to_fc = (getattr(payload, "to_filial_code", None) or "").strip()
+    if to_fc:
+        order.to_filial_code = to_fc
+        order.filial_id = to_fc
+        return
+    fid = (payload.filial_id or "").strip()
+    if fid and len(fid) >= 7 and fid.isdigit():
+        order.filial_id = fid
+        order.to_filial_code = fid
+
+
 def _process_one_order(
     db: Session,
     order: SmartupOrder,
@@ -152,10 +170,17 @@ def _process_one_order(
                     external_id,
                     current_status,
                 )
+                _apply_order_filial_fields(existing, payload)
+                if getattr(payload, "from_warehouse_code", None) is not None:
+                    existing.from_warehouse_code = payload.from_warehouse_code
+                if getattr(payload, "to_warehouse_code", None) is not None:
+                    existing.to_warehouse_code = payload.to_warehouse_code
+                if do_commit:
+                    db.commit()
                 return 0, 0, 1
             existing.source = source
             existing.order_number = payload.order_number
-            existing.filial_id = payload.filial_id
+            _apply_order_filial_fields(existing, payload)
             existing.customer_id = payload.customer_id
             existing.customer_name = payload.customer_name
             existing.agent_id = payload.agent_id
@@ -207,6 +232,7 @@ def _process_one_order(
             delivery_date=getattr(payload, "delivery_date", None),
             delivery_number=getattr(payload, "delivery_number", None),
         )
+        _apply_order_filial_fields(record, payload)
         record.wms_state = OrderWmsState(status=normalize_order_wms_status_for_storage(payload.status))
         record.lines = [
             OrderLine(

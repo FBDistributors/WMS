@@ -89,6 +89,10 @@ class OrderListItem(BaseModel):
         None,
         description="settings_organizations bo'yicha filial_id (SmartUP to_filial_code) nomi",
     )
+    to_filial_code: Optional[str] = Field(
+        None,
+        description="SmartUP to_filial_code (organizatsiya ID)",
+    )
     customer_id: Optional[str] = None
     customer_name: Optional[str] = None
     agent_id: Optional[str] = None
@@ -921,8 +925,9 @@ async def list_orders(
                 filial_display_name=resolve_org_display(
                     order.filial_id,
                     org_name_map,
-                    to_warehouse_code=getattr(order, "to_warehouse_code", None),
+                    to_filial_code=getattr(order, "to_filial_code", None),
                 ),
+                to_filial_code=getattr(order, "to_filial_code", None),
                 customer_id=order.customer_id,
                 customer_name=order.customer_name,
                 agent_id=order.agent_id,
