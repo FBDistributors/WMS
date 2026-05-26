@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
+from app.constants.smartup_org_filials import (
+    ORG_FILIAL_ID_TO_NAME,
+    is_smartup_org_filial_id,
+    normalize_smartup_org_filial_id,
+)
 from app.models.settings_organization import SettingsOrganization as SettingsOrganizationModel
 
 
@@ -32,7 +37,7 @@ def _org_lookup_keys(
         k = str(raw).strip()
         if not k or k in keys:
             continue
-        if len(k) >= 7 and k.isdigit():
+        if is_smartup_org_filial_id(k):
             keys.append(k)
     return keys
 
@@ -50,4 +55,7 @@ def resolve_org_display(
         hit = name_map.get(key)
         if hit:
             return hit
+        fallback = ORG_FILIAL_ID_TO_NAME.get(key)
+        if fallback:
+            return fallback
     return None

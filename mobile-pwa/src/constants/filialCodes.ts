@@ -104,9 +104,15 @@ export function formatDillerFilialDisplay(order: {
   const named = order.filial_display_name?.trim()
   if (named) return named
   const toFilial = order.to_filial_code?.trim()
-  if (toFilial) return toFilial
+  if (toFilial) {
+    const label = getFilialNameById(toFilial)
+    return label ?? toFilial
+  }
   const fid = order.filial_id?.trim()
-  if (fid && !isWarehouseFilialCode(fid)) return fid
+  if (fid && !isWarehouseFilialCode(fid)) {
+    const label = getFilialNameById(fid)
+    return label ?? fid
+  }
   if (fid && isWarehouseFilialCode(fid) && fid === order.from_warehouse_code?.trim()) {
     return '—'
   }

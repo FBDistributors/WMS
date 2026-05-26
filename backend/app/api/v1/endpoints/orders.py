@@ -1547,20 +1547,35 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                 resolved_filial = mfm_resolved_filial_id(filial_override)
                 resolved_project = mfm_resolved_project_code()
                 attempts = mfm_meta.get("sync_attempts") or []
+                parsed = len(items_all)
+                status_hint = ""
+                if parsed and filtered_out_status:
+                    status_hint = (
+                        f" SmartUP dan {parsed} ta parse, lekin importdan oldin "
+                        f"{filtered_out_status} ta status filtri (faqat W) sababli tashlandi — "
+                        "ko'pchilik status=C (yig'ish). SMARTUP_DILLER_SYNC_ONLY_W o'chiq bo'lishi kerak "
+                        "(default). Yangi tab faqat WMS status=W."
+                    )
+                elif parsed and not filtered_out_status:
+                    status_hint = (
+                        f" SmartUP dan {parsed} ta parse, lekin import_orders hech narsa "
+                        "yaratmadi (mavjud/skip). skipped_by debug ga qarang."
+                    )
                 return SmartupSyncResponse(
                     created=resp.created,
                     updated=resp.updated,
                     skipped=resp.skipped,
                     detail=(
-                        f"SmartUp mfm: 0 ta qator (mode={effective_mfm_mode}, "
+                        f"SmartUp mfm: 0 ta import (mode={effective_mfm_mode}, "
                         f"sana {begin}..{end}; "
                         f"filial={resolved_filial}, project_code={resolved_project}, "
                         f"omit_dates={_mfm_movement_export_omit_dates()}, "
+                        f"parsed={parsed}, w_filter_out={filtered_out_status}, "
                         f"body_len={mfm_meta.get('http_body_len')}, keys={raw_keys}, "
-                        f"attempts={attempts}). "
-                        "Postman bilan solishtiring: filial_id, project_code, begin_created_on/modified_on. "
+                        f"attempts={attempts}).{status_hint} "
+                        "Postman: filial_id, project_code, begin_created_on/modified_on. "
                         "VPS: git pull && sudo systemctl restart wms-api. "
-                        "Brauzerda date_from/date_to eski bo'lsa Filter → Tozalash. "
+                        "Brauzer: Filter → Tozalash. "
                         "Log: journalctl -u wms-api -n 200 | grep -i mfm"
                     ),
                     errors_count=resp.errors_count,

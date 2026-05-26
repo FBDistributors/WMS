@@ -12,6 +12,7 @@ from app.constants.order_wms_status import (
     normalize_order_wms_status_for_storage,
     smartup_movement_status_for_wms_storage,
 )
+from app.constants.smartup_org_filials import normalize_smartup_org_filial_id
 from app.integrations.smartup.mapper import (
     OrderLinePayload,
     OrderPayload,
@@ -98,16 +99,14 @@ def load_excluded_room_ids(db: Session) -> FrozenSet[str]:
 
 
 def _apply_order_filial_fields(order: Order, payload: OrderPayload) -> None:
-    """SmartUP to_filial_code → DB; from_warehouse_code (001) filial sifatida saqlanmasin."""
-    to_fc = (getattr(payload, "to_filial_code", None) or "").strip()
-    if to_fc:
-        order.to_filial_code = to_fc
-        order.filial_id = to_fc
+    """SmartUP to_filial_code (organizatsiya ID) → DB; ombor kodi (001) saqlanmasin."""
+    org_id = normalize_smartup_org_filial_id(getattr(payload, "to_filial_code", None)) or normalize_smartup_org_filial_id(
+        payload.filial_id
+    )
+    if not org_id:
         return
-    fid = (payload.filial_id or "").strip()
-    if fid and len(fid) >= 7 and fid.isdigit():
-        order.filial_id = fid
-        order.to_filial_code = fid
+    order.to_filial_code = org_id
+    order.filial_id = org_id
 
 
 def _process_one_order(
@@ -170,13 +169,17 @@ def _process_one_order(
                     external_id,
                     current_status,
                 )
+                filial_before = (existing.to_filial_code or existing.filial_id or "").strip()
                 _apply_order_filial_fields(existing, payload)
+                filial_after = (existing.to_filial_code or existing.filial_id or "").strip()
                 if getattr(payload, "from_warehouse_code", None) is not None:
                     existing.from_warehouse_code = payload.from_warehouse_code
                 if getattr(payload, "to_warehouse_code", None) is not None:
                     existing.to_warehouse_code = payload.to_warehouse_code
                 if do_commit:
                     db.commit()
+                if filial_after and filial_after != filial_before:
+                    return 0, 1, 0
                 return 0, 0, 1
             existing.source = source
             existing.order_number = payload.order_number
@@ -471,12 +474,15 @@ def import_orders(
         for i, order in enumerate(orders_list[:5]):
             ext = _resolve_external_id(order)
             logger.info(
-                "import_orders preview [%s] source=%s: external_id=%s order_no=%s status=%s lines=%s",
+                "import_orders preview [%s] source=%s: external_id=%s order_no=%s status=%s "
+                "to_filial=%s filial_id=%s lines=%s",
                 i,
                 label,
                 ext,
                 order.order_no,
                 order.status,
+                getattr(order, "to_filial_code", None),
+                order.filial_id,
                 len(order.lines) if order.lines else 0,
             )
 

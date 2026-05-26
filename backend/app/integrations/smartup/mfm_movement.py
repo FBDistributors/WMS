@@ -15,6 +15,7 @@ from typing import Any
 from pydantic import ValidationError as PydanticValidationError
 
 from app.constants.order_wms_status import normalize_order_wms_status_for_storage
+from app.constants.smartup_org_filials import normalize_smartup_org_filial_id
 from app.integrations.smartup.movement_rows import extract_movement_rows, movement_delivery_datetime
 from app.integrations.smartup.schemas import SmartupOrder, SmartupOrderExportResponse, SmartupOrderLine
 
@@ -92,12 +93,21 @@ def _filter_mfm_movement_rows_for_export(rows: list[Any]) -> tuple[list[Any], in
     return kept, skipped
 
 
+def _diller_sync_only_w_status() -> bool:
+    """Eski qattiq filtr: faqat SmartUp status W. Default: barcha parse qilingan qatorlar."""
+    v = (os.getenv("SMARTUP_DILLER_SYNC_ONLY_W") or "").strip().lower()
+    return v in ("1", "true", "yes", "on")
+
+
 def filter_mfm_orders_for_diller_w_sync(
     items: list[SmartupOrder],
 ) -> tuple[list[SmartupOrder], int]:
     """
-    Diller sinxron: asosiy buyurtmalardagi B#W filtri kabi — faqat SmartUp status W.
+    Diller sinxron: default barcha parse qilingan harakatlar (WMS status importer da).
+    SMARTUP_DILLER_SYNC_ONLY_W=true: faqat SmartUp status W (Yangi tab uchun qattiq filtr).
     """
+    if not _diller_sync_only_w_status():
+        return list(items), 0
     kept = [
         item
         for item in items
@@ -237,6 +247,22 @@ def _raw_status_from_movement_rows(rows: list[dict]) -> str:
         if s:
             return s
     return ""
+
+
+def _resolve_to_filial_from_row(row: dict) -> str | None:
+    """SmartUP organizatsiya ID (to_filial_code); ombor kodi (001) emas."""
+    raw = _row_field(
+        row,
+        "to_filial_code",
+        "toFilialCode",
+        "to_filial",
+        "toFilial",
+        "to_organization_id",
+        "toOrganizationId",
+        "to_org_id",
+        "toOrgId",
+    )
+    return normalize_smartup_org_filial_id(raw)
 
 DEFAULT_MFM_URL = "https://smartup.online/b/anor/mxsx/mfm/movement$export"
 
@@ -379,7 +405,6 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
                 continue
             groups[gid].append(r)
 
-        default_filial = (os.getenv("DEFAULT_WAREHOUSE_CODE") or os.getenv("SMARTUP_DEFAULT_FILIAL") or "MAIN").strip()
         skip_empty_lines = validation_failed = 0
         for group_id, unit_rows in groups.items():
             lines = []
@@ -410,15 +435,13 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
                 "to_warehouse_code",
                 "toWarehouseCode",
             )
-            to_filial = _first_row_field(
-                unit_rows,
-                "to_filial_code",
-                "toFilialCode",
-                "to_filial",
-                "toFilial",
-            )
+            to_filial = None
+            for u in unit_rows:
+                to_filial = _resolve_to_filial_from_row(u)
+                if to_filial:
+                    break
             note = _first_row_field(unit_rows, "note", "movement_note", "movementNote")
-            filial = to_filial or default_filial
+            filial = to_filial
             if not lines:
                 skip_empty_lines += 1
                 continue
@@ -472,7 +495,6 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
         logger.info("mfm movement$export: %s ta guruh -> %s ta order (flat)", len(groups), len(orders))
     else:
         # Movement-level: movement_id, movement_items, from_warehouse_code, to_warehouse_code, note (sklad-sklad)
-        default_filial = (os.getenv("DEFAULT_WAREHOUSE_CODE") or os.getenv("SMARTUP_DEFAULT_FILIAL") or "MAIN").strip()
         skip_no_mid = non_dict = validation_failed = 0
         for m in rows:
             if not isinstance(m, dict):
@@ -502,9 +524,9 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
                 })
             from_wh = _row_field(m, "from_warehouse_code", "fromWarehouseCode")
             to_wh = _row_field(m, "to_warehouse_code", "toWarehouseCode")
-            to_filial = _row_field(m, "to_filial_code", "toFilialCode", "to_filial", "toFilial")
+            to_filial = _resolve_to_filial_from_row(m)
             note = (m.get("note") or "").strip() or None
-            filial = to_filial or default_filial
+            filial = to_filial
             amount = m.get("amount")
             if amount is not None and amount != "":
                 try:
@@ -746,11 +768,12 @@ def export_mfm_movements_for_sync(
     begin_date: date,
     end_date: date,
     filial_id: str | None = None,
-    export_status: str | None = DILLER_SYNC_MFM_EXPORT_STATUS,
+    export_status: str | None = None,
 ) -> tuple[SmartupOrderExportResponse, str]:
     """
     Diller sinxron: bo'sh javobda created va both rejimlarida qayta urinadi.
-    export_status default W — asosiy order$export dagi B#W kabi SmartUp body filtri.
+    export_status default None — body ga status yozilmaydi (to'liq eksport, filtr admin/importda).
+    SMARTUP_MFM_MOVEMENT_EXPORT_SEND_STATUS=true yoki export_status berilsa — body filtri.
     Qaytadi: (response, effective_date_filter_mode).
     """
     if _mfm_movement_export_omit_dates():
