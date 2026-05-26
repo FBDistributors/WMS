@@ -218,6 +218,15 @@ def _first_row_field(rows: list[dict], *keys: str) -> str | None:
     return None
 
 
+def _row_field(row: dict, *keys: str) -> str | None:
+    """Bitta movement qatoridan birinchi bo'sh bo'lmagan maydon."""
+    for key in keys:
+        val = row.get(key)
+        if val is not None and str(val).strip():
+            return str(val).strip()
+    return None
+
+
 def _raw_status_from_movement_row(row: dict) -> str:
     return str(row.get("status") or row.get("movement_status") or "").strip()
 
@@ -395,22 +404,21 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
                 unit_rows,
                 "from_warehouse_code",
                 "fromWarehouseCode",
-                "from_filial_code",
-                "fromFilialCode",
             )
             to_wh = _first_row_field(
                 unit_rows,
                 "to_warehouse_code",
                 "toWarehouseCode",
+            )
+            to_filial = _first_row_field(
+                unit_rows,
                 "to_filial_code",
                 "toFilialCode",
                 "to_filial",
                 "toFilial",
-                "filial_code",
-                "filialCode",
             )
             note = _first_row_field(unit_rows, "note", "movement_note", "movementNote")
-            filial = to_wh or from_wh or default_filial
+            filial = to_filial or default_filial
             if not lines:
                 skip_empty_lines += 1
                 continue
@@ -491,10 +499,11 @@ def _parse_mfm_response(body: str) -> SmartupOrderExportResponse:
                     "quantity": qty,
                     "name": it.get("product_article_code") or it.get("productArticleCode") or pc or "",
                 })
-            from_wh = (m.get("from_warehouse_code") or "").strip() or None
-            to_wh = (m.get("to_warehouse_code") or "").strip() or None
+            from_wh = _row_field(m, "from_warehouse_code", "fromWarehouseCode")
+            to_wh = _row_field(m, "to_warehouse_code", "toWarehouseCode")
+            to_filial = _row_field(m, "to_filial_code", "toFilialCode", "to_filial", "toFilial")
             note = (m.get("note") or "").strip() or None
-            filial = from_wh or to_wh or default_filial
+            filial = to_filial or default_filial
             amount = m.get("amount")
             if amount is not None and amount != "":
                 try:

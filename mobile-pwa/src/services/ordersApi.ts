@@ -70,6 +70,8 @@ export type OrderListItem = {
   /** SO terish hujjati statusi (backend: so_document_status) */
   so_document_status?: string | null
   filial_id?: string | null
+  /** settings_organizations nomi (SmartUP to_filial_code / filial_id bo'yicha) */
+  filial_display_name?: string | null
   customer_id?: string | null
   customer_name?: string | null
   agent_id?: string | null

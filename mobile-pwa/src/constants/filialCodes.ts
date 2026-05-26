@@ -86,14 +86,20 @@ export function resolveFilialLabel(codeOrId: string | null | undefined): string 
   return byCode !== '—' ? byCode : v
 }
 
-/** Tashkiliy harakat jadvali: to_filial_code / filial_id → nom (kod emas) */
+/**
+ * Tashkiliy harakat jadvali: SmartUP to_filial_code (= orders.filial_id) → Organizatsiya sozlamalari nomi.
+ * Qattiq FILIAL_CODE_TO_NAME fallback ishlatilmaydi.
+ */
 export function formatDillerFilialDisplay(order: {
-  to_warehouse_code?: string | null
+  filial_display_name?: string | null
   filial_id?: string | null
+  to_warehouse_code?: string | null
 }): string {
-  const toWh = order.to_warehouse_code?.trim()
-  if (toWh) return resolveFilialLabel(toWh)
+  const named = order.filial_display_name?.trim()
+  if (named) return named
   const fid = order.filial_id?.trim()
-  if (fid) return resolveFilialLabel(fid)
+  if (fid) return fid
+  const toWh = order.to_warehouse_code?.trim()
+  if (toWh) return toWh
   return '—'
 }

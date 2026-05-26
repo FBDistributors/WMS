@@ -229,7 +229,7 @@ def test_parse_mfm_flat_rows_to_filial_code() -> None:
                 {
                     "movement_id": "MV-FIL",
                     "movement_unit_id": "U1",
-                    "to_filial_code": "014",
+                    "to_filial_code": "3964966",
                     "product_code": "SKU-X",
                     "quantity": 1,
                 },
@@ -238,8 +238,37 @@ def test_parse_mfm_flat_rows_to_filial_code() -> None:
     )
     result = _parse_mfm_response(body)
     assert len(result.items) == 1
-    assert result.items[0].to_warehouse_code == "014"
-    assert result.items[0].filial_id == "014"
+    assert result.items[0].filial_id == "3964966"
+    assert result.items[0].to_warehouse_code is None
+
+
+def test_parse_mfm_movement_level_to_filial_code_postman() -> None:
+    """Postman movement$export: to_filial_code = org id; warehouse codes alohida."""
+    body = json.dumps(
+        {
+            "movement": [
+                {
+                    "from_filial_code": "3788131",
+                    "from_warehouse_code": "001",
+                    "to_filial_code": "3964966",
+                    "to_warehouse_code": None,
+                    "movement_id": "712945",
+                    "delivery_number": "92713",
+                    "status": "C",
+                    "note": "Заказ Дилер Ипподром",
+                    "movement_items": [
+                        {"product_code": "SKU-1", "quantity": 1},
+                    ],
+                },
+            ]
+        }
+    )
+    result = _parse_mfm_response(body)
+    assert len(result.items) == 1
+    order = result.items[0]
+    assert order.filial_id == "3964966"
+    assert order.from_warehouse_code == "001"
+    assert order.to_warehouse_code is None
 
 
 def test_parse_mfm_flat_rows() -> None:

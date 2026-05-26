@@ -30,6 +30,7 @@ from app.auth.deps import get_current_user, require_any_permission, require_perm
 from app.db import get_db
 from app.services.audit_service import ACTION_CREATE, ACTION_DELETE, ACTION_UPDATE, get_client_ip, log_action
 from app.services.push_notifications import send_push_to_user
+from app.services.organization_labels import load_org_name_map, resolve_org_display
 from app.services.safe_cancel_return_service import initiate_safe_cancel_return
 from app.integrations.smartup.client import SmartupClient
 from app.integrations.smartup.importer import delete_stale_orders, import_orders, load_excluded_room_ids
@@ -84,6 +85,10 @@ class OrderListItem(BaseModel):
     source_external_id: str
     status: str
     filial_id: Optional[str] = None
+    filial_display_name: Optional[str] = Field(
+        None,
+        description="settings_organizations bo'yicha filial_id (SmartUP to_filial_code) nomi",
+    )
     customer_id: Optional[str] = None
     customer_name: Optional[str] = None
     agent_id: Optional[str] = None
@@ -892,6 +897,8 @@ async def list_orders(
         u = doc.controlled_by_user
         return u.full_name or u.username
 
+    org_name_map = load_org_name_map(db)
+
     items = []
     for order in orders:
         doc = doc_by_order.get(order.id)
@@ -911,6 +918,11 @@ async def list_orders(
                     )
                 ),
                 filial_id=order.filial_id,
+                filial_display_name=resolve_org_display(
+                    order.filial_id,
+                    org_name_map,
+                    to_warehouse_code=getattr(order, "to_warehouse_code", None),
+                ),
                 customer_id=order.customer_id,
                 customer_name=order.customer_name,
                 agent_id=order.agent_id,
