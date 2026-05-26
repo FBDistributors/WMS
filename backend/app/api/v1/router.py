@@ -7,7 +7,6 @@ from app.api.v1.endpoints import (
     waves,
     dashboard,
     documents,
-    download,
     integrations,
     general_customers,
     inventory,
@@ -33,7 +32,6 @@ router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
 router.include_router(auth.router, prefix="/auth", tags=["auth"])
 router.include_router(brands.router, prefix="/brands", tags=["brands"])
 router.include_router(documents.router, prefix="/documents", tags=["documents"])
-router.include_router(download.router, prefix="/download", tags=["download"])
 router.include_router(movements.router, prefix="/movements", tags=["movements"])
 router.include_router(movements_orikzor.router, prefix="/movements-orikzor", tags=["movements-orikzor"])
 router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])

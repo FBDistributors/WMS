@@ -8,7 +8,6 @@
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest",
-    "copy-apk": "node scripts/copy-apk-to-backend.js",
     "android:release-apk": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-release-apk.ps1"
   },
   "dependencies": {
