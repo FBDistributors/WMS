@@ -67,22 +67,82 @@ export function getFilialNameById(id: string | null | undefined): string | null 
   return FILIAL_ID_TO_NAME[String(id).trim()] ?? null
 }
 
-/** SmartUP izoh: «Заказ Дилер Таш обл…» → filial nomi (flat eksportda to_filial_code bo'lmasa). */
+const NOTE_DISAMBIG: Array<{ id: string; tokens: string[] }> = [
+  { id: '8109116', tokens: ['jizzax', 'munav'] },
+  { id: '8109116', tokens: ['jizax', 'munav'] },
+  { id: '8109106', tokens: ['jizzax', 'sherdil'] },
+  { id: '8109110', tokens: ['qarshi', 'ulug'] },
+  { id: '8109110', tokens: ['karshi', 'ulug'] },
+  { id: '8109099', tokens: ['urikzor', 'ulug'] },
+]
+
+const NOTE_ALIASES: Array<{ id: string; aliases: string[] }> = [
+  { id: '8109116', aliases: ['munavvar', 'munav', 'мунаввар', 'мунав', 'jizzax', 'jizax', 'жиззах'] },
+  { id: '8109106', aliases: ['sherdil', 'шердил'] },
+  { id: '8109110', aliases: ['qarshi', 'karshi', 'карши'] },
+  { id: '8109111', aliases: ['termiz', 'термез', 'gayrat', 'гайрат'] },
+  { id: '8109101', aliases: ['fargona', 'fergana', 'фергана', 'tavakal', 'тавакал'] },
+  { id: '8109103', aliases: ['namangan', 'наманган'] },
+  { id: '8109104', aliases: ['таш обл', 'tash obl', 'мейрлан', 'meirlan'] },
+  { id: '3964966', aliases: ['ippodrom', 'ипподром'] },
+  { id: '8109099', aliases: ['urikzor', 'урикзор'] },
+  { id: '8109102', aliases: ['andijan', 'андижан'] },
+  { id: '8109107', aliases: ['samarkand', 'samarqand', 'самарканд'] },
+  { id: '8109108', aliases: ['bukhara', 'buxoro', 'бухара'] },
+  { id: '8109105', aliases: ['kokand', 'коканд'] },
+  { id: '8109112', aliases: ['xorezm', 'хорезм'] },
+  { id: '8109100', aliases: ['yangiyul', 'янгиюль'] },
+]
+
+function normalizeNote(note: string): string {
+  return note.trim().toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ')
+}
+
+function filialNameById(id: string): string | null {
+  return FILIAL_LIST.find((f) => f.id === id)?.name ?? null
+}
+
+/** SmartUP izoh: «Заказ Дилер …», «XAYITLIK FARGONA …» → filial nomi. */
 export function resolveFilialNameFromNote(note: string | null | undefined): string | null {
-  const text = (note ?? '').trim().toLowerCase()
-  if (!text || !text.includes('дилер')) return null
-  let best: { name: string; score: number } | null = null
-  for (const { id, name } of FILIAL_LIST) {
-    if (id === '3788131') continue
-    const m = name.toLowerCase().match(/дилер\s+([^()]+)/i)
-    const keyword = (m?.[1] ?? name).trim().replace(/\s+/g, ' ')
-    if (keyword.length < 4) continue
-    if (text.includes(keyword)) {
-      const score = keyword.length
-      if (!best || score > best.score) best = { name, score }
+  const text = normalizeNote(note ?? '')
+  if (!text) return null
+
+  if (text.includes('дилер') || text.includes('diler') || text.includes('накопительный')) {
+    let best: { name: string; score: number } | null = null
+    for (const { id, name } of FILIAL_LIST) {
+      if (id === '3788131') continue
+      const m = name.toLowerCase().match(/дилер\s+([^()]+)/i)
+      const keyword = (m?.[1] ?? name).trim().replace(/\s+/g, ' ')
+      if (keyword.length < 4) continue
+      if (text.includes(keyword)) {
+        const score = keyword.length
+        if (!best || score > best.score) best = { name, score }
+      }
+    }
+    if (best) return best.name
+  }
+
+  for (const { id, tokens } of NOTE_DISAMBIG) {
+    if (tokens.every((t) => text.includes(t))) return filialNameById(id)
+  }
+
+  let bestId: string | null = null
+  let bestScore = 0
+  const flat: Array<{ id: string; alias: string; score: number }> = []
+  for (const { id, aliases } of NOTE_ALIASES) {
+    for (const alias of aliases) {
+      const a = alias.toLowerCase()
+      if (a.length >= 4) flat.push({ id, alias: a, score: a.length })
     }
   }
-  return best?.name ?? null
+  flat.sort((a, b) => b.score - a.score)
+  for (const { id, alias, score } of flat) {
+    if (text.includes(alias) && score > bestScore) {
+      bestScore = score
+      bestId = id
+    }
+  }
+  return bestId ? filialNameById(bestId) : null
 }
 
 export function getFilialNameByCode(code: string | null | undefined): string {
