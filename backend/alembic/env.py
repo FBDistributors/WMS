@@ -5,9 +5,13 @@ import sys
 from logging.config import fileConfig
 
 from alembic import context
+from dotenv import load_dotenv
 from sqlalchemy import engine_from_config, pool
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+# VPS: systemd faqat /etc/wms/api.env ni beradi; alembic qo'lda ishga tushganda backend/.env kerak
+load_dotenv()
 
 from app.db import get_database_url  # noqa: E402
 from app.models.base import Base  # noqa: E402
