@@ -30,7 +30,11 @@ from app.auth.deps import get_current_user, require_any_permission, require_perm
 from app.db import get_db
 from app.services.audit_service import ACTION_CREATE, ACTION_DELETE, ACTION_UPDATE, get_client_ip, log_action
 from app.services.push_notifications import send_push_to_user
-from app.services.organization_labels import load_org_name_map, resolve_org_display
+from app.services.organization_labels import (
+    load_org_name_map,
+    reconcile_diller_orders_filial_from_settings,
+    resolve_org_display,
+)
 from app.services.safe_cancel_return_service import initiate_safe_cancel_return
 from app.integrations.smartup.client import SmartupClient
 from app.integrations.smartup.importer import delete_stale_orders, import_orders, load_excluded_room_ids
@@ -902,6 +906,11 @@ async def list_orders(
         return u.full_name or u.username
 
     org_name_map = load_org_name_map(db)
+    if order_src.lower() == "diller" and not org_name_map:
+        logger.warning(
+            "list_orders(diller): settings_organizations bo'sh — Filial ustuni ko'rinmaydi; "
+            "Sozlamalar → Organizatsiya ni to'ldiring"
+        )
 
     items = []
     for order in orders:
@@ -1486,6 +1495,9 @@ async def _sync_diller(db: Session, payload: SmartupSyncRequest) -> SmartupSyncR
                 db, items_to_import, order_source="diller"
             )
             stale_deleted = delete_stale_orders(db, items_to_import, order_source="diller")
+            filial_reconciled = reconcile_diller_orders_filial_from_settings(db)
+            if filial_reconciled:
+                logger.info("sync-smartup(diller): filial settings bo'yicha %s ta yangilandi", filial_reconciled)
             skipped += filtered_out_status
             breakdown = {k: v for k, v in skipped_by_reason.items() if v}
             logger.info(

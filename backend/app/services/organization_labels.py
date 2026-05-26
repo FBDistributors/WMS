@@ -7,7 +7,11 @@ import re
 from sqlalchemy.orm import Session
 
 from app.constants.smartup_org_filials import is_smartup_org_filial_id, normalize_smartup_org_filial_id
+from app.models.order import Order
 from app.models.settings_organization import SettingsOrganization as SettingsOrganizationModel
+
+# SmartUp so'rov header filiali — manzil tashkiloti emas.
+_IGNORE_FILIAL_IDS_FOR_LOOKUP = frozenset({"3788131"})
 
 # Izohdagi latin shahar tokenlari → kirill (settings nomi bilan solishtirish).
 _LATIN_TO_CYR_FRAGMENTS: dict[str, str] = {
@@ -63,7 +67,7 @@ def _org_lookup_keys(
         k = str(raw).strip()
         if not k or k in keys:
             continue
-        if is_smartup_org_filial_id(k):
+        if is_smartup_org_filial_id(k) and k not in _IGNORE_FILIAL_IDS_FOR_LOOKUP:
             keys.append(k)
     return keys
 
@@ -71,7 +75,12 @@ def _org_lookup_keys(
 def _normalize_note_text(note: str | None) -> str:
     t = (note or "").strip().lower()
     t = t.replace("ё", "е")
+    t = re.sub(r"[.\u2010-\u2015-]+", " ", t)
     return re.sub(r"\s+", " ", t)
+
+
+def _normalize_match_text(value: str) -> str:
+    return _normalize_note_text(value)
 
 
 def _dealer_keyword_from_org_name(name: str) -> str:
@@ -110,51 +119,115 @@ def _match_tokens_from_org_name(name: str) -> list[str]:
     return tokens
 
 
+def _token_match_variants(token: str) -> list[str]:
+    base = _normalize_match_text(token)
+    if not base:
+        return []
+    variants = [base]
+    if "обл" in base and "област" not in base:
+        variants.append(base.replace("обл", "область"))
+    if "област" in base:
+        variants.append(base.replace("область", "обл").replace("област", "обл"))
+    return list(dict.fromkeys(variants))
+
+
 def _note_contains_token(text: str, token: str) -> bool:
-    if token in text:
-        return True
+    for variant in _token_match_variants(token):
+        if variant in text:
+            return True
     for lat, cyr in _LATIN_TO_CYR_FRAGMENTS.items():
-        if token == cyr and lat in text:
-            return True
-        if token == lat and cyr in text:
-            return True
+        norm_lat = _normalize_match_text(lat)
+        norm_cyr = _normalize_match_text(cyr)
+        if _normalize_match_text(token) in (norm_lat, norm_cyr):
+            if norm_lat in text or norm_cyr in text:
+                return True
     return False
 
 
-def resolve_org_filial_id_from_note(
+def _parenthetical_tokens(note: str | None) -> list[str]:
+    tokens: list[str] = []
+    for m in re.finditer(r"\(([^)]+)\)", note or ""):
+        for w in re.findall(r"[a-zа-яё]+", m.group(1).lower()):
+            if len(w) >= 4:
+                tokens.append(w)
+    return tokens
+
+
+def _best_org_match_from_note(
     note: str | None,
     name_map: dict[str, str],
-) -> str | None:
-    """
-    Izoh → settings_organizations.org_id (nom bo'yicha, qattiq ro'yxat emas).
-  """
+) -> tuple[str | None, str | None]:
+    """(org_id, display_name) — eng yaxshi mos settings qatori."""
     text = _normalize_note_text(note)
     if not text or not name_map:
-        return None
-
+        return None, None
+    paren_tokens = _parenthetical_tokens(note)
     best_id: str | None = None
+    best_name: str | None = None
     best_score = 0
-
     for org_id, name in name_map.items():
+        name_l = _normalize_match_text(name)
+        for paren in paren_tokens:
+            if paren in name_l:
+                score = len(paren) + 20
+                if score > best_score:
+                    best_score = score
+                    best_id = org_id
+                    best_name = name
         for token in _match_tokens_from_org_name(name):
             if _note_contains_token(text, token):
                 score = len(token)
                 if score > best_score:
                     best_score = score
                     best_id = org_id
-
+                    best_name = name
     if best_id:
-        return best_id
-
+        return best_id, best_name
     for lat, cyr in _LATIN_TO_CYR_FRAGMENTS.items():
         if len(lat) < 4 or lat not in text:
             continue
         for org_id, name in name_map.items():
-            if cyr in name.lower():
+            if cyr in _normalize_match_text(name):
                 if len(lat) > best_score:
                     best_score = len(lat)
                     best_id = org_id
-    return best_id
+                    best_name = name
+    return best_id, best_name
+
+
+def resolve_org_filial_id_from_note(
+    note: str | None,
+    name_map: dict[str, str],
+) -> str | None:
+    """Izoh → settings_organizations.org_id."""
+    org_id, _ = _best_org_match_from_note(note, name_map)
+    return org_id
+
+
+def reconcile_diller_orders_filial_from_settings(db: Session) -> int:
+    """Mavjud diller buyurtmalarga settings org_id (izoh/to_filial bo'yicha) yozadi."""
+    name_map = load_org_name_map(db)
+    if not name_map:
+        return 0
+    rows = db.query(Order).filter(Order.source == "diller").all()
+    updated = 0
+    for order in rows:
+        before = (order.to_filial_code or order.filial_id or "").strip()
+        org_id = normalize_smartup_org_filial_id(order.to_filial_code) or normalize_smartup_org_filial_id(
+            order.filial_id
+        )
+        if org_id in _IGNORE_FILIAL_IDS_FOR_LOOKUP:
+            org_id = None
+        if not org_id or org_id not in name_map:
+            inferred, _ = _best_org_match_from_note(order.movement_note, name_map)
+            org_id = inferred
+        if org_id and org_id != before:
+            order.to_filial_code = org_id
+            order.filial_id = org_id
+            updated += 1
+    if updated:
+        db.commit()
+    return updated
 
 
 def resolve_org_display(
@@ -171,6 +244,9 @@ def resolve_org_display(
         hit = name_map.get(key)
         if hit:
             return hit
+    _, display_name = _best_org_match_from_note(movement_note, name_map)
+    if display_name:
+        return display_name
     inferred_id = resolve_org_filial_id_from_note(movement_note, name_map)
     if inferred_id:
         return name_map.get(inferred_id)
