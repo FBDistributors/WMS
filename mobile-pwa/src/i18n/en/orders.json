@@ -212,7 +212,11 @@
   },
   "columns_orikzor": {
     "order_number": "Movement number",
-    "external_id": "Movement ID",
+    "movement_number": "Movement number",
+    "external_id": "Delivery / movement ID",
+    "from_warehouse_code": "From warehouse",
+    "to_warehouse_code": "To warehouse",
+    "movement_note": "Note",
     "customer": "Customer",
     "customer_id": "Customer ID",
     "agent": "Agent",

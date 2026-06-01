@@ -110,16 +110,27 @@ export function useDillerTableConfig() {
 export function useOrikzorTableConfig() {
   const ORIKZOR_COLUMN_IDS = [
     'select',
-    'movement_number',
+    'order_number',
+    'external_id',
+    'from_warehouse_code',
+    'to_warehouse_code',
     'movement_note',
+    'total_amount',
     'status',
     'lines',
     'delivery_date',
     'view_details',
   ]
-  const ORIKZOR_SEARCH_FIELDS = ['movement_number', 'movement_note', 'status']
+  const ORIKZOR_SEARCH_FIELDS = [
+    'order_number',
+    'external_id',
+    'from_warehouse_code',
+    'to_warehouse_code',
+    'movement_note',
+    'status',
+  ]
   const { defaultConfig, normalizeConfig, loadConfig } = createMovementsTableConfig(
-    'wms_orikzor_table_config',
+    'wms_orikzor_table_config_v2',
     ORIKZOR_COLUMN_IDS,
     ORIKZOR_SEARCH_FIELDS
   )
@@ -127,7 +138,7 @@ export function useOrikzorTableConfig() {
   const [config, setConfig] = useState<MovementsTableConfig>(() => loadConfig())
 
   useEffect(() => {
-    localStorage.setItem('wms_orikzor_table_config', JSON.stringify(config))
+    localStorage.setItem('wms_orikzor_table_config_v2', JSON.stringify(config))
   }, [config])
 
   const updateConfig = useCallback(

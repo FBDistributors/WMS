@@ -17,6 +17,7 @@ from pydantic import ValidationError as PydanticValidationError
 from app.integrations.smartup.movement_rows import (
     extract_movement_rows,
     flatten_movement_list as _flatten_movement_list,
+    movement_delivery_datetime,
     parse_movement_date as _parse_movement_date,
 )
 from app.integrations.smartup.schemas import SmartupOrder, SmartupOrderExportResponse
@@ -44,6 +45,15 @@ _env_statuses = (os.getenv("SMARTUP_ORIKZOR_ALLOWED_STATUSES") or "").strip()
 ALLOWED_MOVEMENT_STATUSES: set[str] = (
     {s.strip().upper() for s in _env_statuses.split(",") if s.strip()} if _env_statuses else set()
 )
+
+
+def _row_field(row: dict, *keys: str) -> str | None:
+    """Bitta movement qatoridan birinchi bo'sh bo'lmagan maydon."""
+    for key in keys:
+        val = row.get(key)
+        if val is not None and str(val).strip():
+            return str(val).strip()
+    return None
 
 
 def _extract_movements_list(data: Any) -> list:
@@ -272,15 +282,33 @@ def _parse_movement_response(
             })
 
         external_key = (m.get("external_id") or "").strip() or f"movement:{movement_id}"
+        from_wh = _row_field(m, "from_warehouse_code", "fromWarehouseCode")
+        to_wh = _row_field(m, "to_warehouse_code", "toWarehouseCode")
+        note = (m.get("note") or m.get("movement_note") or m.get("movementNote") or "").strip() or None
+        amount = m.get("amount")
+        if amount is not None and amount != "":
+            try:
+                amount = str(amount).replace(" ", "").replace(",", ".")
+            except Exception:
+                amount = None
+        delivery_dt = movement_delivery_datetime(m)
+        smartup_status = normalized_status or raw_status or None
         order_dict = {
             "external_id": external_key,
             "deal_id": movement_id,
             "order_no": movement_number,
-            "status": "imported",
+            "status": smartup_status,
             "filial_id": filial,
             "filial_code": filial,
+            "to_filial_code": to_wh or filial,
+            "from_warehouse_code": from_wh,
+            "to_warehouse_code": to_wh,
+            "note": note,
+            "total_amount": amount,
             "lines": lines,
         }
+        if delivery_dt is not None:
+            order_dict["delivery_date"] = delivery_dt
         try:
             validate = getattr(SmartupOrder, "model_validate", getattr(SmartupOrder, "parse_obj", None))
             if validate:

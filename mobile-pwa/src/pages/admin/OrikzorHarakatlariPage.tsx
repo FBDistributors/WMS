@@ -14,7 +14,13 @@ import { Card } from '../../components/ui/card'
 import { DateInput } from '../../components/DateInput'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
-import { getOrders, syncSmartupOrders, type OrderListItem, type SmartupSyncResult } from '../../services/ordersApi'
+import {
+  formatSourceExternalIdDisplay,
+  getOrders,
+  syncSmartupOrders,
+  type OrderListItem,
+  type SmartupSyncResult,
+} from '../../services/ordersApi'
 import { useAuth } from '../../rbac/AuthProvider'
 
 const PAGE_SIZE = 50
@@ -22,7 +28,11 @@ const PAGE_SIZE = 50
 const COLUMNS_ORIKZOR = [
   { id: 'select', labelKey: 'orders:columns.select' },
   { id: 'order_number', labelKey: 'orders:columns_diller.movement_number' },
+  { id: 'external_id', labelKey: 'orders:columns_diller.external_id' },
+  { id: 'from_warehouse_code', labelKey: 'orders:columns_diller.from_warehouse_code' },
+  { id: 'to_warehouse_code', labelKey: 'orders:columns_diller.to_warehouse_code' },
   { id: 'movement_note', labelKey: 'orders:columns_diller.movement_note' },
+  { id: 'total_amount', labelKey: 'orders:columns_diller.total_amount' },
   { id: 'status', labelKey: 'orders:columns_diller.status' },
   { id: 'lines', labelKey: 'orders:columns_diller.lines' },
   { id: 'delivery_date', labelKey: 'orders:columns_diller.delivery_date' },
@@ -31,6 +41,9 @@ const COLUMNS_ORIKZOR = [
 
 const ORIKZOR_SEARCH_FIELD_OPTIONS = [
   { id: 'order_number', labelKey: 'orders:columns_diller.movement_number' },
+  { id: 'external_id', labelKey: 'orders:columns_diller.external_id' },
+  { id: 'from_warehouse_code', labelKey: 'orders:columns_diller.from_warehouse_code' },
+  { id: 'to_warehouse_code', labelKey: 'orders:columns_diller.to_warehouse_code' },
   { id: 'movement_note', labelKey: 'orders:columns_diller.movement_note' },
   { id: 'status', labelKey: 'orders:columns_diller.status' },
 ]
@@ -174,15 +187,44 @@ export function OrikzorHarakatlariPage() {
             {order.order_number}
           </td>
         )
+      case 'external_id':
+        return (
+          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+            {formatSourceExternalIdDisplay(order.source_external_id) || '—'}
+          </td>
+        )
+      case 'from_warehouse_code':
+        return (
+          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+            {order.from_warehouse_code ?? '—'}
+          </td>
+        )
+      case 'to_warehouse_code':
+        return (
+          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+            {order.to_warehouse_code ?? '—'}
+          </td>
+        )
       case 'movement_note':
         return (
-          <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300" title={order.movement_note ?? ''}>
+          <td
+            className="max-w-[200px] truncate px-4 py-3 text-slate-600 dark:text-slate-300"
+            title={order.movement_note ?? undefined}
+          >
             {order.movement_note ?? '—'}
+          </td>
+        )
+      case 'total_amount':
+        return (
+          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+            {order.total_amount == null ? '—' : Number(order.total_amount).toLocaleString()}
           </td>
         )
       case 'status':
         return (
-          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{order.status}</td>
+          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+            {t(`orders:status.${order.status}`, order.status)}
+          </td>
         )
       case 'lines':
         return (
@@ -243,7 +285,7 @@ export function OrikzorHarakatlariPage() {
     const orderedCols = orikzorTableConfig.config.columnOrder.filter((id) => COLUMNS_ORIKZOR.some((c) => c.id === id)) as OrikzorColumnId[]
     return (
       <TableScrollArea inline>
-        <table className="w-max min-w-[600px] table-auto text-sm">
+        <table className="w-max min-w-[960px] table-auto text-sm">
           <thead className="text-xs uppercase text-slate-500">
             <tr className="border-b border-slate-200 dark:border-slate-800">
               {orderedCols.map((colId) =>

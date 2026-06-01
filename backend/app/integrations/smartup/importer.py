@@ -147,7 +147,8 @@ def _process_one_order(
         .one_or_none()
     )
     payload = map_order_to_wms_order(order)
-    if (order_source or "").strip().lower() == "diller":
+    order_src = (order_source or "").strip().lower()
+    if order_src == "diller":
         payload.status = smartup_movement_status_for_wms_storage(order.status)
         if org_name_map and not normalize_smartup_org_filial_id(
             getattr(payload, "to_filial_code", None) or payload.filial_id
@@ -159,6 +160,8 @@ def _process_one_order(
             if inferred:
                 payload.to_filial_code = inferred
                 payload.filial_id = inferred
+    elif order_src == "orikzor":
+        payload.status = smartup_movement_status_for_wms_storage(order.status)
     else:
         raw_status = (order.status or "").strip()
         if raw_status:

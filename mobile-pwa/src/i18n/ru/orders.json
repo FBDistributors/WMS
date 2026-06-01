@@ -209,7 +209,11 @@
   },
   "columns_orikzor": {
     "order_number": "Номер движения",
-    "external_id": "Movement ID",
+    "movement_number": "Номер движения",
+    "external_id": "Номер доставки",
+    "from_warehouse_code": "Откуда (склад)",
+    "to_warehouse_code": "Куда (склад)",
+    "movement_note": "Примечание",
     "customer": "Клиент",
     "customer_id": "ID клиента",
     "agent": "Агент",

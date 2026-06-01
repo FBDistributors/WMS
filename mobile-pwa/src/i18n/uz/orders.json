@@ -198,7 +198,11 @@
   },
   "columns_orikzor": {
     "order_number": "Harakat raqami",
-    "external_id": "Movement ID",
+    "movement_number": "Harakat raqami",
+    "external_id": "Yetkazib berish raqami",
+    "from_warehouse_code": "Qayerdan (sklad)",
+    "to_warehouse_code": "Qayerga (sklad)",
+    "movement_note": "Izoh",
     "customer": "Mijoz",
     "customer_id": "Mijoz ID",
     "agent": "Agent",

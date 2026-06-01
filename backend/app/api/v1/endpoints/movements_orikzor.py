@@ -34,10 +34,21 @@ def _parse_date(value: str | None) -> date | None:
     return None
 
 
+def _field(m: dict[str, Any], *keys: str) -> Any:
+    for key in keys:
+        val = m.get(key)
+        if val is not None and str(val).strip() != "":
+            return val
+    return None
+
+
 def _raw_to_display(m: dict[str, Any]) -> dict[str, Any]:
     """Smartup raw movement ni frontend kutilgan formatga aylantiradi."""
-    mid = m.get("movement_id") or m.get("movement_number") or ""
-    barcode = (m.get("external_id") or "").strip() or (f"movement:{mid}" if mid else "")
+    mid = _field(m, "movement_id", "movement_number", "movementId") or ""
+    movement_number = (str(_field(m, "movement_number", "movementNumber") or mid)).strip()
+    barcode = (str(_field(m, "external_id", "externalId") or "")).strip() or (
+        f"movement:{mid}" if mid else ""
+    )
     items = m.get("movement_items") or m.get("movement_itens") or m.get("movementItems") or []
     if not isinstance(items, list):
         items = [items] if items else []
@@ -50,19 +61,22 @@ def _raw_to_display(m: dict[str, Any]) -> dict[str, Any]:
         for it in items
         if isinstance(it, dict)
     ]
-    from_date = m.get("from_movement_date") or m.get("fromMovementDate") or ""
-    movement_number = (m.get("movement_number") or "").strip() or mid
+    from_date = _field(m, "from_movement_date", "fromMovementDate", "from_created_on", "created_on") or ""
     return {
         "movement_id": mid,
         "movement_number": movement_number,
         "barcode": barcode,
-        "from_warehouse_code": m.get("from_warehouse_code"),
-        "to_warehouse_code": m.get("to_warehouse_code"),
-        "note": m.get("note"),
-        "amount": m.get("amount"),
-        "status": m.get("status"),
+        "external_id": _field(m, "external_id", "externalId"),
+        "from_warehouse_code": _field(m, "from_warehouse_code", "fromWarehouseCode"),
+        "to_warehouse_code": _field(m, "to_warehouse_code", "toWarehouseCode"),
+        "filial_code": _field(m, "filial_code", "filialCode"),
+        "note": _field(m, "note", "movement_note", "movementNote"),
+        "amount": _field(m, "amount"),
+        "status": _field(m, "status", "movement_status", "movementStatus"),
         "from_time": from_date,
         "from_movement_date": from_date,
+        "created_on": _field(m, "created_on", "createdOn"),
+        "modified_on": _field(m, "modified_on", "modifiedOn"),
         "movement_items": movement_items,
     }
 
