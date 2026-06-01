@@ -352,6 +352,9 @@ def finish_safe_cancel_return(db: Session, *, session_id: UUID, picker_user_id: 
         )
         dline.picked_qty = 0.0
 
+    # Terish bekor qilish (pick+/unallocate+) yozuvlari SQL balansda ko'rinishi kerak;
+    # aks holda release_document_reserve_on_cancel reserved=0 deb o'qiydi (409).
+    db.flush()
     release_document_reserve_on_cancel(db, document, document.lines, picker_user_id)
 
     require_transition_rule(order.wms_state.status, "cancelled")

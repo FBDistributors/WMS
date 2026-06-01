@@ -1,5 +1,8 @@
 -- Reference: PostgreSQL function mirroring "Finish Return" stock + status updates.
 -- Application code path: `app.services.safe_cancel_return_service.finish_safe_cancel_return` (SQLAlchemy, single commit/rollback).
+-- NOTE: Prod kod sessiya qatorlarida pick+/unallocate+ dan keyin db.flush() qiladi, so'ng
+-- `release_document_reserve_on_cancel` orqali terilmagan qatorlar rezervini ham yechadi.
+-- Ushbu SQL faqat sessiya qatorlarini qaytaradi; to'liq bekor uchun Python yo'lini ishlating.
 
 BEGIN;
 
