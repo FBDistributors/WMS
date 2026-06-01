@@ -14,7 +14,7 @@ from app.models.user_fcm_token import UserFCMToken
 
 logger = logging.getLogger(__name__)
 
-# Render / PaaS: paste full service account JSON as a secret (file path is awkward).
+# VPS server: FCM service account JSON ni /etc/wms/api.env yoki backend/.env ga qo'ying (fayl yo'li qulay emas bo'lsa).
 # Keep aliases for easier migration from older environment naming.
 _ENV_JSON_KEYS = (
     "FIREBASE_SERVICE_ACCOUNT_JSON",

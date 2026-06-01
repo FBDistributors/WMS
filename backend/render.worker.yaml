@@ -1,4 +1,5 @@
-# Render Background Worker - SmartUp Sync
+# ARXIV — faol deploy emas. Production worker: VPS wms-smartup-worker
+# Eski PaaS background worker (referens)
 # Deploy as separate service from the web API.
 # Uses same PostgreSQL database as web service.
 # If using from repo root (WMS/), add: rootDir: backend
@@ -12,7 +13,7 @@ services:
     startCommand: python worker.py
     envVars:
       - key: DATABASE_URL
-        sync: false  # Set in Render dashboard or use PostgreSQL addon
+        sync: false  # VPS: /etc/wms/api.env yoki PostgreSQL localhost
       - key: SMARTUP_BASE_URL
         sync: false
       - key: SMARTUP_BASIC_USER

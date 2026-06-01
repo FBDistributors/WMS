@@ -6,7 +6,7 @@ Create Date: 2026-02-22
 
 Zone types: NORMAL, EXPIRED, DAMAGED, QUARANTINE.
 NOTE: movement_type CHECK is NOT changed here so existing allocate/unallocate
-rows on Render (and other envs) do not violate the constraint. App validates
+rows on VPS server (and other envs) do not violate the constraint. App validates
 new movements via ON_HAND_MOVEMENT_TYPES. When all envs have no allocate/
 unallocate rows, add a separate migration to tighten the CHECK.
 """

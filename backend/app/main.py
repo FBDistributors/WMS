@@ -97,7 +97,7 @@ app.add_middleware(RequestTimeLoggingMiddleware)
 
 @app.get("/")
 async def root():
-    """Render va boshqa platformalar health check uchun HEAD/GET / ishlatadi — 404 oldini olish."""
+    """VPS va boshqa platformalar health check uchun HEAD/GET / ishlatadi — 404 oldini olish."""
     return {"status": "ok"}
 
 

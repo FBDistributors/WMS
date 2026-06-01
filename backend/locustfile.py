@@ -11,11 +11,11 @@ Ishga tushirish (lokal):
   set WMS_LOCUST_PASSWORD=...
   locust -f locustfile.py --host=http://127.0.0.1:8000
 
-Render / production:
-  locust -f locustfile.py --host=https://sizning-domen.com
+Production (VPS):
+  locust -f locustfile.py --host=https://api.fbwarehouse.uz
 
 Web UI: http://localhost:8089 — Users, spawn rate, Start.
-  Windows: 8089 band bo'lsa — python -m locust ... --web-port=8090 yoki .\run_locust_render.ps1 (avto bo'sh port).
+  Windows: 8089 band bo'lsa — python -m locust ... --web-port=8090 yoki .\run_locust_vps.ps1 (avto bo'sh port).
 
 Muhim:
   - Bir xil oddiy foydalanuvchi bilan juda ko‘p parallel virtual user ishga tushirsangiz,

@@ -1,14 +1,14 @@
-# WMS — Locust yuk sinovi (prod API; default VPS).
+# WMS — Locust yuk sinovi (VPS production API).
 # Parol chat/repoga yozilmaydi: env orqali yoki quyidagi so'rovda kiritiladi.
 #
 # Ishlatish:
-#   .\run_locust_render.ps1
-#   .\run_locust_render.ps1 -Users 50 -SpawnRate 5
+#   .\run_locust_vps.ps1
+#   .\run_locust_vps.ps1 -Users 50 -SpawnRate 5
 #
 # Yoki parolni oldindan (bir sessiya), so'roqsiz:
 #   $env:WMS_LOCUST_USERNAME = "test"
 #   $env:WMS_LOCUST_PASSWORD = "..."
-#   .\run_locust_render.ps1 -EnvOnly
+#   .\run_locust_vps.ps1 -EnvOnly
 
 param(
     [string]$HostUrl = "https://api.fbwarehouse.uz",
@@ -18,7 +18,6 @@ param(
     [int]$Users = 0,
     [int]$SpawnRate = 0,
     [int]$RunSeconds = 0,
-    # Faqat env: WMS_LOCUST_USERNAME va WMS_LOCUST_PASSWORD (so'roqsiz)
     [switch]$EnvOnly
 )
 

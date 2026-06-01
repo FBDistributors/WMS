@@ -1,4 +1,5 @@
-# WMS Render Blueprint: DB + Web Service + Background Worker
+# ARXIV — faol deploy emas. Production: VPS server (api.fbwarehouse.uz), runbook: deploy/vps/VPS_DEPLOY_RUNBOOK.md
+# Eski PaaS blueprint (referens)
 # Ulanish: Web va Worker ikkalasi ham wms-db PostgreSQL ga ulanadi (DATABASE_URL).
 # Repo root WMS/ bo'lsa: Dashboard da Blueprint path = backend/render.yaml yoki Root Directory = backend.
 ---
@@ -26,7 +27,7 @@ services:
         generateValue: true
       - key: CORS_ORIGINS
         value: "*"
-      # FCM: Quyidagilardan bittasini Render Dashboard secret sifatida bering:
+      # FCM: Quyidagilardan bittasini VPS server /etc/wms/api.env ga qo'ying:
       #  - FIREBASE_SERVICE_ACCOUNT_JSON (tavsiya)
       #  - FIREBASE_SERVICE_ACCOUNT_JSON_B64
       #  - GOOGLE_APPLICATION_CREDENTIALS (json file path, agar file mount qilingan bo‘lsa)

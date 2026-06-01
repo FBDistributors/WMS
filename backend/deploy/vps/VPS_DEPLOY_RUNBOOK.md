@@ -1,6 +1,44 @@
 # WMS VPS — deploy va diagnostika
 
+**Production hosting:** WMS backend, PostgreSQL va SmartUp worker **VPS server**da ishlaydi. Public API: **`https://api.fbwarehouse.uz`**.
+
 Oxirgi tekshiruv: **2026-05-21** (`vm56637`, commit `5715413`).
+
+---
+
+## Server yangilash (standart deploy)
+
+Yangi kod (masalan `git push` dan keyin) VPS da quyidagicha yangilanadi:
+
+```bash
+cd /var/www/wms/backend
+bash deploy/vps/update-wms.sh
+```
+
+Skript ketma-ketligi: `git pull` → `pip install -r requirements.txt` → `alembic upgrade head` → `systemctl restart wms-api` va `wms-smartup-worker` → `/health` tekshiruv.
+
+**Qo‘lda** (skriptsiz):
+
+```bash
+cd /var/www/wms
+git pull origin main
+cd backend
+.venv/bin/pip install -r requirements.txt
+set -a && source /etc/wms/api.env && set +a
+.venv/bin/alembic upgrade head
+sudo systemctl restart wms-api
+sudo systemctl restart wms-smartup-worker
+curl -s https://api.fbwarehouse.uz/health
+```
+
+**Loglar:**
+
+```bash
+journalctl -u wms-api -f
+journalctl -u wms-smartup-worker -n 50 --no-pager
+```
+
+---
 
 ## Tezkor diagnostika
 

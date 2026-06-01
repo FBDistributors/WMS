@@ -1,5 +1,5 @@
 """
-Render Background Worker entrypoint for SmartUp sync.
+VPS server SmartUp sync worker entrypoint (`wms-smartup-worker` systemd).
 
 Runs periodic sync of products and orders from SmartUp ERP.
 Configure SYNC_INTERVAL_SECONDS (default: 300) for interval.

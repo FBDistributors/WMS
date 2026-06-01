@@ -111,7 +111,7 @@ class SmartupClient:
                 logger.error("Smartup export failed (HTTP %s): %s", exc.code, response_text)
                 if exc.code == 481 or (exc.code == 401 and ("авторизация" in response_text.lower() or "невидим" in response_text.lower())):
                     hint = (
-                        "Render env: SMARTUP_BASIC_USER, SMARTUP_BASIC_PASS, SMARTUP_PROJECT_CODE=trade. "
+                        "VPS server env: SMARTUP_BASIC_USER, SMARTUP_BASIC_PASS, SMARTUP_PROJECT_CODE=trade. "
                         "Agar 'Проект невидим' bo'lsa: SMARTUP_PROJECT_CODE=trade qiling."
                     )
                     last_detail = f"{response_text} ({hint})"
