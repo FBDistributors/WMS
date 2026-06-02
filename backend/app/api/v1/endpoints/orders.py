@@ -59,6 +59,7 @@ from app.models.document import DocumentLine as DocumentLineModel
 from app.models.order import Order as OrderModel
 from app.models.order import OrderLine as OrderLineModel
 from app.models.order import OrderWmsState as OrderWmsStateModel
+from app.models.settings_organization import SettingsOrganization as SettingsOrganizationModel
 from app.models.product import Product as ProductModel
 from app.models.product import ProductBarcode
 from app.models.location import Location as LocationModel
@@ -778,12 +779,23 @@ async def list_orders(
         )
 
     if q:
+        if order_src.lower() == "diller":
+            query = query.outerjoin(
+                SettingsOrganizationModel,
+                SettingsOrganizationModel.org_id
+                == func.coalesce(OrderModel.to_filial_code, OrderModel.filial_id),
+            )
         allowed_fields = {
             "order_number": OrderModel.order_number,
             "external_id": OrderModel.source_external_id,
             "customer": OrderModel.customer_name,
             "customer_id": OrderModel.customer_id,
             "agent": OrderModel.agent_name,
+            "to_filial": func.coalesce(
+                SettingsOrganizationModel.name,
+                OrderModel.to_filial_code,
+                OrderModel.filial_id,
+            ),
         }
         if search_fields:
             requested_fields = [field.strip() for field in search_fields.split(",") if field.strip()]
