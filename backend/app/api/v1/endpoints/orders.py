@@ -779,6 +779,11 @@ async def list_orders(
         )
 
     if q:
+        requested_fields = (
+            [field.strip() for field in search_fields.split(",") if field.strip()] if search_fields else []
+        )
+        if "status" in requested_fields and not status:
+            query = query.outerjoin(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)
         if order_src.lower() == "diller":
             query = query.outerjoin(
                 SettingsOrganizationModel,
@@ -791,6 +796,8 @@ async def list_orders(
             "customer": OrderModel.customer_name,
             "customer_id": OrderModel.customer_id,
             "agent": OrderModel.agent_name,
+            "status": OrderWmsStateModel.status,
+            "movement_note": OrderModel.movement_note,
             "to_filial": func.coalesce(
                 SettingsOrganizationModel.name,
                 OrderModel.to_filial_code,
@@ -798,7 +805,6 @@ async def list_orders(
             ),
         }
         if search_fields:
-            requested_fields = [field.strip() for field in search_fields.split(",") if field.strip()]
             invalid = [field for field in requested_fields if field not in allowed_fields]
             if invalid:
                 raise HTTPException(status_code=400, detail="Invalid search fields")
@@ -809,6 +815,17 @@ async def list_orders(
                 OrderModel.source_external_id,
                 OrderModel.customer_name,
             ]
+            if order_src.lower() == "diller":
+                fields.extend(
+                    [
+                        OrderModel.movement_note,
+                        func.coalesce(
+                            SettingsOrganizationModel.name,
+                            OrderModel.to_filial_code,
+                            OrderModel.filial_id,
+                        ),
+                    ]
+                )
         term = f"%{q.strip()}%"
         order_id_from_so = (
             db.query(DocumentModel.order_id)
