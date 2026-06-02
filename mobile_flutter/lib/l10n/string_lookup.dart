@@ -153,6 +153,10 @@ abstract final class StringLookup {
     'consolidatedNoOpenLinesForSwitch':
         'Barcha pozitsiyalar terilgan — manbani almashtirish uchun ochiq qator yo‘q',
     'lineReasonModalTitle': 'Pozitsiyani sabab bilan bekor qilish',
+    'unpickActionTitle': 'Qisman qaytarish',
+    'unpickReasonTitle': 'Terilgan miqdorni qaytarish',
+    'unpickQtyLabel': 'Qaytariladigan miqdor',
+    'unpickDone': 'Miqdor qaytarildi',
     'consolidatedScanMismatch':
         'Skanlangan mahsulot tanlangan pozitsiyaga mos kelmadi. To‘g‘ri mahsulotni skanlang.',
     'consolidatedModalScanHint':
@@ -452,6 +456,10 @@ abstract final class StringLookup {
     'consolidatedNoOpenLinesForSwitch':
         'Все позиции собраны — нечего переназначать',
     'lineReasonModalTitle': 'Отменить позицию с указанием причины',
+    'unpickActionTitle': 'Частичный возврат',
+    'unpickReasonTitle': 'Вернуть собранное количество',
+    'unpickQtyLabel': 'Количество к возврату',
+    'unpickDone': 'Количество возвращено',
     'consolidatedScanMismatch':
         'Отсканированный товар не совпадает с выбранной позицией. Отсканируйте правильный товар.',
     'consolidatedModalScanHint':
@@ -750,6 +758,10 @@ abstract final class StringLookup {
     'consolidatedNoOpenLinesForSwitch':
         'All lines are complete — nothing to reassign',
     'lineReasonModalTitle': 'Skip position with reason',
+    'unpickActionTitle': 'Partial rollback',
+    'unpickReasonTitle': 'Rollback picked quantity',
+    'unpickQtyLabel': 'Rollback quantity',
+    'unpickDone': 'Quantity rolled back',
     'consolidatedScanMismatch':
         'Scanned product does not match the selected position. Scan the correct product.',
     'consolidatedModalScanHint':

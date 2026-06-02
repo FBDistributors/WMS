@@ -216,6 +216,31 @@ class PickingRepository {
     }
   }
 
+  Future<PickLineResponse> unpickLine(
+    String lineId, {
+    required int delta,
+    required String reason,
+    required String requestId,
+  }) async {
+    try {
+      final Response<Object?> res = await _dio.post<Object?>(
+        '$_p/lines/$lineId/unpick',
+        data: <String, Object?>{
+          'delta': delta,
+          'reason': reason.trim(),
+          'request_id': requestId,
+        },
+      );
+      final Object? data = res.data;
+      if (data is! Map) {
+        throw const FormatException('unpick');
+      }
+      return PickLineResponse.fromJson(Map<String, Object?>.from(data));
+    } on DioException catch (e) {
+      throw Exception(mapDioExceptionToMessage(e));
+    }
+  }
+
   bool _barcodeMatchesLineStrict(String raw, PickingLine line) {
     final String q = raw.trim().toLowerCase();
     if (q.isEmpty) {

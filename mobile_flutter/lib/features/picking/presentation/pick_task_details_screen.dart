@@ -1151,6 +1151,23 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                           },
                           child: Text(StringLookup.t(loc, 'confirmButton')),
                         ),
+                        if (online &&
+                            (_findLineByScan(doc.lines, scannedForQty!)?.qtyPicked ?? 0) >
+                                0) ...<Widget>[
+                          const SizedBox(height: 8),
+                          TextButton(
+                            onPressed: () async {
+                              final PickingLine? lineForUnpick =
+                                  _findLineByScan(doc.lines, scannedForQty!);
+                              if (lineForUnpick == null) {
+                                return;
+                              }
+                              Navigator.of(ctx).pop();
+                              await _showUnpickSheet(lineForUnpick);
+                            },
+                            child: Text(StringLookup.t(loc, 'unpickActionTitle')),
+                          ),
+                        ],
                       ],
                     ] else ...<Widget>[
                       const SizedBox(height: 16),
@@ -1313,6 +1330,14 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                             },
                             child: Text(StringLookup.t(loc, 'lineReasonModalTitle')),
                           ),
+                          if (pickTargetHolder[0].qtyPicked > 0)
+                            TextButton(
+                              onPressed: () async {
+                                Navigator.of(ctx).pop();
+                                await _showUnpickSheet(pickTargetHolder[0]);
+                              },
+                              child: Text(StringLookup.t(loc, 'unpickActionTitle')),
+                            ),
                         ],
                       ],
                       if (group.members.length == 1 &&
@@ -1455,6 +1480,161 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
         );
       },
     );
+  }
+
+  Future<void> _showUnpickSheet(PickingLine line) async {
+    final AppLocale loc = ref.read(appLocaleProvider);
+    final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
+    if (!online) {
+      showAppSnackBar(
+        context,
+        SnackBar(content: Text(StringLookup.t(loc, 'reportReasonOffline'))),
+      );
+      return;
+    }
+    final int maxQty = line.qtyPicked.floor();
+    if (maxQty < 1) {
+      return;
+    }
+
+    final TextEditingController qty = TextEditingController(text: '1');
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (BuildContext ctx) {
+          String? selectedReason;
+          bool sheetBusy = false;
+          return StatefulBuilder(
+            builder: (BuildContext context, void Function(void Function()) setM) {
+              return Padding(
+                padding: EdgeInsets.only(bottom: sheetBottomPadding(context)),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      Text(
+                        StringLookup.t(loc, 'unpickReasonTitle'),
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(line.productName, maxLines: 2, overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: qty,
+                        keyboardType: kStockQtyKeyboardType,
+                        inputFormatters: kStockQtyInputFormatters,
+                        decoration: InputDecoration(
+                          labelText: StringLookup.t(loc, 'unpickQtyLabel'),
+                          helperText: StringLookup.tParams(
+                            loc,
+                            'qtyRangeError',
+                            <String, String>{'max': '$maxQty'},
+                          ),
+                          border: const OutlineInputBorder(),
+                        ),
+                        onChanged: (_) => setM(() {}),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        height: 220,
+                        child: ListView(
+                          children: kIncompleteReasonKeys.map((String key) {
+                            return RadioListTile<String>(
+                              title: Text(StringLookup.t(loc, 'reason_$key')),
+                              value: key,
+                              groupValue: selectedReason,
+                              onChanged: (String? v) => setM(() => selectedReason = v),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                      Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: sheetBusy ? null : () => Navigator.of(ctx).pop(),
+                              child: Text(StringLookup.t(loc, 'cancel')),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: (sheetBusy || selectedReason == null)
+                                  ? null
+                                  : () async {
+                                      final int delta = int.tryParse(qty.text.trim()) ?? 0;
+                                      if (delta < 1 || delta > maxQty) {
+                                        _rejectScanHaptic();
+                                        showAppSnackBar(
+                                          this.context,
+                                          SnackBar(
+                                            content: Text(
+                                              StringLookup.tParams(
+                                                loc,
+                                                'qtyRangeError',
+                                                <String, String>{'max': '$maxQty'},
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                      setM(() => sheetBusy = true);
+                                      try {
+                                        final PickLineResponse res = await ref
+                                            .read(pickingRepositoryProvider)
+                                            .unpickLine(
+                                              line.id,
+                                              delta: delta,
+                                              reason: selectedReason!,
+                                              requestId:
+                                                  'unpick-${widget.taskId}-${line.id}-${DateTime.now().millisecondsSinceEpoch}',
+                                            );
+                                        await ref
+                                            .read(pickTaskDetailProvider(widget.taskId).notifier)
+                                            .applyPickLineResponse(widget.taskId, res);
+                                        if (ctx.mounted) {
+                                          Navigator.of(ctx).pop();
+                                        }
+                                        if (mounted) {
+                                          showAppSnackBar(
+                                            this.context,
+                                            SnackBar(
+                                              content: Text(StringLookup.t(loc, 'unpickDone')),
+                                            ),
+                                          );
+                                        }
+                                      } on Exception catch (e) {
+                                        if (mounted) {
+                                          _rejectScanHaptic();
+                                          showAppSnackBar(
+                                            this.context,
+                                            SnackBar(content: Text('$e')),
+                                          );
+                                        }
+                                      } finally {
+                                        setM(() => sheetBusy = false);
+                                      }
+                                    },
+                              child: Text(StringLookup.t(loc, 'confirmButton')),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      qty.dispose();
+    }
   }
 
   @override

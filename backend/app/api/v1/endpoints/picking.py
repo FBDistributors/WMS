@@ -1808,6 +1808,189 @@ class SkipLineRequest(BaseModel):
     reason: str
 
 
+class UnpickLineRequest(BaseModel):
+    delta: int
+    reason: str
+    request_id: str
+
+    @field_validator("delta")
+    @classmethod
+    def delta_positive(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError("delta must be >= 1")
+        if v > 10000:
+            raise ValueError("delta must be <= 10000")
+        return v
+
+
+def _assert_pick_line_access(user, document: DocumentModel) -> None:
+    if user.role == "picker" and document.assigned_to_user_id != user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if user.role == "inventory_controller" and document.controlled_by_user_id != user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+
+@router.post(
+    "/lines/{line_id}/unpick",
+    response_model=PickLineResponse,
+    summary="Partially rollback picked qty with reason",
+)
+async def unpick_line(
+    line_id: UUID,
+    payload: UnpickLineRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("picking:pick")),
+):
+    if not payload.reason or payload.reason.strip() not in INCOMPLETE_REASON_CODES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"reason must be one of: {list(INCOMPLETE_REASON_CODES)}",
+        )
+    reason = payload.reason.strip()
+
+    existing_request = (
+        db.query(PickRequest).filter(PickRequest.request_id == payload.request_id).one_or_none()
+    )
+    if existing_request:
+        line = (
+            db.query(DocumentLineModel)
+            .options(selectinload(DocumentLineModel.document))
+            .filter(DocumentLineModel.id == existing_request.line_id)
+            .one_or_none()
+        )
+        if not line:
+            raise HTTPException(status_code=404, detail="Line not found")
+        document = (
+            db.query(DocumentModel)
+            .options(selectinload(DocumentModel.lines))
+            .filter(DocumentModel.id == line.document_id)
+            .one_or_none()
+        )
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+        _assert_pick_line_access(user, document)
+        return PickLineResponse(
+            line=_to_picking_line(line),
+            progress=_calculate_progress(document.lines),
+            document_status=document.status,
+        )
+
+    line = (
+        db.query(DocumentLineModel)
+        .options(selectinload(DocumentLineModel.document))
+        .filter(DocumentLineModel.id == line_id)
+        .with_for_update()
+        .one_or_none()
+    )
+    if not line:
+        raise HTTPException(status_code=404, detail="Line not found")
+    document = line.document
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    _assert_pick_line_access(user, document)
+    if document.order_id and order_in_cancelling_flow(db, document.order_id):
+        raise HTTPException(
+            status_code=409,
+            detail="Buyurtma bekor qilinmoqda: avval terilganlarni joyiga qaytaring.",
+        )
+    if _line_is_vip_expiry_informational(line):
+        raise HTTPException(
+            status_code=409,
+            detail="VIP muddat: bu qator faqat ma'lumot uchun, terilmaydi",
+        )
+    if line.picked_qty <= 0:
+        raise HTTPException(status_code=400, detail="Line has no picked qty to rollback")
+    if Decimal(str(payload.delta)) > Decimal(str(line.picked_qty)):
+        raise HTTPException(status_code=400, detail="delta cannot exceed qty_picked")
+    if not line.product_id or not line.lot_id or not line.location_id:
+        raise HTTPException(status_code=400, detail="Line missing product/lot/location")
+
+    qty_to_rollback = Decimal(str(payload.delta))
+    line.picked_qty = float(Decimal(str(line.picked_qty)) - qty_to_rollback)
+    line.skip_reason = reason
+
+    # rollback invariant: pick=+delta, unallocate=+delta (stock and reserve are restored)
+    db.add(
+        StockMovementModel(
+            product_id=line.product_id,
+            lot_id=line.lot_id,
+            location_id=line.location_id,
+            qty_change=qty_to_rollback,
+            movement_type="pick",
+            source_document_type="document",
+            source_document_id=document.id,
+            created_by_user_id=user.id,
+        )
+    )
+    db.add(
+        StockMovementModel(
+            product_id=line.product_id,
+            lot_id=line.lot_id,
+            location_id=line.location_id,
+            qty_change=qty_to_rollback,
+            movement_type="unallocate",
+            source_document_type="document",
+            source_document_id=document.id,
+            created_by_user_id=user.id,
+        )
+    )
+
+    lines = (
+        db.query(DocumentLineModel)
+        .filter(DocumentLineModel.document_id == document.id)
+        .all()
+    )
+    _refresh_document_status(document, lines)
+    try:
+        db.add(PickRequest(request_id=payload.request_id, line_id=line.id))
+        db.commit()
+    except IntegrityError as e:
+        db.rollback()
+        logger.warning("unpick_line IntegrityError: %s", e)
+        stored = (
+            db.query(PickRequest)
+            .filter(PickRequest.request_id == payload.request_id)
+            .one_or_none()
+        )
+        if stored:
+            line = (
+                db.query(DocumentLineModel)
+                .options(selectinload(DocumentLineModel.document))
+                .filter(DocumentLineModel.id == stored.line_id)
+                .one_or_none()
+            )
+            if not line:
+                raise HTTPException(status_code=404, detail="Line not found")
+            document = (
+                db.query(DocumentModel)
+                .options(selectinload(DocumentModel.lines))
+                .filter(DocumentModel.id == line.document_id)
+                .one_or_none()
+            )
+            if not document:
+                raise HTTPException(status_code=404, detail="Document not found")
+            _assert_pick_line_access(user, document)
+            return PickLineResponse(
+                line=_to_picking_line(line),
+                progress=_calculate_progress(document.lines),
+                document_status=document.status,
+            )
+        raise HTTPException(status_code=409, detail="Unpick conflict (duplicate or constraint).")
+
+    db.refresh(line)
+    lines_after = (
+        db.query(DocumentLineModel)
+        .filter(DocumentLineModel.document_id == document.id)
+        .all()
+    )
+    db.refresh(document)
+    return PickLineResponse(
+        line=_to_picking_line(line),
+        progress=_calculate_progress(lines_after),
+        document_status=document.status,
+    )
+
+
 @router.post(
     "/lines/{line_id}/skip",
     response_model=PickLineResponse,
