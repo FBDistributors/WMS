@@ -7,7 +7,7 @@ export type PickListsTableConfig = {
 
 const STORAGE_KEYS: Record<string, string> = {
   active: 'wms_picklists_table_config',
-  cancelled: 'wms_picklists_cancelled_table_config',
+  cancelled: 'wms_picklists_cancelled_table_config_v2',
   archive: 'wms_picklists_archive_table_config',
 }
 
@@ -22,6 +22,10 @@ export const PICKLISTS_COLUMN_IDS = [
   'picker',
   'controller',
   'last_activity',
+  'sent_to_picker_at',
+  'picker_reassigned_at',
+  'cancelled_at',
+  'cancelled_by',
   'view',
   'cancel',
 ]
@@ -51,6 +55,19 @@ export const DEFAULT_VISIBLE_ARCHIVE: string[] = [
   'picker',
   'controller',
   'last_activity',
+  'view',
+]
+
+export const DEFAULT_VISIBLE_CANCELLED: string[] = [
+  'document_no',
+  'pipeline_status',
+  'doc_status',
+  'total_lines',
+  'picker',
+  'sent_to_picker_at',
+  'picker_reassigned_at',
+  'cancelled_by',
+  'cancelled_at',
   'view',
 ]
 
@@ -94,7 +111,12 @@ function loadConfig(key: string, defaultVisible: string[]): PickListsTableConfig
 
 export function usePickListsTableConfig(scope: 'active' | 'cancelled' | 'archive') {
   const storageKey = STORAGE_KEYS[scope]
-  const defaultVisible = scope === 'archive' ? DEFAULT_VISIBLE_ARCHIVE : DEFAULT_VISIBLE_ACTIVE
+  const defaultVisible =
+    scope === 'archive'
+      ? DEFAULT_VISIBLE_ARCHIVE
+      : scope === 'cancelled'
+        ? DEFAULT_VISIBLE_CANCELLED
+        : DEFAULT_VISIBLE_ACTIVE
 
   const [config, setConfig] = useState<PickListsTableConfig>(() => loadConfig(storageKey, defaultVisible))
 

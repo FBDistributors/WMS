@@ -192,6 +192,7 @@ def initiate_safe_cancel_return(
 
     require_transition_rule(order.wms_state.status, "cancelling_in_progress")
     order.wms_state.status = "cancelling_in_progress"
+    order.wms_state.cancelled_by_user_id = admin_user_id
     document.status = "cancelling"
     db.flush()
     db.refresh(session)
@@ -358,10 +359,14 @@ def finish_safe_cancel_return(db: Session, *, session_id: UUID, picker_user_id: 
     release_document_reserve_on_cancel(db, document, document.lines, picker_user_id)
 
     require_transition_rule(order.wms_state.status, "cancelled")
+    cancel_now = datetime.now(timezone.utc)
     session.status = "completed"
-    session.completed_at = datetime.now(timezone.utc)
+    session.completed_at = cancel_now
     document.status = "cancelled"
     order.wms_state.status = "cancelled"
+    order.wms_state.cancelled_at = cancel_now
+    if not order.wms_state.cancelled_by_user_id:
+        order.wms_state.cancelled_by_user_id = session.initiated_by_user_id
 
     db.flush()
 

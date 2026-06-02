@@ -59,6 +59,10 @@ const PICKLISTS_COLUMN_LABEL_KEYS: Record<string, string> = {
   picker: 'picking:column_picker',
   controller: 'picking:column_controller',
   last_activity: 'picking:last_activity',
+  sent_to_picker_at: 'picking:column_sent_to_picker',
+  picker_reassigned_at: 'picking:column_picker_reassigned',
+  cancelled_at: 'picking:column_cancelled_at',
+  cancelled_by: 'picking:column_cancelled_by',
   view: 'picking:details_title',
   cancel: 'picking:cancel_document',
 }
@@ -411,6 +415,30 @@ export function PickListsPage() {
               {t('picking:last_activity')}
             </th>
           )
+        case 'sent_to_picker_at':
+          return (
+            <th key={colId} className="px-4 py-3 text-left">
+              {t('picking:column_sent_to_picker')}
+            </th>
+          )
+        case 'picker_reassigned_at':
+          return (
+            <th key={colId} className="px-4 py-3 text-left">
+              {t('picking:column_picker_reassigned')}
+            </th>
+          )
+        case 'cancelled_at':
+          return (
+            <th key={colId} className="px-4 py-3 text-left">
+              {t('picking:column_cancelled_at')}
+            </th>
+          )
+        case 'cancelled_by':
+          return (
+            <th key={colId} className="px-4 py-3 text-left">
+              {t('picking:column_cancelled_by')}
+            </th>
+          )
         case 'view':
         case 'cancel':
           return <th key={colId} className="px-4 py-3" />
@@ -512,7 +540,38 @@ export function PickListsPage() {
         case 'last_activity':
           return (
             <td key={colId} className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300">
-              {formatActivity(item.updated_at, i18n.language)}
+              {formatActivity(
+                cancelled ? item.cancelled_at ?? item.updated_at : item.updated_at,
+                i18n.language,
+              )}
+            </td>
+          )
+        case 'sent_to_picker_at':
+          return (
+            <td key={colId} className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300">
+              {formatActivity(item.first_assigned_at ?? undefined, i18n.language)}
+            </td>
+          )
+        case 'picker_reassigned_at':
+          return (
+            <td key={colId} className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300">
+              {formatActivity(item.last_assigned_at ?? undefined, i18n.language)}
+            </td>
+          )
+        case 'cancelled_at':
+          return (
+            <td key={colId} className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300">
+              {formatActivity(item.cancelled_at ?? undefined, i18n.language)}
+            </td>
+          )
+        case 'cancelled_by':
+          return (
+            <td
+              key={colId}
+              className="max-w-[160px] truncate px-4 py-3 text-slate-600 dark:text-slate-300"
+              title={item.cancelled_by_name ?? ''}
+            >
+              {item.cancelled_by_name ?? '—'}
             </td>
           )
         case 'view':

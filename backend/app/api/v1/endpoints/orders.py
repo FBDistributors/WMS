@@ -1297,7 +1297,10 @@ async def update_order_status(
             released_reserve_lines = release_document_reserve_on_cancel(
                 db, doc_so, doc_so.lines, user.id
             )
+        cancel_now = datetime.now(timezone.utc)
         order.wms_state.status = "cancelled"
+        order.wms_state.cancelled_at = cancel_now
+        order.wms_state.cancelled_by_user_id = user.id
         if doc_so and doc_so.status != "cancelled":
             doc_so.status = "cancelled"
         log_action(
@@ -1372,6 +1375,9 @@ async def update_order_status(
         )
         if doc:
             doc.status = "cancelled"
+        cancel_now = datetime.now(timezone.utc)
+        order.wms_state.cancelled_at = cancel_now
+        order.wms_state.cancelled_by_user_id = user.id
 
     log_action(
         db,
@@ -1811,6 +1817,7 @@ async def send_movement_to_picking(
         if not document_lines:
             raise HTTPException(status_code=409, detail="Insufficient stock to allocate")
 
+        assign_now = datetime.now(timezone.utc)
         document = DocumentModel(
             doc_no=order.order_number,
             doc_type="SO",
@@ -1819,6 +1826,8 @@ async def send_movement_to_picking(
             source_external_id=order.source_external_id,
             order_id=order.id,
             assigned_to_user_id=payload.assigned_to_user_id,
+            first_assigned_at=assign_now,
+            last_assigned_at=None,
         )
         document.lines = document_lines
 
@@ -2028,6 +2037,7 @@ async def send_order_to_picking(
         if not document_lines:
             raise HTTPException(status_code=409, detail="Insufficient stock to allocate")
 
+        assign_now = datetime.now(timezone.utc)
         document = DocumentModel(
             doc_no=order.order_number,
             doc_type="SO",
@@ -2036,6 +2046,8 @@ async def send_order_to_picking(
             source_external_id=order.source_external_id,
             order_id=order.id,
             assigned_to_user_id=payload.assigned_to_user_id,
+            first_assigned_at=assign_now,
+            last_assigned_at=None,
         )
         document.lines = document_lines
 
@@ -2158,6 +2170,7 @@ async def reassign_order_picker(
         return SendToPickingResponse(pick_task_id=document.id, assigned_to=payload.assigned_to_user_id)
 
     document.assigned_to_user_id = payload.assigned_to_user_id
+    document.last_assigned_at = datetime.now(timezone.utc)
     log_action(
         db,
         user_id=user.id,

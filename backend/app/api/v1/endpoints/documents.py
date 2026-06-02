@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Literal, Optional
 from uuid import UUID
 
@@ -12,6 +12,7 @@ from app.db import get_db
 from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_ip, log_action
 from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
+from app.models.order import Order as OrderModel
 
 router = APIRouter()
 
@@ -287,7 +288,10 @@ async def update_document_status(
     """Cancel a document (e.g. test picking). Only transition to cancelled is allowed."""
     doc = (
         db.query(DocumentModel)
-        .options(selectinload(DocumentModel.lines))
+        .options(
+            selectinload(DocumentModel.lines),
+            selectinload(DocumentModel.order).selectinload(OrderModel.wms_state),
+        )
         .filter(DocumentModel.id == document_id)
         .one_or_none()
     )
@@ -297,6 +301,11 @@ async def update_document_status(
         raise HTTPException(status_code=400, detail="Only status 'cancelled' is allowed")
     old_status = doc.status
     doc.status = "cancelled"
+    if doc.order and doc.order.wms_state:
+        cancel_now = datetime.now(timezone.utc)
+        doc.order.wms_state.status = "cancelled"
+        doc.order.wms_state.cancelled_at = cancel_now
+        doc.order.wms_state.cancelled_by_user_id = user.id
     log_action(
         db,
         user_id=user.id,

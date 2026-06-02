@@ -120,6 +120,10 @@ class PickingListItem(BaseModel):
     sent_to_controller_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     updated_at: datetime
+    first_assigned_at: Optional[datetime] = None
+    last_assigned_at: Optional[datetime] = None
+    cancelled_at: Optional[datetime] = None
+    cancelled_by_user_name: Optional[str] = None
 
 
 class ConsolidatedLineItem(BaseModel):
@@ -524,6 +528,19 @@ def _controller_name(doc: DocumentModel) -> Optional[str]:
     return getattr(user, "full_name", None) or getattr(user, "username", None)
 
 
+def _cancelled_by_name(doc: DocumentModel) -> Optional[str]:
+    order = getattr(doc, "order", None)
+    if order is None:
+        return None
+    ws = getattr(order, "wms_state", None)
+    if ws is None:
+        return None
+    user = getattr(ws, "cancelled_by_user", None)
+    if user is None:
+        return None
+    return getattr(user, "full_name", None) or getattr(user, "username", None)
+
+
 def _picking_cancel_meta(db: Optional[Session], doc: DocumentModel) -> tuple[Optional[str], Optional[UUID]]:
     if db is None or not doc.order_id:
         return None, None
@@ -640,10 +657,12 @@ def _to_picking_list_item(doc: DocumentModel) -> PickingListItem:
     )
     order = getattr(doc, "order", None)
     wms_status: Optional[str] = None
+    cancelled_at: Optional[datetime] = None
     if order is not None:
         ws = getattr(order, "wms_state", None)
         if ws is not None:
             wms_status = getattr(ws, "status", None)
+            cancelled_at = getattr(ws, "cancelled_at", None)
     return PickingListItem(
         id=doc.id,
         reference_number=doc.doc_no,
@@ -664,6 +683,10 @@ def _to_picking_list_item(doc: DocumentModel) -> PickingListItem:
         sent_to_controller_at=doc.sent_to_controller_at,
         completed_at=doc.completed_at,
         updated_at=doc.updated_at,
+        first_assigned_at=doc.first_assigned_at,
+        last_assigned_at=doc.last_assigned_at,
+        cancelled_at=cancelled_at,
+        cancelled_by_user_name=_cancelled_by_name(doc),
     )
 
 
@@ -778,7 +801,9 @@ async def list_picking_documents(
             selectinload(DocumentModel.lines),
             selectinload(DocumentModel.assigned_to_user),
             selectinload(DocumentModel.controlled_by_user),
-            selectinload(DocumentModel.order).selectinload(OrderModel.wms_state),
+            selectinload(DocumentModel.order).selectinload(OrderModel.wms_state).selectinload(
+                OrderWmsStateModel.cancelled_by_user
+            ),
         )
         .outerjoin(OrderModel, DocumentModel.order_id == OrderModel.id)
         .outerjoin(OrderWmsStateModel, OrderModel.id == OrderWmsStateModel.order_id)

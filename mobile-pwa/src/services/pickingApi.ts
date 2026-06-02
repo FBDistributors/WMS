@@ -28,6 +28,10 @@ export type PickList = {
   picker_name?: string | null
   controller_name?: string | null
   updated_at?: string
+  first_assigned_at?: string | null
+  last_assigned_at?: string | null
+  cancelled_at?: string | null
+  cancelled_by_name?: string | null
   customer_id?: string | null
   customer_name?: string | null
 }
@@ -70,6 +74,10 @@ type BackendPickingListItem = {
   assigned_to_user_name?: string | null
   controlled_by_user_name?: string | null
   updated_at?: string
+  first_assigned_at?: string | null
+  last_assigned_at?: string | null
+  cancelled_at?: string | null
+  cancelled_by_user_name?: string | null
   customer_id?: string | null
   customer_name?: string | null
 }
@@ -185,6 +193,10 @@ function mapList(item: BackendPickingListItem): PickList {
     picker_name: item.assigned_to_user_name ?? undefined,
     controller_name: item.controlled_by_user_name ?? undefined,
     updated_at: item.updated_at,
+    first_assigned_at: item.first_assigned_at ?? undefined,
+    last_assigned_at: item.last_assigned_at ?? undefined,
+    cancelled_at: item.cancelled_at ?? undefined,
+    cancelled_by_name: item.cancelled_by_user_name ?? undefined,
     customer_id: item.customer_id?.trim() || undefined,
     customer_name: item.customer_name?.trim() || undefined,
   }

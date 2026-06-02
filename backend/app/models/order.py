@@ -29,11 +29,20 @@ class OrderWmsState(Base):
         UUID(as_uuid=True), ForeignKey("orders.id", ondelete="CASCADE"), primary_key=True
     )
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="imported")
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    cancelled_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
     order: Mapped["Order"] = relationship("Order", back_populates="wms_state")
+    cancelled_by_user = relationship(
+        "User",
+        foreign_keys=[cancelled_by_user_id],
+        lazy="selectin",
+    )
 
     __table_args__ = (Index("ix_order_wms_state_status", "status"),)
 
