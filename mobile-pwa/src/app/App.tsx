@@ -19,7 +19,6 @@ import { OrderDetailsPage } from '../pages/admin/OrderDetailsPage'
 import { LocationsPage } from '../pages/admin/LocationsPage'
 import { LocationDetailPage } from '../pages/admin/LocationDetailPage'
 import { ReceivingPage } from '../pages/admin/ReceivingPage'
-import { ReceivingDetailPage } from '../pages/admin/ReceivingDetailPage'
 import { InventorySummaryPage } from '../pages/admin/InventorySummaryPage'
 import { SmartupBalancePage } from '../pages/admin/SmartupBalancePage'
 import { SmartupBronPage } from '../pages/admin/SmartupBronPage'
@@ -565,13 +564,7 @@ export function App() {
         />
         <Route
           path="/admin/receiving/:id"
-          element={
-            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
-              <RequirePermission permission="receiving:read">
-                <ReceivingDetailPage />
-              </RequirePermission>
-            </RequirePermission>
-          }
+          element={<Navigate to="/admin/receiving" replace />}
         />
         <Route
           path="/admin/users"

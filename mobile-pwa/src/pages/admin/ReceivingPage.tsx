@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Filter, Plus, Search, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -34,6 +34,7 @@ import { getInventorySummary } from '../../services/inventoryApi'
 import {
   buildReceiptListExportLabels,
   buildReceiptListExportRows,
+  type ReceiptListExportRow,
   downloadReceiptListCsv,
   downloadReceiptListExcel,
   downloadReceiptListPdf,
@@ -56,26 +57,14 @@ const EMPTY_LINE: LineDraft = {
 
 const PAGE_SIZE = 50
 
-function formatReceiptDate(iso: string): string {
-  try {
-    const d = new Date(iso)
-    if (Number.isNaN(d.getTime())) return iso
-    return d.toLocaleString(undefined, {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  } catch {
-    return iso
-  }
+type FlatReceiptTableRow = ReceiptListExportRow & {
+  receiptId: string
+  lineId: string
+  showComplete: boolean
 }
 
 export function ReceivingPage() {
   const { t } = useTranslation(['receiving', 'common'])
-  const navigate = useNavigate()
-  const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const { has } = useAuth()
   const canWrite = has('receiving:write')
@@ -111,6 +100,7 @@ export function ReceivingPage() {
   const [error, setError] = useState<string | null>(null)
   const [snackMessage, setSnackMessage] = useState<string | null>(null)
   const [snackVariant, setSnackVariant] = useState<'success' | 'error'>('success')
+  const [inventoryMap, setInventoryMap] = useState<Map<string, number>>(new Map())
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -140,13 +130,22 @@ export function ReceivingPage() {
         ),
       ]
       if (productIds.length > 0) {
-        const productsResponse = await getProducts({
-          product_ids: productIds,
-          limit: productIds.length,
-        })
+        const [productsResponse, inventoryRows] = await Promise.all([
+          getProducts({
+            product_ids: productIds,
+            limit: productIds.length,
+          }),
+          getInventorySummary({ product_ids: productIds }),
+        ])
         setProducts(productsResponse.items)
+        const inv = new Map<string, number>()
+        inventoryRows.forEach((row) => {
+          inv.set(row.product_id, Math.round(Number(row.on_hand_total)))
+        })
+        setInventoryMap(inv)
       } else {
         setProducts([])
+        setInventoryMap(new Map())
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : t('receiving:load_failed'))
@@ -217,6 +216,39 @@ export function ReceivingPage() {
     const map = new Map(locations.map((location) => [location.id, location]))
     return map
   }, [locations])
+
+  const flatRows = useMemo((): FlatReceiptTableRow[] => {
+    const exportRows = buildReceiptListExportRows(
+      filteredReceipts,
+      productLookup,
+      locationLookup,
+      inventoryMap,
+      (status) => t(`receiving:statuses.${status}`)
+    )
+    const result: FlatReceiptTableRow[] = []
+    const completeShown = new Set<string>()
+    let idx = 0
+    for (const receipt of filteredReceipts) {
+      const lines = receipt.lines.length > 0 ? receipt.lines : []
+      for (const line of lines) {
+        const row = exportRows[idx]
+        idx += 1
+        if (!row) continue
+        const showComplete =
+          receipt.status === 'draft' && !completeShown.has(receipt.id)
+        if (showComplete) {
+          completeShown.add(receipt.id)
+        }
+        result.push({
+          ...row,
+          receiptId: receipt.id,
+          lineId: line.id,
+          showComplete,
+        })
+      }
+    }
+    return result
+  }, [filteredReceipts, productLookup, locationLookup, inventoryMap, t])
 
   const buildExportFilterSummary = useCallback((): string[] => {
     const parts: string[] = []
@@ -846,9 +878,14 @@ export function ReceivingPage() {
             title={t('receiving:no_results')}
             description={t('receiving:no_results_desc')}
           />
+        ) : flatRows.length === 0 ? (
+          <EmptyState
+            title={t('receiving:no_results')}
+            description={t('receiving:no_results_desc')}
+          />
         ) : (
           <TableScrollArea>
-            <table className="w-full min-w-[640px] border-collapse text-sm">
+            <table className="w-full min-w-[1200px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-700">
                   <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
@@ -864,7 +901,28 @@ export function ReceivingPage() {
                     {t('receiving:col_received_at')}
                   </th>
                   <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                    {t('receiving:col_lines')}
+                    {t('receiving:detail_col_code')}
+                  </th>
+                  <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                    {t('receiving:detail_col_barcode')}
+                  </th>
+                  <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                    {t('receiving:detail_col_product')}
+                  </th>
+                  <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                    {t('receiving:fields.qty')}
+                  </th>
+                  <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                    {t('receiving:detail_col_qoldiq')}
+                  </th>
+                  <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                    {t('receiving:fields.batch')}
+                  </th>
+                  <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                    {t('receiving:fields.expiry_date')}
+                  </th>
+                  <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                    {t('receiving:fields.location')}
                   </th>
                   <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
                     {t('receiving:col_actions')}
@@ -872,49 +930,52 @@ export function ReceivingPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredReceipts.map((receipt) => (
+                {flatRows.map((row) => (
                   <tr
-                    key={receipt.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() =>
-                      navigate(`/admin/receiving/${receipt.id}`, {
-                        state: { listQuery: location.search },
-                      })
-                    }
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        navigate(`/admin/receiving/${receipt.id}`, {
-                          state: { listQuery: location.search },
-                        })
-                      }
-                    }}
-                    className="cursor-pointer border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                    key={`${row.receiptId}-${row.lineId}`}
+                    className="border-b border-slate-100 dark:border-slate-800"
                   >
                     <td className="py-2.5 px-2 text-slate-900 dark:text-slate-100 font-medium">
-                      {receipt.doc_no}
+                      {row.docNo}
                     </td>
                     <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300">
-                      {t(`receiving:statuses.${receipt.status}`)}
+                      {row.status}
                     </td>
                     <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300">
-                      {receipt.created_by_username ?? '—'}
+                      {row.receivedBy}
                     </td>
                     <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                      {receipt.created_at ? formatReceiptDate(receipt.created_at) : '—'}
+                      {row.receivedAt}
+                    </td>
+                    <td className="py-2.5 px-2 font-medium text-slate-900 dark:text-slate-100">
+                      {row.code}
+                    </td>
+                    <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300 font-mono text-xs">
+                      {row.barcode}
                     </td>
                     <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300">
-                      {t('receiving:lines_count', { count: receipt.lines.length })}
+                      {row.productName}
                     </td>
-                    <td className="py-2.5 px-2" onClick={(e) => e.stopPropagation()}>
-                      {receipt.status === 'draft' ? (
+                    <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300">
+                      {row.qty}
+                    </td>
+                    <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300">
+                      {row.qoldiq}
+                    </td>
+                    <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300">
+                      {row.batch}
+                    </td>
+                    <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                      {row.expiry}
+                    </td>
+                    <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300">
+                      {row.location}
+                    </td>
+                    <td className="py-2.5 px-2">
+                      {row.showComplete ? (
                         <Button
                           className="py-2 px-3 text-xs"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleComplete(receipt.id)
-                          }}
+                          onClick={() => void handleComplete(row.receiptId)}
                           disabled={!canWrite || isSubmitting}
                         >
                           {t('receiving:complete')}
