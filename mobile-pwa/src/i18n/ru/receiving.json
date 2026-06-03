@@ -87,6 +87,7 @@
   "export_grouped_total_qty": "Всего принято",
   "export_too_large": "Размер экспорта превышает 10 МБ. Сузьте фильтр.",
   "export_fetching": "Сбор данных…",
+  "export_stale_app": "Приложение обновилось. Обновите страницу (F5) и повторите экспорт в Excel.",
   "export_filter_date": "Дата",
   "export_filter_product": "Товар",
   "export_filter_brand": "Бренд",

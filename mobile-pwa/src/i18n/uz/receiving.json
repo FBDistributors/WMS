@@ -87,6 +87,7 @@
   "export_grouped_total_qty": "Jami kirim",
   "export_too_large": "Eksport hajmi 10 MB dan oshdi. Filterni toraytiring.",
   "export_fetching": "Ma'lumot yig'ilmoqda…",
+  "export_stale_app": "Ilova yangilandi. Sahifani yangilang (F5) va Excel eksportini qayta urinib ko'ring.",
   "export_filter_date": "Sana",
   "export_filter_product": "Mahsulot",
   "export_filter_brand": "Brend",

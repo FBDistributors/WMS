@@ -5,6 +5,11 @@ import type { Receipt } from '../services/receivingApi'
 import { writeExcelJsFile } from './exportExcel'
 import { formatExpiryDate } from './expiry'
 import { applyUnicodeFontToPdf } from './jspdfUnicodeFont'
+import {
+  isStaleChunkLoadError,
+  reloadOnceOnStaleChunk,
+  StaleAppChunkError,
+} from '../lib/staleChunkLoad'
 
 export type ReceiptExportLabels = {
   colDocNo: string
@@ -100,10 +105,18 @@ function downloadBlob(fileName: string, blob: Blob): void {
 }
 
 export async function downloadReceiptExcel(ctx: ReceiptExportContext): Promise<void> {
-  const { buildStyledReceiptWorkbook } = await import('./receiptExcelStyled')
-  const wb = await buildStyledReceiptWorkbook(ctx)
-  const buffer = await wb.xlsx.writeBuffer()
-  await writeExcelJsFile(buffer, `${receiptExportBaseName(ctx.receipt.doc_no)}.xlsx`)
+  try {
+    const { buildStyledReceiptWorkbook } = await import('./receiptExcelStyled')
+    const wb = await buildStyledReceiptWorkbook(ctx)
+    const buffer = await wb.xlsx.writeBuffer()
+    await writeExcelJsFile(buffer, `${receiptExportBaseName(ctx.receipt.doc_no)}.xlsx`)
+  } catch (err) {
+    if (reloadOnceOnStaleChunk(err)) return
+    if (isStaleChunkLoadError(err)) {
+      throw new StaleAppChunkError()
+    }
+    throw err
+  }
 }
 
 export function downloadReceiptCsv(ctx: ReceiptExportContext): void {

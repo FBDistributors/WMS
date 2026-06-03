@@ -32,6 +32,20 @@ export default defineConfig({
       // Desktop (Tauri) da service worker cache eski buildni saqlab qoladi — o'chirib qo'yamiz
       disable: !!process.env.TAURI_ENV_PLATFORM,
       registerType: 'autoUpdate',
+      workbox: {
+        // JS chunklar deploydan keyin yangilanadi — tarmoqdan olish ustun
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/assets/'),
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'wms-assets',
+              networkTimeoutSeconds: 10,
+              expiration: { maxEntries: 80, maxAgeSeconds: 60 * 60 * 24 * 7 },
+            },
+          },
+        ],
+      },
       includeAssets: ['favicon.ico', 'apple-touch-icon-180x180.png', 'logo-icon.png', 'pwa-192x192.png', 'pwa-512x512.png'],
       manifest: {
         name: 'FB Warehouse',

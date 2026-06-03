@@ -9,6 +9,11 @@ import { escapeCsvCell } from './receiptExport'
 import { writeExcelJsFile } from './exportExcel'
 import { applyUnicodeFontToPdf } from './jspdfUnicodeFont'
 import { formatUnknownError } from '../lib/formatUnknownError'
+import {
+  reloadOnceOnStaleChunk,
+  StaleAppChunkError,
+  isStaleChunkLoadError,
+} from '../lib/staleChunkLoad'
 import { buildReceiptExportLineRow } from './receiptExport'
 
 export type ReceiptListExportLabels = {
@@ -268,6 +273,10 @@ export async function downloadReceiptListExcel(ctx: ReceiptListExportContext): P
     const buffer = await wb.xlsx.writeBuffer()
     await writeExcelJsFile(buffer, `${receiptListExportBaseName()}.xlsx`)
   } catch (err) {
+    if (reloadOnceOnStaleChunk(err)) return
+    if (isStaleChunkLoadError(err)) {
+      throw new StaleAppChunkError()
+    }
     throw new Error(formatUnknownError(err) || 'Excel fayl yaratib bo‘lmadi')
   }
 }

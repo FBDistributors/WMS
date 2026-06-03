@@ -51,6 +51,7 @@ import {
 import { useAuth } from '../../rbac/AuthProvider'
 import { fetchProductsAndInventoryForExport } from '../../lib/fetchProductsAndInventory'
 import { formatUnknownError } from '../../lib/formatUnknownError'
+import { StaleAppChunkError } from '../../lib/staleChunkLoad'
 import { sanitizeStockQtyDigits } from '../../lib/stockQtyInput'
 
 type LineDraft = Omit<ReceiptLineCreate, 'qty'> & { id: string; qty: number | '' }
@@ -133,6 +134,10 @@ export function ReceivingPage() {
   const [isTableSettingsOpen, setIsTableSettingsOpen] = useState(false)
   const { config: tableConfig, updateConfig: updateTableConfig, resetConfig: resetTableConfig } =
     useReceivingTableConfig()
+
+  useEffect(() => {
+    void import('../../utils/receiptListExcelStyled')
+  }, [])
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -428,6 +433,9 @@ export function ReceivingPage() {
         if (err instanceof ReceiptExportTooLargeError) {
           setSnackVariant('error')
           setSnackMessage(t('receiving:export_too_large'))
+        } else if (err instanceof StaleAppChunkError) {
+          setSnackVariant('error')
+          setSnackMessage(t('receiving:export_stale_app'))
         } else {
           setSnackVariant('error')
           setSnackMessage(

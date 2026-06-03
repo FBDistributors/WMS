@@ -87,6 +87,7 @@
   "export_grouped_total_qty": "Total received",
   "export_too_large": "Export size exceeds 10 MB. Narrow your filters.",
   "export_fetching": "Gathering data…",
+  "export_stale_app": "The app was updated. Refresh the page (F5) and try the Excel export again.",
   "export_filter_date": "Date",
   "export_filter_product": "Product",
   "export_filter_brand": "Brand",
