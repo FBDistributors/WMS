@@ -10,6 +10,7 @@ import { Card } from '../../components/ui/card'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
+import { useAppToast } from '../../feedback/useAppToast'
 import { useAuth } from '../../rbac/AuthProvider'
 import {
   addOrderLine,
@@ -31,7 +32,8 @@ export function OrderDetailsPage() {
   const backUrl = listPath ? `${listPath}${listQuery ? `?${listQuery}` : ''}` : '/admin/orders'
   const [order, setOrder] = useState<OrderDetails | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
+  const { showError } = useAppToast()
+  const [hasLoadError, setHasLoadError] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [addName, setAddName] = useState('')
   const [addSku, setAddSku] = useState('')
@@ -39,7 +41,7 @@ export function OrderDetailsPage() {
   const [addQty, setAddQty] = useState('1')
   const [addUom, setAddUom] = useState('')
   const [addSubmitting, setAddSubmitting] = useState(false)
-  const [addError, setAddError] = useState<string | null>(null)
+  const [addValidationError, setAddValidationError] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<OrderLine | null>(null)
   const [deleteSubmitting, setDeleteSubmitting] = useState(false)
 
@@ -48,21 +50,22 @@ export function OrderDetailsPage() {
 
   const load = useCallback(async () => {
     if (!id) {
-      setLoadError(t('orders:not_found'))
+      setHasLoadError(true)
       setIsLoading(false)
       return
     }
     setIsLoading(true)
-    setLoadError(null)
+    setHasLoadError(false)
     try {
       const data = await getOrder(id)
       setOrder(data)
     } catch {
-      setLoadError(t('orders:load_failed'))
+      showError(t('orders:load_failed'))
+      setHasLoadError(true)
     } finally {
       setIsLoading(false)
     }
-  }, [id, t])
+  }, [id, showError, t])
 
   useEffect(() => {
     void load()
@@ -76,7 +79,7 @@ export function OrderDetailsPage() {
     setAddBarcode('')
     setAddQty('1')
     setAddUom('')
-    setAddError(null)
+    setAddValidationError(null)
     setAddOpen(true)
   }
 
@@ -85,15 +88,15 @@ export function OrderDetailsPage() {
     const name = addName.trim()
     const qty = Number.parseFloat(addQty.replace(',', '.'))
     if (!name) {
-      setAddError(t('orders:line_edit.name_required'))
+      setAddValidationError(t('orders:line_edit.name_required'))
       return
     }
     if (!Number.isFinite(qty) || qty <= 0) {
-      setAddError(t('orders:line_edit.qty_invalid'))
+      setAddValidationError(t('orders:line_edit.qty_invalid'))
       return
     }
     setAddSubmitting(true)
-    setAddError(null)
+    setAddValidationError(null)
     try {
       const next = await addOrderLine(id, {
         name,
@@ -105,7 +108,7 @@ export function OrderDetailsPage() {
       setOrder(next)
       setAddOpen(false)
     } catch (e) {
-      setAddError(e instanceof Error ? e.message : t('orders:line_edit.failed'))
+      showError(e instanceof Error ? e.message : t('orders:line_edit.failed'))
     } finally {
       setAddSubmitting(false)
     }
@@ -133,11 +136,11 @@ export function OrderDetailsPage() {
     )
   }
 
-  if (!order || loadError) {
+  if (!order || hasLoadError) {
     return (
       <AdminLayout title={t('orders:details_title')}>
         <EmptyState
-          title={loadError ?? t('orders:not_found')}
+          title={hasLoadError ? t('orders:load_failed') : t('orders:not_found')}
           actionLabel={t('common:buttons.retry')}
           onAction={load}
         />
@@ -332,9 +335,9 @@ export function OrderDetailsPage() {
                   onChange={(e) => setAddUom(e.target.value)}
                 />
               </label>
-              {addError ? (
+              {addValidationError ? (
                 <p className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
-                  {addError}
+                  {addValidationError}
                 </p>
               ) : null}
             </div>

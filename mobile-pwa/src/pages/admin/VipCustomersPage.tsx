@@ -28,6 +28,7 @@ import {
   type VipCustomer,
 } from '../../services/vipCustomersApi'
 import { getBrands, type Brand } from '../../services/brandsApi'
+import { useAppToast } from '../../feedback/useAppToast'
 import { useAuth } from '../../rbac/AuthProvider'
 
 type TabKey = 'vip' | 'general'
@@ -65,7 +66,8 @@ export function VipCustomersSection({ embedded = false, setHeaderAction }: VipCu
   const [vipItems, setVipItems] = useState<VipCustomer[]>([])
   const [generalItems, setGeneralItems] = useState<GeneralCustomer[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { showError } = useAppToast()
+  const [hasLoadError, setHasLoadError] = useState(false)
   const [vipDialog, setVipDialog] = useState<VipDialogState>({ open: false, mode: 'create' })
   const [generalDialog, setGeneralDialog] = useState<GeneralDialogState>({ open: false, mode: 'create' })
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
@@ -73,7 +75,7 @@ export function VipCustomersSection({ embedded = false, setHeaderAction }: VipCu
 
   const load = useCallback(async () => {
     setIsLoading(true)
-    setError(null)
+    setHasLoadError(false)
     try {
       if (tab === 'vip') {
         const list = await getVipCustomers(search.trim() || undefined)
@@ -83,11 +85,12 @@ export function VipCustomersSection({ embedded = false, setHeaderAction }: VipCu
         setGeneralItems(list)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('vipCustomers:load_failed'))
+      showError(err instanceof Error ? err.message : t('vipCustomers:load_failed'))
+      setHasLoadError(true)
     } finally {
       setIsLoading(false)
     }
-  }, [search, tab, t])
+  }, [search, showError, tab, t])
 
   useEffect(() => {
     void load()
@@ -117,8 +120,14 @@ export function VipCustomersSection({ embedded = false, setHeaderAction }: VipCu
         </div>
       )
     }
-    if (error) {
-      return <EmptyState title={error} actionLabel={t('common:buttons.retry')} onAction={load} />
+    if (hasLoadError) {
+      return (
+        <EmptyState
+          title={t('vipCustomers:load_failed')}
+          actionLabel={t('common:buttons.retry')}
+          onAction={load}
+        />
+      )
     }
     if (tableRows.length === 0) {
       return (
@@ -148,7 +157,7 @@ export function VipCustomersSection({ embedded = false, setHeaderAction }: VipCu
         onDelete={(id) => setConfirmDeleteId(id)}
       />
     )
-  }, [isLoading, error, tableRows, tab, canManage, t, load, vipItems, generalItems])
+  }, [hasLoadError, isLoading, tableRows, tab, canManage, t, load, vipItems, generalItems])
 
   const actionLabel = tab === 'vip' ? t('vipCustomers:add') : t('vipCustomers:add_general')
 
@@ -340,16 +349,17 @@ function CustomerTable({
 
 function GeneralImportPanel({ canManage, onImportDone }: { canManage: boolean; onImportDone: () => void }) {
   const { t } = useTranslation(['vipCustomers'])
+  const { showError } = useAppToast()
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string>('')
   const [result, setResult] = useState<GeneralCustomerImportResult | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [validationError, setValidationError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     setFile(f ?? null)
-    setError(null)
+    setValidationError(null)
     setResult(null)
     setPreview('')
     if (!f) return
@@ -364,18 +374,18 @@ function GeneralImportPanel({ canManage, onImportDone }: { canManage: boolean; o
   const submit = async () => {
     if (!canManage) return
     if (!file) {
-      setError(t('vipCustomers:general_import_no_file'))
+      setValidationError(t('vipCustomers:general_import_no_file'))
       return
     }
     setBusy(true)
-    setError(null)
+    setValidationError(null)
     setResult(null)
     try {
       const r = await importGeneralCustomers(file)
       setResult(r)
       await onImportDone()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Import failed')
+      showError(err instanceof Error ? err.message : 'Import failed')
     } finally {
       setBusy(false)
     }
@@ -399,9 +409,9 @@ function GeneralImportPanel({ canManage, onImportDone }: { canManage: boolean; o
         />
       </div>
       <p className="text-sm text-slate-600 dark:text-slate-400">{t('vipCustomers:general_import_hint')}</p>
-      {error ? (
+      {validationError ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
-          {error}
+          {validationError}
         </div>
       ) : null}
       {preview ? (
@@ -440,26 +450,24 @@ type DialogProps = {
 
 function VipCustomerDialog({ mode, target, onClose, onSaved }: DialogProps) {
   const { t } = useTranslation(['vipCustomers', 'common'])
+  const { showError, showWarning } = useAppToast()
   const [customerId, setCustomerId] = useState(target?.customer_id ?? '')
   const [customerName, setCustomerName] = useState(target?.customer_name ?? '')
   const [brands, setBrands] = useState<Brand[]>([])
   const [brandMonths, setBrandMonths] = useState<Record<string, number>>({})
   const [brandsLoading, setBrandsLoading] = useState(false)
-  const [brandsError, setBrandsError] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [validationError, setValidationError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     setCustomerId(target?.customer_id ?? '')
     setCustomerName(target?.customer_name ?? '')
-    setError(null)
-    setBrandsError(null)
+    setValidationError(null)
   }, [mode, target?.id, target?.customer_id, target?.customer_name])
 
   useEffect(() => {
     let cancelled = false
     setBrandsLoading(true)
-    setBrandsError(null)
     void getBrands(undefined, false)
       .then((list) => {
         if (cancelled) return
@@ -479,7 +487,7 @@ function VipCustomerDialog({ mode, target, onClose, onSaved }: DialogProps) {
         setBrandMonths(init)
       })
       .catch(() => {
-        if (!cancelled) setBrandsError(t('vipCustomers:brands_load_failed'))
+        if (!cancelled) showWarning(t('vipCustomers:brands_load_failed'))
       })
       .finally(() => {
         if (!cancelled) setBrandsLoading(false)
@@ -487,24 +495,24 @@ function VipCustomerDialog({ mode, target, onClose, onSaved }: DialogProps) {
     return () => {
       cancelled = true
     }
-  }, [mode, target, t])
+  }, [mode, showWarning, target, t])
 
   const validateMonths = (n: number) => n >= 1 && n <= 60
 
   const handleSubmit = async () => {
     if (!customerId.trim()) {
-      setError(t('vipCustomers:validation.customer_id_required'))
+      setValidationError(t('vipCustomers:validation.customer_id_required'))
       return
     }
     for (const b of brands) {
       const v = brandMonths[b.id]
       if (v === undefined || !validateMonths(Number(v))) {
-        setError(t('vipCustomers:validation.months_range'))
+        setValidationError(t('vipCustomers:validation.months_range'))
         return
       }
     }
     setIsSubmitting(true)
-    setError(null)
+    setValidationError(null)
     try {
       if (mode === 'create') {
         const nameVal = customerName.trim() || null
@@ -543,7 +551,7 @@ function VipCustomerDialog({ mode, target, onClose, onSaved }: DialogProps) {
       onSaved()
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('vipCustomers:save_failed'))
+      showError(err instanceof Error ? err.message : t('vipCustomers:save_failed'))
     } finally {
       setIsSubmitting(false)
     }
@@ -567,9 +575,9 @@ function VipCustomerDialog({ mode, target, onClose, onSaved }: DialogProps) {
           </Button>
         </div>
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-6 py-5">
-          {error ? (
+          {validationError ? (
             <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-500/30 dark:bg-red-500/10">
-              {error}
+              {validationError}
             </div>
           ) : null}
           <label className="text-sm text-slate-600 dark:text-slate-300">
@@ -599,10 +607,6 @@ function VipCustomerDialog({ mode, target, onClose, onSaved }: DialogProps) {
               <div className="flex min-h-[100px] items-center justify-center gap-2 text-sm text-slate-500 dark:text-slate-400">
                 <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden />
                 {t('common:messages.loading')}
-              </div>
-            ) : brandsError ? (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-                {brandsError}
               </div>
             ) : brands.length === 0 ? (
               <div className="text-sm text-slate-500 dark:text-slate-400">{t('vipCustomers:no_active_brands')}</div>
@@ -649,7 +653,7 @@ function VipCustomerDialog({ mode, target, onClose, onSaved }: DialogProps) {
           <Button variant="ghost" onClick={onClose}>
             {t('common:buttons.cancel')}
           </Button>
-          <Button onClick={() => void handleSubmit()} disabled={isSubmitting || brandsLoading || !!brandsError}>
+          <Button onClick={() => void handleSubmit()} disabled={isSubmitting || brandsLoading}>
             {isSubmitting ? t('vipCustomers:saving') : t('vipCustomers:save')}
           </Button>
         </div>
@@ -667,24 +671,25 @@ type GeneralDialogProps = {
 
 function GeneralCustomerDialog({ mode, target, onClose, onSaved }: GeneralDialogProps) {
   const { t } = useTranslation(['vipCustomers', 'common'])
+  const { showError } = useAppToast()
   const [customerId, setCustomerId] = useState(target?.customer_id ?? '')
   const [customerName, setCustomerName] = useState(target?.customer_name ?? '')
-  const [error, setError] = useState<string | null>(null)
+  const [validationError, setValidationError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     setCustomerId(target?.customer_id ?? '')
     setCustomerName(target?.customer_name ?? '')
-    setError(null)
+    setValidationError(null)
   }, [mode, target?.id, target?.customer_id, target?.customer_name])
 
   const handleSubmit = async () => {
     if (!customerId.trim()) {
-      setError(t('vipCustomers:validation.customer_id_required'))
+      setValidationError(t('vipCustomers:validation.customer_id_required'))
       return
     }
     setIsSubmitting(true)
-    setError(null)
+    setValidationError(null)
     try {
       if (mode === 'create') {
         await createGeneralCustomer({
@@ -699,7 +704,7 @@ function GeneralCustomerDialog({ mode, target, onClose, onSaved }: GeneralDialog
       onSaved()
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('vipCustomers:save_failed'))
+      showError(err instanceof Error ? err.message : t('vipCustomers:save_failed'))
     } finally {
       setIsSubmitting(false)
     }
@@ -723,9 +728,9 @@ function GeneralCustomerDialog({ mode, target, onClose, onSaved }: GeneralDialog
           </Button>
         </div>
         <div className="space-y-3 px-6 py-5">
-          {error ? (
+          {validationError ? (
             <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-500/30 dark:bg-red-500/10">
-              {error}
+              {validationError}
             </div>
           ) : null}
           <label className="text-sm text-slate-600 dark:text-slate-300">

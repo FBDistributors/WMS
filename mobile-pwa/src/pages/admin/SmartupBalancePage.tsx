@@ -11,6 +11,7 @@ import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
+import { useAppToast } from '../../feedback/useAppToast'
 import { getSmartupBalance } from '../../services/inventoryApi'
 import { writeExcelFile } from '../../utils/exportExcel'
 import {
@@ -87,7 +88,8 @@ export function SmartupBalanceView({ warehouseCode, filialId, customHeaderSlot }
   )
   const [data, setData] = useState<unknown>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { showError } = useAppToast()
+  const [hasLoadError, setHasLoadError] = useState(false)
   const [visibleCount, setVisibleCount] = useState(INITIAL_PAGE_SIZE)
   const [isExporting, setIsExporting] = useState(false)
   const [exportSuccessAt, setExportSuccessAt] = useState<number | null>(null)
@@ -100,12 +102,12 @@ export function SmartupBalanceView({ warehouseCode, filialId, customHeaderSlot }
       if (cached) {
         setData(cached.raw)
         setCachedAt(cached.loadedAt)
-        setError(null)
+        setHasLoadError(false)
         setIsLoading(false)
         return
       }
       setIsLoading(true)
-      setError(null)
+      setHasLoadError(false)
       try {
         const res = await getSmartupBalance({
           warehouse_code: warehouseCode,
@@ -120,7 +122,8 @@ export function SmartupBalanceView({ warehouseCode, filialId, customHeaderSlot }
         setData(res)
         setCachedAt(writeSmartupBalanceRawCache(warehouseCode, filialId, res))
       } catch (err) {
-        setError(err instanceof Error ? err.message : t('inventory:load_failed'))
+        showError(err instanceof Error ? err.message : t('inventory:load_failed'))
+        setHasLoadError(true)
         setData(null)
         setCachedAt(null)
       } finally {
@@ -130,7 +133,7 @@ export function SmartupBalanceView({ warehouseCode, filialId, customHeaderSlot }
     }
 
     setIsLoading(true)
-    setError(null)
+    setHasLoadError(false)
     setVisibleCount(INITIAL_PAGE_SIZE)
     try {
       const res = await getSmartupBalance({
@@ -141,11 +144,12 @@ export function SmartupBalanceView({ warehouseCode, filialId, customHeaderSlot }
       setData(res)
       setCachedAt(writeSmartupBalanceRawCache(warehouseCode, filialId, res))
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('inventory:load_failed'))
+      showError(err instanceof Error ? err.message : t('inventory:load_failed'))
+      setHasLoadError(true)
     } finally {
       setIsLoading(false)
     }
-  }, [t, warehouseCode, filialId])
+  }, [t, warehouseCode, filialId, showError])
 
   useEffect(() => {
     void load(false)
@@ -220,10 +224,10 @@ export function SmartupBalanceView({ warehouseCode, filialId, customHeaderSlot }
         </div>
       )
     }
-    if (error) {
+    if (hasLoadError) {
       return (
         <EmptyState
-          title={error}
+          title={t('inventory:load_failed')}
           actionLabel={t('common:buttons.retry')}
           onAction={() => load(true)}
         />
@@ -290,7 +294,7 @@ export function SmartupBalanceView({ warehouseCode, filialId, customHeaderSlot }
         )}
       </div>
     )
-  }, [columns, error, isLoading, load, rows, rawRows.length, allRows.length, visibleCount, hasMore, loadMore, t])
+  }, [columns, hasLoadError, isLoading, load, rows, rawRows.length, allRows.length, visibleCount, hasMore, loadMore, t])
 
   return (
     <AdminLayout titleSlot={<InventoryHeaderTabs />}>

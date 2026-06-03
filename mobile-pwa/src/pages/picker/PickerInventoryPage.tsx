@@ -18,6 +18,7 @@ import {
 import { resolveBarcode } from '../../services/scannerApi'
 import { getPickerInventoryCache, setPickerInventoryCache } from '../../lib/pickerInventoryCache'
 import { formatExpiryDate, getExpiryColorClass } from '../../utils/expiry'
+import { useAppToast } from '../../feedback/useAppToast'
 import type { ApiError } from '../../services/apiClient'
 
 function formatError(err: unknown): string {
@@ -39,14 +40,15 @@ export function PickerInventoryPage() {
   const [items, setItems] = useState<PickerInventoryItem[]>([])
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { showError } = useAppToast()
+  const [hasLoadError, setHasLoadError] = useState(false)
   const [scanOpen, setScanOpen] = useState(false)
   const [offlineMode, setOfflineMode] = useState(false)
   const [, setNextCursor] = useState<string | null>(null)
 
   const load = useCallback(async (overrides?: { q?: string; location_id?: string }) => {
     setIsLoading(true)
-    setError(null)
+    setHasLoadError(false)
     const qVal = overrides?.q ?? query
     const locVal = overrides?.location_id ?? locationId
     try {
@@ -65,14 +67,15 @@ export function PickerInventoryPage() {
         const data = cached.data as { items: PickerInventoryItem[] }
         setItems(data.items)
         setOfflineMode(true)
-        setError(null)
+        setHasLoadError(false)
       } else {
-        setError(formatError(err))
+        showError(formatError(err))
+        setHasLoadError(true)
       }
     } finally {
       setIsLoading(false)
     }
-  }, [query, locationId])
+  }, [query, locationId, showError])
 
   const handleSearch = () => void load()
 
@@ -107,14 +110,14 @@ export function PickerInventoryPage() {
           setNextCursor(res2.next_cursor)
           setPickerInventoryCache(res2)
         } else if (res.type === 'UNKNOWN') {
-          setError(t('scan.unknown'))
+          showError(t('scan.unknown'))
         }
       } catch {
         setQuery(barcode)
         void load()
       }
     },
-    [navigate, load, t]
+    [navigate, load, showError, t]
   )
 
   const toggleExpand = (productId: string) => {
@@ -172,11 +175,10 @@ export function PickerInventoryPage() {
         <div className="relative min-h-[200px]">
           <LoadingOverlay label={t('common:messages.loading')} />
         </div>
-      ) : error ? (
+      ) : hasLoadError ? (
         <EmptyState
           icon={<Boxes size={32} />}
           title={t('inventory.load_error')}
-          description={error}
           actionLabel={t('common:buttons.retry')}
           onAction={load}
         />

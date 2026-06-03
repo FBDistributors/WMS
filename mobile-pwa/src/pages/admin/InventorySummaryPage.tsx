@@ -34,6 +34,7 @@ import {
 } from '../../services/inventoryApi'
 import { getBrands, type Brand } from '../../services/brandsApi'
 import { useAuth } from '../../rbac/AuthProvider'
+import { useAppToast } from '../../feedback/useAppToast'
 import { writeExcelFile } from '../../utils/exportExcel'
 import {
   formatSmartupCacheTime,
@@ -109,7 +110,8 @@ export function InventorySummaryPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [onlyAvailable, setOnlyAvailable] = useState(true)
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { showError } = useAppToast()
+  const [hasLoadError, setHasLoadError] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [excelMenuOpen, setExcelMenuOpen] = useState(false)
   const [brandFilterOpen, setBrandFilterOpen] = useState(false)
@@ -123,7 +125,6 @@ export function InventorySummaryPage() {
   const [smartupQoldiqByBarcode, setSmartupQoldiqByBarcode] = useState(initialSmartup.q001Barcode)
   const [smartupBronByBarcode, setSmartupBronByBarcode] = useState(initialSmartup.q002Barcode)
   const [isSmartupSyncing, setIsSmartupSyncing] = useState(false)
-  const [smartupSyncError, setSmartupSyncError] = useState<string | null>(null)
   const [smartupCachedAt, setSmartupCachedAt] = useState<string | null>(initialSmartup.loadedAt)
   const [exportSuccessAt, setExportSuccessAt] = useState<number | null>(null)
   const [exportSavedPath, setExportSavedPath] = useState<string | null>(null)
@@ -153,7 +154,7 @@ export function InventorySummaryPage() {
 
   const load = useCallback(async () => {
     setIsLoading(true)
-    setError(null)
+    setHasLoadError(false)
     try {
       const summaryRes = await getInventorySummaryLight({
         search: debouncedSearch.trim() || undefined,
@@ -166,12 +167,13 @@ export function InventorySummaryPage() {
       })
       setData({ items: summaryRes.items, total: summaryRes.total })
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('inventory:load_failed'))
+      showError(err instanceof Error ? err.message : t('inventory:load_failed'))
+      setHasLoadError(true)
       setData({ items: [], total: 0 })
     } finally {
       setIsLoading(false)
     }
-  }, [debouncedSearch, selectedBrandIds, onlyAvailable, offset, warehouse, t])
+  }, [debouncedSearch, selectedBrandIds, onlyAvailable, offset, warehouse, showError, t])
 
   const loadBrands = useCallback(async () => {
     setBrandFilterLoading(true)
@@ -187,7 +189,6 @@ export function InventorySummaryPage() {
 
   const syncSmartupFromSource = useCallback(async () => {
     setIsSmartupSyncing(true)
-    setSmartupSyncError(null)
     const prev = readSmartupSummaryCache()
     const settled = await Promise.allSettled([
       getSmartupBalance({ warehouse_code: '001', refresh: true }),
@@ -228,10 +229,10 @@ export function InventorySummaryPage() {
       applySmartupMaps(q001Map, q002Map, q001Bc, q002Bc, loadedAt)
     }
     if (errs.length > 0) {
-      setSmartupSyncError(errs.filter(Boolean).join(' · ') || t('inventory:smartup_sync_failed'))
+      showError(errs.filter(Boolean).join(' · ') || t('inventory:smartup_sync_failed'))
     }
     setIsSmartupSyncing(false)
-  }, [applySmartupMaps, t])
+  }, [applySmartupMaps, showError, t])
 
   useEffect(() => {
     if (
@@ -431,8 +432,7 @@ export function InventorySummaryPage() {
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : t('inventory:load_failed')
-        setError(msg)
-        window.alert(`${t('inventory:export_failed')}\n\n${msg}`)
+        showError(`${t('inventory:export_failed')}: ${msg}`)
       } finally {
         setIsExporting(false)
       }
@@ -456,9 +456,13 @@ export function InventorySummaryPage() {
         </div>
       )
     }
-    if (error) {
+    if (hasLoadError) {
       return (
-        <EmptyState title={error} actionLabel={t('common:buttons.retry')} onAction={load} />
+        <EmptyState
+          title={t('inventory:load_failed')}
+          actionLabel={t('common:buttons.retry')}
+          onAction={load}
+        />
       )
     }
     if (data.items.length === 0) {
@@ -631,7 +635,7 @@ export function InventorySummaryPage() {
     config.columnOrder,
     config.visibleColumns,
     data.items,
-    error,
+    hasLoadError,
     isLoading,
     isSmartupSyncing,
     load,
@@ -802,15 +806,6 @@ export function InventorySummaryPage() {
             {t('inventory:smartup_cache_empty_hint')}
           </p>
         )}
-
-        {smartupSyncError ? (
-          <div
-            role="alert"
-            className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-200"
-          >
-            {smartupSyncError}
-          </div>
-        ) : null}
 
         {exportSuccessAt !== null && (
           <div

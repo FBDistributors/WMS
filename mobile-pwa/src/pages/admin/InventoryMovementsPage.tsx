@@ -10,6 +10,7 @@ import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
+import { useAppToast } from '../../feedback/useAppToast'
 import { getInventoryMovements, type InventoryMovement } from '../../services/inventoryApi'
 
 const PAGE_SIZE = 50
@@ -36,11 +37,12 @@ export function InventoryMovementsPage() {
   const [dateTo, setDateTo] = useState('')
   const [offset, setOffset] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { showError } = useAppToast()
+  const [hasLoadError, setHasLoadError] = useState(false)
 
   const load = useCallback(async () => {
     setIsLoading(true)
-    setError(null)
+    setHasLoadError(false)
     try {
       const data = await getInventoryMovements({
         movement_type: movementType || undefined,
@@ -51,11 +53,12 @@ export function InventoryMovementsPage() {
       })
       setItems(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('inventory:load_failed'))
+      showError(err instanceof Error ? err.message : t('inventory:load_failed'))
+      setHasLoadError(true)
     } finally {
       setIsLoading(false)
     }
-  }, [dateFrom, dateTo, movementType, offset, t])
+  }, [dateFrom, dateTo, movementType, offset, showError, t])
 
   const handleApply = () => {
     if (offset === 0) {
@@ -77,8 +80,14 @@ export function InventoryMovementsPage() {
         </div>
       )
     }
-    if (error) {
-      return <EmptyState title={error} actionLabel={t('common:buttons.retry')} onAction={load} />
+    if (hasLoadError) {
+      return (
+        <EmptyState
+          title={t('inventory:load_failed')}
+          actionLabel={t('common:buttons.retry')}
+          onAction={load}
+        />
+      )
     }
     if (items.length === 0) {
       return (

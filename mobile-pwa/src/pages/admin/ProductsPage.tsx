@@ -4,13 +4,13 @@ import { Search, Settings, Upload, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { useAppToast } from '../../feedback/useAppToast'
 import { AddProductDialog } from '../../admin/components/products/AddProductDialog'
 import { ImportProductsDialog } from '../../admin/components/products/ImportProductsDialog'
 import { ProductsTable } from '../../admin/components/products/ProductsTable'
 import { ProductsTableSettings } from '../../admin/components/products/ProductsTableSettings'
 import { useTableConfig } from '../../admin/hooks/useTableConfig'
 import { Button } from '../../components/ui/button'
-import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import {
@@ -18,7 +18,6 @@ import {
   listProductsSyncRuns,
   syncProductsFromSmartup,
   type Product,
-  type SmartupProductsSyncResult,
   type SmartupSyncRun,
 } from '../../services/productsApi'
 import { useAuth } from '../../rbac/AuthProvider'
@@ -74,9 +73,8 @@ export function ProductsPage() {
   const [activeSearch, setActiveSearch] = useState('')
   const abortRef = useRef<AbortController | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [syncError, setSyncError] = useState<string | null>(null)
-  const [syncResult, setSyncResult] = useState<SmartupProductsSyncResult | null>(null)
+  const { showError, showSuccess } = useAppToast()
+  const [hasLoadError, setHasLoadError] = useState(false)
   const [lastRun, setLastRun] = useState<SmartupSyncRun | null>(null)
   const [isSyncing, setIsSyncing] = useState(false)
 
@@ -86,7 +84,7 @@ export function ProductsPage() {
       const ac = new AbortController()
       abortRef.current = ac
       setIsLoading(true)
-      setError(null)
+      setHasLoadError(false)
       try {
         const data = await getProducts(
           {
@@ -102,7 +100,8 @@ export function ProductsPage() {
         setTotal(data.total)
       } catch (err) {
         if ((err as { name?: string }).name === 'AbortError') return
-        setError(t('products:load_error'))
+        showError(t('products:load_error'))
+        setHasLoadError(true)
       } finally {
         if (abortRef.current === ac) {
           abortRef.current = null
@@ -110,7 +109,7 @@ export function ProductsPage() {
         }
       }
     },
-    [limit, t]
+    [limit, t, showError]
   )
 
   const handleRetry = useCallback(() => {
@@ -165,11 +164,11 @@ export function ProductsPage() {
       )
     }
 
-    if (error) {
+    if (hasLoadError) {
       return (
         <EmptyState
           icon={<Settings size={32} />}
-          title={error}
+          title={t('products:load_error')}
           actionLabel={t('common:buttons.retry')}
           onAction={handleRetry}
         />
@@ -198,12 +197,10 @@ export function ProductsPage() {
         onInventoryClick={(item) => navigate(`/admin/inventory/${item.id}`)}
       />
     )
-  }, [config.columnOrder, config.visibleColumns, error, handleRetry, isLoading, items, navigate, t])
+  }, [config.columnOrder, config.visibleColumns, hasLoadError, handleRetry, isLoading, items, navigate, t])
 
   const handleSync = async () => {
     setIsSyncing(true)
-    setSyncError(null)
-    setSyncResult(null)
     try {
       const result = await syncProductsFromSmartup({
         code: '',
@@ -212,11 +209,17 @@ export function ProductsPage() {
         begin_modified_on: '',
         end_modified_on: '',
       })
-      setSyncResult(result)
+      showSuccess(
+        `${t('products:sync_completed')} ${t('products:sync_summary', {
+          inserted: result.inserted,
+          updated: result.updated,
+          skipped: result.skipped,
+        })}`
+      )
       await loadRuns()
       await load(activeSearch, offset)
     } catch (err) {
-      setSyncError(err instanceof Error ? err.message : t('products:sync_failed'))
+      showError(err instanceof Error ? err.message : t('products:sync_failed'))
     } finally {
       setIsSyncing(false)
     }
@@ -226,21 +229,6 @@ export function ProductsPage() {
     <AdminLayout
       title={t('products:title')}
     >
-      {syncError ? (
-        <Card className="mb-4 border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-500/30 dark:bg-red-500/10">
-          {syncError}
-        </Card>
-      ) : null}
-      {syncResult ? (
-        <Card className="mb-4 border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700 dark:border-green-500/30 dark:bg-green-500/10">
-          {t('products:sync_completed')}{' '}
-          {t('products:sync_summary', {
-            inserted: syncResult.inserted,
-            updated: syncResult.updated,
-            skipped: syncResult.skipped,
-          })}
-        </Card>
-      ) : null}
       {lastRun ? (
         <div className="mb-4 text-sm text-slate-600 dark:text-slate-300">
           {t('products:last_sync')}: {new Date(lastRun.started_at).toLocaleString()} ·{' '}

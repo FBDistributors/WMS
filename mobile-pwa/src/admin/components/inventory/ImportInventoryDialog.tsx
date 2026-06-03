@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import * as XLSX from 'xlsx'
 
 import { Button } from '../../../components/ui/button'
+import { useAppToast } from '../../../feedback/useAppToast'
 import {
   IMPORT_QTY_MAX_LINES,
   importInventoryQtyRows,
@@ -363,6 +364,7 @@ export function ImportInventoryDialog({
   onSuccess,
 }: ImportInventoryDialogProps) {
   const { t } = useTranslation(['inventory', 'common'])
+  const { showError, showWarning } = useAppToast()
   const [fileName, setFileName] = useState<string | null>(null)
   const [lines, setLines] = useState<ImportQtyRowLine[]>([])
   const [submitting, setSubmitting] = useState(false)
@@ -370,7 +372,6 @@ export function ImportInventoryDialog({
   const [result, setResult] = useState<ImportQtyResponse | null>(null)
   const [columnFlags, setColumnFlags] = useState({ barcode: false, product: false, brand: false, brandId: false })
   const [catalogEnriching, setCatalogEnriching] = useState(false)
-  const [catalogEnrichError, setCatalogEnrichError] = useState<string | null>(null)
   const [catalogMissingCount, setCatalogMissingCount] = useState(0)
 
   const reset = useCallback(() => {
@@ -380,7 +381,6 @@ export function ImportInventoryDialog({
     setResult(null)
     setColumnFlags({ barcode: false, product: false, brand: false, brandId: false })
     setCatalogEnriching(false)
-    setCatalogEnrichError(null)
     setCatalogMissingCount(0)
   }, [])
 
@@ -413,7 +413,6 @@ export function ImportInventoryDialog({
     setFileName(file.name)
     setLines([])
     setColumnFlags({ barcode: false, product: false, brand: false, brandId: false })
-    setCatalogEnrichError(null)
     setCatalogMissingCount(0)
     const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
     try {
@@ -457,7 +456,6 @@ export function ImportInventoryDialog({
         return
       }
       setCatalogEnriching(true)
-      setCatalogEnrichError(null)
       setCatalogMissingCount(0)
       try {
         const bySku = await fetchProductsBySkuCodes(parsed.lines.map((l) => l.code))
@@ -465,7 +463,7 @@ export function ImportInventoryDialog({
         setCatalogMissingCount(missingUniqueCodes)
         setLines(enriched)
       } catch {
-        setCatalogEnrichError(t('inventory:import_catalog_enrich_failed'))
+        showWarning(t('inventory:import_catalog_enrich_failed'))
         setLines(parsed.lines)
         setCatalogMissingCount(0)
       } finally {
@@ -505,7 +503,7 @@ export function ImportInventoryDialog({
         onOpenChange(false)
       }
     } catch (err) {
-      setFormError(importSubmitErrorMessage(err, t('inventory:import_failed')))
+      showError(importSubmitErrorMessage(err, t('inventory:import_failed')))
     } finally {
       setSubmitting(false)
     }
@@ -574,12 +572,7 @@ export function ImportInventoryDialog({
               {t('inventory:import_catalog_enriching')}
             </div>
           ) : null}
-          {catalogEnrichError ? (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
-              {catalogEnrichError}
-            </div>
-          ) : null}
-          {lines.length > 0 && !catalogEnriching && !catalogEnrichError ? (
+          {lines.length > 0 && !catalogEnriching ? (
             <p className="text-xs text-slate-500 dark:text-slate-400">{t('inventory:import_catalog_filled')}</p>
           ) : null}
           {catalogMissingCount > 0 && !catalogEnriching ? (

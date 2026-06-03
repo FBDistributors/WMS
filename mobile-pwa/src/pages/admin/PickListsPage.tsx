@@ -16,6 +16,7 @@ import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { listPickLists, cancelPickList, type PickList, type PickListStatus, type ListPickListsOptions } from '../../services/pickingApi'
 import { updateOrderStatus } from '../../services/ordersApi'
+import { useAppToast } from '../../feedback/useAppToast'
 import { useAuth } from '../../rbac/AuthProvider'
 
 const PAGE_SIZE = 200
@@ -101,7 +102,8 @@ export function PickListsPage() {
   const [hasMore, setHasMore] = useState(false)
   const [query, setQuery] = useState('')
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { showError } = useAppToast()
+  const [hasLoadError, setHasLoadError] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
@@ -149,7 +151,7 @@ export function PickListsPage() {
       const { background = false, append = false } = opts
       if (!background && !append) {
         setIsLoading(true)
-        setError(null)
+        setHasLoadError(false)
       } else if (background && !append) {
         setIsRefreshing(true)
       } else if (append) {
@@ -169,7 +171,10 @@ export function PickListsPage() {
         setHasMore(data.length === PAGE_SIZE)
       } catch {
         if (!append) {
-          if (!background) setError(t('picking:load_error'))
+          if (!background) {
+            showError(t('picking:load_error'))
+            setHasLoadError(true)
+          }
         }
       } finally {
         if (!background && !append) {
@@ -181,7 +186,7 @@ export function PickListsPage() {
         }
       }
     },
-    [processScope, t, wmsGroupForApi]
+    [processScope, showError, t, wmsGroupForApi]
   )
 
   useEffect(() => {
@@ -285,13 +290,13 @@ export function PickListsPage() {
         nextOffsetRef.current = 0
         void load({ background: true })
       } catch {
-        setError(t('picking:cancel_error'))
+        showError(t('picking:cancel_error'))
       } finally {
         setCancellingId(null)
         setCancelTarget(null)
       }
     },
-    [cancelTarget, load, t]
+    [cancelTarget, load, showError, t]
   )
 
   const content = useMemo(() => {
@@ -302,10 +307,10 @@ export function PickListsPage() {
         </div>
       )
     }
-    if (error) {
+    if (hasLoadError) {
       return (
         <EmptyState
-          title={error}
+          title={t('picking:load_error')}
           actionLabel={t('common:buttons.retry')}
           onAction={() => {
             nextOffsetRef.current = 0
@@ -641,7 +646,7 @@ export function PickListsPage() {
     cancellingId,
     docStatusLabel,
     pipelineStatusLabel,
-    error,
+    hasLoadError,
     filtered,
     query,
     i18n.language,

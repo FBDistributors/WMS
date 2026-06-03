@@ -13,6 +13,7 @@ import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { getLocations, type Location } from '../../services/locationsApi'
 import { getInventoryDetails, type InventoryDetailRow } from '../../services/inventoryApi'
 import { getProductHistory, type ProductHistoryResponse } from '../../services/productsApi'
+import { useAppToast } from '../../feedback/useAppToast'
 import { formatExpiryDate } from '../../utils/expiry'
 
 type TabId = 'receiving' | 'picks' | 'adjustments' | 'stock'
@@ -37,11 +38,11 @@ export function InventoryDetailsPage() {
   const [expiryBefore, setExpiryBefore] = useState('')
   const [showZero, setShowZero] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { showError, showWarning } = useAppToast()
+  const [hasLoadError, setHasLoadError] = useState(false)
   const [activeTab, setActiveTab] = useState<TabId>('stock')
   const [history, setHistory] = useState<ProductHistoryResponse | null>(null)
   const [historyLoading, setHistoryLoading] = useState(true)
-  const [historyError, setHistoryError] = useState<string | null>(null)
 
   const loadHistory = useCallback(async () => {
     if (!productId) {
@@ -49,21 +50,20 @@ export function InventoryDetailsPage() {
       return
     }
     setHistoryLoading(true)
-    setHistoryError(null)
     try {
       const data = await getProductHistory(productId)
       setHistory(data)
     } catch (err) {
-      setHistoryError(err instanceof Error ? err.message : t('products:history_load_failed'))
+      showWarning(err instanceof Error ? err.message : t('products:history_load_failed'))
       setHistory(null)
     } finally {
       setHistoryLoading(false)
     }
-  }, [productId, t])
+  }, [productId, showWarning, t])
 
   const load = useCallback(async () => {
     setIsLoading(true)
-    setError(null)
+    setHasLoadError(false)
     try {
       const [details, locationsResponse] = await Promise.all([
         getInventoryDetails({
@@ -77,11 +77,12 @@ export function InventoryDetailsPage() {
       setItems(details)
       setLocations(locationsResponse)
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('inventory:load_failed'))
+      showError(err instanceof Error ? err.message : t('inventory:load_failed'))
+      setHasLoadError(true)
     } finally {
       setIsLoading(false)
     }
-  }, [expiryBefore, locationId, productId, showZero, t])
+  }, [expiryBefore, locationId, productId, showError, showZero, t])
 
   useEffect(() => {
     void load()
@@ -106,9 +107,13 @@ export function InventoryDetailsPage() {
         </div>
       )
     }
-    if (error) {
+    if (hasLoadError) {
       return (
-        <EmptyState title={error} actionLabel={t('common:buttons.retry')} onAction={load} />
+        <EmptyState
+          title={t('inventory:load_failed')}
+          actionLabel={t('common:buttons.retry')}
+          onAction={load}
+        />
       )
     }
     if (items.length === 0) {
@@ -151,7 +156,7 @@ export function InventoryDetailsPage() {
         </table>
       </TableScrollArea>
     )
-  }, [error, isLoading, items, load, t])
+  }, [hasLoadError, isLoading, items, load, t])
 
   return (
     <AdminLayout title={t('inventory:details_title')}>
@@ -185,9 +190,6 @@ export function InventoryDetailsPage() {
         </div>
 
         <div className="p-4">
-          {historyError && activeTab !== 'stock' && (
-            <p className="mb-4 text-sm text-amber-600 dark:text-amber-400">{historyError}</p>
-          )}
 
           {activeTab === 'receiving' && (
             <section>

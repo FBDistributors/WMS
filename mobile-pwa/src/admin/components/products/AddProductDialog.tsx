@@ -3,6 +3,7 @@ import { Plus, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '../../../components/ui/button'
+import { useAppToast } from '../../../feedback/useAppToast'
 import { createProduct } from '../../../services/productsApi'
 
 type AddProductDialogProps = {
@@ -38,12 +39,11 @@ export function AddProductDialog({ open, onOpenChange, onCreated }: AddProductDi
   const [form, setForm] = useState<FormState>(defaultState)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState<string | null>(null)
+  const { showError } = useAppToast()
 
   const reset = () => {
     setForm(defaultState)
     setErrors({})
-    setSubmitError(null)
   }
 
   useEffect(() => {
@@ -74,7 +74,6 @@ export function AddProductDialog({ open, onOpenChange, onCreated }: AddProductDi
     event.preventDefault()
     if (!validate()) return
     setIsSubmitting(true)
-    setSubmitError(null)
     try {
       await createProduct({
         sku: form.sku.trim(),
@@ -91,7 +90,7 @@ export function AddProductDialog({ open, onOpenChange, onCreated }: AddProductDi
     } catch (error) {
       const message =
         error instanceof Error ? error.message : t('products:validation.submit_failed')
-      setSubmitError(message)
+      showError(message)
     } finally {
       setIsSubmitting(false)
     }
@@ -120,11 +119,6 @@ export function AddProductDialog({ open, onOpenChange, onCreated }: AddProductDi
           </Button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
-          {submitError ? (
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-500/30 dark:bg-red-500/10">
-              {submitError}
-            </div>
-          ) : null}
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm text-slate-600 dark:text-slate-300">
               {t('products:fields.sku')}

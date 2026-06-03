@@ -16,6 +16,7 @@ import {
   updateBrand,
   type Brand,
 } from '../../services/brandsApi'
+import { useAppToast } from '../../feedback/useAppToast'
 import { useAuth } from '../../rbac/AuthProvider'
 
 type DialogState = {
@@ -30,7 +31,8 @@ export function BrandsPage() {
   const canManage = has('brands:manage')
   const [items, setItems] = useState<Brand[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { showError } = useAppToast()
+  const [hasLoadError, setHasLoadError] = useState(false)
   const [search, setSearch] = useState('')
   const [includeInactive, setIncludeInactive] = useState(false)
   const [dialog, setDialog] = useState<DialogState>({ open: false, mode: 'create' })
@@ -39,16 +41,17 @@ export function BrandsPage() {
 
   const load = useCallback(async () => {
     setIsLoading(true)
-    setError(null)
+    setHasLoadError(false)
     try {
       const brands = await getBrands(search.trim() || undefined, includeInactive)
       setItems(brands)
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('brands:load_failed'))
+      showError(err instanceof Error ? err.message : t('brands:load_failed'))
+      setHasLoadError(true)
     } finally {
       setIsLoading(false)
     }
-  }, [includeInactive, search, t])
+  }, [includeInactive, search, showError, t])
 
   useEffect(() => {
     void load()
@@ -62,8 +65,14 @@ export function BrandsPage() {
         </div>
       )
     }
-    if (error) {
-      return <EmptyState title={error} actionLabel={t('common:buttons.retry')} onAction={load} />
+    if (hasLoadError) {
+      return (
+        <EmptyState
+          title={t('brands:load_failed')}
+          actionLabel={t('common:buttons.retry')}
+          onAction={load}
+        />
+      )
     }
     if (items.length === 0) {
       return (
@@ -127,7 +136,7 @@ export function BrandsPage() {
         </table>
       </TableScrollArea>
     )
-  }, [canManage, error, isLoading, items, load, t])
+  }, [canManage, hasLoadError, isLoading, items, load, t])
 
   return (
     <AdminLayout
@@ -209,20 +218,21 @@ type DialogProps = {
 
 function BrandDialog({ mode, target, onClose, onSaved }: DialogProps) {
   const { t } = useTranslation(['brands', 'common'])
+  const { showError } = useAppToast()
   const [code, setCode] = useState(target?.code ?? '')
   const [name, setName] = useState(target?.name ?? '')
   const [displayName, setDisplayName] = useState(target?.display_name ?? '')
   const [isActive, setIsActive] = useState(target?.is_active ?? true)
-  const [error, setError] = useState<string | null>(null)
+  const [validationError, setValidationError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSubmit = async () => {
     if (!code.trim() || !name.trim()) {
-      setError(t('brands:validation.required'))
+      setValidationError(t('brands:validation.required'))
       return
     }
     setIsSubmitting(true)
-    setError(null)
+    setValidationError(null)
     try {
       if (mode === 'create') {
         await createBrand({
@@ -242,7 +252,7 @@ function BrandDialog({ mode, target, onClose, onSaved }: DialogProps) {
       onSaved()
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('brands:save_failed'))
+      showError(err instanceof Error ? err.message : t('brands:save_failed'))
     } finally {
       setIsSubmitting(false)
     }
@@ -266,9 +276,9 @@ function BrandDialog({ mode, target, onClose, onSaved }: DialogProps) {
           </Button>
         </div>
         <div className="space-y-3 px-6 py-5">
-          {error ? (
+          {validationError ? (
             <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-500/30 dark:bg-red-500/10">
-              {error}
+              {validationError}
             </div>
           ) : null}
           <label className="text-sm text-slate-600 dark:text-slate-300">

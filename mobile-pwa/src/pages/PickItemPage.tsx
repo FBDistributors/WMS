@@ -14,6 +14,7 @@ import {
 } from '../services/pickingApi'
 import { PickItemCard } from '../picking/components/PickItemCard'
 import { ScanInput } from '../picking/components/ScanInput'
+import { useAppToast } from '../feedback/useAppToast'
 import { cn } from '../lib/utils'
 
 const CameraScanner = lazy(() => import('../picking/components/CameraScanner'))
@@ -22,11 +23,13 @@ export function PickItemPage() {
   const { documentId, lineId } = useParams()
   const navigate = useNavigate()
   const { t } = useTranslation('picking')
+  const { showError } = useAppToast()
   const [line, setLine] = useState<PickLine | null>(null)
   const [qty, setQty] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
   const [isPicking, setIsPicking] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [hasLoadError, setHasLoadError] = useState(false)
+  const [notFound, setNotFound] = useState(false)
   const [isCameraActive, setIsCameraActive] = useState(false)
   const [lastScan, setLastScan] = useState<{ code: string; found: boolean } | null>(null)
 
@@ -39,12 +42,13 @@ export function PickItemPage() {
 
   const load = useCallback(async () => {
     if (!documentId || !lineId) {
-      setError(t('item_not_found'))
+      setNotFound(true)
       setIsLoading(false)
       return
     }
     setIsLoading(true)
-    setError(null)
+    setHasLoadError(false)
+    setNotFound(false)
     try {
       const details = await getPickListDetailsForPicker(documentId)
       if (isTerminalPickListStatus(details.status)) {
@@ -54,14 +58,15 @@ export function PickItemPage() {
       const found = details.lines.find((item) => item.id === lineId) ?? null
       setLine(found)
       if (!found) {
-        setError(t('item_not_found'))
+        setNotFound(true)
       }
-    } catch (err) {
-      setError(t('item_load_failed'))
+    } catch {
+      showError(t('item_load_failed'))
+      setHasLoadError(true)
     } finally {
       setIsLoading(false)
     }
-  }, [documentId, lineId, navigate, t])
+  }, [documentId, lineId, navigate, showError, t])
 
   useEffect(() => {
     void load()
@@ -77,18 +82,17 @@ export function PickItemPage() {
     const target = Math.min(remaining, qty)
     if (target <= 0) return
     setIsPicking(true)
-    setError(null)
     try {
       for (let i = 0; i < target; i += 1) {
         await pickLineDelta(line.id, 1)
       }
       navigate(`/picking/mobile-pwa/${documentId}`, { replace: true })
-    } catch (err) {
-      setError(t('pick_error'))
+    } catch {
+      showError(t('pick_error'))
     } finally {
       setIsPicking(false)
     }
-  }, [documentId, line, navigate, qty, remaining, t])
+  }, [documentId, line, navigate, qty, remaining, showError, t])
 
   const handleScan = useCallback(
     (code: string) => {
@@ -118,12 +122,14 @@ export function PickItemPage() {
     )
   }
 
-  if (!line || error) {
+  if (!line || hasLoadError || notFound) {
     return (
       <div className="min-h-screen bg-slate-50 px-4">
         <AppHeader title={t('item_title')} onBack={() => navigate(-1)} hideUserMenu />
         <EmptyState
-          title={error ?? t('item_not_found')}
+          title={
+            hasLoadError ? t('item_load_failed') : notFound ? t('item_not_found') : t('item_not_found')
+          }
           actionLabel={t('refresh')}
           onAction={load}
         />
@@ -214,7 +220,6 @@ export function PickItemPage() {
         </Button>
       </div>
 
-      {error ? <div className="mt-4 text-sm text-red-600">{error}</div> : null}
     </div>
   )
 }

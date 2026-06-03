@@ -11,6 +11,7 @@ import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
+import { useAppToast } from '../../feedback/useAppToast'
 import { getInventoryMovements, type InventoryMovement } from '../../services/inventoryApi'
 
 const PAGE_SIZE = 50
@@ -26,14 +27,15 @@ export function KamomatlarPage() {
   const [filterDateTo, setFilterDateTo] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { showError } = useAppToast()
+  const [hasLoadError, setHasLoadError] = useState(false)
   const [detailRow, setDetailRow] = useState<InventoryMovement | null>(null)
   const [filterPanelOpen, setFilterPanelOpen] = useState(false)
   const filterPanelRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async () => {
     setIsLoading(true)
-    setError(null)
+    setHasLoadError(false)
     try {
       const data = await getInventoryMovements({
         date_from: filterDateFrom.trim() || undefined,
@@ -43,11 +45,12 @@ export function KamomatlarPage() {
       })
       setItems(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('kamomat:load_error'))
+      showError(err instanceof Error ? err.message : t('kamomat:load_error'))
+      setHasLoadError(true)
     } finally {
       setIsLoading(false)
     }
-  }, [filterDateFrom, filterDateTo, offset, t])
+  }, [filterDateFrom, filterDateTo, offset, showError, t])
 
   useEffect(() => {
     void load()
@@ -77,8 +80,14 @@ export function KamomatlarPage() {
         </div>
       )
     }
-    if (error) {
-      return <EmptyState title={error} actionLabel={t('common:buttons.retry')} onAction={load} />
+    if (hasLoadError) {
+      return (
+        <EmptyState
+          title={t('kamomat:load_error')}
+          actionLabel={t('common:buttons.retry')}
+          onAction={load}
+        />
+      )
     }
     if (items.length === 0) {
       return (

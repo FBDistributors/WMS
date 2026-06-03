@@ -10,6 +10,7 @@ import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { getLocation, type Location } from '../../services/locationsApi'
+import { useAppToast } from '../../feedback/useAppToast'
 import { getInventoryByLocation, type InventoryByLocationRow } from '../../services/inventoryApi'
 
 export function LocationDetailPage() {
@@ -20,7 +21,8 @@ export function LocationDetailPage() {
   const [items, setItems] = useState<InventoryByLocationRow[]>([])
   const [filterQuery, setFilterQuery] = useState('')
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { showError } = useAppToast()
+  const [hasLoadError, setHasLoadError] = useState(false)
 
   const filteredItems = useMemo(() => {
     const q = filterQuery.trim().toLowerCase()
@@ -46,7 +48,7 @@ export function LocationDetailPage() {
   const load = useCallback(async () => {
     if (!id) return
     setIsLoading(true)
-    setError(null)
+    setHasLoadError(false)
     try {
       const [loc, inventory] = await Promise.all([
         getLocation(id),
@@ -55,13 +57,14 @@ export function LocationDetailPage() {
       setLocation(loc)
       setItems(inventory)
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('locations:load_failed'))
+      showError(err instanceof Error ? err.message : t('locations:load_failed'))
+      setHasLoadError(true)
       setLocation(null)
       setItems([])
     } finally {
       setIsLoading(false)
     }
-  }, [id, t])
+  }, [id, showError, t])
 
   useEffect(() => {
     void load()
@@ -75,9 +78,13 @@ export function LocationDetailPage() {
         </div>
       )
     }
-    if (error) {
+    if (hasLoadError) {
       return (
-        <EmptyState title={error} actionLabel={t('common:buttons.retry')} onAction={load} />
+        <EmptyState
+          title={t('locations:load_failed')}
+          actionLabel={t('common:buttons.retry')}
+          onAction={load}
+        />
       )
     }
     if (items.length === 0) {
@@ -167,7 +174,7 @@ export function LocationDetailPage() {
         </div>
       </>
     )
-  }, [error, isLoading, items, filteredItems, filterQuery, load, navigate, t])
+  }, [hasLoadError, isLoading, items, filteredItems, filterQuery, load, navigate, t])
 
   const title = location ? location.code : (id ?? '')
 

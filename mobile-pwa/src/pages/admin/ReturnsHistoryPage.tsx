@@ -9,6 +9,7 @@ import { Card } from '../../components/ui/card'
 import { DateInput } from '../../components/DateInput'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
+import { useAppToast } from '../../feedback/useAppToast'
 import { getCustomerReturnsHistory, type CustomerReturnOut } from '../../services/ordersApi'
 
 const PAGE_SIZE = 20
@@ -27,7 +28,9 @@ export function ReturnsHistoryPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { showError } = useAppToast()
+  const [hasLoadError, setHasLoadError] = useState(false)
+  const loadErrorTitle = "Qaytim tarixini yuklab bo'lmadi"
   const [rows, setRows] = useState<CustomerReturnOut[]>([])
   const [total, setTotal] = useState(0)
 
@@ -39,7 +42,7 @@ export function ReturnsHistoryPage() {
 
   const load = useCallback(async () => {
     setIsLoading(true)
-    setError(null)
+    setHasLoadError(false)
     try {
       const data = await getCustomerReturnsHistory({
         q: q || undefined,
@@ -52,11 +55,12 @@ export function ReturnsHistoryPage() {
       setRows(data.items)
       setTotal(data.total)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Qaytim tarixini yuklab bo‘lmadi')
+      showError(err instanceof Error ? err.message : loadErrorTitle)
+      setHasLoadError(true)
     } finally {
       setIsLoading(false)
     }
-  }, [dateFrom, dateTo, page, q, status])
+  }, [dateFrom, dateTo, loadErrorTitle, page, q, showError, status])
 
   useEffect(() => {
     void load()
@@ -149,8 +153,12 @@ export function ReturnsHistoryPage() {
           <div className="relative min-h-[240px]">
             <LoadingOverlay label={t('common:messages.loading')} />
           </div>
-        ) : error ? (
-          <EmptyState title={error} actionLabel={t('common:buttons.retry')} onAction={() => void load()} />
+        ) : hasLoadError ? (
+          <EmptyState
+            title={loadErrorTitle}
+            actionLabel={t('common:buttons.retry')}
+            onAction={() => void load()}
+          />
         ) : rows.length === 0 ? (
           <EmptyState title="Qaytim hujjatlari topilmadi" actionLabel={t('common:buttons.refresh')} onAction={() => void load()} />
         ) : (

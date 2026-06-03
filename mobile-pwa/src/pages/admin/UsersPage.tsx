@@ -9,6 +9,7 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
+import { useAppToast } from '../../feedback/useAppToast'
 import { listUsers } from '../../services/usersApi'
 import type { UserRecord, UserRole } from '../../types/users'
 
@@ -17,22 +18,24 @@ export function UsersPage() {
   const { t } = useTranslation(['users', 'common'])
   const [items, setItems] = useState<UserRecord[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { showError } = useAppToast()
+  const [hasLoadError, setHasLoadError] = useState(false)
   const [query, setQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all')
 
   const load = useCallback(async () => {
     setIsLoading(true)
-    setError(null)
+    setHasLoadError(false)
     try {
       const data = await listUsers({ q: query || undefined, limit: 100, offset: 0 })
       setItems(data.items)
     } catch {
-      setError(t('users:load_error'))
+      showError(t('users:load_error'))
+      setHasLoadError(true)
     } finally {
       setIsLoading(false)
     }
-  }, [query, t])
+  }, [query, t, showError])
 
   useEffect(() => {
     const handle = setTimeout(() => {
@@ -104,10 +107,10 @@ export function UsersPage() {
         <div className="relative flex-1 min-h-[200px]">
           <LoadingOverlay label={t('common:messages.loading')} />
         </div>
-      ) : error ? (
+      ) : hasLoadError ? (
         <EmptyState
           icon={<Users size={32} />}
-          title={error}
+          title={t('users:load_error')}
           actionLabel={t('common:buttons.retry')}
           onAction={load}
         />

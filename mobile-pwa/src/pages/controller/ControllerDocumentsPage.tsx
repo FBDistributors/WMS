@@ -4,7 +4,9 @@ import { ClipboardList } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AppHeader } from '../../components/layout/AppHeader'
+import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
+import { useAppToast } from '../../feedback/useAppToast'
 import { listPickLists, type PickList, isTerminalPickListStatus } from '../../services/pickingApi'
 
 export function ControllerDocumentsPage() {
@@ -12,7 +14,8 @@ export function ControllerDocumentsPage() {
   const navigate = useNavigate()
   const [docs, setDocs] = useState<PickList[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { showError } = useAppToast()
+  const [hasLoadError, setHasLoadError] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -21,7 +24,10 @@ export function ControllerDocumentsPage() {
         if (!cancelled) setDocs(data)
       })
       .catch(() => {
-        if (!cancelled) setError(t('documents.load_error'))
+        if (!cancelled) {
+          showError(t('documents.load_error'))
+          setHasLoadError(true)
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -29,7 +35,7 @@ export function ControllerDocumentsPage() {
     return () => {
       cancelled = true
     }
-  }, [t])
+  }, [showError, t])
 
   const statusBadge = (status: PickList['status']) => {
     const map: Record<PickList['status'], string> = {
@@ -51,10 +57,12 @@ export function ControllerDocumentsPage() {
           <div className="relative min-h-[200px]">
             <LoadingOverlay label={t('common:messages.loading')} />
           </div>
-        ) : error ? (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950">
-            <p className="text-red-800 dark:text-red-200">{error}</p>
-          </div>
+        ) : hasLoadError ? (
+          <EmptyState
+            title={t('documents.load_error')}
+            actionLabel={t('common:buttons.retry')}
+            onAction={() => window.location.reload()}
+          />
         ) : docs.length === 0 ? (
           <div className="flex flex-col items-center gap-4 rounded-2xl border border-slate-200 bg-white p-8 dark:border-slate-700 dark:bg-slate-800">
             <ClipboardList size={48} className="text-slate-400" />

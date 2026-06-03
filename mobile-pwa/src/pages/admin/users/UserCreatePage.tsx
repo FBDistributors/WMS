@@ -8,6 +8,7 @@ import { Button } from '../../../components/ui/button'
 import { Card } from '../../../components/ui/card'
 import type { ApiError } from '../../../services/apiClient'
 import { createUser } from '../../../services/usersApi'
+import { useAppToast } from '../../../feedback/useAppToast'
 import type { UserRole } from '../../../types/users'
 
 function isFetchApiError(err: unknown): err is ApiError {
@@ -49,7 +50,8 @@ export function UserCreatePage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { showError } = useAppToast()
+  const [validationError, setValidationError] = useState<string | null>(null)
 
   const handleGeneratePassword = () => {
     const newPassword = generateStrongPassword()
@@ -60,11 +62,11 @@ export function UserCreatePage() {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     if (password !== confirmPassword) {
-      setError(t('users:messages.password_mismatch'))
+      setValidationError(t('users:messages.password_mismatch'))
       return
     }
     setIsSaving(true)
-    setError(null)
+    setValidationError(null)
     try {
       const created = await createUser({
         username: username.trim(),
@@ -76,19 +78,19 @@ export function UserCreatePage() {
       navigate(`/admin/users/${created.id}`, { replace: true })
     } catch (err) {
       if (!isFetchApiError(err)) {
-        setError(t('users:messages.create_failed'))
+        showError(t('users:messages.create_failed'))
       } else if (err.code === 'NETWORK') {
-        setError(t('users:messages.network_error'))
+        showError(t('users:messages.network_error'))
       } else if (err.status === 409) {
-        setError(t('users:messages.username_exists'))
+        showError(t('users:messages.username_exists'))
       } else if (err.status === 403) {
-        setError(t('users:messages.no_permission'))
+        showError(t('users:messages.no_permission'))
       } else if (err.status === 400 && err.message) {
-        setError(err.message)
+        showError(err.message)
       } else if (err.message) {
-        setError(err.message)
+        showError(err.message)
       } else {
-        setError(t('users:messages.create_failed'))
+        showError(t('users:messages.create_failed'))
       }
     } finally {
       setIsSaving(false)
@@ -191,7 +193,7 @@ export function UserCreatePage() {
             />
             {t('users:form.active')}
           </label>
-          {error ? <div className="text-sm text-red-600">{error}</div> : null}
+          {validationError ? <div className="text-sm text-red-600">{validationError}</div> : null}
           <div className="flex items-center gap-2">
             <Button type="submit" disabled={isSaving}>
               {isSaving ? t('common:messages.loading') : t('users:form.create')}

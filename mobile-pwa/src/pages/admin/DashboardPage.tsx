@@ -27,6 +27,7 @@ import {
   type PickingOrderStats,
   type PickingStaffStatsRow,
 } from '../../services/dashboardApi'
+import { useAppToast } from '../../feedback/useAppToast'
 import { getReserveStuckSummary } from '../../services/inventoryApi'
 import { writeExcelFile } from '../../utils/exportExcel'
 
@@ -140,7 +141,8 @@ export function DashboardPage() {
   const [pickerRows, setPickerRows] = useState<PickingStaffStatsRow[]>([])
   const [controllerRows, setControllerRows] = useState<PickingStaffStatsRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { showError } = useAppToast()
+  const [hasLoadError, setHasLoadError] = useState(false)
   const [dateFrom, setDateFrom] = useState(todayIsoDate)
   const [dateTo, setDateTo] = useState(todayIsoDate)
   const [pickingOrderStats, setPickingOrderStats] = useState<PickingOrderStats | null>(null)
@@ -155,7 +157,7 @@ export function DashboardPage() {
 
   const load = useCallback(async () => {
     setIsLoading(true)
-    setError(null)
+    setHasLoadError(false)
     try {
       const dateFromQ = dateFrom.trim() || undefined
       const dateToQ = dateTo.trim() || undefined
@@ -189,7 +191,8 @@ export function DashboardPage() {
       setStuckOrdersCount(stuckOrders)
       setStuckOldestHours(oldest)
     } catch {
-      setError(t('admin:dashboard.load_error'))
+      showError(t('admin:dashboard.load_error'))
+      setHasLoadError(true)
       setStuckRowsCount(0)
       setStuckOrdersCount(0)
       setStuckOldestHours(0)
@@ -198,7 +201,7 @@ export function DashboardPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [t, dateFrom, dateTo])
+  }, [t, dateFrom, dateTo, showError])
 
   const resetStatsDatesToToday = () => {
     const today = todayIsoDate()
@@ -267,8 +270,12 @@ export function DashboardPage() {
 
   return (
     <AdminLayout title={t('admin:dashboard.title')}>
-      {error ? (
-        <EmptyState title={error} actionLabel={t('common:buttons.retry')} onAction={load} />
+      {hasLoadError ? (
+        <EmptyState
+          title={t('admin:dashboard.load_error')}
+          actionLabel={t('common:buttons.retry')}
+          onAction={load}
+        />
       ) : (
         <>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">

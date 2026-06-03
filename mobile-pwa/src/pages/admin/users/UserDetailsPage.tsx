@@ -11,6 +11,7 @@ import { LoadingOverlay } from '../../../components/ui/LoadingOverlay'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../../components/ui/tooltip'
 import { useAuth } from '../../../rbac/AuthProvider'
 import { getUser, resetPassword, updateUser } from '../../../services/usersApi'
+import { useAppToast } from '../../../feedback/useAppToast'
 import type { UserRecord, UserRole } from '../../../types/users'
 
 const GRANTABLE_PERMISSIONS = [
@@ -39,7 +40,9 @@ export function UserDetailsPage() {
   const { t } = useTranslation(['users', 'common'])
   const [user, setUser] = useState<UserRecord | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { showError } = useAppToast()
+  const [hasLoadError, setHasLoadError] = useState(false)
+  const [validationError, setValidationError] = useState<string | null>(null)
   const [username, setUsername] = useState('')
   const [fullName, setFullName] = useState('')
   const [role, setRole] = useState<UserRole>('picker')
@@ -53,7 +56,7 @@ export function UserDetailsPage() {
   const load = useCallback(async () => {
     if (!id) return
     setIsLoading(true)
-    setError(null)
+    setHasLoadError(false)
     try {
       const data = await getUser(id)
       setUser(data)
@@ -63,11 +66,12 @@ export function UserDetailsPage() {
       setIsActive(data.is_active)
       setGrantedPermissions(data.granted_permissions ?? [])
     } catch {
-      setError(t('users:messages.load_failed'))
+      showError(t('users:messages.load_failed'))
+      setHasLoadError(true)
     } finally {
       setIsLoading(false)
     }
-  }, [id, t])
+  }, [id, showError, t])
 
   useEffect(() => {
     void load()
@@ -78,7 +82,7 @@ export function UserDetailsPage() {
     if (!user) return
     const trimmedUsername = username.trim()
     if (trimmedUsername.length < 3) {
-      setError(t('users:messages.username_min'))
+      setValidationError(t('users:messages.username_min'))
       return
     }
     if (isSelf && (!isActive || role !== 'warehouse_admin')) {
@@ -86,7 +90,7 @@ export function UserDetailsPage() {
       if (!confirmed) return
     }
     setIsSaving(true)
-    setError(null)
+    setValidationError(null)
     try {
       await updateUser(user.id, {
         username: trimmedUsername,
@@ -97,7 +101,7 @@ export function UserDetailsPage() {
       })
       navigate('/admin/users')
     } catch {
-      setError(t('users:messages.update_failed'))
+      showError(t('users:messages.update_failed'))
     } finally {
       setIsSaving(false)
     }
@@ -106,18 +110,18 @@ export function UserDetailsPage() {
   const handleResetPassword = async () => {
     if (!user) return
     if (newPassword !== confirmPassword) {
-      setError(t('users:messages.password_mismatch'))
+      setValidationError(t('users:messages.password_mismatch'))
       return
     }
     setIsSaving(true)
-    setError(null)
+    setValidationError(null)
     try {
       await resetPassword(user.id, { new_password: newPassword })
       setNewPassword('')
       setConfirmPassword('')
       alert(t('users:messages.reset_success'))
     } catch {
-      setError(t('users:messages.reset_failed'))
+      showError(t('users:messages.reset_failed'))
     } finally {
       setIsSaving(false)
     }
@@ -136,7 +140,7 @@ export function UserDetailsPage() {
   if (!user) {
     return (
       <AdminLayout title={t('users:form.details_title')}>
-        <div>{error ?? t('users:messages.not_found')}</div>
+        <div>{hasLoadError ? t('users:messages.load_failed') : t('users:messages.not_found')}</div>
       </AdminLayout>
     )
   }
@@ -270,7 +274,7 @@ export function UserDetailsPage() {
             </div>
           </div>
 
-          {error ? <div className="text-sm text-red-600">{error}</div> : null}
+          {validationError ? <div className="text-sm text-red-600">{validationError}</div> : null}
           <div className="flex items-center gap-2">
             <Button type="submit" disabled={isSaving}>
               {isSaving ? t('common:messages.loading') : t('users:form.save')}

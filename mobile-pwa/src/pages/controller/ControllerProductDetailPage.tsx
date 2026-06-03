@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 
 import { AppHeader } from '../../components/layout/AppHeader'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
+import { useAppToast } from '../../feedback/useAppToast'
 import { getProduct, type Product } from '../../services/productsApi'
 
 export function ControllerProductDetailPage() {
@@ -12,6 +13,7 @@ export function ControllerProductDetailPage() {
   const { t } = useTranslation(['controller', 'common'])
   const navigate = useNavigate()
   const [product, setProduct] = useState<Product | null>(null)
+  const { showError } = useAppToast()
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -22,7 +24,10 @@ export function ControllerProductDetailPage() {
         if (!cancelled) setProduct(p)
       })
       .catch(() => {
-        if (!cancelled) setProduct(null)
+        if (!cancelled) {
+          setProduct(null)
+          showError(t('products.load_error'))
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -30,7 +35,7 @@ export function ControllerProductDetailPage() {
     return () => {
       cancelled = true
     }
-  }, [productId])
+  }, [productId, showError, t])
 
   if (!productId) {
     navigate('/controller/products')
@@ -50,12 +55,12 @@ export function ControllerProductDetailPage() {
             <LoadingOverlay label={t('common:messages.loading')} />
           </div>
         ) : !product ? (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950">
-            <p className="text-red-800 dark:text-red-200">{t('products.load_error')}</p>
+          <div className="space-y-3">
+            <p className="text-slate-600 dark:text-slate-400">{t('products.load_error')}</p>
             <button
               type="button"
               onClick={() => navigate('/controller/products')}
-              className="mt-3 flex items-center gap-2 text-sm text-red-700 dark:text-red-300"
+              className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400"
             >
               <ArrowLeft size={16} />
               {t('home.back_to_scan')}

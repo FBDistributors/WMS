@@ -22,6 +22,7 @@ import {
 import { getBrands, type Brand } from '../../services/brandsApi'
 import { getLocations, type Location } from '../../services/locationsApi'
 import { getProducts, type Product } from '../../services/productsApi'
+import { useAppToast } from '../../feedback/useAppToast'
 import { sanitizeStockQtyDigits } from '../../lib/stockQtyInput'
 
 const REASON_WRITE_OFF = 'inventory_shortage'
@@ -39,8 +40,7 @@ export function MahsulotYoqQilishPage() {
   const [products, setProducts] = useState<InventoryByLocationRow[]>([])
   const [loading, setLoading] = useState(false)
   const [submitLoading, setSubmitLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
+  const { showError, showSuccess } = useAppToast()
   /** writeOffQty[key] = number to write off; key = `${product_id}:${lot_id}` or by_product: `${product_id}:${lot_id}:${location_id}` */
   const [writeOffQty, setWriteOffQty] = useState<Record<string, string>>({})
 
@@ -114,15 +114,13 @@ export function MahsulotYoqQilishPage() {
 
   const loadProductDetails = useCallback((productId: string) => {
     setLoadingDetail(true)
-    setError(null)
-    setSuccess(null)
     getInventoryDetails({ product_id: productId })
       .then((rows) => {
         setDetailRows(rows)
         setWriteOffQty({})
       })
       .catch((err) => {
-        setError(err instanceof Error ? err.message : t('kamomat:load_error'))
+        showError(err instanceof Error ? err.message : t('kamomat:load_error'))
         setDetailRows([])
       })
       .finally(() => setLoadingDetail(false))
@@ -156,15 +154,13 @@ export function MahsulotYoqQilishPage() {
       return
     }
     setLoading(true)
-    setError(null)
-    setSuccess(null)
     getInventoryByLocation(locationId)
       .then((rows) => {
         setProducts(rows)
         setWriteOffQty({})
       })
       .catch((err) => {
-        setError(err instanceof Error ? err.message : t('kamomat:load_error'))
+        showError(err instanceof Error ? err.message : t('kamomat:load_error'))
         setProducts([])
       })
       .finally(() => setLoading(false))
@@ -239,8 +235,6 @@ export function MahsulotYoqQilishPage() {
     if (searchMode === 'by_location') {
       if (!locationId) return
       setSubmitLoading(true)
-      setError(null)
-      setSuccess(null)
       try {
         const promises: Promise<unknown>[] = []
         for (const row of products) {
@@ -258,11 +252,11 @@ export function MahsulotYoqQilishPage() {
           )
         }
         await Promise.all(promises)
-        setSuccess(t('kamomat:write_off.success'))
+        showSuccess(t('kamomat:write_off.success'))
         setWriteOffQty({})
         loadProducts()
       } catch (err) {
-        setError(getErrorMessage(err))
+        showError(getErrorMessage(err))
       } finally {
         setSubmitLoading(false)
       }
@@ -270,8 +264,6 @@ export function MahsulotYoqQilishPage() {
     }
     if (searchMode === 'by_product' && selectedProduct) {
       setSubmitLoading(true)
-      setError(null)
-      setSuccess(null)
       try {
         const promises: Promise<unknown>[] = []
         for (const row of detailRows) {
@@ -289,11 +281,11 @@ export function MahsulotYoqQilishPage() {
           )
         }
         await Promise.all(promises)
-        setSuccess(t('kamomat:write_off.success'))
+        showSuccess(t('kamomat:write_off.success'))
         setWriteOffQty({})
         loadProductDetails(selectedProduct.id)
       } catch (err) {
-        setError(getErrorMessage(err))
+        showError(getErrorMessage(err))
       } finally {
         setSubmitLoading(false)
       }
@@ -301,12 +293,10 @@ export function MahsulotYoqQilishPage() {
     }
     if (searchMode === 'by_brand' && selectedBrand) {
       setSubmitLoading(true)
-      setError(null)
-      setSuccess(null)
       try {
         // Keep this call compatible even when idempotency migration is pending.
         const res = await zeroBrandStock(selectedBrand.id, brandZeroMode)
-        setSuccess(
+        showSuccess(
           t('kamomat:write_off.brand_zero_success', {
             products: res.products_affected,
             movements: res.movements_created,
@@ -317,7 +307,7 @@ export function MahsulotYoqQilishPage() {
         )
         setConfirmOpen(false)
       } catch (err) {
-        setError(getErrorMessage(err))
+        showError(getErrorMessage(err))
       } finally {
         setSubmitLoading(false)
       }
@@ -344,11 +334,9 @@ export function MahsulotYoqQilishPage() {
   const handleZeroMain = useCallback(async () => {
     if (submitLoading) return
     setSubmitLoading(true)
-    setError(null)
-    setSuccess(null)
     try {
       const res = await zeroMainStock('brand_and_reserve')
-      setSuccess(
+      showSuccess(
         t('kamomat:write_off.brand_zero_success', {
           products: res.products_affected,
           movements: res.movements_created,
@@ -359,7 +347,7 @@ export function MahsulotYoqQilishPage() {
       )
       setConfirmMainOpen(false)
     } catch (err) {
-      setError(getErrorMessage(err))
+      showError(getErrorMessage(err))
     } finally {
       setSubmitLoading(false)
     }
@@ -661,17 +649,6 @@ export function MahsulotYoqQilishPage() {
           </>
         )}
       </Card>
-
-      {error && (
-        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200">
-          {error}
-        </div>
-      )}
-      {success && (
-        <div className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-900 dark:bg-green-950/50 dark:text-green-200">
-          {success}
-        </div>
-      )}
 
       {((searchMode === 'by_location' && locationId)
         || (searchMode === 'by_product' && selectedProduct)

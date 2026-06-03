@@ -11,6 +11,7 @@ import { Card } from '../../components/ui/card'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
+import { useAppToast } from '../../feedback/useAppToast'
 import { useAuth } from '../../rbac/AuthProvider'
 import { getProducts } from '../../services/productsApi'
 import {
@@ -40,7 +41,7 @@ export function MovementDetailsPage() {
 
   const [linkedOrder, setLinkedOrder] = useState<OrderDetails | null>(null)
   const [ensureLoading, setEnsureLoading] = useState(false)
-  const [ensureError, setEnsureError] = useState<string | null>(null)
+  const { showError } = useAppToast()
 
   const [addOpen, setAddOpen] = useState(false)
   const [addName, setAddName] = useState('')
@@ -49,7 +50,7 @@ export function MovementDetailsPage() {
   const [addQty, setAddQty] = useState('1')
   const [addUom, setAddUom] = useState('')
   const [addSubmitting, setAddSubmitting] = useState(false)
-  const [addError, setAddError] = useState<string | null>(null)
+  const [addValidationError, setAddValidationError] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<OrderLine | null>(null)
   const [deleteSubmitting, setDeleteSubmitting] = useState(false)
 
@@ -91,19 +92,17 @@ export function MovementDetailsPage() {
   useEffect(() => {
     if (!movement || !movementId || !has('orders:write')) {
       setLinkedOrder(null)
-      setEnsureError(null)
       setEnsureLoading(false)
       return
     }
     let cancelled = false
     setEnsureLoading(true)
-    setEnsureError(null)
     void ensureMovementOrder({ source, movement_id: movementId, movement })
       .then((o) => {
         if (!cancelled) setLinkedOrder(o)
       })
       .catch(() => {
-        if (!cancelled) setEnsureError(t('orders:movement_ensure_failed'))
+        if (!cancelled) showError(t('orders:movement_ensure_failed'))
       })
       .finally(() => {
         if (!cancelled) setEnsureLoading(false)
@@ -111,7 +110,7 @@ export function MovementDetailsPage() {
     return () => {
       cancelled = true
     }
-  }, [movement, movementId, source, has, t])
+  }, [movement, movementId, source, has, showError, t])
 
   const canEditLines = Boolean(linkedOrder?.lines_editable && has('orders:write'))
 
@@ -121,7 +120,7 @@ export function MovementDetailsPage() {
     setAddBarcode('')
     setAddQty('1')
     setAddUom('')
-    setAddError(null)
+    setAddValidationError(null)
     setAddOpen(true)
   }
 
@@ -130,15 +129,15 @@ export function MovementDetailsPage() {
     const name = addName.trim()
     const qty = Number.parseFloat(addQty.replace(',', '.'))
     if (!name) {
-      setAddError(t('orders:line_edit.name_required'))
+      setAddValidationError(t('orders:line_edit.name_required'))
       return
     }
     if (!Number.isFinite(qty) || qty <= 0) {
-      setAddError(t('orders:line_edit.qty_invalid'))
+      setAddValidationError(t('orders:line_edit.qty_invalid'))
       return
     }
     setAddSubmitting(true)
-    setAddError(null)
+    setAddValidationError(null)
     try {
       const next = await addOrderLine(linkedOrder.id, {
         name,
@@ -150,7 +149,7 @@ export function MovementDetailsPage() {
       setLinkedOrder(next)
       setAddOpen(false)
     } catch (e) {
-      setAddError(e instanceof Error ? e.message : t('orders:line_edit.failed'))
+      showError(e instanceof Error ? e.message : t('orders:line_edit.failed'))
     } finally {
       setAddSubmitting(false)
     }
@@ -230,33 +229,6 @@ export function MovementDetailsPage() {
           <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
             {t('orders:line_edit.locked')}
           </p>
-        ) : null}
-        {ensureError ? (
-          <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200">
-            <span>{ensureError}</span>
-            <Button
-              type="button"
-              variant="ghost"
-              className="shrink-0"
-              onClick={() => {
-                setEnsureError(null)
-                void (async () => {
-                  if (!movementId || !movement) return
-                  setEnsureLoading(true)
-                  try {
-                    const o = await ensureMovementOrder({ source, movement_id: movementId, movement })
-                    setLinkedOrder(o)
-                  } catch {
-                    setEnsureError(t('orders:movement_ensure_failed'))
-                  } finally {
-                    setEnsureLoading(false)
-                  }
-                })()
-              }}
-            >
-              {t('common:buttons.retry')}
-            </Button>
-          </div>
         ) : null}
 
         <div className="grid gap-3 md:grid-cols-3">
@@ -471,9 +443,9 @@ export function MovementDetailsPage() {
                   onChange={(e) => setAddUom(e.target.value)}
                 />
               </label>
-              {addError ? (
+              {addValidationError ? (
                 <p className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
-                  {addError}
+                  {addValidationError}
                 </p>
               ) : null}
             </div>

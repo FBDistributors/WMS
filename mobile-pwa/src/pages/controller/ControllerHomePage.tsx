@@ -4,12 +4,14 @@ import { ClipboardList, Package, WifiOff } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AppHeader } from '../../components/layout/AppHeader'
+import { useAppToast } from '../../feedback/useAppToast'
 import { formatExpiryDate } from '../../utils/expiry'
 
 type ScanResult = 'idle' | 'product' | 'location' | 'unknown' | 'loading'
 
 export function ControllerHomePage() {
   const { t } = useTranslation('controller')
+  const { showError } = useAppToast()
   const navigate = useNavigate()
   const location = useLocation()
   const [resultState, setResultState] = useState<ScanResult>('idle')
@@ -46,13 +48,10 @@ export function ControllerHomePage() {
       setOfflineMode(Boolean(state.scanResult.offline))
       navigate(location.pathname, { replace: true, state: {} })
     } else if (state?.scanError) {
-      setResultState('unknown')
-      setResultData({
-        message: state.scanError === 'unknown' ? t('scan.unknown') : t('inventory.load_error'),
-      })
+      showError(state.scanError === 'unknown' ? t('scan.unknown') : t('inventory.load_error'))
       navigate(location.pathname, { replace: true, state: {} })
     }
-  }, [location.state, location.pathname, navigate, t])
+  }, [location.state, location.pathname, navigate, showError, t])
 
   return (
     <div className="min-h-screen w-full min-w-0 overflow-x-hidden bg-slate-50 dark:bg-slate-950">
@@ -133,21 +132,6 @@ export function ControllerHomePage() {
           </div>
         )}
 
-        {resultState === 'unknown' && resultData?.message && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950">
-            <div className="font-medium text-red-800 dark:text-red-200">{resultData.message}</div>
-            <button
-              type="button"
-              onClick={() => {
-                setResultState('idle')
-                setResultData(null)
-              }}
-              className="mt-3 rounded-xl bg-red-600 px-4 py-2 text-sm text-white"
-            >
-              {t('home.retry')}
-            </button>
-          </div>
-        )}
 
         <div className="mt-4 space-y-2 pb-nav">
           <button

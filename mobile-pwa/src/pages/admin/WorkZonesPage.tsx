@@ -16,6 +16,7 @@ import {
   updateWorkZone,
   type WorkZone,
 } from '../../services/workZonesApi'
+import { useAppToast } from '../../feedback/useAppToast'
 import { useAuth } from '../../rbac/AuthProvider'
 
 type DialogState = { open: boolean; mode: 'create' | 'edit'; target?: WorkZone }
@@ -32,23 +33,25 @@ export function WorkZonesSection({ embedded = false, setHeaderAction }: WorkZone
   const [search, setSearch] = useState('')
   const [items, setItems] = useState<WorkZone[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { showError } = useAppToast()
+  const [hasLoadError, setHasLoadError] = useState(false)
   const [dialog, setDialog] = useState<DialogState>({ open: false, mode: 'create' })
   const [confirmDelete, setConfirmDelete] = useState<WorkZone | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
   const load = useCallback(async () => {
     setIsLoading(true)
-    setError(null)
+    setHasLoadError(false)
     try {
       const list = await getWorkZones(search.trim() || undefined)
       setItems(list)
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('workZones:load_failed'))
+      showError(err instanceof Error ? err.message : t('workZones:load_failed'))
+      setHasLoadError(true)
     } finally {
       setIsLoading(false)
     }
-  }, [search, t])
+  }, [search, showError, t])
 
   useEffect(() => {
     void load()
@@ -72,7 +75,7 @@ export function WorkZonesSection({ embedded = false, setHeaderAction }: WorkZone
       setConfirmDelete(null)
       await load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('workZones:save_failed'))
+      showError(err instanceof Error ? err.message : t('workZones:save_failed'))
     } finally {
       setIsDeleting(false)
     }
@@ -110,13 +113,13 @@ export function WorkZonesSection({ embedded = false, setHeaderAction }: WorkZone
           />
         </label>
 
-        {error ? (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
-            {error}
-          </div>
-        ) : null}
-
-        {!isLoading && rows.length === 0 ? (
+        {!isLoading && hasLoadError ? (
+          <EmptyState
+            title={t('workZones:load_failed')}
+            actionLabel={t('common:buttons.retry')}
+            onAction={load}
+          />
+        ) : !isLoading && rows.length === 0 ? (
           <EmptyState title={t('workZones:empty')} description={t('workZones:empty_desc')} />
         ) : (
           <TableScrollArea>
@@ -212,24 +215,25 @@ type DialogProps = {
 
 function WorkZoneDialog({ mode, target, onClose, onSaved }: DialogProps) {
   const { t } = useTranslation(['workZones', 'common'])
+  const { showError } = useAppToast()
   const [roomId, setRoomId] = useState(target?.room_id ?? '')
   const [name, setName] = useState(target?.name ?? '')
-  const [error, setError] = useState<string | null>(null)
+  const [validationError, setValidationError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     setRoomId(target?.room_id ?? '')
     setName(target?.name ?? '')
-    setError(null)
+    setValidationError(null)
   }, [mode, target?.id, target?.room_id, target?.name])
 
   const handleSubmit = async () => {
     if (!roomId.trim()) {
-      setError(t('workZones:validation.room_id_required'))
+      setValidationError(t('workZones:validation.room_id_required'))
       return
     }
     setIsSubmitting(true)
-    setError(null)
+    setValidationError(null)
     try {
       if (mode === 'create') {
         await createWorkZone({
@@ -245,7 +249,7 @@ function WorkZoneDialog({ mode, target, onClose, onSaved }: DialogProps) {
       onSaved()
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('workZones:save_failed'))
+      showError(err instanceof Error ? err.message : t('workZones:save_failed'))
     } finally {
       setIsSubmitting(false)
     }
@@ -269,9 +273,9 @@ function WorkZoneDialog({ mode, target, onClose, onSaved }: DialogProps) {
           </Button>
         </div>
         <div className="space-y-3 px-6 py-5">
-          {error ? (
+          {validationError ? (
             <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-500/30 dark:bg-red-500/10">
-              {error}
+              {validationError}
             </div>
           ) : null}
           <label className="text-sm text-slate-600 dark:text-slate-300">

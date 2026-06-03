@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '../../../components/ui/button'
+import { useAppToast } from '../../../feedback/useAppToast'
 import {
   getPickerUsers,
   reassignOrderPicker,
@@ -120,11 +121,12 @@ export function SendToPickingDialog({
   movementPayloads,
 }: SendToPickingDialogProps) {
   const { t } = useTranslation(['orders', 'common'])
+  const { showError } = useAppToast()
   const [pickers, setPickers] = useState<PickerUser[]>([])
   const [selected, setSelected] = useState('')
   const [isLoadingPickers, setIsLoadingPickers] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [validationError, setValidationError] = useState<string | null>(null)
   const [stockBlockFailures, setStockBlockFailures] = useState<SendToPickingValidationFailureOut[] | null>(null)
 
   useEffect(() => {
@@ -132,7 +134,7 @@ export function SendToPickingDialog({
       setStockBlockFailures(null)
       return
     }
-    setError(null)
+    setValidationError(null)
     setSelected('')
     setIsLoadingPickers(true)
     void (async () => {
@@ -140,12 +142,12 @@ export function SendToPickingDialog({
         const data = await getPickerUsers()
         setPickers(data)
       } catch (err) {
-        setError(formatApiError(err, t) || t('orders:send_to_picking.load_failed'))
+        showError(formatApiError(err, t) || t('orders:send_to_picking.load_failed'))
       } finally {
         setIsLoadingPickers(false)
       }
     })()
-  }, [open, t])
+  }, [open, showError, t])
 
   const isMovementMode = Boolean(movementPayload) || Boolean(movementPayloads?.length)
   const movementsCount = movementPayloads?.length ?? (movementPayload ? 1 : 0)
@@ -154,16 +156,16 @@ export function SendToPickingDialog({
 
   const handleSubmit = async () => {
     if (!selected) {
-      setError(t('orders:send_to_picking.picker_required'))
+      setValidationError(t('orders:send_to_picking.picker_required'))
       return
     }
     const selectedStr = String(selected).trim()
     if (!isValidUuid(selectedStr)) {
-      setError(t('orders:send_to_picking.invalid_selection'))
+      setValidationError(t('orders:send_to_picking.invalid_selection'))
       return
     }
     setIsSubmitting(true)
-    setError(null)
+    setValidationError(null)
     try {
       let successCount = 0
       const failedMessages: string[] = []
@@ -213,12 +215,12 @@ export function SendToPickingDialog({
       } else {
         const validIds = orderIds.filter((id) => isValidUuid(id))
         if (validIds.length === 0) {
-          setError(t('orders:send_to_picking.invalid_selection'))
+          setValidationError(t('orders:send_to_picking.invalid_selection'))
           setIsSubmitting(false)
           return
         }
         if (mode === 'reassign' && validIds.length > 1) {
-          setError(t('orders:reassign_picker.one_order_only'))
+          setValidationError(t('orders:reassign_picker.one_order_only'))
           setIsSubmitting(false)
           return
         }
@@ -230,7 +232,7 @@ export function SendToPickingDialog({
               return
             }
           } catch (err) {
-            setError(formatApiError(err, t) || t('orders:send_to_picking.failed'))
+            showError(formatApiError(err, t) || t('orders:send_to_picking.failed'))
             return
           }
         }
@@ -266,7 +268,7 @@ export function SendToPickingDialog({
         onOpenChange(false)
         return
       }
-      setError(
+      showError(
         failedMessages[0] ??
           (mode === 'reassign' ? t('orders:reassign_picker.failed') : t('orders:send_to_picking.failed'))
       )
@@ -359,9 +361,9 @@ export function SendToPickingDialog({
           </Button>
         </div>
         <div className="space-y-4 px-6 py-5">
-          {error ? (
+          {validationError ? (
             <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-500/30 dark:bg-red-500/10">
-              {error}
+              {validationError}
             </div>
           ) : null}
           <label className="text-sm text-slate-600 dark:text-slate-300">
@@ -383,7 +385,7 @@ export function SendToPickingDialog({
                   </option>
                 ))}
             </select>
-            {!error && !isLoadingPickers && pickers.length === 0 ? (
+            {!validationError && !isLoadingPickers && pickers.length === 0 ? (
               <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
                 {t('orders:send_to_picking.no_pickers_hint')}
               </p>

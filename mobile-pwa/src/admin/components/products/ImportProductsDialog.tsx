@@ -3,6 +3,7 @@ import { Download, Upload, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '../../../components/ui/button'
+import { useAppToast } from '../../../feedback/useAppToast'
 import { importProducts, type ProductImportFailure, type ProductImportItem } from '../../../services/productsApi'
 
 type ImportProductsDialogProps = {
@@ -79,7 +80,8 @@ export function ImportProductsDialog({
   const { t } = useTranslation(['products', 'common'])
   const [fileName, setFileName] = useState<string | null>(null)
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([])
-  const [errors, setErrors] = useState<string | null>(null)
+  const { showError } = useAppToast()
+  const [validationError, setValidationError] = useState<string | null>(null)
   const [isImporting, setIsImporting] = useState(false)
   const [progress, setProgress] = useState(0)
   const [summary, setSummary] = useState<{ inserted: number; failed: ProductImportFailure[] } | null>(null)
@@ -87,7 +89,7 @@ export function ImportProductsDialog({
   const reset = () => {
     setFileName(null)
     setParsedRows([])
-    setErrors(null)
+    setValidationError(null)
     setIsImporting(false)
     setProgress(0)
     setSummary(null)
@@ -115,20 +117,20 @@ export function ImportProductsDialog({
   }
 
   const handleFile = async (file: File) => {
-    setErrors(null)
+    setValidationError(null)
     setSummary(null)
     setFileName(file.name)
     const text = await file.text()
     const rows = parseCsv(text)
     if (rows.length === 0) {
-      setErrors(t('products:import.empty'))
+      setValidationError(t('products:import.empty'))
       setParsedRows([])
       return
     }
     const headers = rows[0].map((header) => header.trim().toLowerCase())
     const missing = TEMPLATE_HEADERS.filter((header) => !headers.includes(header))
     if (missing.length > 0) {
-      setErrors(t('products:import.missing_columns'))
+      setValidationError(t('products:import.missing_columns'))
       setParsedRows([])
       return
     }
@@ -181,7 +183,7 @@ export function ImportProductsDialog({
       } catch (error) {
         const message =
           error instanceof Error ? error.message : t('products:import.failed')
-        setErrors(message)
+        showError(message)
         setIsImporting(false)
         return
       }
@@ -216,9 +218,9 @@ export function ImportProductsDialog({
           </Button>
         </div>
         <div className="space-y-4 px-6 py-5">
-          {errors ? (
+          {validationError ? (
             <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-500/30 dark:bg-red-500/10">
-              {errors}
+              {validationError}
             </div>
           ) : null}
           <div className="flex flex-wrap items-center gap-2">

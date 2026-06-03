@@ -12,6 +12,7 @@ import { Card } from '../../components/ui/card'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
+import { useAppToast } from '../../feedback/useAppToast'
 import {
   createLocation,
   deactivateLocation,
@@ -61,7 +62,8 @@ export function LocationsPage() {
   const navigate = useNavigate()
   const [items, setItems] = useState<Location[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { showError } = useAppToast()
+  const [hasLoadError, setHasLoadError] = useState(false)
   const [dialog, setDialog] = useState<DialogState>({ open: false, mode: 'create' })
   const [createdForBarcode, setCreatedForBarcode] = useState<Location | null>(null)
   const [locationForQr, setLocationForQr] = useState<Location | null>(null)
@@ -75,17 +77,18 @@ export function LocationsPage() {
 
   const load = useCallback(async () => {
     setIsLoading(true)
-    setError(null)
+    setHasLoadError(false)
     try {
       const data = await getLocations(includeInactive, warehouse)
       setItems(data)
     } catch (err) {
       const message = err instanceof Error ? err.message : t('locations:load_failed')
-      setError(message)
+      showError(message)
+      setHasLoadError(true)
     } finally {
       setIsLoading(false)
     }
-  }, [includeInactive, warehouse, t])
+  }, [includeInactive, warehouse, showError, t])
 
   useEffect(() => {
     void load()
@@ -128,9 +131,13 @@ export function LocationsPage() {
         </div>
       )
     }
-    if (error) {
+    if (hasLoadError) {
       return (
-        <EmptyState title={error} actionLabel={t('common:buttons.retry')} onAction={load} />
+        <EmptyState
+          title={t('locations:load_failed')}
+          actionLabel={t('common:buttons.retry')}
+          onAction={load}
+        />
       )
     }
     if (items.length === 0) {
@@ -282,7 +289,7 @@ export function LocationsPage() {
         </table>
       </TableScrollArea>
     )
-  }, [error, isLoading, items, filteredItems, paginatedItems, load, navigate, t, filterQuery])
+  }, [hasLoadError, isLoading, items, filteredItems, paginatedItems, load, navigate, t, filterQuery])
 
   const warehouseTabs = (
     <div className="flex items-center gap-1 overflow-x-auto rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
@@ -398,7 +405,7 @@ export function LocationsPage() {
           </Button>
         </div>
         {content}
-        {!isLoading && !error && filteredItems.length > 0 && (
+        {!isLoading && !hasLoadError && filteredItems.length > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-4 dark:border-slate-800">
             <Button variant="outline" onClick={() => void load()} disabled={isLoading}>
               <RefreshCw size={16} className={isLoading ? 'animate-spin shrink-0' : 'shrink-0'} />
@@ -482,6 +489,7 @@ type DialogProps = {
 
 function LocationDialog({ mode, target, isShowroom = false, onClose, onSaved, onCreated }: DialogProps) {
   const { t } = useTranslation(['locations', 'common'])
+  const { showError } = useAppToast()
   const isShowroomForm = isShowroom || (target?.location_type as string) === 'SHOWROOM_RACK'
   const [locationType, setLocationType] = useState<LocationTypeEnum>(
     (target?.location_type as LocationTypeEnum) ?? (isShowroom ? 'SHOWROOM_RACK' : 'RACK')
@@ -492,7 +500,7 @@ function LocationDialog({ mode, target, isShowroom = false, onClose, onSaved, on
   const [rowNo, setRowNo] = useState<number | ''>(target?.row_no ?? '')
   const [palletNo, setPalletNo] = useState<number | ''>(target?.pallet_no ?? '')
   const [pickSequence, setPickSequence] = useState<number | ''>(target?.pick_sequence ?? '')
-  const [error, setError] = useState<string | null>(null)
+  const [validationError, setValidationError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false)
   const [isDeactivating, setIsDeactivating] = useState(false)
@@ -521,39 +529,39 @@ function LocationDialog({ mode, target, isShowroom = false, onClose, onSaved, on
   const handleSubmit = async () => {
     const s = sector.trim()
     if (!s) {
-      setError(t('locations:validation.sector_required'))
+      setValidationError(t('locations:validation.sector_required'))
       return
     }
     if (effectiveType === 'SHOWROOM_RACK') {
       if (levelNo === '') {
-        setError(t('locations:validation.etaj_required'))
+        setValidationError(t('locations:validation.etaj_required'))
         return
       }
       if (Number(levelNo) < 0 || Number(levelNo) > 99) {
-        setError(t('locations:validation.level_row_range'))
+        setValidationError(t('locations:validation.level_row_range'))
         return
       }
     } else if (locationType === 'RACK') {
       if (levelNo === '' || rowNo === '') {
-        setError(t('locations:validation.level_row_required'))
+        setValidationError(t('locations:validation.level_row_required'))
         return
       }
       if (Number(levelNo) < 0 || Number(levelNo) > 99 || Number(rowNo) < 0 || Number(rowNo) > 99) {
-        setError(t('locations:validation.level_row_range'))
+        setValidationError(t('locations:validation.level_row_range'))
         return
       }
     } else if (locationType === 'FLOOR') {
       if (palletNo === '') {
-        setError(t('locations:validation.pallet_required'))
+        setValidationError(t('locations:validation.pallet_required'))
         return
       }
       if (Number(palletNo) < 0 || Number(palletNo) > 99) {
-        setError(t('locations:validation.pallet_range'))
+        setValidationError(t('locations:validation.pallet_range'))
         return
       }
     }
     setIsSubmitting(true)
-    setError(null)
+    setValidationError(null)
     try {
       if (mode === 'create') {
         const created = await createLocation({
@@ -584,7 +592,7 @@ function LocationDialog({ mode, target, isShowroom = false, onClose, onSaved, on
       onClose()
     } catch (err) {
       const message = err instanceof Error ? err.message : t('locations:save_failed')
-      setError(message)
+      showError(message)
     } finally {
       setIsSubmitting(false)
     }
@@ -608,9 +616,9 @@ function LocationDialog({ mode, target, isShowroom = false, onClose, onSaved, on
           </Button>
         </div>
         <div className="space-y-3 px-6 py-5">
-          {error ? (
+          {validationError ? (
             <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-500/30 dark:bg-red-500/10">
-              {error}
+              {validationError}
             </div>
           ) : null}
 
@@ -779,7 +787,7 @@ function LocationDialog({ mode, target, isShowroom = false, onClose, onSaved, on
         onConfirm={async () => {
           if (!target) return
           setIsDeactivating(true)
-          setError(null)
+          setValidationError(null)
           try {
             await deactivateLocation(target.id)
             setShowDeactivateConfirm(false)
@@ -791,7 +799,7 @@ function LocationDialog({ mode, target, isShowroom = false, onClose, onSaved, on
               typeof (err as { details?: { detail?: string } }).details?.detail === 'string'
                 ? (err as { details: { detail: string } }).details.detail
                 : err instanceof Error ? err.message : t('locations:delete_failed')
-            setError(msg)
+            showError(msg)
             setShowDeactivateConfirm(false)
           } finally {
             setIsDeactivating(false)
@@ -809,7 +817,7 @@ function LocationDialog({ mode, target, isShowroom = false, onClose, onSaved, on
         onConfirm={async () => {
           if (!target) return
           setIsActivating(true)
-          setError(null)
+          setValidationError(null)
           try {
             await updateLocation(target.id, { is_active: true })
             setShowActivateConfirm(false)
@@ -821,7 +829,7 @@ function LocationDialog({ mode, target, isShowroom = false, onClose, onSaved, on
               typeof (err as { details?: { detail?: string } }).details?.detail === 'string'
                 ? (err as { details: { detail: string } }).details.detail
                 : err instanceof Error ? err.message : t('locations:save_failed')
-            setError(msg)
+            showError(msg)
             setShowActivateConfirm(false)
           } finally {
             setIsActivating(false)

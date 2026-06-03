@@ -5,6 +5,7 @@ import { AdminLayout } from '../../admin/components/AdminLayout'
 import { DateInput } from '../../components/DateInput'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
+import { useAppToast } from '../../feedback/useAppToast'
 import { fetchJSON, type ApiError } from '../../services/apiClient'
 
 type SmartupImportResponse = {
@@ -22,11 +23,10 @@ export function IntegrationsSmartupPage() {
   const [filialCode, setFilialCode] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [result, setResult] = useState<SmartupImportResponse | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { showError, showSuccess } = useAppToast()
 
   const handleSubmit = async () => {
     setIsSubmitting(true)
-    setError(null)
     try {
       const payload = {
         begin_deal_date: beginDealDate,
@@ -38,14 +38,21 @@ export function IntegrationsSmartupPage() {
         body: payload,
       })
       setResult(data)
+      showSuccess(
+        t('admin:integrations.smartup.summary', {
+          created: data.created,
+          updated: data.updated,
+          skipped: data.skipped,
+        })
+      )
     } catch (err) {
       const apiError = err as ApiError
       if (apiError?.details && typeof apiError.details === 'object' && 'detail' in apiError.details) {
-        setError(String((apiError.details as { detail: string }).detail))
+        showError(String((apiError.details as { detail: string }).detail))
         return
       }
       const message = err instanceof Error ? err.message : t('admin:integrations.smartup.error')
-      setError(message)
+      showError(message)
     } finally {
       setIsSubmitting(false)
     }
@@ -62,11 +69,6 @@ export function IntegrationsSmartupPage() {
             {t('admin:integrations.smartup.subtitle')}
           </div>
         </div>
-        {error ? (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-500/30 dark:bg-red-500/10">
-            {error}
-          </div>
-        ) : null}
         <div className="grid gap-3 md:grid-cols-3">
           <label className="text-sm text-slate-600 dark:text-slate-300">
             {t('admin:integrations.smartup.begin_deal_date')}

@@ -12,7 +12,7 @@ import {
   RECEIVING_TABLE_COLUMN_IDS,
 } from '../../admin/hooks/useReceivingTableConfig'
 import type { ExportFormat } from '../../admin/components/receiving/ExportFormatDropdown'
-import { FloatingSnackBar } from '../../components/ui/FloatingSnackBar'
+import { useAppToast } from '../../feedback/useAppToast'
 import { ProductSearchCombobox, formatProductLabel } from '../../components/ProductSearchCombobox'
 import { LocationSearchCombobox, formatLocationLabel } from '../../components/LocationSearchCombobox'
 import { Button } from '../../components/ui/button'
@@ -128,8 +128,7 @@ export function ReceivingPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [snackMessage, setSnackMessage] = useState<string | null>(null)
-  const [snackVariant, setSnackVariant] = useState<'success' | 'error'>('success')
+  const { showSuccess, showError, showInfo } = useAppToast()
   const [inventoryMap, setInventoryMap] = useState<Map<string, number>>(new Map())
   const [isTableSettingsOpen, setIsTableSettingsOpen] = useState(false)
   const { config: tableConfig, updateConfig: updateTableConfig, resetConfig: resetTableConfig } =
@@ -184,11 +183,11 @@ export function ReceivingPage() {
         setInventoryMap(new Map())
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('receiving:load_failed'))
+      showError(err instanceof Error ? err.message : t('receiving:load_failed'))
     } finally {
       setIsLoading(false)
     }
-  }, [t, receiverFilter, brandFilter, dateFrom, dateTo, offset])
+  }, [t, receiverFilter, brandFilter, dateFrom, dateTo, offset, showError])
 
   const loadReceivers = useCallback(async () => {
     try {
@@ -365,8 +364,7 @@ export function ReceivingPage() {
 
   const handleListExport = useCallback(
     async (kind: ExportFormat) => {
-      setSnackVariant('success')
-      setSnackMessage(t('receiving:export_fetching'))
+      showInfo(t('receiving:export_fetching'), 4000)
       try {
         const all = await fetchAllReceipts({
           created_by: receiverFilter.trim() || undefined,
@@ -427,20 +425,14 @@ export function ReceivingPage() {
           await downloadReceiptListPdf(ctx)
         }
 
-        setSnackVariant('success')
-        setSnackMessage(t('receiving:export_success'))
+        showSuccess(t('receiving:export_success'))
       } catch (err) {
         if (err instanceof ReceiptExportTooLargeError) {
-          setSnackVariant('error')
-          setSnackMessage(t('receiving:export_too_large'))
+          showError(t('receiving:export_too_large'))
         } else if (err instanceof StaleAppChunkError) {
-          setSnackVariant('error')
-          setSnackMessage(t('receiving:export_stale_app'))
+          showError(t('receiving:export_stale_app'))
         } else {
-          setSnackVariant('error')
-          setSnackMessage(
-            `${t('receiving:export_failed')}: ${formatUnknownError(err)}`
-          )
+          showError(`${t('receiving:export_failed')}: ${formatUnknownError(err)}`)
         }
         throw err
       }
@@ -453,6 +445,9 @@ export function ReceivingPage() {
       dateTo,
       searchQuery,
       buildExportFilterSummary,
+      showInfo,
+      showSuccess,
+      showError,
     ]
   )
 
@@ -531,7 +526,7 @@ export function ReceivingPage() {
           : err instanceof Error
             ? err.message
             : t('receiving:save_failed')
-      setError(msg)
+      showError(msg)
     } finally {
       setIsSubmitting(false)
     }
@@ -541,10 +536,10 @@ export function ReceivingPage() {
     async (receiptId: string) => {
       if (!canWrite) return
       setIsSubmitting(true)
-      setError(null)
       try {
         await completeReceipt(receiptId)
         await load()
+        showSuccess(t('receiving:statuses.completed'))
       } catch (err) {
         const msg =
           err && typeof err === 'object' && 'message' in err
@@ -552,12 +547,12 @@ export function ReceivingPage() {
             : err instanceof Error
               ? err.message
               : t('receiving:complete_failed')
-        setError(msg)
+        showError(msg)
       } finally {
         setIsSubmitting(false)
       }
     },
-    [canWrite, load, t]
+    [canWrite, load, t, showSuccess, showError]
   )
 
   const renderReceivingCell = useCallback(
@@ -804,12 +799,6 @@ export function ReceivingPage() {
           </div>
         </div>
       ) : null}
-
-      <FloatingSnackBar
-        message={snackMessage}
-        variant={snackVariant}
-        onDismiss={() => setSnackMessage(null)}
-      />
 
       <Card className="space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

@@ -14,6 +14,7 @@ import {
   type Product,
   type ProductHistoryResponse,
 } from '../../services/productsApi'
+import { useAppToast } from '../../feedback/useAppToast'
 import {
   getInventorySummaryByLocation,
   type InventorySummaryWithLocationRow,
@@ -40,8 +41,8 @@ export function ProductDetailsPage() {
   const [activeTab, setActiveTab] = useState<TabId>('basic')
   const [isLoading, setIsLoading] = useState(true)
   const [historyLoading, setHistoryLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [historyError, setHistoryError] = useState<string | null>(null)
+  const { showError, showWarning } = useAppToast()
+  const [hasLoadError, setHasLoadError] = useState(false)
   const [stockByLocation, setStockByLocation] = useState<InventorySummaryWithLocationRow[] | null>(null)
   const [stockByLocationLoading, setStockByLocationLoading] = useState(false)
 
@@ -60,33 +61,33 @@ export function ProductDetailsPage() {
 
   const load = useCallback(async () => {
     if (!id) {
-      setError(t('products:not_found'))
+      setHasLoadError(true)
       setIsLoading(false)
       setHistoryLoading(false)
       return
     }
     setIsLoading(true)
     setHistoryLoading(true)
-    setError(null)
-    setHistoryError(null)
+    setHasLoadError(false)
     try {
       const [productData, historyData] = await Promise.all([
         getProduct(id),
         getProductHistory(id).catch((err) => {
-          setHistoryError(err instanceof Error ? err.message : t('products:history_load_failed'))
+          showWarning(err instanceof Error ? err.message : t('products:history_load_failed'))
           return null
         }),
       ])
       setProduct(productData)
       if (historyData) setHistory(historyData)
       else setHistory(null)
-    } catch (err) {
-      setError(t('products:load_failed'))
+    } catch {
+      showError(t('products:load_failed'))
+      setHasLoadError(true)
     } finally {
       setIsLoading(false)
       setHistoryLoading(false)
     }
-  }, [id, t])
+  }, [id, showError, showWarning, t])
 
   useEffect(() => {
     void load()
@@ -108,11 +109,11 @@ export function ProductDetailsPage() {
     )
   }
 
-  if (!product || error) {
+  if (!product || hasLoadError) {
     return (
       <AdminLayout title={t('products:details_title')}>
         <EmptyState
-          title={error ?? t('products:not_found')}
+          title={hasLoadError ? t('products:load_failed') : t('products:not_found')}
           actionLabel={t('common:buttons.retry')}
           onAction={load}
         />
@@ -200,9 +201,6 @@ export function ProductDetailsPage() {
           </div>
 
           <div className="p-4">
-            {historyError && (
-              <p className="mb-4 text-sm text-amber-600 dark:text-amber-400">{historyError}</p>
-            )}
 
             {activeTab === 'basic' && (
               <section>

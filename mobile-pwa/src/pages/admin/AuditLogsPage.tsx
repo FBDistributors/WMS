@@ -9,6 +9,7 @@ import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
+import { useAppToast } from '../../feedback/useAppToast'
 import { listAuditLogs } from '../../services/auditApi'
 import type { AuditLogRecord } from '../../services/auditApi'
 
@@ -24,12 +25,13 @@ export function AuditLogsPage() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { showError } = useAppToast()
+  const [hasLoadError, setHasLoadError] = useState(false)
   const [detailRow, setDetailRow] = useState<AuditLogRecord | null>(null)
 
   const load = useCallback(async () => {
     setIsLoading(true)
-    setError(null)
+    setHasLoadError(false)
     try {
       const data = await listAuditLogs({
         entity_type: entityType || undefined,
@@ -41,11 +43,12 @@ export function AuditLogsPage() {
       setItems(data.items)
       setTotal(data.total)
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('audit:load_error'))
+      showError(err instanceof Error ? err.message : t('audit:load_error'))
+      setHasLoadError(true)
     } finally {
       setIsLoading(false)
     }
-  }, [entityType, dateFrom, dateTo, offset, t])
+  }, [entityType, dateFrom, dateTo, offset, t, showError])
 
   useEffect(() => {
     void load()
@@ -74,8 +77,14 @@ export function AuditLogsPage() {
         </div>
       )
     }
-    if (error) {
-      return <EmptyState title={error} actionLabel={t('common:buttons.retry')} onAction={load} />
+    if (hasLoadError) {
+      return (
+        <EmptyState
+          title={t('audit:load_error')}
+          actionLabel={t('common:buttons.retry')}
+          onAction={load}
+        />
+      )
     }
     if (items.length === 0) {
       return (

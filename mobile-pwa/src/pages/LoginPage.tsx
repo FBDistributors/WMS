@@ -9,6 +9,7 @@ import { LanguageSwitcher } from '../components/LanguageSwitcher'
 import { useAuth } from '../rbac/AuthProvider'
 import { BRAND } from '../config/branding'
 import { getHomeRouteForRole } from '../rbac/routes'
+import { useAppToast } from '../feedback/useAppToast'
 import { type ApiError } from '../services/apiClient'
 
 function isApiError(e: unknown): e is ApiError {
@@ -41,7 +42,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { showError, showWarning } = useAppToast()
   const [sessionExpiredMessage, setSessionExpiredMessage] = useState<string | null>(null)
   const isSubmittingRef = useRef(false)
 
@@ -51,10 +52,12 @@ export function LoginPage() {
   useEffect(() => {
     const reason = sessionStorage.getItem('session_expired_reason')
     if (reason === 'another_device') {
-      setSessionExpiredMessage(t('session_expired_another_device'))
+      const msg = t('session_expired_another_device')
+      setSessionExpiredMessage(msg)
+      showWarning(msg, 5000)
       sessionStorage.removeItem('session_expired_reason')
     }
-  }, [])
+  }, [t, showWarning])
 
   useEffect(() => {
     if (isSubmittingRef.current) {
@@ -68,7 +71,6 @@ export function LoginPage() {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     setIsLoading(true)
-    setError(null)
     setSessionExpiredMessage(null)
     isSubmittingRef.current = true
     try {
@@ -85,18 +87,18 @@ export function LoginPage() {
       if (isApiError(err)) {
         if (err.code === 'NETWORK') {
           const detail = formatNetworkErrorDetail(err)
-          setError(detail ? `${t('login_network_error')}\n${detail}` : t('login_network_error'))
+          showError(detail ? `${t('login_network_error')}\n${detail}` : t('login_network_error'), 5000)
         } else if (err.code === 'HTTP' && err.status === 401) {
-          setError(t('invalid_credentials'))
+          showError(t('invalid_credentials'))
         } else if (err.code === 'HTTP' && (err.status === 502 || err.status === 503)) {
-          setError(t('login_service_unavailable'))
+          showError(t('login_service_unavailable'))
         } else if (err.code === 'HTTP' && typeof err.message === 'string' && err.message.trim()) {
-          setError(err.message)
+          showError(err.message)
         } else {
-          setError(t('invalid_credentials'))
+          showError(t('invalid_credentials'))
         }
       } else {
-        setError(t('invalid_credentials'))
+        showError(t('invalid_credentials'))
       }
     } finally {
       setIsLoading(false)
@@ -146,9 +148,6 @@ export function LoginPage() {
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
-          {error ? (
-            <div className="whitespace-pre-line text-sm text-red-600">{error}</div>
-          ) : null}
           <Button fullWidth disabled={isLoading}>
             {isLoading ? t('logging_in') : t('login')}
           </Button>
