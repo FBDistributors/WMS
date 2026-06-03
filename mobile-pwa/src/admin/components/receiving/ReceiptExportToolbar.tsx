@@ -1,21 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  ChevronDown,
-  Download,
-  FileSpreadsheet,
-  FileText,
-  FileType2,
-  Loader2,
-} from 'lucide-react'
-import { useTranslation } from 'react-i18next'
+import { useCallback } from 'react'
 
-import { Button } from '../../../components/ui/button'
 import type { ReceiptExportContext } from '../../../utils/receiptExport'
 import {
   downloadReceiptCsv,
   downloadReceiptExcel,
   downloadReceiptPdf,
 } from '../../../utils/receiptExport'
+import { ExportFormatDropdown, type ExportFormat } from './ExportFormatDropdown'
 
 type ReceiptExportToolbarProps = {
   ctx: ReceiptExportContext
@@ -30,27 +21,8 @@ export function ReceiptExportToolbar({
   onSuccess,
   onError,
 }: ReceiptExportToolbarProps) {
-  const { t } = useTranslation(['receiving'])
-  const [isExporting, setIsExporting] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!menuOpen) return
-    const onDocClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', onDocClick)
-    return () => document.removeEventListener('mousedown', onDocClick)
-  }, [menuOpen])
-
   const runExport = useCallback(
-    async (kind: 'excel' | 'csv' | 'pdf') => {
-      if (disabled || isExporting) return
-      setMenuOpen(false)
-      setIsExporting(true)
+    async (kind: ExportFormat) => {
       try {
         if (kind === 'excel') {
           await downloadReceiptExcel(ctx)
@@ -63,68 +35,22 @@ export function ReceiptExportToolbar({
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         onError?.(msg)
-      } finally {
-        setIsExporting(false)
+        throw err
       }
     },
-    [ctx, disabled, isExporting, onError, onSuccess]
+    [ctx, onError, onSuccess]
   )
 
-  const busy = disabled || isExporting
-
   return (
-    <div className="relative shrink-0" ref={menuRef}>
-      <Button
-        variant="secondary"
-        className="h-10 gap-1.5 rounded-xl px-3"
-        onClick={() => setMenuOpen((o) => !o)}
-        disabled={busy}
-        title={t('receiving:export_download')}
-        aria-label={t('receiving:export_download')}
-        aria-expanded={menuOpen}
-        aria-haspopup="menu"
-      >
-        {isExporting ? (
-          <Loader2 size={18} className="animate-spin" />
-        ) : (
-          <Download size={18} />
-        )}
-        <ChevronDown size={16} className="opacity-70" />
-      </Button>
-      {menuOpen && !busy ? (
-        <div
-          role="menu"
-          className="absolute right-0 top-full z-50 mt-1 min-w-[11rem] rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900"
-        >
-          <button
-            type="button"
-            role="menuitem"
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
-            onClick={() => void runExport('excel')}
-          >
-            <FileSpreadsheet size={16} />
-            {t('receiving:export_excel')}
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
-            onClick={() => void runExport('csv')}
-          >
-            <FileType2 size={16} />
-            {t('receiving:export_csv')}
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
-            onClick={() => void runExport('pdf')}
-          >
-            <FileText size={16} />
-            {t('receiving:export_pdf')}
-          </button>
-        </div>
-      ) : null}
-    </div>
+    <ExportFormatDropdown
+      disabled={disabled}
+      onExport={async (kind) => {
+        try {
+          await runExport(kind)
+        } catch {
+          /* onError already called */
+        }
+      }}
+    />
   )
 }

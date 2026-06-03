@@ -4,6 +4,9 @@ import { ChevronLeft, ChevronRight, Filter, Plus, Search, Trash2, X } from 'luci
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { ReceiptListExportToolbar } from '../../admin/components/receiving/ReceiptListExportToolbar'
+import type { ExportFormat } from '../../admin/components/receiving/ExportFormatDropdown'
+import { FloatingSnackBar } from '../../components/ui/FloatingSnackBar'
 import { ProductSearchCombobox, formatProductLabel } from '../../components/ProductSearchCombobox'
 import { LocationSearchCombobox, formatLocationLabel } from '../../components/LocationSearchCombobox'
 import { Button } from '../../components/ui/button'
@@ -19,12 +22,24 @@ import { getBrands, type Brand } from '../../services/brandsApi'
 import {
   createReceipt,
   listReceipts,
+  fetchAllReceipts,
+  ReceiptExportTooLargeError,
   getReceivers,
   completeReceipt,
   type Receipt,
   type ReceiptLineCreate,
   type Receiver,
 } from '../../services/receivingApi'
+import { getInventorySummary } from '../../services/inventoryApi'
+import {
+  buildReceiptListExportLabels,
+  buildReceiptListExportRows,
+  downloadReceiptListCsv,
+  downloadReceiptListExcel,
+  downloadReceiptListPdf,
+  filterReceiptsBySearch,
+  type ReceiptListExportContext,
+} from '../../utils/receiptListExport'
 import { useAuth } from '../../rbac/AuthProvider'
 import { sanitizeStockQtyDigits } from '../../lib/stockQtyInput'
 
@@ -94,6 +109,8 @@ export function ReceivingPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [snackMessage, setSnackMessage] = useState<string | null>(null)
+  const [snackVariant, setSnackVariant] = useState<'success' | 'error'>('success')
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -200,6 +217,144 @@ export function ReceivingPage() {
     const map = new Map(locations.map((location) => [location.id, location]))
     return map
   }, [locations])
+
+  const buildExportFilterSummary = useCallback((): string[] => {
+    const parts: string[] = []
+    if (dateFrom.trim() || dateTo.trim()) {
+      parts.push(
+        `${t('receiving:export_filter_date')}: ${dateFrom.trim() || '…'} – ${dateTo.trim() || '…'}`
+      )
+    }
+    if (productFilter.trim()) {
+      const p = productLookup.get(productFilter.trim())
+      parts.push(
+        `${t('receiving:export_filter_product')}: ${p ? formatProductLabel(p) : productFilter}`
+      )
+    }
+    if (brandFilter.trim()) {
+      const b = brands.find((br) => br.id === brandFilter.trim())
+      parts.push(
+        `${t('receiving:export_filter_brand')}: ${b?.display_name || b?.name || b?.code || brandFilter}`
+      )
+    }
+    if (receiverFilter.trim()) {
+      const r = receiverOptions.find((rec) => rec.id === receiverFilter.trim())
+      parts.push(
+        `${t('receiving:export_filter_receiver')}: ${r?.name ?? receiverFilter}`
+      )
+    }
+    if (searchQuery.trim()) {
+      parts.push(`${t('receiving:export_filter_search')}: ${searchQuery.trim()}`)
+    }
+    if (parts.length === 0) {
+      parts.push(t('receiving:export_filter_none'))
+    }
+    return parts
+  }, [
+    t,
+    dateFrom,
+    dateTo,
+    productFilter,
+    brandFilter,
+    receiverFilter,
+    searchQuery,
+    productLookup,
+    brands,
+    receiverOptions,
+  ])
+
+  const handleListExport = useCallback(
+    async (kind: ExportFormat) => {
+      setSnackVariant('success')
+      setSnackMessage(t('receiving:export_fetching'))
+      try {
+        const all = await fetchAllReceipts({
+          created_by: receiverFilter.trim() || undefined,
+          product_id: productFilter.trim() || undefined,
+          brand_id: brandFilter.trim() || undefined,
+          date_from: dateFrom.trim() || undefined,
+          date_to: dateTo.trim() || undefined,
+        })
+        const filtered = filterReceiptsBySearch(all, searchQuery)
+        if (filtered.length === 0) {
+          throw new Error(t('receiving:no_results'))
+        }
+
+        const productIds = [
+          ...new Set(
+            filtered.flatMap((r) =>
+              r.lines.map((l) => l.product_id).filter(Boolean)
+            )
+          ),
+        ]
+        const [productsRes, locationsData, inventoryRows] = await Promise.all([
+          productIds.length > 0
+            ? getProducts({ product_ids: productIds, limit: productIds.length })
+            : Promise.resolve({ items: [] as Product[] }),
+          getLocations(false),
+          productIds.length > 0
+            ? getInventorySummary({ product_ids: productIds })
+            : Promise.resolve([]),
+        ])
+
+        const exportProductLookup = new Map(productsRes.items.map((p) => [p.id, p]))
+        const exportLocationLookup = new Map(locationsData.map((loc) => [loc.id, loc]))
+        const inventoryMap = new Map<string, number>()
+        inventoryRows.forEach((row) => {
+          inventoryMap.set(row.product_id, Math.round(Number(row.on_hand_total)))
+        })
+
+        const rows = buildReceiptListExportRows(
+          filtered,
+          exportProductLookup,
+          exportLocationLookup,
+          inventoryMap,
+          (status) => t(`receiving:statuses.${status}`)
+        )
+
+        const ctx: ReceiptListExportContext = {
+          title: t('receiving:export_list_title'),
+          filterSummaryLines: buildExportFilterSummary(),
+          rows,
+          receiptCount: filtered.length,
+          lineCount: rows.length,
+          labels: buildReceiptListExportLabels(t),
+        }
+
+        if (kind === 'excel') {
+          await downloadReceiptListExcel(ctx)
+        } else if (kind === 'csv') {
+          downloadReceiptListCsv(ctx)
+        } else {
+          await downloadReceiptListPdf(ctx)
+        }
+
+        setSnackVariant('success')
+        setSnackMessage(t('receiving:export_success'))
+      } catch (err) {
+        if (err instanceof ReceiptExportTooLargeError) {
+          setSnackVariant('error')
+          setSnackMessage(t('receiving:export_too_large'))
+        } else {
+          setSnackVariant('error')
+          setSnackMessage(
+            `${t('receiving:export_failed')}: ${err instanceof Error ? err.message : String(err)}`
+          )
+        }
+        throw err
+      }
+    },
+    [
+      t,
+      receiverFilter,
+      productFilter,
+      brandFilter,
+      dateFrom,
+      dateTo,
+      searchQuery,
+      buildExportFilterSummary,
+    ]
+  )
 
   useEffect(() => {
     if (filterPanelOpen) {
@@ -476,6 +631,12 @@ export function ReceivingPage() {
         </div>
       ) : null}
 
+      <FloatingSnackBar
+        message={snackMessage}
+        variant={snackVariant}
+        onDismiss={() => setSnackMessage(null)}
+      />
+
       <Card className="space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
@@ -662,6 +823,16 @@ export function ReceivingPage() {
                 </>
               )}
             </div>
+            <ReceiptListExportToolbar
+              disabled={isLoading || totalReceipts === 0}
+              onExport={async (kind) => {
+                try {
+                  await handleListExport(kind)
+                } catch {
+                  /* snackbar set in handleListExport */
+                }
+              }}
+            />
           </div>
         </div>
         {isLoading ? (

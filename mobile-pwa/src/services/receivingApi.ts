@@ -55,8 +55,56 @@ export type ReceiptListResponse = {
   total: number
 }
 
+/** Max receipts fetched for list export (pagination loop cap). */
+export const MAX_EXPORT_RECEIPTS = 500
+
+/** Max line rows allowed in a single list export file. */
+export const MAX_EXPORT_LINES = 10_000
+
+const EXPORT_PAGE_LIMIT = 200
+
+export class ReceiptExportTooLargeError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ReceiptExportTooLargeError'
+  }
+}
+
 export async function getReceivers() {
   return fetchJSON<Receiver[]>('/api/v1/receiving/receipts/receivers')
+}
+
+export async function fetchAllReceipts(
+  params: Omit<ListReceiptsParams, 'limit' | 'offset'> = {}
+): Promise<Receipt[]> {
+  const all: Receipt[] = []
+  let offset = 0
+  let total = Infinity
+
+  while (offset < total && all.length < MAX_EXPORT_RECEIPTS) {
+    const page = await listReceipts({
+      ...params,
+      limit: EXPORT_PAGE_LIMIT,
+      offset,
+    })
+    total = page.total
+    all.push(...page.items)
+    if (page.items.length < EXPORT_PAGE_LIMIT) {
+      break
+    }
+    offset += EXPORT_PAGE_LIMIT
+  }
+
+  if (all.length >= MAX_EXPORT_RECEIPTS && offset < total) {
+    throw new ReceiptExportTooLargeError('MAX_RECEIPTS')
+  }
+
+  const lineCount = all.reduce((n, r) => n + r.lines.length, 0)
+  if (lineCount > MAX_EXPORT_LINES) {
+    throw new ReceiptExportTooLargeError('MAX_LINES')
+  }
+
+  return all
 }
 
 export async function listReceipts(

@@ -50,7 +50,7 @@ export function receiptExportBaseName(docNo: string): string {
   return `receipt_${sanitizeFileToken(docNo)}_${day}`
 }
 
-function escapeCsvCell(value: string | number): string {
+export function escapeCsvCell(value: string | number): string {
   const s = String(value)
   if (/[",\n\r]/.test(s)) {
     return `"${s.replace(/"/g, '""')}"`

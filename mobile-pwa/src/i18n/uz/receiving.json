@@ -75,5 +75,17 @@
   "export_csv": "CSV yuklash",
   "export_pdf": "PDF yuklash",
   "export_failed": "Eksport xatosi",
-  "export_success": "Fayl yuklab olindi"
+  "export_success": "Fayl yuklab olindi",
+  "export_list_title": "Qabul hujjatlari ro'yxati",
+  "export_filter_applied": "Filtrlar",
+  "export_receipts_count": "Hujjatlar soni",
+  "export_lines_count": "Qatorlar soni",
+  "export_too_large": "Eksport uchun juda ko'p ma'lumot. Filterni toraytiring.",
+  "export_fetching": "Ma'lumot yig'ilmoqda…",
+  "export_filter_date": "Sana",
+  "export_filter_product": "Mahsulot",
+  "export_filter_brand": "Brend",
+  "export_filter_receiver": "Qabul qiluvchi",
+  "export_filter_search": "Qidiruv",
+  "export_filter_none": "Filtr yo'q"
 }

@@ -75,5 +75,17 @@
   "export_csv": "Export CSV",
   "export_pdf": "Export PDF",
   "export_failed": "Export failed",
-  "export_success": "File downloaded"
+  "export_success": "File downloaded",
+  "export_list_title": "Receiving documents list",
+  "export_filter_applied": "Filters",
+  "export_receipts_count": "Document count",
+  "export_lines_count": "Line count",
+  "export_too_large": "Too much data to export. Narrow your filters.",
+  "export_fetching": "Gathering data…",
+  "export_filter_date": "Date",
+  "export_filter_product": "Product",
+  "export_filter_brand": "Brand",
+  "export_filter_receiver": "Receiver",
+  "export_filter_search": "Search",
+  "export_filter_none": "No filter"
 }

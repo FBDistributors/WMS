@@ -75,5 +75,17 @@
   "export_csv": "Скачать CSV",
   "export_pdf": "Скачать PDF",
   "export_failed": "Ошибка экспорта",
-  "export_success": "Файл загружен"
+  "export_success": "Файл загружен",
+  "export_list_title": "Список документов приёмки",
+  "export_filter_applied": "Фильтры",
+  "export_receipts_count": "Количество документов",
+  "export_lines_count": "Количество строк",
+  "export_too_large": "Слишком много данных для экспорта. Сузьте фильтр.",
+  "export_fetching": "Сбор данных…",
+  "export_filter_date": "Дата",
+  "export_filter_product": "Товар",
+  "export_filter_brand": "Бренд",
+  "export_filter_receiver": "Получатель",
+  "export_filter_search": "Поиск",
+  "export_filter_none": "Без фильтра"
 }
