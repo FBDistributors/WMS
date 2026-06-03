@@ -36,7 +36,7 @@ const MENU_ITEMS: Array<MenuItem & { key: string }> = [
   { key: 'returns_history', label: 'Qaytganlar', path: '/admin/returns-history', icon: Undo2, required: 'orders:read' },
   { key: 'locations', label: 'Locations', path: '/admin/locations', icon: MapPin, required: 'locations:manage' },
   { key: 'inventory', label: 'Qoldiq', path: '/admin/inventory', icon: Boxes, required: 'inventory:read' },
-  { key: 'movement', label: 'Movement', path: '/admin/movement', icon: ArrowLeftRight, required: 'inventory:adjust' },
+  { key: 'movement', label: 'Movement', path: '/admin/movement', icon: ArrowLeftRight, required: 'movements:read' },
   { key: 'receiving', label: 'Receiving', path: '/admin/receiving', icon: Inbox, required: 'receiving:read' },
   { key: 'users', label: 'Users & Access', path: '/admin/users', icon: Users, required: 'users:manage' },
   { key: 'audit', label: 'Audit Logs', path: '/admin/audit', icon: History, required: 'audit:read' },

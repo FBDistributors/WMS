@@ -356,6 +356,7 @@ export type InventoryMovementsQuery = {
   location_id?: string
   movement_type?: string
   reason_code?: string
+  scope?: 'warehouse_transfer'
   date_from?: string
   date_to?: string
   limit?: number

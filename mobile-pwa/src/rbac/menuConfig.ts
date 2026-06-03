@@ -38,7 +38,7 @@ export const ADMIN_MENU: MenuItem[] = [
   { path: '/admin', labelKey: 'menu.dashboard', permissions: ['admin:access'] },
   { path: '/admin/orders', labelKey: 'menu.orders', permissions: ['orders:read'] },
   { path: '/admin/inventory', labelKey: 'menu.inventory', permissions: ['inventory:read'] },
-  { path: '/admin/inventory/movements', labelKey: 'menu.movements', permissions: ['movements:read'] },
+  { path: '/admin/movement', labelKey: 'menu.movement', permissions: ['movements:read'] },
   { path: '/admin/receiving', labelKey: 'menu.receiving', permissions: ['receiving:read'] },
   { path: '/admin/locations', labelKey: 'menu.locations', permissions: ['locations:read', 'locations:manage'] },
   { path: '/admin/products', labelKey: 'menu.products', permissions: ['products:read'] },

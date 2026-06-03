@@ -1253,12 +1253,28 @@ async def list_stock_movements(
     date_to: Optional[date] = None,
     source_document_type: Optional[str] = None,
     source_document_id: Optional[UUID] = None,
+    scope: Optional[Literal["warehouse_transfer"]] = Query(
+        default=None,
+        description="warehouse_transfer: transfer_in/out or adjust with inventory overage/shortage",
+    ),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     _user=Depends(require_permission("movements:read")),
 ):
     query = db.query(StockMovementModel)
+    if scope == "warehouse_transfer":
+        query = query.filter(
+            or_(
+                StockMovementModel.movement_type.in_(("transfer_in", "transfer_out")),
+                and_(
+                    StockMovementModel.movement_type == "adjust",
+                    StockMovementModel.reason_code.in_(
+                        ("inventory_shortage", "inventory_overage")
+                    ),
+                ),
+            )
+        )
     if product_id:
         query = query.filter(StockMovementModel.product_id == product_id)
     if lot_id:

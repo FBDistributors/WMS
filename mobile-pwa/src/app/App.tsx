@@ -26,7 +26,6 @@ import { SmartupCustomPage } from '../pages/admin/SmartupCustomPage'
 import { InventoryReserveHealthPage } from '../pages/admin/InventoryReserveHealthPage'
 import { InventoryReserveHistoryPage } from '../pages/admin/InventoryReserveHistoryPage'
 import { InventoryDetailsPage } from '../pages/admin/InventoryDetailsPage'
-import { InventoryMovementsPage } from '../pages/admin/InventoryMovementsPage'
 import { MovementPage } from '../pages/admin/MovementPage'
 import { UsersPage } from '../pages/admin/UsersPage'
 import { UserCreatePage } from '../pages/admin/users/UserCreatePage'
@@ -524,19 +523,13 @@ export function App() {
         />
         <Route
           path="/admin/inventory/movements"
-          element={
-            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
-              <RequirePermission permission="movements:read">
-                <InventoryMovementsPage />
-              </RequirePermission>
-            </RequirePermission>
-          }
+          element={<Navigate to="/admin/movement" replace />}
         />
         <Route
           path="/admin/movement"
           element={
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">
-              <RequirePermission permission="inventory:adjust">
+              <RequirePermission permission="movements:read">
                 <MovementPage />
               </RequirePermission>
             </RequirePermission>

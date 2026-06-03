@@ -410,7 +410,7 @@ export function InventoryDetailsPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Button onClick={load}>{t('inventory:filters.apply')}</Button>
-                  <Button variant="secondary" onClick={() => navigate('/admin/inventory/movements')}>
+                  <Button variant="secondary" onClick={() => navigate('/admin/movement')}>
                     {t('inventory:view_movements')}
                   </Button>
                 </div>
