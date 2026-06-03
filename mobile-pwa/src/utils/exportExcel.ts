@@ -41,3 +41,34 @@ export async function writeExcelFile(
   XLSX.writeFile(wb, fileName)
   return null
 }
+
+/** ExcelJS workbook — rang, chegaralar, ustun kengligi (qabul hujjati va h.k.). */
+export async function writeExcelJsFile(
+  arrayBuffer: ArrayBuffer,
+  fileName: string
+): Promise<string | null> {
+  if (typeof window !== 'undefined' && window.__TAURI__) {
+    try {
+      const { downloadDir } = await import('@tauri-apps/api/path')
+      const { invoke } = await import('@tauri-apps/api/core')
+      const dir = await downloadDir()
+      const fullPath = dir ? `${dir.replace(/\/$/, '')}/${fileName}` : null
+      if (!fullPath) return null
+      const contentsBase64 = arrayBufferToBase64(arrayBuffer)
+      await invoke('write_excel_file', { path: fullPath, contentsBase64 })
+      return fullPath
+    } catch {
+      // fallback to browser download
+    }
+  }
+  const blob = new Blob([arrayBuffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = fileName
+  a.click()
+  URL.revokeObjectURL(url)
+  return null
+}

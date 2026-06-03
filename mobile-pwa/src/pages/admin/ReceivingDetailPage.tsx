@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { useLocation, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
-import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
@@ -40,7 +38,6 @@ function formatReceiptDate(iso: string): string {
 export function ReceivingDetailPage() {
   const { id } = useParams<{ id: string }>()
   const location = useLocation()
-  const navigate = useNavigate()
   const { t } = useTranslation(['receiving', 'common'])
   const listQuery = (location.state as { listQuery?: string } | null)?.listQuery ?? ''
   const [receipt, setReceipt] = useState<Receipt | null>(null)
@@ -315,17 +312,6 @@ export function ReceivingDetailPage() {
               </tbody>
             </table>
           </TableScrollArea>
-        </div>
-
-        <div className="flex justify-start pt-2">
-          <Button
-            variant="secondary"
-            onClick={() => navigate(`/admin/receiving${listQuery ? `?${listQuery}` : ''}`)}
-            className="gap-2"
-          >
-            <ArrowLeft size={18} />
-            {t('receiving:back_to_list')}
-          </Button>
         </div>
       </Card>
     </AdminLayout>

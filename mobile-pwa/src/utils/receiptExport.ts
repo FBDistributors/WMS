@@ -1,9 +1,8 @@
-import * as XLSX from 'xlsx'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
 import type { Receipt } from '../services/receivingApi'
-import { writeExcelFile } from './exportExcel'
+import { writeExcelJsFile } from './exportExcel'
 import { formatExpiryDate } from './expiry'
 import { applyUnicodeFontToPdf } from './jspdfUnicodeFont'
 
@@ -101,12 +100,10 @@ function downloadBlob(fileName: string, blob: Blob): void {
 }
 
 export async function downloadReceiptExcel(ctx: ReceiptExportContext): Promise<void> {
-  const aoa = buildSheetAoA(ctx)
-  const ws = XLSX.utils.aoa_to_sheet(aoa)
-  const wb = XLSX.utils.book_new()
-  const sheetName = ctx.labels.detailLines.slice(0, 31) || 'Receipt'
-  XLSX.utils.book_append_sheet(wb, ws, sheetName)
-  await writeExcelFile(wb, `${receiptExportBaseName(ctx.receipt.doc_no)}.xlsx`)
+  const { buildStyledReceiptWorkbook } = await import('./receiptExcelStyled')
+  const wb = await buildStyledReceiptWorkbook(ctx)
+  const buffer = await wb.xlsx.writeBuffer()
+  await writeExcelJsFile(buffer, `${receiptExportBaseName(ctx.receipt.doc_no)}.xlsx`)
 }
 
 export function downloadReceiptCsv(ctx: ReceiptExportContext): void {
