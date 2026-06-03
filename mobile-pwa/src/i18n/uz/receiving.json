@@ -70,6 +70,7 @@
   "detail_col_barcode": "Barkod",
   "detail_col_product": "Mahsulot",
   "detail_col_qoldiq": "Qoldiq",
+  "export_download": "Yuklab olish",
   "export_excel": "Excelga yuklash",
   "export_csv": "CSV yuklash",
   "export_pdf": "PDF yuklash",

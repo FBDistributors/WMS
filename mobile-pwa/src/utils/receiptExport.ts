@@ -5,6 +5,7 @@ import autoTable from 'jspdf-autotable'
 import type { Receipt } from '../services/receivingApi'
 import { writeExcelFile } from './exportExcel'
 import { formatExpiryDate } from './expiry'
+import { applyUnicodeFontToPdf } from './jspdfUnicodeFont'
 
 export type ReceiptExportLabels = {
   colDocNo: string
@@ -115,9 +116,10 @@ export function downloadReceiptCsv(ctx: ReceiptExportContext): void {
   downloadBlob(`${receiptExportBaseName(ctx.receipt.doc_no)}.csv`, blob)
 }
 
-export function downloadReceiptPdf(ctx: ReceiptExportContext): void {
+export async function downloadReceiptPdf(ctx: ReceiptExportContext): Promise<void> {
   const { receipt, labels, lines, statusLabel, receivedAtFormatted } = ctx
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+  const fontFamily = await applyUnicodeFontToPdf(doc)
 
   doc.setFontSize(14)
   doc.text(receipt.doc_no, 14, 16)
@@ -133,6 +135,8 @@ export function downloadReceiptPdf(ctx: ReceiptExportContext): void {
     doc.text(line, 14, y)
     y += 6
   }
+
+  const tableFont = { font: fontFamily, fontStyle: 'normal' as const }
 
   autoTable(doc, {
     startY: y + 4,
@@ -158,8 +162,9 @@ export function downloadReceiptPdf(ctx: ReceiptExportContext): void {
       row.expiry,
       row.location,
     ]),
-    styles: { fontSize: 8, cellPadding: 2 },
-    headStyles: { fillColor: [30, 64, 175] },
+    styles: { fontSize: 8, cellPadding: 2, ...tableFont },
+    headStyles: { fillColor: [30, 64, 175], ...tableFont },
+    bodyStyles: tableFont,
     margin: { left: 14, right: 14 },
   })
 

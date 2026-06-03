@@ -15,6 +15,7 @@ import { getLocations, type Location } from '../../services/locationsApi'
 import { getInventorySummary } from '../../services/inventoryApi'
 import { formatExpiryDate } from '../../utils/expiry'
 import { ReceiptExportToolbar } from '../../admin/components/receiving/ReceiptExportToolbar'
+import { FloatingSnackBar } from '../../components/ui/FloatingSnackBar'
 import {
   buildReceiptExportLineRow,
   type ReceiptExportContext,
@@ -48,8 +49,8 @@ export function ReceivingDetailPage() {
   const [inventoryMap, setInventoryMap] = useState<Map<string, number>>(new Map())
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [exportSuccessAt, setExportSuccessAt] = useState<number | null>(null)
-  const [exportError, setExportError] = useState<string | null>(null)
+  const [snackMessage, setSnackMessage] = useState<string | null>(null)
+  const [snackVariant, setSnackVariant] = useState<'success' | 'error'>('success')
 
   const load = useCallback(async () => {
     if (!id) {
@@ -178,6 +179,11 @@ export function ReceivingDetailPage() {
       title={t('receiving:detail_title')}
       backTo={`/admin/receiving${listQuery ? `?${listQuery}` : ''}`}
     >
+      <FloatingSnackBar
+        message={snackMessage}
+        variant={snackVariant}
+        onDismiss={() => setSnackMessage(null)}
+      />
       <Card className="space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="grid flex-1 gap-3 text-sm sm:grid-cols-2 md:grid-cols-4">
@@ -220,34 +226,16 @@ export function ReceivingDetailPage() {
             <ReceiptExportToolbar
               ctx={exportContext}
               onSuccess={() => {
-                setExportError(null)
-                setExportSuccessAt(Date.now())
+                setSnackVariant('success')
+                setSnackMessage(t('receiving:export_success'))
               }}
               onError={(msg) => {
-                setExportSuccessAt(null)
-                setExportError(msg)
+                setSnackVariant('error')
+                setSnackMessage(`${t('receiving:export_failed')}: ${msg}`)
               }}
             />
           ) : null}
         </div>
-
-        {exportSuccessAt !== null ? (
-          <div
-            role="status"
-            className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
-          >
-            {t('receiving:export_success')}
-          </div>
-        ) : null}
-
-        {exportError ? (
-          <div
-            role="alert"
-            className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-200"
-          >
-            {t('receiving:export_failed')}: {exportError}
-          </div>
-        ) : null}
 
         <div>
           <h3 className="mb-2 text-base font-semibold text-slate-900 dark:text-slate-100">

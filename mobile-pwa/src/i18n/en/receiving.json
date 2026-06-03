@@ -70,6 +70,7 @@
   "detail_col_barcode": "Barcode",
   "detail_col_product": "Product",
   "detail_col_qoldiq": "On hand",
+  "export_download": "Download",
   "export_excel": "Export to Excel",
   "export_csv": "Export CSV",
   "export_pdf": "Export PDF",
