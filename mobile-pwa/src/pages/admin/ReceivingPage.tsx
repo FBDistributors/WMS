@@ -70,8 +70,8 @@ type FlatReceiptTableRow = ReceiptListExportRow & {
 }
 
 const TH_CLASS =
-  'text-left py-2.5 px-3 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400 align-middle whitespace-nowrap'
-const TD_BASE = 'py-2.5 px-3 align-middle text-sm'
+  'text-left py-2.5 px-3 text-xs font-bold uppercase tracking-wide text-slate-700 dark:text-slate-300 align-middle whitespace-nowrap'
+const TD_BASE = 'py-2.5 px-3 align-middle text-sm text-slate-900 dark:text-slate-100'
 
 function receivingThWidth(col: ReceivingTableColumnId): string | undefined {
   const widths: Partial<Record<ReceivingTableColumnId, string>> = {
@@ -107,14 +107,12 @@ export function ReceivingPage() {
   const [filterPanelOpen, setFilterPanelOpen] = useState(false)
 
   const searchQuery = searchParams.get('q') ?? ''
-  const productFilter = searchParams.get('product_id') ?? ''
   const brandFilter = searchParams.get('brand_id') ?? ''
   const receiverFilter = searchParams.get('created_by') ?? ''
   const dateFrom = searchParams.get('date_from') ?? ''
   const dateTo = searchParams.get('date_to') ?? ''
   const offset = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10))
 
-  const [filterProduct, setFilterProduct] = useState<Product | null>(null)
   const [filterBrandId, setFilterBrandId] = useState<string>('')
   const [filterReceiver, setFilterReceiver] = useState<string>('')
   const [filterDateFrom, setFilterDateFrom] = useState('')
@@ -141,7 +139,6 @@ export function ReceivingPage() {
         getLocations(false),
         listReceipts({
           created_by: receiverFilter.trim() || undefined,
-          product_id: productFilter.trim() || undefined,
           brand_id: brandFilter.trim() || undefined,
           date_from: dateFrom.trim() || undefined,
           date_to: dateTo.trim() || undefined,
@@ -183,7 +180,7 @@ export function ReceivingPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [t, receiverFilter, productFilter, brandFilter, dateFrom, dateTo, offset])
+  }, [t, receiverFilter, brandFilter, dateFrom, dateTo, offset])
 
   const loadReceivers = useCallback(async () => {
     try {
@@ -328,12 +325,6 @@ export function ReceivingPage() {
         `${t('receiving:export_filter_date')}: ${dateFrom.trim() || '…'} – ${dateTo.trim() || '…'}`
       )
     }
-    if (productFilter.trim()) {
-      const p = productLookup.get(productFilter.trim())
-      parts.push(
-        `${t('receiving:export_filter_product')}: ${p ? formatProductLabel(p) : productFilter}`
-      )
-    }
     if (brandFilter.trim()) {
       const b = brands.find((br) => br.id === brandFilter.trim())
       parts.push(
@@ -357,11 +348,9 @@ export function ReceivingPage() {
     t,
     dateFrom,
     dateTo,
-    productFilter,
     brandFilter,
     receiverFilter,
     searchQuery,
-    productLookup,
     brands,
     receiverOptions,
   ])
@@ -373,7 +362,6 @@ export function ReceivingPage() {
       try {
         const all = await fetchAllReceipts({
           created_by: receiverFilter.trim() || undefined,
-          product_id: productFilter.trim() || undefined,
           brand_id: brandFilter.trim() || undefined,
           date_from: dateFrom.trim() || undefined,
           date_to: dateTo.trim() || undefined,
@@ -450,7 +438,6 @@ export function ReceivingPage() {
     [
       t,
       receiverFilter,
-      productFilter,
       brandFilter,
       dateFrom,
       dateTo,
@@ -465,9 +452,8 @@ export function ReceivingPage() {
       setFilterReceiver(receiverFilter)
       setFilterDateFrom(dateFrom)
       setFilterDateTo(dateTo)
-      setFilterProduct(productFilter ? productLookup.get(productFilter) ?? null : null)
     }
-  }, [filterPanelOpen, brandFilter, productFilter, receiverFilter, dateFrom, dateTo, productLookup])
+  }, [filterPanelOpen, brandFilter, receiverFilter, dateFrom, dateTo])
 
   const addLine = () => {
     setLines((prev) => [
@@ -569,14 +555,14 @@ export function ReceivingPage() {
       switch (colId) {
         case 'doc_no':
           return (
-            <span className="block truncate font-medium text-slate-900 dark:text-slate-100" title={row.docNo}>
+            <span className="block truncate" title={row.docNo}>
               {row.docNo}
             </span>
           )
         case 'status':
           return (
             <div className="flex flex-col items-start gap-1.5">
-              <span className="inline-block max-w-full truncate text-slate-700 dark:text-slate-200" title={row.status}>
+              <span className="inline-block max-w-full truncate" title={row.status}>
                 {row.status}
               </span>
               {row.showComplete && canWrite ? (
@@ -599,7 +585,7 @@ export function ReceivingPage() {
         case 'received_at':
           return <span className="whitespace-nowrap text-xs">{row.receivedAt}</span>
         case 'code':
-          return <span className="whitespace-nowrap font-medium text-slate-900 dark:text-slate-100">{row.code}</span>
+          return <span className="whitespace-nowrap">{row.code}</span>
         case 'barcode':
           return (
             <span className="block truncate font-mono text-xs" title={row.barcode}>
@@ -609,7 +595,7 @@ export function ReceivingPage() {
         case 'product':
           return (
             <span
-              className="line-clamp-2 text-sm leading-snug text-slate-700 dark:text-slate-200"
+              className="line-clamp-2 text-sm leading-snug"
               title={row.productName}
             >
               {row.productName}
@@ -628,7 +614,7 @@ export function ReceivingPage() {
         case 'expiry':
           return <span className="whitespace-nowrap text-xs">{row.expiry}</span>
         case 'location':
-          return <span className="whitespace-nowrap font-medium">{row.location}</span>
+          return <span className="whitespace-nowrap">{row.location}</span>
         default:
           return null
       }
@@ -897,18 +883,6 @@ export function ReceivingPage() {
                         />
                       </label>
                       <label className="block text-sm text-slate-600 dark:text-slate-400">
-                        {t('receiving:filter_by_product')}
-                        <ProductSearchCombobox
-                          value={filterProduct?.id ?? ''}
-                          displayLabel={filterProduct ? formatProductLabel(filterProduct) : undefined}
-                          onSelect={(p) => {
-                            setFilterProduct(p ?? null)
-                          }}
-                          placeholder={t('receiving:fields.select_product')}
-                          className="mt-1 w-full"
-                        />
-                      </label>
-                      <label className="block text-sm text-slate-600 dark:text-slate-400">
                         {t('receiving:filter_by_brand')}
                         <select
                           value={filterBrandId}
@@ -973,13 +947,11 @@ export function ReceivingPage() {
                           onClick={() => {
                           setSearchParams((prev) => {
                             const next = new URLSearchParams(prev)
-                            const pid = filterProduct?.id ?? ''
                             const bid = filterBrandId.trim()
                             const rid = filterReceiver.trim()
                             const df = filterDateFrom.trim()
                             const dt = filterDateTo.trim()
-                            if (pid) next.set('product_id', pid)
-                            else next.delete('product_id')
+                            next.delete('product_id')
                             if (bid) next.set('brand_id', bid)
                             else next.delete('brand_id')
                             if (rid) next.set('created_by', rid)
@@ -1080,9 +1052,7 @@ export function ReceivingPage() {
                       return (
                         <td
                           key={colId}
-                          className={`${TD_BASE} text-slate-600 dark:text-slate-300${
-                            alignRight ? ' text-right' : ''
-                          }`}
+                          className={`${TD_BASE}${alignRight ? ' text-right' : ''}`}
                         >
                           {renderReceivingCell(colId, row)}
                         </td>

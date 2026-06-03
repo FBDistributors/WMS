@@ -80,7 +80,7 @@
   "export_filter_applied": "Filters",
   "export_receipts_count": "Document count",
   "export_lines_count": "Line count",
-  "export_too_large": "Too much data to export. Narrow your filters.",
+  "export_too_large": "Export size exceeds 10 MB. Narrow your filters.",
   "export_fetching": "Gathering data…",
   "export_filter_date": "Date",
   "export_filter_product": "Product",
