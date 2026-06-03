@@ -16,7 +16,15 @@ import type { RootStackParamList } from '../types/navigation';
 import { sanitizeStockQtyDigits } from '../utils/stockQtyInput';
 import type { PickingDocument, PickingLine } from '../api/picking.types';
 import apiClient, { UNAUTHORIZED_MSG } from '../api/client';
-import { changePickSource, completePickDocument, getTaskById, INCOMPLETE_REASON_KEYS, pickLine, skipLine } from '../api/picking';
+import {
+  changePickSource,
+  completePickDocument,
+  getTaskById,
+  INCOMPLETE_REASON_KEYS,
+  pickLine,
+  skipLine,
+  unpickLine,
+} from '../api/picking';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { ScanInput } from '../components/ScanInput';
 import { useLocale } from '../i18n/LocaleContext';
@@ -72,6 +80,34 @@ function normalizeDocument(raw: PickingDocument | null): PickingDocument | null 
 }
 
 /** Controller uchun: mahsulot bo'yicha guruhlash, har bir guruh bitta "umumiy" qator. */
+function isControllerGroupFullyVerified(
+  lines: PickingLine[],
+  line: PickingLine,
+  verifiedIds: Set<string>
+): boolean {
+  const groups = groupLinesByProduct(lines);
+  const group = groups.find((g) => g.groupLines.some((l) => l.id === line.id));
+  const members = group?.groupLines ?? [line];
+  return members.every((l) => verifiedIds.has(String(l.id)));
+}
+
+function clearControllerVerifiedForGroup(
+  taskId: string,
+  lines: PickingLine[],
+  anchor: PickingLine,
+  setVerified: React.Dispatch<React.SetStateAction<Set<string>>>
+): void {
+  const groups = groupLinesByProduct(lines);
+  const group = groups.find((g) => g.groupLines.some((l) => l.id === anchor.id));
+  const ids = new Set((group?.groupLines ?? [anchor]).map((l) => String(l.id)));
+  setVerified((prev) => {
+    const next = new Set(prev);
+    for (const id of ids) next.delete(id);
+    void saveControllerVerifiedLineIds(taskId, next);
+    return next;
+  });
+}
+
 function groupLinesByProduct(lines: PickingLine[]): { virtualLine: PickingLine; groupLines: PickingLine[] }[] {
   const map = new Map<string, PickingLine[]>();
   for (const l of lines) {
@@ -128,6 +164,10 @@ export function PickTaskDetails() {
   const [incompleteReasonModalVisible, setIncompleteReasonModalVisible] = useState(false);
   const [selectedIncompleteReason, setSelectedIncompleteReason] = useState<string | null>(null);
   const [controllerVerifiedLineIds, setControllerVerifiedLineIds] = useState<Set<string>>(new Set());
+  const [unpickTarget, setUnpickTarget] = useState<PickingLine | null>(null);
+  const [unpickQtyInput, setUnpickQtyInput] = useState('1');
+  const [unpickReason, setUnpickReason] = useState<string | null>(null);
+  const [unpickSubmitting, setUnpickSubmitting] = useState(false);
   const [lineForReasonModal, setLineForReasonModal] = useState<PickingLine | null>(null);
   const [lineReasonModalVisible, setLineReasonModalVisible] = useState(false);
   const [selectedLineReason, setSelectedLineReason] = useState<string | null>(null);
@@ -216,12 +256,24 @@ export function PickTaskDetails() {
           Alert.alert(t('wrongBarcodeTitle'), t('productNotInOrder'));
           return;
         }
+        if (isControllerGroupFullyVerified(lines, line, controllerVerifiedLineIds)) {
+          Alert.alert(t('verifiedBadge'), t('controllerPositionAlreadyVerified'));
+          return;
+        }
         setSelectedLine(line);
         void playSuccessBeep();
         setScannedBarcodeForQty(scannedBarcode);
         setQtyInput(String(line.qty_picked));
       }
-    }, [route.params?.scannedBarcode, route.params?.lineId, doc, navigation, t, isController])
+    }, [
+      route.params?.scannedBarcode,
+      route.params?.lineId,
+      doc,
+      navigation,
+      t,
+      isController,
+      controllerVerifiedLineIds,
+    ])
   );
 
   const openLineScan = useCallback((line: PickingLine, _display?: PickingLine) => {
@@ -245,6 +297,14 @@ export function PickTaskDetails() {
       const matchInGroup =
         groupLines?.find((l) => barcodeMatchesLine(value, l)) ?? null;
       if (matchInGroup) {
+        if (
+          isController &&
+          doc?.lines &&
+          isControllerGroupFullyVerified(doc.lines, matchInGroup, controllerVerifiedLineIds)
+        ) {
+          Alert.alert(t('verifiedBadge'), t('controllerPositionAlreadyVerified'));
+          return;
+        }
         void playSuccessBeep();
         setSelectedLine(matchInGroup);
         setScannedBarcodeForQty(value.trim());
@@ -255,6 +315,14 @@ export function PickTaskDetails() {
           setQtyInput(remaining >= 1 ? String(remaining) : '0');
         }
       } else if (barcodeMatchesLine(value, selectedLine)) {
+        if (
+          isController &&
+          doc?.lines &&
+          isControllerGroupFullyVerified(doc.lines, selectedLine, controllerVerifiedLineIds)
+        ) {
+          Alert.alert(t('verifiedBadge'), t('controllerPositionAlreadyVerified'));
+          return;
+        }
         void playSuccessBeep();
         setScannedBarcodeForQty(value.trim());
         if (isController) {
@@ -270,13 +338,80 @@ export function PickTaskDetails() {
         );
       }
     },
-    [selectedLine, doc?.lines, t, isController]
+    [selectedLine, doc?.lines, t, isController, controllerVerifiedLineIds]
   );
+
+  const closeUnpickModal = useCallback(() => {
+    setUnpickTarget(null);
+    setUnpickQtyInput('1');
+    setUnpickReason(null);
+    setUnpickSubmitting(false);
+  }, []);
+
+  const handleUnpickConfirm = useCallback(async () => {
+    if (!taskId || !doc || !unpickTarget || !unpickReason || !isOnline) return;
+    const delta = Math.floor(Number(unpickQtyInput) || 0);
+    const maxQty = Math.floor(Number(unpickTarget.qty_picked) || 0);
+    if (delta < 1 || delta > maxQty) {
+      Alert.alert(t('error'), t('qtyRangeError', { max: maxQty }));
+      return;
+    }
+    setUnpickSubmitting(true);
+    try {
+      const res = await unpickLine(
+        unpickTarget.id,
+        delta,
+        unpickReason,
+        `unpick-${taskId}-${unpickTarget.id}-${Date.now()}`
+      );
+      const newLines = (doc.lines ?? []).map((l) => (l.id === res.line.id ? res.line : l));
+      const updated: PickingDocument = {
+        ...doc,
+        lines: newLines,
+        progress: res.progress,
+        status: res.document_status,
+      };
+      setDoc(updated);
+      await saveCachedPickTaskDetail(taskId, updated);
+      clearControllerVerifiedForGroup(taskId, newLines, unpickTarget, setControllerVerifiedLineIds);
+      closeUnpickModal();
+      closeLineScan();
+      Alert.alert(t('success'), t('unpickDone'));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : t('error');
+      if (msg === UNAUTHORIZED_MSG) {
+        navigation.replace('Login');
+        closeUnpickModal();
+        return;
+      }
+      Alert.alert(t('error'), msg);
+    } finally {
+      setUnpickSubmitting(false);
+    }
+  }, [
+    taskId,
+    doc,
+    unpickTarget,
+    unpickReason,
+    unpickQtyInput,
+    isOnline,
+    t,
+    navigation,
+    closeUnpickModal,
+    closeLineScan,
+  ]);
 
   const handleLineQtySubmit = useCallback(async () => {
     if (!taskId || !doc || !selectedLine || !scannedBarcodeForQty) return;
     const qty = Math.floor(Number(qtyInput) || 0);
     if (isController) {
+      if (
+        doc.lines &&
+        isControllerGroupFullyVerified(doc.lines, selectedLine, controllerVerifiedLineIds)
+      ) {
+        Alert.alert(t('verifiedBadge'), t('controllerPositionAlreadyVerified'));
+        return;
+      }
       if (qty !== selectedLine.qty_picked) {
         Alert.alert(t('error'), `${t('qtyMismatch') ?? 'Miqdor mos emas'}: ${selectedLine.product_name} — terilgan: ${selectedLine.qty_picked}`);
         return;
@@ -328,7 +463,19 @@ export function PickTaskDetails() {
     } finally {
       setSubmitting(false);
     }
-  }, [taskId, doc, selectedLine, scannedBarcodeForQty, qtyInput, closeLineScan, navigation, t, isOnline, isController]);
+  }, [
+    taskId,
+    doc,
+    selectedLine,
+    scannedBarcodeForQty,
+    qtyInput,
+    closeLineScan,
+    navigation,
+    t,
+    isOnline,
+    isController,
+    controllerVerifiedLineIds,
+  ]);
 
   const handleChangePickSource = useCallback(
     async (lineId: string, locationId: string, lotId: string) => {
@@ -642,8 +789,93 @@ export function PickTaskDetails() {
                         {submitting ? '…' : t('confirmButton')}
                       </Text>
                     </TouchableOpacity>
+                    {isController && selectedLine.qty_picked > 0 && (
+                      <TouchableOpacity
+                        style={styles.unpickLinkBtn}
+                        onPress={() => {
+                          setUnpickTarget(selectedLine);
+                          setUnpickQtyInput('1');
+                          setUnpickReason(null);
+                        }}
+                        disabled={submitting}
+                      >
+                        <Text style={styles.unpickLinkText}>{t('unpickActionTitle')}</Text>
+                      </TouchableOpacity>
+                    )}
                   </>
                 )}
+              </>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      <Modal
+        visible={!!unpickTarget}
+        transparent
+        animationType="slide"
+        onRequestClose={closeUnpickModal}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={closeUnpickModal}
+        >
+          <View style={[styles.modalContent, isDark && styles.modalContentDark]} onStartShouldSetResponder={() => true}>
+            {unpickTarget && (
+              <>
+                <Text style={[styles.modalTitle, isDark && styles.modalTitleDark]}>
+                  {t('unpickReasonTitle')}
+                </Text>
+                <Text style={[styles.modalHint, isDark && styles.modalHintDark]} numberOfLines={2}>
+                  {unpickTarget.product_name}
+                </Text>
+                <TextInput
+                  style={[styles.qtyInput, isDark && styles.qtyInputDark]}
+                  value={unpickQtyInput}
+                  onChangeText={(v) => setUnpickQtyInput(sanitizeStockQtyDigits(v))}
+                  keyboardType="number-pad"
+                  placeholder={t('unpickQtyLabel')}
+                  placeholderTextColor={isDark ? '#64748b' : '#999'}
+                  maxLength={4}
+                />
+                <ScrollView style={styles.incompleteReasonList} nestedScrollEnabled>
+                  {INCOMPLETE_REASON_KEYS.map((key) => (
+                    <TouchableOpacity
+                      key={key}
+                      style={[
+                        styles.incompleteReasonRow,
+                        unpickReason === key && styles.incompleteReasonRowSelected,
+                        isDark && styles.incompleteReasonRowDark,
+                        unpickReason === key && isDark && styles.incompleteReasonRowSelectedDark,
+                      ]}
+                      onPress={() => setUnpickReason(key)}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.incompleteReasonRowText,
+                          isDark && styles.incompleteReasonRowTextDark,
+                          unpickReason === key && styles.incompleteReasonRowTextSelected,
+                        ]}
+                      >
+                        {t(`reason_${key}`)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <TouchableOpacity
+                  style={[styles.modalSubmitBtn, (unpickSubmitting || !unpickReason) && styles.modalSubmitDisabled]}
+                  onPress={handleUnpickConfirm}
+                  disabled={unpickSubmitting || !unpickReason}
+                >
+                  <Text style={styles.modalSubmitText}>
+                    {unpickSubmitting ? '…' : t('confirmButton')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.unpickLinkBtn} onPress={closeUnpickModal}>
+                  <Text style={styles.unpickLinkText}>{t('cancel')}</Text>
+                </TouchableOpacity>
               </>
             )}
           </View>
@@ -1160,6 +1392,8 @@ const styles = StyleSheet.create({
   },
   modalSubmitDisabled: { opacity: 0.7 },
   modalSubmitText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  unpickLinkBtn: { marginTop: 12, paddingVertical: 10, alignItems: 'center' },
+  unpickLinkText: { color: '#c62828', fontSize: 15, fontWeight: '600' },
   incompleteReasonModal: { maxHeight: '80%' },
   incompleteReasonTitle: {
     fontSize: 18,

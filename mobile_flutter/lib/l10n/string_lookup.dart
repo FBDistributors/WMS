@@ -170,6 +170,7 @@ abstract final class StringLookup {
     'pickMultiLocationHint':
         'Bir nechta joydan yig‘iladi — skaner qiling, keyin shu joydagi qoldiq miqdorini kiriting.',
     'controllerPositionVerified': 'Pozitsiya tekshirildi',
+    'controllerPositionAlreadyVerified': 'Bu pozitsiya allaqachon tekshirilgan',
     'productNotInOrder': 'Bu mahsulot ushbu buyurtmada yo‘q.',
     'success': 'Muvaffaqiyat',
     'loadError': 'Yuklash xatosi',
@@ -472,6 +473,7 @@ abstract final class StringLookup {
     'pickMultiLocationHint':
         'Сбор с нескольких ячеек — отсканируйте и введите количество для текущей ячейки.',
     'controllerPositionVerified': 'Позиция проверена',
+    'controllerPositionAlreadyVerified': 'Эта позиция уже проверена',
     'productNotInOrder': 'Этого товара нет в данном заказе.',
     'success': 'Успешно',
     'loadError': 'Ошибка загрузки',
@@ -774,6 +776,7 @@ abstract final class StringLookup {
     'pickMultiLocationHint':
         'Picked from multiple locations — scan, then enter qty for the current location.',
     'controllerPositionVerified': 'Position verified',
+    'controllerPositionAlreadyVerified': 'This position is already verified',
     'productNotInOrder': 'This product is not in this order.',
     'success': 'Success',
     'loadError': 'Load error',

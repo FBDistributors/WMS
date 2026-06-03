@@ -139,6 +139,21 @@ export async function pickLine(
   return data;
 }
 
+/** Terilgan miqdorni qisman qaytarish (controller/picker, sabab bilan). */
+export async function unpickLine(
+  lineId: string,
+  delta: number,
+  reason: string,
+  requestId: string
+): Promise<PickLineResponse> {
+  const { data } = await apiClient.post<PickLineResponse>(`${PICKING}/lines/${lineId}/unpick`, {
+    delta,
+    reason: reason.trim(),
+    request_id: requestId,
+  });
+  return data;
+}
+
 /** Pozitsiyani sabab bilan bekor qilish (qizil holat: picked_qty=0, sabab saqlanadi). */
 export async function skipLine(lineId: string, reason: string): Promise<PickLineResponse> {
   const { data } = await apiClient.post<PickLineResponse>(`${PICKING}/lines/${lineId}/skip`, {

@@ -322,6 +322,52 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     });
   }
 
+  bool _isControllerGroupFullyVerified(PickingDocument doc, PickingLine anchor) {
+    final List<PickingLine> members = _membersOfSameCardAs(doc, anchor);
+    return members.every((PickingLine l) => _verifiedLineIds.contains(l.id));
+  }
+
+  Future<void> _clearVerifiedForGroup(PickingDocument doc, PickingLine anchor) async {
+    final Set<String> ids =
+        _membersOfSameCardAs(doc, anchor).map((PickingLine l) => l.id).toSet();
+    if (!ids.any(_verifiedLineIds.contains)) {
+      return;
+    }
+    setState(() {
+      _verifiedLineIds = _verifiedLineIds.difference(ids);
+    });
+    await _saveVerified();
+  }
+
+  void _showControllerAlreadyVerifiedSnackBar() {
+    final AppLocale loc = ref.read(appLocaleProvider);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      showAppSnackBar(
+        context,
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+          content: Text(StringLookup.t(loc, 'controllerPositionAlreadyVerified')),
+        ),
+      );
+    });
+  }
+
+  Future<void> _controllerVerifyAfterScan(
+    PickingDocument doc,
+    PickingLine line,
+  ) async {
+    if (_isControllerGroupFullyVerified(doc, line)) {
+      _rejectScanHaptic();
+      _showControllerAlreadyVerifiedSnackBar();
+      return;
+    }
+    await _presentControllerVerifySheet(doc, line);
+  }
+
   Future<void> _runPickTaskRouteScanWorkflow({
     required String sb,
     required String? lineId,
@@ -411,7 +457,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       );
       return;
     }
-    await _presentControllerVerifySheet(doc, line);
+    await _controllerVerifyAfterScan(doc, line);
   }
 
   Future<void> _handleControllerRouteScan(String barcode, String lineId) async {
@@ -446,7 +492,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       );
       return;
     }
-    await _presentControllerVerifySheet(doc, physical);
+    await _controllerVerifyAfterScan(doc, physical);
   }
 
   /// RN `PickTaskDetails` `useFocusEffect`: skan + lineId → modal, `submitScan` yo‘q.
@@ -665,7 +711,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
           return;
         }
         _topScan.clear();
-        await _presentControllerVerifySheet(doc, line);
+        await _controllerVerifyAfterScan(doc, line);
       } on Exception catch (e) {
         if (mounted) {
           _rejectScanHaptic();
@@ -1066,6 +1112,11 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                   showAppSnackBar(context,
                                     SnackBar(content: Text(StringLookup.t(loc, 'wrongBarcodeTitle'))),
                                   );
+                                  return;
+                                }
+                                if (_isControllerGroupFullyVerified(doc, match)) {
+                                  _rejectScanHaptic();
+                                  _showControllerAlreadyVerifiedSnackBar();
                                   return;
                                 }
                                 setM(() {
@@ -1596,6 +1647,12 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                         await ref
                                             .read(pickTaskDetailProvider(widget.taskId).notifier)
                                             .applyPickLineResponse(widget.taskId, res);
+                                        final PickingDocument? updated = ref
+                                            .read(pickTaskDetailProvider(widget.taskId))
+                                            .valueOrNull;
+                                        if (updated != null) {
+                                          await _clearVerifiedForGroup(updated, line);
+                                        }
                                         if (ctx.mounted) {
                                           Navigator.of(ctx).pop();
                                         }
