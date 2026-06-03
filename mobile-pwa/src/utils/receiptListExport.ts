@@ -8,6 +8,7 @@ import type { Product } from '../services/productsApi'
 import { escapeCsvCell } from './receiptExport'
 import { writeExcelJsFile } from './exportExcel'
 import { applyUnicodeFontToPdf } from './jspdfUnicodeFont'
+import { formatUnknownError } from '../lib/formatUnknownError'
 import { buildReceiptExportLineRow } from './receiptExport'
 
 export type ReceiptListExportLabels = {
@@ -206,10 +207,14 @@ function buildSheetAoA(ctx: ReceiptListExportContext): (string | number)[][] {
 }
 
 export async function downloadReceiptListExcel(ctx: ReceiptListExportContext): Promise<void> {
-  const { buildStyledReceiptListWorkbook } = await import('./receiptListExcelStyled')
-  const wb = await buildStyledReceiptListWorkbook(ctx)
-  const buffer = await wb.xlsx.writeBuffer()
-  await writeExcelJsFile(buffer, `${receiptListExportBaseName()}.xlsx`)
+  try {
+    const { buildStyledReceiptListWorkbook } = await import('./receiptListExcelStyled')
+    const wb = await buildStyledReceiptListWorkbook(ctx)
+    const buffer = await wb.xlsx.writeBuffer()
+    await writeExcelJsFile(buffer, `${receiptListExportBaseName()}.xlsx`)
+  } catch (err) {
+    throw new Error(formatUnknownError(err) || 'Excel fayl yaratib bo‘lmadi')
+  }
 }
 
 export function downloadReceiptListCsv(ctx: ReceiptListExportContext): void {

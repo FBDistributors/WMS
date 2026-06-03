@@ -15,13 +15,37 @@ function excelThinBorder(): Partial<ExcelJS.Borders> {
   return { top: edge, left: edge, bottom: edge, right: edge }
 }
 
+function safeSheetName(title: string): string {
+  const cleaned = title.replace(/[\\/*?:[\]]/g, '_').trim()
+  return (cleaned || 'Receipts').slice(0, 31)
+}
+
+function setDataCell(cell: ExcelJS.Cell, colIndex: number, val: string | number): void {
+  if (colIndex === 7) {
+    const n = typeof val === 'number' ? val : Number(val)
+    cell.value = Number.isFinite(n) ? n : val
+    if (typeof cell.value === 'number') cell.numFmt = '0'
+    return
+  }
+  if (colIndex === 8) {
+    if (typeof val === 'number' && Number.isFinite(val)) {
+      cell.value = val
+      cell.numFmt = '0'
+    } else {
+      cell.value = val === null || val === undefined ? '' : String(val)
+    }
+    return
+  }
+  cell.value = val === null || val === undefined ? '' : val
+}
+
 export async function buildStyledReceiptListWorkbook(
   ctx: ReceiptListExportContext
 ): Promise<ExcelJS.Workbook> {
   const { labels, filterSummaryLines, rows, receiptCount, lineCount } = ctx
   const wb = new ExcelJS.Workbook()
   wb.creator = 'WMS'
-  const ws = wb.addWorksheet(labels.listTitle.slice(0, 31) || 'Receipts', {
+  const ws = wb.addWorksheet(safeSheetName(labels.listTitle), {
     views: [{ state: 'frozen', ySplit: 6 }],
   })
 
@@ -117,16 +141,13 @@ export async function buildStyledReceiptListWorkbook(
     ]
     values.forEach((val, colIndex) => {
       const cell = dataRow.getCell(colIndex + 1)
-      cell.value = val
+      setDataCell(cell, colIndex, val)
       cell.font = { color: { argb: ARGB_TITLE } }
       cell.border = excelThinBorder()
       cell.alignment = {
         vertical: 'middle',
         horizontal: colIndex === 7 || colIndex === 8 ? 'right' : 'left',
         wrapText: colIndex === 6,
-      }
-      if (colIndex === 7 || colIndex === 8) {
-        cell.numFmt = '0'
       }
     })
     if (lineIndex % 2 === 1) {

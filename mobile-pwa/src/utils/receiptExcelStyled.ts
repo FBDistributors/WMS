@@ -15,6 +15,25 @@ function excelThinBorder(): Partial<ExcelJS.Borders> {
   return { top: edge, left: edge, bottom: edge, right: edge }
 }
 
+function setDataCell(cell: ExcelJS.Cell, colIndex: number, val: string | number): void {
+  if (colIndex === 3) {
+    const n = typeof val === 'number' ? val : Number(val)
+    cell.value = Number.isFinite(n) ? n : val
+    if (typeof cell.value === 'number') cell.numFmt = '0'
+    return
+  }
+  if (colIndex === 4) {
+    if (typeof val === 'number' && Number.isFinite(val)) {
+      cell.value = val
+      cell.numFmt = '0'
+    } else {
+      cell.value = val === null || val === undefined ? '' : String(val)
+    }
+    return
+  }
+  cell.value = val === null || val === undefined ? '' : val
+}
+
 export async function buildStyledReceiptWorkbook(ctx: ReceiptExportContext): Promise<ExcelJS.Workbook> {
   const { receipt, labels, lines, statusLabel, receivedAtFormatted } = ctx
   const wb = new ExcelJS.Workbook()
@@ -105,16 +124,13 @@ export async function buildStyledReceiptWorkbook(ctx: ReceiptExportContext): Pro
     ]
     values.forEach((val, colIndex) => {
       const cell = dataRow.getCell(colIndex + 1)
-      cell.value = val
+      setDataCell(cell, colIndex, val)
       cell.font = { color: { argb: ARGB_TITLE } }
       cell.border = excelThinBorder()
       cell.alignment = {
         vertical: 'middle',
         horizontal: colIndex === 3 || colIndex === 4 ? 'right' : 'left',
         wrapText: colIndex === 2,
-      }
-      if (colIndex === 3 || colIndex === 4) {
-        cell.numFmt = '0'
       }
     })
     if (lineIndex % 2 === 1) {

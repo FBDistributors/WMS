@@ -48,6 +48,8 @@ import {
   type ReceiptListExportContext,
 } from '../../utils/receiptListExport'
 import { useAuth } from '../../rbac/AuthProvider'
+import { fetchProductsAndInventoryForExport } from '../../lib/fetchProductsAndInventory'
+import { formatUnknownError } from '../../lib/formatUnknownError'
 import { sanitizeStockQtyDigits } from '../../lib/stockQtyInput'
 
 type LineDraft = Omit<ReceiptLineCreate, 'qty'> & { id: string; qty: number | '' }
@@ -378,22 +380,14 @@ export function ReceivingPage() {
             )
           ),
         ]
-        const [productsRes, locationsData, inventoryRows] = await Promise.all([
-          productIds.length > 0
-            ? getProducts({ product_ids: productIds, limit: productIds.length })
-            : Promise.resolve({ items: [] as Product[] }),
+        const [exportData, locationsData] = await Promise.all([
+          fetchProductsAndInventoryForExport(productIds),
           getLocations(false),
-          productIds.length > 0
-            ? getInventorySummary({ product_ids: productIds })
-            : Promise.resolve([]),
         ])
 
-        const exportProductLookup = new Map(productsRes.items.map((p) => [p.id, p]))
+        const exportProductLookup = new Map(exportData.products.map((p) => [p.id, p]))
         const exportLocationLookup = new Map(locationsData.map((loc) => [loc.id, loc]))
-        const inventoryMap = new Map<string, number>()
-        inventoryRows.forEach((row) => {
-          inventoryMap.set(row.product_id, Math.round(Number(row.on_hand_total)))
-        })
+        const inventoryMap = exportData.inventoryMap
 
         const rows = buildReceiptListExportRows(
           filtered,
@@ -429,7 +423,7 @@ export function ReceivingPage() {
         } else {
           setSnackVariant('error')
           setSnackMessage(
-            `${t('receiving:export_failed')}: ${err instanceof Error ? err.message : String(err)}`
+            `${t('receiving:export_failed')}: ${formatUnknownError(err)}`
           )
         }
         throw err
