@@ -40,6 +40,7 @@ import { getInventorySummary } from '../../services/inventoryApi'
 import {
   buildReceiptListExportLabels,
   buildReceiptListExportRows,
+  buildReceiptListExportRowsByProduct,
   type ReceiptListExportRow,
   downloadReceiptListCsv,
   downloadReceiptListExcel,
@@ -396,13 +397,20 @@ export function ReceivingPage() {
           inventoryMap,
           (status) => t(`receiving:statuses.${status}`)
         )
+        const groupedRows = buildReceiptListExportRowsByProduct(
+          filtered,
+          exportProductLookup,
+          inventoryMap
+        )
 
         const ctx: ReceiptListExportContext = {
           title: t('receiving:export_list_title'),
           filterSummaryLines: buildExportFilterSummary(),
           rows,
+          groupedRows,
           receiptCount: filtered.length,
           lineCount: rows.length,
+          productsCount: groupedRows.length,
           labels: buildReceiptListExportLabels(t),
         }
 

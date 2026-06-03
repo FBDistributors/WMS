@@ -28,6 +28,19 @@ export type ReceiptListExportLabels = {
   filterSummary: string
   receiptsCount: string
   linesCount: string
+  sheetDetailed: string
+  sheetByProduct: string
+  listTitleByProduct: string
+  productsCount: string
+  colGroupedTotalQty: string
+}
+
+export type ReceiptListExportProductRow = {
+  code: string
+  barcode: string
+  productName: string
+  totalQty: number
+  qoldiq: string | number
 }
 
 export type ReceiptListExportRow = {
@@ -49,8 +62,10 @@ export type ReceiptListExportContext = {
   title: string
   filterSummaryLines: string[]
   rows: ReceiptListExportRow[]
+  groupedRows: ReceiptListExportProductRow[]
   receiptCount: number
   lineCount: number
+  productsCount: number
   labels: ReceiptListExportLabels
 }
 
@@ -137,6 +152,41 @@ export function buildReceiptListExportRows(
   return rows
 }
 
+export function buildReceiptListExportRowsByProduct(
+  receipts: Receipt[],
+  productLookup: Map<string, Product>,
+  inventoryMap: Map<string, number>
+): ReceiptListExportProductRow[] {
+  const qtyByProduct = new Map<string, number>()
+  for (const receipt of receipts) {
+    for (const line of receipt.lines) {
+      const pid = line.product_id
+      if (!pid) continue
+      qtyByProduct.set(
+        pid,
+        (qtyByProduct.get(pid) ?? 0) + Math.round(Number(line.qty))
+      )
+    }
+  }
+  const rows: ReceiptListExportProductRow[] = []
+  for (const [productId, totalQty] of qtyByProduct) {
+    const product = productLookup.get(productId)
+    const barcode =
+      product?.barcode || (product?.barcodes && product.barcodes[0]) || '—'
+    rows.push({
+      code: product?.sku ?? productId,
+      barcode,
+      productName: product?.name ?? '—',
+      totalQty,
+      qoldiq: inventoryMap.get(productId) ?? '—',
+    })
+  }
+  rows.sort((a, b) =>
+    a.productName.localeCompare(b.productName, undefined, { sensitivity: 'base' })
+  )
+  return rows
+}
+
 export function buildReceiptListExportLabels(t: TFunction): ReceiptListExportLabels {
   return {
     listTitle: t('receiving:export_list_title'),
@@ -155,6 +205,11 @@ export function buildReceiptListExportLabels(t: TFunction): ReceiptListExportLab
     filterSummary: t('receiving:export_filter_applied'),
     receiptsCount: t('receiving:export_receipts_count'),
     linesCount: t('receiving:export_lines_count'),
+    sheetDetailed: t('receiving:export_sheet_detailed'),
+    sheetByProduct: t('receiving:export_sheet_by_product'),
+    listTitleByProduct: t('receiving:export_list_title_by_product'),
+    productsCount: t('receiving:export_products_count'),
+    colGroupedTotalQty: t('receiving:export_grouped_total_qty'),
   }
 }
 
