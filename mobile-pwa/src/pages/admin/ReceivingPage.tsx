@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Filter, Plus, Search, Trash2, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Filter, Plus, Search, Settings, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { ReceiptListExportToolbar } from '../../admin/components/receiving/ReceiptListExportToolbar'
+import { ReceivingTableSettings } from '../../admin/components/receiving/ReceivingTableSettings'
+import {
+  useReceivingTableConfig,
+  type ReceivingTableColumnId,
+  RECEIVING_TABLE_COLUMN_IDS,
+} from '../../admin/hooks/useReceivingTableConfig'
 import type { ExportFormat } from '../../admin/components/receiving/ExportFormatDropdown'
 import { FloatingSnackBar } from '../../components/ui/FloatingSnackBar'
 import { ProductSearchCombobox, formatProductLabel } from '../../components/ProductSearchCombobox'
@@ -63,6 +69,28 @@ type FlatReceiptTableRow = ReceiptListExportRow & {
   showComplete: boolean
 }
 
+const TH_CLASS =
+  'text-left py-2.5 px-3 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400 align-middle whitespace-nowrap'
+const TD_BASE = 'py-2.5 px-3 align-middle text-sm'
+
+function receivingThWidth(col: ReceivingTableColumnId): string | undefined {
+  const widths: Partial<Record<ReceivingTableColumnId, string>> = {
+    doc_no: '10rem',
+    status: '7rem',
+    received_by: '8rem',
+    received_at: '9rem',
+    code: '5rem',
+    barcode: '9rem',
+    product: '18rem',
+    qty: '4.5rem',
+    qoldiq: '4.5rem',
+    batch: '7rem',
+    expiry: '7rem',
+    location: '5.5rem',
+  }
+  return widths[col]
+}
+
 export function ReceivingPage() {
   const { t } = useTranslation(['receiving', 'common'])
   const [searchParams, setSearchParams] = useSearchParams()
@@ -101,6 +129,9 @@ export function ReceivingPage() {
   const [snackMessage, setSnackMessage] = useState<string | null>(null)
   const [snackVariant, setSnackVariant] = useState<'success' | 'error'>('success')
   const [inventoryMap, setInventoryMap] = useState<Map<string, number>>(new Map())
+  const [isTableSettingsOpen, setIsTableSettingsOpen] = useState(false)
+  const { config: tableConfig, updateConfig: updateTableConfig, resetConfig: resetTableConfig } =
+    useReceivingTableConfig()
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -249,6 +280,46 @@ export function ReceivingPage() {
     }
     return result
   }, [filteredReceipts, productLookup, locationLookup, inventoryMap, t])
+
+  const columnOptions = useMemo(
+    () =>
+      RECEIVING_TABLE_COLUMN_IDS.map((id) => ({
+        id,
+        label:
+          id === 'doc_no'
+            ? t('receiving:col_doc_no')
+            : id === 'status'
+              ? t('receiving:col_status')
+              : id === 'received_by'
+                ? t('receiving:col_received_by')
+                : id === 'received_at'
+                  ? t('receiving:col_received_at')
+                  : id === 'code'
+                    ? t('receiving:detail_col_code')
+                    : id === 'barcode'
+                      ? t('receiving:detail_col_barcode')
+                      : id === 'product'
+                        ? t('receiving:detail_col_product')
+                        : id === 'qty'
+                          ? t('receiving:fields.qty')
+                          : id === 'qoldiq'
+                            ? t('receiving:detail_col_qoldiq')
+                            : id === 'batch'
+                              ? t('receiving:fields.batch')
+                              : id === 'expiry'
+                                ? t('receiving:fields.expiry_date')
+                                : t('receiving:fields.location'),
+      })),
+    [t]
+  )
+
+  const orderedVisibleColumns = useMemo(() => {
+    const visible = new Set(tableConfig.visibleColumns)
+    return tableConfig.columnOrder.filter(
+      (id): id is ReceivingTableColumnId =>
+        RECEIVING_TABLE_COLUMN_IDS.includes(id as ReceivingTableColumnId) && visible.has(id)
+    )
+  }, [tableConfig.columnOrder, tableConfig.visibleColumns])
 
   const buildExportFilterSummary = useCallback((): string[] => {
     const parts: string[] = []
@@ -470,25 +541,100 @@ export function ReceivingPage() {
     }
   }
 
-  const handleComplete = async (receiptId: string) => {
-    if (!canWrite) return
-    setIsSubmitting(true)
-    setError(null)
-    try {
-      await completeReceipt(receiptId)
-      await load()
-    } catch (err) {
-      const msg =
-        err && typeof err === 'object' && 'message' in err
-          ? String((err as { message: string }).message)
-          : err instanceof Error
-            ? err.message
-            : t('receiving:complete_failed')
-      setError(msg)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
+  const handleComplete = useCallback(
+    async (receiptId: string) => {
+      if (!canWrite) return
+      setIsSubmitting(true)
+      setError(null)
+      try {
+        await completeReceipt(receiptId)
+        await load()
+      } catch (err) {
+        const msg =
+          err && typeof err === 'object' && 'message' in err
+            ? String((err as { message: string }).message)
+            : err instanceof Error
+              ? err.message
+              : t('receiving:complete_failed')
+        setError(msg)
+      } finally {
+        setIsSubmitting(false)
+      }
+    },
+    [canWrite, load, t]
+  )
+
+  const renderReceivingCell = useCallback(
+    (colId: ReceivingTableColumnId, row: FlatReceiptTableRow) => {
+      switch (colId) {
+        case 'doc_no':
+          return (
+            <span className="block truncate font-medium text-slate-900 dark:text-slate-100" title={row.docNo}>
+              {row.docNo}
+            </span>
+          )
+        case 'status':
+          return (
+            <div className="flex flex-col items-start gap-1.5">
+              <span className="inline-block max-w-full truncate text-slate-700 dark:text-slate-200" title={row.status}>
+                {row.status}
+              </span>
+              {row.showComplete && canWrite ? (
+                <Button
+                  className="h-7 px-2 text-xs"
+                  onClick={() => void handleComplete(row.receiptId)}
+                  disabled={isSubmitting}
+                >
+                  {t('receiving:complete')}
+                </Button>
+              ) : null}
+            </div>
+          )
+        case 'received_by':
+          return (
+            <span className="block truncate" title={row.receivedBy}>
+              {row.receivedBy}
+            </span>
+          )
+        case 'received_at':
+          return <span className="whitespace-nowrap text-xs">{row.receivedAt}</span>
+        case 'code':
+          return <span className="whitespace-nowrap font-medium text-slate-900 dark:text-slate-100">{row.code}</span>
+        case 'barcode':
+          return (
+            <span className="block truncate font-mono text-xs" title={row.barcode}>
+              {row.barcode}
+            </span>
+          )
+        case 'product':
+          return (
+            <span
+              className="line-clamp-2 text-sm leading-snug text-slate-700 dark:text-slate-200"
+              title={row.productName}
+            >
+              {row.productName}
+            </span>
+          )
+        case 'qty':
+          return <span className="tabular-nums">{row.qty}</span>
+        case 'qoldiq':
+          return <span className="tabular-nums">{row.qoldiq}</span>
+        case 'batch':
+          return (
+            <span className="block truncate font-mono text-xs" title={String(row.batch)}>
+              {row.batch}
+            </span>
+          )
+        case 'expiry':
+          return <span className="whitespace-nowrap text-xs">{row.expiry}</span>
+        case 'location':
+          return <span className="whitespace-nowrap font-medium">{row.location}</span>
+        default:
+          return null
+      }
+    },
+    [canWrite, handleComplete, isSubmitting, t]
+  )
 
   const createForm = (
     <div className="space-y-4">
@@ -855,6 +1001,15 @@ export function ReceivingPage() {
                 </>
               )}
             </div>
+            <Button
+              variant="secondary"
+              className="h-10 gap-1.5 rounded-xl px-3"
+              onClick={() => setIsTableSettingsOpen(true)}
+              title={t('receiving:table.settings_title')}
+              aria-label={t('receiving:table.settings_title')}
+            >
+              <Settings size={18} />
+            </Button>
             <ReceiptListExportToolbar
               disabled={isLoading || totalReceipts === 0}
               onExport={async (kind) => {
@@ -883,107 +1038,56 @@ export function ReceivingPage() {
             title={t('receiving:no_results')}
             description={t('receiving:no_results_desc')}
           />
+        ) : orderedVisibleColumns.length === 0 ? (
+          <EmptyState
+            title={t('receiving:no_results')}
+            description={t('receiving:table.columns_hint')}
+          />
         ) : (
           <TableScrollArea>
-            <table className="w-full min-w-[1200px] border-collapse text-sm">
-              <thead>
+            <table className="w-full min-w-[64rem] border-collapse text-sm table-fixed">
+              <colgroup>
+                {orderedVisibleColumns.map((colId) => (
+                  <col key={colId} style={{ width: receivingThWidth(colId) }} />
+                ))}
+              </colgroup>
+              <thead className="bg-slate-50 dark:bg-slate-800/60">
                 <tr className="border-b border-slate-200 dark:border-slate-700">
-                  <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                    {t('receiving:col_doc_no')}
-                  </th>
-                  <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                    {t('receiving:col_status')}
-                  </th>
-                  <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                    {t('receiving:col_received_by')}
-                  </th>
-                  <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                    {t('receiving:col_received_at')}
-                  </th>
-                  <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                    {t('receiving:detail_col_code')}
-                  </th>
-                  <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                    {t('receiving:detail_col_barcode')}
-                  </th>
-                  <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                    {t('receiving:detail_col_product')}
-                  </th>
-                  <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                    {t('receiving:fields.qty')}
-                  </th>
-                  <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                    {t('receiving:detail_col_qoldiq')}
-                  </th>
-                  <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                    {t('receiving:fields.batch')}
-                  </th>
-                  <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                    {t('receiving:fields.expiry_date')}
-                  </th>
-                  <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                    {t('receiving:fields.location')}
-                  </th>
-                  <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                    {t('receiving:col_actions')}
-                  </th>
+                  {orderedVisibleColumns.map((colId) => {
+                    const label = columnOptions.find((c) => c.id === colId)?.label ?? colId
+                    const alignRight = colId === 'qty' || colId === 'qoldiq'
+                    return (
+                      <th
+                        key={colId}
+                        className={`${TH_CLASS}${alignRight ? ' text-right' : ''}`}
+                      >
+                        {label}
+                      </th>
+                    )
+                  })}
                 </tr>
               </thead>
               <tbody>
-                {flatRows.map((row) => (
+                {flatRows.map((row, rowIndex) => (
                   <tr
                     key={`${row.receiptId}-${row.lineId}`}
-                    className="border-b border-slate-100 dark:border-slate-800"
+                    className={`border-b border-slate-100 dark:border-slate-800 ${
+                      rowIndex % 2 === 1 ? 'bg-slate-50/50 dark:bg-slate-800/30' : ''
+                    }`}
                   >
-                    <td className="py-2.5 px-2 text-slate-900 dark:text-slate-100 font-medium">
-                      {row.docNo}
-                    </td>
-                    <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300">
-                      {row.status}
-                    </td>
-                    <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300">
-                      {row.receivedBy}
-                    </td>
-                    <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                      {row.receivedAt}
-                    </td>
-                    <td className="py-2.5 px-2 font-medium text-slate-900 dark:text-slate-100">
-                      {row.code}
-                    </td>
-                    <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300 font-mono text-xs">
-                      {row.barcode}
-                    </td>
-                    <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300">
-                      {row.productName}
-                    </td>
-                    <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300">
-                      {row.qty}
-                    </td>
-                    <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300">
-                      {row.qoldiq}
-                    </td>
-                    <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300">
-                      {row.batch}
-                    </td>
-                    <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                      {row.expiry}
-                    </td>
-                    <td className="py-2.5 px-2 text-slate-600 dark:text-slate-300">
-                      {row.location}
-                    </td>
-                    <td className="py-2.5 px-2">
-                      {row.showComplete ? (
-                        <Button
-                          className="py-2 px-3 text-xs"
-                          onClick={() => void handleComplete(row.receiptId)}
-                          disabled={!canWrite || isSubmitting}
+                    {orderedVisibleColumns.map((colId) => {
+                      const alignRight = colId === 'qty' || colId === 'qoldiq'
+                      return (
+                        <td
+                          key={colId}
+                          className={`${TD_BASE} text-slate-600 dark:text-slate-300${
+                            alignRight ? ' text-right' : ''
+                          }`}
                         >
-                          {t('receiving:complete')}
-                        </Button>
-                      ) : (
-                        <span className="text-slate-400">—</span>
-                      )}
-                    </td>
+                          {renderReceivingCell(colId, row)}
+                        </td>
+                      )
+                    })}
                   </tr>
                 ))}
               </tbody>
@@ -1035,6 +1139,14 @@ export function ReceivingPage() {
           </div>
         )}
       </Card>
+      <ReceivingTableSettings
+        open={isTableSettingsOpen}
+        onOpenChange={setIsTableSettingsOpen}
+        config={tableConfig}
+        columns={columnOptions}
+        onSave={updateTableConfig}
+        onReset={resetTableConfig}
+      />
     </AdminLayout>
   )
 }

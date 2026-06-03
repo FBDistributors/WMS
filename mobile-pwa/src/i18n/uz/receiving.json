@@ -87,5 +87,13 @@
   "export_filter_brand": "Brend",
   "export_filter_receiver": "Qabul qiluvchi",
   "export_filter_search": "Qidiruv",
-  "export_filter_none": "Filtr yo'q"
+  "export_filter_none": "Filtr yo'q",
+  "table": {
+    "settings_title": "Jadval sozlamalari",
+    "settings_button": "Jadval",
+    "columns_title": "Ustunlar",
+    "columns_hint": "Ko'rinadigan ustunlarni tanlang va tartibini o'zgartiring.",
+    "reset_default": "Standart",
+    "save_settings": "Saqlash"
+  }
 }

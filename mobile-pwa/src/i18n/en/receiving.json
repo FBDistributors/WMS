@@ -87,5 +87,13 @@
   "export_filter_brand": "Brand",
   "export_filter_receiver": "Receiver",
   "export_filter_search": "Search",
-  "export_filter_none": "No filter"
+  "export_filter_none": "No filter",
+  "table": {
+    "settings_title": "Table settings",
+    "settings_button": "Table",
+    "columns_title": "Columns",
+    "columns_hint": "Choose visible columns and drag to reorder.",
+    "reset_default": "Reset",
+    "save_settings": "Save"
+  }
 }

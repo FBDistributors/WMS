@@ -87,5 +87,13 @@
   "export_filter_brand": "Бренд",
   "export_filter_receiver": "Получатель",
   "export_filter_search": "Поиск",
-  "export_filter_none": "Без фильтра"
+  "export_filter_none": "Без фильтра",
+  "table": {
+    "settings_title": "Настройки таблицы",
+    "settings_button": "Таблица",
+    "columns_title": "Столбцы",
+    "columns_hint": "Выберите видимые столбцы и измените их порядок.",
+    "reset_default": "По умолчанию",
+    "save_settings": "Сохранить"
+  }
 }
