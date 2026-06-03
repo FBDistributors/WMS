@@ -75,7 +75,7 @@ function TaskRow({
     item.lines_total > 0 && item.lines_done >= item.lines_total;
   const showSendBtn =
     profileType === 'picker' &&
-    item.lines_done > 0 &&
+    item.picked_any &&
     !item.controlled_by_user_id;
 
   return (

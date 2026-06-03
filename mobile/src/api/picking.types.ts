@@ -51,6 +51,8 @@ export interface PickingListItem {
   status: string;
   lines_total: number;
   lines_done: number;
+  /** Hech bo'lmaganda bitta qator yoki qisman miqdor yig'ilgan. */
+  picked_any?: boolean;
   controlled_by_user_id?: string | null;
   assigned_to_user_id?: string | null;
   assigned_to_user_name?: string | null;

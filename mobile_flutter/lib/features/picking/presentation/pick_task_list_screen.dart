@@ -22,7 +22,7 @@ import '../picking_providers.dart';
 
 bool _pickerEligibleBulkSend(PickingListItem item, PickerProfileParam profile) {
   return profile == PickerProfileParam.picker &&
-      item.linesDone > 0 &&
+      item.pickedAny &&
       item.controlledByUserId == null;
 }
 
@@ -1030,7 +1030,7 @@ class _TaskCard extends StatelessWidget {
     final bool useGreenListStyle =
         profile != PickerProfileParam.controller && fully;
     final bool showSend = profile == PickerProfileParam.picker &&
-        item.linesDone > 0 &&
+        item.pickedAny &&
         item.controlledByUserId == null;
     final ColorScheme cs = Theme.of(context).colorScheme;
     final Color greenBg = isDark ? const Color(0xFF14532D) : const Color(0xFFDCFCE7);
