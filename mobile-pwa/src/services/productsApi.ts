@@ -83,6 +83,7 @@ export type ProductHistoryReceiving = {
 export type ProductHistoryPick = {
   date: string
   picked_by: string | null
+  location_code: string | null
   order_number: string | null
   document_doc_no: string | null
   qty: number

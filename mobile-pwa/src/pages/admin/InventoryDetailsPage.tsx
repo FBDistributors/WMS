@@ -274,6 +274,9 @@ export function InventoryDetailsPage() {
                           {t('products:history.picked_by')}
                         </th>
                         <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">
+                          {t('products:history.location')}
+                        </th>
+                        <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">
                           {t('products:history.order_number')}
                         </th>
                         <th className="px-3 py-2 text-right font-medium text-slate-600 dark:text-slate-400">
@@ -289,6 +292,9 @@ export function InventoryDetailsPage() {
                           </td>
                           <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
                             {row.picked_by ?? '—'}
+                          </td>
+                          <td className="px-3 py-2 font-mono text-xs text-slate-700 dark:text-slate-300">
+                            {row.location_code ?? '—'}
                           </td>
                           <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
                             {row.order_number ?? row.document_doc_no ?? '—'}

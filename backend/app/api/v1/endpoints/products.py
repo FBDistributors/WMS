@@ -86,6 +86,7 @@ class ProductHistoryReceiving(BaseModel):
 class ProductHistoryPick(BaseModel):
     date: str  # ISO
     picked_by: Optional[str] = None
+    location_code: Optional[str] = None
     order_number: Optional[str] = None
     document_doc_no: Optional[str] = None
     qty: float
@@ -473,6 +474,11 @@ async def get_product_history(
     if order_ids:
         for o in db.query(OrderModel).filter(OrderModel.id.in_(order_ids)).all():
             orders_by_id[o.id] = o
+    pick_location_ids = {m.location_id for m in movements if m.location_id}
+    pick_locations_by_id: Dict[UUID, LocationModel] = {}
+    if pick_location_ids:
+        for loc in db.query(LocationModel).filter(LocationModel.id.in_(pick_location_ids)).all():
+            pick_locations_by_id[loc.id] = loc
     for mov in movements:
         doc = docs_by_id.get(mov.source_document_id) if mov.source_document_id else None
         order_number = None
@@ -483,11 +489,14 @@ async def get_product_history(
                 order_number = order.order_number
         creator = pickers_by_id.get(mov.created_by_user_id) if mov.created_by_user_id else None
         picked_by = (creator.full_name or creator.username) if creator else None
+        pick_loc = pick_locations_by_id.get(mov.location_id) if mov.location_id else None
+        location_code = pick_loc.code if pick_loc else None
         qty = abs(float(mov.qty_change))
         picks.append(
             ProductHistoryPick(
                 date=mov.created_at.isoformat() if mov.created_at else "",
                 picked_by=picked_by,
+                location_code=location_code,
                 order_number=order_number,
                 document_doc_no=document_doc_no,
                 qty=qty,
