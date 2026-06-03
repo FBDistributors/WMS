@@ -183,7 +183,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         PERM_WAVES_SORT,
         "admin:access",
     ],
-    # Backward compat: supervisor = controller; receiver = receiving only
+    # Backward compat: supervisor = controller
     "supervisor": [
         PERM_PICKING_READ,
         PERM_PICKING_WRITE,
@@ -203,13 +203,6 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         PERM_LOCATIONS_READ,
         PERM_MOVEMENTS_READ,
         PERM_BRANDS_MANAGE,
-        "admin:access",
-    ],
-    "receiver": [
-        PERM_RECEIVING_READ,
-        PERM_RECEIVING_WRITE,
-        PERM_DOCUMENTS_READ,
-        PERM_PRODUCTS_READ,
         "admin:access",
     ],
 }

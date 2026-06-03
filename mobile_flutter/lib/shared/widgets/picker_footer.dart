@@ -9,6 +9,7 @@ import '../../core/router/scanner_args.dart';
 import '../../features/picking/data/picking_models.dart';
 import '../../features/picking/domain/profile_type_param.dart';
 import '../../features/picking/picking_providers.dart';
+import '../../features/auth/presentation/auth_providers.dart';
 import '../../features/customer_returns/customer_returns_providers.dart';
 import '../../l10n/string_lookup.dart';
 import '../../core/app_state/locale_controller.dart';
@@ -45,6 +46,13 @@ class PickerFooter extends ConsumerWidget {
     final ProfileType pt = ref.watch(profileTypeProvider);
     final PickerProfileParam profileParam =
         pt == ProfileType.controller ? PickerProfileParam.controller : PickerProfileParam.picker;
+    final AuthSession session =
+        ref.watch(authControllerProvider).valueOrNull ?? const AuthSession.unauthenticated();
+    final List<String> perms = session.me?.permissions ?? const <String>[];
+    final bool showKirimTab = perms.contains('receiving:write') ||
+        perms.contains('documents:edit_status') ||
+        perms.contains('picking:write') ||
+        perms.contains('inventory:adjust');
 
     final Color activeC = isDark ? const Color(0xFF93C5FD) : _active;
     final Color inactiveC = isDark ? const Color(0xFF94A3B8) : const Color(0xFF666666);
@@ -120,17 +128,18 @@ class PickerFooter extends ConsumerWidget {
                   onTap: goInv,
                 ),
               ),
-              Expanded(
-                child: _tab(
-                  icon: Icons.inbox_rounded,
-                  label: StringLookup.t(loc, 'kirim'),
-                  active: current == PickerFooterRoute.kirim,
-                  activeC: activeC,
-                  inactiveC: inactiveC,
-                  badge: returnsAssignedCount,
-                  onTap: goKirim,
+              if (showKirimTab)
+                Expanded(
+                  child: _tab(
+                    icon: Icons.inbox_rounded,
+                    label: StringLookup.t(loc, 'kirim'),
+                    active: current == PickerFooterRoute.kirim,
+                    activeC: activeC,
+                    inactiveC: inactiveC,
+                    badge: returnsAssignedCount,
+                    onTap: goKirim,
+                  ),
                 ),
-              ),
             ],
           ),
         ),

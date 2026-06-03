@@ -88,7 +88,6 @@ export function UsersPage() {
               'warehouse_admin',
               'supervisor',
               'picker',
-              'receiver',
               'inventory_controller',
             ] as UserRole[]
           ).map((role) => (

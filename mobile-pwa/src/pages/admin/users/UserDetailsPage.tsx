@@ -203,7 +203,6 @@ export function UserDetailsPage() {
                   'warehouse_admin',
                   'supervisor',
                   'picker',
-                  'receiver',
                   'inventory_controller',
                 ] as UserRole[]
               ).map((item) => (

@@ -98,8 +98,8 @@ function receivingThWidth(col: ReceivingTableColumnId): string | undefined {
 export function ReceivingPage() {
   const { t } = useTranslation(['receiving', 'common'])
   const [searchParams, setSearchParams] = useSearchParams()
-  const { has } = useAuth()
-  const canWrite = has('receiving:write')
+  const { isWarehouseAdmin, isSupervisor } = useAuth()
+  const canAdminReceiveOps = isWarehouseAdmin || isSupervisor
 
   const [products, setProducts] = useState<Product[]>([])
   const [selectedProducts, setSelectedProducts] = useState<Map<string, Product>>(new Map())
@@ -484,7 +484,7 @@ export function ReceivingPage() {
   }
 
   const handleSubmit = async () => {
-    if (!canWrite) return
+    if (!canAdminReceiveOps) return
     if (!lines.length) {
       setError(t('receiving:validation.lines_required'))
       return
@@ -534,7 +534,7 @@ export function ReceivingPage() {
 
   const handleComplete = useCallback(
     async (receiptId: string) => {
-      if (!canWrite) return
+      if (!canAdminReceiveOps) return
       setIsSubmitting(true)
       try {
         await completeReceipt(receiptId)
@@ -552,7 +552,7 @@ export function ReceivingPage() {
         setIsSubmitting(false)
       }
     },
-    [canWrite, load, t, showSuccess, showError]
+    [canAdminReceiveOps, load, t, showSuccess, showError]
   )
 
   const renderReceivingCell = useCallback(
@@ -570,7 +570,7 @@ export function ReceivingPage() {
               <span className="inline-block max-w-full truncate" title={row.status}>
                 {row.status}
               </span>
-              {row.showComplete && canWrite ? (
+              {row.showComplete && canAdminReceiveOps ? (
                 <Button
                   className="h-7 px-2 text-xs"
                   onClick={() => void handleComplete(row.receiptId)}
@@ -624,7 +624,7 @@ export function ReceivingPage() {
           return null
       }
     },
-    [canWrite, handleComplete, isSubmitting, t]
+    [canAdminReceiveOps, handleComplete, isSubmitting, t]
   )
 
   const createForm = (
@@ -767,7 +767,7 @@ export function ReceivingPage() {
           <Plus size={16} />
           {t('receiving:add_line')}
         </Button>
-        <Button onClick={handleSubmit} disabled={!canWrite || isSubmitting}>
+        <Button onClick={handleSubmit} disabled={!canAdminReceiveOps || isSubmitting}>
           {isSubmitting ? t('receiving:saving') : t('receiving:create')}
         </Button>
       </div>
@@ -778,7 +778,7 @@ export function ReceivingPage() {
     <AdminLayout
       title={t('receiving:title')}
       actionSlot={
-        canWrite ? (
+        canAdminReceiveOps ? (
           <Button onClick={openCreateModal}>
             <Plus size={18} />
             {t('receiving:create')}

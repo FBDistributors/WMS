@@ -2,7 +2,6 @@ export type UserRole =
   | 'warehouse_admin'
   | 'supervisor'
   | 'picker'
-  | 'receiver'
   | 'inventory_controller'
 
 export type UserRecord = {

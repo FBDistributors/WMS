@@ -136,7 +136,6 @@ export function UserCreatePage() {
                   'warehouse_admin',
                   'supervisor',
                   'picker',
-                  'receiver',
                   'inventory_controller',
                 ] as UserRole[]
               ).map((item) => (

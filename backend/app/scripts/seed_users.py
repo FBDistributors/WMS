@@ -24,9 +24,10 @@ ROLE_SPECS = [
         "password_env": "SEED_PICK_PASSWORD",
     },
     {
-        "role": "receiver",
+        "role": "picker",
         "username_env": "SEED_REC_USERNAME",
         "password_env": "SEED_REC_PASSWORD",
+        "granted_permissions": ["receiving:read", "receiving:write"],
     },
     {
         "role": "inventory_controller",
@@ -38,6 +39,7 @@ ROLE_SPECS = [
 LEGACY_ROLE_MAP = {
     "admin": "warehouse_admin",
     "manager": "supervisor",
+    "receiver": "picker",
 }
 
 
@@ -85,6 +87,7 @@ def seed_users() -> None:
                 username=username,
                 password_hash=get_password_hash(password),
                 role=role,
+                granted_permissions=spec.get("granted_permissions"),
                 is_active=True,
             )
             db.add(user)

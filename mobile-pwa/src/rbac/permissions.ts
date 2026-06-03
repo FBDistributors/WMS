@@ -7,7 +7,6 @@ export type Role =
   | 'inventory_controller'
   | 'warehouse_admin'
   | 'supervisor'
-  | 'receiver'
 
 export type PermissionKey =
   | 'picking:read'
@@ -186,13 +185,6 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     'brands:manage',
     'admin:access',
   ],
-  receiver: [
-    'receiving:read',
-    'receiving:write',
-    'documents:read',
-    'products:read',
-    'admin:access',
-  ],
 }
 
 export function normalizePermissions(permissions: string[]): PermissionKey[] {
@@ -225,10 +217,6 @@ export function isWarehouseAdmin(role: Role) {
 
 export function isSupervisor(role: Role) {
   return role === 'supervisor'
-}
-
-export function isReceiver(role: Role) {
-  return role === 'receiver'
 }
 
 /** Route permission required to access admin area (dashboard and below) */

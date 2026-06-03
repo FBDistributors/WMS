@@ -5,7 +5,6 @@ import {
   ROLE_PERMISSIONS,
   isInventoryController,
   isPicker,
-  isReceiver,
   isSupervisor,
   isWarehouseAdmin,
   normalizePermissions,
@@ -27,7 +26,6 @@ type AuthContextValue = {
   isLoading: boolean
   isMock: boolean
   isPicker: boolean
-  isReceiver: boolean
   isInventoryController: boolean
   isSupervisor: boolean
   isWarehouseAdmin: boolean
@@ -160,7 +158,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isLoading,
       isMock,
       isPicker: user ? isPicker(user.role) : false,
-      isReceiver: user ? isReceiver(user.role) : false,
       isInventoryController: user ? isInventoryController(user.role) : false,
       isSupervisor: user ? isSupervisor(user.role) : false,
       isWarehouseAdmin: user ? isWarehouseAdmin(user.role) : false,
