@@ -379,6 +379,39 @@ export async function getInventoryMovements(query: InventoryMovementsQuery = {})
   })
 }
 
+/** Joydan-joyga ko'chirish (juftlangan qatorlar). */
+export type WarehouseTransfer = {
+  id: string
+  product_id: string
+  product_code?: string | null
+  product_name?: string | null
+  lot_id: string
+  batch?: string | null
+  qty: number
+  from_location_id: string
+  from_location_code?: string | null
+  to_location_id: string
+  to_location_code?: string | null
+  created_at: string
+  created_by_user_id?: string | null
+  created_by_username?: string | null
+  movement_out_id: string
+  movement_in_id: string
+}
+
+export type WarehouseTransfersQuery = {
+  date_from?: string
+  date_to?: string
+  limit?: number
+  offset?: number
+}
+
+export async function getWarehouseTransfers(query: WarehouseTransfersQuery = {}) {
+  return fetchJSON<WarehouseTransfer[]>('/api/v1/inventory/movements/warehouse-transfers', {
+    query,
+  })
+}
+
 export async function getReserveHistory(query: ReserveHistoryQuery = {}) {
   return fetchJSON<ReserveHistoryResponse>('/api/v1/inventory/reserve-history', {
     query: {

@@ -427,6 +427,27 @@ class StockMovementOut(BaseModel):
     created_by_username: Optional[str] = None
 
 
+class WarehouseTransferOut(BaseModel):
+    """Bitta ko'chirish: manba joydan → manzil joyga (juft stock_movements)."""
+
+    id: UUID
+    product_id: UUID
+    product_code: Optional[str] = None
+    product_name: Optional[str] = None
+    lot_id: UUID
+    batch: Optional[str] = None
+    qty: Decimal
+    from_location_id: UUID
+    from_location_code: Optional[str] = None
+    to_location_id: UUID
+    to_location_code: Optional[str] = None
+    created_at: datetime
+    created_by_user_id: Optional[UUID] = None
+    created_by_username: Optional[str] = None
+    movement_out_id: UUID
+    movement_in_id: UUID
+
+
 class ReserveHistoryRow(BaseModel):
     id: UUID
     movement_type: str
@@ -741,6 +762,112 @@ def _to_lot(lot: StockLotModel) -> StockLotOut:
         expiry_date=lot.expiry_date,
         created_at=lot.created_at,
     )
+
+
+def _warehouse_transfer_movements_filter(query):
+    """Joydan-joyga ko'chirish: transfer_in/out yoki adjust shortage↔overage juftlari."""
+    return query.filter(
+        or_(
+            StockMovementModel.movement_type.in_(("transfer_in", "transfer_out")),
+            and_(
+                StockMovementModel.movement_type == "adjust",
+                StockMovementModel.reason_code.in_(
+                    ("inventory_shortage", "inventory_overage")
+                ),
+            ),
+        )
+    )
+
+
+def _movement_creator_map(db: Session, movements: list[StockMovementModel]) -> dict[UUID, str]:
+    creator_ids = {m.created_by_user_id for m in movements if m.created_by_user_id}
+    creator_map: dict[UUID, str] = {}
+    if creator_ids:
+        for u in db.query(UserModel).filter(UserModel.id.in_(creator_ids)).all():
+            creator_map[u.id] = (
+                (u.full_name and u.full_name.strip())
+                or (u.username and u.username.strip())
+                or (u.code and f"#{u.code}".strip())
+                or "—"
+            )
+    return creator_map
+
+
+def _pair_warehouse_transfers(
+    movements: list[StockMovementModel],
+    creator_map: dict[UUID, str],
+    *,
+    pair_window_seconds: int = 15,
+) -> list[WarehouseTransferOut]:
+    """Juftlash: manfiy qty (chiqim) + musbat qty (kirim), bir xil mahsulot/partiya/xodim, yaqin vaqt."""
+    used: set[UUID] = set()
+    pairs: list[WarehouseTransferOut] = []
+    sorted_moves = sorted(movements, key=lambda m: m.created_at)
+
+    def _display_name(user_id: Optional[UUID]) -> Optional[str]:
+        if not user_id:
+            return None
+        return creator_map.get(user_id)
+
+    for out_mov in sorted_moves:
+        if out_mov.id in used:
+            continue
+        out_qty = Decimal(str(out_mov.qty_change))
+        if out_qty >= 0:
+            continue
+
+        in_mov = None
+        for cand in sorted_moves:
+            if cand.id in used or cand.id == out_mov.id:
+                continue
+            in_qty = Decimal(str(cand.qty_change))
+            if in_qty <= 0:
+                continue
+            if out_mov.product_id != cand.product_id or out_mov.lot_id != cand.lot_id:
+                continue
+            if out_mov.created_by_user_id != cand.created_by_user_id:
+                continue
+            if in_qty + out_qty != 0:
+                continue
+            delta = abs((cand.created_at - out_mov.created_at).total_seconds())
+            if delta > pair_window_seconds:
+                continue
+            in_mov = cand
+            break
+
+        if in_mov is None:
+            continue
+
+        transfer_qty = Decimal(str(in_mov.qty_change))
+        product = getattr(out_mov, "product", None)
+        lot = getattr(out_mov, "lot", None)
+        from_loc = getattr(out_mov, "location", None)
+        to_loc = getattr(in_mov, "location", None)
+        pairs.append(
+            WarehouseTransferOut(
+                id=in_mov.id,
+                product_id=out_mov.product_id,
+                product_code=product.sku if product else None,
+                product_name=product.name if product else None,
+                lot_id=out_mov.lot_id,
+                batch=lot.batch if lot else None,
+                qty=transfer_qty,
+                from_location_id=out_mov.location_id,
+                from_location_code=from_loc.code if from_loc else None,
+                to_location_id=in_mov.location_id,
+                to_location_code=to_loc.code if to_loc else None,
+                created_at=max(out_mov.created_at, in_mov.created_at),
+                created_by_user_id=out_mov.created_by_user_id,
+                created_by_username=_display_name(out_mov.created_by_user_id),
+                movement_out_id=out_mov.id,
+                movement_in_id=in_mov.id,
+            )
+        )
+        used.add(out_mov.id)
+        used.add(in_mov.id)
+
+    pairs.sort(key=lambda p: p.created_at, reverse=True)
+    return pairs
 
 
 def _to_movement(
@@ -1264,17 +1391,7 @@ async def list_stock_movements(
 ):
     query = db.query(StockMovementModel)
     if scope == "warehouse_transfer":
-        query = query.filter(
-            or_(
-                StockMovementModel.movement_type.in_(("transfer_in", "transfer_out")),
-                and_(
-                    StockMovementModel.movement_type == "adjust",
-                    StockMovementModel.reason_code.in_(
-                        ("inventory_shortage", "inventory_overage")
-                    ),
-                ),
-            )
-        )
+        query = _warehouse_transfer_movements_filter(query)
     if product_id:
         query = query.filter(StockMovementModel.product_id == product_id)
     if lot_id:
@@ -1322,6 +1439,48 @@ async def list_stock_movements(
         _to_movement(mov, creator_map.get(mov.created_by_user_id))
         for mov in movements
     ]
+
+
+WAREHOUSE_TRANSFER_PAIR_FETCH_CAP = 4000
+
+
+@router.get(
+    "/movements/warehouse-transfers",
+    response_model=List[WarehouseTransferOut],
+    summary="List location-to-location transfers (paired movements)",
+)
+@router.get(
+    "/movements/warehouse-transfers/",
+    response_model=List[WarehouseTransferOut],
+    summary="List location-to-location transfers (paired movements)",
+)
+async def list_warehouse_transfers(
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission("movements:read")),
+):
+    query = _warehouse_transfer_movements_filter(db.query(StockMovementModel))
+    if date_from:
+        query = query.filter(func.date(StockMovementModel.created_at) >= date_from)
+    if date_to:
+        query = query.filter(func.date(StockMovementModel.created_at) <= date_to)
+
+    movements = (
+        query.options(
+            selectinload(StockMovementModel.product),
+            selectinload(StockMovementModel.lot),
+            selectinload(StockMovementModel.location),
+        )
+        .order_by(StockMovementModel.created_at.desc())
+        .limit(WAREHOUSE_TRANSFER_PAIR_FETCH_CAP)
+        .all()
+    )
+    creator_map = _movement_creator_map(db, movements)
+    pairs = _pair_warehouse_transfers(movements, creator_map)
+    return pairs[offset : offset + limit]
 
 
 @router.get(

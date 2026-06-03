@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Filter, Search, X } from 'lucide-react'
+import { ArrowRight, Filter, Search, X } from 'lucide-react'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { DateInput } from '../../components/DateInput'
@@ -11,26 +11,13 @@ import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { useAppToast } from '../../feedback/useAppToast'
-import { getInventoryMovements, type InventoryMovement } from '../../services/inventoryApi'
+import { getWarehouseTransfers, type WarehouseTransfer } from '../../services/inventoryApi'
 
 const PAGE_SIZE = 50
 
-/** Admin Ko'chirish: faqat ko'chirish harakatlari jadvali (Qabul uslubi). */
+/** Admin Ko'chirish: joydan-joyga o'tkazmalar jadvali (Qabul uslubi). */
 export function MovementPage() {
   const { t } = useTranslation(['admin', 'common', 'inventory', 'kamomat'])
-
-  const movementTypeLabel = useCallback(
-    (row: InventoryMovement) => {
-      if (row.reason_code === 'inventory_overage') {
-        return t('admin:movement_page.reason_overage')
-      }
-      if (row.reason_code === 'inventory_shortage') {
-        return t('admin:movement_page.reason_shortage')
-      }
-      return t(`inventory:movement_types.${row.movement_type}`, row.movement_type)
-    },
-    [t]
-  )
   const [searchParams, setSearchParams] = useSearchParams()
   const searchQuery = searchParams.get('q') ?? ''
   const dateFrom = searchParams.get('date_from') ?? ''
@@ -39,11 +26,11 @@ export function MovementPage() {
 
   const [filterDateFrom, setFilterDateFrom] = useState(dateFrom)
   const [filterDateTo, setFilterDateTo] = useState(dateTo)
-  const [items, setItems] = useState<InventoryMovement[]>([])
+  const [items, setItems] = useState<WarehouseTransfer[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const { showError } = useAppToast()
   const [hasLoadError, setHasLoadError] = useState(false)
-  const [detailRow, setDetailRow] = useState<InventoryMovement | null>(null)
+  const [detailRow, setDetailRow] = useState<WarehouseTransfer | null>(null)
   const [filterPanelOpen, setFilterPanelOpen] = useState(false)
   const filterPanelRef = useRef<HTMLDivElement>(null)
 
@@ -57,8 +44,7 @@ export function MovementPage() {
     setIsLoading(true)
     setHasLoadError(false)
     try {
-      const data = await getInventoryMovements({
-        scope: 'warehouse_transfer',
+      const data = await getWarehouseTransfers({
         date_from: dateFrom.trim() || undefined,
         date_to: dateTo.trim() || undefined,
         limit: PAGE_SIZE,
@@ -83,9 +69,16 @@ export function MovementPage() {
     return items.filter((row) => {
       const product = [row.product_code, row.product_name].filter(Boolean).join(' ').toLowerCase()
       const batch = (row.batch ?? row.lot_id ?? '').toString().toLowerCase()
-      const location = (row.location_code ?? row.location_id ?? '').toString().toLowerCase()
+      const fromLoc = (row.from_location_code ?? row.from_location_id ?? '').toString().toLowerCase()
+      const toLoc = (row.to_location_code ?? row.to_location_id ?? '').toString().toLowerCase()
       const who = (row.created_by_username ?? row.created_by_user_id ?? '').toString().toLowerCase()
-      return product.includes(q) || batch.includes(q) || location.includes(q) || who.includes(q)
+      return (
+        product.includes(q) ||
+        batch.includes(q) ||
+        fromLoc.includes(q) ||
+        toLoc.includes(q) ||
+        who.includes(q)
+      )
     })
   }, [items, searchQuery])
 
@@ -126,8 +119,8 @@ export function MovementPage() {
     if (items.length === 0) {
       return (
         <EmptyState
-          title={t('inventory:movements_empty')}
-          description={t('inventory:movements_empty_desc')}
+          title={t('admin:movement_page.empty_transfers')}
+          description={t('admin:movement_page.empty_transfers_desc')}
           actionLabel={t('common:buttons.refresh')}
           onAction={load}
         />
@@ -145,11 +138,12 @@ export function MovementPage() {
         <table className="min-w-full text-sm">
           <thead className="sticky top-0 z-10 bg-white text-xs uppercase text-slate-500 dark:bg-slate-900">
             <tr className="border-b border-slate-200 dark:border-slate-800">
-              <th className="px-4 py-3 text-left">{t('inventory:columns.movement_type')}</th>
-              <th className="px-4 py-3 text-left">{t('inventory:columns.qty')}</th>
+              <th className="px-4 py-3 text-left">{t('admin:movement_page.from')}</th>
+              <th className="px-2 py-3 text-center" aria-hidden />
+              <th className="px-4 py-3 text-left">{t('admin:movement_page.to')}</th>
+              <th className="px-4 py-3 text-left">{t('admin:movement_page.qty')}</th>
               <th className="px-4 py-3 text-left">{t('inventory:columns.product')}</th>
               <th className="px-4 py-3 text-left">{t('inventory:columns.lot')}</th>
-              <th className="px-4 py-3 text-left">{t('inventory:columns.location')}</th>
               <th className="px-4 py-3 text-left">{t('inventory:columns.created_by')}</th>
               <th className="px-4 py-3 text-left">{t('inventory:columns.created_at')}</th>
             </tr>
@@ -161,12 +155,17 @@ export function MovementPage() {
                 className="cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
                 onClick={() => setDetailRow(row)}
               >
-                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
-                  {movementTypeLabel(row)}
+                <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">
+                  {row.from_location_code ?? row.from_location_id}
+                </td>
+                <td className="px-2 py-3 text-slate-400">
+                  <ArrowRight size={16} className="mx-auto" aria-hidden />
+                </td>
+                <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">
+                  {row.to_location_code ?? row.to_location_id}
                 </td>
                 <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
-                  {row.qty_change > 0 ? '+' : ''}
-                  {Math.round(Number(row.qty_change))}
+                  {Math.round(Number(row.qty))}
                 </td>
                 <td className="max-w-[200px] px-4 py-3 text-slate-700 dark:text-slate-200">
                   {row.product_code != null || row.product_name != null ? (
@@ -179,9 +178,6 @@ export function MovementPage() {
                 </td>
                 <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
                   {row.batch ?? row.lot_id}
-                </td>
-                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
-                  {row.location_code ?? row.location_id}
                 </td>
                 <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
                   {row.created_by_username ?? row.created_by_user_id ?? '—'}
@@ -202,7 +198,7 @@ export function MovementPage() {
       <Card className="space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            {t('inventory:movements_title')}
+            {t('admin:movement_page.list_title')}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative min-w-[180px] flex-1 max-w-xs">
@@ -356,9 +352,32 @@ export function MovementPage() {
           />
           <div className="relative max-h-[90vh] w-full max-w-2xl overflow-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
             <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
-              {t('kamomat:detail.summary')} • {detailRow.id.slice(0, 8)}
+              {t('admin:movement_page.detail_title')}
             </h3>
             <dl className="space-y-2 text-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-medium text-slate-500 dark:text-slate-400">
+                  {t('admin:movement_page.from')}:
+                </span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">
+                  {detailRow.from_location_code ?? detailRow.from_location_id}
+                </span>
+                <ArrowRight size={16} className="text-slate-400" aria-hidden />
+                <span className="font-medium text-slate-500 dark:text-slate-400">
+                  {t('admin:movement_page.to')}:
+                </span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">
+                  {detailRow.to_location_code ?? detailRow.to_location_id}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-x-2">
+                <span className="font-medium text-slate-500 dark:text-slate-400">
+                  {t('admin:movement_page.qty')}:
+                </span>
+                <span className="text-slate-800 dark:text-slate-200">
+                  {Math.round(Number(detailRow.qty))}
+                </span>
+              </div>
               <div className="flex flex-wrap gap-x-2">
                 <span className="font-medium text-slate-500 dark:text-slate-400">
                   {t('kamomat:detail.product')}:
@@ -374,37 +393,6 @@ export function MovementPage() {
                 </span>
                 <span className="text-slate-800 dark:text-slate-200">
                   {detailRow.batch ?? detailRow.lot_id}
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-x-2">
-                <span className="font-medium text-slate-500 dark:text-slate-400">
-                  {t('kamomat:detail.location')}:
-                </span>
-                <span className="text-slate-800 dark:text-slate-200">
-                  {detailRow.location_code ?? detailRow.location_id}
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-x-2">
-                <span className="font-medium text-slate-500 dark:text-slate-400">
-                  {t('kamomat:detail.qty_change')}:
-                </span>
-                <span
-                  className={
-                    Number(detailRow.qty_change) < 0
-                      ? 'font-medium text-amber-600 dark:text-amber-400'
-                      : 'text-slate-800 dark:text-slate-200'
-                  }
-                >
-                  {Number(detailRow.qty_change) > 0 ? '+' : ''}
-                  {Math.round(Number(detailRow.qty_change))}
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-x-2">
-                <span className="font-medium text-slate-500 dark:text-slate-400">
-                  {t('kamomat:detail.action_type')}:
-                </span>
-                <span className="text-slate-800 dark:text-slate-200">
-                  {movementTypeLabel(detailRow)}
                 </span>
               </div>
               <div className="flex flex-wrap gap-x-2">
