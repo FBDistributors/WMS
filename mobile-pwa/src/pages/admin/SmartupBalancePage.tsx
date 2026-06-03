@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { FileSpreadsheet, Loader2, Check } from 'lucide-react'
+import { FileSpreadsheet, Loader2 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -88,12 +88,10 @@ export function SmartupBalanceView({ warehouseCode, filialId, customHeaderSlot }
   )
   const [data, setData] = useState<unknown>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const { showError } = useAppToast()
+  const { showError, showSuccess } = useAppToast()
   const [hasLoadError, setHasLoadError] = useState(false)
   const [visibleCount, setVisibleCount] = useState(INITIAL_PAGE_SIZE)
   const [isExporting, setIsExporting] = useState(false)
-  const [exportSuccessAt, setExportSuccessAt] = useState<number | null>(null)
-  const [exportSavedPath, setExportSavedPath] = useState<string | null>(null)
   const [cachedAt, setCachedAt] = useState<string | null>(null)
 
   const load = useCallback(async (forceRefresh = false) => {
@@ -199,22 +197,21 @@ export function SmartupBalanceView({ warehouseCode, filialId, customHeaderSlot }
         warehouseCode === '002'
           ? `smartup_bron_${dateStr}.xlsx`
           : `smartup_qoldiq_${dateStr}.xlsx`
-      const savedPath = await writeExcelFile(wb, fileName)
-      setExportSavedPath(savedPath)
-      setExportSuccessAt(Date.now())
+      await writeExcelFile(wb, fileName)
+      showSuccess(
+        `${t('inventory:export_success')}. ${t('inventory:export_success_hint')}`,
+        4000
+      )
+    } catch (err) {
+      showError(
+        `${t('inventory:export_failed')}: ${
+          err instanceof Error ? err.message : t('inventory:load_failed')
+        }`
+      )
     } finally {
       setIsExporting(false)
     }
-  }, [allRows, rawRows, warehouseCode])
-
-  useEffect(() => {
-    if (exportSuccessAt == null) return
-    const t = setTimeout(() => {
-      setExportSuccessAt(null)
-      setExportSavedPath(null)
-    }, 2500)
-    return () => clearTimeout(t)
-  }, [exportSuccessAt])
+  }, [allRows, rawRows, warehouseCode, t, showSuccess, showError])
 
   const content = useMemo(() => {
     if (isLoading) {
@@ -350,34 +347,6 @@ export function SmartupBalanceView({ warehouseCode, filialId, customHeaderSlot }
             </Button>
           </div>
         </div>
-        {exportSuccessAt !== null && (
-          <div
-            role="status"
-            className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
-          >
-            <Check size={18} className="shrink-0" />
-            <span>{t('inventory:export_success')}</span>
-            <span className="text-emerald-600 dark:text-emerald-300">·</span>
-            <span>{t('inventory:export_success_hint')}</span>
-            {exportSavedPath && (
-              <>
-                <span className="text-emerald-600 dark:text-emerald-300">·</span>
-                <button
-                  type="button"
-                  className="font-medium underline hover:no-underline"
-                  onClick={() => {
-                    if (!exportSavedPath) return
-                    import('@tauri-apps/plugin-shell')
-                      .then(({ open }) => open(exportSavedPath))
-                      .catch(() => {})
-                  }}
-                >
-                  {t('inventory:export_open_file')}
-                </button>
-              </>
-            )}
-          </div>
-        )}
         <div className="min-h-[min(70vh,600px)] max-h-[calc(100vh-220px)] flex flex-col overflow-auto">{content}</div>
       </Card>
     </AdminLayout>
