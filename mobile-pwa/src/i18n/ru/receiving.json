@@ -69,5 +69,10 @@
   "detail_col_code": "Код",
   "detail_col_barcode": "Штрихкод",
   "detail_col_product": "Товар",
-  "detail_col_qoldiq": "Остаток"
+  "detail_col_qoldiq": "Остаток",
+  "export_excel": "Скачать Excel",
+  "export_csv": "Скачать CSV",
+  "export_pdf": "Скачать PDF",
+  "export_failed": "Ошибка экспорта",
+  "export_success": "Файл загружен"
 }

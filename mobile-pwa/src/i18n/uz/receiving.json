@@ -69,5 +69,10 @@
   "detail_col_code": "Kod",
   "detail_col_barcode": "Barkod",
   "detail_col_product": "Mahsulot",
-  "detail_col_qoldiq": "Qoldiq"
+  "detail_col_qoldiq": "Qoldiq",
+  "export_excel": "Excelga yuklash",
+  "export_csv": "CSV yuklash",
+  "export_pdf": "PDF yuklash",
+  "export_failed": "Eksport xatosi",
+  "export_success": "Fayl yuklab olindi"
 }

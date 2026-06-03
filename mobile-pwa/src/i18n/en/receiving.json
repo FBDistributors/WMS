@@ -69,5 +69,10 @@
   "detail_col_code": "Code",
   "detail_col_barcode": "Barcode",
   "detail_col_product": "Product",
-  "detail_col_qoldiq": "On hand"
+  "detail_col_qoldiq": "On hand",
+  "export_excel": "Export to Excel",
+  "export_csv": "Export CSV",
+  "export_pdf": "Export PDF",
+  "export_failed": "Export failed",
+  "export_success": "File downloaded"
 }

@@ -14,6 +14,11 @@ import { getProducts, type Product } from '../../services/productsApi'
 import { getLocations, type Location } from '../../services/locationsApi'
 import { getInventorySummary } from '../../services/inventoryApi'
 import { formatExpiryDate } from '../../utils/expiry'
+import { ReceiptExportToolbar } from '../../admin/components/receiving/ReceiptExportToolbar'
+import {
+  buildReceiptExportLineRow,
+  type ReceiptExportContext,
+} from '../../utils/receiptExport'
 
 function formatReceiptDate(iso: string): string {
   try {
@@ -43,6 +48,8 @@ export function ReceivingDetailPage() {
   const [inventoryMap, setInventoryMap] = useState<Map<string, number>>(new Map())
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [exportSuccessAt, setExportSuccessAt] = useState<number | null>(null)
+  const [exportError, setExportError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!id) {
@@ -99,6 +106,51 @@ export function ReceivingDetailPage() {
     return new Map(locations.map((loc) => [loc.id, loc]))
   }, [locations])
 
+  const exportContext = useMemo((): ReceiptExportContext | null => {
+    if (!receipt) return null
+    const lines = receipt.lines.map((line) => {
+      const product = productLookup.get(line.product_id)
+      const loc = locationLookup.get(line.location_id)
+      const barcode =
+        product?.barcode || (product?.barcodes && product.barcodes[0]) || '—'
+      const qoldiq = inventoryMap.get(line.product_id) ?? '—'
+      return buildReceiptExportLineRow({
+        productSku: product?.sku,
+        productName: product?.name,
+        barcode,
+        qty: line.qty,
+        qoldiq,
+        batch: line.batch,
+        expiryDate: line.expiry_date,
+        locationCode: loc?.code ?? line.location_id,
+        productIdFallback: line.product_id,
+      })
+    })
+    return {
+      receipt,
+      statusLabel: t(`receiving:statuses.${receipt.status}`),
+      receivedAtFormatted: receipt.created_at
+        ? formatReceiptDate(receipt.created_at)
+        : '—',
+      lines,
+      labels: {
+        colDocNo: t('receiving:col_doc_no'),
+        status: t('receiving:status'),
+        receivedBy: t('receiving:received_by'),
+        receivedAt: t('receiving:received_at'),
+        detailLines: t('receiving:detail_lines'),
+        colCode: t('receiving:detail_col_code'),
+        colBarcode: t('receiving:detail_col_barcode'),
+        colProduct: t('receiving:detail_col_product'),
+        colQty: t('receiving:fields.qty'),
+        colQoldiq: t('receiving:detail_col_qoldiq'),
+        colBatch: t('receiving:fields.batch'),
+        colExpiry: t('receiving:fields.expiry_date'),
+        colLocation: t('receiving:fields.location'),
+      },
+    }
+  }, [receipt, productLookup, locationLookup, inventoryMap, t])
+
   if (isLoading) {
     return (
       <AdminLayout title={t('receiving:title')}>
@@ -127,42 +179,75 @@ export function ReceivingDetailPage() {
       backTo={`/admin/receiving${listQuery ? `?${listQuery}` : ''}`}
     >
       <Card className="space-y-4">
-        <div className="grid gap-3 text-sm sm:grid-cols-2 md:grid-cols-4">
-          <div>
-            <span className="text-slate-500 dark:text-slate-400">
-              {t('receiving:col_doc_no')}
-            </span>
-            <p className="font-medium text-slate-900 dark:text-slate-100">
-              {receipt.doc_no}
-            </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="grid flex-1 gap-3 text-sm sm:grid-cols-2 md:grid-cols-4">
+            <div>
+              <span className="text-slate-500 dark:text-slate-400">
+                {t('receiving:col_doc_no')}
+              </span>
+              <p className="font-medium text-slate-900 dark:text-slate-100">
+                {receipt.doc_no}
+              </p>
+            </div>
+            <div>
+              <span className="text-slate-500 dark:text-slate-400">
+                {t('receiving:status')}
+              </span>
+              <p className="font-medium text-slate-900 dark:text-slate-100">
+                {t(`receiving:statuses.${receipt.status}`)}
+              </p>
+            </div>
+            <div>
+              <span className="text-slate-500 dark:text-slate-400">
+                {t('receiving:received_by')}
+              </span>
+              <p className="font-medium text-slate-900 dark:text-slate-100">
+                {receipt.created_by_username ?? '—'}
+              </p>
+            </div>
+            <div>
+              <span className="text-slate-500 dark:text-slate-400">
+                {t('receiving:received_at')}
+              </span>
+              <p className="font-medium text-slate-900 dark:text-slate-100">
+                {receipt.created_at
+                  ? formatReceiptDate(receipt.created_at)
+                  : '—'}
+              </p>
+            </div>
           </div>
-          <div>
-            <span className="text-slate-500 dark:text-slate-400">
-              {t('receiving:status')}
-            </span>
-            <p className="font-medium text-slate-900 dark:text-slate-100">
-              {t(`receiving:statuses.${receipt.status}`)}
-            </p>
-          </div>
-          <div>
-            <span className="text-slate-500 dark:text-slate-400">
-              {t('receiving:received_by')}
-            </span>
-            <p className="font-medium text-slate-900 dark:text-slate-100">
-              {receipt.created_by_username ?? '—'}
-            </p>
-          </div>
-          <div>
-            <span className="text-slate-500 dark:text-slate-400">
-              {t('receiving:received_at')}
-            </span>
-            <p className="font-medium text-slate-900 dark:text-slate-100">
-              {receipt.created_at
-                ? formatReceiptDate(receipt.created_at)
-                : '—'}
-            </p>
-          </div>
+          {exportContext ? (
+            <ReceiptExportToolbar
+              ctx={exportContext}
+              onSuccess={() => {
+                setExportError(null)
+                setExportSuccessAt(Date.now())
+              }}
+              onError={(msg) => {
+                setExportSuccessAt(null)
+                setExportError(msg)
+              }}
+            />
+          ) : null}
         </div>
+
+        {exportSuccessAt !== null ? (
+          <div
+            role="status"
+            className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
+          >
+            {t('receiving:export_success')}
+          </div>
+        ) : null}
+
+        {exportError ? (
+          <div
+            role="alert"
+            className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-200"
+          >
+            {t('receiving:export_failed')}: {exportError}
+          </div>
+        ) : null}
 
         <div>
           <h3 className="mb-2 text-base font-semibold text-slate-900 dark:text-slate-100">
