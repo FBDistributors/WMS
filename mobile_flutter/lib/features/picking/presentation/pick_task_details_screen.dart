@@ -35,15 +35,23 @@ class _LineGroup {
   final List<PickingLine> members;
 }
 
-/// `_groupLinesByProduct` bilan bir xil — aksiya + asosiy qatorlarni bir guruhda sanash.
+/// `_groupLinesByProduct` bilan bir xil — asosiy va aksiya/sovg'a alohida guruh.
 String _lineGroupKey(PickingLine l) {
   if (l.isVipExpiryInformational) {
     return 'vip_info:${l.id}';
   }
+  final String src = (l.lineSource ?? 'product').trim();
   if (l.productId != null && l.productId!.isNotEmpty) {
-    return 'id:${l.productId}';
+    return 'id:${l.productId}:src:$src';
   }
-  return '${l.productName}|${l.barcode ?? l.sku ?? ''}';
+  return '${l.productName}|${l.barcode ?? l.sku ?? ''}|src:$src';
+}
+
+String? _lineSourceBadgeKey(PickingLine line) {
+  final String src = (line.lineSource ?? 'product').trim();
+  if (src == 'action') return 'lineSourceAction';
+  if (src == 'gift') return 'lineSourceGift';
+  return null;
 }
 
 bool _pickingLineEffectivelyDone(PickingLine l) =>
@@ -117,6 +125,7 @@ List<_LineGroup> _groupLinesByProduct(List<PickingLine> lines) {
       alternateLocations: first.alternateLocations,
       isVipExpiryInformational: first.isVipExpiryInformational,
       vipExpiryInformationKey: first.vipExpiryInformationKey,
+      lineSource: first.lineSource,
     );
     return _LineGroup(virtual: virtual, members: groupLines);
   }).toList(growable: false);
@@ -1942,12 +1951,32 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: <Widget>[
-                                    Text(
-                                      g.virtual.productName,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 15,
-                                      ),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 4,
+                                      crossAxisAlignment: WrapCrossAlignment.center,
+                                      children: <Widget>[
+                                        Text(
+                                          g.virtual.productName,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 15,
+                                          ),
+                                        ),
+                                        if (_lineSourceBadgeKey(g.virtual) != null)
+                                          Chip(
+                                            label: Text(
+                                              StringLookup.t(
+                                                loc,
+                                                _lineSourceBadgeKey(g.virtual)!,
+                                              ),
+                                            ),
+                                            visualDensity: VisualDensity.compact,
+                                            padding: EdgeInsets.zero,
+                                            materialTapTargetSize:
+                                                MaterialTapTargetSize.shrinkWrap,
+                                          ),
+                                      ],
                                     ),
                                     const SizedBox(height: 4),
                                     Text(

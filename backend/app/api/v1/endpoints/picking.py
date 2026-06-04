@@ -73,6 +73,10 @@ class PickingLine(BaseModel):
         default=None,
         description="Mijoz uchun i18n kalit, masalan vip_expiry_not_picked",
     )
+    line_source: Optional[str] = Field(
+        default="product",
+        description="product | action | gift — SmartUP buyurtma qatori manbasi",
+    )
 
 
 class PickingProgress(BaseModel):
@@ -486,6 +490,7 @@ def _to_picking_line(
         alternate_locations=list(alternate_locations or []),
         is_vip_expiry_informational=is_vip_info,
         vip_expiry_information_key="vip_expiry_not_picked" if is_vip_info else None,
+        line_source=(getattr(line, "line_source", None) or "product").strip(),
     )
 
 

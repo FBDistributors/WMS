@@ -621,7 +621,8 @@ def _allocate_order(
 
         remaining = Decimal(str(line.qty))
         allocated_total = Decimal("0")
-        is_promo = (getattr(line, "line_source", None) or "product") in ("gift", "action")
+        line_source = (getattr(line, "line_source", None) or "product").strip()
+        is_promo = line_source in ("gift", "action")
 
         if is_promo:
             lot_phases = [
@@ -666,6 +667,7 @@ def _allocate_order(
                         required_qty=float(allocate_qty),
                         picked_qty=0,
                         is_vip_expiry_informational=False,
+                        line_source=line_source,
                     )
                 )
                 db.add(
@@ -704,6 +706,7 @@ def _allocate_order(
                         required_qty=float(remaining_need),
                         picked_qty=0,
                         is_vip_expiry_informational=True,
+                        line_source=line_source,
                     )
                 )
             else:

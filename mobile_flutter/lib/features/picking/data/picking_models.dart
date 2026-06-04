@@ -58,6 +58,7 @@ class PickingLine {
     required this.alternateLocations,
     this.isVipExpiryInformational = false,
     this.vipExpiryInformationKey,
+    this.lineSource = 'product',
   });
 
   final String id;
@@ -75,6 +76,8 @@ class PickingLine {
   /// VIP muddat: faqat ma'lumot, terilmaydi (backend `is_vip_expiry_informational`).
   final bool isVipExpiryInformational;
   final String? vipExpiryInformationKey;
+  /// product | action | gift
+  final String? lineSource;
 
   factory PickingLine.fromJson(Map<String, Object?> json) {
     final Object? alts = json['alternate_locations'];
@@ -101,6 +104,9 @@ class PickingLine {
       alternateLocations: list,
       isVipExpiryInformational: json['is_vip_expiry_informational'] == true,
       vipExpiryInformationKey: json['vip_expiry_information_key'] as String?,
+      lineSource: (json['line_source'] as String?)?.trim().isNotEmpty == true
+          ? (json['line_source'] as String).trim()
+          : 'product',
     );
   }
 
@@ -120,6 +126,7 @@ class PickingLine {
             alternateLocations.map((PickingAlternateLocation a) => a.toJson()).toList(),
         'is_vip_expiry_informational': isVipExpiryInformational,
         'vip_expiry_information_key': vipExpiryInformationKey,
+        'line_source': lineSource ?? 'product',
       };
 }
 

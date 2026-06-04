@@ -115,6 +115,7 @@ class DocumentLine(Base):
         default=False,
         server_default=text("false"),
     )
+    line_source: Mapped[str | None] = mapped_column(String(16), nullable=True, default="product")
 
     document: Mapped[Document] = relationship("Document", back_populates="lines")
 
