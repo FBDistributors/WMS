@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ArrowRight, ChevronLeft, ChevronRight, Filter, RefreshCw, Search, Settings, X } from 'lucide-react'
+import { ArrowRight, Filter, RefreshCw, Search, Settings, X } from 'lucide-react'
 
+import { AdminDataTable, type AdminDataTableColumn } from '../../admin/components/AdminDataTable'
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { AdminTablePagination } from '../../admin/components/AdminTablePagination'
 import { MovementTableSettings } from '../../admin/components/movement/MovementTableSettings'
 import { ReceiptListExportToolbar } from '../../admin/components/receiving/ReceiptListExportToolbar'
 import type { ExportFormat } from '../../admin/components/receiving/ExportFormatDropdown'
@@ -13,7 +15,6 @@ import {
   type MovementTableColumnId,
 } from '../../admin/hooks/useMovementTableConfig'
 import { DateInput } from '../../components/DateInput'
-import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -42,10 +43,6 @@ function formatIsoDate(d: Date): string {
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
 }
-
-const TH_CLASS =
-  'text-left py-2.5 px-3 text-xs font-bold uppercase tracking-wide text-slate-700 dark:text-slate-300 align-middle whitespace-nowrap'
-const TD_BASE = 'py-2.5 px-3 align-middle text-sm text-slate-900 dark:text-slate-100'
 
 function movementThWidth(col: MovementTableColumnId): string | undefined {
   const widths: Partial<Record<MovementTableColumnId, string>> = {
@@ -221,6 +218,16 @@ export function MovementPage() {
     )
   }, [tableConfig.columnOrder, tableConfig.visibleColumns])
 
+  const tableColumns = useMemo((): AdminDataTableColumn<WarehouseTransfer>[] => {
+    return orderedVisibleColumns.map((colId) => ({
+      id: colId,
+      header: columnOptions.find((c) => c.id === colId)?.label ?? colId,
+      width: movementThWidth(colId),
+      align: colId === 'qty' ? 'right' : 'left',
+      cell: (row) => renderMovementCell(colId, row),
+    }))
+  }, [orderedVisibleColumns, columnOptions])
+
   const buildExportFilterSummary = useCallback((): string[] => {
     const parts: string[] = []
     if (dateFrom.trim() || dateTo.trim()) {
@@ -330,61 +337,15 @@ export function MovementPage() {
       )
     }
     return (
-      <div className="relative">
-        {isRefreshing ? (
-          <div className="pointer-events-none absolute inset-0 z-20 flex items-start justify-center bg-white/40 pt-8 dark:bg-slate-950/40">
-            <LoadingOverlay label={t('common:messages.loading')} />
-          </div>
-        ) : null}
-        <TableScrollArea>
-          <table className="w-full min-w-[56rem] border-collapse text-sm table-fixed">
-            <colgroup>
-              {orderedVisibleColumns.map((colId) => (
-                <col key={colId} style={{ width: movementThWidth(colId) }} />
-              ))}
-            </colgroup>
-            <thead className="bg-slate-50 dark:bg-slate-800/60">
-              <tr className="border-b border-slate-200 dark:border-slate-700">
-                {orderedVisibleColumns.map((colId) => {
-                  const label = columnOptions.find((c) => c.id === colId)?.label ?? colId
-                  const alignRight = colId === 'qty'
-                  return (
-                    <th
-                      key={colId}
-                      className={`${TH_CLASS}${alignRight ? ' text-right' : ''}`}
-                    >
-                      {label}
-                    </th>
-                  )
-                })}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredItems.map((row, rowIndex) => (
-                <tr
-                  key={row.id}
-                  className={`cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50 ${
-                    rowIndex % 2 === 1 ? 'bg-slate-50/50 dark:bg-slate-800/30' : ''
-                  }`}
-                  onClick={() => setDetailRow(row)}
-                >
-                  {orderedVisibleColumns.map((colId) => {
-                    const alignRight = colId === 'qty'
-                    return (
-                      <td
-                        key={colId}
-                        className={`${TD_BASE}${alignRight ? ' text-right' : ''}`}
-                      >
-                        {renderMovementCell(colId, row)}
-                      </td>
-                    )
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </TableScrollArea>
-      </div>
+      <AdminDataTable
+        columns={tableColumns}
+        rows={filteredItems}
+        getRowKey={(row) => row.id}
+        minWidth="min-w-[56rem]"
+        onRowClick={setDetailRow}
+        refreshing={isRefreshing}
+        refreshingLabel={t('common:messages.loading')}
+      />
     )
   }
 
@@ -528,51 +489,29 @@ export function MovementPage() {
           </div>
         </div>
         {tableBody()}
-        {!showInitialLoading && totalTransfers > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-3 dark:border-slate-700">
-            <span className="text-sm text-slate-600 dark:text-slate-400">
-              {t('receiving:pagination_range', {
-                from: totalTransfers > 0 ? offset + 1 : 0,
-                to: Math.min(offset + PAGE_SIZE, totalTransfers),
-                total: totalTransfers,
-              })}
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  const newOffset = Math.max(0, offset - PAGE_SIZE)
-                  setSearchParams((prev) => {
-                    const next = new URLSearchParams(prev)
-                    if (newOffset > 0) next.set('offset', String(newOffset))
-                    else next.delete('offset')
-                    return next
-                  })
-                }}
-                disabled={offset === 0}
-                className="gap-1"
-              >
-                <ChevronLeft size={16} />
-                {t('receiving:prev_page')}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSearchParams((prev) => {
-                    const next = new URLSearchParams(prev)
-                    next.set('offset', String(offset + PAGE_SIZE))
-                    return next
-                  })
-                }}
-                disabled={offset + PAGE_SIZE >= totalTransfers}
-                className="gap-1"
-              >
-                {t('receiving:next_page')}
-                <ChevronRight size={16} />
-              </Button>
-            </div>
-          </div>
-        )}
+        {!showInitialLoading && totalTransfers > 0 ? (
+          <AdminTablePagination
+            offset={offset}
+            pageSize={PAGE_SIZE}
+            total={totalTransfers}
+            onPrev={() => {
+              const newOffset = Math.max(0, offset - PAGE_SIZE)
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev)
+                if (newOffset > 0) next.set('offset', String(newOffset))
+                else next.delete('offset')
+                return next
+              })
+            }}
+            onNext={() => {
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev)
+                next.set('offset', String(offset + PAGE_SIZE))
+                return next
+              })
+            }}
+          />
+        ) : null}
       </Card>
 
       <MovementTableSettings

@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Filter, Plus, Search, Settings, Trash2, X } from 'lucide-react'
+import { Filter, Plus, Search, Settings, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { AdminDataTable, type AdminDataTableColumn } from '../../admin/components/AdminDataTable'
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { AdminTablePagination } from '../../admin/components/AdminTablePagination'
 import { ReceiptListExportToolbar } from '../../admin/components/receiving/ReceiptListExportToolbar'
 import { ReceivingTableSettings } from '../../admin/components/receiving/ReceivingTableSettings'
 import {
@@ -21,7 +23,6 @@ import { DateInput } from '../../components/DateInput'
 import { MonthYearInput } from '../../components/MonthYearInput'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
-import { TableScrollArea } from '../../components/TableScrollArea'
 import { getProducts, type Product } from '../../services/productsApi'
 import { getLocations, type Location } from '../../services/locationsApi'
 import { getBrands, type Brand } from '../../services/brandsApi'
@@ -72,10 +73,6 @@ type FlatReceiptTableRow = ReceiptListExportRow & {
   lineId: string
   showComplete: boolean
 }
-
-const TH_CLASS =
-  'text-left py-2.5 px-3 text-xs font-bold uppercase tracking-wide text-slate-700 dark:text-slate-300 align-middle whitespace-nowrap'
-const TD_BASE = 'py-2.5 px-3 align-middle text-sm text-slate-900 dark:text-slate-100'
 
 function receivingThWidth(col: ReceivingTableColumnId): string | undefined {
   const widths: Partial<Record<ReceivingTableColumnId, string>> = {
@@ -627,6 +624,16 @@ export function ReceivingPage() {
     [canAdminReceiveOps, handleComplete, isSubmitting, t]
   )
 
+  const tableColumns = useMemo((): AdminDataTableColumn<FlatReceiptTableRow>[] => {
+    return orderedVisibleColumns.map((colId) => ({
+      id: colId,
+      header: columnOptions.find((c) => c.id === colId)?.label ?? colId,
+      width: receivingThWidth(colId),
+      align: colId === 'qty' || colId === 'qoldiq' ? 'right' : 'left',
+      cell: (row) => renderReceivingCell(colId, row),
+    }))
+  }, [orderedVisibleColumns, columnOptions, renderReceivingCell])
+
   const createForm = (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -1015,98 +1022,35 @@ export function ReceivingPage() {
             description={t('receiving:table.columns_hint')}
           />
         ) : (
-          <TableScrollArea>
-            <table className="w-full min-w-[64rem] border-collapse text-sm table-fixed">
-              <colgroup>
-                {orderedVisibleColumns.map((colId) => (
-                  <col key={colId} style={{ width: receivingThWidth(colId) }} />
-                ))}
-              </colgroup>
-              <thead className="bg-slate-50 dark:bg-slate-800/60">
-                <tr className="border-b border-slate-200 dark:border-slate-700">
-                  {orderedVisibleColumns.map((colId) => {
-                    const label = columnOptions.find((c) => c.id === colId)?.label ?? colId
-                    const alignRight = colId === 'qty' || colId === 'qoldiq'
-                    return (
-                      <th
-                        key={colId}
-                        className={`${TH_CLASS}${alignRight ? ' text-right' : ''}`}
-                      >
-                        {label}
-                      </th>
-                    )
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {flatRows.map((row, rowIndex) => (
-                  <tr
-                    key={`${row.receiptId}-${row.lineId}`}
-                    className={`border-b border-slate-100 dark:border-slate-800 ${
-                      rowIndex % 2 === 1 ? 'bg-slate-50/50 dark:bg-slate-800/30' : ''
-                    }`}
-                  >
-                    {orderedVisibleColumns.map((colId) => {
-                      const alignRight = colId === 'qty' || colId === 'qoldiq'
-                      return (
-                        <td
-                          key={colId}
-                          className={`${TD_BASE}${alignRight ? ' text-right' : ''}`}
-                        >
-                          {renderReceivingCell(colId, row)}
-                        </td>
-                      )
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableScrollArea>
+          <AdminDataTable
+            columns={tableColumns}
+            rows={flatRows}
+            getRowKey={(row) => `${row.receiptId}-${row.lineId}`}
+            minWidth="min-w-[64rem]"
+          />
         )}
-        {!isLoading && totalReceipts > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-3 dark:border-slate-700">
-            <span className="text-sm text-slate-600 dark:text-slate-400">
-              {t('receiving:pagination_range', {
-                from: offset + 1,
-                to: Math.min(offset + PAGE_SIZE, totalReceipts),
-                total: totalReceipts,
-              })}
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  const newOffset = Math.max(0, offset - PAGE_SIZE)
-                  setSearchParams((prev) => {
-                    const next = new URLSearchParams(prev)
-                    next.set('offset', String(newOffset))
-                    return next
-                  })
-                }}
-                disabled={offset === 0}
-                className="gap-1"
-              >
-                <ChevronLeft size={16} />
-                {t('receiving:prev_page')}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSearchParams((prev) => {
-                    const next = new URLSearchParams(prev)
-                    next.set('offset', String(offset + PAGE_SIZE))
-                    return next
-                  })
-                }}
-                disabled={offset + PAGE_SIZE >= totalReceipts}
-                className="gap-1"
-              >
-                {t('receiving:next_page')}
-                <ChevronRight size={16} />
-              </Button>
-            </div>
-          </div>
-        )}
+        {!isLoading && totalReceipts > 0 ? (
+          <AdminTablePagination
+            offset={offset}
+            pageSize={PAGE_SIZE}
+            total={totalReceipts}
+            onPrev={() => {
+              const newOffset = Math.max(0, offset - PAGE_SIZE)
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev)
+                next.set('offset', String(newOffset))
+                return next
+              })
+            }}
+            onNext={() => {
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev)
+                next.set('offset', String(offset + PAGE_SIZE))
+                return next
+              })
+            }}
+          />
+        ) : null}
       </Card>
       <ReceivingTableSettings
         open={isTableSettingsOpen}
