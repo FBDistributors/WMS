@@ -71,7 +71,31 @@
     "move_entire_location_submit": "Переместить всё",
     "move_entire_location_success": "Перемещено {{count}} позиций",
     "move_entire_location_error": "Ошибка перемещения",
-    "move_entire_location_empty": "В этой локации нет товаров для перемещения"
+    "move_entire_location_empty": "В этой локации нет товаров для перемещения",
+    "col_code": "Код товара",
+    "col_barcode": "Штрихкод",
+    "col_product": "Товар",
+    "export_download": "Скачать",
+    "export_excel": "Скачать Excel",
+    "export_csv": "Скачать CSV",
+    "export_pdf": "Скачать PDF",
+    "export_failed": "Ошибка экспорта",
+    "export_success": "Файл загружен",
+    "export_list_title": "Перемещения между локациями",
+    "export_filter_applied": "Фильтры",
+    "export_rows_count": "Количество строк",
+    "export_fetching": "Сбор данных…",
+    "export_filter_date": "Дата",
+    "export_filter_search": "Поиск",
+    "export_filter_none": "Без фильтра",
+    "export_too_large": "Экспорт слишком большой. Сузьте фильтр.",
+    "table": {
+      "settings_title": "Настройки таблицы",
+      "columns_title": "Столбцы",
+      "columns_hint": "Выберите видимые столбцы и измените порядок.",
+      "reset_default": "Сброс",
+      "save_settings": "Сохранить"
+    }
   },
   "settings_hub": {
     "title": "Настройки",

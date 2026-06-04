@@ -71,7 +71,31 @@
     "move_entire_location_submit": "Move all",
     "move_entire_location_success": "{{count}} item(s) moved",
     "move_entire_location_error": "Move failed",
-    "move_entire_location_empty": "No products to move at this location"
+    "move_entire_location_empty": "No products to move at this location",
+    "col_code": "Product code",
+    "col_barcode": "Barcode",
+    "col_product": "Product",
+    "export_download": "Download",
+    "export_excel": "Export to Excel",
+    "export_csv": "Export CSV",
+    "export_pdf": "Export PDF",
+    "export_failed": "Export failed",
+    "export_success": "File downloaded",
+    "export_list_title": "Location-to-location transfers",
+    "export_filter_applied": "Filters",
+    "export_rows_count": "Row count",
+    "export_fetching": "Gathering data…",
+    "export_filter_date": "Date",
+    "export_filter_search": "Search",
+    "export_filter_none": "No filter",
+    "export_too_large": "Export is too large. Narrow your filters.",
+    "table": {
+      "settings_title": "Table settings",
+      "columns_title": "Columns",
+      "columns_hint": "Choose visible columns and drag to reorder.",
+      "reset_default": "Reset",
+      "save_settings": "Save"
+    }
   },
   "settings_hub": {
     "title": "Settings",

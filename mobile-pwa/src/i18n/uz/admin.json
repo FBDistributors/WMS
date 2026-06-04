@@ -71,7 +71,31 @@
     "move_entire_location_submit": "Barchasini ko'chirish",
     "move_entire_location_success": "{{count}} ta pozitsiya ko'chirildi",
     "move_entire_location_error": "Ko'chirishda xato",
-    "move_entire_location_empty": "Bu joyda ko'chiriladigan mahsulot yo'q"
+    "move_entire_location_empty": "Bu joyda ko'chiriladigan mahsulot yo'q",
+    "col_code": "Mahsulot kodi",
+    "col_barcode": "Shtrix kod",
+    "col_product": "Mahsulot",
+    "export_download": "Yuklab olish",
+    "export_excel": "Excelga yuklash",
+    "export_csv": "CSV yuklash",
+    "export_pdf": "PDF yuklash",
+    "export_failed": "Eksport xatosi",
+    "export_success": "Fayl yuklab olindi",
+    "export_list_title": "Joydan-joyga ko'chirishlar",
+    "export_filter_applied": "Filtrlar",
+    "export_rows_count": "Qatorlar soni",
+    "export_fetching": "Ma'lumot yig'ilmoqda…",
+    "export_filter_date": "Sana",
+    "export_filter_search": "Qidiruv",
+    "export_filter_none": "Filtr yo'q",
+    "export_too_large": "Eksport hajmi juda katta. Filterni toraytiring.",
+    "table": {
+      "settings_title": "Jadval sozlamalari",
+      "columns_title": "Ustunlar",
+      "columns_hint": "Ko'rinadigan ustunlarni tanlang va tartibini o'zgartiring.",
+      "reset_default": "Standart",
+      "save_settings": "Saqlash"
+    }
   },
   "settings_hub": {
     "title": "Sozlamalar",

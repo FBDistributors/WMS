@@ -385,6 +385,7 @@ export type WarehouseTransfer = {
   product_id: string
   product_code?: string | null
   product_name?: string | null
+  product_barcode?: string | null
   lot_id: string
   batch?: string | null
   qty: number
@@ -399,6 +400,11 @@ export type WarehouseTransfer = {
   movement_in_id: string
 }
 
+export type WarehouseTransferListResponse = {
+  items: WarehouseTransfer[]
+  total: number
+}
+
 export type WarehouseTransfersQuery = {
   date_from?: string
   date_to?: string
@@ -406,10 +412,66 @@ export type WarehouseTransfersQuery = {
   offset?: number
 }
 
-export async function getWarehouseTransfers(query: WarehouseTransfersQuery = {}) {
-  return fetchJSON<WarehouseTransfer[]>('/api/v1/inventory/movements/warehouse-transfers', {
-    query,
+const WAREHOUSE_TRANSFERS_CACHE_TTL_MS = 30_000
+const warehouseTransfersCache = new Map<
+  string,
+  { at: number; data: WarehouseTransferListResponse }
+>()
+
+function warehouseTransfersCacheKey(query: WarehouseTransfersQuery): string {
+  return JSON.stringify({
+    date_from: query.date_from ?? '',
+    date_to: query.date_to ?? '',
+    limit: query.limit ?? 50,
+    offset: query.offset ?? 0,
   })
+}
+
+export function clearWarehouseTransfersClientCache(): void {
+  warehouseTransfersCache.clear()
+}
+
+export async function getWarehouseTransfers(
+  query: WarehouseTransfersQuery = {},
+  options?: { forceRefresh?: boolean }
+): Promise<WarehouseTransferListResponse> {
+  const key = warehouseTransfersCacheKey(query)
+  if (!options?.forceRefresh) {
+    const hit = warehouseTransfersCache.get(key)
+    if (hit && Date.now() - hit.at < WAREHOUSE_TRANSFERS_CACHE_TTL_MS) {
+      return hit.data
+    }
+  }
+  const raw = await fetchJSON<WarehouseTransferListResponse | WarehouseTransfer[]>(
+    '/api/v1/inventory/movements/warehouse-transfers',
+    { query }
+  )
+  const data: WarehouseTransferListResponse = Array.isArray(raw)
+    ? { items: raw, total: raw.length }
+    : { items: raw.items ?? [], total: raw.total ?? 0 }
+  warehouseTransfersCache.set(key, { at: Date.now(), data })
+  return data
+}
+
+export async function fetchAllWarehouseTransfers(
+  query: Omit<WarehouseTransfersQuery, 'limit' | 'offset'> = {}
+): Promise<WarehouseTransfer[]> {
+  const pageSize = 200
+  const all: WarehouseTransfer[] = []
+  let offset = 0
+  let total = Number.POSITIVE_INFINITY
+  while (offset < total) {
+    const page = await getWarehouseTransfers(
+      { ...query, limit: pageSize, offset },
+      { forceRefresh: true }
+    )
+    all.push(...page.items)
+    total = page.total
+    if (page.items.length < pageSize) break
+    offset += pageSize
+    if (offset > 10_000) break
+  }
+  return all
 }
 
 export async function getReserveHistory(query: ReserveHistoryQuery = {}) {

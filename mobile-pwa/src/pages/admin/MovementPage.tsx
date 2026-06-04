@@ -1,9 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ArrowRight, Filter, Search, X } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight, Filter, RefreshCw, Search, Settings, X } from 'lucide-react'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { MovementTableSettings } from '../../admin/components/movement/MovementTableSettings'
+import { ReceiptListExportToolbar } from '../../admin/components/receiving/ReceiptListExportToolbar'
+import type { ExportFormat } from '../../admin/components/receiving/ExportFormatDropdown'
+import {
+  useMovementTableConfig,
+  MOVEMENT_TABLE_COLUMN_IDS,
+  type MovementTableColumnId,
+} from '../../admin/hooks/useMovementTableConfig'
 import { DateInput } from '../../components/DateInput'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
@@ -11,13 +19,81 @@ import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { useAppToast } from '../../feedback/useAppToast'
-import { getWarehouseTransfers, type WarehouseTransfer } from '../../services/inventoryApi'
+import { formatUnknownError } from '../../lib/formatUnknownError'
+import {
+  clearWarehouseTransfersClientCache,
+  fetchAllWarehouseTransfers,
+  getWarehouseTransfers,
+  type WarehouseTransfer,
+} from '../../services/inventoryApi'
+import {
+  buildTransferListExportLabels,
+  buildTransferListExportRows,
+  filterTransfersBySearch,
+  runTransferListExport,
+  TransferExportTooLargeError,
+} from '../../utils/transferListExport'
 
 const PAGE_SIZE = 50
 
+function formatIsoDate(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+const TH_CLASS =
+  'text-left py-2.5 px-3 text-xs font-bold uppercase tracking-wide text-slate-700 dark:text-slate-300 align-middle whitespace-nowrap'
+const TD_BASE = 'py-2.5 px-3 align-middle text-sm text-slate-900 dark:text-slate-100'
+
+function movementThWidth(col: MovementTableColumnId): string | undefined {
+  const widths: Partial<Record<MovementTableColumnId, string>> = {
+    from: '6rem',
+    to: '6rem',
+    qty: '4rem',
+    code: '5.5rem',
+    barcode: '9rem',
+    product: '16rem',
+    batch: '6rem',
+    created_by: '8rem',
+    created_at: '9rem',
+  }
+  return widths[col]
+}
+
+function renderMovementCell(colId: MovementTableColumnId, row: WarehouseTransfer): ReactNode {
+  switch (colId) {
+    case 'from':
+      return row.from_location_code ?? row.from_location_id
+    case 'to':
+      return row.to_location_code ?? row.to_location_id
+    case 'qty':
+      return Math.round(Number(row.qty))
+    case 'code':
+      return row.product_code ?? '—'
+    case 'barcode':
+      return row.product_barcode ?? '—'
+    case 'product':
+      return (
+        <span className="block truncate max-w-[16rem]" title={row.product_name ?? undefined}>
+          {row.product_name ?? row.product_id}
+        </span>
+      )
+    case 'batch':
+      return row.batch ?? row.lot_id
+    case 'created_by':
+      return row.created_by_username ?? row.created_by_user_id ?? '—'
+    case 'created_at':
+      return new Date(row.created_at).toLocaleString()
+    default:
+      return '—'
+  }
+}
+
 /** Admin Ko'chirish: joydan-joyga o'tkazmalar jadvali (Qabul uslubi). */
 export function MovementPage() {
-  const { t } = useTranslation(['admin', 'common', 'inventory', 'kamomat'])
+  const { t } = useTranslation(['admin', 'common', 'inventory', 'kamomat', 'receiving'])
   const [searchParams, setSearchParams] = useSearchParams()
   const searchQuery = searchParams.get('q') ?? ''
   const dateFrom = searchParams.get('date_from') ?? ''
@@ -27,12 +103,41 @@ export function MovementPage() {
   const [filterDateFrom, setFilterDateFrom] = useState(dateFrom)
   const [filterDateTo, setFilterDateTo] = useState(dateTo)
   const [items, setItems] = useState<WarehouseTransfer[]>([])
+  const [totalTransfers, setTotalTransfers] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
-  const { showError } = useAppToast()
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const { showError, showSuccess, showInfo } = useAppToast()
   const [hasLoadError, setHasLoadError] = useState(false)
   const [detailRow, setDetailRow] = useState<WarehouseTransfer | null>(null)
   const [filterPanelOpen, setFilterPanelOpen] = useState(false)
+  const [isTableSettingsOpen, setIsTableSettingsOpen] = useState(false)
   const filterPanelRef = useRef<HTMLDivElement>(null)
+  const defaultDatesApplied = useRef(false)
+  const hasLoadedOnceRef = useRef(false)
+
+  const { config: tableConfig, updateConfig: updateTableConfig, resetConfig: resetTableConfig } =
+    useMovementTableConfig()
+
+  useEffect(() => {
+    if (defaultDatesApplied.current) return
+    if (dateFrom.trim() || dateTo.trim()) {
+      defaultDatesApplied.current = true
+      return
+    }
+    defaultDatesApplied.current = true
+    const to = new Date()
+    const from = new Date()
+    from.setDate(from.getDate() - 7)
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.set('date_from', formatIsoDate(from))
+        next.set('date_to', formatIsoDate(to))
+        return next
+      },
+      { replace: true }
+    )
+  }, [dateFrom, dateTo, setSearchParams])
 
   useEffect(() => {
     if (!filterPanelOpen) return
@@ -40,51 +145,130 @@ export function MovementPage() {
     setFilterDateTo(dateTo)
   }, [filterPanelOpen, dateFrom, dateTo])
 
-  const load = useCallback(async () => {
-    setIsLoading(true)
-    setHasLoadError(false)
-    try {
-      const data = await getWarehouseTransfers({
-        date_from: dateFrom.trim() || undefined,
-        date_to: dateTo.trim() || undefined,
-        limit: PAGE_SIZE,
-        offset,
-      })
-      setItems(data)
-    } catch (err) {
-      showError(err instanceof Error ? err.message : t('inventory:load_failed'))
-      setHasLoadError(true)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [dateFrom, dateTo, offset, showError, t])
+  const load = useCallback(
+    async (opts?: { forceRefresh?: boolean }) => {
+      if (!hasLoadedOnceRef.current) setIsLoading(true)
+      else setIsRefreshing(true)
+      setHasLoadError(false)
+      try {
+        const { items: pageItems, total } = await getWarehouseTransfers(
+          {
+            date_from: dateFrom.trim() || undefined,
+            date_to: dateTo.trim() || undefined,
+            limit: PAGE_SIZE,
+            offset,
+          },
+          { forceRefresh: opts?.forceRefresh }
+        )
+        setItems(pageItems)
+        setTotalTransfers(total)
+        hasLoadedOnceRef.current = true
+      } catch (err) {
+        showError(err instanceof Error ? err.message : t('inventory:load_failed'))
+        setHasLoadError(true)
+      } finally {
+        setIsLoading(false)
+        setIsRefreshing(false)
+      }
+    },
+    [dateFrom, dateTo, offset, showError, t]
+  )
 
   useEffect(() => {
     void load()
   }, [load])
 
+  const handleRefresh = useCallback(() => {
+    clearWarehouseTransfersClientCache()
+    void load({ forceRefresh: true })
+  }, [load])
+
   const filteredItems = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-    if (!q) return items
-    return items.filter((row) => {
-      const product = [row.product_code, row.product_name].filter(Boolean).join(' ').toLowerCase()
-      const batch = (row.batch ?? row.lot_id ?? '').toString().toLowerCase()
-      const fromLoc = (row.from_location_code ?? row.from_location_id ?? '').toString().toLowerCase()
-      const toLoc = (row.to_location_code ?? row.to_location_id ?? '').toString().toLowerCase()
-      const who = (row.created_by_username ?? row.created_by_user_id ?? '').toString().toLowerCase()
-      return (
-        product.includes(q) ||
-        batch.includes(q) ||
-        fromLoc.includes(q) ||
-        toLoc.includes(q) ||
-        who.includes(q)
-      )
-    })
+    return filterTransfersBySearch(items, searchQuery)
   }, [items, searchQuery])
 
-  const hasNextPage = items.length >= PAGE_SIZE
-  const pageStart = items.length > 0 ? offset + 1 : 0
-  const pageEnd = offset + items.length
+  const columnOptions = useMemo(
+    () =>
+      MOVEMENT_TABLE_COLUMN_IDS.map((id) => ({
+        id,
+        label:
+          id === 'from'
+            ? t('admin:movement_page.from')
+            : id === 'to'
+              ? t('admin:movement_page.to')
+              : id === 'qty'
+                ? t('admin:movement_page.qty')
+                : id === 'code'
+                  ? t('admin:movement_page.col_code')
+                  : id === 'barcode'
+                    ? t('admin:movement_page.col_barcode')
+                    : id === 'product'
+                      ? t('admin:movement_page.col_product')
+                      : id === 'batch'
+                        ? t('inventory:columns.lot')
+                        : id === 'created_by'
+                          ? t('inventory:columns.created_by')
+                          : t('inventory:columns.created_at'),
+      })),
+    [t]
+  )
+
+  const orderedVisibleColumns = useMemo(() => {
+    const visible = new Set(tableConfig.visibleColumns)
+    return tableConfig.columnOrder.filter(
+      (id): id is MovementTableColumnId =>
+        MOVEMENT_TABLE_COLUMN_IDS.includes(id as MovementTableColumnId) && visible.has(id)
+    )
+  }, [tableConfig.columnOrder, tableConfig.visibleColumns])
+
+  const buildExportFilterSummary = useCallback((): string[] => {
+    const parts: string[] = []
+    if (dateFrom.trim() || dateTo.trim()) {
+      parts.push(
+        `${t('admin:movement_page.export_filter_date')}: ${dateFrom.trim() || '…'} – ${dateTo.trim() || '…'}`
+      )
+    }
+    if (searchQuery.trim()) {
+      parts.push(`${t('admin:movement_page.export_filter_search')}: ${searchQuery.trim()}`)
+    }
+    if (parts.length === 0) {
+      parts.push(t('admin:movement_page.export_filter_none'))
+    }
+    return parts
+  }, [t, dateFrom, dateTo, searchQuery])
+
+  const handleListExport = useCallback(
+    async (kind: ExportFormat) => {
+      showInfo(t('admin:movement_page.export_fetching'), 4000)
+      try {
+        const all = await fetchAllWarehouseTransfers({
+          date_from: dateFrom.trim() || undefined,
+          date_to: dateTo.trim() || undefined,
+        })
+        const filtered = filterTransfersBySearch(all, searchQuery)
+        if (filtered.length === 0) {
+          throw new Error(t('admin:movement_page.search_no_results'))
+        }
+        const rows = buildTransferListExportRows(filtered)
+        const ctx = {
+          title: t('admin:movement_page.export_list_title'),
+          filterSummaryLines: buildExportFilterSummary(),
+          rows,
+          labels: buildTransferListExportLabels(t),
+        }
+        await runTransferListExport(kind, ctx)
+        showSuccess(t('admin:movement_page.export_success'))
+      } catch (err) {
+        if (err instanceof TransferExportTooLargeError) {
+          showError(t('admin:movement_page.export_too_large'))
+        } else {
+          showError(`${t('admin:movement_page.export_failed')}: ${formatUnknownError(err)}`)
+        }
+        throw err
+      }
+    },
+    [t, dateFrom, dateTo, searchQuery, buildExportFilterSummary, showInfo, showSuccess, showError]
+  )
 
   const applyDateFilters = () => {
     setSearchParams((prev) => {
@@ -97,99 +281,110 @@ export function MovementPage() {
       return next
     })
     setFilterPanelOpen(false)
+    clearWarehouseTransfersClientCache()
   }
 
-  const content = () => {
-    if (isLoading) {
+  const showInitialLoading = isLoading && !hasLoadedOnceRef.current
+
+  const tableBody = () => {
+    if (showInitialLoading) {
       return (
         <div className="relative min-h-[200px] flex-1">
           <LoadingOverlay label={t('common:messages.loading')} />
         </div>
       )
     }
-    if (hasLoadError) {
+    if (hasLoadError && items.length === 0) {
       return (
         <EmptyState
           title={t('inventory:load_failed')}
-          actionLabel={t('common:buttons.retry')}
-          onAction={load}
+          actionLabel={t('common:buttons.refresh')}
+          onAction={handleRefresh}
         />
       )
     }
-    if (items.length === 0) {
+    if (totalTransfers === 0 && !searchQuery.trim()) {
       return (
         <EmptyState
           title={t('admin:movement_page.empty_transfers')}
           description={t('admin:movement_page.empty_transfers_desc')}
           actionLabel={t('common:buttons.refresh')}
-          onAction={load}
+          onAction={handleRefresh}
         />
       )
     }
     if (filteredItems.length === 0) {
       return (
-        <p className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">
-          {t('admin:movement_page.search_no_results')}
-        </p>
+        <EmptyState
+          title={t('admin:movement_page.search_no_results')}
+          description={t('receiving:no_results_desc')}
+        />
+      )
+    }
+    if (orderedVisibleColumns.length === 0) {
+      return (
+        <EmptyState
+          title={t('admin:movement_page.search_no_results')}
+          description={t('admin:movement_page.table.columns_hint')}
+        />
       )
     }
     return (
-      <TableScrollArea>
-        <table className="min-w-full text-sm">
-          <thead className="sticky top-0 z-10 bg-white text-xs uppercase text-slate-500 dark:bg-slate-900">
-            <tr className="border-b border-slate-200 dark:border-slate-800">
-              <th className="px-4 py-3 text-left">{t('admin:movement_page.from')}</th>
-              <th className="px-2 py-3 text-center" aria-hidden />
-              <th className="px-4 py-3 text-left">{t('admin:movement_page.to')}</th>
-              <th className="px-4 py-3 text-left">{t('admin:movement_page.qty')}</th>
-              <th className="px-4 py-3 text-left">{t('inventory:columns.product')}</th>
-              <th className="px-4 py-3 text-left">{t('inventory:columns.lot')}</th>
-              <th className="px-4 py-3 text-left">{t('inventory:columns.created_by')}</th>
-              <th className="px-4 py-3 text-left">{t('inventory:columns.created_at')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredItems.map((row) => (
-              <tr
-                key={row.id}
-                className="cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
-                onClick={() => setDetailRow(row)}
-              >
-                <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">
-                  {row.from_location_code ?? row.from_location_id}
-                </td>
-                <td className="px-2 py-3 text-slate-400">
-                  <ArrowRight size={16} className="mx-auto" aria-hidden />
-                </td>
-                <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">
-                  {row.to_location_code ?? row.to_location_id}
-                </td>
-                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
-                  {Math.round(Number(row.qty))}
-                </td>
-                <td className="max-w-[200px] px-4 py-3 text-slate-700 dark:text-slate-200">
-                  {row.product_code != null || row.product_name != null ? (
-                    <span className="block truncate" title={row.product_name ?? undefined}>
-                      {[row.product_code, row.product_name].filter(Boolean).join(' — ')}
-                    </span>
-                  ) : (
-                    row.product_id
-                  )}
-                </td>
-                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
-                  {row.batch ?? row.lot_id}
-                </td>
-                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
-                  {row.created_by_username ?? row.created_by_user_id ?? '—'}
-                </td>
-                <td className="px-4 py-3 text-slate-500">
-                  {new Date(row.created_at).toLocaleString()}
-                </td>
+      <div className="relative">
+        {isRefreshing ? (
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-start justify-center bg-white/40 pt-8 dark:bg-slate-950/40">
+            <LoadingOverlay label={t('common:messages.loading')} />
+          </div>
+        ) : null}
+        <TableScrollArea>
+          <table className="w-full min-w-[56rem] border-collapse text-sm table-fixed">
+            <colgroup>
+              {orderedVisibleColumns.map((colId) => (
+                <col key={colId} style={{ width: movementThWidth(colId) }} />
+              ))}
+            </colgroup>
+            <thead className="bg-slate-50 dark:bg-slate-800/60">
+              <tr className="border-b border-slate-200 dark:border-slate-700">
+                {orderedVisibleColumns.map((colId) => {
+                  const label = columnOptions.find((c) => c.id === colId)?.label ?? colId
+                  const alignRight = colId === 'qty'
+                  return (
+                    <th
+                      key={colId}
+                      className={`${TH_CLASS}${alignRight ? ' text-right' : ''}`}
+                    >
+                      {label}
+                    </th>
+                  )
+                })}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </TableScrollArea>
+            </thead>
+            <tbody>
+              {filteredItems.map((row, rowIndex) => (
+                <tr
+                  key={row.id}
+                  className={`cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50 ${
+                    rowIndex % 2 === 1 ? 'bg-slate-50/50 dark:bg-slate-800/30' : ''
+                  }`}
+                  onClick={() => setDetailRow(row)}
+                >
+                  {orderedVisibleColumns.map((colId) => {
+                    const alignRight = colId === 'qty'
+                    return (
+                      <td
+                        key={colId}
+                        className={`${TD_BASE}${alignRight ? ' text-right' : ''}`}
+                      >
+                        {renderMovementCell(colId, row)}
+                      </td>
+                    )
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableScrollArea>
+      </div>
     )
   }
 
@@ -291,6 +486,7 @@ export function MovementPage() {
                             return next
                           })
                           setFilterPanelOpen(false)
+                          clearWarehouseTransfersClientCache()
                         }}
                       >
                         {t('orders:filters.filter_clear')}
@@ -301,46 +497,92 @@ export function MovementPage() {
                 </>
               )}
             </div>
+            <Button
+              variant="secondary"
+              className="h-10 gap-1.5 rounded-xl px-3"
+              onClick={handleRefresh}
+              disabled={isRefreshing || isLoading}
+            >
+              <RefreshCw size={18} className={isRefreshing ? 'animate-spin shrink-0' : 'shrink-0'} />
+              {t('common:buttons.refresh')}
+            </Button>
+            <Button
+              variant="secondary"
+              className="h-10 gap-1.5 rounded-xl px-3"
+              onClick={() => setIsTableSettingsOpen(true)}
+              title={t('admin:movement_page.table.settings_title')}
+              aria-label={t('admin:movement_page.table.settings_title')}
+            >
+              <Settings size={18} />
+            </Button>
+            <ReceiptListExportToolbar
+              disabled={isLoading || totalTransfers === 0}
+              onExport={async (kind) => {
+                try {
+                  await handleListExport(kind)
+                } catch {
+                  /* toast in handleListExport */
+                }
+              }}
+            />
           </div>
         </div>
-        {content()}
-        {items.length > 0 && (
-          <div className="flex items-center justify-end gap-2 pt-2">
-            <span className="mr-auto text-sm text-slate-600 dark:text-slate-400">
-              {pageStart}–{pageEnd}
-              {hasNextPage ? '+' : ''}
+        {tableBody()}
+        {!showInitialLoading && totalTransfers > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-3 dark:border-slate-700">
+            <span className="text-sm text-slate-600 dark:text-slate-400">
+              {t('receiving:pagination_range', {
+                from: totalTransfers > 0 ? offset + 1 : 0,
+                to: Math.min(offset + PAGE_SIZE, totalTransfers),
+                total: totalTransfers,
+              })}
             </span>
-            <Button
-              variant="secondary"
-              disabled={offset === 0}
-              onClick={() => {
-                setSearchParams((prev) => {
-                  const next = new URLSearchParams(prev)
-                  const nextOffset = Math.max(0, offset - PAGE_SIZE)
-                  if (nextOffset > 0) next.set('offset', String(nextOffset))
-                  else next.delete('offset')
-                  return next
-                })
-              }}
-            >
-              {t('common:buttons.back')}
-            </Button>
-            <Button
-              variant="secondary"
-              disabled={!hasNextPage}
-              onClick={() => {
-                setSearchParams((prev) => {
-                  const next = new URLSearchParams(prev)
-                  next.set('offset', String(offset + PAGE_SIZE))
-                  return next
-                })
-              }}
-            >
-              {t('common:buttons.next')}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const newOffset = Math.max(0, offset - PAGE_SIZE)
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev)
+                    if (newOffset > 0) next.set('offset', String(newOffset))
+                    else next.delete('offset')
+                    return next
+                  })
+                }}
+                disabled={offset === 0}
+                className="gap-1"
+              >
+                <ChevronLeft size={16} />
+                {t('receiving:prev_page')}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSearchParams((prev) => {
+                    const next = new URLSearchParams(prev)
+                    next.set('offset', String(offset + PAGE_SIZE))
+                    return next
+                  })
+                }}
+                disabled={offset + PAGE_SIZE >= totalTransfers}
+                className="gap-1"
+              >
+                {t('receiving:next_page')}
+                <ChevronRight size={16} />
+              </Button>
+            </div>
           </div>
         )}
       </Card>
+
+      <MovementTableSettings
+        open={isTableSettingsOpen}
+        onOpenChange={setIsTableSettingsOpen}
+        config={tableConfig}
+        columns={columnOptions}
+        onSave={updateTableConfig}
+        onReset={resetTableConfig}
+      />
 
       {detailRow && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
@@ -380,11 +622,26 @@ export function MovementPage() {
               </div>
               <div className="flex flex-wrap gap-x-2">
                 <span className="font-medium text-slate-500 dark:text-slate-400">
-                  {t('kamomat:detail.product')}:
+                  {t('admin:movement_page.col_code')}:
                 </span>
                 <span className="text-slate-800 dark:text-slate-200">
-                  {[detailRow.product_code, detailRow.product_name].filter(Boolean).join(' — ') ||
-                    detailRow.product_id}
+                  {detailRow.product_code ?? '—'}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-x-2">
+                <span className="font-medium text-slate-500 dark:text-slate-400">
+                  {t('admin:movement_page.col_barcode')}:
+                </span>
+                <span className="text-slate-800 dark:text-slate-200">
+                  {detailRow.product_barcode ?? '—'}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-x-2">
+                <span className="font-medium text-slate-500 dark:text-slate-400">
+                  {t('admin:movement_page.col_product')}:
+                </span>
+                <span className="text-slate-800 dark:text-slate-200">
+                  {detailRow.product_name ?? detailRow.product_id}
                 </span>
               </div>
               <div className="flex flex-wrap gap-x-2">
