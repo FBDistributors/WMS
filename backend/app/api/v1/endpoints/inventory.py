@@ -413,6 +413,7 @@ class StockMovementOut(BaseModel):
     id: UUID
     product_id: UUID
     product_code: Optional[str] = None
+    product_barcode: Optional[str] = None
     product_name: Optional[str] = None
     lot_id: UUID
     batch: Optional[str] = None
@@ -906,6 +907,7 @@ def _to_movement(
         id=movement.id,
         product_id=movement.product_id,
         product_code=product.sku if product else None,
+        product_barcode=product.barcode if product else None,
         product_name=product.name if product else None,
         lot_id=movement.lot_id,
         batch=lot.batch if lot else None,

@@ -132,3 +132,66 @@ def test_warehouse_transfers_default_date_range(
 
     assert res.status_code == 200
     assert "items" in res.json()
+
+
+def _seed_pick_movement(db: Session, *, user_id: uuid.UUID, sku: str) -> None:
+    product = Product(
+        external_source="test",
+        external_id=f"prod-{uuid.uuid4().hex[:8]}",
+        name="Pick Product",
+        sku=sku,
+        barcode=f"BC-{sku}",
+        is_active=True,
+    )
+    db.add(product)
+    db.flush()
+    loc = Location(
+        code=f"L-{uuid.uuid4().hex[:4]}",
+        barcode_value=f"L-{uuid.uuid4().hex[:4]}",
+        name="Loc",
+        type="bin",
+        is_active=True,
+    )
+    db.add(loc)
+    db.flush()
+    lot = StockLot(product_id=product.id, batch="b1", expiry_date=None)
+    db.add(lot)
+    db.flush()
+    db.add(
+        StockMovement(
+            product_id=product.id,
+            lot_id=lot.id,
+            location_id=loc.id,
+            qty_change=Decimal("-2"),
+            movement_type="pick",
+            created_by_user_id=user_id,
+            created_at=datetime.now(timezone.utc),
+        )
+    )
+    db.commit()
+
+
+def test_stock_movements_list_includes_product_barcode(
+    client: TestClient, db_session: Session
+) -> None:
+    admin = _mk_admin(db_session)
+    sku = f"SM-{uuid.uuid4().hex[:6]}"
+    _seed_pick_movement(db_session, user_id=admin.id, sku=sku)
+    today = date.today().isoformat()
+
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        res = client.get(
+            "/api/v1/inventory/movements",
+            params={"date_from": today, "date_to": today, "limit": 50, "offset": 0},
+        )
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    assert res.status_code == 200
+    rows = res.json()
+    assert isinstance(rows, list)
+    assert len(rows) >= 1
+    match = next((r for r in rows if r.get("product_code") == sku), None)
+    assert match is not None
+    assert match.get("product_barcode") == f"BC-{sku}"

@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
-import { FileText, Filter, MinusCircle, X } from 'lucide-react'
+import { FileText, Filter, MinusCircle, Search, X } from 'lucide-react'
 
 import { useAuth } from '../../rbac/AuthProvider'
+import { AdminDataTable, type AdminDataTableColumn } from '../../admin/components/AdminDataTable'
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { AdminTablePagination } from '../../admin/components/AdminTablePagination'
 import { DateInput } from '../../components/DateInput'
-import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -16,7 +18,103 @@ import { getInventoryMovements, type InventoryMovement } from '../../services/in
 
 const PAGE_SIZE = 50
 
-/** Inventarizatsiya (Hujjatlar tarixi): barcha ombor harakatlari — Ko'chirish jadvali formatida. */
+type KamomatColumnId =
+  | 'movement_type'
+  | 'qty'
+  | 'code'
+  | 'barcode'
+  | 'product'
+  | 'lot'
+  | 'location'
+  | 'created_by'
+  | 'created_at'
+
+const KAMOMAT_COLUMN_IDS: KamomatColumnId[] = [
+  'movement_type',
+  'qty',
+  'code',
+  'barcode',
+  'product',
+  'lot',
+  'location',
+  'created_by',
+  'created_at',
+]
+
+function kamomatThWidth(col: KamomatColumnId): string | undefined {
+  const widths: Partial<Record<KamomatColumnId, string>> = {
+    movement_type: '9rem',
+    qty: '4.5rem',
+    code: '5.5rem',
+    barcode: '9rem',
+    product: '14rem',
+    lot: '7rem',
+    location: '6rem',
+    created_by: '8rem',
+    created_at: '9rem',
+  }
+  return widths[col]
+}
+
+function movementTypeLabel(row: InventoryMovement, t: TFunction): string {
+  if (row.reason_code === 'inventory_overage') {
+    return t('admin:movement_page.reason_overage')
+  }
+  if (row.reason_code === 'inventory_shortage') {
+    return t('admin:movement_page.reason_shortage')
+  }
+  return t(`inventory:movement_types.${row.movement_type}`, row.movement_type)
+}
+
+function renderKamomatCell(colId: KamomatColumnId, row: InventoryMovement, t: TFunction): ReactNode {
+  switch (colId) {
+    case 'movement_type':
+      return (
+        <span className="block truncate" title={movementTypeLabel(row, t)}>
+          {movementTypeLabel(row, t)}
+        </span>
+      )
+    case 'qty': {
+      const n = Math.round(Number(row.qty_change))
+      const text = n > 0 ? `+${n}` : String(n)
+      return <span className="tabular-nums">{text}</span>
+    }
+    case 'code':
+      return <span className="whitespace-nowrap">{row.product_code ?? '—'}</span>
+    case 'barcode':
+      return (
+        <span className="block truncate font-mono text-xs" title={row.product_barcode ?? undefined}>
+          {row.product_barcode ?? '—'}
+        </span>
+      )
+    case 'product':
+      return (
+        <span className="line-clamp-2 text-sm leading-snug" title={row.product_name ?? undefined}>
+          {row.product_name ?? row.product_id}
+        </span>
+      )
+    case 'lot':
+      return (
+        <span className="block truncate font-mono text-xs" title={String(row.batch ?? row.lot_id)}>
+          {row.batch ?? row.lot_id}
+        </span>
+      )
+    case 'location':
+      return <span className="whitespace-nowrap">{row.location_code ?? row.location_id}</span>
+    case 'created_by':
+      return (
+        <span className="block truncate" title={row.created_by_username ?? undefined}>
+          {row.created_by_username ?? row.created_by_user_id ?? '—'}
+        </span>
+      )
+    case 'created_at':
+      return <span className="whitespace-nowrap text-xs">{new Date(row.created_at).toLocaleString()}</span>
+    default:
+      return '—'
+  }
+}
+
+/** Inventarizatsiya (Hujjatlar tarixi): barcha ombor harakatlari — standart admin jadvali. */
 export function KamomatlarPage() {
   const { t } = useTranslation(['kamomat', 'common', 'admin', 'inventory'])
   const { has } = useAuth()
@@ -60,19 +158,52 @@ export function KamomatlarPage() {
     const q = searchQuery.trim().toLowerCase()
     if (!q) return items
     return items.filter((row) => {
-      const product = [row.product_code, row.product_name].filter(Boolean).join(' ').toLowerCase()
+      const code = (row.product_code ?? '').toLowerCase()
+      const barcode = (row.product_barcode ?? '').toLowerCase()
+      const name = (row.product_name ?? '').toLowerCase()
       const batch = (row.batch ?? row.lot_id ?? '').toString().toLowerCase()
       const location = (row.location_code ?? row.location_id ?? '').toString().toLowerCase()
       const who = (row.created_by_username ?? row.created_by_user_id ?? '').toString().toLowerCase()
-      return product.includes(q) || batch.includes(q) || location.includes(q) || who.includes(q)
+      return (
+        code.includes(q) ||
+        barcode.includes(q) ||
+        name.includes(q) ||
+        batch.includes(q) ||
+        location.includes(q) ||
+        who.includes(q)
+      )
     })
   }, [items, searchQuery])
 
+  const columnLabels = useMemo(
+    (): Record<KamomatColumnId, string> => ({
+      movement_type: t('inventory:columns.movement_type'),
+      qty: t('inventory:columns.qty'),
+      code: t('inventory:columns.code'),
+      barcode: t('inventory:columns.barcode'),
+      product: t('inventory:columns.product'),
+      lot: t('inventory:columns.lot'),
+      location: t('inventory:columns.location'),
+      created_by: t('inventory:columns.created_by'),
+      created_at: t('inventory:columns.created_at'),
+    }),
+    [t]
+  )
+
+  const tableColumns = useMemo((): AdminDataTableColumn<InventoryMovement>[] => {
+    return KAMOMAT_COLUMN_IDS.map((colId) => ({
+      id: colId,
+      header: columnLabels[colId],
+      width: kamomatThWidth(colId),
+      align: colId === 'qty' ? 'right' : 'left',
+      cell: (row) => renderKamomatCell(colId, row, t),
+    }))
+  }, [columnLabels, t])
+
   const hasNextPage = items.length >= PAGE_SIZE
-  const pageStart = offset + 1
   const pageEnd = offset + items.length
 
-  const content = () => {
+  const tableBody = () => {
     if (isLoading) {
       return (
         <div className="relative flex-1 min-h-[200px]">
@@ -102,68 +233,20 @@ export function KamomatlarPage() {
     }
     if (filteredItems.length === 0) {
       return (
-        <p className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">
-          {t('admin:movement_page.search_no_results')}
-        </p>
+        <EmptyState
+          title={t('admin:movement_page.search_no_results')}
+          description={t('receiving:no_results_desc')}
+        />
       )
     }
     return (
-      <TableScrollArea>
-        <table className="min-w-full text-sm">
-          <thead className="text-xs uppercase text-slate-500">
-            <tr className="border-b border-slate-200 dark:border-slate-800">
-              <th className="px-4 py-3 text-left">{t('inventory:columns.movement_type')}</th>
-              <th className="px-4 py-3 text-left">{t('inventory:columns.qty')}</th>
-              <th className="px-4 py-3 text-left">{t('inventory:columns.product')}</th>
-              <th className="px-4 py-3 text-left">{t('inventory:columns.lot')}</th>
-              <th className="px-4 py-3 text-left">{t('inventory:columns.location')}</th>
-              <th className="px-4 py-3 text-left">{t('inventory:columns.created_by')}</th>
-              <th className="px-4 py-3 text-left">{t('inventory:columns.created_at')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredItems.map((row) => (
-              <tr
-                key={row.id}
-                className="cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
-                onClick={() => setDetailRow(row)}
-              >
-                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
-                  {row.reason_code === 'inventory_overage'
-                    ? t('admin:movement_page.reason_overage')
-                    : row.reason_code === 'inventory_shortage'
-                      ? t('admin:movement_page.reason_shortage')
-                      : t(`inventory:movement_types.${row.movement_type}`, row.movement_type)}
-                </td>
-                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
-                  {row.qty_change > 0 ? '+' : ''}{Math.round(Number(row.qty_change))}
-                </td>
-                <td className="max-w-[200px] px-4 py-3 text-slate-700 dark:text-slate-200">
-                  {row.product_code != null || row.product_name != null ? (
-                    <span className="block truncate" title={row.product_name ?? undefined}>
-                      {[row.product_code, row.product_name].filter(Boolean).join(' — ')}
-                    </span>
-                  ) : (
-                    row.product_id
-                  )}
-                </td>
-                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
-                  {row.batch ?? row.lot_id}
-                </td>
-                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
-                  {row.location_code ?? row.location_id}
-                </td>
-                <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
-                  {row.created_by_username ?? row.created_by_user_id ?? '—'}
-                </td>
-                <td className="px-4 py-3 text-slate-500">
-                  {new Date(row.created_at).toLocaleString()}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </TableScrollArea>
+      <AdminDataTable
+        columns={tableColumns}
+        rows={filteredItems}
+        getRowKey={(row) => row.id}
+        minWidth="min-w-[72rem]"
+        onRowClick={setDetailRow}
+      />
     )
   }
 
@@ -182,16 +265,21 @@ export function KamomatlarPage() {
       )}
       <Card className="space-y-4">
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <label className="flex-1 min-w-[180px] max-w-md text-sm text-slate-600 dark:text-slate-300">
-            <span className="sr-only">{t('admin:movement_page.search_placeholder')}</span>
+          <div className="relative min-w-[180px] flex-1 max-w-md">
+            <Search
+              size={18}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              aria-hidden
+            />
             <input
               type="search"
-              className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+              className="w-full rounded-2xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t('admin:movement_page.search_placeholder')}
+              aria-label={t('admin:movement_page.search_placeholder')}
             />
-          </label>
+          </div>
           <div className="relative" ref={filterPanelRef}>
             <Button
               variant="outline"
@@ -260,6 +348,7 @@ export function KamomatlarPage() {
                       onClick={() => {
                         setOffset(0)
                         setFilterPanelOpen(false)
+                        void load()
                       }}
                     >
                       {t('inventory:filters.apply')}
@@ -270,29 +359,18 @@ export function KamomatlarPage() {
             )}
           </div>
         </div>
-        {content()}
-        {items.length > 0 && (
-          <div className="flex items-center justify-end gap-2 pt-2">
-            <span className="mr-auto text-sm text-slate-600 dark:text-slate-400">
-              {pageStart}–{pageEnd}
-              {hasNextPage ? '+' : ''}
-            </span>
-            <Button
-              variant="secondary"
-              disabled={offset === 0}
-              onClick={() => setOffset((p) => Math.max(0, p - PAGE_SIZE))}
-            >
-              {t('common:buttons.back')}
-            </Button>
-            <Button
-              variant="secondary"
-              disabled={!hasNextPage}
-              onClick={() => setOffset((p) => p + PAGE_SIZE)}
-            >
-              {t('common:buttons.next')}
-            </Button>
-          </div>
-        )}
+        {tableBody()}
+        {!isLoading && items.length > 0 ? (
+          <AdminTablePagination
+            offset={offset}
+            pageSize={PAGE_SIZE}
+            to={pageEnd}
+            rangeSuffix={hasNextPage ? '+' : ''}
+            onPrev={() => setOffset((p) => Math.max(0, p - PAGE_SIZE))}
+            onNext={() => setOffset((p) => p + PAGE_SIZE)}
+            nextDisabled={!hasNextPage}
+          />
+        ) : null}
       </Card>
 
       {detailRow && (
@@ -309,9 +387,27 @@ export function KamomatlarPage() {
             </h3>
             <dl className="space-y-2 text-sm">
               <div className="flex flex-wrap gap-x-2">
-                <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.product')}:</span>
+                <span className="font-medium text-slate-500 dark:text-slate-400">
+                  {t('kamomat:detail.product_code')}:
+                </span>
                 <span className="text-slate-800 dark:text-slate-200">
-                  {[detailRow.product_code, detailRow.product_name].filter(Boolean).join(' — ') || detailRow.product_id}
+                  {detailRow.product_code ?? '—'}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-x-2">
+                <span className="font-medium text-slate-500 dark:text-slate-400">
+                  {t('kamomat:detail.barcode')}:
+                </span>
+                <span className="font-mono text-slate-800 dark:text-slate-200">
+                  {detailRow.product_barcode ?? '—'}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-x-2">
+                <span className="font-medium text-slate-500 dark:text-slate-400">
+                  {t('inventory:columns.product')}:
+                </span>
+                <span className="text-slate-800 dark:text-slate-200">
+                  {detailRow.product_name ?? detailRow.product_id}
                 </span>
               </div>
               <div className="flex flex-wrap gap-x-2">
@@ -320,7 +416,9 @@ export function KamomatlarPage() {
               </div>
               <div className="flex flex-wrap gap-x-2">
                 <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.location')}:</span>
-                <span className="text-slate-800 dark:text-slate-200">{detailRow.location_code ?? detailRow.location_id}</span>
+                <span className="text-slate-800 dark:text-slate-200">
+                  {detailRow.location_code ?? detailRow.location_id}
+                </span>
               </div>
               <div className="flex flex-wrap gap-x-2">
                 <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.qty_change')}:</span>
@@ -331,18 +429,13 @@ export function KamomatlarPage() {
                       : 'text-slate-800 dark:text-slate-200'
                   }
                 >
-                  {Number(detailRow.qty_change) > 0 ? '+' : ''}{Math.round(Number(detailRow.qty_change))}
+                  {Number(detailRow.qty_change) > 0 ? '+' : ''}
+                  {Math.round(Number(detailRow.qty_change))}
                 </span>
               </div>
               <div className="flex flex-wrap gap-x-2">
                 <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.action_type')}:</span>
-                <span className="text-slate-800 dark:text-slate-200">
-                  {detailRow.reason_code === 'inventory_overage'
-                    ? t('admin:movement_page.reason_overage')
-                    : detailRow.reason_code === 'inventory_shortage'
-                      ? t('admin:movement_page.reason_shortage')
-                      : t(`inventory:movement_types.${detailRow.movement_type}`, detailRow.movement_type)}
-                </span>
+                <span className="text-slate-800 dark:text-slate-200">{movementTypeLabel(detailRow, t)}</span>
               </div>
               <div className="flex flex-wrap gap-x-2">
                 <span className="font-medium text-slate-500 dark:text-slate-400">{t('kamomat:detail.who')}:</span>

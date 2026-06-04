@@ -45,6 +45,7 @@ export type InventoryMovement = {
   id: string
   product_id: string
   product_code?: string | null
+  product_barcode?: string | null
   product_name?: string | null
   lot_id: string
   batch?: string | null
