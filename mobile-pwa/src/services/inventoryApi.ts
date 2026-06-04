@@ -380,6 +380,25 @@ export async function getInventoryMovements(query: InventoryMovementsQuery = {})
   })
 }
 
+const MAX_INVENTORY_MOVEMENTS_FETCH = 10_000
+
+/** Inventarizatsiya eksporti: filtr oralig'idagi barcha harakatlar (sahifalab). */
+export async function fetchAllInventoryMovements(
+  query: Omit<InventoryMovementsQuery, 'limit' | 'offset'> = {}
+): Promise<InventoryMovement[]> {
+  const pageSize = 200
+  const all: InventoryMovement[] = []
+  let offset = 0
+  while (true) {
+    const page = await getInventoryMovements({ ...query, limit: pageSize, offset })
+    all.push(...page)
+    if (page.length < pageSize) break
+    offset += pageSize
+    if (offset > MAX_INVENTORY_MOVEMENTS_FETCH) break
+  }
+  return all
+}
+
 /** Joydan-joyga ko'chirish (juftlangan qatorlar). */
 export type WarehouseTransfer = {
   id: string

@@ -2,19 +2,33 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { Link } from 'react-router-dom'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
-import { FileText, Filter, MinusCircle, Search, X } from 'lucide-react'
+import { FileText, Filter, MinusCircle, RefreshCw, Search, X } from 'lucide-react'
 
 import { useAuth } from '../../rbac/AuthProvider'
 import { AdminDataTable, type AdminDataTableColumn } from '../../admin/components/AdminDataTable'
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { AdminTablePagination } from '../../admin/components/AdminTablePagination'
+import { ReceiptListExportToolbar } from '../../admin/components/receiving/ReceiptListExportToolbar'
+import type { ExportFormat } from '../../admin/components/receiving/ExportFormatDropdown'
 import { DateInput } from '../../components/DateInput'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { useAppToast } from '../../feedback/useAppToast'
-import { getInventoryMovements, type InventoryMovement } from '../../services/inventoryApi'
+import { formatUnknownError } from '../../lib/formatUnknownError'
+import {
+  fetchAllInventoryMovements,
+  getInventoryMovements,
+  type InventoryMovement,
+} from '../../services/inventoryApi'
+import {
+  buildKamomatListExportLabels,
+  buildKamomatListExportRows,
+  filterKamomatBySearch,
+  KamomatExportTooLargeError,
+  runKamomatListExport,
+} from '../../utils/kamomatListExport'
 
 const PAGE_SIZE = 50
 
@@ -125,14 +139,17 @@ export function KamomatlarPage() {
   const [filterDateTo, setFilterDateTo] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [isLoading, setIsLoading] = useState(true)
-  const { showError } = useAppToast()
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const { showError, showSuccess, showInfo } = useAppToast()
   const [hasLoadError, setHasLoadError] = useState(false)
   const [detailRow, setDetailRow] = useState<InventoryMovement | null>(null)
   const [filterPanelOpen, setFilterPanelOpen] = useState(false)
   const filterPanelRef = useRef<HTMLDivElement>(null)
+  const hasLoadedOnceRef = useRef(false)
 
   const load = useCallback(async () => {
-    setIsLoading(true)
+    if (!hasLoadedOnceRef.current) setIsLoading(true)
+    else setIsRefreshing(true)
     setHasLoadError(false)
     try {
       const data = await getInventoryMovements({
@@ -142,11 +159,13 @@ export function KamomatlarPage() {
         offset,
       })
       setItems(data)
+      hasLoadedOnceRef.current = true
     } catch (err) {
       showError(err instanceof Error ? err.message : t('kamomat:load_error'))
       setHasLoadError(true)
     } finally {
       setIsLoading(false)
+      setIsRefreshing(false)
     }
   }, [filterDateFrom, filterDateTo, offset, showError, t])
 
@@ -154,26 +173,64 @@ export function KamomatlarPage() {
     void load()
   }, [load])
 
+  const handleRefresh = useCallback(() => {
+    void load()
+  }, [load])
+
   const filteredItems = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-    if (!q) return items
-    return items.filter((row) => {
-      const code = (row.product_code ?? '').toLowerCase()
-      const barcode = (row.product_barcode ?? '').toLowerCase()
-      const name = (row.product_name ?? '').toLowerCase()
-      const batch = (row.batch ?? row.lot_id ?? '').toString().toLowerCase()
-      const location = (row.location_code ?? row.location_id ?? '').toString().toLowerCase()
-      const who = (row.created_by_username ?? row.created_by_user_id ?? '').toString().toLowerCase()
-      return (
-        code.includes(q) ||
-        barcode.includes(q) ||
-        name.includes(q) ||
-        batch.includes(q) ||
-        location.includes(q) ||
-        who.includes(q)
-      )
-    })
+    return filterKamomatBySearch(items, searchQuery)
   }, [items, searchQuery])
+
+  const showInitialLoading = isLoading && !hasLoadedOnceRef.current
+
+  const buildExportFilterSummary = useCallback((): string[] => {
+    const parts: string[] = []
+    if (filterDateFrom.trim() || filterDateTo.trim()) {
+      parts.push(
+        `${t('kamomat:export.filter_date')}: ${filterDateFrom.trim() || '…'} – ${filterDateTo.trim() || '…'}`
+      )
+    }
+    if (searchQuery.trim()) {
+      parts.push(`${t('kamomat:export.filter_search')}: ${searchQuery.trim()}`)
+    }
+    if (parts.length === 0) {
+      parts.push(t('kamomat:export.filter_none'))
+    }
+    return parts
+  }, [t, filterDateFrom, filterDateTo, searchQuery])
+
+  const handleListExport = useCallback(
+    async (kind: ExportFormat) => {
+      showInfo(t('kamomat:export.fetching'), 4000)
+      try {
+        const all = await fetchAllInventoryMovements({
+          date_from: filterDateFrom.trim() || undefined,
+          date_to: filterDateTo.trim() || undefined,
+        })
+        const filtered = filterKamomatBySearch(all, searchQuery)
+        if (filtered.length === 0) {
+          throw new Error(t('admin:movement_page.search_no_results'))
+        }
+        const rows = buildKamomatListExportRows(filtered, t)
+        const ctx = {
+          title: t('kamomat:export.list_title'),
+          filterSummaryLines: buildExportFilterSummary(),
+          rows,
+          labels: buildKamomatListExportLabels(t),
+        }
+        await runKamomatListExport(kind, ctx)
+        showSuccess(t('kamomat:export.success'))
+      } catch (err) {
+        if (err instanceof KamomatExportTooLargeError) {
+          showError(t('kamomat:export.too_large'))
+        } else {
+          showError(`${t('kamomat:export.failed')}: ${formatUnknownError(err)}`)
+        }
+        throw err
+      }
+    },
+    [t, filterDateFrom, filterDateTo, searchQuery, buildExportFilterSummary, showInfo, showSuccess, showError]
+  )
 
   const columnLabels = useMemo(
     (): Record<KamomatColumnId, string> => ({
@@ -204,7 +261,7 @@ export function KamomatlarPage() {
   const pageEnd = offset + items.length
 
   const tableBody = () => {
-    if (isLoading) {
+    if (showInitialLoading) {
       return (
         <div className="relative flex-1 min-h-[200px]">
           <LoadingOverlay label={t('common:messages.loading')} />
@@ -246,6 +303,8 @@ export function KamomatlarPage() {
         getRowKey={(row) => row.id}
         minWidth="min-w-[72rem]"
         onRowClick={setDetailRow}
+        refreshing={isRefreshing}
+        refreshingLabel={t('common:messages.loading')}
       />
     )
   }
@@ -358,9 +417,28 @@ export function KamomatlarPage() {
               </>
             )}
           </div>
+          <Button
+            variant="secondary"
+            className="h-10 gap-1.5 rounded-xl px-3"
+            onClick={handleRefresh}
+            disabled={isRefreshing || showInitialLoading}
+          >
+            <RefreshCw size={18} className={isRefreshing ? 'animate-spin shrink-0' : 'shrink-0'} />
+            {t('common:buttons.refresh')}
+          </Button>
+          <ReceiptListExportToolbar
+            disabled={showInitialLoading || items.length === 0}
+            onExport={async (kind) => {
+              try {
+                await handleListExport(kind)
+              } catch {
+                /* toast in handleListExport */
+              }
+            }}
+          />
         </div>
         {tableBody()}
-        {!isLoading && items.length > 0 ? (
+        {!showInitialLoading && items.length > 0 ? (
           <AdminTablePagination
             offset={offset}
             pageSize={PAGE_SIZE}
