@@ -33,6 +33,8 @@ export default defineConfig({
       disable: !!process.env.TAURI_ENV_PLATFORM,
       registerType: 'autoUpdate',
       workbox: {
+        // Asosiy bundle ~2.1MB (exceljs/jspdf) — default 2 MiB precache limitidan oshadi
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         // JS chunklar deploydan keyin yangilanadi — tarmoqdan olish ustun
         runtimeCaching: [
           {
