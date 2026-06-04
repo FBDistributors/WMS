@@ -2,12 +2,18 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { Link } from 'react-router-dom'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
-import { FileText, Filter, MinusCircle, RefreshCw, Search, X } from 'lucide-react'
+import { FileText, Filter, MinusCircle, RefreshCw, Search, Settings, X } from 'lucide-react'
 
 import { useAuth } from '../../rbac/AuthProvider'
+import { KamomatTableSettings } from '../../admin/components/kamomat/KamomatTableSettings'
 import { AdminDataTable, type AdminDataTableColumn } from '../../admin/components/AdminDataTable'
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { AdminTablePagination } from '../../admin/components/AdminTablePagination'
+import {
+  KAMOMAT_TABLE_COLUMN_IDS,
+  useKamomatTableConfig,
+  type KamomatTableColumnId,
+} from '../../admin/hooks/useKamomatTableConfig'
 import { ReceiptListExportToolbar } from '../../admin/components/receiving/ReceiptListExportToolbar'
 import type { ExportFormat } from '../../admin/components/receiving/ExportFormatDropdown'
 import { DateInput } from '../../components/DateInput'
@@ -32,31 +38,8 @@ import {
 
 const PAGE_SIZE = 50
 
-type KamomatColumnId =
-  | 'movement_type'
-  | 'qty'
-  | 'code'
-  | 'barcode'
-  | 'product'
-  | 'lot'
-  | 'location'
-  | 'created_by'
-  | 'created_at'
-
-const KAMOMAT_COLUMN_IDS: KamomatColumnId[] = [
-  'movement_type',
-  'qty',
-  'code',
-  'barcode',
-  'product',
-  'lot',
-  'location',
-  'created_by',
-  'created_at',
-]
-
-function kamomatThWidth(col: KamomatColumnId): string | undefined {
-  const widths: Partial<Record<KamomatColumnId, string>> = {
+function kamomatThWidth(col: KamomatTableColumnId): string | undefined {
+  const widths: Partial<Record<KamomatTableColumnId, string>> = {
     movement_type: '9rem',
     qty: '4.5rem',
     code: '5.5rem',
@@ -80,7 +63,7 @@ function movementTypeLabel(row: InventoryMovement, t: TFunction): string {
   return t(`inventory:movement_types.${row.movement_type}`, row.movement_type)
 }
 
-function renderKamomatCell(colId: KamomatColumnId, row: InventoryMovement, t: TFunction): ReactNode {
+function renderKamomatCell(colId: KamomatTableColumnId, row: InventoryMovement, t: TFunction): ReactNode {
   switch (colId) {
     case 'movement_type':
       return (
@@ -144,8 +127,12 @@ export function KamomatlarPage() {
   const [hasLoadError, setHasLoadError] = useState(false)
   const [detailRow, setDetailRow] = useState<InventoryMovement | null>(null)
   const [filterPanelOpen, setFilterPanelOpen] = useState(false)
+  const [isTableSettingsOpen, setIsTableSettingsOpen] = useState(false)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const hasLoadedOnceRef = useRef(false)
+
+  const { config: tableConfig, updateConfig: updateTableConfig, resetConfig: resetTableConfig } =
+    useKamomatTableConfig()
 
   const load = useCallback(async () => {
     if (!hasLoadedOnceRef.current) setIsLoading(true)
@@ -232,8 +219,42 @@ export function KamomatlarPage() {
     [t, filterDateFrom, filterDateTo, searchQuery, buildExportFilterSummary, showInfo, showSuccess, showError]
   )
 
+  const columnOptions = useMemo(
+    () =>
+      KAMOMAT_TABLE_COLUMN_IDS.map((id) => ({
+        id,
+        label:
+          id === 'movement_type'
+            ? t('inventory:columns.movement_type')
+            : id === 'qty'
+              ? t('inventory:columns.qty')
+              : id === 'code'
+                ? t('inventory:columns.code')
+                : id === 'barcode'
+                  ? t('inventory:columns.barcode')
+                  : id === 'product'
+                    ? t('inventory:columns.product')
+                    : id === 'lot'
+                      ? t('inventory:columns.lot')
+                      : id === 'location'
+                        ? t('inventory:columns.location')
+                        : id === 'created_by'
+                          ? t('inventory:columns.created_by')
+                          : t('inventory:columns.created_at'),
+      })),
+    [t]
+  )
+
+  const orderedVisibleColumns = useMemo(() => {
+    const visible = new Set(tableConfig.visibleColumns)
+    return tableConfig.columnOrder.filter(
+      (id): id is KamomatTableColumnId =>
+        KAMOMAT_TABLE_COLUMN_IDS.includes(id as KamomatTableColumnId) && visible.has(id)
+    )
+  }, [tableConfig.columnOrder, tableConfig.visibleColumns])
+
   const columnLabels = useMemo(
-    (): Record<KamomatColumnId, string> => ({
+    (): Record<KamomatTableColumnId, string> => ({
       movement_type: t('inventory:columns.movement_type'),
       qty: t('inventory:columns.qty'),
       code: t('inventory:columns.code'),
@@ -248,14 +269,14 @@ export function KamomatlarPage() {
   )
 
   const tableColumns = useMemo((): AdminDataTableColumn<InventoryMovement>[] => {
-    return KAMOMAT_COLUMN_IDS.map((colId) => ({
+    return orderedVisibleColumns.map((colId) => ({
       id: colId,
       header: columnLabels[colId],
       width: kamomatThWidth(colId),
       align: colId === 'qty' ? 'right' : 'left',
       cell: (row) => renderKamomatCell(colId, row, t),
     }))
-  }, [columnLabels, t])
+  }, [orderedVisibleColumns, columnLabels, t])
 
   const hasNextPage = items.length >= PAGE_SIZE
   const pageEnd = offset + items.length
@@ -296,6 +317,14 @@ export function KamomatlarPage() {
         />
       )
     }
+    if (orderedVisibleColumns.length === 0) {
+      return (
+        <EmptyState
+          title={t('admin:movement_page.search_no_results')}
+          description={t('kamomat:table.columns_hint')}
+        />
+      )
+    }
     return (
       <AdminDataTable
         columns={tableColumns}
@@ -323,7 +352,7 @@ export function KamomatlarPage() {
         </div>
       )}
       <Card className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative min-w-[180px] flex-1 max-w-md">
             <Search
               size={18}
@@ -339,6 +368,7 @@ export function KamomatlarPage() {
               aria-label={t('admin:movement_page.search_placeholder')}
             />
           </div>
+          <div className="flex flex-wrap items-center justify-end gap-2 sm:ml-auto">
           <div className="relative" ref={filterPanelRef}>
             <Button
               variant="outline"
@@ -426,6 +456,15 @@ export function KamomatlarPage() {
             <RefreshCw size={18} className={isRefreshing ? 'animate-spin shrink-0' : 'shrink-0'} />
             {t('common:buttons.refresh')}
           </Button>
+          <Button
+            variant="secondary"
+            className="h-10 gap-1.5 rounded-xl px-3"
+            onClick={() => setIsTableSettingsOpen(true)}
+            title={t('kamomat:table.settings_title')}
+            aria-label={t('kamomat:table.settings_title')}
+          >
+            <Settings size={18} />
+          </Button>
           <ReceiptListExportToolbar
             disabled={showInitialLoading || items.length === 0}
             onExport={async (kind) => {
@@ -436,6 +475,7 @@ export function KamomatlarPage() {
               }
             }}
           />
+          </div>
         </div>
         {tableBody()}
         {!showInitialLoading && items.length > 0 ? (
@@ -450,6 +490,15 @@ export function KamomatlarPage() {
           />
         ) : null}
       </Card>
+
+      <KamomatTableSettings
+        open={isTableSettingsOpen}
+        onOpenChange={setIsTableSettingsOpen}
+        config={tableConfig}
+        columns={columnOptions}
+        onSave={updateTableConfig}
+        onReset={resetTableConfig}
+      />
 
       {detailRow && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
