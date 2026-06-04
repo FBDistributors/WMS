@@ -72,7 +72,7 @@
     "move_entire_location_success": "{{count}} item(s) moved",
     "move_entire_location_error": "Move failed",
     "move_entire_location_empty": "No products to move at this location",
-    "col_code": "Product code",
+    "col_code": "Code",
     "col_barcode": "Barcode",
     "col_product": "Product",
     "export_download": "Download",

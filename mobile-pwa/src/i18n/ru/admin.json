@@ -72,7 +72,7 @@
     "move_entire_location_success": "Перемещено {{count}} позиций",
     "move_entire_location_error": "Ошибка перемещения",
     "move_entire_location_empty": "В этой локации нет товаров для перемещения",
-    "col_code": "Код товара",
+    "col_code": "Код",
     "col_barcode": "Штрихкод",
     "col_product": "Товар",
     "export_download": "Скачать",
