@@ -135,13 +135,13 @@ function StaffStatsTable({
 }
 
 export function DashboardPage() {
-  const { t } = useTranslation(['admin', 'common', 'inventory'])
+  const { t } = useTranslation(['admin', 'common', 'inventory', 'receiving'])
   const navigate = useNavigate()
   const [ordersByStatus, setOrdersByStatus] = useState<{ status: string; count: number }[]>([])
   const [pickerRows, setPickerRows] = useState<PickingStaffStatsRow[]>([])
   const [controllerRows, setControllerRows] = useState<PickingStaffStatsRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const { showError } = useAppToast()
+  const { showError, showSuccess, showInfo } = useAppToast()
   const [hasLoadError, setHasLoadError] = useState(false)
   const [dateFrom, setDateFrom] = useState(todayIsoDate)
   const [dateTo, setDateTo] = useState(todayIsoDate)
@@ -218,6 +218,7 @@ export function DashboardPage() {
 
   const handleExportStaffStatsExcel = useCallback(async () => {
     if (pickerRows.length === 0 && controllerRows.length === 0) return
+    showInfo(t('receiving:export_fetching'), 4000)
     setIsExporting(true)
     try {
       const headers = [
@@ -252,13 +253,14 @@ export function DashboardPage() {
       const fileName = `picking_staff_stats_${fromPart}_${toPart}_${day}.xlsx`
 
       await writeExcelFile(wb, fileName)
+      showSuccess(t('receiving:export_success'))
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      window.alert(`${t('admin:dashboard.staff_stats_export_failed')}\n\n${msg}`)
+      showError(`${t('admin:dashboard.staff_stats_export_failed')}: ${msg}`)
     } finally {
       setIsExporting(false)
     }
-  }, [t, pickerRows, controllerRows, dateFrom, dateTo])
+  }, [t, pickerRows, controllerRows, dateFrom, dateTo, showInfo, showSuccess, showError])
 
   const statusRows = [
     { key: 'xom' as const, labelKey: 'admin:dashboard.status_xom', count: counts.xom },
