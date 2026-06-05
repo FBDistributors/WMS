@@ -230,25 +230,10 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
   Set<String> _verifiedLineIds = <String>{};
   Timer? _detailPollTimer;
 
-  String _postCompleteRouteName(PickerProfileParam profile) {
-    return profile == PickerProfileParam.controller ? 'pickTasks' : 'pickerHome';
-  }
-
   void _navigateAfterComplete(PickerProfileParam profile, AppLocale loc) {
-    if (profile == PickerProfileParam.controller) {
-      unawaited(ref.read(openPickTasksProvider.notifier).refreshFromNetwork());
-      if (Navigator.of(context).canPop()) {
-        context.pop();
-        return;
-      }
-      context.goNamed(
-        'pickTasks',
-        queryParameters: <String, String>{'profile': profileToQuery(profile)},
-      );
-      return;
-    }
+    unawaited(ref.read(openPickTasksProvider.notifier).refreshFromNetwork());
     context.goNamed(
-      'pickerHome',
+      'pickTasks',
       queryParameters: <String, String>{
         'profile': profileToQuery(profile),
         'completedMessage': StringLookup.t(loc, 'taskCompletedBanner'),
@@ -1761,17 +1746,12 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
             ref.read(pickTaskDetailProvider(widget.taskId)).when(
                   data: (PickingDocument d) {
                     if (d.status == 'completed') {
-                      if (profile == PickerProfileParam.controller &&
-                          Navigator.of(context).canPop()) {
-                        context.pop();
-                      } else {
-                        context.goNamed(
-                          _postCompleteRouteName(profile),
-                          queryParameters: <String, String>{
-                            'profile': profileToQuery(profile),
-                          },
-                        );
-                      }
+                      context.goNamed(
+                        'pickTasks',
+                        queryParameters: <String, String>{
+                          'profile': profileToQuery(profile),
+                        },
+                      );
                     } else {
                       context.goNamed(
                         'pickTasks',

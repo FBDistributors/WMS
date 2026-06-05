@@ -13,7 +13,6 @@ import '../../../core/app_state/profile_type_controller.dart';
 import '../../../core/app_state/theme_controller.dart';
 import '../../../core/offline/offline_providers.dart';
 import '../../../l10n/string_lookup.dart';
-import '../../../shared/feedback/app_top_snackbar.dart';
 import '../../../shared/widgets/picker_footer.dart';
 import '../../../shared/widgets/picker_tab_app_header.dart';
 import '../domain/profile_type_param.dart';
@@ -83,17 +82,12 @@ class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
       if (!mounted) {
         return;
       }
-      await ref.read(openPickTasksProvider.notifier).refreshFromNetwork();
-      if (!mounted) {
-        return;
-      }
-      showAppSnackBar(
-        context,
-        SnackBar(content: Text(Uri.decodeComponent(msg))),
-      );
       context.goNamed(
-        'pickerHome',
-        queryParameters: <String, String>{'profile': profileQ},
+        'pickTasks',
+        queryParameters: <String, String>{
+          'profile': profileQ,
+          'completedMessage': msg,
+        },
       );
     });
   }
