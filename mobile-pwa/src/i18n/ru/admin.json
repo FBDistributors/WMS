@@ -257,6 +257,42 @@
       }
     }
   },
+  "returns_history": {
+    "load_error": "Не удалось загрузить историю возвратов",
+    "empty_title": "Документы возврата не найдены",
+    "empty_desc": "Измените фильтры или поиск.",
+    "search_placeholder": "Номер док., ID или имя клиента",
+    "filter_btn": "Фильтр",
+    "filter_panel_title": "Фильтры",
+    "filter_status": "Статус",
+    "filter_all_statuses": "Все статусы",
+    "status_pending_controller": "Ожидание (контролёр)",
+    "status_approved": "Подтверждён",
+    "status_assigned_to_picker": "Назначен сборщику",
+    "status_completed": "Завершён",
+    "status_cancelled": "Отменён",
+    "columns": {
+      "doc_no": "Doc No",
+      "customer": "Клиент",
+      "status": "Статус",
+      "controller": "Контролёр",
+      "picker": "Сборщик",
+      "assigned_at": "Отправлен",
+      "created_at": "Создан",
+      "updated_at": "Обновлён"
+    },
+    "export_list_title": "Список возвратов",
+    "export_fetching": "Сбор данных…",
+    "export_success": "Файл загружен",
+    "export_failed": "Ошибка экспорта",
+    "export_too_large": "Экспорт слишком большой. Сузьте фильтры.",
+    "export_filter_applied": "Фильтры",
+    "export_rows_count": "Количество строк",
+    "export_filter_date": "Дата",
+    "export_filter_status": "Статус",
+    "export_filter_search": "Поиск",
+    "export_filter_none": "Без фильтров"
+  },
   "returns_details": {
     "title": "Детали возврата",
     "load_failed": "Не удалось загрузить детали возврата",

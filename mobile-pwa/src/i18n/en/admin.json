@@ -257,6 +257,42 @@
       }
     }
   },
+  "returns_history": {
+    "load_error": "Failed to load returns history",
+    "empty_title": "No return documents found",
+    "empty_desc": "Try changing filters or search.",
+    "search_placeholder": "Doc no, customer ID or customer name",
+    "filter_btn": "Filter",
+    "filter_panel_title": "Filters",
+    "filter_status": "Status",
+    "filter_all_statuses": "All statuses",
+    "status_pending_controller": "Pending (controller)",
+    "status_approved": "Approved",
+    "status_assigned_to_picker": "Assigned to picker",
+    "status_completed": "Completed",
+    "status_cancelled": "Cancelled",
+    "columns": {
+      "doc_no": "Doc No",
+      "customer": "Customer",
+      "status": "Status",
+      "controller": "Controller",
+      "picker": "Picker",
+      "assigned_at": "Sent at",
+      "created_at": "Created at",
+      "updated_at": "Updated at"
+    },
+    "export_list_title": "Returns list",
+    "export_fetching": "Gathering data…",
+    "export_success": "File downloaded",
+    "export_failed": "Export failed",
+    "export_too_large": "Export is too large. Narrow your filters.",
+    "export_filter_applied": "Filters",
+    "export_rows_count": "Row count",
+    "export_filter_date": "Date",
+    "export_filter_status": "Status",
+    "export_filter_search": "Search",
+    "export_filter_none": "No filters"
+  },
   "returns_details": {
     "title": "Return details",
     "load_failed": "Failed to load return details",

@@ -476,6 +476,44 @@ export async function getCustomerReturnsHistory(
   return fetchJSON<CustomerReturnListOut>('/api/v1/customer-returns', { query, signal: init?.signal })
 }
 
+const RETURNS_EXPORT_PAGE_SIZE = 200
+const MAX_RETURNS_EXPORT_ROWS = 10_000
+
+export class CustomerReturnsExportTooLargeError extends Error {
+  constructor() {
+    super('RETURNS_EXPORT_TOO_LARGE')
+    this.name = 'CustomerReturnsExportTooLargeError'
+  }
+}
+
+/** Qaytganlar ro'yxati eksporti: filtr oralig'idagi barcha hujjatlar (sahifalab). */
+export async function fetchAllCustomerReturns(
+  query: Omit<CustomerReturnsHistoryQuery, 'limit' | 'offset'> = {}
+): Promise<CustomerReturnOut[]> {
+  const all: CustomerReturnOut[] = []
+  let offset = 0
+  let total = Infinity
+
+  while (offset < total) {
+    const page = await getCustomerReturnsHistory({
+      ...query,
+      limit: RETURNS_EXPORT_PAGE_SIZE,
+      offset,
+    })
+    total = page.total
+    all.push(...page.items)
+    if (page.items.length < RETURNS_EXPORT_PAGE_SIZE) {
+      break
+    }
+    offset += RETURNS_EXPORT_PAGE_SIZE
+    if (all.length > MAX_RETURNS_EXPORT_ROWS) {
+      throw new CustomerReturnsExportTooLargeError()
+    }
+  }
+
+  return all
+}
+
 export async function getCustomerReturn(returnId: string, init?: { signal?: AbortSignal }) {
   return fetchJSON<CustomerReturnOut>(`/api/v1/customer-returns/${returnId}`, {
     signal: init?.signal,

@@ -257,6 +257,42 @@
       }
     }
   },
+  "returns_history": {
+    "load_error": "Qaytim tarixini yuklab bo'lmadi",
+    "empty_title": "Qaytim hujjatlari topilmadi",
+    "empty_desc": "Filtr yoki qidiruvni o'zgartirib ko'ring.",
+    "search_placeholder": "Doc no, mijoz ID yoki mijoz nomi",
+    "filter_btn": "Filter",
+    "filter_panel_title": "Filtr",
+    "filter_status": "Status",
+    "filter_all_statuses": "Barcha statuslar",
+    "status_pending_controller": "Kutilmoqda (controller)",
+    "status_approved": "Tasdiqlangan",
+    "status_assigned_to_picker": "Yig'uvchiga biriktirilgan",
+    "status_completed": "Yakunlangan",
+    "status_cancelled": "Bekor qilingan",
+    "columns": {
+      "doc_no": "Doc No",
+      "customer": "Mijoz",
+      "status": "Status",
+      "controller": "Controller",
+      "picker": "Yig'uvchi",
+      "assigned_at": "Yuborilgan",
+      "created_at": "Yaratilgan",
+      "updated_at": "Yangilangan"
+    },
+    "export_list_title": "Qaytganlar ro'yxati",
+    "export_fetching": "Ma'lumot yig'ilmoqda…",
+    "export_success": "Fayl yuklab olindi",
+    "export_failed": "Eksport xatosi",
+    "export_too_large": "Eksport hajmi juda katta. Filterni toraytiring.",
+    "export_filter_applied": "Filtrlar",
+    "export_rows_count": "Qatorlar soni",
+    "export_filter_date": "Sana",
+    "export_filter_status": "Status",
+    "export_filter_search": "Qidiruv",
+    "export_filter_none": "Filtr yo'q"
+  },
   "returns_details": {
     "title": "Qaytim tafsiloti",
     "load_failed": "Qaytim tafsilotini yuklab bo'lmadi",
