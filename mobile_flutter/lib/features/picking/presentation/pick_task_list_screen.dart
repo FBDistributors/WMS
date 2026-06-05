@@ -45,8 +45,6 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
   final TextEditingController _controllerSearch = TextEditingController();
   final TextEditingController _consolidatedBarcode = TextEditingController();
 
-  String? _completedBanner;
-  bool _bannerScheduled = false;
   bool _orderSelectionMode = false;
   final Set<String> _selectedOrderIds = <String>{};
   bool _headerRefreshing = false;
@@ -122,22 +120,6 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
           _consolidatedBarcode.text = b;
         }
       }
-    }
-    final String? done = uri.queryParameters['completedMessage'];
-    if (done != null && done.isNotEmpty && !_bannerScheduled) {
-      _bannerScheduled = true;
-      _completedBanner = done;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) {
-          return;
-        }
-        setState(() {});
-        Future<void>.delayed(const Duration(milliseconds: 2600), () {
-          if (mounted) {
-            setState(() => _completedBanner = null);
-          }
-        });
-      });
     }
   }
 
@@ -668,25 +650,6 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
       backgroundColor: bg,
       body: Column(
         children: <Widget>[
-          if (_completedBanner != null)
-            Material(
-              color: const Color(0xFF15803D),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                child: Row(
-                  children: <Widget>[
-                    const Icon(Icons.check_circle_rounded, color: Colors.white, size: 22),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        Uri.decodeComponent(_completedBanner!),
-                        style: const TextStyle(color: Colors.white, fontSize: 14),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
           PickerTabAppHeader(
             title: headerTitle,
             headerBackgroundColor: isDark ? const Color(0xFF1E293B) : null,

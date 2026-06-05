@@ -30,7 +30,6 @@ class PickerHomeScreen extends ConsumerStatefulWidget {
 
 class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
   bool _refreshing = false;
-  String? _consumedCompletedMessage;
 
   @override
   void initState() {
@@ -66,30 +65,6 @@ class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
     } on Object {
       /* tarmoq yo'q yoki 401 — e'tiborsiz */
     }
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final String? msg = GoRouterState.of(context).uri.queryParameters['completedMessage'];
-    if (msg == null || msg.isEmpty || msg == _consumedCompletedMessage) {
-      return;
-    }
-    _consumedCompletedMessage = msg;
-    final String profileQ =
-        GoRouterState.of(context).uri.queryParameters['profile'] ?? 'picker';
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) {
-        return;
-      }
-      context.goNamed(
-        'pickTasks',
-        queryParameters: <String, String>{
-          'profile': profileQ,
-          'completedMessage': msg,
-        },
-      );
-    });
   }
 
   @override
