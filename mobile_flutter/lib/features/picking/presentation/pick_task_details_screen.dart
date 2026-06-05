@@ -25,6 +25,7 @@ import '../alternate_location_menu_label.dart' show mergeAlternateLocationsForDi
 import '../data/picking_constants.dart';
 import '../data/return_session_storage.dart';
 import '../data/picking_models.dart';
+import '../domain/pick_scan_resolution.dart';
 import '../domain/profile_type_param.dart';
 import '../picking_providers.dart';
 
@@ -33,18 +34,6 @@ class _LineGroup {
 
   final PickingLine virtual;
   final List<PickingLine> members;
-}
-
-/// `_groupLinesByProduct` bilan bir xil — asosiy va aksiya/sovg'a alohida guruh.
-String _lineGroupKey(PickingLine l) {
-  if (l.isVipExpiryInformational) {
-    return 'vip_info:${l.id}';
-  }
-  final String src = (l.lineSource ?? 'product').trim();
-  if (l.productId != null && l.productId!.isNotEmpty) {
-    return 'id:${l.productId}:src:$src';
-  }
-  return '${l.productName}|${l.barcode ?? l.sku ?? ''}|src:$src';
 }
 
 String? _lineSourceBadgeKey(PickingLine line) {
@@ -97,7 +86,7 @@ double _aggregateQtyRequired(Iterable<PickingLine> lines) {
 List<_LineGroup> _groupLinesByProduct(List<PickingLine> lines) {
   final Map<String, List<PickingLine>> map = <String, List<PickingLine>>{};
   for (final PickingLine l in lines) {
-    final String key = _lineGroupKey(l);
+    final String key = pickLineGroupKey(l);
     map.putIfAbsent(key, () => <PickingLine>[]).add(l);
   }
   return map.values.map((List<PickingLine> groupLines) {
@@ -182,29 +171,6 @@ List<_LineGroup> _orderedLineGroupsController(
 
 String _barcodeSkuSubtitle(PickingLine l) => '${l.barcode ?? '—'} / ${l.sku ?? '—'}';
 
-bool _barcodeMatchesLine(String raw, PickingLine line) {
-  final String q = raw.trim().toLowerCase();
-  if (q.isEmpty) {
-    return false;
-  }
-  if (line.barcode != null && line.barcode!.toLowerCase() == q) {
-    return true;
-  }
-  if (line.sku != null && line.sku!.toLowerCase() == q) {
-    return true;
-  }
-  return false;
-}
-
-PickingLine? _findLineByScan(List<PickingLine> lines, String raw) {
-  for (final PickingLine l in lines) {
-    if (_barcodeMatchesLine(raw, l)) {
-      return l;
-    }
-  }
-  return null;
-}
-
 /// RN `Math.floor(Number(qtyInput))` bilan `qty_picked` solishtirish.
 bool _controllerQtyMismatch(String qtyRaw, num qtyPicked) {
   final int entered = (double.tryParse(qtyRaw.trim()) ?? 0).floor();
@@ -230,14 +196,11 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
   Set<String> _verifiedLineIds = <String>{};
   Timer? _detailPollTimer;
 
-  void _navigateAfterComplete(PickerProfileParam profile, AppLocale loc) {
+  void _navigateAfterComplete(PickerProfileParam profile) {
     unawaited(ref.read(openPickTasksProvider.notifier).refreshFromNetwork());
     context.goNamed(
       'pickTasks',
-      queryParameters: <String, String>{
-        'profile': profileToQuery(profile),
-        'completedMessage': StringLookup.t(loc, 'taskCompletedBanner'),
-      },
+      queryParameters: <String, String>{'profile': profileToQuery(profile)},
     );
   }
 
@@ -317,8 +280,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
   }
 
   bool _isControllerGroupFullyVerified(PickingDocument doc, PickingLine anchor) {
-    final List<PickingLine> members = _membersOfSameCardAs(doc, anchor);
-    return members.every((PickingLine l) => _verifiedLineIds.contains(l.id));
+    return isControllerPickGroupFullyVerified(doc.lines, anchor, _verifiedLineIds);
   }
 
   Future<void> _clearVerifiedForGroup(PickingDocument doc, PickingLine anchor) async {
@@ -443,7 +405,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       return;
     }
     final AppLocale loc = ref.read(appLocaleProvider);
-    final PickingLine? line = _findLineByScan(doc.lines, barcode);
+    final PickingLine? line =
+        resolveControllerScanLine(doc.lines, barcode, _verifiedLineIds);
     if (line == null) {
       _rejectScanHaptic();
       showAppSnackBar(context,
@@ -474,7 +437,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       );
       return;
     }
-    if (!_barcodeMatchesLine(barcode, physical)) {
+    if (!barcodeMatchesPickLine(barcode, physical)) {
       _rejectScanHaptic();
       showAppSnackBar(context,
         SnackBar(
@@ -511,7 +474,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     final String normalized = barcode.trim();
     PickingLine? line = preferredLineId != null && preferredLineId.isNotEmpty
         ? null
-        : _findLineByScan(doc.lines, normalized);
+        : resolvePickerScanLine(doc.lines, normalized);
 
     if (preferredLineId != null && preferredLineId.isNotEmpty) {
       for (final PickingLine l in doc.lines) {
@@ -535,7 +498,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       );
       return;
     }
-    if (!_barcodeMatchesLine(normalized, line)) {
+    if (!barcodeMatchesPickLine(normalized, line)) {
       _rejectScanHaptic();
       showAppSnackBar(context,
         SnackBar(
@@ -696,7 +659,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
         if (!mounted) {
           return;
         }
-        final PickingLine? line = _findLineByScan(doc.lines, code);
+        final PickingLine? line =
+            resolveControllerScanLine(doc.lines, code, _verifiedLineIds);
         if (line == null) {
           _rejectScanHaptic();
           showAppSnackBar(context,
@@ -821,7 +785,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
             'pending',
           );
           if (mounted) {
-            _navigateAfterComplete(profile, loc);
+            _navigateAfterComplete(profile);
           }
           return;
         }
@@ -867,7 +831,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                 incompleteReason: pickedReason,
               );
           if (mounted) {
-            _navigateAfterComplete(profile, loc);
+            _navigateAfterComplete(profile);
           }
         } on Exception catch (e) {
           if (mounted) {
@@ -914,7 +878,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
         );
       }
       if (mounted) {
-        _navigateAfterComplete(profile, loc);
+        _navigateAfterComplete(profile);
       }
       return;
     }
@@ -925,7 +889,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       final SharedPreferences sp = await SharedPreferences.getInstance();
       await sp.remove(_verifiedKey(widget.taskId));
       if (mounted) {
-        _navigateAfterComplete(profile, loc);
+        _navigateAfterComplete(profile);
       }
     } on Exception catch (e) {
       if (mounted) {
@@ -1093,18 +1057,12 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                               onChanged: (_) => setM(() {}),
                               onSubmitted: (String v) {
                                 final String t = v.trim();
-                                final PickingLine? match = _findLineByScan(doc.lines, t);
+                                final PickingLine? match =
+                                    resolveScanLineInGroup(group.members, t);
                                 if (match == null) {
                                   _rejectScanHaptic();
                                   showAppSnackBar(context,
                                     SnackBar(content: Text(StringLookup.t(loc, 'productNotInOrder'))),
-                                  );
-                                  return;
-                                }
-                                if (!group.members.any((PickingLine m) => m.id == match.id)) {
-                                  _rejectScanHaptic();
-                                  showAppSnackBar(context,
-                                    SnackBar(content: Text(StringLookup.t(loc, 'wrongBarcodeTitle'))),
                                   );
                                   return;
                                 }
@@ -1163,11 +1121,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                         FilledButton(
                           onPressed: () async {
                             final PickingLine? physical =
-                                _findLineByScan(doc.lines, scannedForQty!);
+                                resolveScanLineInGroup(group.members, scannedForQty!);
                             if (physical == null) {
-                              return;
-                            }
-                            if (!group.members.any((PickingLine m) => m.id == physical.id)) {
                               return;
                             }
                             final double aggPickConfirm =
@@ -1197,13 +1152,14 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                           child: Text(StringLookup.t(loc, 'confirmButton')),
                         ),
                         if (online &&
-                            (_findLineByScan(doc.lines, scannedForQty!)?.qtyPicked ?? 0) >
+                            (resolveScanLineInGroup(group.members, scannedForQty!)?.qtyPicked ??
+                                    0) >
                                 0) ...<Widget>[
                           const SizedBox(height: 8),
                           TextButton(
                             onPressed: () async {
                               final PickingLine? lineForUnpick =
-                                  _findLineByScan(doc.lines, scannedForQty!);
+                                  resolveScanLineInGroup(group.members, scannedForQty!);
                               if (lineForUnpick == null) {
                                 return;
                               }
@@ -1232,13 +1188,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                               ),
                               onChanged: (_) => setM(() {}),
                               onSubmitted: (String v) {
-                                PickingLine? matched;
-                                for (final PickingLine m in group.members) {
-                                  if (_barcodeMatchesLine(v, m)) {
-                                    matched = m;
-                                    break;
-                                  }
-                                }
+                                final PickingLine? matched =
+                                    resolveScanLineInGroup(group.members, v);
                                 if (matched != null) {
                                   setM(() {
                                     pickTargetHolder[0] = matched!;

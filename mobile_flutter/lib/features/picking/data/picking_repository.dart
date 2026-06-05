@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/network/app_dio.dart';
+import '../domain/pick_scan_resolution.dart';
 import 'picking_models.dart';
 
 class PickingRepository {
@@ -281,16 +282,7 @@ class PickingRepository {
         );
       }
     } else {
-      for (final PickingLine l in doc.lines) {
-        final bool byBarcode =
-            l.barcode != null && l.barcode!.toLowerCase() == q;
-        final bool bySku = l.sku != null && l.sku!.toLowerCase() == q;
-        final bool byName = l.productName.toLowerCase().contains(q);
-        if (byBarcode || bySku || byName) {
-          line = l;
-          break;
-        }
-      }
+      line = resolveSubmitScanLine(doc.lines, barcode);
       if (line == null) {
         throw Exception('"$barcode" bo\'yicha pozitsiya topilmadi');
       }
