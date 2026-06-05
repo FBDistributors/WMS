@@ -378,6 +378,10 @@ def _expand_movement_source_status_filters(
         out.append("W")
     if src == "orikzor" and "imported" in out and "S" not in out:
         out.append("S")
+    if src == "orikzor" and "S" in out:
+        for legacy in ("W", "imported"):
+            if legacy not in out:
+                out.append(legacy)
     return list({(s or "").strip() for s in out if (s or "").strip()})
 
 

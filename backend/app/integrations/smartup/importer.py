@@ -41,6 +41,20 @@ WORKFLOW_LOCKED_STATUSES = frozenset(
     }
 )
 FINAL_FROZEN_STATUSES = frozenset({"completed", "packed", "shipped"})
+ORIKZOR_S_REQUEUE_FROM_STATUSES = frozenset({"completed", "packed", "shipped", "W", "imported"})
+
+
+def _orikzor_smartup_s_requeue(
+    order_src: str,
+    incoming_status: str | None,
+    current_status: str | None,
+) -> bool:
+    """Smartup S qayta kelganda eski completed/W/imported yozuvni S navbatiga qaytarish."""
+    return (
+        order_src == "orikzor"
+        and (incoming_status or "").strip().upper() == "S"
+        and (current_status or "") in ORIKZOR_S_REQUEUE_FROM_STATUSES
+    )
 
 
 def reconcile_diller_imported_status_to_w(db: Session) -> int:
@@ -172,14 +186,17 @@ def _process_one_order(
     if override and external_id != payload.source_external_id:
         payload.source_external_id = external_id
     source = order_source if order_source else payload.source
+    incoming_status = normalize_order_wms_status_for_storage(payload.status)
     try:
         _enrich_order_line_names_from_products(db, payload.lines)
         if existing:
             current_status = normalize_order_wms_status_for_storage(
                 existing.wms_state.status if existing.wms_state else None
             )
+            orikzor_s_requeue = _orikzor_smartup_s_requeue(order_src, incoming_status, current_status)
             if (
-                current_status in FINAL_FROZEN_STATUSES
+                not orikzor_s_requeue
+                and current_status in FINAL_FROZEN_STATUSES
                 and _order_lines_fingerprint_from_order(existing)
                 == _order_lines_fingerprint_from_payload(payload.lines)
             ):
@@ -222,16 +239,15 @@ def _process_one_order(
             if getattr(payload, "delivery_number", None) is not None:
                 existing.delivery_number = getattr(payload, "delivery_number", None)
             if existing.wms_state:
-                incoming_status = normalize_order_wms_status_for_storage(payload.status)
-                if current_status in WORKFLOW_LOCKED_STATUSES:
+                if orikzor_s_requeue or current_status not in WORKFLOW_LOCKED_STATUSES:
+                    existing.wms_state.status = incoming_status
+                else:
                     logger.info(
                         "import_orders: preserve wms status for %s (current=%s, incoming=%s)",
                         external_id,
                         current_status,
                         incoming_status,
                     )
-                else:
-                    existing.wms_state.status = incoming_status
             else:
                 existing.wms_state = OrderWmsState(
                     status=normalize_order_wms_status_for_storage(payload.status)

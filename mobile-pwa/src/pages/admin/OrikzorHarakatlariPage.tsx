@@ -503,6 +503,7 @@ export function OrikzorHarakatlariPage() {
             {syncResult ? (
               <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
                 {t('orders:sync_result', { created: syncResult.created, updated: syncResult.updated, skipped: syncResult.skipped })}
+                {syncResult.detail ? ` — ${syncResult.detail}` : null}
               </span>
             ) : null}
           </div>
