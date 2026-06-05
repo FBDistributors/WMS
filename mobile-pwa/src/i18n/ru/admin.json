@@ -291,7 +291,14 @@
     "export_filter_date": "Дата",
     "export_filter_status": "Статус",
     "export_filter_search": "Поиск",
-    "export_filter_none": "Без фильтров"
+    "export_filter_none": "Без фильтров",
+    "table": {
+      "settings_title": "Настройки таблицы",
+      "columns_title": "Столбцы",
+      "columns_hint": "Выберите видимые столбцы и измените порядок.",
+      "reset_default": "По умолчанию",
+      "save_settings": "Сохранить"
+    }
   },
   "returns_details": {
     "title": "Детали возврата",

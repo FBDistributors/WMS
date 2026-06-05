@@ -291,7 +291,14 @@
     "export_filter_date": "Date",
     "export_filter_status": "Status",
     "export_filter_search": "Search",
-    "export_filter_none": "No filters"
+    "export_filter_none": "No filters",
+    "table": {
+      "settings_title": "Table settings",
+      "columns_title": "Columns",
+      "columns_hint": "Choose visible columns and drag to reorder.",
+      "reset_default": "Reset to default",
+      "save_settings": "Save"
+    }
   },
   "returns_details": {
     "title": "Return details",

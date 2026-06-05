@@ -1,13 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ClipboardList, Filter, RefreshCw, Search, X } from 'lucide-react'
+import { ClipboardList, Filter, RefreshCw, Search, Settings, X } from 'lucide-react'
 
 import { AdminDataTable, type AdminDataTableColumn } from '../../admin/components/AdminDataTable'
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { AdminTablePagination } from '../../admin/components/AdminTablePagination'
+import { ReturnsHistoryTableSettings } from '../../admin/components/returns/ReturnsHistoryTableSettings'
 import { ReceiptListExportToolbar } from '../../admin/components/receiving/ReceiptListExportToolbar'
 import type { ExportFormat } from '../../admin/components/receiving/ExportFormatDropdown'
+import {
+  RETURNS_HISTORY_TABLE_COLUMN_IDS,
+  useReturnsHistoryTableConfig,
+  type ReturnsHistoryTableColumnId,
+} from '../../admin/hooks/useReturnsHistoryTableConfig'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { DateInput } from '../../components/DateInput'
@@ -69,8 +75,11 @@ export function ReturnsHistoryPage() {
   const [rows, setRows] = useState<CustomerReturnOut[]>([])
   const [total, setTotal] = useState(0)
   const [filterPanelOpen, setFilterPanelOpen] = useState(false)
+  const [isTableSettingsOpen, setIsTableSettingsOpen] = useState(false)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const hasLoadedOnceRef = useRef(false)
+  const { config: tableConfig, updateConfig: updateTableConfig, resetConfig: resetTableConfig } =
+    useReturnsHistoryTableConfig()
 
   const q = searchParams.get('q') ?? ''
   const status = searchParams.get('status') ?? ''
@@ -184,85 +193,91 @@ export function ReturnsHistoryPage() {
     [buildExportFilterSummary, dateFrom, dateTo, q, showError, showInfo, showSuccess, status, t]
   )
 
-  const tableColumns = useMemo((): AdminDataTableColumn<CustomerReturnOut>[] => {
-    const cols: Array<{ id: string; header: string; cell: (row: CustomerReturnOut) => ReactNode }> = [
-      {
-        id: 'doc_no',
-        header: t('admin:returns_history.columns.doc_no'),
-        cell: (row) => (
-          <span className="block truncate font-semibold text-blue-700 dark:text-blue-300" title={row.doc_no}>
-            {row.doc_no}
-          </span>
-        ),
-      },
-      {
-        id: 'customer',
-        header: t('admin:returns_history.columns.customer'),
-        cell: (row) => (
-          <span className="block truncate" title={row.customer_name ?? row.customer_id ?? undefined}>
-            {row.customer_name || row.customer_id || '—'}
-          </span>
-        ),
-      },
-      {
-        id: 'status',
-        header: t('admin:returns_history.columns.status'),
-        cell: (row) => (
-          <span className="block truncate" title={returnStatusLabel(row.status, t)}>
-            {returnStatusLabel(row.status, t)}
-          </span>
-        ),
-      },
-      {
-        id: 'controller',
-        header: t('admin:returns_history.columns.controller'),
-        cell: (row) => (
-          <span
-            className="block truncate"
-            title={row.assigned_by_user_name || row.approved_by_user_name || undefined}
-          >
-            {row.assigned_by_user_name || row.approved_by_user_name || row.assigned_by_user_id || '—'}
-          </span>
-        ),
-      },
-      {
-        id: 'picker',
-        header: t('admin:returns_history.columns.picker'),
-        cell: (row) => (
-          <span className="block truncate" title={row.assigned_picker_user_name ?? undefined}>
-            {row.assigned_picker_user_name || row.assigned_picker_user_id || '—'}
-          </span>
-        ),
-      },
-      {
-        id: 'assigned_at',
-        header: t('admin:returns_history.columns.assigned_at'),
-        cell: (row) => (
-          <span className="whitespace-nowrap text-xs">{formatReturnsDateTime(row.assigned_at)}</span>
-        ),
-      },
-      {
-        id: 'created_at',
-        header: t('admin:returns_history.columns.created_at'),
-        cell: (row) => (
-          <span className="whitespace-nowrap text-xs">{formatReturnsDateTime(row.created_at)}</span>
-        ),
-      },
-      {
-        id: 'updated_at',
-        header: t('admin:returns_history.columns.updated_at'),
-        cell: (row) => (
-          <span className="whitespace-nowrap text-xs">{formatReturnsDateTime(row.updated_at)}</span>
-        ),
-      },
-    ]
-    return cols.map((col) => ({
-      id: col.id,
-      header: col.header,
-      width: returnsThWidth(col.id),
-      cell: (row) => col.cell(row),
-    }))
+  const columnLabels = useMemo((): Record<ReturnsHistoryTableColumnId, string> => {
+    return {
+      doc_no: t('admin:returns_history.columns.doc_no'),
+      customer: t('admin:returns_history.columns.customer'),
+      status: t('admin:returns_history.columns.status'),
+      controller: t('admin:returns_history.columns.controller'),
+      picker: t('admin:returns_history.columns.picker'),
+      assigned_at: t('admin:returns_history.columns.assigned_at'),
+      created_at: t('admin:returns_history.columns.created_at'),
+      updated_at: t('admin:returns_history.columns.updated_at'),
+    }
   }, [t])
+
+  const columnOptions = useMemo(
+    () =>
+      RETURNS_HISTORY_TABLE_COLUMN_IDS.map((id) => ({
+        id,
+        label: columnLabels[id],
+      })),
+    [columnLabels]
+  )
+
+  const orderedVisibleColumns = useMemo(() => {
+    const visible = new Set(tableConfig.visibleColumns)
+    return tableConfig.columnOrder.filter(
+      (id): id is ReturnsHistoryTableColumnId =>
+        RETURNS_HISTORY_TABLE_COLUMN_IDS.includes(id as ReturnsHistoryTableColumnId) &&
+        visible.has(id)
+    )
+  }, [tableConfig.columnOrder, tableConfig.visibleColumns])
+
+  const tableColumns = useMemo((): AdminDataTableColumn<CustomerReturnOut>[] => {
+    const cellByColumn = (colId: ReturnsHistoryTableColumnId, row: CustomerReturnOut): ReactNode => {
+      switch (colId) {
+        case 'doc_no':
+          return (
+            <span className="block truncate font-semibold text-blue-700 dark:text-blue-300" title={row.doc_no}>
+              {row.doc_no}
+            </span>
+          )
+        case 'customer':
+          return (
+            <span className="block truncate" title={row.customer_name ?? row.customer_id ?? undefined}>
+              {row.customer_name || row.customer_id || '—'}
+            </span>
+          )
+        case 'status':
+          return (
+            <span className="block truncate" title={returnStatusLabel(row.status, t)}>
+              {returnStatusLabel(row.status, t)}
+            </span>
+          )
+        case 'controller':
+          return (
+            <span
+              className="block truncate"
+              title={row.assigned_by_user_name || row.approved_by_user_name || undefined}
+            >
+              {row.assigned_by_user_name || row.approved_by_user_name || row.assigned_by_user_id || '—'}
+            </span>
+          )
+        case 'picker':
+          return (
+            <span className="block truncate" title={row.assigned_picker_user_name ?? undefined}>
+              {row.assigned_picker_user_name || row.assigned_picker_user_id || '—'}
+            </span>
+          )
+        case 'assigned_at':
+          return <span className="whitespace-nowrap text-xs">{formatReturnsDateTime(row.assigned_at)}</span>
+        case 'created_at':
+          return <span className="whitespace-nowrap text-xs">{formatReturnsDateTime(row.created_at)}</span>
+        case 'updated_at':
+          return <span className="whitespace-nowrap text-xs">{formatReturnsDateTime(row.updated_at)}</span>
+        default:
+          return '—'
+      }
+    }
+
+    return orderedVisibleColumns.map((colId) => ({
+      id: colId,
+      header: columnLabels[colId],
+      width: returnsThWidth(colId),
+      cell: (row) => cellByColumn(colId, row),
+    }))
+  }, [columnLabels, orderedVisibleColumns, t])
 
   const showInitialLoading = isLoading && !hasLoadedOnceRef.current
 
@@ -305,6 +320,16 @@ export function ReturnsHistoryPage() {
         />
       )
     }
+    if (orderedVisibleColumns.length === 0) {
+      return (
+        <EmptyState
+          title={t('admin:returns_history.empty_title')}
+          description={t('admin:returns_history.table.columns_hint')}
+          actionLabel={t('admin:returns_history.table.settings_title')}
+          onAction={() => setIsTableSettingsOpen(true)}
+        />
+      )
+    }
     return (
       <AdminDataTable
         columns={tableColumns}
@@ -328,8 +353,8 @@ export function ReturnsHistoryPage() {
       }
     >
       <Card className="space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative min-w-[180px] flex-1 max-w-md">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="relative w-full min-w-[180px] max-w-md sm:w-72 sm:flex-none">
             <Search
               size={18}
               className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -353,8 +378,7 @@ export function ReturnsHistoryPage() {
               aria-label={t('admin:returns_history.search_placeholder')}
             />
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-2 sm:ml-auto">
-            <div className="relative" ref={filterPanelRef}>
+          <div className="relative" ref={filterPanelRef}>
               <Button
                 variant="outline"
                 onClick={() => setFilterPanelOpen((open) => !open)}
@@ -476,6 +500,15 @@ export function ReturnsHistoryPage() {
               <RefreshCw size={18} className={isRefreshing ? 'animate-spin shrink-0' : 'shrink-0'} />
               {t('common:buttons.refresh')}
             </Button>
+            <Button
+              variant="secondary"
+              className="h-10 gap-1.5 rounded-xl px-3"
+              onClick={() => setIsTableSettingsOpen(true)}
+              title={t('admin:returns_history.table.settings_title')}
+              aria-label={t('admin:returns_history.table.settings_title')}
+            >
+              <Settings size={18} />
+            </Button>
             <ReceiptListExportToolbar
               disabled={showInitialLoading || total === 0}
               onExport={async (kind) => {
@@ -486,7 +519,6 @@ export function ReturnsHistoryPage() {
                 }
               }}
             />
-          </div>
         </div>
 
         {tableBody()}
@@ -513,6 +545,15 @@ export function ReturnsHistoryPage() {
           />
         ) : null}
       </Card>
+
+      <ReturnsHistoryTableSettings
+        open={isTableSettingsOpen}
+        onOpenChange={setIsTableSettingsOpen}
+        config={tableConfig}
+        columns={columnOptions}
+        onSave={updateTableConfig}
+        onReset={resetTableConfig}
+      />
     </AdminLayout>
   )
 }

@@ -291,7 +291,14 @@
     "export_filter_date": "Sana",
     "export_filter_status": "Status",
     "export_filter_search": "Qidiruv",
-    "export_filter_none": "Filtr yo'q"
+    "export_filter_none": "Filtr yo'q",
+    "table": {
+      "settings_title": "Jadval sozlamalari",
+      "columns_title": "Ustunlar",
+      "columns_hint": "Ko'rinadigan ustunlarni tanlang va tartibini o'zgartiring.",
+      "reset_default": "Standart",
+      "save_settings": "Saqlash"
+    }
   },
   "returns_details": {
     "title": "Qaytim tafsiloti",
