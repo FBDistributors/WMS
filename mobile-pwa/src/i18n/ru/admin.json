@@ -22,6 +22,7 @@
     "receiving": "Приёмка",
     "users": "Пользователи и доступ",
     "audit": "Журнал аудита",
+    "app_feedback": "Отзывы о приложении",
     "kamomat": "Инвентаризация",
     "integrations": "Интеграции",
     "smartup_orders": "Заказы Smartup",
@@ -349,5 +350,49 @@
     "password_soon": "Смена пароля скоро будет доступна.",
     "security_title": "Безопасность",
     "enable_2fa": "Включить двухфакторную аутентификацию"
+  },
+  "app_feedback": {
+    "title": "Отзывы о приложении",
+    "load_error": "Не удалось загрузить отзывы",
+    "empty_title": "Отзывы не найдены",
+    "empty_desc": "Попробуйте изменить фильтры.",
+    "filter_btn": "Фильтр",
+    "filter_panel_title": "Фильтр",
+    "filter_role": "Роль",
+    "filter_module": "Модуль",
+    "filter_rating": "Оценка",
+    "filter_date_from": "С",
+    "filter_date_to": "По",
+    "filter_all": "Все",
+    "stats": {
+      "average": "Средняя оценка",
+      "picker": "Средняя (сборщик)",
+      "controller": "Средняя (контролёр)",
+      "total": "Всего отзывов"
+    },
+    "columns": {
+      "created_at": "Время",
+      "user": "Пользователь",
+      "rating": "Оценка",
+      "role": "Роль",
+      "module": "Модуль",
+      "comment": "Комментарий",
+      "platform": "Платформа",
+      "app_version": "Версия приложения"
+    },
+    "roles": {
+      "picker": "Сборщик",
+      "controller": "Контролёр",
+      "warehouse_admin": "Админ",
+      "supervisor": "Супервайзер",
+      "inventory_controller": "Инвентарный контролёр"
+    },
+    "modules": {
+      "picking": "Сбор",
+      "returns": "Возвраты",
+      "inventory": "Инвентарь",
+      "receiving": "Приёмка",
+      "general": "Общее"
+    }
   }
 }

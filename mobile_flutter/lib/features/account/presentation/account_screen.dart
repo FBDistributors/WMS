@@ -6,6 +6,7 @@ import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../core/app_state/theme_controller.dart';
 import '../../../l10n/string_lookup.dart';
+import '../../feedback/presentation/app_feedback_sheet.dart';
 import '../../auth/data/auth_models.dart';
 import '../../auth/presentation/auth_providers.dart';
 
@@ -56,6 +57,17 @@ class AccountScreen extends ConsumerWidget {
             leading: const Icon(Icons.notifications_none_rounded),
             title: Text(StringLookup.t(loc, 'notifications')),
             onTap: () => context.pushNamed('notifications'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.star_outline_rounded),
+            title: Text(StringLookup.t(loc, 'appFeedbackMenu')),
+            onTap: () {
+              showAppFeedbackSheet(
+                context: context,
+                module: 'general',
+                forceShow: true,
+              );
+            },
           ),
           ListTile(
             leading: const Icon(Icons.logout_rounded),

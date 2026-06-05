@@ -22,6 +22,7 @@
     "receiving": "Receiving",
     "users": "Users & Access",
     "audit": "Audit Logs",
+    "app_feedback": "App feedback",
     "kamomat": "Inventory count",
     "integrations": "Integrations",
     "smartup_orders": "Smartup Orders",
@@ -349,5 +350,49 @@
     "password_soon": "Password change is coming soon.",
     "security_title": "Security",
     "enable_2fa": "Enable Two-Factor Authentication"
+  },
+  "app_feedback": {
+    "title": "App feedback",
+    "load_error": "Could not load feedback",
+    "empty_title": "No feedback found",
+    "empty_desc": "Try changing the filters.",
+    "filter_btn": "Filter",
+    "filter_panel_title": "Filter",
+    "filter_role": "Role",
+    "filter_module": "Module",
+    "filter_rating": "Rating",
+    "filter_date_from": "From",
+    "filter_date_to": "To",
+    "filter_all": "All",
+    "stats": {
+      "average": "Average rating",
+      "picker": "Picker average",
+      "controller": "Controller average",
+      "total": "Total feedback"
+    },
+    "columns": {
+      "created_at": "Time",
+      "user": "User",
+      "rating": "Rating",
+      "role": "Role",
+      "module": "Module",
+      "comment": "Comment",
+      "platform": "Platform",
+      "app_version": "App version"
+    },
+    "roles": {
+      "picker": "Picker",
+      "controller": "Controller",
+      "warehouse_admin": "Admin",
+      "supervisor": "Supervisor",
+      "inventory_controller": "Inventory controller"
+    },
+    "modules": {
+      "picking": "Picking",
+      "returns": "Returns",
+      "inventory": "Inventory",
+      "receiving": "Receiving",
+      "general": "General"
+    }
   }
 }

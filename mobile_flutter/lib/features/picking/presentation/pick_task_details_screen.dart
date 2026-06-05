@@ -200,7 +200,11 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     unawaited(ref.read(openPickTasksProvider.notifier).refreshFromNetwork());
     context.goNamed(
       'pickTasks',
-      queryParameters: <String, String>{'profile': profileToQuery(profile)},
+      queryParameters: <String, String>{
+        'profile': profileToQuery(profile),
+        'promptFeedback': '1',
+        'feedbackContext': widget.taskId,
+      },
     );
   }
 

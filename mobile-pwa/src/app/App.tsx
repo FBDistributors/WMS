@@ -33,6 +33,7 @@ import { UserDetailsPage } from '../pages/admin/users/UserDetailsPage'
 import { AuditLogsPage } from '../pages/admin/AuditLogsPage'
 import { KamomatlarPage } from '../pages/admin/KamomatlarPage'
 import { ReturnsHistoryPage } from '../pages/admin/ReturnsHistoryPage'
+import { AppFeedbackPage } from '../pages/admin/AppFeedbackPage'
 import { ReturnDetailsPage } from '../pages/admin/ReturnDetailsPage'
 import { MahsulotYoqQilishPage } from '../pages/admin/MahsulotYoqQilishPage'
 import { PickListsPage } from '../pages/admin/PickListsPage'
@@ -585,6 +586,16 @@ export function App() {
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">
               <RequirePermission permission="movements:read">
                 <KamomatlarPage />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/app-feedback"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="audit:read">
+                <AppFeedbackPage />
               </RequirePermission>
             </RequirePermission>
           }

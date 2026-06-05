@@ -19,6 +19,7 @@ import '../data/picking_constants.dart';
 import '../data/picking_models.dart';
 import '../domain/profile_type_param.dart';
 import '../picking_providers.dart';
+import '../../feedback/presentation/app_feedback_sheet.dart';
 
 bool _pickerEligibleBulkSend(PickingListItem item, PickerProfileParam profile) {
   return profile == PickerProfileParam.picker &&
@@ -38,6 +39,7 @@ class PickTaskListScreen extends ConsumerStatefulWidget {
 
 class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
   bool _handledRouteExtras = false;
+  bool _handledFeedbackPrompt = false;
   bool _showConsolidated = false;
   int _consolidatedRefreshKey = 0;
   String? _pendingConsolidatedBarcode;
@@ -120,6 +122,29 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
           _consolidatedBarcode.text = b;
         }
       }
+    }
+
+    if (!_handledFeedbackPrompt && uri.queryParameters['promptFeedback'] == '1') {
+      _handledFeedbackPrompt = true;
+      final String? feedbackContext = uri.queryParameters['feedbackContext'];
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) {
+          return;
+        }
+        await maybeShowAutomaticAppFeedback(
+          context: context,
+          ref: ref,
+          module: 'picking',
+          contextRef: feedbackContext,
+        );
+        if (!mounted) {
+          return;
+        }
+        context.goNamed(
+          'pickTasks',
+          queryParameters: <String, String>{'profile': profileToQuery(routeProfile)},
+        );
+      });
     }
   }
 

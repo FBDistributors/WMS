@@ -22,6 +22,7 @@
     "receiving": "Qabul",
     "users": "Users & Access",
     "audit": "Audit log",
+    "app_feedback": "Ilova fikrlari",
     "kamomat": "Inventarizatsiya",
     "integrations": "Integratsiyalar",
     "smartup_orders": "Smartup buyurtmalar",
@@ -349,5 +350,49 @@
     "password_soon": "Parolni o‘zgartirish tez orada.",
     "security_title": "Xavfsizlik",
     "enable_2fa": "Ikki bosqichli autentifikatsiyani yoqish"
+  },
+  "app_feedback": {
+    "title": "Ilova fikrlari",
+    "load_error": "Fikrlarni yuklab bo'lmadi",
+    "empty_title": "Fikrlar topilmadi",
+    "empty_desc": "Filtrlarni o'zgartirib ko'ring.",
+    "filter_btn": "Filter",
+    "filter_panel_title": "Filtr",
+    "filter_role": "Rol",
+    "filter_module": "Modul",
+    "filter_rating": "Reyting",
+    "filter_date_from": "Dan",
+    "filter_date_to": "Gacha",
+    "filter_all": "Barchasi",
+    "stats": {
+      "average": "O'rtacha reyting",
+      "picker": "Yig'uvchi o'rtachasi",
+      "controller": "Controller o'rtachasi",
+      "total": "Jami fikrlar"
+    },
+    "columns": {
+      "created_at": "Vaqt",
+      "user": "Foydalanuvchi",
+      "rating": "Reyting",
+      "role": "Rol",
+      "module": "Modul",
+      "comment": "Izoh",
+      "platform": "Platforma",
+      "app_version": "Ilova versiyasi"
+    },
+    "roles": {
+      "picker": "Yig'uvchi",
+      "controller": "Controller",
+      "warehouse_admin": "Admin",
+      "supervisor": "Supervisor",
+      "inventory_controller": "Inventar controller"
+    },
+    "modules": {
+      "picking": "Terish",
+      "returns": "Qaytim",
+      "inventory": "Inventar",
+      "receiving": "Qabul",
+      "general": "Umumiy"
+    }
   }
 }

@@ -15,6 +15,7 @@ from app.models.safe_cancel_return import SafeCancelReturnLine, SafeCancelReturn
 from app.models.stock import StockLot, StockMovement
 from app.models.smartup_sync import SmartupSyncRun
 from app.models.user import User
+from app.models.user_app_feedback import UserAppFeedback
 from app.models.user_fcm_token import UserFCMToken
 from app.models.user_session import UserSession
 from app.models.vip_customer import VipCustomer
@@ -57,6 +58,7 @@ __all__ = [
     "StockMovement",
     "SmartupSyncRun",
     "User",
+    "UserAppFeedback",
     "UserFCMToken",
     "UserSession",
     "VipCustomer",
