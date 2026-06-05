@@ -87,7 +87,7 @@ export function OrikzorHarakatlariPage() {
       try {
         const data = await getOrders({
           order_source: 'orikzor',
-          status: 'imported',
+          status: 'S',
           q: searchQuery.trim() || undefined,
           date_from: dateFrom.trim() || undefined,
           date_to: dateTo.trim() || undefined,

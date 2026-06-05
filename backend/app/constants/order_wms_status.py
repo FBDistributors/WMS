@@ -10,6 +10,7 @@ CANONICAL_ORDER_WMS_STATUSES: frozenset[str] = frozenset(
     {
         "imported",
         "W",  # SmartUp tashkiliy harakat (mfm) yangi qator — DB da saqlanadi
+        "S",  # SmartUp O'rikzor harakati (literal Smartup status S)
         "allocated",
         "picking",
         "picked",
@@ -56,6 +57,22 @@ def smartup_movement_status_for_wms_storage(value: str | None) -> str:
     if ru in ("A", "CANCELLED"):
         return "cancelled"
     return normalize_order_wms_status_for_storage(s)
+
+
+def smartup_orikzor_status_for_wms_storage(value: str | None) -> str:
+    """
+    SmartUp O'rikzor harakati holati -> order_wms_state (DB).
+    Smartup S/B#S literal "S" sifatida saqlanadi (completed ga map qilinmaydi).
+    """
+    s = (value or "").strip()
+    if not s:
+        return "S"
+    ru = s.upper()
+    if ru in ("S", "B#S"):
+        return "S"
+    if ru in ("A", "CANCELLED"):
+        return "cancelled"
+    return "S"
 
 
 def normalize_list_status_filter_token(token: str) -> str:

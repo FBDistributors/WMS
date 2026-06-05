@@ -39,12 +39,14 @@ def _structure_summary(obj, depth: int = 0, max_depth: int = 4):
     return type(obj).__name__
 
 
-# Smartup movement statuslari. Env bo'sh/berilmagan bo'lsa barcha statuslar qabul qilinadi (filtr o'chiq).
-# SMARTUP_ORIKZOR_ALLOWED_STATUSES=N,C,B#W,D,P,O,S (vergul bilan) — faqat shu statuslar import qilinadi.
+# Smartup movement statuslari. O'rikzor DB sync: faqat status S import qilinadi (env dan mustaqil).
+# SMARTUP_ORIKZOR_ALLOWED_STATUSES — legacy; parse loop endi doim S talab qiladi.
 _env_statuses = (os.getenv("SMARTUP_ORIKZOR_ALLOWED_STATUSES") or "").strip()
 ALLOWED_MOVEMENT_STATUSES: set[str] = (
     {s.strip().upper() for s in _env_statuses.split(",") if s.strip()} if _env_statuses else set()
 )
+ORIKZOR_REQUIRED_STATUS = "S"
+ORIKZOR_TO_WAREHOUSE_CODE = (os.getenv("SMARTUP_ORIKZOR_TO_WAREHOUSE") or "777").strip() or "777"
 
 
 def _row_field(row: dict, *keys: str) -> str | None:
@@ -71,6 +73,7 @@ def _parse_movement_response(
     skipped_by_reason: dict[str, int] = {
         "missing_id": 0,
         "status_not_allowed": 0,
+        "to_warehouse_not_777": 0,
         "product_not_found": 0,
         "warehouse_null_or_not_found": 0,
         "date_parse_error": 0,
@@ -105,6 +108,7 @@ def _parse_movement_response(
     skipped_by_reason = {
         "missing_id": 0,
         "status_not_allowed": 0,
+        "to_warehouse_not_777": 0,
         "product_not_found": 0,
         "warehouse_null_or_not_found": 0,
         "date_parse_error": 0,
@@ -214,15 +218,13 @@ def _parse_movement_response(
         raw_status = (m.get("status") or "").strip()
         # Normalize to uppercase: Smartup "c"/"n" qaytarsa ham "C"/"N" sifatida qabul qilamiz
         normalized_status = raw_status.upper() if raw_status else ""
-        if not status_filter_off and ALLOWED_MOVEMENT_STATUSES and normalized_status and normalized_status not in ALLOWED_MOVEMENT_STATUSES:
+        if not status_filter_off and normalized_status != ORIKZOR_REQUIRED_STATUS:
             skipped_by_reason["status_not_allowed"] += 1
-            if raw_status != normalized_status:
-                logger.debug(
-                    "O'rikzor: status skipped (raw=%r normalized=%r allowed=%s)",
-                    raw_status,
-                    normalized_status,
-                    sorted(ALLOWED_MOVEMENT_STATUSES),
-                )
+            continue
+
+        to_wh_filter = _row_field(m, "to_warehouse_code", "toWarehouseCode")
+        if (to_wh_filter or "").strip() != ORIKZOR_TO_WAREHOUSE_CODE:
+            skipped_by_reason["to_warehouse_not_777"] += 1
             continue
 
         # from/to_warehouse_code null bo'lsa skip qilmaymiz — default warehouse (filial) ishlatamiz

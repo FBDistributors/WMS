@@ -143,6 +143,7 @@
   },
   "status": {
     "W": "Yangi",
+    "S": "Smartup (S)",
     "imported": "Navbatda (import)",
     "allocated": "Yig'uvchiga yuborilgan",
     "ready_for_picking": "Navbatda (import)",

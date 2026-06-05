@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.constants.order_wms_status import (
     normalize_order_wms_status_for_storage,
     smartup_movement_status_for_wms_storage,
+    smartup_orikzor_status_for_wms_storage,
 )
 from app.constants.smartup_org_filials import normalize_smartup_org_filial_id
 from app.services.organization_labels import load_org_name_map, resolve_org_filial_id_from_note
@@ -161,7 +162,7 @@ def _process_one_order(
                 payload.to_filial_code = inferred
                 payload.filial_id = inferred
     elif order_src == "orikzor":
-        payload.status = smartup_movement_status_for_wms_storage(order.status)
+        payload.status = smartup_orikzor_status_for_wms_storage(order.status)
     else:
         raw_status = (order.status or "").strip()
         if raw_status:
@@ -292,6 +293,13 @@ def _process_one_order(
 
 
 STALE_ORDER_STATUSES = ("imported", "W")
+ORIKZOR_STALE_ORDER_STATUSES = ("S",)
+
+
+def _stale_order_statuses(order_source: str | None) -> tuple[str, ...]:
+    if (order_source or "").strip().lower() == "orikzor":
+        return ORIKZOR_STALE_ORDER_STATUSES
+    return STALE_ORDER_STATUSES
 
 
 def _external_ids_to_keep_from_smartup(
@@ -334,8 +342,9 @@ def _delete_imported_orders_by_external_ids(
 ) -> int:
     if not external_ids:
         return 0
+    stale_statuses = _stale_order_statuses(order_source)
     filters = [
-        OrderWmsState.status.in_(STALE_ORDER_STATUSES),
+        OrderWmsState.status.in_(stale_statuses),
         Order.source_external_id.in_(external_ids),
     ]
     src = (order_source or "").strip()
@@ -384,8 +393,9 @@ def delete_stale_orders(
         db.commit()
         return deleted
 
+    stale_statuses = _stale_order_statuses(order_source)
     filters = [
-        OrderWmsState.status.in_(STALE_ORDER_STATUSES),
+        OrderWmsState.status.in_(stale_statuses),
         Order.source_external_id.notin_(external_ids_to_keep),
     ]
     src = (order_source or "").strip()
@@ -400,7 +410,7 @@ def delete_stale_orders(
     ]
     if ids_to_delete:
         deleted += db.query(Order).filter(Order.id.in_(ids_to_delete)).delete(synchronize_session=False)
-        logger.info("delete_stale_orders: %d ta eski buyurtma o'chirildi (imported/W)", len(ids_to_delete))
+        logger.info("delete_stale_orders: %d ta eski buyurtma o'chirildi (%s)", len(ids_to_delete), stale_statuses)
     db.commit()
     return deleted
 

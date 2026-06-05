@@ -374,8 +374,10 @@ def _expand_movement_source_status_filters(
     if src not in ("diller", "orikzor"):
         return status_values
     out = list(status_values)
-    if "imported" in out and "W" not in out:
+    if src == "diller" and "imported" in out and "W" not in out:
         out.append("W")
+    if src == "orikzor" and "imported" in out and "S" not in out:
+        out.append("S")
     return list({(s or "").strip() for s in out if (s or "").strip()})
 
 
@@ -1666,7 +1668,14 @@ async def _sync_orikzor(db: Session, payload: SmartupSyncRequest) -> SmartupSync
             created, updated, skipped, import_errors, skipped_by_reason = import_orders(
                 db, items, order_source="orikzor"
             )
-            return _build_sync_response(created, updated, skipped, import_errors, skipped_by_reason)
+            stale_deleted = delete_stale_orders(db, items, order_source="orikzor")
+            extra_debug = {
+                "stale_deleted": stale_deleted,
+                "parse_skipped_by_reason": response.debug_skipped_by_reason,
+            }
+            return _build_sync_response(
+                created, updated, skipped, import_errors, skipped_by_reason, extra_debug=extra_debug
+            )
         except RuntimeError as exc:
             msg = str(exc)
             if "400" in msg or "не найдена" in msg or "organization" in msg.lower():

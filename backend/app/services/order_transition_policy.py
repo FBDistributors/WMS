@@ -6,6 +6,7 @@ from typing import Literal
 OrderStatus = Literal[
     "imported",
     "W",
+    "S",
     "allocated",
     "picking",
     "picked",
@@ -28,6 +29,7 @@ class TransitionRule:
 _RULES: tuple[TransitionRule, ...] = (
     TransitionRule("imported", "allocated", "allocate"),
     TransitionRule("W", "allocated", "allocate"),
+    TransitionRule("S", "allocated", "allocate"),
     TransitionRule("allocated", "allocated", "allocate"),
     TransitionRule("allocated", "picking", "noop"),
     TransitionRule("picking", "picked", "noop"),

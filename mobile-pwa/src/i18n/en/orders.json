@@ -143,6 +143,7 @@
   },
   "status": {
     "W": "New",
+    "S": "Smartup (S)",
     "imported": "In queue (imported)",
     "allocated": "Sent to picker",
     "ready_for_picking": "In queue (imported)",
