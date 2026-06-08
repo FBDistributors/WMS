@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { FileText, Filter, RefreshCw, Settings, X, XCircle } from 'lucide-react'
+import { FileText, Filter, RefreshCw, Settings, UserRoundPen, X, XCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -525,22 +525,24 @@ export function PickListsPage() {
           return (
             <td
               key={colId}
-              className="max-w-[160px] truncate px-4 py-3 text-slate-600 dark:text-slate-300"
+              className="max-w-[160px] px-4 py-3 text-slate-600 dark:text-slate-300"
               title={item.picker_name ?? ''}
             >
-              <div className="flex flex-col gap-1">
-                <span>{item.picker_name ?? '—'}</span>
+              <div className="flex items-center gap-1">
+                <span className="min-w-0 truncate">{item.picker_name ?? '—'}</span>
                 {!archive && canReassignPickerRow(item) ? (
-                  <button
-                    type="button"
-                    className="text-left text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
-                    onClick={(e) => {
+                  <Button
+                    variant="ghost"
+                    className="h-7 w-7 shrink-0 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:text-blue-400 dark:hover:bg-blue-950/40"
+                    title={t('orders:reassign_picker.button')}
+                    aria-label={t('orders:reassign_picker.button')}
+                    onClick={(e: React.MouseEvent) => {
                       e.stopPropagation()
                       setReassignDialogOrderIds([item.order_id as string])
                     }}
                   >
-                    {t('orders:reassign_picker.button')}
-                  </button>
+                    <UserRoundPen size={14} />
+                  </Button>
                 ) : null}
               </div>
             </td>
@@ -549,22 +551,24 @@ export function PickListsPage() {
           return (
             <td
               key={colId}
-              className="max-w-[140px] truncate px-4 py-3 text-slate-600 dark:text-slate-300"
+              className="max-w-[140px] px-4 py-3 text-slate-600 dark:text-slate-300"
               title={item.controller_name ?? ''}
             >
-              <div className="flex flex-col gap-1">
-                <span>{item.controller_name ?? '—'}</span>
+              <div className="flex items-center gap-1">
+                <span className="min-w-0 truncate">{item.controller_name ?? '—'}</span>
                 {!archive && canReassignControllerRow(item) ? (
-                  <button
-                    type="button"
-                    className="text-left text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
-                    onClick={(e) => {
+                  <Button
+                    variant="ghost"
+                    className="h-7 w-7 shrink-0 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:text-blue-400 dark:hover:bg-blue-950/40"
+                    title={t('orders:reassign_controller.button')}
+                    aria-label={t('orders:reassign_controller.button')}
+                    onClick={(e: React.MouseEvent) => {
                       e.stopPropagation()
                       setReassignControllerDialogOrderIds([item.order_id as string])
                     }}
                   >
-                    {t('orders:reassign_controller.button')}
-                  </button>
+                    <UserRoundPen size={14} />
+                  </Button>
                 ) : null}
               </div>
             </td>
