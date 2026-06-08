@@ -21,6 +21,7 @@ import {
   completePickDocument,
   getTaskById,
   INCOMPLETE_REASON_KEYS,
+  markControllerVerificationStarted,
   pickLine,
   skipLine,
   unpickLine,
@@ -423,12 +424,16 @@ export function PickTaskDetails() {
           l.product_name === selectedLine.product_name &&
           (l.barcode === selectedLine.barcode || l.sku === selectedLine.sku)
       ).map((l) => String(l.id));
+      const firstVerify = controllerVerifiedLineIds.size === 0;
       setControllerVerifiedLineIds((prev) => {
         const next = new Set(prev);
         lineIdsToVerify.forEach((id) => next.add(id));
         saveControllerVerifiedLineIds(String(taskId), next);
         return next;
       });
+      if (firstVerify && taskId) {
+        void markControllerVerificationStarted(String(taskId)).catch(() => undefined);
+      }
       return;
     }
     const remaining = selectedLine.qty_required - selectedLine.qty_picked;

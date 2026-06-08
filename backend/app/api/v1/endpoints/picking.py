@@ -101,6 +101,7 @@ class PickingDocument(BaseModel):
     customer_name: Optional[str] = None
     safe_cancel_return_session_id: Optional[UUID] = None
     sent_to_controller_at: Optional[datetime] = None
+    controller_verification_started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 
 
@@ -122,6 +123,7 @@ class PickingListItem(BaseModel):
     customer_name: Optional[str] = None
     order_wms_status: Optional[str] = None
     sent_to_controller_at: Optional[datetime] = None
+    controller_verification_started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     updated_at: datetime
     first_assigned_at: Optional[datetime] = None
@@ -579,6 +581,7 @@ def _to_picking_document(doc: DocumentModel, db: Optional[Session] = None) -> Pi
         customer_name=_customer_name(doc),
         safe_cancel_return_session_id=sid,
         sent_to_controller_at=doc.sent_to_controller_at,
+        controller_verification_started_at=doc.controller_verification_started_at,
         completed_at=doc.completed_at,
     )
 
@@ -611,6 +614,7 @@ def _to_picking_document_with_lines(
         customer_name=_customer_name(doc),
         safe_cancel_return_session_id=sid,
         sent_to_controller_at=doc.sent_to_controller_at,
+        controller_verification_started_at=doc.controller_verification_started_at,
         completed_at=doc.completed_at,
     )
 
@@ -686,6 +690,7 @@ def _to_picking_list_item(doc: DocumentModel) -> PickingListItem:
         customer_name=_customer_name(doc),
         order_wms_status=wms_status,
         sent_to_controller_at=doc.sent_to_controller_at,
+        controller_verification_started_at=doc.controller_verification_started_at,
         completed_at=doc.completed_at,
         updated_at=doc.updated_at,
         first_assigned_at=doc.first_assigned_at,
@@ -1393,6 +1398,38 @@ async def send_to_controller(
     document.controlled_by_user_id = payload.controller_user_id
     document.sent_to_controller_at = datetime.now(timezone.utc)
     db.commit()
+    return _to_picking_document(document, db)
+
+
+@router.post(
+    "/documents/{document_id}/controller-verification-started",
+    response_model=PickingDocument,
+    summary="Mark controller verification started (first scan/confirm)",
+)
+async def mark_controller_verification_started(
+    document_id: UUID,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("picking:read")),
+):
+    """Controller birinchi marta skan/tekshiruvni boshlaganda chaqiriladi; ochish (GET) yetarli emas."""
+    if user.role != "inventory_controller":
+        raise HTTPException(status_code=403, detail="Forbidden")
+    document = (
+        db.query(DocumentModel)
+        .filter(DocumentModel.id == document_id)
+        .with_for_update()
+        .one_or_none()
+    )
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if document.controlled_by_user_id != user.id:
+        raise HTTPException(status_code=403, detail="Document not assigned to you")
+    if document.status != "picked":
+        raise HTTPException(status_code=409, detail="Document must be in picked status")
+    if document.controller_verification_started_at is None:
+        document.controller_verification_started_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(document)
     return _to_picking_document(document, db)
 
 

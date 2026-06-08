@@ -7,6 +7,7 @@ import { AdminLayout } from '../../admin/components/AdminLayout'
 import { OrdersHubTabs } from '../../admin/components/orders/OrdersHubTabs'
 import { OrdersTableSettings } from '../../admin/components/orders/OrdersTableSettings'
 import { SendToPickingDialog } from '../../admin/components/orders/SendToPickingDialog'
+import { ReassignControllerDialog } from '../../admin/components/orders/ReassignControllerDialog'
 import { usePickListsTableConfig, PICKLISTS_COLUMN_IDS } from '../../admin/hooks/usePickListsTableConfig'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
@@ -109,6 +110,9 @@ export function PickListsPage() {
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [cancelTarget, setCancelTarget] = useState<PickList | null>(null)
   const [reassignDialogOrderIds, setReassignDialogOrderIds] = useState<string[] | null>(null)
+  const [reassignControllerDialogOrderIds, setReassignControllerDialogOrderIds] = useState<
+    string[] | null
+  >(null)
   const [filterPanelOpen, setFilterPanelOpen] = useState(false)
   const filterPanelRef = useRef<HTMLDivElement>(null)
   const [filterStatus, setFilterStatus] = useState('')
@@ -136,6 +140,15 @@ export function PickListsPage() {
   const canReassignPickerRow = useCallback(
     (item: PickList) =>
       Boolean(item.order_id) && has('orders:write') && item.order_wms_status === 'allocated',
+    [has]
+  )
+  const canReassignControllerRow = useCallback(
+    (item: PickList) =>
+      Boolean(item.order_id) &&
+      has('documents:edit_status') &&
+      item.document_status === 'picked' &&
+      Boolean(item.controller_name) &&
+      !item.controller_verification_started_at,
     [has]
   )
 
@@ -539,7 +552,21 @@ export function PickListsPage() {
               className="max-w-[140px] truncate px-4 py-3 text-slate-600 dark:text-slate-300"
               title={item.controller_name ?? ''}
             >
-              {item.controller_name ?? '—'}
+              <div className="flex flex-col gap-1">
+                <span>{item.controller_name ?? '—'}</span>
+                {!archive && canReassignControllerRow(item) ? (
+                  <button
+                    type="button"
+                    className="text-left text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setReassignControllerDialogOrderIds([item.order_id as string])
+                    }}
+                  >
+                    {t('orders:reassign_controller.button')}
+                  </button>
+                ) : null}
+              </div>
             </td>
           )
         case 'last_activity':
@@ -643,6 +670,7 @@ export function PickListsPage() {
     canCancel,
     cancelled,
     canReassignPickerRow,
+    canReassignControllerRow,
     cancellingId,
     docStatusLabel,
     pipelineStatusLabel,
@@ -846,6 +874,18 @@ export function PickListsPage() {
             onOpenChange={(open) => !open && setReassignDialogOrderIds(null)}
             onSent={() => {
               setReassignDialogOrderIds(null)
+              void load({ background: true })
+            }}
+          />
+        ) : null}
+
+        {reassignControllerDialogOrderIds !== null ? (
+          <ReassignControllerDialog
+            open
+            orderIds={reassignControllerDialogOrderIds}
+            onOpenChange={(open) => !open && setReassignControllerDialogOrderIds(null)}
+            onReassigned={() => {
+              setReassignControllerDialogOrderIds(null)
               void load({ background: true })
             }}
           />

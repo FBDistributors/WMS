@@ -107,6 +107,9 @@ class OrderListItem(BaseModel):
     lines_total: int
     picker_name: Optional[str] = None
     controller_name: Optional[str] = None
+    controller_user_id: Optional[UUID] = None
+    controller_verification_started_at: Optional[datetime] = None
+    can_reassign_controller: bool = False
     is_incomplete: bool = False
     has_so: bool = False
     so_document_status: Optional[str] = Field(None, description="SO terish hujjati statusi (bo'lsa)")
@@ -183,6 +186,15 @@ class SmartupSyncResponse(BaseModel):
 
 class SendToPickingRequest(BaseModel):
     assigned_to_user_id: UUID
+
+
+class ReassignControllerRequest(BaseModel):
+    controller_user_id: UUID
+
+
+class ReassignControllerResponse(BaseModel):
+    document_id: UUID
+    controlled_by: UUID
 
 
 class SendToPickingResponse(BaseModel):
@@ -943,6 +955,15 @@ async def list_orders(
         u = doc.controlled_by_user
         return u.full_name or u.username
 
+    def _can_reassign_controller(doc: DocumentModel | None, order_status: str | None) -> bool:
+        if not doc or not doc.controlled_by_user_id:
+            return False
+        if (order_status or "") != "picked":
+            return False
+        if doc.status != "picked":
+            return False
+        return doc.controller_verification_started_at is None
+
     org_name_map = load_org_name_map(db)
     if order_src.lower() == "diller" and not org_name_map:
         logger.warning(
@@ -956,18 +977,19 @@ async def list_orders(
         is_incomplete = doc is not None and doc.incomplete_reason is not None
         has_so = doc is not None
         so_doc_status = doc.status if doc else None
+        wms_status = (
+            order.wms_state.status
+            if order.wms_state and order.wms_state.status in ORDER_STATUSES
+            else normalize_order_wms_status_for_storage(
+                order.wms_state.status if order.wms_state else None
+            )
+        )
         items.append(
             OrderListItem(
                 id=order.id,
                 order_number=order.order_number,
                 source_external_id=order.source_external_id,
-                status=(
-                    order.wms_state.status
-                    if order.wms_state and order.wms_state.status in ORDER_STATUSES
-                    else normalize_order_wms_status_for_storage(
-                        order.wms_state.status if order.wms_state else None
-                    )
-                ),
+                status=wms_status,
                 filial_id=order.filial_id,
                 filial_display_name=resolve_org_display(
                     order.filial_id,
@@ -988,6 +1010,9 @@ async def list_orders(
                 movement_note=getattr(order, "movement_note", None),
                 picker_name=_picker_name(doc),
                 controller_name=_controller_name(doc),
+                controller_user_id=doc.controlled_by_user_id if doc else None,
+                controller_verification_started_at=doc.controller_verification_started_at if doc else None,
+                can_reassign_controller=_can_reassign_controller(doc, wms_status),
                 is_incomplete=is_incomplete,
                 has_so=has_so,
                 so_document_status=so_doc_status,
@@ -2245,6 +2270,117 @@ async def reassign_order_picker(
         pass
 
     return SendToPickingResponse(pick_task_id=document.id, assigned_to=payload.assigned_to_user_id)
+
+
+@router.post(
+    "/{order_id}/reassign-controller",
+    response_model=ReassignControllerResponse,
+    summary="Reassign controller before they open the picking document",
+)
+async def reassign_order_controller(
+    request: Request,
+    order_id: UUID,
+    payload: ReassignControllerRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("documents:edit_status")),
+):
+    """Change assigned controller while document is in picked status and not yet opened by controller."""
+    order = (
+        db.query(OrderModel)
+        .options(selectinload(OrderModel.wms_state))
+        .filter(OrderModel.id == order_id)
+        .one_or_none()
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if not order.wms_state:
+        raise HTTPException(status_code=409, detail="Order has no WMS state")
+    if order.wms_state.status != "picked":
+        raise HTTPException(
+            status_code=409,
+            detail="Controller can only be reassigned while order is in picked (verification) status",
+        )
+
+    document = (
+        db.query(DocumentModel)
+        .filter(
+            DocumentModel.order_id == order.id,
+            DocumentModel.doc_type == "SO",
+            DocumentModel.status != "cancelled",
+        )
+        .with_for_update()
+        .one_or_none()
+    )
+    if not document:
+        raise HTTPException(status_code=409, detail="No active picking document for this order")
+    if document.status != "picked":
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot reassign controller: document already completed or not in verification",
+        )
+    if document.controlled_by_user_id is None:
+        raise HTTPException(status_code=409, detail="No controller assigned to this order")
+    if document.controller_verification_started_at is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot reassign controller: verification already started",
+        )
+
+    new_controller = (
+        db.query(User)
+        .filter(
+            User.id == payload.controller_user_id,
+            User.role == "inventory_controller",
+            User.is_active.is_(True),
+        )
+        .one_or_none()
+    )
+    if not new_controller:
+        raise HTTPException(status_code=400, detail="Invalid controller selection")
+
+    old_id = document.controlled_by_user_id
+    if old_id == payload.controller_user_id:
+        db.commit()
+        return ReassignControllerResponse(
+            document_id=document.id,
+            controlled_by=payload.controller_user_id,
+        )
+
+    document.controlled_by_user_id = payload.controller_user_id
+    document.controller_verification_started_at = None
+    document.sent_to_controller_at = datetime.now(timezone.utc)
+    log_action(
+        db,
+        user_id=user.id,
+        action=ACTION_UPDATE,
+        entity_type="order",
+        entity_id=str(order_id),
+        old_data={"controlled_by_user_id": str(old_id) if old_id else None},
+        new_data={
+            "controlled_by_user_id": str(payload.controller_user_id),
+            "document_id": str(document.id),
+            "action": "reassign_controller",
+        },
+        ip_address=get_client_ip(request),
+    )
+    db.commit()
+    db.refresh(document)
+
+    try:
+        send_push_to_user(
+            db,
+            payload.controller_user_id,
+            "Tekshiruv buyurtmasi",
+            f"Tekshiruv: {document.doc_no}. Ilovani oching.",
+            data={"taskId": str(document.id), "type": "new_controller_task"},
+        )
+    except Exception:
+        pass
+
+    return ReassignControllerResponse(
+        document_id=document.id,
+        controlled_by=payload.controller_user_id,
+    )
 
 
 @router.post("/{order_id}/pack", response_model=OrderDetails, summary="Mark order as packed")

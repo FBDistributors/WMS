@@ -246,6 +246,19 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     );
   }
 
+  Future<void> _markControllerVerificationStartedIfNeeded(bool firstVerify) async {
+    if (!firstVerify) {
+      return;
+    }
+    try {
+      await ref
+          .read(pickingRepositoryProvider)
+          .markControllerVerificationStarted(widget.taskId);
+    } on Object {
+      /* offline yoki vaqtinchalik xato — mahalliy tekshiruv davom etadi */
+    }
+  }
+
   @override
   void dispose() {
     _detailPollTimer?.cancel();
@@ -605,10 +618,12 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                       }
                       final Set<String> ids =
                           groupLines.map((PickingLine l) => l.id).toSet();
+                      final bool firstVerify = _verifiedLineIds.isEmpty;
                       setState(() {
                         _verifiedLineIds = {..._verifiedLineIds, ...ids};
                       });
                       await _saveVerified();
+                      await _markControllerVerificationStartedIfNeeded(firstVerify);
                       if (ctx.mounted) {
                         Navigator.of(ctx).pop();
                       }
@@ -1144,10 +1159,12 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                             }
                             final Set<String> ids =
                                 group.members.map((PickingLine l) => l.id).toSet();
+                            final bool firstVerify = _verifiedLineIds.isEmpty;
                             setState(() {
                               _verifiedLineIds = {..._verifiedLineIds, ...ids};
                             });
                             await _saveVerified();
+                            await _markControllerVerificationStartedIfNeeded(firstVerify);
                             if (ctx.mounted) {
                               Navigator.of(ctx).pop();
                             }

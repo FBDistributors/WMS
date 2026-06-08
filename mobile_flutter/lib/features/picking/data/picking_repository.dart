@@ -100,6 +100,16 @@ class PickingRepository {
     }
   }
 
+  Future<void> markControllerVerificationStarted(String documentId) async {
+    try {
+      await _dio.post<Object?>(
+        '$_p/documents/$documentId/controller-verification-started',
+      );
+    } on DioException catch (e) {
+      throw Exception(mapDioExceptionToMessage(e));
+    }
+  }
+
   Future<PickLineResponse> changePickSource(
     String lineId, {
     required String locationId,

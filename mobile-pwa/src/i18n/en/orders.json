@@ -78,6 +78,18 @@
     "error_sent_to_controller": "Already sent to controller; reassignment is not allowed.",
     "error_terminal_doc": "Document is in a terminal state; reassignment is not allowed."
   },
+  "reassign_controller": {
+    "button": "Change controller",
+    "title": "Reassign controller",
+    "submit": "Save",
+    "submitting": "Saving...",
+    "failed": "Could not reassign controller.",
+    "one_order_only": "You can only reassign the controller for one order at a time.",
+    "error_verification_started": "Controller has already started verification; reassignment is not allowed.",
+    "error_terminal_doc": "Verification is finished or the document is in another state.",
+    "error_no_controller": "No controller assigned yet.",
+    "no_controllers_hint": "No controllers found. Create a user with the Controller role in Admin > Users."
+  },
   "controller_modal": {
     "title": "Under review — select controller",
     "controller_label": "Controller",

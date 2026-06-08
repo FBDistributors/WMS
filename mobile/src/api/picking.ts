@@ -66,6 +66,10 @@ export async function sendToController(documentId: string, controllerUserId: str
   return data;
 }
 
+export async function markControllerVerificationStarted(documentId: string): Promise<void> {
+  await apiClient.post(`${PICKING}/documents/${documentId}/controller-verification-started`);
+}
+
 export async function getTaskById(documentId: string): Promise<PickingDocument> {
   const { data } = await apiClient.get<PickingDocument>(`${PICKING}/documents/${documentId}`);
   return data;

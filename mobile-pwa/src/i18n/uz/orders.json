@@ -78,6 +78,18 @@
     "error_sent_to_controller": "Controllerga yuborilgan; yig'uvchini almashtirib bo'lmaydi.",
     "error_terminal_doc": "Hujjat yakuniy bosqichda; yig'uvchini almashtirib bo'lmaydi."
   },
+  "reassign_controller": {
+    "button": "Controllerni o'zgartirish",
+    "title": "Controllerni o'zgartirish",
+    "submit": "Saqlash",
+    "submitting": "Saqlanmoqda...",
+    "failed": "Controllerni almashtirib bo'lmadi.",
+    "one_order_only": "Bir vaqtning o'zida faqat bitta buyurtma uchun controllerni almashtirish mumkin.",
+    "error_verification_started": "Controller tekshiruvni boshlagan; almashtirib bo'lmaydi.",
+    "error_terminal_doc": "Tekshiruv yakunlangan yoki hujjat boshqa holatda.",
+    "error_no_controller": "Controllerga hali biriktirilmagan.",
+    "no_controllers_hint": "Controller yo'q. Admin > Foydalanuvchilar orqali Controller rolida foydalanuvchi yarating."
+  },
   "controller_modal": {
     "title": "Tekshiruvda — kontrolyor tanlash",
     "controller_label": "Kontrolyor",

@@ -7,6 +7,7 @@ import { AdminLayout } from '../../admin/components/AdminLayout'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { OrdersHubTabs, OrdersSourceSubTabs } from '../../admin/components/orders/OrdersHubTabs'
 import { SendToPickingDialog } from '../../admin/components/orders/SendToPickingDialog'
+import { ReassignControllerDialog } from '../../admin/components/orders/ReassignControllerDialog'
 import { OrdersTableSettings } from '../../admin/components/orders/OrdersTableSettings'
 import { useDillerTableConfig } from '../../admin/hooks/useMovementsTableConfig'
 import { useOrdersTableConfig } from '../../admin/hooks/useOrdersTableConfig'
@@ -246,6 +247,9 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set())
   const [sendDialogOrderIds, setSendDialogOrderIds] = useState<string[] | null>(null)
   const [reassignDialogOrderIds, setReassignDialogOrderIds] = useState<string[] | null>(null)
+  const [reassignControllerDialogOrderIds, setReassignControllerDialogOrderIds] = useState<
+    string[] | null
+  >(null)
   const [syncError, setSyncError] = useState<string | null>(null)
   const [syncResult, setSyncResult] = useState<{
     created: number
@@ -272,6 +276,17 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const canReassignPicker = useCallback(
     (order: OrderListItem) => canSend && order.has_so && order.status === 'allocated',
     [canSend]
+  )
+
+  const canReassignController = useCallback(
+    (order: OrderListItem) =>
+      has('documents:edit_status') &&
+      (order.can_reassign_controller ??
+        (order.status === 'picked' &&
+          Boolean(order.controller_name) &&
+          order.so_document_status === 'picked' &&
+          !order.controller_verification_started_at)),
+    [has]
   )
 
   const load = useCallback(async (background = false, _forceRefresh?: boolean) => {
@@ -784,7 +799,18 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         case 'controller':
           return (
             <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-              {order.controller_name ?? '—'}
+              <div className="flex flex-col gap-1">
+                <span>{order.controller_name ?? '—'}</span>
+                {canReassignController(order) ? (
+                  <button
+                    type="button"
+                    className="text-left text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+                    onClick={() => setReassignControllerDialogOrderIds([order.id])}
+                  >
+                    {t('orders:reassign_controller.button')}
+                  </button>
+                ) : null}
+              </div>
             </td>
           )
         case 'lines':
@@ -911,6 +937,7 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   }, [
     canEditStatus,
     canReassignPicker,
+    canReassignController,
     canSend,
     config.columnOrder,
     config.visibleColumns,
@@ -1273,6 +1300,15 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             onOpenChange={(open) => !open && setReassignDialogOrderIds(null)}
             onSent={() => {
               setReassignDialogOrderIds(null)
+              void load(true)
+            }}
+          />
+          <ReassignControllerDialog
+            open={reassignControllerDialogOrderIds !== null}
+            orderIds={reassignControllerDialogOrderIds ?? []}
+            onOpenChange={(open) => !open && setReassignControllerDialogOrderIds(null)}
+            onReassigned={() => {
+              setReassignControllerDialogOrderIds(null)
               void load(true)
             }}
           />

@@ -83,6 +83,9 @@ export type OrderListItem = {
   lines_total: number
   picker_name?: string | null
   controller_name?: string | null
+  controller_user_id?: string | null
+  controller_verification_started_at?: string | null
+  can_reassign_controller?: boolean
   is_incomplete?: boolean
   has_so?: boolean
   from_warehouse_code?: string | null
@@ -343,6 +346,16 @@ export async function reassignOrderPicker(orderId: string, assignedToUserId: str
     {
       method: 'POST',
       body: { assigned_to_user_id: assignedToUserId },
+    }
+  )
+}
+
+export async function reassignOrderController(orderId: string, controllerUserId: string) {
+  return fetchJSON<{ document_id: string; controlled_by: string }>(
+    `/api/v1/orders/${orderId}/reassign-controller`,
+    {
+      method: 'POST',
+      body: { controller_user_id: controllerUserId },
     }
   )
 }
