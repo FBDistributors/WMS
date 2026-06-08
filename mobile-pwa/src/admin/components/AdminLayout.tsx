@@ -10,7 +10,6 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { LanguageSwitcher } from '../../components/LanguageSwitcher'
 import { useAuth } from '../../rbac/AuthProvider'
 import { useTheme } from '../../theme/ThemeProvider'
-import { getReserveStuckSummary, type ReserveStuckSummaryResponse } from '../../services/inventoryApi'
 
 type AdminLayoutProps = {
   /** Headerda ko'rsatiladigan sarlavha; berilmasa yoki bo'sh bo'lsa headerda sarlavha ko'rinmaydi (sahifa ichidagi jadval/kartada qoladi). */
@@ -30,11 +29,10 @@ export function AdminLayout({ title, titleSlot, backTo, actionSlot, children }: 
   })
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
-  const [stuckSummary, setStuckSummary] = useState<ReserveStuckSummaryResponse | null>(null)
   const userMenuRef = useRef<HTMLDivElement>(null)
   const { user, setRole, isMock, logout } = useAuth()
   const { theme, setTheme } = useTheme()
-  const { t } = useTranslation(['admin', 'common', 'inventory'])
+  const { t } = useTranslation(['admin', 'common'])
   const navigate = useNavigate()
 
   const handleLogout = async () => {
@@ -48,36 +46,6 @@ export function AdminLayout({ title, titleSlot, backTo, actionSlot, children }: 
     if (typeof window === 'undefined') return
     window.localStorage.setItem('wms_sidebar_collapsed', String(isCollapsed))
   }, [isCollapsed])
-
-  useEffect(() => {
-    let mounted = true
-    const loadStuck = async () => {
-      try {
-        // Faqat asosiy ombor — reserve-health default (?warehouse=main) bilan mos;
-        // showroom alohida tekshiriladi (yig'indi buyurtmani ikki marta sanashi mumkin edi).
-        const main = await getReserveStuckSummary({ warehouse: 'main', age_hours: 48, sample_limit: 5 })
-        if (!mounted) return
-        setStuckSummary(main)
-      } catch {
-        if (mounted) setStuckSummary(null)
-      }
-    }
-    void loadStuck()
-    const timer = window.setInterval(() => {
-      void loadStuck()
-    }, 60_000)
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') void loadStuck()
-    }
-    document.addEventListener('visibilitychange', onVisible)
-    window.addEventListener('focus', onVisible)
-    return () => {
-      mounted = false
-      window.clearInterval(timer)
-      document.removeEventListener('visibilitychange', onVisible)
-      window.removeEventListener('focus', onVisible)
-    }
-  }, [])
 
   // Close user menu when clicking anywhere outside (platform-wide)
   useEffect(() => {
@@ -241,26 +209,6 @@ export function AdminLayout({ title, titleSlot, backTo, actionSlot, children }: 
             ) : null}
           </div>
         </header>
-        {stuckSummary && stuckSummary.stuck_rows_count > 0 ? (
-          <div className="border-b border-rose-200 bg-rose-50 px-4 py-3 text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-100 sm:px-6">
-            <button
-              type="button"
-              className="text-left text-sm"
-              onClick={() => navigate('/admin/inventory/reserve-health?warehouse=main')}
-            >
-              <span className="font-semibold">
-                {t('inventory:reserve_health.stuck_alert_title', { hours: 48 })}
-              </span>
-              <span className="ml-2">
-                {t('inventory:reserve_health.stuck_alert_desc', {
-                  rows: stuckSummary.stuck_rows_count,
-                  orders: stuckSummary.stuck_orders_count,
-                  oldest: stuckSummary.oldest_hours,
-                })}
-              </span>
-            </button>
-          </div>
-        ) : null}
         <main className="min-w-0 flex-1 overflow-x-auto overflow-y-auto px-4 py-4 pb-14 sm:px-6 sm:py-6">{children}</main>
         <footer className="shrink-0 border-t border-slate-200 bg-white/80 px-4 py-2 text-left text-[10px] text-slate-500 backdrop-blur sm:px-6 sm:text-xs dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
           © 2026 FB Warehouse Management System · Developed by Jaloliddin
