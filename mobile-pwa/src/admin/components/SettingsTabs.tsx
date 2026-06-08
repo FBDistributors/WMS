@@ -1,10 +1,14 @@
 import { useTranslation } from 'react-i18next'
 
-const TABS = [
+import { useAuth } from '../../rbac/AuthProvider'
+import type { PermissionKey } from '../../rbac/permissions'
+
+const TABS: Array<{ id: string; labelKey: string; permission?: PermissionKey }> = [
   { id: 'profile', labelKey: 'admin:settings.tabs.profile' },
   { id: 'notifications', labelKey: 'admin:settings.tabs.notifications' },
   { id: 'integrations', labelKey: 'admin:settings.tabs.integrations' },
   { id: 'security', labelKey: 'admin:settings.tabs.security' },
+  { id: 'app_feedback', labelKey: 'admin:settings.tabs.app_feedback', permission: 'audit:read' },
 ]
 
 type SettingsTabsProps = {
@@ -14,10 +18,12 @@ type SettingsTabsProps = {
 
 export function SettingsTabs({ value, onChange }: SettingsTabsProps) {
   const { t } = useTranslation('admin')
+  const { has } = useAuth()
+  const visibleTabs = TABS.filter((tab) => !tab.permission || has(tab.permission))
 
   return (
     <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3 dark:border-slate-800">
-      {TABS.map((tab) => {
+      {visibleTabs.map((tab) => {
         const isActive = tab.id === value
         return (
           <button

@@ -64,8 +64,8 @@ class AccountScreen extends ConsumerWidget {
             onTap: () {
               showAppFeedbackSheet(
                 context: context,
+                ref: ref,
                 module: 'general',
-                forceShow: true,
               );
             },
           ),

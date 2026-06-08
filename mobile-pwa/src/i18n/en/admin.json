@@ -112,7 +112,8 @@
       "profile": "Profile",
       "notifications": "Notifications",
       "integrations": "Integrations",
-      "security": "Security"
+      "security": "Security",
+      "app_feedback": "App feedback"
     },
     "coming_soon": "Coming soon",
     "notifications": {

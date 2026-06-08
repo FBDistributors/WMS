@@ -112,7 +112,8 @@
       "profile": "Профиль",
       "notifications": "Уведомления",
       "integrations": "Интеграции",
-      "security": "Безопасность"
+      "security": "Безопасность",
+      "app_feedback": "Отзывы о приложении"
     },
     "coming_soon": "Скоро",
     "notifications": {

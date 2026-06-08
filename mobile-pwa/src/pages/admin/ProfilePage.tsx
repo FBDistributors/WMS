@@ -1,7 +1,9 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { AppFeedbackPanel } from '../../admin/components/AppFeedbackPanel'
 import { NotificationsSettingsPanel } from '../../admin/components/NotificationsSettingsPanel'
 import { SettingsTabs } from '../../admin/components/SettingsTabs'
 import { Card } from '../../components/ui/card'
@@ -11,10 +13,21 @@ import { useAuth } from '../../rbac/AuthProvider'
 
 import type React from 'react'
 
+const SETTINGS_TAB_IDS = ['profile', 'notifications', 'integrations', 'security', 'app_feedback'] as const
+type SettingsTabId = (typeof SETTINGS_TAB_IDS)[number]
+
+function isSettingsTabId(value: string | null): value is SettingsTabId {
+  return value != null && (SETTINGS_TAB_IDS as readonly string[]).includes(value)
+}
+
 export function ProfilePage() {
   const { user } = useAuth()
   const { t } = useTranslation(['admin', 'common'])
-  const [activeTab, setActiveTab] = useState('profile')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tabFromUrl = searchParams.get('tab')
+  const [activeTab, setActiveTab] = useState<SettingsTabId>(() =>
+    isSettingsTabId(tabFromUrl) ? tabFromUrl : 'profile',
+  )
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -34,6 +47,26 @@ export function ProfilePage() {
     return { full: raw, initials }
   }, [user])
 
+  useEffect(() => {
+    if (isSettingsTabId(tabFromUrl) && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl)
+    }
+  }, [tabFromUrl, activeTab])
+
+  const handleTabChange = (tabId: string) => {
+    if (!isSettingsTabId(tabId)) {
+      return
+    }
+    setActiveTab(tabId)
+    const next = new URLSearchParams(searchParams)
+    if (tabId === 'profile') {
+      next.delete('tab')
+    } else {
+      next.set('tab', tabId)
+    }
+    setSearchParams(next)
+  }
+
   const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -47,9 +80,9 @@ export function ProfilePage() {
   return (
     <AdminLayout title={t('admin:settings.title')}>
       <div className="space-y-6">
-        <SettingsTabs value={activeTab} onChange={setActiveTab} />
+        <SettingsTabs value={activeTab} onChange={handleTabChange} />
 
-        {activeTab !== 'profile' && activeTab !== 'notifications' ? (
+        {activeTab !== 'profile' && activeTab !== 'notifications' && activeTab !== 'app_feedback' ? (
           <Card className="max-w-3xl">
             <div className="flex items-center justify-between">
               <div className="text-base font-semibold text-slate-900 dark:text-slate-100">
@@ -60,6 +93,7 @@ export function ProfilePage() {
           </Card>
         ) : null}
         {activeTab === 'notifications' ? <NotificationsSettingsPanel /> : null}
+        {activeTab === 'app_feedback' ? <AppFeedbackPanel /> : null}
 
         {activeTab === 'profile' ? (
           <Card className="max-w-3xl space-y-8">

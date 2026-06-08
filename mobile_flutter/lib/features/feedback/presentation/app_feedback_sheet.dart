@@ -20,12 +20,10 @@ class AppFeedbackSheet extends ConsumerStatefulWidget {
     super.key,
     required this.module,
     this.contextRef,
-    this.forceShow = false,
   });
 
   final String module;
   final String? contextRef;
-  final bool forceShow;
 
   @override
   ConsumerState<AppFeedbackSheet> createState() => _AppFeedbackSheetState();
@@ -81,9 +79,20 @@ class _AppFeedbackSheetState extends ConsumerState<AppFeedbackSheet> {
         context,
         SnackBar(content: Text(StringLookup.t(loc, 'appFeedbackThanks'))),
       );
+    } on FeedbackRateLimitException {
+      await AppFeedbackPromptStorage.recordSubmitted(ref.read(sharedPreferencesProvider));
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).pop(AppFeedbackDismissAction.cancelled);
+      showAppSnackBar(
+        context,
+        SnackBar(content: Text(StringLookup.t(loc, 'appFeedbackOncePerDay'))),
+      );
     } on Exception catch (e) {
       if (mounted) {
-        showAppSnackBar(context, SnackBar(content: Text('$e')));
+        final String msg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+        showAppSnackBar(context, SnackBar(content: Text(msg)));
       }
     } finally {
       if (mounted) {
@@ -193,17 +202,25 @@ class _AppFeedbackSheetState extends ConsumerState<AppFeedbackSheet> {
 
 Future<AppFeedbackDismissAction?> showAppFeedbackSheet({
   required BuildContext context,
+  required WidgetRef ref,
   required String module,
   String? contextRef,
-  bool forceShow = false,
-}) {
+}) async {
+  final prefs = ref.read(sharedPreferencesProvider);
+  final AppLocale loc = ref.read(appLocaleProvider);
+  if (AppFeedbackPromptStorage.wasSubmittedToday(prefs, DateTime.now())) {
+    showAppSnackBar(
+      context,
+      SnackBar(content: Text(StringLookup.t(loc, 'appFeedbackOncePerDay'))),
+    );
+    return null;
+  }
   return showModalBottomSheet<AppFeedbackDismissAction>(
     context: context,
     isScrollControlled: true,
     builder: (BuildContext ctx) => AppFeedbackSheet(
       module: module,
       contextRef: contextRef,
-      forceShow: forceShow,
     ),
   );
 }
@@ -215,11 +232,16 @@ Future<void> maybeShowAutomaticAppFeedback({
   String? contextRef,
 }) async {
   final prefs = ref.read(sharedPreferencesProvider);
-  if (!AppFeedbackPromptStorage.shouldShowAutomaticPrompt(prefs, DateTime.now())) {
+  final DateTime now = DateTime.now();
+  if (AppFeedbackPromptStorage.wasSubmittedToday(prefs, now)) {
+    return;
+  }
+  if (!AppFeedbackPromptStorage.shouldShowAutomaticPrompt(prefs, now)) {
     return;
   }
   await showAppFeedbackSheet(
     context: context,
+    ref: ref,
     module: module,
     contextRef: contextRef,
   );

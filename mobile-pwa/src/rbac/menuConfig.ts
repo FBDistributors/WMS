@@ -29,7 +29,6 @@ export const CONTROLLER_MENU: MenuItem[] = [
   { path: '/admin/receiving', labelKey: 'menu.receiving', permissions: ['receiving:read'] },
   { path: '/admin/inventory', labelKey: 'menu.inventory', permissions: ['inventory:read'] },
   { path: '/admin/audit', labelKey: 'menu.audit', permissions: ['audit:read'] },
-  { path: '/admin/app-feedback', labelKey: 'menu.app_feedback', permissions: ['audit:read'] },
   { path: '/controller/profile', labelKey: 'menu.profile', permissions: ['documents:read'] },
   { path: '/controller/settings', labelKey: 'menu.settings', permissions: ['documents:read'] },
 ]
@@ -46,7 +45,6 @@ export const ADMIN_MENU: MenuItem[] = [
   { path: '/admin/brands', labelKey: 'menu.brands', permissions: ['brands:manage'] },
   { path: '/admin/users', labelKey: 'menu.users', permissions: ['users:read', 'users:manage'] },
   { path: '/admin/audit', labelKey: 'menu.audit', permissions: ['audit:read'] },
-  { path: '/admin/app-feedback', labelKey: 'menu.app_feedback', permissions: ['audit:read'] },
   { path: '/admin/kamomat', labelKey: 'menu.kamomat', permissions: ['audit:read'] },
   { path: '/admin/settings', labelKey: 'menu.settings', permissions: ['orders:read'] },
   { path: '/admin/profile', labelKey: 'menu.profile', permissions: ['admin:access'] },

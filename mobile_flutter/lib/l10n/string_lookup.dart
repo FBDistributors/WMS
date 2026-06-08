@@ -142,8 +142,9 @@ abstract final class StringLookup {
     'cancel': 'Bekor',
     'confirmButton': 'Tasdiqlash',
     'appFeedbackTitle': 'Ilovani baholang',
-    'appFeedbackTrust':
-        'Bu fikr faqat ilovani yaxshilash uchun. Rahbariyatga jazo sifatida yuborilmaydi.',
+    'appFeedbackTrust': 'Bu fikr faqat ilovani yaxshilash uchun.',
+    'appFeedbackOncePerDay':
+        'Bugun allaqachon fikr yubordingiz. Ertaga qayta yuborishingiz mumkin.',
     'appFeedbackStarsLabel': 'Ilova qanchalik qulay?',
     'appFeedbackCommentHint': 'Izoh (ixtiyoriy)',
     'appFeedbackSubmit': 'Yuborish',
@@ -458,8 +459,9 @@ abstract final class StringLookup {
     'cancel': 'Отмена',
     'confirmButton': 'Подтвердить',
     'appFeedbackTitle': 'Оцените приложение',
-    'appFeedbackTrust':
-        'Этот отзыв только для улучшения приложения. Он не используется для наказания сотрудников.',
+    'appFeedbackTrust': 'Этот отзыв только для улучшения приложения.',
+    'appFeedbackOncePerDay':
+        'Вы уже отправили отзыв сегодня. Повторно можно завтра.',
     'appFeedbackStarsLabel': 'Насколько удобно приложение?',
     'appFeedbackCommentHint': 'Комментарий (необязательно)',
     'appFeedbackSubmit': 'Отправить',
@@ -773,8 +775,9 @@ abstract final class StringLookup {
     'cancel': 'Cancel',
     'confirmButton': 'Confirm',
     'appFeedbackTitle': 'Rate the app',
-    'appFeedbackTrust':
-        'This feedback is only used to improve the app. It is not sent to management as a penalty.',
+    'appFeedbackTrust': 'This feedback is only used to improve the app.',
+    'appFeedbackOncePerDay':
+        'You already submitted feedback today. Try again tomorrow.',
     'appFeedbackStarsLabel': 'How easy is the app to use?',
     'appFeedbackCommentHint': 'Comment (optional)',
     'appFeedbackSubmit': 'Submit',

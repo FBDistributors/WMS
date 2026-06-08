@@ -14,6 +14,19 @@ class AppFeedbackPromptStorage {
     return DateTime.tryParse(raw);
   }
 
+  static DateTime _utcTodayStart(DateTime now) {
+    return DateTime.utc(now.year, now.month, now.day);
+  }
+
+  static bool wasSubmittedToday(SharedPreferences prefs, DateTime now) {
+    final DateTime? submitted = _readInstant(prefs, submittedAtKey);
+    if (submitted == null) {
+      return false;
+    }
+    final DateTime submittedUtc = submitted.toUtc();
+    return !submittedUtc.isBefore(_utcTodayStart(now.toUtc()));
+  }
+
   static bool shouldShowAutomaticPrompt(SharedPreferences prefs, DateTime now) {
     final DateTime? dismissed = _readInstant(prefs, dismissedUntilKey);
     if (dismissed != null && dismissed.isAfter(now)) {

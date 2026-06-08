@@ -35,6 +35,10 @@ class FeedbackSubmitPayload {
       };
 }
 
+class FeedbackRateLimitException implements Exception {
+  const FeedbackRateLimitException();
+}
+
 class FeedbackRepository {
   FeedbackRepository(this._dio);
 
@@ -45,6 +49,9 @@ class FeedbackRepository {
     try {
       await _dio.post<Object?>(_path, data: payload.toJson());
     } on DioException catch (e) {
+      if (e.response?.statusCode == 429) {
+        throw const FeedbackRateLimitException();
+      }
       throw Exception(mapDioExceptionToMessage(e));
     }
   }
