@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { FileText, Filter, RefreshCw, Settings, UserCog, X, XCircle } from 'lucide-react'
+import { FileText, Filter, Pencil, RefreshCw, Settings, X, XCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
@@ -531,18 +531,18 @@ export function PickListsPage() {
               <div className="flex items-center gap-1">
                 <span className="min-w-0 truncate">{item.picker_name ?? '—'}</span>
                 {!archive && canReassignPickerRow(item) ? (
-                  <Button
-                    variant="outline"
-                    className="h-7 w-7 shrink-0 rounded-lg border-blue-200 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40"
+                  <button
+                    type="button"
+                    className="inline-flex shrink-0 items-center justify-center rounded-md p-1 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:text-blue-400 dark:hover:bg-blue-950/40"
                     title={t('orders:reassign_picker.button')}
                     aria-label={t('orders:reassign_picker.button')}
-                    onClick={(e: React.MouseEvent) => {
+                    onClick={(e) => {
                       e.stopPropagation()
                       setReassignDialogOrderIds([item.order_id as string])
                     }}
                   >
-                    <UserCog size={16} strokeWidth={2} aria-hidden />
-                  </Button>
+                    <Pencil size={16} aria-hidden />
+                  </button>
                 ) : null}
               </div>
             </td>
@@ -557,18 +557,18 @@ export function PickListsPage() {
               <div className="flex items-center gap-1">
                 <span className="min-w-0 truncate">{item.controller_name ?? '—'}</span>
                 {!archive && canReassignControllerRow(item) ? (
-                  <Button
-                    variant="outline"
-                    className="h-7 w-7 shrink-0 rounded-lg border-blue-200 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40"
+                  <button
+                    type="button"
+                    className="inline-flex shrink-0 items-center justify-center rounded-md p-1 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:text-blue-400 dark:hover:bg-blue-950/40"
                     title={t('orders:reassign_controller.button')}
                     aria-label={t('orders:reassign_controller.button')}
-                    onClick={(e: React.MouseEvent) => {
+                    onClick={(e) => {
                       e.stopPropagation()
                       setReassignControllerDialogOrderIds([item.order_id as string])
                     }}
                   >
-                    <UserCog size={16} strokeWidth={2} aria-hidden />
-                  </Button>
+                    <Pencil size={16} aria-hidden />
+                  </button>
                 ) : null}
               </div>
             </td>
