@@ -336,6 +336,17 @@ abstract final class StringLookup {
     'inventorySaved': 'Saqlandi',
     'inventoryNoChanges': 'O‘zgarish yo‘q',
     'inventoryAdjusted': 'Tuzatildi',
+    'inventoryAddBox': 'Quti qo‘shish',
+    'inventoryScanBox': 'Quti skan',
+    'inventoryBoxUnitsPerBox': 'Qutida necha dona',
+    'inventoryBoxCount': 'Quti soni',
+    'inventoryFullBox': 'To‘liq quti',
+    'inventoryBoxSaved': 'Quti saqlandi',
+    'inventoryBoxProductMismatch': 'Bu quti boshqa mahsulotga tegishli',
+    'inventoryBoxAlreadyExists': 'Bu quti shtrix-kodi allaqachon mavjud',
+    'inventoryBoxNotFound': 'Quti topilmadi',
+    'inventoryBoxBarcode': 'Quti shtrix-kodi',
+    'inventoryBoxSave': 'Saqlash',
   };
 
   static const Map<String, String> _ru = <String, String>{
@@ -652,6 +663,17 @@ abstract final class StringLookup {
     'inventorySaved': 'Сохранено',
     'inventoryNoChanges': 'Нет изменений',
     'inventoryAdjusted': 'Исправлено',
+    'inventoryAddBox': 'Добавить коробку',
+    'inventoryScanBox': 'Скан коробки',
+    'inventoryBoxUnitsPerBox': 'Штук в коробке',
+    'inventoryBoxCount': 'Количество коробок',
+    'inventoryFullBox': 'Полная коробка',
+    'inventoryBoxSaved': 'Коробка сохранена',
+    'inventoryBoxProductMismatch': 'Эта коробка относится к другому товару',
+    'inventoryBoxAlreadyExists': 'Штрих-код коробки уже существует',
+    'inventoryBoxNotFound': 'Коробка не найдена',
+    'inventoryBoxBarcode': 'Штрих-код коробки',
+    'inventoryBoxSave': 'Сохранить',
   };
 
   static const Map<String, String> _en = <String, String>{
@@ -968,5 +990,16 @@ abstract final class StringLookup {
     'inventorySaved': 'Saved',
     'inventoryNoChanges': 'No changes',
     'inventoryAdjusted': 'Adjusted',
+    'inventoryAddBox': 'Add box',
+    'inventoryScanBox': 'Scan box',
+    'inventoryBoxUnitsPerBox': 'Units per box',
+    'inventoryBoxCount': 'Box count',
+    'inventoryFullBox': 'Full box',
+    'inventoryBoxSaved': 'Box saved',
+    'inventoryBoxProductMismatch': 'This box belongs to another product',
+    'inventoryBoxAlreadyExists': 'This box barcode already exists',
+    'inventoryBoxNotFound': 'Box not found',
+    'inventoryBoxBarcode': 'Box barcode',
+    'inventoryBoxSave': 'Save',
   };
 }

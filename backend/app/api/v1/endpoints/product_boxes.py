@@ -168,7 +168,9 @@ async def create_product_box(
     request: Request,
     payload: ProductBoxCreate,
     db: Session = Depends(get_db),
-    user: UserModel = Depends(require_permission("products:write")),
+    user: UserModel = Depends(
+        require_any_permission(["products:write", "inventory:adjust"])
+    ),
 ):
     code = _normalize_box_barcode(payload.box_barcode)
     if not code:

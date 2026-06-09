@@ -27,6 +27,7 @@ class ScannerArgs {
     this.inventoryLocationCode,
     this.receivingLocationId,
     this.receivingLocationCode,
+    this.returnRawBarcode = false,
   });
 
   final bool returnToPick;
@@ -53,4 +54,6 @@ class ScannerArgs {
   final String? inventoryLocationCode;
   final String? receivingLocationId;
   final String? receivingLocationCode;
+  /// Mahsulot resolve qilmasdan faqat shtrix-kodni qaytarish (quti skan).
+  final bool returnRawBarcode;
 }

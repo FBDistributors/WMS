@@ -116,6 +116,13 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       setState(() => _scanEnabled = false);
     }
 
+    if (a != null && a.returnRawBarcode) {
+      if (context.canPop()) {
+        context.pop<String>(value);
+      }
+      return;
+    }
+
     if (a != null &&
         a.returnToCustomerReturnProductVerify &&
         (a.customerReturnId ?? '').trim().isNotEmpty &&
