@@ -804,11 +804,11 @@ function VipCustomerDialog({ mode, target, onClose, onSaved }: DialogProps) {
                                       <Button
                                         type="button"
                                         variant="ghost"
-                                        className="h-8 w-8 shrink-0 px-0"
+                                        className="h-8 w-8 shrink-0 rounded-full border border-red-200 px-0 text-red-600 hover:bg-red-50 dark:border-red-500/40 dark:text-red-400 dark:hover:bg-red-500/10"
                                         onClick={() => removeProductLimit(pl.product_id)}
                                         aria-label={t('common:buttons.delete')}
                                       >
-                                        <Trash2 size={16} />
+                                        <X size={16} strokeWidth={2.5} />
                                       </Button>
                                     </div>
                                   ))}
