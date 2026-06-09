@@ -1415,6 +1415,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                       pickTargetHolder[0].id,
                                       delta,
                                       'scan-${widget.taskId}-${pickTargetHolder[0].id}-${DateTime.now().millisecondsSinceEpoch}',
+                                      barcode: scannedForQty,
                                     );
                                 await ref
                                     .read(pickTaskDetailProvider(widget.taskId).notifier)

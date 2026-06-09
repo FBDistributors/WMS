@@ -24,6 +24,7 @@ from app.models.stock import ON_HAND_MOVEMENT_TYPES
 from app.models.stock import StockLot as StockLotModel
 from app.models.stock import StockMovement as StockMovementModel
 from app.models.user import User as UserModel
+from app.services.box_location_service import get_breakdown_map_for_product
 from app.services.expired_zone_labels import get_labels_row, resolve_expired_display_label
 
 router = APIRouter()
@@ -99,6 +100,9 @@ class PickerProductLocation(BaseModel):
     on_hand_qty: Decimal
     reserved_qty: Decimal
     available_qty: Decimal
+    box_count: int = 0
+    units_in_boxes: int = 0
+    loose_units: int = 0
 
 
 class PickerProductDetailResponse(BaseModel):
@@ -511,6 +515,11 @@ async def get_picker_product_detail(
     loc_ids = _location_ids_for_warehouse(db, warehouse) if warehouse else None
     lot_data = _get_lot_level_balances(db, [product_id], location_ids=loc_ids)
     main_barcode = _get_product_main_barcode(db, product)
+    breakdown_map = get_breakdown_map_for_product(
+        db,
+        product_id,
+        [(r["lot_id"], r["location_id"]) for r in lot_data],
+    )
     locations: list[PickerProductLocation] = []
     negative_rows = 0
     for r in lot_data:
@@ -519,6 +528,7 @@ async def get_picker_product_detail(
         available = Decimal(str(r["available"]))
         if on_hand < 0 or available < 0:
             negative_rows += 1
+        bd = breakdown_map.get((r["lot_id"], r["location_id"]))
         locations.append(
             PickerProductLocation(
                 location_id=r["location_id"],
@@ -529,6 +539,9 @@ async def get_picker_product_detail(
                 on_hand_qty=on_hand,
                 reserved_qty=reserved,
                 available_qty=available,
+                box_count=bd.box_count if bd else 0,
+                units_in_boxes=bd.units_in_boxes if bd else 0,
+                loose_units=bd.loose_units if bd else int(available) if available > 0 else 0,
             )
         )
     if negative_rows:

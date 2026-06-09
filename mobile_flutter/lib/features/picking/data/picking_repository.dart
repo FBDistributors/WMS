@@ -194,12 +194,17 @@ class PickingRepository {
   Future<PickLineResponse> pickLine(
     String lineId,
     int delta,
-    String requestId,
-  ) async {
+    String requestId, {
+    String? barcode,
+  }) async {
     try {
       final Response<Object?> res = await _dio.post<Object?>(
         '$_p/lines/$lineId/pick',
-        data: <String, Object?>{'delta': delta, 'request_id': requestId},
+        data: <String, Object?>{
+          'delta': delta,
+          'request_id': requestId,
+          if (barcode != null && barcode.trim().isNotEmpty) 'barcode': barcode.trim(),
+        },
       );
       final Object? data = res.data;
       if (data is! Map) {

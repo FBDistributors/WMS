@@ -34,6 +34,33 @@ class ProductBoxRepository {
     }
   }
 
+  Future<List<ProductBoxSummary>> listByProduct(String productId) async {
+    try {
+      final Response<Object?> res = await _dio.get<Object?>(
+        '/product-boxes',
+        queryParameters: <String, Object?>{
+          'product_id': productId,
+          'active_only': true,
+          'limit': 100,
+        },
+      );
+      final Object? data = res.data;
+      if (data is! List) {
+        return const <ProductBoxSummary>[];
+      }
+      return data
+          .whereType<Map<dynamic, dynamic>>()
+          .map(
+            (Map<dynamic, dynamic> m) => ProductBoxSummary.fromJson(
+              Map<String, Object?>.from(m),
+            ),
+          )
+          .toList(growable: false);
+    } on DioException catch (e) {
+      throw Exception(mapDioExceptionToMessage(e));
+    }
+  }
+
   Future<ProductBoxResolve> create(ProductBoxCreate payload) async {
     try {
       final Response<Object?> res = await _dio.post<Object?>(

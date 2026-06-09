@@ -347,6 +347,16 @@ abstract final class StringLookup {
     'inventoryBoxNotFound': 'Quti topilmadi',
     'inventoryBoxBarcode': 'Quti shtrix-kodi',
     'inventoryBoxSave': 'Saqlash',
+    'inventoryLocationFullBoxes': 'To‘liq quti',
+    'inventoryLocationLooseUnits': 'Ochiq dona',
+    'inventoryLocationTotalUnits': 'Jami dona',
+    'inventoryBoxSizeSelect': 'Quti hajmi',
+    'inventoryBoxBreakdownPerUnit': '1 qutida {n} dona',
+    'inventoryLocationStockComputed': 'Lokatsiyada (hisob)',
+    'inventoryUnitsInBoxes': 'Qutilardagi dona',
+    'inventoryLooseStock': 'Qutisiz dona',
+    'inventoryBoxBarcodeOptional': 'Quti shtrix-kodi (ixtiyoriy)',
+    'movementTransferSealedBox': 'Yopiq qutini ko‘chirish',
   };
 
   static const Map<String, String> _ru = <String, String>{
@@ -674,6 +684,16 @@ abstract final class StringLookup {
     'inventoryBoxNotFound': 'Коробка не найдена',
     'inventoryBoxBarcode': 'Штрих-код коробки',
     'inventoryBoxSave': 'Сохранить',
+    'inventoryLocationFullBoxes': 'Полных коробок',
+    'inventoryLocationLooseUnits': 'Отдельных штук',
+    'inventoryLocationTotalUnits': 'Всего штук',
+    'inventoryBoxSizeSelect': 'Размер коробки',
+    'inventoryBoxBreakdownPerUnit': '{n} шт. в коробке',
+    'inventoryLocationStockComputed': 'На локации (расчёт)',
+    'inventoryUnitsInBoxes': 'Штук в коробках',
+    'inventoryLooseStock': 'Штук без коробки',
+    'inventoryBoxBarcodeOptional': 'Штрих-код коробки (необяз.)',
+    'movementTransferSealedBox': 'Переместить закрытую коробку',
   };
 
   static const Map<String, String> _en = <String, String>{
@@ -1001,5 +1021,15 @@ abstract final class StringLookup {
     'inventoryBoxNotFound': 'Box not found',
     'inventoryBoxBarcode': 'Box barcode',
     'inventoryBoxSave': 'Save',
+    'inventoryLocationFullBoxes': 'Full boxes',
+    'inventoryLocationLooseUnits': 'Loose units',
+    'inventoryLocationTotalUnits': 'Total units',
+    'inventoryBoxSizeSelect': 'Box size',
+    'inventoryBoxBreakdownPerUnit': '{n} units per box',
+    'inventoryLocationStockComputed': 'At location (computed)',
+    'inventoryUnitsInBoxes': 'Units in boxes',
+    'inventoryLooseStock': 'Loose units',
+    'inventoryBoxBarcodeOptional': 'Box barcode (optional)',
+    'movementTransferSealedBox': 'Transfer sealed box',
   };
 }

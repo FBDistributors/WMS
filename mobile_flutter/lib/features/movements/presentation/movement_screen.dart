@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -17,6 +19,7 @@ import '../../../shared/input/stock_quantity_input.dart';
 import '../../../shared/widgets/barcode_search_input.dart';
 import '../../../shared/widgets/product_card.dart';
 import '../../../shared/widgets/scan_action_button.dart';
+import '../../product_boxes/product_box_providers.dart';
 import '../data/movements_repository.dart';
 import '../movements_providers.dart';
 
@@ -212,6 +215,91 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
           _palletError = '$e';
           _palletLoading = false;
         });
+      }
+    }
+  }
+
+  Future<void> _transferSealedBox() async {
+    final PickerProductDetailResponse? p = _product;
+    final PickerProductLocation? from = _fromLocation;
+    final PickerLocationOption? to = _toLocation;
+    if (p == null || from == null || to == null) {
+      _showValidation('movementSelectSource');
+      return;
+    }
+    if (from.locationId == to.id) {
+      _showValidation('movementSourceDestinationSame');
+      return;
+    }
+    final String? barcode = await context.pushNamed<String>(
+      'scanner',
+      extra: const ScannerArgs(returnRawBarcode: true),
+    );
+    if (!mounted || barcode == null || barcode.trim().isEmpty) {
+      return;
+    }
+    setState(() => _submitting = true);
+    try {
+      final resolved =
+          await ref.read(productBoxRepositoryProvider).resolveByBarcode(barcode.trim());
+      if (resolved.productId != p.productId) {
+        throw Exception(StringLookup.t(ref.read(appLocaleProvider), 'inventoryBoxProductMismatch'));
+      }
+      final int n = resolved.unitsPerBox;
+      if (n > from.availableQty.floor()) {
+        _showValidation('movementQtyOrLocationInvalid');
+        return;
+      }
+      final MovementsRepository repo = ref.read(movementsRepositoryProvider);
+      final String baseKey = _productSubmitKey ?? const Uuid().v4();
+      _productSubmitKey = baseKey;
+      await repo.createStockMovement(
+        productId: p.productId,
+        lotId: from.lotId,
+        locationId: from.locationId,
+        qtyChange: -n.toDouble(),
+        reasonCode: 'inventory_shortage',
+        idempotencyKey: '$baseKey-box-out',
+      );
+      await repo.createStockMovement(
+        productId: p.productId,
+        lotId: from.lotId,
+        locationId: to.id,
+        qtyChange: n.toDouble(),
+        reasonCode: 'inventory_overage',
+        idempotencyKey: '$baseKey-box-in',
+      );
+      await ref.read(boxLocationRepositoryProvider).transferBox(
+            boxBarcode: barcode.trim(),
+            fromLocationId: from.locationId,
+            toLocationId: to.id,
+          );
+      if (mounted) {
+        final AppLocale loc = ref.read(appLocaleProvider);
+        showAppSnackBar(
+          context,
+          SnackBar(content: Text(StringLookup.t(loc, 'movementTransferred'))),
+        );
+        setState(() {
+          _phase = _MovementPhase.choose;
+          _product = null;
+          _fromLocation = null;
+          _toLocation = null;
+          _qty.clear();
+          _locationSearch = '';
+          _locationSearchCtrl.clear();
+          _productSubmitKey = null;
+          _productError = null;
+        });
+        _resetRouteScanState();
+      }
+    } on Exception catch (e) {
+      if (mounted) {
+        showAppSnackBar(context, SnackBar(content: Text('$e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _submitting = false);
       }
     }
   }
@@ -596,10 +684,15 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
                     child: ListTile(
                       title: Text(pl.locationCode),
                       subtitle: Text(
-                        StringLookup.tParams(loc, 'movementAvailableInLot', <String, String>{
-                          'qty': pl.availableQty.toStringAsFixed(0),
-                          'expiry': formatExpiryMonthYear(pl.expiryDate),
-                        }),
+                        pl.boxCount > 0
+                            ? '${StringLookup.tParams(loc, 'movementAvailableInLot', <String, String>{
+                                'qty': pl.availableQty.toStringAsFixed(0),
+                                'expiry': formatExpiryMonthYear(pl.expiryDate),
+                              })} · ${pl.boxCount} ${StringLookup.t(loc, 'inventoryLocationFullBoxes').toLowerCase()}'
+                            : StringLookup.tParams(loc, 'movementAvailableInLot', <String, String>{
+                                'qty': pl.availableQty.toStringAsFixed(0),
+                                'expiry': formatExpiryMonthYear(pl.expiryDate),
+                              }),
                       ),
                       trailing: sel
                           ? Icon(Icons.check_circle, color: Colors.green.shade700)
@@ -666,6 +759,12 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
                 onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _submitting ? null : () => unawaited(_transferSealedBox()),
+                icon: const Icon(Icons.qr_code_scanner),
+                label: Text(StringLookup.t(loc, 'movementTransferSealedBox')),
+              ),
+              const SizedBox(height: 8),
               FilledButton(
                 onPressed: _submitting ? null : _submitProductMove,
                 child: _submitting

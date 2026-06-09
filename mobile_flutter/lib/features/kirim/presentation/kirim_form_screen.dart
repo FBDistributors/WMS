@@ -129,6 +129,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   final TextEditingController _invScanActualQty = TextEditingController();
   final TextEditingController _invBoxCount = TextEditingController(text: '1');
   int? _invLastUnitsPerBox;
+  List<ProductBoxSummary> _invProductBoxes = const <ProductBoxSummary>[];
+  final TextEditingController _receiveBoxBarcode = TextEditingController();
   String? _invScanExpiry;
   bool _invSubmitting = false;
   String? _invHandledLocationStr;
@@ -140,6 +142,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     _invLocSearch.dispose();
     _invScanActualQty.dispose();
     _invBoxCount.dispose();
+    _receiveBoxBarcode.dispose();
     _kirimPutawaySearch.dispose();
     _returnManualBatch.dispose();
     _qty.dispose();
@@ -217,6 +220,9 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         setState(() {
           _product = res;
           _loadingProduct = false;
+          if (_flow == 'inventory') {
+            unawaited(_loadInvProductBoxes(productId));
+          }
           if (_flow == 'return' && res.locations.isNotEmpty) {
             final List<PickerProductLocation> sorted = _sortFefo(res.locations);
             _returnPick = sorted.first;
@@ -590,6 +596,33 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
               ),
               onChanged: (_) => setState(() {}),
             ),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Expanded(
+                  child: TextField(
+                    controller: _receiveBoxBarcode,
+                    decoration: InputDecoration(
+                      labelText: StringLookup.t(appLoc, 'inventoryBoxBarcodeOptional'),
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ScanActionButton(
+                  compact: true,
+                  label: StringLookup.t(appLoc, 'inventoryScanBox'),
+                  onPressed: () async {
+                    final String? code = await _scanRawBarcode();
+                    if (!mounted || code == null || code.trim().isEmpty) {
+                      return;
+                    }
+                    setState(() => _receiveBoxBarcode.text = code.trim());
+                  },
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -737,6 +770,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             ],
           );
       await ref.read(receivingRepositoryProvider).completeReceipt(receipt.id);
+      await _placeReceiveBoxIfNeeded(productId: p.productId, locationId: loc.id);
       if (mounted) {
         final AppLocale loc = ref.read(appLocaleProvider);
         if (_newReceiveMode == 'byLocation') {
@@ -1006,6 +1040,11 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             onSaved: (int units) {
               onSaved?.call(units);
               if (mounted) {
+                setState(() => _invLastUnitsPerBox = units);
+                unawaited(_loadInvProductBoxes(productId));
+                if (initialBarcode != null && initialBarcode.trim().isNotEmpty) {
+                  unawaited(_placeInventoryBoxAtSelectedLoc(initialBarcode.trim()));
+                }
                 showAppSnackBar(
                   context,
                   SnackBar(content: Text(StringLookup.t(loc, 'inventoryBoxSaved'))),
@@ -1055,6 +1094,9 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         }
         return;
       }
+      if (_invScanSelectedLoc != null) {
+        await _placeInventoryBoxAtSelectedLoc(barcode);
+      }
       final int boxCount = int.tryParse(_invBoxCount.text.trim()) ?? 1;
       _applyBoxUnitsToActualQty(unitsPerBox: resolved.unitsPerBox, boxCount: boxCount);
     } on ProductBoxNotFoundException {
@@ -1062,7 +1104,12 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         productId: p.productId,
         productName: p.name,
         initialBarcode: barcode,
-        onSaved: (int units) => _applyBoxUnitsToActualQty(unitsPerBox: units),
+        onSaved: (int units) {
+          _applyBoxUnitsToActualQty(unitsPerBox: units);
+          if (_invScanSelectedLoc != null) {
+            unawaited(_placeInventoryBoxAtSelectedLoc(barcode));
+          }
+        },
       );
     } on Exception catch (e) {
       if (mounted) {
@@ -1274,6 +1321,99 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     return parts.join(' • ');
   }
 
+  Future<void> _loadInvProductBoxes(String productId) async {
+    try {
+      final List<ProductBoxSummary> boxes =
+          await ref.read(productBoxRepositoryProvider).listByProduct(productId);
+      if (!mounted) {
+        return;
+      }
+      setState(() => _invProductBoxes = boxes);
+    } on Exception {
+      if (mounted) {
+        setState(() => _invProductBoxes = const <ProductBoxSummary>[]);
+      }
+    }
+  }
+
+  Future<void> _placeInventoryBoxAtSelectedLoc(String boxBarcode) async {
+    final PickerProductLocation? loc = _invScanSelectedLoc;
+    final PickerProductDetailResponse? p = _product;
+    if (loc == null || p == null || boxBarcode.trim().isEmpty) {
+      return;
+    }
+    try {
+      await ref.read(boxLocationRepositoryProvider).placeBox(
+            boxBarcode: boxBarcode.trim(),
+            locationId: loc.locationId,
+            lotId: loc.lotId,
+          );
+      await _loadProduct(p.productId);
+    } on Exception catch (e) {
+      if (mounted) {
+        showAppSnackBar(context, SnackBar(content: Text('$e')));
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> _placeReceiveBoxIfNeeded({
+    required String productId,
+    required String locationId,
+  }) async {
+    final String code = _receiveBoxBarcode.text.trim();
+    if (code.isEmpty) {
+      return;
+    }
+    try {
+      final PickerProductDetailResponse detail = await ref
+          .read(inventoryRepositoryProvider)
+          .getPickerProductDetail(productId);
+      final PickerProductLocation lotLoc = detail.locations.firstWhere(
+        (PickerProductLocation l) => l.locationId == locationId,
+        orElse: () => throw StateError('lot'),
+      );
+      await ref.read(boxLocationRepositoryProvider).placeBox(
+            boxBarcode: code,
+            locationId: locationId,
+            lotId: lotLoc.lotId,
+          );
+    } on Exception catch (e) {
+      if (mounted) {
+        showAppSnackBar(context, SnackBar(content: Text('$e')));
+      }
+    }
+  }
+
+  bool _invShowBoxBreakdown(PickerProductLocation loc) =>
+      _invProductBoxes.isNotEmpty || loc.boxCount > 0;
+
+  List<Widget> _invBoxBreakdownRowsFromLoc(AppLocale appLoc, PickerProductLocation loc) {
+    if (!_invShowBoxBreakdown(loc)) {
+      return const <Widget>[];
+    }
+    return <Widget>[
+      _invValueRow(
+        StringLookup.t(appLoc, 'inventoryLocationFullBoxes'),
+        '${loc.boxCount}',
+      ),
+      _invValueRow(
+        StringLookup.t(appLoc, 'inventoryUnitsInBoxes'),
+        '${loc.unitsInBoxes}',
+      ),
+      if (loc.looseUnits > 0)
+        _invValueRow(
+          StringLookup.t(appLoc, 'inventoryLooseStock'),
+          '${loc.looseUnits}',
+        ),
+      _invValueRow(
+        StringLookup.t(appLoc, 'inventoryLocationTotalUnits'),
+        '${loc.availableQty.round()}',
+        emphasize: true,
+      ),
+    ];
+  }
+
   Widget _invValueRow(String label, String value, {bool emphasize = false}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
@@ -1301,9 +1441,14 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     );
   }
 
-  Widget _invScanLocationCard(PickerProductDetailResponse p, PickerProductLocation loc) {
+  Widget _invScanLocationCard(
+    AppLocale appLoc,
+    PickerProductDetailResponse p,
+    PickerProductLocation loc,
+  ) {
     final String ean = (p.mainBarcode ?? '').trim().isEmpty ? '—' : p.mainBarcode!.trim();
     final String expiry = formatExpiryMonthYear(loc.expiryDate);
+    final List<Widget> boxRows = _invBoxBreakdownRowsFromLoc(appLoc, loc);
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: InkWell(
@@ -1339,7 +1484,22 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                     _invValueRow('Shtrix kod', ean),
                     _invValueRow('SKU', p.code.trim().isEmpty ? '—' : p.code.trim()),
                     _invValueRow('Muddat', expiry),
-                    _invValueRow('Qoldiq', '${loc.availableQty.round()}', emphasize: true),
+                    if (boxRows.isEmpty)
+                      _invValueRow('Qoldiq', '${loc.availableQty.round()}', emphasize: true)
+                    else ...<Widget>[
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text(
+                          StringLookup.t(appLoc, 'inventoryLocationStockComputed'),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ),
+                      ...boxRows,
+                    ],
                   ],
                 ),
               ),
@@ -1574,12 +1734,15 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             Text('Qoldiq topilmadi', style: TextStyle(color: Colors.grey.shade700))
           else
             ..._product!.locations.map(
-              (PickerProductLocation loc) => _invScanLocationCard(_product!, loc),
+              (PickerProductLocation loc) =>
+                  _invScanLocationCard(appLoc, _product!, loc),
             ),
           TextButton(
             onPressed: () => setState(() {
               _product = null;
               _invStep = 1;
+              _invProductBoxes = const <ProductBoxSummary>[];
+              _invLastUnitsPerBox = null;
             }),
             child: const Text('Boshqa mahsulot skanerlash'),
           ),
@@ -1632,11 +1795,26 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                         : _product!.mainBarcode!.trim(),
                   ),
                   _invValueRow('Muddat', formatExpiryMonthYear(_invScanSelectedLoc!.expiryDate)),
-                  _invValueRow(
-                    'Qoldiq',
-                    '${_invScanSelectedLoc!.availableQty.round()}',
-                    emphasize: true,
-                  ),
+                  if (!_invShowBoxBreakdown(_invScanSelectedLoc!))
+                    _invValueRow(
+                      'Qoldiq',
+                      '${_invScanSelectedLoc!.availableQty.round()}',
+                      emphasize: true,
+                    )
+                  else ...<Widget>[
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        StringLookup.t(appLoc, 'inventoryLocationStockComputed'),
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ),
+                    ..._invBoxBreakdownRowsFromLoc(appLoc, _invScanSelectedLoc!),
+                  ],
                 ],
               ),
             ),

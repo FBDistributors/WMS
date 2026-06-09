@@ -27,6 +27,29 @@ class ProductBoxResolve {
   }
 }
 
+class ProductBoxSummary {
+  const ProductBoxSummary({
+    required this.id,
+    required this.boxBarcode,
+    required this.unitsPerBox,
+    this.label,
+  });
+
+  final String id;
+  final String boxBarcode;
+  final int unitsPerBox;
+  final String? label;
+
+  factory ProductBoxSummary.fromJson(Map<String, Object?> json) {
+    return ProductBoxSummary(
+      id: '${json['id']}',
+      boxBarcode: json['box_barcode'] as String? ?? '',
+      unitsPerBox: _int(json['units_per_box']),
+      label: json['label'] as String?,
+    );
+  }
+}
+
 class ProductBoxCreate {
   const ProductBoxCreate({
     required this.boxBarcode,

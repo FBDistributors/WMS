@@ -7,6 +7,7 @@ from app.models.expired_zone_display_labels import ExpiredZoneDisplayLabels
 from app.models.general_customer import GeneralCustomer
 from app.models.idempotency_key import IdempotencyKey
 from app.models.location import Location
+from app.models.location_box_placement import LocationBoxPlacement
 from app.models.order import Order, OrderLine, OrderWmsState
 from app.models.picking import PickRequest
 from app.models.product import Product, ProductBarcode
@@ -45,6 +46,7 @@ __all__ = [
     "GeneralCustomer",
     "IdempotencyKey",
     "Location",
+    "LocationBoxPlacement",
     "Order",
     "OrderLine",
     "OrderWmsState",

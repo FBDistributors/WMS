@@ -32,6 +32,10 @@ from app.api.v1.endpoints.picker_inventory import _get_lot_level_balances, _loca
 from app.services.order_reserve_release import release_document_reserve_on_cancel
 from app.services.stock_availability import require_sufficient_reserved
 from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_ip, log_action
+from app.services.box_location_service import (
+    remove_box_for_pick_if_needed,
+    require_sufficient_loose_for_unit_pick,
+)
 from app.services.product_scan_resolve import resolve_product_scan
 from app.services.safe_cancel_return_service import (
     active_return_session_id_for_document,
@@ -200,6 +204,7 @@ class ChangePickSourceRequest(BaseModel):
 class PickLineRequest(BaseModel):
     delta: int
     request_id: str
+    barcode: str | None = None
 
     @field_validator("delta")
     @classmethod
@@ -1148,8 +1153,11 @@ async def consolidated_pick(
     lines = sorted(lines_locked, key=lambda L: order_map[L.id])
 
     remaining = Decimal(str(qty))
+    box_pick = resolved is not None and resolved.scan_kind == "box"
+    unit_pick = resolved is not None and resolved.scan_kind == "unit"
     first_picked_line_id: Optional[UUID] = None
     docs_to_refresh = set()
+    box_removed = False
     try:
         for line in lines:
             if remaining <= 0:
@@ -1177,6 +1185,24 @@ async def consolidated_pick(
                 need,
                 lock=True,
             )
+            if box_pick and not box_removed:
+                remove_box_for_pick_if_needed(
+                    db,
+                    box_barcode=barcode,
+                    location_id=line.location_id,
+                    lot_id=line.lot_id,
+                    user=user,
+                    pick_qty=need,
+                )
+                box_removed = True
+            elif unit_pick:
+                require_sufficient_loose_for_unit_pick(
+                    db,
+                    product_id=line.product_id,
+                    lot_id=line.lot_id,
+                    location_id=line.location_id,
+                    qty=need,
+                )
             line.picked_qty = float(Decimal(str(line.picked_qty or 0)) + need)
             docs_to_refresh.add(line.document_id)
             db.add(
@@ -1750,6 +1776,26 @@ def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
             qty_delta,
             lock=True,
         )
+        scan_barcode = (payload.barcode or "").strip()
+        if scan_barcode:
+            resolved = resolve_product_scan(db, scan_barcode)
+            if resolved and resolved.scan_kind == "box":
+                remove_box_for_pick_if_needed(
+                    db,
+                    box_barcode=scan_barcode,
+                    location_id=line.location_id,
+                    lot_id=line.lot_id,
+                    user=user,
+                    pick_qty=qty_delta,
+                )
+            elif resolved and resolved.scan_kind == "unit":
+                require_sufficient_loose_for_unit_pick(
+                    db,
+                    product_id=line.product_id,
+                    lot_id=line.lot_id,
+                    location_id=line.location_id,
+                    qty=qty_delta,
+                )
 
     try:
         db.add(

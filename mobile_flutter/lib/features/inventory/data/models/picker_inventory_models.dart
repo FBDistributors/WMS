@@ -150,6 +150,9 @@ class PickerProductLocation {
     required this.onHandQty,
     required this.reservedQty,
     required this.availableQty,
+    this.boxCount = 0,
+    this.unitsInBoxes = 0,
+    this.looseUnits = 0,
   });
 
   final String locationId;
@@ -160,6 +163,9 @@ class PickerProductLocation {
   final double onHandQty;
   final double reservedQty;
   final double availableQty;
+  final int boxCount;
+  final int unitsInBoxes;
+  final int looseUnits;
 
   factory PickerProductLocation.fromJson(Map<String, Object?> json) {
     return PickerProductLocation(
@@ -171,8 +177,21 @@ class PickerProductLocation {
       onHandQty: _reqNum(json, 'on_hand_qty'),
       reservedQty: _reqNum(json, 'reserved_qty'),
       availableQty: _reqNum(json, 'available_qty'),
+      boxCount: _int(json['box_count']),
+      unitsInBoxes: _int(json['units_in_boxes']),
+      looseUnits: _int(json['loose_units']),
     );
   }
+}
+
+int _int(Object? v) {
+  if (v is int) {
+    return v;
+  }
+  if (v is num) {
+    return v.round();
+  }
+  return int.tryParse('$v') ?? 0;
 }
 
 class PickerProductDetailResponse {
