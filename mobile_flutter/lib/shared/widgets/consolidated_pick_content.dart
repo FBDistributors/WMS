@@ -12,6 +12,8 @@ import '../../core/router/scanner_args.dart';
 import '../../features/picking/alternate_location_menu_label.dart'
     show mergeAlternateLocationsForDisplay, MergedAlternateLocationRow;
 import '../../features/picking/data/picking_models.dart';
+import '../../features/scanner/data/scanner_repository.dart';
+import '../../features/scanner/scanner_providers.dart';
 import '../../features/picking/domain/profile_type_param.dart';
 import '../../features/picking/picking_providers.dart';
 import '../../l10n/string_lookup.dart';
@@ -98,6 +100,53 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
     }
   }
 
+  Future<bool> _consolidatedPendingMatchesProduct(
+    String pending,
+    ConsolidatedProduct prod,
+  ) async {
+    if (consolidatedScanMatchesProduct(pending, prod)) {
+      return true;
+    }
+    try {
+      final ScannerResolveOut out =
+          await ref.read(scannerRepositoryProvider).resolveBarcode(pending);
+      if (out.type == ScannerResolveType.product && out.productId != null) {
+        return consolidatedScanMatchesResolvedProduct(
+          p: prod,
+          resolvedProductId: out.productId,
+          rawBarcode: pending,
+        );
+      }
+    } on Object {
+      /* offline */
+    }
+    return false;
+  }
+
+  Future<int> _consolidatedDefaultPickQtyForScan(
+    String raw,
+    ConsolidatedProduct product,
+  ) async {
+    final double rem = product.totalRequired - product.totalPicked;
+    try {
+      final ScannerResolveOut out =
+          await ref.read(scannerRepositoryProvider).resolveBarcode(raw);
+      if (out.isBoxScan &&
+          out.productId != null &&
+          consolidatedScanMatchesResolvedProduct(
+            p: product,
+            resolvedProductId: out.productId,
+            rawBarcode: raw,
+          )) {
+        final int units = out.unitsPerScan ?? 1;
+        return min(rem.round(), units);
+      }
+    } on Object {
+      /* offline */
+    }
+    return max(1, rem.round());
+  }
+
   void _tryApplyRouteRestore(ConsolidatedViewResponse v) {
     final String? key = widget.restoreConsolidatedProductKey;
     if (key == null || key.isEmpty) {
@@ -124,32 +173,38 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
     }
 
     if (pending != null && pending.isNotEmpty) {
-      if (!consolidatedScanMatchesProduct(pending, prod)) {
-        _lastRestoreSig = sig;
-        widget.onClearPendingScan?.call();
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) {
-            return;
-          }
+      final ConsolidatedProduct matched = prod;
+      unawaited(() async {
+        final bool ok = await _consolidatedPendingMatchesProduct(pending, matched);
+        if (!mounted) {
+          return;
+        }
+        if (!ok) {
+          _lastRestoreSig = sig;
+          widget.onClearPendingScan?.call();
           final AppLocale loc = ref.read(appLocaleProvider);
           showAppSnackBar(
-          context,
+            context,
             SnackBar(content: Text(StringLookup.t(loc, 'consolidatedScanMismatch'))),
           );
-        });
-        return;
-      }
+          return;
+        }
+        _lastRestoreSig = sig;
+        widget.onClearPendingScan?.call();
+        final String? pre = pending.trim().isNotEmpty ? pending.trim() : null;
+        await _openPickSheet(context, matched, verifiedBarcode: pre);
+      }());
+      return;
     }
 
     _lastRestoreSig = sig;
     widget.onClearPendingScan?.call();
     final ConsolidatedProduct openProd = prod;
-    final String? pre = pending != null && pending.trim().isNotEmpty ? pending.trim() : null;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
       }
-      _openPickSheet(context, openProd, verifiedBarcode: pre);
+      unawaited(_openPickSheet(context, openProd));
     });
   }
 
@@ -356,24 +411,29 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                               ),
                               onChanged: (_) => setM(() {}),
                               onSubmitted: (String v) {
-                                final String t = v.trim();
-                                if (t.isEmpty) {
-                                  return;
-                                }
-                                if (!consolidatedScanMatchesProduct(t, product)) {
-                                  showAppSnackBar(
-        host,
-                                    SnackBar(
-                                      content: Text(StringLookup.t(loc, 'consolidatedScanMismatch')),
-                                    ),
-                                  );
-                                  return;
-                                }
-                                setM(() {
-                                  scannedForQty = t;
-                                  final double rem = product.totalRequired - product.totalPicked;
-                                  qty.text = '${max(1, rem.round())}';
-                                });
+                                unawaited(() async {
+                                  final String t = v.trim();
+                                  if (t.isEmpty) {
+                                    return;
+                                  }
+                                  if (!await _consolidatedPendingMatchesProduct(t, product)) {
+                                    showAppSnackBar(
+                                      host,
+                                      SnackBar(
+                                        content: Text(
+                                          StringLookup.t(loc, 'consolidatedScanMismatch'),
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  final int pickQty =
+                                      await _consolidatedDefaultPickQtyForScan(t, product);
+                                  setM(() {
+                                    scannedForQty = t;
+                                    qty.text = '$pickQty';
+                                  });
+                                }());
                               },
                             ),
                           ),
@@ -402,25 +462,29 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                         onPressed: sheetBusy
                             ? null
                             : () {
-                            final String t = bc.text.trim();
-                            if (t.isEmpty) {
-                              return;
-                            }
-                            if (!consolidatedScanMatchesProduct(t, product)) {
-                              showAppSnackBar(
-        host,
-                                SnackBar(
-                                  content:
-                                      Text(StringLookup.t(loc, 'consolidatedScanMismatch')),
-                                ),
-                              );
-                              return;
-                            }
-                            setM(() {
-                              scannedForQty = t;
-                              final double rem = product.totalRequired - product.totalPicked;
-                              qty.text = '${max(1, rem.round())}';
-                            });
+                            unawaited(() async {
+                              final String t = bc.text.trim();
+                              if (t.isEmpty) {
+                                return;
+                              }
+                              if (!await _consolidatedPendingMatchesProduct(t, product)) {
+                                showAppSnackBar(
+                                  host,
+                                  SnackBar(
+                                    content: Text(
+                                      StringLookup.t(loc, 'consolidatedScanMismatch'),
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+                              final int pickQty =
+                                  await _consolidatedDefaultPickQtyForScan(t, product);
+                              setM(() {
+                                scannedForQty = t;
+                                qty.text = '$pickQty';
+                              });
+                            }());
                           },
                         child: Text(StringLookup.t(loc, 'submit')),
                       ),

@@ -2,7 +2,6 @@ import 'dart:async' show Timer, unawaited;
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -19,12 +18,15 @@ import '../../../l10n/string_lookup.dart';
 import '../../../shared/input/input_clear_button.dart';
 import '../../../shared/input/stock_quantity_input.dart';
 import '../../../shared/feedback/app_top_snackbar.dart';
+import '../../../shared/feedback/scan_reject_haptic.dart';
 import '../../../shared/layout/sheet_bottom_inset.dart';
 import '../../../shared/widgets/scan_action_button.dart';
 import '../alternate_location_menu_label.dart' show mergeAlternateLocationsForDisplay, MergedAlternateLocationRow;
 import '../data/picking_constants.dart';
 import '../data/return_session_storage.dart';
 import '../data/picking_models.dart';
+import '../../scanner/data/scanner_repository.dart';
+import '../../scanner/scanner_providers.dart';
 import '../domain/pick_scan_resolution.dart';
 import '../domain/profile_type_param.dart';
 import '../picking_providers.dart';
@@ -267,7 +269,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
   }
 
   void _rejectScanHaptic() {
-    HapticFeedback.heavyImpact();
+    triggerRejectScanHaptic();
   }
 
   /// Konsolidatsiya `consolidatedPickSuccess` uslubida — modal yopilgach asosiy sahifada.
@@ -313,12 +315,12 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
   }
 
   void _showControllerAlreadyVerifiedSnackBar() {
-    _rejectScanHaptic();
     final AppLocale loc = ref.read(appLocaleProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
       }
+      _rejectScanHaptic();
       showAppSnackBar(
         context,
         SnackBar(
@@ -407,6 +409,132 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     });
   }
 
+  Future<void> _submitControllerSheetScan({
+    required String raw,
+    required PickingDocument doc,
+    required _LineGroup group,
+    required void Function(void Function()) setM,
+    required TextEditingController qty,
+    required void Function(String scan, String? productId) onResolved,
+  }) async {
+    final String t = raw.trim();
+    if (t.isEmpty) {
+      return;
+    }
+    final AppLocale loc = ref.read(appLocaleProvider);
+    final PickScanResolveResult? resolved = await _resolvePickScanForDocument(
+      doc: doc,
+      barcode: t,
+      controller: true,
+    );
+    PickingLine? match;
+    if (resolved != null) {
+      for (final PickingLine m in group.members) {
+        if (m.id == resolved.line.id) {
+          match = m;
+          break;
+        }
+      }
+      match ??= resolved.line.productId != null &&
+              resolved.line.productId!.trim().isNotEmpty
+          ? resolveScanLineInGroupByProductId(
+              group.members,
+              resolved.line.productId!,
+            )
+          : null;
+    } else {
+      match = resolveScanLineInGroup(group.members, t);
+    }
+    if (match == null) {
+      _rejectScanHaptic();
+      if (mounted) {
+        showAppSnackBar(context,
+          SnackBar(content: Text(StringLookup.t(loc, 'productNotInOrder'))),
+        );
+      }
+      return;
+    }
+    if (_isControllerGroupFullyVerified(doc, match)) {
+      _showControllerAlreadyVerifiedSnackBar();
+      return;
+    }
+    final String? pid = match.productId?.trim();
+    setM(() {
+      onResolved(t, pid != null && pid.isNotEmpty ? pid : null);
+      qty.text = formatPickQty(_aggregateQtyPicked(group.members));
+    });
+  }
+
+  Future<PickScanResolveResult?> _resolvePickScanForDocument({
+    required PickingDocument doc,
+    required String barcode,
+    required bool controller,
+    String? preferredLineId,
+  }) async {
+    final String normalized = barcode.trim();
+    if (normalized.isEmpty) {
+      return null;
+    }
+    try {
+      final ScannerResolveOut out =
+          await ref.read(scannerRepositoryProvider).resolveBarcode(normalized);
+      if (out.type == ScannerResolveType.product &&
+          out.productId != null &&
+          out.productId!.trim().isNotEmpty) {
+        final bool isBox = out.isBoxScan;
+        final int units = out.unitsPerScan ?? 1;
+        PickingLine? line;
+        if (preferredLineId != null && preferredLineId.isNotEmpty) {
+          for (final PickingLine l in doc.lines) {
+            if (l.id == preferredLineId) {
+              line = l;
+              break;
+            }
+          }
+          if (line == null) {
+            return null;
+          }
+          if (isBox) {
+            if (!productIdMatchesPickLine(out.productId!, line)) {
+              return null;
+            }
+          } else if (!barcodeMatchesPickLine(normalized, line)) {
+            return null;
+          }
+        } else if (controller) {
+          line = isBox
+              ? resolveControllerScanLineByProductId(
+                  doc.lines,
+                  out.productId!,
+                  _verifiedLineIds,
+                )
+              : resolveControllerScanLine(doc.lines, normalized, _verifiedLineIds);
+        } else {
+          line = isBox
+              ? resolvePickerScanLineByProductId(doc.lines, out.productId!)
+              : resolvePickerScanLine(doc.lines, normalized);
+        }
+        if (line == null) {
+          return null;
+        }
+        return PickScanResolveResult(
+          line: line,
+          unitsPerScan: units,
+          isBoxScan: isBox,
+        );
+      }
+    } on Object {
+      /* offline yoki resolve xato — mahalliy dona qidiruv */
+    }
+    final PickingLine? fallback = controller
+        ? resolveControllerScanLine(doc.lines, normalized, _verifiedLineIds)
+        : resolvePickerScanLine(doc.lines, normalized);
+    if (fallback == null) {
+      return null;
+    }
+    return PickScanResolveResult(line: fallback);
+  }
+
   Future<PickingDocument> _loadRouteScanDocument() async {
     final AsyncValue<PickingDocument> cached = ref.read(pickTaskDetailProvider(widget.taskId));
     final PickingDocument? doc = cached.valueOrNull;
@@ -423,16 +551,19 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       return;
     }
     final AppLocale loc = ref.read(appLocaleProvider);
-    final PickingLine? line =
-        resolveControllerScanLine(doc.lines, barcode, _verifiedLineIds);
-    if (line == null) {
+    final PickScanResolveResult? resolved = await _resolvePickScanForDocument(
+      doc: doc,
+      barcode: barcode,
+      controller: true,
+    );
+    if (resolved == null) {
       _rejectScanHaptic();
       showAppSnackBar(context,
         SnackBar(content: Text(StringLookup.t(loc, 'productNotInOrder'))),
       );
       return;
     }
-    await _controllerVerifyAfterScan(doc, line);
+    await _controllerVerifyAfterScan(doc, resolved.line);
   }
 
   Future<void> _handleControllerRouteScan(String barcode, String lineId) async {
@@ -440,34 +571,26 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     if (!mounted) {
       return;
     }
-    PickingLine? physical;
-    for (final PickingLine scanLine in doc.lines) {
-      if (scanLine.id == lineId) {
-        physical = scanLine;
-        break;
-      }
-    }
     final AppLocale loc = ref.read(appLocaleProvider);
-    if (physical == null) {
-      _rejectScanHaptic();
-      showAppSnackBar(context,
-        SnackBar(content: Text(StringLookup.t(loc, 'notFound'))),
-      );
-      return;
-    }
-    if (!barcodeMatchesPickLine(barcode, physical)) {
+    final PickScanResolveResult? resolved = await _resolvePickScanForDocument(
+      doc: doc,
+      barcode: barcode,
+      controller: true,
+      preferredLineId: lineId,
+    );
+    if (resolved == null) {
       _rejectScanHaptic();
       showAppSnackBar(context,
         SnackBar(
           content: Text(
             '${StringLookup.t(loc, 'wrongBarcodeMessage')}'
-            '${physical.barcode ?? physical.sku ?? '—'}',
+            '—',
           ),
         ),
       );
       return;
     }
-    await _controllerVerifyAfterScan(doc, physical);
+    await _controllerVerifyAfterScan(doc, resolved.line);
   }
 
   /// RN `PickTaskDetails` `useFocusEffect`: skan + lineId → modal, `submitScan` yo‘q.
@@ -490,20 +613,14 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
   }) async {
     final AppLocale loc = ref.read(appLocaleProvider);
     final String normalized = barcode.trim();
-    PickingLine? line = preferredLineId != null && preferredLineId.isNotEmpty
-        ? null
-        : resolvePickerScanLine(doc.lines, normalized);
+    final PickScanResolveResult? resolved = await _resolvePickScanForDocument(
+      doc: doc,
+      barcode: normalized,
+      controller: false,
+      preferredLineId: preferredLineId,
+    );
 
-    if (preferredLineId != null && preferredLineId.isNotEmpty) {
-      for (final PickingLine l in doc.lines) {
-        if (l.id == preferredLineId) {
-          line = l;
-          break;
-        }
-      }
-    }
-
-    if (line == null) {
+    if (resolved == null) {
       _rejectScanHaptic();
       showAppSnackBar(context,
         SnackBar(
@@ -516,18 +633,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       );
       return;
     }
-    if (!barcodeMatchesPickLine(normalized, line)) {
-      _rejectScanHaptic();
-      showAppSnackBar(context,
-        SnackBar(
-          content: Text(
-            '${StringLookup.t(loc, 'wrongBarcodeMessage')}'
-            '${line.barcode ?? line.sku ?? '—'}',
-          ),
-        ),
-      );
-      return;
-    }
+    final PickingLine line = resolved.line;
     final double remaining = line.qtyRequired - line.qtyPicked;
     if (remaining <= 0) {
       _rejectScanHaptic();
@@ -536,12 +642,14 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       );
       return;
     }
-    final PickingLine resolvedLine = line;
+    final double presetQty = resolved.isBoxScan
+        ? (remaining < resolved.unitsPerScan ? remaining : resolved.unitsPerScan.toDouble())
+        : remaining;
     _topScan.clear();
     final List<_LineGroup> groups = _groupLinesByProduct(doc.lines);
     _LineGroup? group;
     for (final _LineGroup g in groups) {
-      if (g.members.any((PickingLine m) => m.id == resolvedLine.id)) {
+      if (g.members.any((PickingLine m) => m.id == line.id)) {
         group = g;
         break;
       }
@@ -550,11 +658,12 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       doc,
       group ??
           _LineGroup(
-            virtual: resolvedLine,
-            members: <PickingLine>[resolvedLine],
+            virtual: line,
+            members: <PickingLine>[line],
           ),
       PickerProfileParam.picker,
       presetScannedBarcode: normalized,
+      presetPickQty: presetQty,
     );
   }
 
@@ -679,9 +788,12 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
         if (!mounted) {
           return;
         }
-        final PickingLine? line =
-            resolveControllerScanLine(doc.lines, code, _verifiedLineIds);
-        if (line == null) {
+        final PickScanResolveResult? resolved = await _resolvePickScanForDocument(
+          doc: doc,
+          barcode: code,
+          controller: true,
+        );
+        if (resolved == null) {
           _rejectScanHaptic();
           showAppSnackBar(context,
             SnackBar(content: Text(StringLookup.t(loc, 'productNotInOrder'))),
@@ -689,7 +801,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
           return;
         }
         _topScan.clear();
-        await _controllerVerifyAfterScan(doc, line);
+        await _controllerVerifyAfterScan(doc, resolved.line);
       } on Exception catch (e) {
         if (mounted) {
           _rejectScanHaptic();
@@ -928,6 +1040,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     _LineGroup group,
     PickerProfileParam profile, {
     String? presetScannedBarcode,
+    double? presetPickQty,
   }) async {
     final AppLocale loc = ref.read(appLocaleProvider);
     final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
@@ -983,12 +1096,17 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     final double remPick =
         pickTargetHolder[0].qtyRequired - pickTargetHolder[0].qtyPicked;
     final String presetQtyText = pickerPreset != null
-        ? (remPick >= 1 ? formatPickQty(remPick) : '0')
+        ? formatPickQty(
+            presetPickQty != null
+                ? (presetPickQty <= remPick ? presetPickQty : remPick)
+                : (remPick >= 1 ? remPick : 0),
+          )
         : '';
     final TextEditingController bc = TextEditingController();
     final TextEditingController qty =
         TextEditingController(text: presetQtyText);
     String? scannedForQty = pickerPreset;
+    String? scannedResolveProductId;
     bool sheetBusy = false;
     String? selectedLocationId;
     for (final PickingAlternateLocation a in pickTargetHolder[0].alternateLocations) {
@@ -1076,25 +1194,17 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                               ),
                               onChanged: (_) => setM(() {}),
                               onSubmitted: (String v) {
-                                final String t = v.trim();
-                                final PickingLine? match =
-                                    resolveScanLineInGroup(group.members, t);
-                                if (match == null) {
-                                  _rejectScanHaptic();
-                                  showAppSnackBar(context,
-                                    SnackBar(content: Text(StringLookup.t(loc, 'productNotInOrder'))),
-                                  );
-                                  return;
-                                }
-                                if (_isControllerGroupFullyVerified(doc, match)) {
-                                  _showControllerAlreadyVerifiedSnackBar();
-                                  return;
-                                }
-                                setM(() {
-                                  scannedForQty = t;
-                                  qty.text =
-                                      formatPickQty(_aggregateQtyPicked(group.members));
-                                });
+                                unawaited(_submitControllerSheetScan(
+                                  raw: v,
+                                  doc: doc,
+                                  group: group,
+                                  setM: setM,
+                                  qty: qty,
+                                  onResolved: (String scan, String? productId) {
+                                    scannedForQty = scan;
+                                    scannedResolveProductId = productId;
+                                  },
+                                ));
                               },
                             ),
                           ),
@@ -1139,8 +1249,13 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                         const SizedBox(height: 16),
                         FilledButton(
                           onPressed: () async {
-                            final PickingLine? physical =
-                                resolveScanLineInGroup(group.members, scannedForQty!);
+                            final PickingLine? physical = scannedResolveProductId != null &&
+                                    scannedResolveProductId!.trim().isNotEmpty
+                                ? resolveScanLineInGroupByProductId(
+                                    group.members,
+                                    scannedResolveProductId!,
+                                  )
+                                : resolveScanLineInGroup(group.members, scannedForQty!);
                             if (physical == null) {
                               return;
                             }

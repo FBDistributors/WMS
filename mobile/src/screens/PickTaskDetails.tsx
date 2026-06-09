@@ -36,6 +36,10 @@ import { useProfileType } from '../context/ProfileTypeContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCachedPickTaskDetail, saveCachedPickTaskDetail } from '../offline/offlineDb';
 import { addToQueue } from '../offline/offlineQueue';
+import {
+  barcodeMatchesLine,
+  resolvePickScanForDocument,
+} from '../utils/pickScanResolve';
 
 const CONTROLLER_VERIFIED_KEY = (taskId: string) => `wms_controller_verified_${taskId}`;
 
@@ -56,13 +60,6 @@ async function saveControllerVerifiedLineIds(taskId: string, ids: Set<string>): 
   } catch {
     // ignore
   }
-}
-
-function barcodeMatchesLine(value: string, line: PickingLine): boolean {
-  const v = value.trim().toLowerCase();
-  if (line.barcode && line.barcode.toLowerCase() === v) return true;
-  if (line.sku && line.sku.toLowerCase() === v) return true;
-  return false;
 }
 
 /** API dan kelgan documentni xavfsiz ko‘rsatish uchun normalizatsiya (lines/progress bo‘lmasa crash bo‘lmasin). */
@@ -226,46 +223,44 @@ export function PickTaskDetails() {
       navigation.setParams({ scannedBarcode: undefined, lineId: undefined });
 
       const lines = doc.lines ?? [];
-      if (lineId) {
-        const line = lines.find((l) => l.id === lineId);
-        if (!line) return;
-        if (barcodeMatchesLine(scannedBarcode, line)) {
+      void (async () => {
+        const resolved = await resolvePickScanForDocument({
+          lines,
+          barcode: scannedBarcode,
+          preferredLineId: lineId,
+        });
+        if (!resolved) {
+          if (lineId) {
+            Alert.alert(
+              t('wrongBarcodeTitle'),
+              t('wrongBarcodeMessage') + '—'
+            );
+          } else if (isController) {
+            Alert.alert(t('wrongBarcodeTitle'), t('productNotInOrder'));
+          }
+          return;
+        }
+        const { line, unitsPerScan, isBoxScan } = resolved;
+        if (isController) {
+          if (isControllerGroupFullyVerified(lines, line, controllerVerifiedLineIds)) {
+            Alert.alert(t('verifiedBadge'), t('controllerPositionAlreadyVerified'));
+            return;
+          }
           setSelectedLine(line);
           void playSuccessBeep();
           setScannedBarcodeForQty(scannedBarcode);
-          const remaining = line.qty_required - line.qty_picked;
-          setQtyInput(remaining >= 1 ? String(remaining) : '0');
-        } else {
-          setScannedBarcodeForQty(null);
-          setQtyInput('');
-          Alert.alert(
-            t('wrongBarcodeTitle'),
-            t('wrongBarcodeMessage') + (line.barcode || line.sku || '—')
-          );
-        }
-        return;
-      }
-
-      if (isController) {
-        const q = scannedBarcode.trim().toLowerCase();
-        const line = lines.find(
-          (l) =>
-            (l.barcode && l.barcode.toLowerCase() === q) ||
-            (l.sku && l.sku.toLowerCase() === q)
-        );
-        if (!line) {
-          Alert.alert(t('wrongBarcodeTitle'), t('productNotInOrder'));
-          return;
-        }
-        if (isControllerGroupFullyVerified(lines, line, controllerVerifiedLineIds)) {
-          Alert.alert(t('verifiedBadge'), t('controllerPositionAlreadyVerified'));
+          setQtyInput(String(line.qty_picked));
           return;
         }
         setSelectedLine(line);
         void playSuccessBeep();
         setScannedBarcodeForQty(scannedBarcode);
-        setQtyInput(String(line.qty_picked));
-      }
+        const remaining = line.qty_required - line.qty_picked;
+        const preset = isBoxScan
+          ? Math.min(remaining, unitsPerScan)
+          : remaining;
+        setQtyInput(preset >= 1 ? String(preset) : '0');
+      })();
     }, [
       route.params?.scannedBarcode,
       route.params?.lineId,
@@ -291,12 +286,18 @@ export function PickTaskDetails() {
 
   const handleLineScanSubmit = useCallback(
     (value: string) => {
-      if (!selectedLine) return;
-      const groupLines = groupLinesByProduct(doc?.lines ?? []).find((g) =>
+      if (!selectedLine || !doc) return;
+      void (async () => {
+      const groupLines = groupLinesByProduct(doc.lines ?? []).find((g) =>
         g.groupLines.some((l) => l.id === selectedLine.id)
       )?.groupLines;
-      const matchInGroup =
-        groupLines?.find((l) => barcodeMatchesLine(value, l)) ?? null;
+      const resolved = await resolvePickScanForDocument({
+        lines: groupLines ?? doc.lines ?? [],
+        barcode: value,
+      });
+      const matchInGroup = resolved?.line
+        ?? groupLines?.find((l) => barcodeMatchesLine(value, l))
+        ?? null;
       if (matchInGroup) {
         if (
           isController &&
@@ -313,7 +314,10 @@ export function PickTaskDetails() {
           setQtyInput(String(matchInGroup.qty_picked));
         } else {
           const remaining = matchInGroup.qty_required - matchInGroup.qty_picked;
-          setQtyInput(remaining >= 1 ? String(remaining) : '0');
+          const preset = resolved?.isBoxScan
+            ? Math.min(remaining, resolved.unitsPerScan)
+            : remaining;
+          setQtyInput(preset >= 1 ? String(preset) : '0');
         }
       } else if (barcodeMatchesLine(value, selectedLine)) {
         if (
@@ -338,8 +342,9 @@ export function PickTaskDetails() {
           t('wrongBarcodeMessage') + (selectedLine.barcode || selectedLine.sku || '—')
         );
       }
+      })();
     },
-    [selectedLine, doc?.lines, t, isController, controllerVerifiedLineIds]
+    [selectedLine, doc, t, isController, controllerVerifiedLineIds]
   );
 
   const closeUnpickModal = useCallback(() => {

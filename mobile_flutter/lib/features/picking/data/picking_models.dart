@@ -612,6 +612,25 @@ bool consolidatedScanMatchesProduct(String raw, ConsolidatedProduct p) {
   return (b.isNotEmpty && scanned == b) || (s.isNotEmpty && scanned == s);
 }
 
+/// Quti skani: resolve qilingan product_id bilan umumiy yig'ish mahsulotini topish.
+bool consolidatedScanMatchesResolvedProduct({
+  required ConsolidatedProduct p,
+  String? resolvedProductId,
+  String? rawBarcode,
+}) {
+  final String? pid = resolvedProductId?.trim();
+  if (pid != null && pid.isNotEmpty) {
+    final String? linePid = p.productId?.trim();
+    if (linePid != null && linePid == pid) {
+      return true;
+    }
+  }
+  if (rawBarcode != null && rawBarcode.trim().isNotEmpty) {
+    return consolidatedScanMatchesProduct(rawBarcode, p);
+  }
+  return false;
+}
+
 /// Mos mahsulot bo‘lsa — yig‘ish qoldig‘i (rounded); moslik yo‘q bo‘lsa `null`.
 int? consolidatedOpenPickQtyForBarcode(String raw, List<ConsolidatedProduct> products) {
   for (final ConsolidatedProduct p in products) {

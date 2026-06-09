@@ -43,6 +43,12 @@ class Product(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+    boxes: Mapped[List["ProductBox"]] = relationship(
+        "ProductBox",
+        back_populates="product",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
     brand_ref = relationship("Brand", lazy="joined")
 
     __table_args__ = (

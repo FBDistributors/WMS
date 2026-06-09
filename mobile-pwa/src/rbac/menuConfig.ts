@@ -42,6 +42,7 @@ export const ADMIN_MENU: MenuItem[] = [
   { path: '/admin/receiving', labelKey: 'menu.receiving', permissions: ['receiving:read'] },
   { path: '/admin/locations', labelKey: 'menu.locations', permissions: ['locations:read', 'locations:manage'] },
   { path: '/admin/products', labelKey: 'menu.products', permissions: ['products:read'] },
+  { path: '/admin/product-boxes', labelKey: 'menu.product_boxes', permissions: ['products:read'] },
   { path: '/admin/brands', labelKey: 'menu.brands', permissions: ['brands:manage'] },
   { path: '/admin/users', labelKey: 'menu.users', permissions: ['users:read', 'users:manage'] },
   { path: '/admin/audit', labelKey: 'menu.audit', permissions: ['audit:read'] },

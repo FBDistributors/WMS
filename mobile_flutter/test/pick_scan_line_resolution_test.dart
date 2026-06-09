@@ -82,6 +82,20 @@ void main() {
     });
   });
 
+  group('resolvePickerScanLineByProductId', () {
+    test('prefers open line for product id', () {
+      final List<PickingLine> lines = <PickingLine>[
+        _line(id: 'main', productId: 'p1', lineSource: 'product', qtyPicked: 2),
+        _line(id: 'promo', productId: 'p1', lineSource: 'action', qtyPicked: 0),
+      ];
+
+      final PickingLine? resolved =
+          resolvePickerScanLineByProductId(lines, 'p1');
+
+      expect(resolved?.id, 'promo');
+    });
+  });
+
   group('resolveScanLineInGroup', () {
     test('only matches members of the current group', () {
       final List<PickingLine> groupMembers = <PickingLine>[

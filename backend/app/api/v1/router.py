@@ -17,6 +17,7 @@ from app.api.v1.endpoints import (
     notifications,
     orders,
     picking,
+    product_boxes,
     products,
     receiving,
     reports,
@@ -46,6 +47,7 @@ router.include_router(reports.router, prefix="/reports", tags=["reports"])
 router.include_router(general_customers.router, prefix="/general-customers", tags=["general-customers"])
 router.include_router(picking.router, prefix="/picking", tags=["picking"])
 router.include_router(products.router, prefix="/products", tags=["products"])
+router.include_router(product_boxes.router, prefix="/product-boxes", tags=["product-boxes"])
 router.include_router(integrations.router, prefix="/integrations", tags=["integrations"])
 router.include_router(users.router, prefix="/users", tags=["users"])
 router.include_router(vip_customers.router, prefix="/vip-customers", tags=["vip-customers"])

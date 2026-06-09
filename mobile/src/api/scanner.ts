@@ -10,6 +10,8 @@ export type ScannerResolveOut = {
   entity_id: string | null;
   display_label: string | null;
   message: string | null;
+  scan_kind?: 'unit' | 'box' | string | null;
+  units_per_scan?: number | null;
 };
 
 export async function resolveScannerBarcode(barcode: string): Promise<ScannerResolveOut> {

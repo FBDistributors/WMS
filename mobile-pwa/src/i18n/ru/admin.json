@@ -2,6 +2,7 @@
   "menu": {
     "dashboard": "Дашборд",
     "products": "Товары",
+    "product_boxes": "Коробки",
     "brands": "Бренды",
     "orders": "Заказы",
     "returns_history": "Возвраты",

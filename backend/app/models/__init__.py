@@ -10,6 +10,7 @@ from app.models.location import Location
 from app.models.order import Order, OrderLine, OrderWmsState
 from app.models.picking import PickRequest
 from app.models.product import Product, ProductBarcode
+from app.models.product_box import ProductBox
 from app.models.receipt import Receipt, ReceiptLine
 from app.models.safe_cancel_return import SafeCancelReturnLine, SafeCancelReturnSession
 from app.models.stock import StockLot, StockMovement
@@ -50,6 +51,7 @@ __all__ = [
     "PickRequest",
     "Product",
     "ProductBarcode",
+    "ProductBox",
     "Receipt",
     "ReceiptLine",
     "SafeCancelReturnLine",

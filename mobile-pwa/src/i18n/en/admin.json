@@ -2,6 +2,7 @@
   "menu": {
     "dashboard": "Dashboard",
     "products": "Products",
+    "product_boxes": "Product boxes",
     "brands": "Brands",
     "orders": "Orders",
     "returns_history": "Returns",

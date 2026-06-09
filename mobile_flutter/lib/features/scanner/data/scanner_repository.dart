@@ -15,6 +15,8 @@ class ScannerResolveOut {
     required this.entityId,
     required this.displayLabel,
     required this.message,
+    this.scanKind,
+    this.unitsPerScan,
   });
 
   final ScannerResolveType type;
@@ -26,6 +28,9 @@ class ScannerResolveOut {
   final String? entityId;
   final String? displayLabel;
   final String? message;
+  /// `unit` yoki `box` (quti shtrix-kodi).
+  final String? scanKind;
+  final int? unitsPerScan;
 
   factory ScannerResolveOut.fromJson(Map<String, Object?> json) {
     final String t = (json['type'] as String? ?? 'UNKNOWN').toUpperCase();
@@ -52,6 +57,13 @@ class ScannerResolveOut {
       lid = m['id'] as String?;
       lcode = m['code'] as String?;
     }
+    final Object? unitsRaw = json['units_per_scan'];
+    int? unitsPerScan;
+    if (unitsRaw is int) {
+      unitsPerScan = unitsRaw;
+    } else if (unitsRaw is num) {
+      unitsPerScan = unitsRaw.round();
+    }
     return ScannerResolveOut(
       type: type,
       productId: pid,
@@ -62,8 +74,12 @@ class ScannerResolveOut {
       entityId: json['entity_id'] as String?,
       displayLabel: json['display_label'] as String?,
       message: json['message'] as String?,
+      scanKind: json['scan_kind'] as String?,
+      unitsPerScan: unitsPerScan,
     );
   }
+
+  bool get isBoxScan => scanKind == 'box' && (unitsPerScan ?? 0) > 0;
 }
 
 class ScannerRepository {

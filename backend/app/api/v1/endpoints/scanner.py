@@ -11,9 +11,8 @@ from sqlalchemy.orm import Session
 from app.auth.deps import get_current_user, require_any_permission
 from app.db import get_db
 from app.models.location import Location as LocationModel
-from app.models.product import Product as ProductModel
-from app.models.product import ProductBarcode
 from app.models.user import User as UserModel
+from app.services.product_scan_resolve import resolve_product_scan
 
 router = APIRouter()
 
@@ -53,6 +52,8 @@ class ScannerResolveOut(BaseModel):
     entity_id: str | None = None
     display_label: str | None = None
     message: str | None = None
+    scan_kind: str | None = None  # "unit" | "box"
+    units_per_scan: int | None = None
 
 
 @router.post(
@@ -75,23 +76,20 @@ async def resolve_barcode(
             message="Barcode is empty",
         )
 
-    # Check PRODUCT: main barcode or product_barcodes (indexed)
-    product = (
-        db.query(ProductModel)
-        .filter(
-            (ProductModel.barcode == barcode)
-            | ProductModel.id.in_(
-                db.query(ProductBarcode.product_id).filter(ProductBarcode.barcode == barcode)
-            )
-        )
-        .filter(ProductModel.is_active == True)
-        .first()
-    )
-    if product:
+    resolved = resolve_product_scan(db, barcode)
+    if resolved:
+        product = resolved.product
         main_barcode = product.barcode
         if not main_barcode:
+            from app.models.product import ProductBarcode
+
             b = db.query(ProductBarcode.barcode).filter(ProductBarcode.product_id == product.id).first()
             main_barcode = b[0] if b else None
+        label_suffix = (
+            f" — quti ×{resolved.units_per_scan}"
+            if resolved.scan_kind == "box"
+            else ""
+        )
         return ScannerResolveOut(
             type="PRODUCT",
             product=ProductResolveOut(
@@ -102,7 +100,9 @@ async def resolve_barcode(
             ),
             location=None,
             entity_id=str(product.id),
-            display_label=f"{product.name} ({product.sku})",
+            display_label=f"{product.name} ({product.sku}){label_suffix}",
+            scan_kind=resolved.scan_kind,
+            units_per_scan=resolved.units_per_scan,
         )
 
     # Check LOCATION: by code (location barcodes typically match code)

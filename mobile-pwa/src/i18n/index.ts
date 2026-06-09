@@ -8,6 +8,7 @@ import pickingUz from './uz/picking.json'
 import pickerUz from './uz/picker.json'
 import controllerUz from './uz/controller.json'
 import productsUz from './uz/products.json'
+import productBoxesUz from './uz/productBoxes.json'
 import ordersUz from './uz/orders.json'
 import locationsUz from './uz/locations.json'
 import receivingUz from './uz/receiving.json'
@@ -27,6 +28,7 @@ import pickingEn from './en/picking.json'
 import pickerEn from './en/picker.json'
 import controllerEn from './en/controller.json'
 import productsEn from './en/products.json'
+import productBoxesEn from './en/productBoxes.json'
 import ordersEn from './en/orders.json'
 import locationsEn from './en/locations.json'
 import receivingEn from './en/receiving.json'
@@ -46,6 +48,7 @@ import pickingRu from './ru/picking.json'
 import pickerRu from './ru/picker.json'
 import controllerRu from './ru/controller.json'
 import productsRu from './ru/products.json'
+import productBoxesRu from './ru/productBoxes.json'
 import ordersRu from './ru/orders.json'
 import locationsRu from './ru/locations.json'
 import receivingRu from './ru/receiving.json'
@@ -76,6 +79,7 @@ i18n.use(initReactI18next).init({
       picker: pickerUz,
       controller: controllerUz,
       products: productsUz,
+      productBoxes: productBoxesUz,
       orders: ordersUz,
       locations: locationsUz,
       receiving: receivingUz,
@@ -96,6 +100,7 @@ i18n.use(initReactI18next).init({
       picker: pickerEn,
       controller: controllerEn,
       products: productsEn,
+      productBoxes: productBoxesEn,
       orders: ordersEn,
       locations: locationsEn,
       receiving: receivingEn,
@@ -116,6 +121,7 @@ i18n.use(initReactI18next).init({
       picker: pickerRu,
       controller: controllerRu,
       products: productsRu,
+      productBoxes: productBoxesRu,
       orders: ordersRu,
       locations: locationsRu,
       receiving: receivingRu,
@@ -135,7 +141,7 @@ i18n.use(initReactI18next).init({
   fallbackLng: 'en',
   supportedLngs: SUPPORTED_LANGS,
   defaultNS: 'common',
-    ns: ['common', 'auth', 'admin', 'audit', 'kamomat', 'picking', 'picker', 'controller', 'products', 'orders', 'locations', 'receiving', 'inventory', 'brands', 'vipCustomers', 'workZones', 'organizations', 'users'],
+    ns: ['common', 'auth', 'admin', 'audit', 'kamomat', 'picking', 'picker', 'controller', 'products', 'productBoxes', 'orders', 'locations', 'receiving', 'inventory', 'brands', 'vipCustomers', 'workZones', 'organizations', 'users'],
   interpolation: {
     escapeValue: false,
   },

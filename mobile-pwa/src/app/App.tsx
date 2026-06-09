@@ -10,6 +10,7 @@ import { NotAuthorizedPage } from '../pages/admin/NotAuthorizedPage'
 import { ProfilePage } from '../pages/admin/ProfilePage'
 import { ProductDetailsPage } from '../pages/admin/ProductDetailsPage'
 import { ProductsPage } from '../pages/admin/ProductsPage'
+import { ProductBoxesPage } from '../pages/admin/ProductBoxesPage'
 import { BrandsPage } from '../pages/admin/BrandsPage'
 import { AdminSettingsPage } from '../pages/admin/AdminSettingsPage'
 import { OrdersPage } from '../pages/admin/OrdersPage'
@@ -286,6 +287,16 @@ export function App() {
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">
               <RequirePermission permission="products:read">
                 <ProductsPage />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/product-boxes"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="products:read">
+                <ProductBoxesPage />
               </RequirePermission>
             </RequirePermission>
           }

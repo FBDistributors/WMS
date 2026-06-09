@@ -32,6 +32,7 @@ from app.api.v1.endpoints.picker_inventory import _get_lot_level_balances, _loca
 from app.services.order_reserve_release import release_document_reserve_on_cancel
 from app.services.stock_availability import require_sufficient_reserved
 from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_ip, log_action
+from app.services.product_scan_resolve import resolve_product_scan
 from app.services.safe_cancel_return_service import (
     active_return_session_id_for_document,
     finish_safe_cancel_return,
@@ -1115,16 +1116,22 @@ async def consolidated_pick(
     # Two-step to avoid PostgreSQL "FOR UPDATE cannot be applied to the nullable side of an outer join":
     # 1) get ordered line IDs (join, no lock); 2) lock only document_lines by those IDs.
     cutoff = _picking_urgency_cutoff_today()
+    resolved = resolve_product_scan(db, barcode)
+    line_match_filter = (
+        DocumentLineModel.product_id == resolved.product_id
+        if resolved
+        else or_(
+            DocumentLineModel.barcode == barcode,
+            DocumentLineModel.sku == barcode,
+        )
+    )
     ordered_ids_query = (
         db.query(DocumentLineModel.id)
         .outerjoin(LocationModel, DocumentLineModel.location_id == LocationModel.id)
         .filter(
             DocumentLineModel.document_id.in_(doc_ids),
             DocumentLineModel.is_vip_expiry_informational.is_(False),
-            or_(
-                DocumentLineModel.barcode == barcode,
-                DocumentLineModel.sku == barcode,
-            ),
+            line_match_filter,
         )
         .order_by(*_picking_route_order_by(urgency_cutoff_date=cutoff))
     )

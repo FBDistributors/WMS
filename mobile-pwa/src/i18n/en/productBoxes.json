@@ -1,0 +1,37 @@
+{
+  "title": "Product boxes",
+  "add": "Create box",
+  "add_title": "New box",
+  "save": "Save",
+  "created": "Box saved",
+  "deleted": "Box removed",
+  "delete_failed": "Could not remove box",
+  "load_error": "Could not load boxes",
+  "search_placeholder": "Search by box code or product",
+  "empty_title": "No boxes yet",
+  "empty_desc": "When a sealed product box arrives, register its barcode, product, and units per box.",
+  "confirm_delete": "Delete box «{{code}}»?",
+  "fields": {
+    "box_barcode": "Box barcode",
+    "product": "Product",
+    "units_per_box": "Units per box",
+    "label": "Note (optional)"
+  },
+  "placeholders": {
+    "box_barcode": "Supplier label barcode",
+    "product_search": "SKU, name, or barcode",
+    "label": "e.g. sealed 12-pack"
+  },
+  "columns": {
+    "box_barcode": "Box code",
+    "product": "Product",
+    "units": "Units / box",
+    "label": "Note"
+  },
+  "validation": {
+    "box_barcode_required": "Box barcode is required",
+    "product_required": "Select a product",
+    "units_required": "Units must be a positive whole number",
+    "submit_failed": "Could not save"
+  }
+}
