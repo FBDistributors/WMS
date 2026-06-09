@@ -21,6 +21,7 @@ from app.models.stock import StockLot, StockMovement
 from app.models.user import User
 from app.models.vip_customer import VipCustomer
 from app.models.vip_customer_brand_limit import VipCustomerBrandLimit
+from app.models.vip_customer_product_limit import VipCustomerProductLimit
 
 
 def _mk_admin(db: Session) -> User:
@@ -157,6 +158,100 @@ def test_vip_short_expiry_creates_informational_line_and_send_ok(
         .count()
     )
     assert alloc_count == 0
+
+
+def test_vip_product_override_stricter_creates_informational_line(
+    client: TestClient, db_session: Session
+) -> None:
+    """Brend 12 oy, mahsulot 24 oy — 12 oyga yetadigan lot 24 oy qoidasida informational."""
+    admin = _mk_admin(db_session)
+    picker = _mk_picker(db_session)
+    brand = Brand(code=f"B-P-{uuid.uuid4().hex[:6]}", name="VIP Brand P", is_active=True)
+    db_session.add(brand)
+    db_session.flush()
+
+    vip = VipCustomer(customer_id="vip-cust-prod", customer_name="VIP Prod")
+    db_session.add(vip)
+    db_session.flush()
+    db_session.add(
+        VipCustomerBrandLimit(vip_customer_id=vip.id, brand_id=brand.id, min_expiry_months=12),
+    )
+
+    sku = f"SKU-VIP-P-{uuid.uuid4().hex[:6]}"
+    product = Product(
+        external_source="test",
+        external_id=f"ext-p-{uuid.uuid4().hex[:8]}",
+        name="VIP Prod Override",
+        sku=sku,
+        brand_id=brand.id,
+        is_active=True,
+    )
+    db_session.add(product)
+    db_session.flush()
+    db_session.add(
+        VipCustomerProductLimit(
+            vip_customer_id=vip.id,
+            product_id=product.id,
+            min_expiry_months=24,
+        ),
+    )
+
+    loc = Location(
+        code=f"LP-{uuid.uuid4().hex[:6]}",
+        barcode_value=f"LP-{uuid.uuid4().hex[:6]}",
+        name="Bin P",
+        type="bin",
+        zone_type="NORMAL",
+        is_active=True,
+    )
+    db_session.add(loc)
+    db_session.flush()
+
+    lot_expiry = min_expiry_date_from_months(12)
+    lot = StockLot(product_id=product.id, batch="B-VIP-P", expiry_date=lot_expiry)
+    db_session.add(lot)
+    db_session.flush()
+    db_session.add(
+        StockMovement(
+            product_id=product.id,
+            lot_id=lot.id,
+            location_id=loc.id,
+            qty_change=Decimal("10"),
+            movement_type="receipt",
+        )
+    )
+
+    order = Order(
+        source="test",
+        source_external_id=f"ext-op-{uuid.uuid4().hex[:10]}",
+        order_number=f"ONP-{uuid.uuid4().hex[:6]}",
+        customer_id="vip-cust-prod",
+    )
+    order.wms_state = OrderWmsState(status="imported")
+    order.lines = [OrderLine(sku=sku, name="Line", qty=2.0, uom="dona")]
+    db_session.add(order)
+    db_session.commit()
+    db_session.refresh(order)
+
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        res = client.post(
+            f"/api/v1/orders/{order.id}/send-to-picking",
+            json={"assigned_to_user_id": str(picker.id)},
+        )
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    assert res.status_code == 200
+    doc = (
+        db_session.query(Document)
+        .filter(Document.order_id == order.id, Document.doc_type == "SO")
+        .one()
+    )
+    lines = db_session.query(DocumentLine).filter(DocumentLine.document_id == doc.id).all()
+    info_lines = [ln for ln in lines if ln.is_vip_expiry_informational]
+    assert len(info_lines) == 1
+    assert info_lines[0].required_qty == 2.0
 
 
 def test_vip_no_physical_stock_still_409(client: TestClient, db_session: Session) -> None:

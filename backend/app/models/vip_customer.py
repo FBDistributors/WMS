@@ -1,4 +1,4 @@
-"""VIP customer: customer_id, name; muddat chegaralari faqat brand_limits orqali."""
+"""VIP customer: customer_id, name; muddat chegaralari brand_limits va product_limits orqali."""
 from __future__ import annotations
 
 import uuid
@@ -23,6 +23,11 @@ class VipCustomer(Base):
 
     brand_limits: Mapped[list["VipCustomerBrandLimit"]] = relationship(
         "VipCustomerBrandLimit",
+        back_populates="vip_customer",
+        cascade="all, delete-orphan",
+    )
+    product_limits: Mapped[list["VipCustomerProductLimit"]] = relationship(
+        "VipCustomerProductLimit",
         back_populates="vip_customer",
         cascade="all, delete-orphan",
     )

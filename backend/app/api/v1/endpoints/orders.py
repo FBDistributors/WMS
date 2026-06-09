@@ -634,7 +634,7 @@ def _allocate_order(
         product = db.get(ProductModel, product_id)
         product_name = (product.name if product else None) or line.name or ""
         brand_id = product.brand_id if product else None
-        vip_months = resolve_vip_min_expiry_months(db, order.customer_id, brand_id)
+        vip_months = resolve_vip_min_expiry_months(db, order.customer_id, brand_id, product_id)
         min_expiry_date = min_expiry_date_from_months(vip_months) if vip_months > 0 else None
 
         remaining = Decimal(str(line.qty))

@@ -276,7 +276,7 @@ async def start_wave(
                 order = db.query(OrderModel).filter(OrderModel.id == wo.order_id).first()
             if not order:
                 continue
-            m = resolve_vip_min_expiry_months(db, order.customer_id, brand_id)
+            m = resolve_vip_min_expiry_months(db, order.customer_id, brand_id, wl.product_id)
             if m > max_vip_months:
                 max_vip_months = m
         min_expiry_date = min_expiry_date_from_months(max_vip_months) if max_vip_months > 0 else None

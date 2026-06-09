@@ -21,6 +21,10 @@ export type ProductSearchComboboxProps = {
   className?: string
   /** Override product label for display when selected (if known) */
   displayLabel?: string
+  /** Faqat shu brenddagi mahsulotlarni ko'rsatish */
+  brandId?: string | null
+  /** Ro'yxatdan chiqariladigan mahsulot idlari */
+  excludeProductIds?: string[]
 }
 
 export function ProductSearchCombobox({
@@ -30,6 +34,8 @@ export function ProductSearchCombobox({
   onSelect,
   className = '',
   displayLabel,
+  brandId = null,
+  excludeProductIds = [],
 }: ProductSearchComboboxProps) {
   const { t } = useTranslation(['receiving', 'common'])
   const [query, setQuery] = useState('')
@@ -46,32 +52,51 @@ export function ProductSearchCombobox({
     return () => clearTimeout(timer)
   }, [query])
 
-  const search = useCallback(async (term: string) => {
-    if (!term) {
-      setResults([])
-      return
-    }
-    const cached = cache.get(term.toLowerCase())
-    if (cached) {
-      setResults(cached)
-      return
-    }
-    setIsSearching(true)
-    try {
-      const res = await getProducts({
-        search: term,
-        limit: SEARCH_LIMIT,
-        offset: 0,
-      })
-      const items = res.items
-      cache.set(term.toLowerCase(), items)
-      setResults(items)
-    } catch {
-      setResults([])
-    } finally {
-      setIsSearching(false)
-    }
-  }, [])
+  const filterResults = useCallback(
+    (items: Product[]) => {
+      let filtered = items
+      if (brandId) {
+        filtered = filtered.filter((p) => p.brand_id === brandId)
+      }
+      if (excludeProductIds.length > 0) {
+        const excluded = new Set(excludeProductIds)
+        filtered = filtered.filter((p) => !excluded.has(p.id))
+      }
+      return filtered
+    },
+    [brandId, excludeProductIds]
+  )
+
+  const search = useCallback(
+    async (term: string) => {
+      if (!term) {
+        setResults([])
+        return
+      }
+      const cacheKey = `${term.toLowerCase()}|${brandId ?? ''}|${excludeProductIds.join(',')}`
+      const cached = cache.get(cacheKey)
+      if (cached) {
+        setResults(cached)
+        return
+      }
+      setIsSearching(true)
+      try {
+        const res = await getProducts({
+          search: term,
+          limit: SEARCH_LIMIT,
+          offset: 0,
+        })
+        const items = filterResults(res.items)
+        cache.set(cacheKey, items)
+        setResults(items)
+      } catch {
+        setResults([])
+      } finally {
+        setIsSearching(false)
+      }
+    },
+    [brandId, excludeProductIds, filterResults]
+  )
 
   useEffect(() => {
     if (debouncedQuery) {

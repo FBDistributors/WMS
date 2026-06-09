@@ -11,12 +11,21 @@ export type VipBrandLimit = {
   min_expiry_months: number
 }
 
+export type VipProductLimit = {
+  product_id: string
+  brand_id: string
+  product_sku: string | null
+  product_name: string | null
+  min_expiry_months: number
+}
+
 export type VipCustomer = {
   id: string
   customer_id: string
   customer_name: string | null
   created_at: string
   brand_limits: VipBrandLimit[]
+  product_limits: VipProductLimit[]
 }
 
 export type VipCustomerCreateInput = {
@@ -32,6 +41,11 @@ export type VipCustomerUpdateInput = {
 
 export type VipBrandLimitInput = {
   brand_id: string
+  min_expiry_months: number
+}
+
+export type VipProductLimitInput = {
+  product_id: string
   min_expiry_months: number
 }
 
@@ -51,6 +65,13 @@ export async function updateVipCustomer(id: string, payload: VipCustomerUpdateIn
 
 export async function putVipCustomerBrandLimits(id: string, limits: VipBrandLimitInput[]) {
   return fetchJSON<VipCustomer>(`/api/v1/vip-customers/${id}/brand-limits`, {
+    method: 'PUT',
+    body: limits,
+  })
+}
+
+export async function putVipCustomerProductLimits(id: string, limits: VipProductLimitInput[]) {
+  return fetchJSON<VipCustomer>(`/api/v1/vip-customers/${id}/product-limits`, {
     method: 'PUT',
     body: limits,
   })

@@ -22,6 +22,7 @@ from app.models.user_fcm_token import UserFCMToken
 from app.models.user_session import UserSession
 from app.models.vip_customer import VipCustomer
 from app.models.vip_customer_brand_limit import VipCustomerBrandLimit
+from app.models.vip_customer_product_limit import VipCustomerProductLimit
 from app.models.settings_organization import SettingsOrganization
 from app.models.work_zone import WorkZone
 from app.models.wave import (
@@ -67,6 +68,7 @@ __all__ = [
     "UserSession",
     "VipCustomer",
     "VipCustomerBrandLimit",
+    "VipCustomerProductLimit",
     "SettingsOrganization",
     "WorkZone",
     "Wave",
