@@ -313,6 +313,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
   }
 
   void _showControllerAlreadyVerifiedSnackBar() {
+    _rejectScanHaptic();
     final AppLocale loc = ref.read(appLocaleProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
@@ -325,6 +326,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
           duration: const Duration(seconds: 3),
           content: Text(StringLookup.t(loc, 'controllerPositionAlreadyVerified')),
         ),
+        type: AppToastType.error,
       );
     });
   }
@@ -334,7 +336,6 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     PickingLine line,
   ) async {
     if (_isControllerGroupFullyVerified(doc, line)) {
-      _rejectScanHaptic();
       _showControllerAlreadyVerifiedSnackBar();
       return;
     }
@@ -1086,7 +1087,6 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                   return;
                                 }
                                 if (_isControllerGroupFullyVerified(doc, match)) {
-                                  _rejectScanHaptic();
                                   _showControllerAlreadyVerifiedSnackBar();
                                   return;
                                 }
