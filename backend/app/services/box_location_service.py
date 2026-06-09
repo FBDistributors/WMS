@@ -108,6 +108,41 @@ def get_breakdown(
     )
 
 
+def get_breakdown_for_pick(
+    db: Session,
+    *,
+    product_id: UUID,
+    lot_id: UUID,
+    location_id: UUID,
+) -> LocationBoxBreakdown:
+    """Terish UI: ajratilgan (reserved) zaxira bilan ham quti sonini ko'rsatish."""
+    from app.services.stock_availability import compute_lot_location_balances
+
+    lot = db.get(StockLotModel, lot_id)
+    if not lot or lot.product_id != product_id:
+        raise HTTPException(status_code=400, detail="Invalid lot for product")
+    on_hand, _reserved, available = compute_lot_location_balances(db, lot_id, location_id)
+    total = max(0, int(on_hand))
+    box_count, units_in_boxes, sealed = _units_in_boxes_for_lot_location(db, lot_id, location_id)
+    if units_in_boxes > total:
+        raise HTTPException(
+            status_code=409,
+            detail="Qutilardagi dona jami qoldiqdan oshib ketgan (ma'lumot nomuvofiqligi)",
+        )
+    physical_loose = max(0, total - units_in_boxes)
+    pickable_loose = max(0, min(int(available), physical_loose))
+    return LocationBoxBreakdown(
+        product_id=product_id,
+        lot_id=lot_id,
+        location_id=location_id,
+        box_count=box_count,
+        units_in_boxes=units_in_boxes,
+        loose_units=pickable_loose,
+        total_units=total,
+        sealed_boxes=sealed,
+    )
+
+
 def get_breakdown_map_for_product(
     db: Session,
     product_id: UUID,
@@ -362,6 +397,66 @@ def relocate_sealed_box(
     )
 
 
+def remove_sealed_boxes_for_pick(
+    db: Session,
+    *,
+    box_barcode: str,
+    location_id: UUID,
+    lot_id: UUID,
+    user: UserModel,
+    box_count: int,
+    pick_qty: Decimal,
+) -> None:
+    """Terishda bir yoki bir nechta sealed qutini olib tashlaydi."""
+    if box_count < 1:
+        raise HTTPException(status_code=400, detail="box_count must be >= 1")
+    if box_count > 500:
+        raise HTTPException(status_code=400, detail="box_count too large")
+    box = _get_product_box_by_barcode(db, box_barcode)
+    lot = db.get(StockLotModel, lot_id)
+    if not lot or lot.product_id != box.product_id:
+        raise HTTPException(status_code=400, detail="Partiya mahsulotga mos emas")
+    expected = Decimal(str(box.units_per_box * box_count))
+    qty_dec = Decimal(str(pick_qty))
+    if qty_dec != expected:
+        raise HTTPException(
+            status_code=400,
+            detail=f"qty {int(qty_dec)} != box_count * units_per_box ({int(expected)})",
+        )
+    lock_lot_location(db, lot_id, location_id)
+    sealed_count = (
+        db.query(LocationBoxPlacement)
+        .filter(
+            LocationBoxPlacement.product_box_id == box.id,
+            LocationBoxPlacement.lot_id == lot_id,
+            LocationBoxPlacement.location_id == location_id,
+            LocationBoxPlacement.status == PLACEMENT_SEALED,
+        )
+        .count()
+    )
+    if sealed_count < box_count:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Sealed quti yetarli emas (kerak {box_count}, mavjud {sealed_count})"
+            ),
+        )
+    for _ in range(box_count):
+        placement = _find_sealed_at(
+            db,
+            box.id,
+            location_id=location_id,
+            lot_id=lot_id,
+        )
+        if not placement:
+            raise HTTPException(status_code=404, detail="Quti bu lokatsiyada joylashmagan")
+        placement.status = PLACEMENT_REMOVED
+        placement.removed_at = datetime.now(timezone.utc)
+        placement.removed_by_user_id = user.id
+        placement.remove_reason = "pick"
+        db.flush()
+
+
 def remove_box_for_pick_if_needed(
     db: Session,
     *,
@@ -371,20 +466,15 @@ def remove_box_for_pick_if_needed(
     user: UserModel,
     pick_qty: Decimal,
 ) -> None:
-    """Quti skan bilan terishda sealed yozuvni olib tashlaydi."""
-    box = _get_product_box_by_barcode(db, box_barcode)
-    if pick_qty != Decimal(str(box.units_per_box)):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Quti skanida miqdor {box.units_per_box} bo'lishi kerak",
-        )
-    remove_sealed_box(
+    """Quti skan bilan terishda bitta sealed yozuvni olib tashlaydi (orqaga moslik)."""
+    remove_sealed_boxes_for_pick(
         db,
         box_barcode=box_barcode,
-        user=user,
-        reason="pick",
         location_id=location_id,
         lot_id=lot_id,
+        user=user,
+        box_count=1,
+        pick_qty=pick_qty,
     )
 
 

@@ -19,9 +19,9 @@ import '../../features/picking/picking_providers.dart';
 import '../../l10n/string_lookup.dart';
 import '../feedback/app_top_snackbar.dart';
 import '../input/input_clear_button.dart';
-import '../input/stock_quantity_input.dart';
 import '../layout/sheet_bottom_inset.dart';
 import 'consolidated_pick_success_snackbar.dart';
+import 'pick_box_qty_fields.dart';
 import 'scan_action_button.dart';
 
 /// Takrorlanmas joy kodlari, `lines` tartibida birinchi uchragan tartibda.
@@ -292,10 +292,26 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
     final AppLocale loc = ref.read(appLocaleProvider);
     final TextEditingController bc = TextEditingController();
     final TextEditingController qty = TextEditingController();
+    final TextEditingController boxCountCtrl = TextEditingController(text: '1');
     String? scannedForQty = verifiedBarcode;
+    String pickQtyMode = 'byUnit';
+    int? unitsPerBox;
     if (scannedForQty != null) {
       final double rem = product.totalRequired - product.totalPicked;
-      qty.text = '${max(1, rem.round())}';
+      try {
+        final ScannerResolveOut out =
+            await ref.read(scannerRepositoryProvider).resolveBarcode(scannedForQty);
+        if (out.isBoxScan && out.unitsPerScan != null) {
+          pickQtyMode = 'byBox';
+          unitsPerBox = out.unitsPerScan;
+          final int units = out.unitsPerScan!;
+          qty.text = '${min(rem.round(), units)}';
+        } else {
+          qty.text = '${max(1, rem.round())}';
+        }
+      } on Object {
+        qty.text = '${max(1, rem.round())}';
+      }
     }
 
     await showModalBottomSheet<void>(
@@ -427,10 +443,29 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                                     );
                                     return;
                                   }
-                                  final int pickQty =
+                                  int pickQty =
                                       await _consolidatedDefaultPickQtyForScan(t, product);
+                                  String mode = 'byUnit';
+                                  int? upb;
+                                  try {
+                                    final ScannerResolveOut out = await ref
+                                        .read(scannerRepositoryProvider)
+                                        .resolveBarcode(t);
+                                    if (out.isBoxScan && out.unitsPerScan != null) {
+                                      mode = 'byBox';
+                                      upb = out.unitsPerScan;
+                                      pickQty = out.unitsPerScan!;
+                                    }
+                                  } on Object {
+                                    /* offline */
+                                  }
                                   setM(() {
                                     scannedForQty = t;
+                                    pickQtyMode = mode;
+                                    unitsPerBox = upb;
+                                    if (mode == 'byBox') {
+                                      boxCountCtrl.text = '1';
+                                    }
                                     qty.text = '$pickQty';
                                   });
                                 }());
@@ -478,10 +513,29 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                                 );
                                 return;
                               }
-                              final int pickQty =
+                              int pickQty =
                                   await _consolidatedDefaultPickQtyForScan(t, product);
+                              String mode = 'byUnit';
+                              int? upb;
+                              try {
+                                final ScannerResolveOut out = await ref
+                                    .read(scannerRepositoryProvider)
+                                    .resolveBarcode(t);
+                                if (out.isBoxScan && out.unitsPerScan != null) {
+                                  mode = 'byBox';
+                                  upb = out.unitsPerScan;
+                                  pickQty = out.unitsPerScan!;
+                                }
+                              } on Object {
+                                /* offline */
+                              }
                               setM(() {
                                 scannedForQty = t;
+                                pickQtyMode = mode;
+                                unitsPerBox = upb;
+                                if (mode == 'byBox') {
+                                  boxCountCtrl.text = '1';
+                                }
                                 qty.text = '$pickQty';
                               });
                             }());
@@ -505,28 +559,38 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                         ),
                       ),
                       const SizedBox(height: 12),
-                      TextField(
-                        controller: qty,
-                        keyboardType: kStockQtyKeyboardType,
-                        inputFormatters: kStockQtyInputFormatters,
-                        decoration: InputDecoration(
-                          labelText: StringLookup.t(loc, 'qtyShort'),
-                          border: const OutlineInputBorder(),
-                          suffixIcon: buildInputClearButton(
-                            visible: qty.text.trim().isNotEmpty,
-                            onPressed: () => setM(() => qty.clear()),
-                          ),
-                        ),
-                        onChanged: (_) => setM(() {}),
+                      PickBoxQtyFields(
+                        loc: loc,
+                        mode: pickQtyMode,
+                        onModeChanged: (String m) => setM(() => pickQtyMode = m),
+                        unitQty: qty,
+                        boxCount: boxCountCtrl,
+                        unitsPerBox: unitsPerBox,
+                        maxUnits: product.totalRequired - product.totalPicked,
+                        looseUnits: () {
+                          for (final PickingAlternateLocation a in product.alternateLocations) {
+                            if (a.isPrimary) {
+                              return a.looseUnits;
+                            }
+                          }
+                          return null;
+                        }(),
+                        onFieldsChanged: () => setM(() {}),
                       ),
                       const SizedBox(height: 16),
                       FilledButton(
                         onPressed: sheetBusy
                             ? null
                             : () async {
-                            final int q = int.tryParse(qty.text.trim()) ?? 0;
                             final double rem = product.totalRequired - product.totalPicked;
                             final int maxPick = max(0, rem.round());
+                            final int q = pickQtyFromBoxMode(
+                              mode: pickQtyMode,
+                              unitQty: qty,
+                              boxCount: boxCountCtrl,
+                              unitsPerBox: unitsPerBox,
+                              maxUnits: rem,
+                            );
                             if (q < 1 || q > maxPick) {
                               showAppSnackBar(
         host,
@@ -549,6 +613,11 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                                     qty: q,
                                     requestId:
                                         'consolidated-${DateTime.now().millisecondsSinceEpoch}',
+                                    boxCount: pickBoxCountForSubmit(
+                                      mode: pickQtyMode,
+                                      boxCount: boxCountCtrl,
+                                      unitsPerBox: unitsPerBox,
+                                    ),
                                   );
                               await ref
                                   .read(consolidatedViewProvider.notifier)
@@ -587,6 +656,7 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
 
     bc.dispose();
     qty.dispose();
+    boxCountCtrl.dispose();
   }
 
   @override

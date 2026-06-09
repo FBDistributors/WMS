@@ -19,6 +19,7 @@ from app.services.box_location_service import (
     place_sealed_box,
     place_sealed_boxes,
     remove_sealed_box,
+    remove_sealed_boxes_for_pick,
 )
 
 
@@ -222,3 +223,45 @@ def test_remove_box(
         location_id=sample_location.id,
     )
     assert bd.units_in_boxes + bd.loose_units == bd.total_units
+
+
+def test_remove_sealed_boxes_for_pick_multi(
+    db_session: Session,
+    inv_user: UserModel,
+    sample_product: ProductModel,
+    sample_location: LocationModel,
+) -> None:
+    lot = _seed_stock(db_session, sample_product, sample_location, 60)
+    box = ProductBoxModel(
+        box_barcode="BOX-PICK-MULTI",
+        product_id=sample_product.id,
+        units_per_box=6,
+        is_active=True,
+    )
+    db_session.add(box)
+    db_session.flush()
+    place_sealed_boxes(
+        db_session,
+        box_barcode="BOX-PICK-MULTI",
+        location_id=sample_location.id,
+        lot_id=lot.id,
+        user=inv_user,
+        box_count=5,
+    )
+    remove_sealed_boxes_for_pick(
+        db_session,
+        box_barcode="BOX-PICK-MULTI",
+        location_id=sample_location.id,
+        lot_id=lot.id,
+        user=inv_user,
+        box_count=3,
+        pick_qty=Decimal("18"),
+    )
+    bd = get_breakdown(
+        db_session,
+        product_id=sample_product.id,
+        lot_id=lot.id,
+        location_id=sample_location.id,
+    )
+    assert bd.box_count == 2
+    assert bd.units_in_boxes == 12

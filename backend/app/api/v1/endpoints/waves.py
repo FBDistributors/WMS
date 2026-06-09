@@ -40,6 +40,12 @@ from app.services.wave_service import (
     compute_wave_lines,
     get_staging_location_id,
 )
+from app.services.box_location_service import (
+    get_breakdown_for_pick,
+    remove_sealed_boxes_for_pick,
+    require_sufficient_loose_for_unit_pick,
+)
+from app.services.product_scan_resolve import resolve_product_scan
 from app.services.stock_availability import compute_lot_location_available, lock_lot_location
 
 router = APIRouter()
@@ -67,6 +73,9 @@ class WaveLineAllocationOut(BaseModel):
     expiry_date: Optional[datetime]
     allocated_qty: Decimal
     picked_qty: Decimal
+    box_count: Optional[int] = None
+    units_in_boxes: Optional[int] = None
+    loose_units: Optional[int] = None
 
 
 class WaveLineOut(BaseModel):
@@ -106,6 +115,7 @@ class PickScanIn(BaseModel):
     barcode: str = Field(..., min_length=1)
     qty: Decimal = Field(..., gt=0)
     request_id: UUID
+    box_count: Optional[int] = Field(default=None, ge=1, le=500)
 
 
 class SortingScanIn(BaseModel):
@@ -352,31 +362,83 @@ async def pick_scan(
     if existing:
         return {"status": "ok", "idempotent": True}
 
-    wl = db.query(WaveLine).options(selectinload(WaveLine.allocations)).filter(
-        WaveLine.wave_id == wave_id, WaveLine.barcode == payload.barcode.strip()
-    ).first()
+    scan_barcode = payload.barcode.strip()
+    resolved = resolve_product_scan(db, scan_barcode)
+    if resolved:
+        wl = db.query(WaveLine).options(selectinload(WaveLine.allocations)).filter(
+            WaveLine.wave_id == wave_id, WaveLine.product_id == resolved.product_id
+        ).first()
+    else:
+        wl = db.query(WaveLine).options(selectinload(WaveLine.allocations)).filter(
+            WaveLine.wave_id == wave_id, WaveLine.barcode == scan_barcode
+        ).first()
     if not wl:
         raise HTTPException(status_code=404, detail="Barcode not in wave")
     remaining = wl.total_qty - wl.picked_qty
     if payload.qty > remaining:
         raise HTTPException(status_code=400, detail=f"Qty {payload.qty} exceeds remaining {remaining}")
 
+    box_pick = resolved is not None and resolved.scan_kind == "box"
+    unit_pick = resolved is not None and resolved.scan_kind == "unit"
+    units_per_box: Optional[Decimal] = None
+    boxes_remaining = 0
+    if box_pick:
+        if payload.box_count is None:
+            raise HTTPException(status_code=400, detail="box_count required for box scan")
+        units_per_box = Decimal(str(resolved.units_per_scan))
+        expected_qty = units_per_box * Decimal(str(payload.box_count))
+        if payload.qty != expected_qty:
+            raise HTTPException(
+                status_code=400,
+                detail=f"qty {payload.qty} != box_count * units_per_box ({expected_qty})",
+            )
+        boxes_remaining = payload.box_count
+
     staging_id = get_staging_location_id(db)
     if not staging_id:
         raise HTTPException(status_code=500, detail="Staging location not found")
 
     to_pick = payload.qty
+    picked_total = Decimal("0")
     for wa in wl.allocations:
         if to_pick <= 0:
             break
         available = wa.allocated_qty - wa.picked_qty
         if available <= 0:
             continue
-        pick_from_alloc = min(to_pick, available)
+        if box_pick:
+            assert units_per_box is not None
+            max_pick = min(to_pick, available)
+            line_boxes = min(boxes_remaining, int(max_pick // units_per_box))
+            if line_boxes <= 0:
+                continue
+            pick_from_alloc = Decimal(str(line_boxes)) * units_per_box
+        else:
+            pick_from_alloc = min(to_pick, available)
         # Serialise lot+joy (parallel skanlar bir xil ajratishdan ortiq terib qo‘ymasin).
         # unallocate reservedni kamaytiradi — available o‘zgarmaydi; shuning uchun
         # require_sufficient_available bu yerda noto‘g‘ri bloklardi (hammasi reserved bo‘lsa).
         lock_lot_location(db, wa.stock_lot_id, wa.location_id)
+        if box_pick:
+            line_boxes = int(pick_from_alloc // units_per_box)
+            remove_sealed_boxes_for_pick(
+                db,
+                box_barcode=scan_barcode,
+                location_id=wa.location_id,
+                lot_id=wa.stock_lot_id,
+                user=user,
+                box_count=line_boxes,
+                pick_qty=pick_from_alloc,
+            )
+            boxes_remaining -= line_boxes
+        elif unit_pick:
+            require_sufficient_loose_for_unit_pick(
+                db,
+                product_id=wl.product_id,
+                lot_id=wa.stock_lot_id,
+                location_id=wa.location_id,
+                qty=pick_from_alloc,
+            )
         wa.picked_qty += pick_from_alloc
         db.add(StockMovementModel(
             product_id=wl.product_id,
@@ -399,8 +461,15 @@ async def pick_scan(
             created_by_user_id=user.id,
         ))
         to_pick -= pick_from_alloc
+        picked_total += pick_from_alloc
 
-    wl.picked_qty += payload.qty
+    if box_pick and (to_pick > 0 or boxes_remaining > 0):
+        raise HTTPException(
+            status_code=409,
+            detail="Quti terish: ajratishlarda yetarli joy yo'q",
+        )
+
+    wl.picked_qty += picked_total
     if wl.picked_qty >= wl.total_qty:
         wl.status = "PICKED"
 
@@ -523,18 +592,35 @@ def _to_wave_out(db: Session, wave: Wave, include_allocations: bool = False) -> 
         p = wl.product
         allocs = None
         if include_allocations and wl.allocations:
-            allocs = [
-                WaveLineAllocationOut(
-                    lot_id=wa.stock_lot_id,
-                    location_id=wa.location_id,
-                    location_code=wa.location.code if wa.location else "",
-                    batch=wa.lot.batch if wa.lot else "",
-                    expiry_date=wa.lot.expiry_date if wa.lot else None,
-                    allocated_qty=wa.allocated_qty,
-                    picked_qty=wa.picked_qty,
+            allocs = []
+            for wa in wl.allocations:
+                bd_kw: dict = {}
+                try:
+                    bd = get_breakdown_for_pick(
+                        db,
+                        product_id=wl.product_id,
+                        lot_id=wa.stock_lot_id,
+                        location_id=wa.location_id,
+                    )
+                    bd_kw = {
+                        "box_count": bd.box_count,
+                        "units_in_boxes": bd.units_in_boxes,
+                        "loose_units": bd.loose_units,
+                    }
+                except HTTPException:
+                    pass
+                allocs.append(
+                    WaveLineAllocationOut(
+                        lot_id=wa.stock_lot_id,
+                        location_id=wa.location_id,
+                        location_code=wa.location.code if wa.location else "",
+                        batch=wa.lot.batch if wa.lot else "",
+                        expiry_date=wa.lot.expiry_date if wa.lot else None,
+                        allocated_qty=wa.allocated_qty,
+                        picked_qty=wa.picked_qty,
+                        **bd_kw,
+                    )
                 )
-                for wa in wl.allocations
-            ]
         lines_out.append(WaveLineOut(
             id=wl.id,
             product_id=wl.product_id,

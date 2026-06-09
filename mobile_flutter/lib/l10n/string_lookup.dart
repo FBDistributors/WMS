@@ -327,6 +327,8 @@ abstract final class StringLookup {
     'kirimNewScanBoxFirst':
         'Qutini skanerlang. Bazada bo‘lmasa, avval mahsulotni qidiring.',
     'kirimNewBoxQtyIncomplete': 'Quti skani, hajmi va sonini to‘ldiring',
+    'pickUseBoxScan': 'Dona terish uchun qoldiq yetmaydi — quti skan qiling',
+    'pickLocationBreakdown': '{{breakdown}}',
     'kirimBoxReceiveSuccess':
         'Qabul: {{boxCount}} quti × {{unitsPerBox}} = {{total}} dona\n{{product}} · {{location}}',
     'inventoryScannedViaBox': 'Quti skani: {{barcode}} · {{units}} dona/quti',
@@ -676,6 +678,8 @@ abstract final class StringLookup {
     'kirimNewScanBoxFirst':
         'Отсканируйте коробку. Если её нет в базе, сначала найдите товар.',
     'kirimNewBoxQtyIncomplete': 'Укажите скан коробки, размер и количество',
+    'pickUseBoxScan': 'Недостаточно штук — отсканируйте коробку',
+    'pickLocationBreakdown': '{{breakdown}}',
     'kirimBoxReceiveSuccess':
         'Приём: {{boxCount}} кор. × {{unitsPerBox}} = {{total}} шт.\n{{product}} · {{location}}',
     'inventoryScannedViaBox': 'Скан коробки: {{barcode}} · {{units}} шт./кор.',
@@ -1025,6 +1029,8 @@ abstract final class StringLookup {
     'kirimNewScanBoxFirst':
         'Scan the box. If it is not in the database, search for the product first.',
     'kirimNewBoxQtyIncomplete': 'Complete box scan, size, and count',
+    'pickUseBoxScan': 'Not enough loose units — scan a box',
+    'pickLocationBreakdown': '{{breakdown}}',
     'kirimBoxReceiveSuccess':
         'Received: {{boxCount}} boxes × {{unitsPerBox}} = {{total}} units\n{{product}} · {{location}}',
     'inventoryScannedViaBox': 'Box scan: {{barcode}} · {{units}} units/box',

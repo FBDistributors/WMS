@@ -33,7 +33,8 @@ from app.services.order_reserve_release import release_document_reserve_on_cance
 from app.services.stock_availability import require_sufficient_reserved
 from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_ip, log_action
 from app.services.box_location_service import (
-    remove_box_for_pick_if_needed,
+    get_breakdown_for_pick,
+    remove_sealed_boxes_for_pick,
     require_sufficient_loose_for_unit_pick,
 )
 from app.services.product_scan_resolve import resolve_product_scan
@@ -58,6 +59,9 @@ class PickingAlternateLocation(BaseModel):
     batch: Optional[str] = None
     expiry_date: Optional[str] = None
     is_primary: bool = False
+    box_count: Optional[int] = None
+    units_in_boxes: Optional[int] = None
+    loose_units: Optional[int] = None
 
 
 class PickingLine(BaseModel):
@@ -180,6 +184,16 @@ class ConsolidatedPickRequest(BaseModel):
     barcode: str
     qty: float
     request_id: str
+    box_count: Optional[int] = None
+
+    @field_validator("box_count")
+    @classmethod
+    def box_count_bounded(cls, v: Optional[int]) -> Optional[int]:
+        if v is None:
+            return None
+        if v < 1 or v > 500:
+            raise ValueError("box_count must be between 1 and 500")
+        return v
 
     @field_validator("qty", mode="before")
     @classmethod
@@ -205,6 +219,16 @@ class PickLineRequest(BaseModel):
     delta: int
     request_id: str
     barcode: str | None = None
+    box_count: Optional[int] = None
+
+    @field_validator("box_count")
+    @classmethod
+    def box_count_bounded(cls, v: Optional[int]) -> Optional[int]:
+        if v is None:
+            return None
+        if v < 1 or v > 500:
+            raise ValueError("box_count must be between 1 and 500")
+        return v
 
     @field_validator("delta")
     @classmethod
@@ -339,6 +363,29 @@ def _safe_expiry_date(expiry_date) -> Optional[str]:
     return str(expiry_date) if expiry_date else None
 
 
+def _breakdown_kwargs_for_location(
+    db: Session,
+    *,
+    product_id: UUID,
+    lot_id: UUID,
+    location_id: UUID,
+) -> dict:
+    try:
+        bd = get_breakdown_for_pick(
+            db,
+            product_id=product_id,
+            lot_id=lot_id,
+            location_id=location_id,
+        )
+        return {
+            "box_count": bd.box_count,
+            "units_in_boxes": bd.units_in_boxes,
+            "loose_units": bd.loose_units,
+        }
+    except HTTPException:
+        return {}
+
+
 def _picking_expiry_urgency_days() -> int:
     """Kunlar: muddat <= bugun + N bo‘lsa 'yaqin tugash' guruhi (env WMS_PICKING_EXPIRY_URGENCY_DAYS, default 30)."""
     raw = (os.getenv("WMS_PICKING_EXPIRY_URGENCY_DAYS") or "30").strip()
@@ -430,6 +477,16 @@ def _line_alternate_locations(
         av = float(r["available"] or 0)
         if av <= 0 and not is_pri:
             continue
+        bd_kw = (
+            _breakdown_kwargs_for_location(
+                db,
+                product_id=line.product_id,
+                lot_id=r["lot_id"],
+                location_id=r["location_id"],
+            )
+            if line.product_id
+            else {}
+        )
         out.append(
             PickingAlternateLocation(
                 location_id=r["location_id"],
@@ -439,6 +496,7 @@ def _line_alternate_locations(
                 batch=r.get("batch"),
                 expiry_date=_safe_expiry_date(r.get("expiry_date")),
                 is_primary=is_pri,
+                **bd_kw,
             )
         )
     # Asosiy joy+lott — ombor filtri tufayli `rows`da bo‘lmasa ham, joriy lokatsiya bo‘yicha aniq balans.
@@ -447,6 +505,12 @@ def _line_alternate_locations(
         pr = next((r for r in loc_balances if r["lot_id"] == lot_line), None)
         if pr is not None:
             out = [x for x in out if not (x.location_id == lid and x.lot_id == lot_line)]
+            pri_bd = _breakdown_kwargs_for_location(
+                db,
+                product_id=line.product_id,
+                lot_id=lot_line,
+                location_id=lid,
+            )
             out.insert(
                 0,
                 PickingAlternateLocation(
@@ -459,9 +523,16 @@ def _line_alternate_locations(
                         pr.get("expiry_date") or getattr(line, "expiry_date", None)
                     ),
                     is_primary=True,
+                    **pri_bd,
                 ),
             )
         elif not any(x.is_primary for x in out):
+            pri_bd = _breakdown_kwargs_for_location(
+                db,
+                product_id=line.product_id,
+                lot_id=lot_line,
+                location_id=lid,
+            )
             out.insert(
                 0,
                 PickingAlternateLocation(
@@ -472,6 +543,7 @@ def _line_alternate_locations(
                     batch=line.batch,
                     expiry_date=_safe_expiry_date(getattr(line, "expiry_date", None)),
                     is_primary=True,
+                    **pri_bd,
                 ),
             )
     return out[:max_rows]
@@ -1155,14 +1227,37 @@ async def consolidated_pick(
     remaining = Decimal(str(qty))
     box_pick = resolved is not None and resolved.scan_kind == "box"
     unit_pick = resolved is not None and resolved.scan_kind == "unit"
+    units_per_box: Optional[Decimal] = None
+    boxes_remaining = 0
+    if box_pick:
+        if payload.box_count is None:
+            raise HTTPException(status_code=400, detail="box_count required for box scan")
+        units_per_box = Decimal(str(resolved.units_per_scan))
+        expected_qty = units_per_box * Decimal(str(payload.box_count))
+        if remaining != expected_qty:
+            raise HTTPException(
+                status_code=400,
+                detail=f"qty {int(remaining)} != box_count * units_per_box ({int(expected_qty)})",
+            )
+        boxes_remaining = payload.box_count
     first_picked_line_id: Optional[UUID] = None
     docs_to_refresh = set()
-    box_removed = False
     try:
         for line in lines:
             if remaining <= 0:
                 break
-            need = min(remaining, Decimal(str(line.required_qty or 0)) - Decimal(str(line.picked_qty or 0)))
+            line_remaining = Decimal(str(line.required_qty or 0)) - Decimal(str(line.picked_qty or 0))
+            if line_remaining <= 0:
+                continue
+            if box_pick:
+                assert units_per_box is not None
+                max_pick = min(remaining, line_remaining)
+                line_boxes = min(boxes_remaining, int(max_pick // units_per_box))
+                if line_boxes <= 0:
+                    continue
+                need = Decimal(str(line_boxes)) * units_per_box
+            else:
+                need = min(remaining, line_remaining)
             if need <= 0:
                 continue
             if not line.product_id or not line.lot_id or not line.location_id:
@@ -1185,16 +1280,18 @@ async def consolidated_pick(
                 need,
                 lock=True,
             )
-            if box_pick and not box_removed:
-                remove_box_for_pick_if_needed(
+            if box_pick:
+                line_boxes = int(need // units_per_box)
+                remove_sealed_boxes_for_pick(
                     db,
                     box_barcode=barcode,
                     location_id=line.location_id,
                     lot_id=line.lot_id,
                     user=user,
+                    box_count=line_boxes,
                     pick_qty=need,
                 )
-                box_removed = True
+                boxes_remaining -= line_boxes
             elif unit_pick:
                 require_sufficient_loose_for_unit_pick(
                     db,
@@ -1232,6 +1329,12 @@ async def consolidated_pick(
             if first_picked_line_id is None:
                 first_picked_line_id = line.id
             remaining -= need
+
+        if box_pick and (remaining > 0 or boxes_remaining > 0):
+            raise HTTPException(
+                status_code=409,
+                detail="Quti terish: buyurtma qatorlarida yetarli joy yo'q",
+            )
 
         for doc_id in docs_to_refresh:
             document = (
@@ -1780,12 +1883,15 @@ def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
         if scan_barcode:
             resolved = resolve_product_scan(db, scan_barcode)
             if resolved and resolved.scan_kind == "box":
-                remove_box_for_pick_if_needed(
+                if payload.box_count is None:
+                    raise HTTPException(status_code=400, detail="box_count required for box scan")
+                remove_sealed_boxes_for_pick(
                     db,
                     box_barcode=scan_barcode,
                     location_id=line.location_id,
                     lot_id=line.lot_id,
                     user=user,
+                    box_count=payload.box_count,
                     pick_qty=qty_delta,
                 )
             elif resolved and resolved.scan_kind == "unit":

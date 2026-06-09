@@ -171,6 +171,7 @@ class PickingRepository {
     required String barcode,
     required int qty,
     String? requestId,
+    int? boxCount,
   }) async {
     try {
       final Response<Object?> res = await _dio.post<Object?>(
@@ -179,6 +180,7 @@ class PickingRepository {
           'barcode': barcode.trim(),
           'qty': qty,
           'request_id': requestId ?? const Uuid().v4(),
+          if (boxCount != null) 'box_count': boxCount,
         },
       );
       final Object? data = res.data;
@@ -196,6 +198,7 @@ class PickingRepository {
     int delta,
     String requestId, {
     String? barcode,
+    int? boxCount,
   }) async {
     try {
       final Response<Object?> res = await _dio.post<Object?>(
@@ -204,6 +207,7 @@ class PickingRepository {
           'delta': delta,
           'request_id': requestId,
           if (barcode != null && barcode.trim().isNotEmpty) 'barcode': barcode.trim(),
+          if (boxCount != null) 'box_count': boxCount,
         },
       );
       final Object? data = res.data;

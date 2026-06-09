@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:math' show max;
 
 import 'package:flutter/material.dart';
@@ -6,11 +7,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_state/app_locale.dart';
 import '../../features/picking/data/picking_models.dart';
 import '../../features/picking/picking_providers.dart';
+import '../../features/scanner/data/scanner_repository.dart';
+import '../../features/scanner/scanner_providers.dart';
 import '../../l10n/string_lookup.dart';
 import '../feedback/app_top_snackbar.dart';
-import '../input/stock_quantity_input.dart';
 import '../layout/sheet_bottom_inset.dart';
 import 'consolidated_pick_success_snackbar.dart';
+import 'pick_box_qty_fields.dart';
 
 Future<void> showConsolidatedTopPickQtySheet({
   required BuildContext context,
@@ -35,7 +38,7 @@ Future<void> showConsolidatedTopPickQtySheet({
   );
 }
 
-class _ConsolidatedTopPickQtySheet extends StatefulWidget {
+class _ConsolidatedTopPickQtySheet extends ConsumerStatefulWidget {
   const _ConsolidatedTopPickQtySheet({
     required this.host,
     required this.ref,
@@ -53,11 +56,15 @@ class _ConsolidatedTopPickQtySheet extends StatefulWidget {
   final VoidCallback? onSuccess;
 
   @override
-  State<_ConsolidatedTopPickQtySheet> createState() => _ConsolidatedTopPickQtySheetState();
+  ConsumerState<_ConsolidatedTopPickQtySheet> createState() =>
+      _ConsolidatedTopPickQtySheetState();
 }
 
-class _ConsolidatedTopPickQtySheetState extends State<_ConsolidatedTopPickQtySheet> {
+class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPickQtySheet> {
   late final TextEditingController _qty;
+  late final TextEditingController _boxCount;
+  String _pickQtyMode = 'byUnit';
+  int? _unitsPerBox;
   bool _busy = false;
 
   @override
@@ -66,18 +73,50 @@ class _ConsolidatedTopPickQtySheetState extends State<_ConsolidatedTopPickQtyShe
     final double rem = widget.product.totalRequired - widget.product.totalPicked;
     final int maxPick = max(0, rem.round());
     _qty = TextEditingController(text: '${max(1, maxPick)}');
+    _boxCount = TextEditingController(text: '1');
+    unawaited(_resolveBoxScan());
+  }
+
+  Future<void> _resolveBoxScan() async {
+    try {
+      final ScannerResolveOut out =
+          await ref.read(scannerRepositoryProvider).resolveBarcode(widget.pickBarcode);
+      if (!mounted) {
+        return;
+      }
+      if (out.isBoxScan && out.unitsPerScan != null) {
+        final double rem = widget.product.totalRequired - widget.product.totalPicked;
+        setState(() {
+          _pickQtyMode = 'byBox';
+          _unitsPerBox = out.unitsPerScan;
+          _qty.text = '${out.unitsPerScan}';
+          if (rem < out.unitsPerScan!) {
+            _qty.text = '${rem.round()}';
+          }
+        });
+      }
+    } on Object {
+      /* offline */
+    }
   }
 
   @override
   void dispose() {
     _qty.dispose();
+    _boxCount.dispose();
     super.dispose();
   }
 
   Future<void> _confirm() async {
-    final int q = int.tryParse(_qty.text.trim()) ?? 0;
     final double rem = widget.product.totalRequired - widget.product.totalPicked;
     final int maxPick = max(0, rem.round());
+    final int q = pickQtyFromBoxMode(
+      mode: _pickQtyMode,
+      unitQty: _qty,
+      boxCount: _boxCount,
+      unitsPerBox: _unitsPerBox,
+      maxUnits: rem,
+    );
     if (q < 1 || q > maxPick) {
       if (widget.host.mounted) {
         showAppSnackBar(
@@ -101,6 +140,11 @@ class _ConsolidatedTopPickQtySheetState extends State<_ConsolidatedTopPickQtyShe
             barcode: widget.pickBarcode.trim(),
             qty: q,
             requestId: 'consolidated-${DateTime.now().millisecondsSinceEpoch}',
+            boxCount: pickBoxCountForSubmit(
+              mode: _pickQtyMode,
+              boxCount: _boxCount,
+              unitsPerBox: _unitsPerBox,
+            ),
           );
       await widget.ref.read(consolidatedViewProvider.notifier).refreshFromNetwork();
       if (!mounted) {
@@ -130,6 +174,13 @@ class _ConsolidatedTopPickQtySheetState extends State<_ConsolidatedTopPickQtyShe
     final ConsolidatedProduct product = widget.product;
     final AppLocale loc = widget.loc;
     final double rem = product.totalRequired - product.totalPicked;
+    int? primaryLoose;
+    for (final PickingAlternateLocation a in product.alternateLocations) {
+      if (a.isPrimary) {
+        primaryLoose = a.looseUnits;
+        break;
+      }
+    }
     return Padding(
       padding: EdgeInsets.only(bottom: sheetBottomPadding(context)),
       child: SingleChildScrollView(
@@ -174,14 +225,16 @@ class _ConsolidatedTopPickQtySheetState extends State<_ConsolidatedTopPickQtyShe
               ),
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _qty,
-              keyboardType: kStockQtyKeyboardType,
-              inputFormatters: kStockQtyInputFormatters,
-              decoration: InputDecoration(
-                labelText: StringLookup.t(loc, 'qtyShort'),
-                border: const OutlineInputBorder(),
-              ),
+            PickBoxQtyFields(
+              loc: loc,
+              mode: _pickQtyMode,
+              onModeChanged: (String m) => setState(() => _pickQtyMode = m),
+              unitQty: _qty,
+              boxCount: _boxCount,
+              unitsPerBox: _unitsPerBox,
+              maxUnits: rem,
+              looseUnits: primaryLoose,
+              onFieldsChanged: () => setState(() {}),
             ),
             const SizedBox(height: 16),
             FilledButton(

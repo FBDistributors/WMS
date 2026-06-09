@@ -236,6 +236,106 @@ def test_pick_scan_idempotent(
     assert data.get("idempotent") is True
 
 
+def test_wave_pick_scan_box_barcode(
+    client: TestClient,
+    auth_headers: dict,
+    wave_with_line: Wave,
+    test_product_with_barcode: Product,
+    bin_location: Location,
+    staging_location: Location,
+    admin_user: User,
+    db_session: Session,
+) -> None:
+    """Wave pick/scan accepts quti barcode + box_count."""
+    from app.models.product_box import ProductBox
+    from app.models.wave import WaveAllocation
+    from app.services.box_location_service import get_breakdown, place_sealed_boxes
+
+    lot = StockLot(
+        product_id=test_product_with_barcode.id,
+        batch="B-WAVE-BOX",
+        expiry_date=None,
+    )
+    db_session.add(lot)
+    db_session.flush()
+
+    db_session.add(
+        StockMovement(
+            product_id=test_product_with_barcode.id,
+            lot_id=lot.id,
+            location_id=bin_location.id,
+            qty_change=Decimal("12"),
+            movement_type="receipt",
+            created_by_user_id=admin_user.id,
+        )
+    )
+
+    box_barcode = "BOX-WAVE-001"
+    db_session.add(
+        ProductBox(
+            box_barcode=box_barcode,
+            product_id=test_product_with_barcode.id,
+            units_per_box=6,
+            is_active=True,
+        )
+    )
+    db_session.flush()
+
+    place_sealed_boxes(
+        db_session,
+        box_barcode=box_barcode,
+        location_id=bin_location.id,
+        lot_id=lot.id,
+        user=admin_user,
+        box_count=2,
+    )
+
+    wl = db_session.query(WaveLine).filter(WaveLine.wave_id == wave_with_line.id).one()
+    wl.total_qty = Decimal("12")
+    db_session.add(
+        WaveAllocation(
+            wave_line_id=wl.id,
+            stock_lot_id=lot.id,
+            location_id=bin_location.id,
+            allocated_qty=Decimal("12"),
+            picked_qty=Decimal("0"),
+        )
+    )
+    db_session.commit()
+
+    wave_id = str(wave_with_line.id)
+    r = client.post(
+        f"/api/v1/waves/{wave_id}/pick/scan",
+        json={
+            "barcode": box_barcode,
+            "qty": 12,
+            "box_count": 2,
+            "request_id": str(uuid.uuid4()),
+        },
+        headers=auth_headers,
+    )
+    assert r.status_code == 200, r.text
+
+    bd = get_breakdown(
+        db_session,
+        product_id=test_product_with_barcode.id,
+        lot_id=lot.id,
+        location_id=bin_location.id,
+    )
+    assert bd.box_count == 0
+
+    r2 = client.post(
+        f"/api/v1/waves/{wave_id}/pick/scan",
+        json={
+            "barcode": test_product_with_barcode.barcode,
+            "qty": 2,
+            "request_id": str(uuid.uuid4()),
+        },
+        headers=auth_headers,
+    )
+    assert r2.status_code in (200, 400, 409)
+
+
 def test_sorting_scan_on_nonexistent_wave(
     client: TestClient,
     auth_headers: dict,

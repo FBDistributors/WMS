@@ -20,6 +20,7 @@ import '../../../shared/input/stock_quantity_input.dart';
 import '../../../shared/feedback/app_top_snackbar.dart';
 import '../../../shared/feedback/scan_reject_haptic.dart';
 import '../../../shared/layout/sheet_bottom_inset.dart';
+import '../../../shared/widgets/pick_box_qty_fields.dart';
 import '../../../shared/widgets/scan_action_button.dart';
 import '../alternate_location_menu_label.dart' show mergeAlternateLocationsForDisplay, MergedAlternateLocationRow;
 import '../data/picking_constants.dart';
@@ -67,7 +68,13 @@ String _groupLocationQtyLine(_LineGroup g) {
       .toList();
   if (physical.length <= 1) {
     final PickingLine l = physical.isNotEmpty ? physical.first : g.members.first;
-    return '${l.locationCode} · ${formatPickQty(g.virtual.qtyPicked)}/${formatPickQty(g.virtual.qtyRequired)}';
+    final String? breakdown = pickLocationBreakdownLabel(l);
+    final String base =
+        '${l.locationCode} · ${formatPickQty(g.virtual.qtyPicked)}/${formatPickQty(g.virtual.qtyRequired)}';
+    if (breakdown != null && breakdown.isNotEmpty) {
+      return '$base · $breakdown';
+    }
+    return base;
   }
   return physical
       .map(
@@ -664,6 +671,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       PickerProfileParam.picker,
       presetScannedBarcode: normalized,
       presetPickQty: presetQty,
+      presetIsBoxScan: resolved.isBoxScan,
+      presetUnitsPerBox: resolved.isBoxScan ? resolved.unitsPerScan : null,
     );
   }
 
@@ -1041,6 +1050,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     PickerProfileParam profile, {
     String? presetScannedBarcode,
     double? presetPickQty,
+    bool presetIsBoxScan = false,
+    int? presetUnitsPerBox,
   }) async {
     final AppLocale loc = ref.read(appLocaleProvider);
     final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
@@ -1105,8 +1116,11 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     final TextEditingController bc = TextEditingController();
     final TextEditingController qty =
         TextEditingController(text: presetQtyText);
+    final TextEditingController boxCountCtrl = TextEditingController(text: '1');
     String? scannedForQty = pickerPreset;
     String? scannedResolveProductId;
+    String pickQtyMode = presetIsBoxScan ? 'byBox' : 'byUnit';
+    int? unitsPerBox = presetUnitsPerBox;
     bool sheetBusy = false;
     String? selectedLocationId;
     for (final PickingAlternateLocation a in pickTargetHolder[0].alternateLocations) {
@@ -1324,28 +1338,61 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                               ),
                               onChanged: (_) => setM(() {}),
                               onSubmitted: (String v) {
-                                final PickingLine? matched =
-                                    resolveScanLineInGroup(group.members, v);
-                                if (matched != null) {
-                                  setM(() {
-                                    pickTargetHolder[0] = matched!;
-                                    scannedForQty = v.trim();
-                                    final double rem =
-                                        pickTargetHolder[0].qtyRequired -
-                                        pickTargetHolder[0].qtyPicked;
-                                    qty.text =
-                                        rem >= 1 ? formatPickQty(rem) : '0';
-                                  });
-                                } else {
-                                  _rejectScanHaptic();
-                                  showAppSnackBar(context,
-                                    SnackBar(
-                                      content: Text(
-                                        '${StringLookup.t(loc, 'wrongBarcodeMessage')}${pickTargetHolder[0].barcode ?? pickTargetHolder[0].sku ?? '—'}',
+                                unawaited(() async {
+                                  final String t = v.trim();
+                                  if (t.isEmpty) {
+                                    return;
+                                  }
+                                  PickingLine? matched =
+                                      resolveScanLineInGroup(group.members, t);
+                                  bool isBox = false;
+                                  int? upb;
+                                  try {
+                                    final ScannerResolveOut out = await ref
+                                        .read(scannerRepositoryProvider)
+                                        .resolveBarcode(t);
+                                    if (out.isBoxScan && out.productId != null) {
+                                      matched = resolveScanLineInGroupByProductId(
+                                        group.members,
+                                        out.productId!,
+                                      );
+                                      isBox = matched != null;
+                                      upb = out.unitsPerScan;
+                                    }
+                                  } on Object {
+                                    /* offline */
+                                  }
+                                  matched ??= resolveScanLineInGroup(group.members, t);
+                                  if (matched != null) {
+                                    setM(() {
+                                      pickTargetHolder[0] = matched!;
+                                      scannedForQty = t;
+                                      pickQtyMode = isBox ? 'byBox' : 'byUnit';
+                                      unitsPerBox = upb;
+                                      final double rem =
+                                          pickTargetHolder[0].qtyRequired -
+                                          pickTargetHolder[0].qtyPicked;
+                                      if (isBox && upb != null) {
+                                        boxCountCtrl.text = '1';
+                                        qty.text = formatPickQty(
+                                          rem < upb ? rem : upb.toDouble(),
+                                        );
+                                      } else {
+                                        qty.text =
+                                            rem >= 1 ? formatPickQty(rem) : '0';
+                                      }
+                                    });
+                                  } else {
+                                    _rejectScanHaptic();
+                                    showAppSnackBar(context,
+                                      SnackBar(
+                                        content: Text(
+                                          '${StringLookup.t(loc, 'wrongBarcodeMessage')}${pickTargetHolder[0].barcode ?? pickTargetHolder[0].sku ?? '—'}',
+                                        ),
                                       ),
-                                    ),
-                                  );
-                                }
+                                    );
+                                  }
+                                }());
                               },
                             ),
                           ),
@@ -1370,28 +1417,40 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                       ),
                       if (scannedForQty != null) ...<Widget>[
                         const SizedBox(height: 12),
-                        TextField(
-                          controller: qty,
-                          keyboardType: kStockQtyKeyboardType,
-                          inputFormatters: kStockQtyInputFormatters,
-                          decoration: InputDecoration(
-                            labelText: StringLookup.t(loc, 'qtyShort'),
-                            border: const OutlineInputBorder(),
-                            suffixIcon: buildInputClearButton(
-                              visible: qty.text.trim().isNotEmpty,
-                              onPressed: () => setM(() => qty.clear()),
-                            ),
-                          ),
-                          onChanged: (_) => setM(() {}),
+                        PickBoxQtyFields(
+                          loc: loc,
+                          mode: pickQtyMode,
+                          onModeChanged: (String m) => setM(() => pickQtyMode = m),
+                          unitQty: qty,
+                          boxCount: boxCountCtrl,
+                          unitsPerBox: unitsPerBox,
+                          maxUnits: pickTargetHolder[0].qtyRequired -
+                              pickTargetHolder[0].qtyPicked,
+                          looseUnits: () {
+                            for (final PickingAlternateLocation a
+                                in pickTargetHolder[0].alternateLocations) {
+                              if (a.isPrimary) {
+                                return a.looseUnits;
+                              }
+                            }
+                            return null;
+                          }(),
+                          onFieldsChanged: () => setM(() {}),
                         ),
                         const SizedBox(height: 16),
                         FilledButton(
                           onPressed: sheetBusy
                               ? null
                               : () async {
-                            final int delta = int.tryParse(qty.text.trim()) ?? 0;
-                              final double rem = pickTargetHolder[0].qtyRequired -
-                                  pickTargetHolder[0].qtyPicked;
+                            final double rem = pickTargetHolder[0].qtyRequired -
+                                pickTargetHolder[0].qtyPicked;
+                            final int delta = pickQtyFromBoxMode(
+                              mode: pickQtyMode,
+                              unitQty: qty,
+                              boxCount: boxCountCtrl,
+                              unitsPerBox: unitsPerBox,
+                              maxUnits: rem,
+                            );
                             if (delta < 1 || delta > rem) {
                               _rejectScanHaptic();
                               showAppSnackBar(context,
@@ -1410,12 +1469,18 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                             setM(() => sheetBusy = true);
                             try {
                               if (online) {
+                                final int? submitBoxCount = pickBoxCountForSubmit(
+                                  mode: pickQtyMode,
+                                  boxCount: boxCountCtrl,
+                                  unitsPerBox: unitsPerBox,
+                                );
                                 final PickLineResponse res =
                                     await ref.read(pickingRepositoryProvider).pickLine(
                                       pickTargetHolder[0].id,
                                       delta,
                                       'scan-${widget.taskId}-${pickTargetHolder[0].id}-${DateTime.now().millisecondsSinceEpoch}',
                                       barcode: scannedForQty,
+                                      boxCount: submitBoxCount,
                                     );
                                 await ref
                                     .read(pickTaskDetailProvider(widget.taskId).notifier)
@@ -1557,6 +1622,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     } finally {
       bc.dispose();
       qty.dispose();
+      boxCountCtrl.dispose();
     }
   }
 

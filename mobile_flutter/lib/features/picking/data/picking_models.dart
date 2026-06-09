@@ -9,6 +9,9 @@ class PickingAlternateLocation {
     required this.batch,
     required this.expiryDate,
     required this.isPrimary,
+    this.boxCount,
+    this.unitsInBoxes,
+    this.looseUnits,
   });
 
   final String locationId;
@@ -18,6 +21,9 @@ class PickingAlternateLocation {
   final String? batch;
   final String? expiryDate;
   final bool isPrimary;
+  final int? boxCount;
+  final int? unitsInBoxes;
+  final int? looseUnits;
 
   factory PickingAlternateLocation.fromJson(Map<String, Object?> json) {
     return PickingAlternateLocation(
@@ -28,6 +34,9 @@ class PickingAlternateLocation {
       batch: json['batch'] as String?,
       expiryDate: json['expiry_date'] as String?,
       isPrimary: json['is_primary'] == true,
+      boxCount: _optionalInt(json['box_count']),
+      unitsInBoxes: _optionalInt(json['units_in_boxes']),
+      looseUnits: _optionalInt(json['loose_units']),
     );
   }
 
@@ -39,6 +48,9 @@ class PickingAlternateLocation {
         'batch': batch,
         'expiry_date': expiryDate,
         'is_primary': isPrimary,
+        if (boxCount != null) 'box_count': boxCount,
+        if (unitsInBoxes != null) 'units_in_boxes': unitsInBoxes,
+        if (looseUnits != null) 'loose_units': looseUnits,
       };
 }
 
@@ -766,4 +778,39 @@ int _int(Object? v) {
     return int.tryParse(v) ?? 0;
   }
   return 0;
+}
+
+int? _optionalInt(Object? v) {
+  if (v == null) {
+    return null;
+  }
+  if (v is int) {
+    return v;
+  }
+  if (v is num) {
+    return v.toInt();
+  }
+  if (v is String) {
+    return int.tryParse(v);
+  }
+  return null;
+}
+
+/// Asosiy lokatsiyadagi quti/dona breakdown matni (API `alternate_locations`).
+String? pickLocationBreakdownLabel(PickingLine line) {
+  PickingAlternateLocation? primary;
+  for (final PickingAlternateLocation a in line.alternateLocations) {
+    if (a.isPrimary) {
+      primary = a;
+      break;
+    }
+  }
+  if (primary == null || (primary.boxCount ?? 0) <= 0) {
+    return null;
+  }
+  final int boxes = primary.boxCount!;
+  final int unitsInBoxes = primary.unitsInBoxes ?? 0;
+  final int loose = primary.looseUnits ?? 0;
+  final int perBox = boxes > 0 ? unitsInBoxes ~/ boxes : 0;
+  return '$boxes × $perBox · $loose loose';
 }
