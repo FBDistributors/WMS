@@ -57,7 +57,23 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
   final Map<String, bool> _palletSelected = <String, bool>{};
   final Map<String, String> _palletSelectedQty = <String, String>{};
 
-  bool _handledRouteScan = false;
+  String? _lastHandledProductId;
+  String? _lastHandledLocationCode;
+
+  void _clearMovementRouteScanParams() {
+    final Uri u = GoRouterState.of(context).uri;
+    if (u.queryParameters.containsKey('scannedProductId') ||
+        u.queryParameters.containsKey('scannedLocationCode') ||
+        u.queryParameters.containsKey('scannedBarcode')) {
+      context.goNamed('movement');
+    }
+  }
+
+  void _resetRouteScanState() {
+    _lastHandledProductId = null;
+    _lastHandledLocationCode = null;
+    _clearMovementRouteScanParams();
+  }
 
   void _showValidation(String key) {
     final AppLocale loc = ref.read(appLocaleProvider);
@@ -93,18 +109,15 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_handledRouteScan) {
-      return;
-    }
     final Uri u = GoRouterState.of(context).uri;
     final String? pid = u.queryParameters['scannedProductId'];
     final String? loc = u.queryParameters['scannedLocationCode'];
-    if (pid != null && pid.isNotEmpty) {
-      _handledRouteScan = true;
+    if (pid != null && pid.isNotEmpty && _lastHandledProductId != pid) {
+      _lastHandledProductId = pid;
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadProduct(pid));
       setState(() => _phase = _MovementPhase.scanProduct);
-    } else if (loc != null && loc.isNotEmpty) {
-      _handledRouteScan = true;
+    } else if (loc != null && loc.isNotEmpty && _lastHandledLocationCode != loc) {
+      _lastHandledLocationCode = loc;
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadPallet(loc));
       setState(() => _phase = _MovementPhase.pallet);
     }
@@ -272,7 +285,9 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
           _locationSearch = '';
           _locationSearchCtrl.clear();
           _productSubmitKey = null;
+          _productError = null;
         });
+        _resetRouteScanState();
       }
     } on Exception catch (e) {
       if (mounted) {
@@ -366,6 +381,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
           _palletDestCtrl.clear();
           _palletSubmitKey = null;
         });
+        _resetRouteScanState();
       }
     } on Exception catch (e) {
       if (mounted) {
@@ -398,6 +414,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
         _locationSearch = '';
         _locationSearchCtrl.clear();
       });
+      _resetRouteScanState();
       return;
     }
     setState(() {
@@ -409,6 +426,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
       _palletDestSearch = '';
       _palletDestCtrl.clear();
     });
+    _resetRouteScanState();
   }
 
   List<PickerLocationOption> _filterLocations(
