@@ -89,6 +89,12 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   String _warehouse = 'main';
   /// `flow=new` uchun: `byProduct` (standart) yoki `byLocation` (avval saqlash joyi).
   String _newReceiveMode = 'byProduct';
+  /// `flow=new` miqdor kiritish: `byUnit` (dona) yoki `byBox` (quti × hajm).
+  String _newReceiveQtyMode = 'byUnit';
+  final TextEditingController _newReceiveBoxCount = TextEditingController(text: '1');
+  final TextEditingController _newReceiveBoxBarcode = TextEditingController();
+  int? _newReceiveUnitsPerBox;
+  bool _skipClearNewReceiveBoxOnLoad = false;
   final List<_FormLine> _lines = <_FormLine>[];
   PickerProductDetailResponse? _product;
   PickerProductLocation? _returnPick;
@@ -130,7 +136,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   final TextEditingController _invBoxCount = TextEditingController(text: '1');
   int? _invLastUnitsPerBox;
   List<ProductBoxSummary> _invProductBoxes = const <ProductBoxSummary>[];
-  final TextEditingController _receiveBoxBarcode = TextEditingController();
   String? _invScanExpiry;
   bool _invSubmitting = false;
   String? _invHandledLocationStr;
@@ -142,7 +147,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     _invLocSearch.dispose();
     _invScanActualQty.dispose();
     _invBoxCount.dispose();
-    _receiveBoxBarcode.dispose();
+    _newReceiveBoxCount.dispose();
+    _newReceiveBoxBarcode.dispose();
     _kirimPutawaySearch.dispose();
     _returnManualBatch.dispose();
     _qty.dispose();
@@ -208,6 +214,10 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         _returnManualBatch.clear();
       }
       _qty.clear();
+      if (_flow == 'new' && !_skipClearNewReceiveBoxOnLoad) {
+        _clearNewReceiveBoxState();
+      }
+      _skipClearNewReceiveBoxOnLoad = false;
     });
     try {
       final PickerProductDetailResponse res = await ref
@@ -512,6 +522,12 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     );
   }
 
+  void _clearNewReceiveBoxState() {
+    _newReceiveUnitsPerBox = null;
+    _newReceiveBoxBarcode.clear();
+    _newReceiveBoxCount.text = '1';
+  }
+
   void _clearKirimNewAfterLocationSuccess() {
     setState(() {
       _product = null;
@@ -521,6 +537,33 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       _loadingProduct = false;
       _handledProductId = null;
       _barcodeFieldKey++;
+      _clearNewReceiveBoxState();
+    });
+  }
+
+  void _syncNewReceiveComputedQty() {
+    if (_newReceiveQtyMode != 'byBox') {
+      return;
+    }
+    final int? unitsPerBox = _newReceiveUnitsPerBox;
+    final int boxCount = int.tryParse(_newReceiveBoxCount.text.trim()) ?? 0;
+    if (unitsPerBox != null && boxCount > 0) {
+      _qty.text = '${unitsPerBox * boxCount}';
+    } else {
+      _qty.clear();
+    }
+  }
+
+  void _onNewReceiveQtyModeChanged(Set<String> selection) {
+    setState(() {
+      _newReceiveQtyMode = selection.first;
+      if (_newReceiveQtyMode == 'byUnit') {
+        _clearNewReceiveBoxState();
+        _qty.clear();
+      } else {
+        _qty.clear();
+        _syncNewReceiveComputedQty();
+      }
     });
   }
 
@@ -570,6 +613,113 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     );
   }
 
+  Widget _kirimNewQtyModeSelector(AppLocale appLoc) {
+    return SegmentedButton<String>(
+      segments: <ButtonSegment<String>>[
+        ButtonSegment<String>(
+          value: 'byUnit',
+          label: Text(StringLookup.t(appLoc, 'kirimNewQtyTabByUnit')),
+        ),
+        ButtonSegment<String>(
+          value: 'byBox',
+          label: Text(StringLookup.t(appLoc, 'kirimNewQtyTabByBox')),
+        ),
+      ],
+      selected: <String>{_newReceiveQtyMode},
+      onSelectionChanged: _onNewReceiveQtyModeChanged,
+    );
+  }
+
+  Widget _kirimNewBoxQtyCard(AppLocale appLoc) {
+    final int boxCount = int.tryParse(_newReceiveBoxCount.text.trim()) ?? 0;
+    final int? unitsPerBox = _newReceiveUnitsPerBox;
+    final int? totalUnits =
+        unitsPerBox != null && boxCount > 0 ? unitsPerBox * boxCount : null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Expanded(
+              child: TextField(
+                controller: _newReceiveBoxBarcode,
+                readOnly: true,
+                decoration: InputDecoration(
+                  labelText: StringLookup.t(appLoc, 'inventoryScanBox'),
+                  border: const OutlineInputBorder(),
+                  hintText: StringLookup.t(appLoc, 'kirimNewScanBoxFirst'),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            ScanActionButton(
+              compact: true,
+              label: StringLookup.t(appLoc, 'inventoryScanBox'),
+              onPressed: () => unawaited(_openNewReceiveBoxScan()),
+            ),
+          ],
+        ),
+        if (_product == null) ...<Widget>[
+          const SizedBox(height: 8),
+          Text(
+            StringLookup.t(appLoc, 'kirimNewScanBoxFirst'),
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+          ),
+        ],
+        const SizedBox(height: 12),
+        InputDecorator(
+          decoration: InputDecoration(
+            labelText: StringLookup.t(appLoc, 'kirimNewUnitsPerBox'),
+            border: const OutlineInputBorder(),
+          ),
+          child: Text(
+            unitsPerBox?.toString() ?? '—',
+            style: TextStyle(
+              fontSize: 16,
+              color: unitsPerBox != null ? null : Colors.grey.shade600,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _newReceiveBoxCount,
+          keyboardType: kStockQtyKeyboardType,
+          inputFormatters: kStockQtyInputFormatters,
+          decoration: InputDecoration(
+            labelText: StringLookup.t(appLoc, 'kirimNewBoxCount'),
+            border: const OutlineInputBorder(),
+            suffixIcon: buildInputClearButton(
+              visible: _newReceiveBoxCount.text.trim().isNotEmpty &&
+                  _newReceiveBoxCount.text.trim() != '1',
+              onPressed: () => setState(() {
+                _newReceiveBoxCount.text = '1';
+                _syncNewReceiveComputedQty();
+              }),
+            ),
+          ),
+          onChanged: (_) => setState(_syncNewReceiveComputedQty),
+        ),
+        if (totalUnits != null) ...<Widget>[
+          const SizedBox(height: 12),
+          Text(
+            StringLookup.tParams(
+              appLoc,
+              'kirimNewTotalUnits',
+              <String, String>{'total': '$totalUnits'},
+            ),
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF1A237E),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _kirimNewExpiryQtyCard(AppLocale appLoc) {
     return Card(
       child: Padding(
@@ -577,56 +727,124 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
+            _kirimNewQtyModeSelector(appLoc),
+            const SizedBox(height: 12),
             ExpiryDatePickerField(
               value: _expiry,
               onChanged: (String? v) => setState(() => _expiry = v),
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _qty,
-              keyboardType: kStockQtyKeyboardType,
-              inputFormatters: kStockQtyInputFormatters,
-              decoration: InputDecoration(
-                labelText: StringLookup.t(appLoc, 'qtyShort'),
-                border: const OutlineInputBorder(),
-                suffixIcon: buildInputClearButton(
-                  visible: _qty.text.trim().isNotEmpty,
-                  onPressed: () => setState(() => _qty.clear()),
-                ),
-              ),
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Expanded(
-                  child: TextField(
-                    controller: _receiveBoxBarcode,
-                    decoration: InputDecoration(
-                      labelText: StringLookup.t(appLoc, 'inventoryBoxBarcodeOptional'),
-                      border: const OutlineInputBorder(),
-                    ),
+            if (_newReceiveQtyMode == 'byUnit')
+              TextField(
+                controller: _qty,
+                keyboardType: kStockQtyKeyboardType,
+                inputFormatters: kStockQtyInputFormatters,
+                decoration: InputDecoration(
+                  labelText: StringLookup.t(appLoc, 'qtyShort'),
+                  border: const OutlineInputBorder(),
+                  suffixIcon: buildInputClearButton(
+                    visible: _qty.text.trim().isNotEmpty,
+                    onPressed: () => setState(() => _qty.clear()),
                   ),
                 ),
-                const SizedBox(width: 8),
-                ScanActionButton(
-                  compact: true,
-                  label: StringLookup.t(appLoc, 'inventoryScanBox'),
-                  onPressed: () async {
-                    final String? code = await _scanRawBarcode();
-                    if (!mounted || code == null || code.trim().isEmpty) {
-                      return;
-                    }
-                    setState(() => _receiveBoxBarcode.text = code.trim());
-                  },
-                ),
-              ],
-            ),
+                onChanged: (_) => setState(() {}),
+              )
+            else
+              _kirimNewBoxQtyCard(appLoc),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _openNewReceiveBoxScan() async {
+    final String? barcode = await _scanRawBarcode();
+    if (!mounted || barcode == null || barcode.trim().isEmpty) {
+      return;
+    }
+    await _handleNewReceiveBoxBarcode(barcode.trim());
+  }
+
+  Future<void> _openRegisterProductBoxSheetForReceive({
+    required String productId,
+    required String productName,
+    required String initialBarcode,
+  }) async {
+    final AppLocale loc = ref.read(appLocaleProvider);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (BuildContext ctx) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: sheetBottomPadding(context)),
+          child: RegisterProductBoxSheet(
+            productId: productId,
+            productName: productName,
+            initialBarcode: initialBarcode,
+            onSaved: (int units) {
+              if (mounted) {
+                setState(() {
+                  _newReceiveUnitsPerBox = units;
+                  _syncNewReceiveComputedQty();
+                });
+                showAppSnackBar(
+                  context,
+                  SnackBar(content: Text(StringLookup.t(loc, 'inventoryBoxSaved'))),
+                );
+              }
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _handleNewReceiveBoxBarcode(String barcode) async {
+    final AppLocale loc = ref.read(appLocaleProvider);
+    setState(() => _newReceiveBoxBarcode.text = barcode);
+    try {
+      final ProductBoxResolve resolved =
+          await ref.read(productBoxRepositoryProvider).resolveByBarcode(barcode);
+      if (_product != null && _product!.productId != resolved.productId) {
+        if (mounted) {
+          showAppSnackBar(
+            context,
+            SnackBar(content: Text(StringLookup.t(loc, 'inventoryBoxProductMismatch'))),
+          );
+        }
+        return;
+      }
+      _skipClearNewReceiveBoxOnLoad = true;
+      await _loadProduct(resolved.productId);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _newReceiveBoxBarcode.text = barcode;
+        _newReceiveUnitsPerBox = resolved.unitsPerBox;
+        _syncNewReceiveComputedQty();
+      });
+    } on ProductBoxNotFoundException {
+      final PickerProductDetailResponse? p = _product;
+      if (p == null) {
+        if (mounted) {
+          showAppSnackBar(
+            context,
+            SnackBar(content: Text(StringLookup.t(loc, 'kirimNewScanBoxFirst'))),
+          );
+        }
+        return;
+      }
+      await _openRegisterProductBoxSheetForReceive(
+        productId: p.productId,
+        productName: p.name,
+        initialBarcode: barcode,
+      );
+    } on Exception catch (e) {
+      if (mounted) {
+        showAppSnackBar(context, SnackBar(content: Text('$e')));
+      }
+    }
   }
 
   Future<void> _submitReturn() async {
@@ -741,7 +959,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
 
     final PickerProductDetailResponse? p = _product;
     final PickerLocationOption? loc = _destLocation;
-    final int q = int.tryParse(_qty.text.trim()) ?? 0;
     final String? exp = _expiry?.trim();
 
     if (p == null || loc == null) {
@@ -752,8 +969,38 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       showFillAll();
       return;
     }
+    if (_newReceiveQtyMode == 'byBox') {
+      if (_newReceiveUnitsPerBox == null) {
+        if (mounted) {
+          showAppSnackBar(
+            context,
+            SnackBar(content: Text(StringLookup.t(locMsg, 'kirimNewBoxQtyIncomplete'))),
+          );
+        }
+        return;
+      }
+      final int boxCount = int.tryParse(_newReceiveBoxCount.text.trim()) ?? 0;
+      if (boxCount < 1) {
+        if (mounted) {
+          showAppSnackBar(
+            context,
+            SnackBar(content: Text(StringLookup.t(locMsg, 'kirimNewBoxQtyIncomplete'))),
+          );
+        }
+        return;
+      }
+      _syncNewReceiveComputedQty();
+    }
+    final int q = int.tryParse(_qty.text.trim()) ?? 0;
     if (_qty.text.trim().isEmpty || q < 1) {
-      showFillAll();
+      if (_newReceiveQtyMode == 'byBox' && mounted) {
+        showAppSnackBar(
+          context,
+          SnackBar(content: Text(StringLookup.t(locMsg, 'kirimNewBoxQtyIncomplete'))),
+        );
+      } else {
+        showFillAll();
+      }
       return;
     }
 
@@ -770,7 +1017,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             ],
           );
       await ref.read(receivingRepositoryProvider).completeReceipt(receipt.id);
-      await _placeReceiveBoxIfNeeded(productId: p.productId, locationId: loc.id);
       if (mounted) {
         final AppLocale loc = ref.read(appLocaleProvider);
         if (_newReceiveMode == 'byLocation') {
@@ -1354,34 +1600,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         showAppSnackBar(context, SnackBar(content: Text('$e')));
       }
       rethrow;
-    }
-  }
-
-  Future<void> _placeReceiveBoxIfNeeded({
-    required String productId,
-    required String locationId,
-  }) async {
-    final String code = _receiveBoxBarcode.text.trim();
-    if (code.isEmpty) {
-      return;
-    }
-    try {
-      final PickerProductDetailResponse detail = await ref
-          .read(inventoryRepositoryProvider)
-          .getPickerProductDetail(productId);
-      final PickerProductLocation lotLoc = detail.locations.firstWhere(
-        (PickerProductLocation l) => l.locationId == locationId,
-        orElse: () => throw StateError('lot'),
-      );
-      await ref.read(boxLocationRepositoryProvider).placeBox(
-            boxBarcode: code,
-            locationId: locationId,
-            lotId: lotLoc.lotId,
-          );
-    } on Exception catch (e) {
-      if (mounted) {
-        showAppSnackBar(context, SnackBar(content: Text('$e')));
-      }
     }
   }
 
