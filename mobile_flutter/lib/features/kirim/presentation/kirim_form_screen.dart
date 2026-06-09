@@ -200,17 +200,23 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
 
   Future<void> _loadProduct(String productId) async {
     final bool preservePutaway = _flow == 'new' && _newReceiveMode == 'byLocation';
+    final bool preserveUserInput = preservePutaway ||
+        _skipClearNewReceiveBoxOnLoad ||
+        (_flow == 'new' && _product?.productId == productId);
+    final PickerLocationOption? savedDest =
+        preserveUserInput ? _destLocation : null;
+    final String savedPutawaySearch =
+        preserveUserInput ? _kirimPutawaySearch.text : '';
+    final String? savedExpiry = preserveUserInput ? _expiry : null;
     setState(() {
       _loadingProduct = true;
       _productError = null;
       _product = null;
       _returnPick = null;
-      if (!preservePutaway) {
+      if (!preserveUserInput) {
         _destLocation = null;
         _kirimPutawaySearch.clear();
-      }
-      _expiry = null;
-      if (!preservePutaway) {
+        _expiry = null;
         _returnManualBatch.clear();
       }
       _qty.clear();
@@ -230,6 +236,13 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         setState(() {
           _product = res;
           _loadingProduct = false;
+          if (preserveUserInput) {
+            _destLocation = savedDest;
+            if (savedPutawaySearch.isNotEmpty) {
+              _kirimPutawaySearch.text = savedPutawaySearch;
+            }
+            _expiry = savedExpiry;
+          }
           if (_flow == 'inventory') {
             unawaited(_loadInvProductBoxes(productId));
           }
@@ -812,6 +825,14 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             SnackBar(content: Text(StringLookup.t(loc, 'inventoryBoxProductMismatch'))),
           );
         }
+        return;
+      }
+      if (_product != null && _product!.productId == resolved.productId) {
+        setState(() {
+          _newReceiveBoxBarcode.text = barcode;
+          _newReceiveUnitsPerBox = resolved.unitsPerBox;
+          _syncNewReceiveComputedQty();
+        });
         return;
       }
       _skipClearNewReceiveBoxOnLoad = true;

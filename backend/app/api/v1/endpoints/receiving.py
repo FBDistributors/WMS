@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field, validator
 from sqlalchemy import func
+from sqlalchemy.exc import ProgrammingError, SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth.deps import get_current_user, require_any_permission, require_permission
@@ -22,7 +23,7 @@ from app.models.receipt import ReceiptLine as ReceiptLineModel
 from app.models.stock import StockLot as StockLotModel
 from app.models.stock import StockMovement as StockMovementModel
 from app.models.user import User as UserModel
-from app.services.box_location_service import place_sealed_boxes
+from app.services.box_location_service import place_sealed_boxes_for_receipt
 from app.services.product_scan_resolve import normalize_scan_barcode
 
 router = APIRouter()
@@ -425,14 +426,30 @@ async def complete_receipt(
         db.flush()
 
         if line.box_barcode and line.box_count:
-            place_sealed_boxes(
-                db,
-                box_barcode=line.box_barcode,
-                location_id=line.location_id,
-                lot_id=lot.id,
-                user=user,
-                box_count=line.box_count,
-            )
+            db.expire_all()
+            try:
+                place_sealed_boxes_for_receipt(
+                    db,
+                    box_barcode=line.box_barcode,
+                    location_id=line.location_id,
+                    lot_id=lot.id,
+                    user=user,
+                    box_count=line.box_count,
+                    receipt_qty=line.qty,
+                )
+            except ProgrammingError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=(
+                        "Quti joylashuvi sozlanmagan (location_box_placements). "
+                        "Serverda alembic upgrade head ishga tushiring."
+                    ),
+                ) from exc
+            except SQLAlchemyError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Quti joylashuvi xatosi: {exc}",
+                ) from exc
 
     receipt.status = "completed"
     db.commit()

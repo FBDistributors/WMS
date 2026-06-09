@@ -179,6 +179,54 @@ def _find_sealed_at(
     return q.order_by(LocationBoxPlacement.placed_at.asc()).first()
 
 
+def place_sealed_boxes_for_receipt(
+    db: Session,
+    *,
+    box_barcode: str,
+    location_id: UUID,
+    lot_id: UUID,
+    user: UserModel,
+    box_count: int,
+    receipt_qty: Decimal,
+) -> None:
+    """Qabul yakunida: movement qo'shilgandan keyin qutilarni sealed deb belgilash."""
+    if box_count < 1:
+        raise HTTPException(status_code=400, detail="box_count must be >= 1")
+    if box_count > 500:
+        raise HTTPException(status_code=400, detail="box_count too large")
+    box = _get_product_box_by_barcode(db, box_barcode)
+    lot = db.get(StockLotModel, lot_id)
+    if not lot or lot.product_id != box.product_id:
+        raise HTTPException(status_code=400, detail="Partiya mahsulotga mos emas")
+    units_needed = box.units_per_box * box_count
+    qty_dec = Decimal(str(receipt_qty))
+    if qty_dec != Decimal(str(units_needed)):
+        raise HTTPException(
+            status_code=400,
+            detail=f"qty {int(qty_dec)} != box_count * units_per_box ({units_needed})",
+        )
+    lock_lot_location(db, lot_id, location_id)
+    available = compute_lot_location_available(db, lot_id, location_id)
+    if available < Decimal(str(units_needed)):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Qabul qilingan qoldiq yetarli emas (kerak {units_needed}, mavjud {int(available)})"
+            ),
+        )
+    for _ in range(box_count):
+        db.add(
+            LocationBoxPlacement(
+                product_box_id=box.id,
+                location_id=location_id,
+                lot_id=lot_id,
+                status=PLACEMENT_SEALED,
+                placed_by_user_id=user.id,
+            )
+        )
+    db.flush()
+
+
 def place_sealed_boxes(
     db: Session,
     *,
