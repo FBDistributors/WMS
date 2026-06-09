@@ -801,15 +801,14 @@ function VipCustomerDialog({ mode, target, onClose, onSaved }: DialogProps) {
                                         }}
                                       />
                                       <span className="text-xs text-slate-500">{t('vipCustomers:months')}</span>
-                                      <Button
+                                      <button
                                         type="button"
-                                        variant="ghost"
-                                        className="h-8 w-8 shrink-0 rounded-full border border-red-200 px-0 text-red-600 hover:bg-red-50 dark:border-red-500/40 dark:text-red-400 dark:hover:bg-red-500/10"
+                                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300"
                                         onClick={() => removeProductLimit(pl.product_id)}
                                         aria-label={t('common:buttons.delete')}
                                       >
-                                        <X size={16} strokeWidth={2.5} />
-                                      </Button>
+                                        <X size={20} strokeWidth={2.5} aria-hidden />
+                                      </button>
                                     </div>
                                   ))}
                                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
