@@ -60,7 +60,7 @@ export function ProductBoxesPage() {
   return (
     <AdminLayout
       title={t('productBoxes:title')}
-      actions={
+      actionSlot={
         canManage ? (
           <Button type="button" onClick={() => setIsAddOpen(true)}>
             <PackagePlus className="mr-1 h-4 w-4" />
