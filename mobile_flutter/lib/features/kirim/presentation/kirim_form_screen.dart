@@ -969,8 +969,18 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       showFillAll();
       return;
     }
+    int? submitBoxCount;
     if (_newReceiveQtyMode == 'byBox') {
       if (_newReceiveUnitsPerBox == null) {
+        if (mounted) {
+          showAppSnackBar(
+            context,
+            SnackBar(content: Text(StringLookup.t(locMsg, 'kirimNewBoxQtyIncomplete'))),
+          );
+        }
+        return;
+      }
+      if (_newReceiveBoxBarcode.text.trim().isEmpty) {
         if (mounted) {
           showAppSnackBar(
             context,
@@ -989,6 +999,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         }
         return;
       }
+      submitBoxCount = boxCount;
       _syncNewReceiveComputedQty();
     }
     final int q = int.tryParse(_qty.text.trim()) ?? 0;
@@ -1005,6 +1016,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     }
 
     setState(() => _sending = true);
+    final int? successUnitsPerBox = _newReceiveUnitsPerBox;
+    final String destLocationCode = loc.code;
     try {
       final receipt = await ref.read(receivingRepositoryProvider).createReceipt(
             lines: <ReceiptLineCreate>[
@@ -1013,24 +1026,39 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                 qty: q,
                 locationId: loc.id,
                 expiryDate: _expiry,
+                boxBarcode: submitBoxCount != null ? _newReceiveBoxBarcode.text.trim() : null,
+                boxCount: submitBoxCount,
               ),
             ],
           );
       await ref.read(receivingRepositoryProvider).completeReceipt(receipt.id);
       if (mounted) {
         final AppLocale loc = ref.read(appLocaleProvider);
+        final String successMessage = submitBoxCount != null && successUnitsPerBox != null
+            ? StringLookup.tParams(
+                loc,
+                'kirimBoxReceiveSuccess',
+                <String, String>{
+                  'boxCount': '$submitBoxCount',
+                  'unitsPerBox': '$successUnitsPerBox',
+                  'total': '$q',
+                  'product': p.name,
+                  'location': destLocationCode,
+                },
+              )
+            : StringLookup.t(loc, 'kirimSingleReceiveSuccess');
         if (_newReceiveMode == 'byLocation') {
           _clearKirimNewAfterLocationSuccess();
           showAppSnackBar(
             context,
-            SnackBar(content: Text(StringLookup.t(loc, 'kirimNewLineReceivedStay'))),
+            SnackBar(content: Text(successMessage)),
           );
         } else {
           await showDialog<void>(
             context: context,
             builder: (BuildContext ctx) {
               return AlertDialog(
-                content: Text(StringLookup.t(loc, 'kirimSingleReceiveSuccess')),
+                content: Text(successMessage),
                 actions: <Widget>[
                   TextButton(
                     onPressed: () => Navigator.of(ctx).pop(),

@@ -160,14 +160,73 @@ def _get_product_box_by_barcode(db: Session, box_barcode: str) -> ProductBoxMode
     return box
 
 
-def _existing_sealed(db: Session, product_box_id: UUID) -> LocationBoxPlacement | None:
-    return (
-        db.query(LocationBoxPlacement)
-        .filter(
-            LocationBoxPlacement.product_box_id == product_box_id,
-            LocationBoxPlacement.status == PLACEMENT_SEALED,
+def _find_sealed_at(
+    db: Session,
+    product_box_id: UUID,
+    *,
+    location_id: UUID | None = None,
+    lot_id: UUID | None = None,
+) -> LocationBoxPlacement | None:
+    """FIFO: eng eski sealed placement (bir xil quti turi ko'p marta bo'lishi mumkin)."""
+    q = db.query(LocationBoxPlacement).filter(
+        LocationBoxPlacement.product_box_id == product_box_id,
+        LocationBoxPlacement.status == PLACEMENT_SEALED,
+    )
+    if location_id is not None:
+        q = q.filter(LocationBoxPlacement.location_id == location_id)
+    if lot_id is not None:
+        q = q.filter(LocationBoxPlacement.lot_id == lot_id)
+    return q.order_by(LocationBoxPlacement.placed_at.asc()).first()
+
+
+def place_sealed_boxes(
+    db: Session,
+    *,
+    box_barcode: str,
+    location_id: UUID,
+    lot_id: UUID,
+    user: UserModel,
+    box_count: int = 1,
+) -> LocationBoxBreakdown:
+    if box_count < 1:
+        raise HTTPException(status_code=400, detail="box_count must be >= 1")
+    if box_count > 500:
+        raise HTTPException(status_code=400, detail="box_count too large")
+    box = _get_product_box_by_barcode(db, box_barcode)
+    lot = db.get(StockLotModel, lot_id)
+    if not lot or lot.product_id != box.product_id:
+        raise HTTPException(status_code=400, detail="Partiya mahsulotga mos emas")
+    lock_lot_location(db, lot_id, location_id)
+    breakdown = get_breakdown(
+        db,
+        product_id=box.product_id,
+        lot_id=lot_id,
+        location_id=location_id,
+    )
+    units_needed = box.units_per_box * box_count
+    if breakdown.loose_units < units_needed:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Qutisiz qoldiq yetarli emas (kerak {units_needed}, mavjud {breakdown.loose_units})"
+            ),
         )
-        .one_or_none()
+    for _ in range(box_count):
+        db.add(
+            LocationBoxPlacement(
+                product_box_id=box.id,
+                location_id=location_id,
+                lot_id=lot_id,
+                status=PLACEMENT_SEALED,
+                placed_by_user_id=user.id,
+            )
+        )
+    db.flush()
+    return get_breakdown(
+        db,
+        product_id=box.product_id,
+        lot_id=lot_id,
+        location_id=location_id,
     )
 
 
@@ -179,40 +238,13 @@ def place_sealed_box(
     lot_id: UUID,
     user: UserModel,
 ) -> LocationBoxBreakdown:
-    box = _get_product_box_by_barcode(db, box_barcode)
-    if _existing_sealed(db, box.id):
-        raise HTTPException(status_code=409, detail="Bu quti allaqachon boshqa joyda joylashgan")
-    lot = db.get(StockLotModel, lot_id)
-    if not lot or lot.product_id != box.product_id:
-        raise HTTPException(status_code=400, detail="Partiya mahsulotga mos emas")
-    lock_lot_location(db, lot_id, location_id)
-    breakdown = get_breakdown(
+    return place_sealed_boxes(
         db,
-        product_id=box.product_id,
-        lot_id=lot_id,
-        location_id=location_id,
-    )
-    if breakdown.loose_units < box.units_per_box:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                f"Qutisiz qoldiq yetarli emas (kerak {box.units_per_box}, mavjud {breakdown.loose_units})"
-            ),
-        )
-    placement = LocationBoxPlacement(
-        product_box_id=box.id,
+        box_barcode=box_barcode,
         location_id=location_id,
         lot_id=lot_id,
-        status=PLACEMENT_SEALED,
-        placed_by_user_id=user.id,
-    )
-    db.add(placement)
-    db.flush()
-    return get_breakdown(
-        db,
-        product_id=box.product_id,
-        lot_id=lot_id,
-        location_id=location_id,
+        user=user,
+        box_count=1,
     )
 
 
@@ -226,13 +258,14 @@ def remove_sealed_box(
     lot_id: UUID | None = None,
 ) -> LocationBoxBreakdown:
     box = _get_product_box_by_barcode(db, box_barcode)
-    placement = _existing_sealed(db, box.id)
+    placement = _find_sealed_at(
+        db,
+        box.id,
+        location_id=location_id,
+        lot_id=lot_id,
+    )
     if not placement:
         raise HTTPException(status_code=404, detail="Quti bu lokatsiyada joylashmagan")
-    if location_id is not None and placement.location_id != location_id:
-        raise HTTPException(status_code=409, detail="Quti boshqa lokatsiyada")
-    if lot_id is not None and placement.lot_id != lot_id:
-        raise HTTPException(status_code=409, detail="Quti boshqa partiyada")
     placement.status = PLACEMENT_REMOVED
     placement.removed_at = datetime.now(timezone.utc)
     placement.removed_by_user_id = user.id
@@ -255,11 +288,13 @@ def relocate_sealed_box(
     from_location_id: UUID | None = None,
 ) -> LocationBoxBreakdown:
     box = _get_product_box_by_barcode(db, box_barcode)
-    placement = _existing_sealed(db, box.id)
+    placement = _find_sealed_at(
+        db,
+        box.id,
+        location_id=from_location_id,
+    )
     if not placement:
         raise HTTPException(status_code=404, detail="Quti joylashmagan")
-    if from_location_id is not None and placement.location_id != from_location_id:
-        raise HTTPException(status_code=409, detail="Quti manba lokatsiyada emas")
     if placement.location_id == to_location_id:
         return get_breakdown(
             db,

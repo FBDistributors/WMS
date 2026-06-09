@@ -4,7 +4,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, DateTime, ForeignKey, Index, Numeric, String, func
+from sqlalchemy import Date, DateTime, ForeignKey, Index, Integer, Numeric, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -55,6 +55,8 @@ class ReceiptLine(Base):
     location_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("locations.id", ondelete="RESTRICT"), nullable=False
     )
+    box_barcode: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    box_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

@@ -256,6 +256,10 @@ class InventoryByBarcodeResponse {
     required this.brand,
     required this.bestLocations,
     required this.totalAvailable,
+    this.scanKind = 'unit',
+    this.scannedBarcode,
+    this.unitsPerBox,
+    this.boxBarcode,
   });
 
   final String productId;
@@ -264,6 +268,10 @@ class InventoryByBarcodeResponse {
   final String? brand;
   final List<InventoryByBarcodeLocation> bestLocations;
   final double totalAvailable;
+  final String scanKind;
+  final String? scannedBarcode;
+  final int? unitsPerBox;
+  final String? boxBarcode;
 
   factory InventoryByBarcodeResponse.fromJson(Map<String, Object?> json) {
     final Object? best = json['best_locations'];
@@ -284,8 +292,22 @@ class InventoryByBarcodeResponse {
       brand: json['brand'] as String?,
       bestLocations: locs,
       totalAvailable: _reqNum(json, 'total_available'),
+      scanKind: json['scan_kind'] as String? ?? 'unit',
+      scannedBarcode: json['scanned_barcode'] as String?,
+      unitsPerBox: _optionalInt(json['units_per_box']),
+      boxBarcode: json['box_barcode'] as String?,
     );
   }
+}
+
+int? _optionalInt(Object? v) {
+  if (v is int) {
+    return v;
+  }
+  if (v is num) {
+    return v.round();
+  }
+  return null;
 }
 
 class LocationContentsItem {

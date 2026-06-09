@@ -26,6 +26,7 @@ from app.models.stock import StockMovement as StockMovementModel
 from app.models.user import User as UserModel
 from app.services.box_location_service import get_breakdown_map_for_product
 from app.services.expired_zone_labels import get_labels_row, resolve_expired_display_label
+from app.services.product_scan_resolve import resolve_product_scan
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -141,6 +142,10 @@ class InventoryByBarcodeResponse(BaseModel):
     best_locations: list[ByBarcodeLocationInfo]
     fefo_lots: list[ByBarcodeLotInfo]
     total_available: Decimal
+    scan_kind: str = "unit"
+    scanned_barcode: str | None = None
+    units_per_box: int | None = None
+    box_barcode: str | None = None
 
 
 def _get_product_main_barcode(db: Session, product: ProductModel) -> str | None:
@@ -297,9 +302,21 @@ async def get_inventory_by_barcode(
     _user: UserModel = Depends(get_current_user),
     _guard=Depends(PICKER_INVENTORY_PERMISSION),
 ):
-    product = _get_product_by_barcode(db, barcode)
-    if not product:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    scanned = (barcode or "").strip()
+    scan_kind = "unit"
+    units_per_box: int | None = None
+    box_barcode: str | None = None
+    resolved = resolve_product_scan(db, scanned)
+    if resolved:
+        product = resolved.product
+        scan_kind = resolved.scan_kind
+        if resolved.scan_kind == "box":
+            units_per_box = resolved.units_per_scan
+            box_barcode = scanned
+    else:
+        product = _get_product_by_barcode(db, scanned)
+        if not product:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     main_barcode = _get_product_main_barcode(db, product)
     lot_data = _get_lot_level_balances(db, [product.id])
     total = sum(Decimal(str(r["available"])) for r in lot_data)
@@ -328,6 +345,10 @@ async def get_inventory_by_barcode(
         best_locations=best_locations,
         fefo_lots=[ByBarcodeLotInfo(**lot) for lot in fefo_lots],
         total_available=total,
+        scan_kind=scan_kind,
+        scanned_barcode=scanned or None,
+        units_per_box=units_per_box,
+        box_barcode=box_barcode,
     )
 
 

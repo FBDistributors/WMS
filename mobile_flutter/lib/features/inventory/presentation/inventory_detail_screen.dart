@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:math' as math;
 
+import '../../../core/app_state/app_locale.dart';
+import '../../../core/app_state/locale_controller.dart';
 import '../../../core/formatting/expiry_display_format.dart';
+import '../../../l10n/string_lookup.dart';
 import '../data/models/picker_inventory_models.dart';
 import 'inventory_locale.dart';
 import 'inventory_providers.dart';
@@ -16,15 +19,19 @@ class InventoryDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final InventoryLocale loc = ref.watch(inventoryLocaleProvider);
+    final InventoryLocale invLoc = ref.watch(inventoryLocaleProvider);
+    final AppLocale appLoc = ref.watch(appLocaleProvider);
     final AsyncValue<InventoryDetailPair> data =
         ref.watch(inventoryProductDetailProvider(productId));
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final Uri uri = GoRouterState.of(context).uri;
+    final String? scannedBoxBarcode = uri.queryParameters['scannedBoxBarcode'];
+    final int? unitsPerBox = int.tryParse(uri.queryParameters['unitsPerBox'] ?? '');
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF5F5F5),
       appBar: AppBar(
-        title: Text(InventoryStrings.invTitle(loc)),
+        title: Text(InventoryStrings.invTitle(invLoc)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
@@ -42,6 +49,31 @@ class InventoryDetailScreen extends ConsumerWidget {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: <Widget>[
+              if (scannedBoxBarcode != null &&
+                  scannedBoxBarcode.isNotEmpty &&
+                  unitsPerBox != null &&
+                  unitsPerBox > 0)
+                Card(
+                  color: isDark ? const Color(0xFF1E3A5F) : const Color(0xFFE8EAF6),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    child: Text(
+                      StringLookup.tParams(
+                        appLoc,
+                        'inventoryScannedViaBox',
+                        <String, String>{
+                          'barcode': scannedBoxBarcode,
+                          'units': '$unitsPerBox',
+                        },
+                      ),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1A237E),
+                      ),
+                    ),
+                  ),
+                ),
               Text(
                 main.name,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -63,7 +95,7 @@ class InventoryDetailScreen extends ConsumerWidget {
                 children: <Widget>[
                   Expanded(
                     child: Text(
-                      '${InventoryStrings.invTitle(loc)} — asosiy',
+                      '${InventoryStrings.invTitle(invLoc)} — asosiy',
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: isDark ? Colors.white70 : Colors.black54,
@@ -71,7 +103,7 @@ class InventoryDetailScreen extends ConsumerWidget {
                     ),
                   ),
                   Text(
-                    '${InventoryStrings.invOnHand(loc)}: $mainTotalOnHand',
+                    '${InventoryStrings.invOnHand(invLoc)}: $mainTotalOnHand',
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       color: isDark ? Colors.white70 : Colors.black54,
@@ -79,7 +111,7 @@ class InventoryDetailScreen extends ConsumerWidget {
                   ),
                 ],
               ),
-              ...inventoryLocTiles(main.locations, loc, isDark),
+              ...inventoryLocTiles(main.locations, invLoc, appLoc, isDark),
               const SizedBox(height: 16),
               Row(
                 children: <Widget>[
@@ -93,7 +125,7 @@ class InventoryDetailScreen extends ConsumerWidget {
                     ),
                   ),
                   Text(
-                    '${InventoryStrings.invOnHand(loc)}: $showroomTotalOnHand',
+                    '${InventoryStrings.invOnHand(invLoc)}: $showroomTotalOnHand',
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       color: isDark ? Colors.white70 : Colors.black54,
@@ -101,12 +133,12 @@ class InventoryDetailScreen extends ConsumerWidget {
                   ),
                 ],
               ),
-              ...inventoryLocTiles(pair.showroom.locations, loc, isDark),
+              ...inventoryLocTiles(pair.showroom.locations, invLoc, appLoc, isDark),
             ],
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => Center(child: Text(InventoryStrings.invLoadError(loc))),
+        error: (_, __) => Center(child: Text(InventoryStrings.invLoadError(invLoc))),
       ),
     );
   }
@@ -134,6 +166,9 @@ List<PickerProductLocation> mergePickerProductLocationsForDisplay(
         onHandQty: ex.onHandQty + p.onHandQty,
         reservedQty: ex.reservedQty + p.reservedQty,
         availableQty: ex.availableQty + p.availableQty,
+        boxCount: ex.boxCount + p.boxCount,
+        unitsInBoxes: ex.unitsInBoxes + p.unitsInBoxes,
+        looseUnits: ex.looseUnits + p.looseUnits,
       );
     }
   }
@@ -151,6 +186,7 @@ int _totalOnHandForDisplay(List<PickerProductLocation> locations) {
 List<Widget> inventoryLocTiles(
   List<PickerProductLocation> locations,
   InventoryLocale loc,
+  AppLocale appLoc,
   bool isDark,
 ) {
   if (locations.isEmpty) {
@@ -173,13 +209,42 @@ List<Widget> inventoryLocTiles(
     ];
   }
   return merged.map((PickerProductLocation l) {
+    final List<String> boxLines = <String>[];
+    if (l.boxCount > 0 || l.unitsInBoxes > 0) {
+      boxLines.add(
+        '${StringLookup.t(appLoc, 'inventoryLocationFullBoxes')}: ${l.boxCount}',
+      );
+      boxLines.add(
+        '${StringLookup.t(appLoc, 'inventoryUnitsInBoxes')}: ${l.unitsInBoxes}',
+      );
+      boxLines.add(
+        '${StringLookup.t(appLoc, 'inventoryLocationLooseUnits')}: ${l.looseUnits}',
+      );
+    }
     return Card(
       color: isDark ? const Color(0xFF1E293B) : Colors.white,
       child: ListTile(
         title: Text(l.locationCode, style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
-        subtitle: Text(
-          formatExpiryMonthYear(l.expiryDate),
-          style: TextStyle(color: isDark ? Colors.white54 : Colors.black45),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              formatExpiryMonthYear(l.expiryDate),
+              style: TextStyle(color: isDark ? Colors.white54 : Colors.black45),
+            ),
+            if (boxLines.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 4),
+              ...boxLines.map(
+                (String line) => Text(
+                  line,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? Colors.white60 : Colors.black54,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
         trailing: Text(
           '${InventoryStrings.invOnHand(loc)}: ${_toNonNegativeRounded(l.availableQty)}',

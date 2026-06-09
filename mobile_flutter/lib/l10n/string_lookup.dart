@@ -327,6 +327,10 @@ abstract final class StringLookup {
     'kirimNewScanBoxFirst':
         'Qutini skanerlang. Bazada bo‘lmasa, avval mahsulotni qidiring.',
     'kirimNewBoxQtyIncomplete': 'Quti skani, hajmi va sonini to‘ldiring',
+    'kirimBoxReceiveSuccess':
+        'Qabul: {{boxCount}} quti × {{unitsPerBox}} = {{total}} dona\n{{product}} · {{location}}',
+    'inventoryScannedViaBox': 'Quti skani: {{barcode}} · {{units}} dona/quti',
+    'inventoryDetailBoxBreakdown': 'Qoldiq tarkibi',
     'syncFailed': 'Sinxronlash muvaffaqiyatsiz tugadi',
     'pickerQtyExceeded': 'Kerakli miqdordan oshmaydi',
     'pickerQtyBelowZero': '0 dan kam bo‘lmaydi',
@@ -672,6 +676,10 @@ abstract final class StringLookup {
     'kirimNewScanBoxFirst':
         'Отсканируйте коробку. Если её нет в базе, сначала найдите товар.',
     'kirimNewBoxQtyIncomplete': 'Укажите скан коробки, размер и количество',
+    'kirimBoxReceiveSuccess':
+        'Приём: {{boxCount}} кор. × {{unitsPerBox}} = {{total}} шт.\n{{product}} · {{location}}',
+    'inventoryScannedViaBox': 'Скан коробки: {{barcode}} · {{units}} шт./кор.',
+    'inventoryDetailBoxBreakdown': 'Состав остатка',
     'syncFailed': 'Синхронизация завершилась с ошибкой',
     'pickerQtyExceeded': 'Нельзя превысить требуемое количество',
     'pickerQtyBelowZero': 'Нельзя меньше 0',
@@ -1017,6 +1025,10 @@ abstract final class StringLookup {
     'kirimNewScanBoxFirst':
         'Scan the box. If it is not in the database, search for the product first.',
     'kirimNewBoxQtyIncomplete': 'Complete box scan, size, and count',
+    'kirimBoxReceiveSuccess':
+        'Received: {{boxCount}} boxes × {{unitsPerBox}} = {{total}} units\n{{product}} · {{location}}',
+    'inventoryScannedViaBox': 'Box scan: {{barcode}} · {{units}} units/box',
+    'inventoryDetailBoxBreakdown': 'Stock breakdown',
     'syncFailed': 'Sync failed',
     'pickerQtyExceeded': 'Cannot exceed required quantity',
     'pickerQtyBelowZero': 'Cannot be less than 0',

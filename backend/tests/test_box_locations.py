@@ -14,7 +14,12 @@ from app.models.product_box import ProductBox as ProductBoxModel
 from app.models.stock import StockLot, StockMovement
 from app.models.user import User as UserModel
 from app.auth.security import get_password_hash
-from app.services.box_location_service import get_breakdown, place_sealed_box, remove_sealed_box
+from app.services.box_location_service import (
+    get_breakdown,
+    place_sealed_box,
+    place_sealed_boxes,
+    remove_sealed_box,
+)
 
 
 @pytest.fixture()
@@ -110,37 +115,45 @@ def test_place_and_breakdown(
     assert result.total_units == 50
 
 
-def test_place_duplicate_barcode_fails(
+def test_place_multiple_boxes_same_barcode(
     db_session: Session,
     inv_user: UserModel,
     sample_product: ProductModel,
     sample_location: LocationModel,
 ) -> None:
-    lot = _seed_stock(db_session, sample_product, sample_location, 50)
+    lot = _seed_stock(db_session, sample_product, sample_location, 80)
     box = ProductBoxModel(
-        box_barcode="BOX-DUP",
+        box_barcode="BOX-MULTI",
         product_id=sample_product.id,
-        units_per_box=12,
+        units_per_box=10,
         is_active=True,
     )
     db_session.add(box)
     db_session.flush()
-    place_sealed_box(
+    result = place_sealed_boxes(
         db_session,
-        box_barcode="BOX-DUP",
+        box_barcode="BOX-MULTI",
         location_id=sample_location.id,
         lot_id=lot.id,
         user=inv_user,
+        box_count=8,
     )
-    with pytest.raises(HTTPException) as exc:
-        place_sealed_box(
-            db_session,
-            box_barcode="BOX-DUP",
-            location_id=sample_location.id,
-            lot_id=lot.id,
-            user=inv_user,
-        )
-    assert exc.value.status_code == 409
+    assert result.box_count == 8
+    assert result.units_in_boxes == 80
+    assert result.loose_units == 0
+    assert result.total_units == 80
+
+    result2 = remove_sealed_box(
+        db_session,
+        box_barcode="BOX-MULTI",
+        user=inv_user,
+        reason="pick",
+        location_id=sample_location.id,
+        lot_id=lot.id,
+    )
+    assert result2.box_count == 7
+    assert result2.units_in_boxes == 70
+    assert result2.loose_units == 10
 
 
 def test_place_insufficient_loose_fails(

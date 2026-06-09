@@ -16,11 +16,14 @@ from app.core.stock_rules import check_location_single_expiry
 from app.db import get_db
 from app.models.location import Location as LocationModel
 from app.models.product import Product as ProductModel
+from app.models.product_box import ProductBox as ProductBoxModel
 from app.models.receipt import Receipt as ReceiptModel
 from app.models.receipt import ReceiptLine as ReceiptLineModel
 from app.models.stock import StockLot as StockLotModel
 from app.models.stock import StockMovement as StockMovementModel
 from app.models.user import User as UserModel
+from app.services.box_location_service import place_sealed_boxes
+from app.services.product_scan_resolve import normalize_scan_barcode
 
 router = APIRouter()
 
@@ -33,6 +36,8 @@ class ReceiptLineCreate(BaseModel):
     batch: Optional[str] = Field(default=None, max_length=64)
     expiry_date: Optional[date] = None
     location_id: UUID
+    box_barcode: Optional[str] = Field(default=None, max_length=64)
+    box_count: Optional[int] = Field(default=None, ge=1, le=500)
 
     @validator("qty")
     def qty_must_be_integer(cls, v: Decimal) -> Decimal:
@@ -54,6 +59,8 @@ class ReceiptLineOut(BaseModel):
     batch: str
     expiry_date: Optional[date] = None
     location_id: UUID
+    box_barcode: Optional[str] = None
+    box_count: Optional[int] = None
 
 
 class ReceiptOut(BaseModel):
@@ -94,6 +101,8 @@ def _to_receipt(receipt: ReceiptModel, created_by_username: Optional[str] = None
                 batch=line.batch,
                 expiry_date=line.expiry_date,
                 location_id=line.location_id,
+                box_barcode=line.box_barcode,
+                box_count=line.box_count,
             )
             for line in receipt.lines
         ],
@@ -104,6 +113,54 @@ def _generate_doc_no() -> str:
     today = datetime.utcnow().strftime("%Y%m%d")
     token = uuid4().hex[:6].upper()
     return f"RCPT-{today}-{token}"
+
+
+def _normalize_box_barcode(raw: str | None) -> str | None:
+    if raw is None:
+        return None
+    code = normalize_scan_barcode(raw)
+    return code if code else None
+
+
+def _validate_box_receipt_line(
+    db: Session,
+    *,
+    product_id: UUID,
+    qty: Decimal,
+    box_barcode: str | None,
+    box_count: int | None,
+) -> tuple[str | None, int | None]:
+    has_barcode = box_barcode is not None and box_barcode.strip() != ""
+    has_count = box_count is not None
+    if has_barcode != has_count:
+        raise HTTPException(
+            status_code=400,
+            detail="box_barcode va box_count birgalikda berilishi kerak",
+        )
+    if not has_barcode:
+        return None, None
+    code = _normalize_box_barcode(box_barcode)
+    if not code:
+        raise HTTPException(status_code=400, detail="box_barcode required")
+    box = (
+        db.query(ProductBoxModel)
+        .filter(
+            ProductBoxModel.box_barcode == code,
+            ProductBoxModel.is_active.is_(True),
+        )
+        .one_or_none()
+    )
+    if not box:
+        raise HTTPException(status_code=404, detail="Quti topilmadi")
+    if box.product_id != product_id:
+        raise HTTPException(status_code=400, detail="Quti mahsulotga mos emas")
+    expected = Decimal(str(box.units_per_box * box_count))
+    if qty != expected:
+        raise HTTPException(
+            status_code=400,
+            detail=f"qty {int(qty)} != box_count * units_per_box ({int(expected)})",
+        )
+    return code, box_count
 
 
 @router.get("/receipts/receivers", response_model=List[ReceiverOut], summary="List receivers")
@@ -268,6 +325,13 @@ async def create_receipt(
             batch_val = uuid4().hex[:12]
         expiry_normalized = normalize_expiry_to_first_of_month(line.expiry_date)
         check_location_single_expiry(db, line.location_id, line.product_id, expiry_normalized)
+        box_code, box_cnt = _validate_box_receipt_line(
+            db,
+            product_id=line.product_id,
+            qty=line.qty,
+            box_barcode=line.box_barcode,
+            box_count=line.box_count,
+        )
         receipt.lines.append(
             ReceiptLineModel(
                 product_id=line.product_id,
@@ -275,6 +339,8 @@ async def create_receipt(
                 batch=batch_val,
                 expiry_date=expiry_normalized,
                 location_id=line.location_id,
+                box_barcode=box_code,
+                box_count=box_cnt,
             )
         )
 
@@ -356,6 +422,17 @@ async def complete_receipt(
             created_by_user_id=user.id,
         )
         db.add(movement)
+        db.flush()
+
+        if line.box_barcode and line.box_count:
+            place_sealed_boxes(
+                db,
+                box_barcode=line.box_barcode,
+                location_id=line.location_id,
+                lot_id=lot.id,
+                user=user,
+                box_count=line.box_count,
+            )
 
     receipt.status = "completed"
     db.commit()

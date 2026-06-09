@@ -5,6 +5,8 @@ class ReceiptLineCreate {
     required this.locationId,
     this.batch,
     this.expiryDate,
+    this.boxBarcode,
+    this.boxCount,
   });
 
   final String productId;
@@ -13,6 +15,8 @@ class ReceiptLineCreate {
   final String? batch;
   final String locationId;
   final String? expiryDate;
+  final String? boxBarcode;
+  final int? boxCount;
 
   Map<String, Object?> toJson() => <String, Object?>{
         'product_id': productId,
@@ -20,6 +24,9 @@ class ReceiptLineCreate {
         'location_id': locationId,
         if (batch != null && batch!.trim().isNotEmpty) 'batch': batch!.trim(),
         if (expiryDate != null) 'expiry_date': expiryDate,
+        if (boxBarcode != null && boxBarcode!.trim().isNotEmpty)
+          'box_barcode': boxBarcode!.trim(),
+        if (boxCount != null) 'box_count': boxCount,
       };
 }
 

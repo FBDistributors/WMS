@@ -13,7 +13,7 @@ from app.models.user import User as UserModel
 from app.services.box_location_service import (
     LocationBoxBreakdown,
     get_breakdown,
-    place_sealed_box,
+    place_sealed_boxes,
     relocate_sealed_box,
     remove_sealed_box,
 )
@@ -44,6 +44,7 @@ class BoxPlaceIn(BaseModel):
     box_barcode: str = Field(..., min_length=1, max_length=64)
     location_id: UUID
     lot_id: UUID
+    box_count: int = Field(default=1, ge=1, le=500)
 
 
 class BoxRemoveIn(BaseModel):
@@ -104,12 +105,13 @@ async def box_place(
         require_any_permission(["inventory:adjust", "receiving:write", "products:write"])
     ),
 ):
-    result = place_sealed_box(
+    result = place_sealed_boxes(
         db,
         box_barcode=payload.box_barcode,
         location_id=payload.location_id,
         lot_id=payload.lot_id,
         user=user,
+        box_count=payload.box_count,
     )
     db.commit()
     return _to_out(result)
