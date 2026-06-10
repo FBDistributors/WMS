@@ -326,6 +326,8 @@ abstract final class StringLookup {
     'kirimNewTotalUnits': 'Jami: {{total}} dona',
     'kirimNewScanBoxFirst':
         'Qutini skanerlang. Bazada bo‘lmasa, avval mahsulotni qidiring.',
+    'kirimNewBoxBarcodeHint': 'Skanerlang yoki shtrix kodni qo‘lda kiriting',
+    'kirimNewBoxBarcodeConfirm': 'Shtrix kodni tasdiqlash',
     'kirimNewBoxQtyIncomplete': 'Quti skani, hajmi va sonini to‘ldiring',
     'pickUseBoxScan': 'Dona terish uchun qoldiq yetmaydi — quti skan qiling',
     'pickLocationBreakdown': '{{breakdown}}',
@@ -677,6 +679,8 @@ abstract final class StringLookup {
     'kirimNewTotalUnits': 'Итого: {{total}} шт.',
     'kirimNewScanBoxFirst':
         'Отсканируйте коробку. Если её нет в базе, сначала найдите товар.',
+    'kirimNewBoxBarcodeHint': 'Отсканируйте или введите штрихкод вручную',
+    'kirimNewBoxBarcodeConfirm': 'Подтвердить штрихкод',
     'kirimNewBoxQtyIncomplete': 'Укажите скан коробки, размер и количество',
     'pickUseBoxScan': 'Недостаточно штук — отсканируйте коробку',
     'pickLocationBreakdown': '{{breakdown}}',
@@ -1028,6 +1032,8 @@ abstract final class StringLookup {
     'kirimNewTotalUnits': 'Total: {{total}} units',
     'kirimNewScanBoxFirst':
         'Scan the box. If it is not in the database, search for the product first.',
+    'kirimNewBoxBarcodeHint': 'Scan or enter the barcode manually',
+    'kirimNewBoxBarcodeConfirm': 'Confirm barcode',
     'kirimNewBoxQtyIncomplete': 'Complete box scan, size, and count',
     'pickUseBoxScan': 'Not enough loose units — scan a box',
     'pickLocationBreakdown': '{{breakdown}}',

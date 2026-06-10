@@ -94,6 +94,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   final TextEditingController _newReceiveBoxCount = TextEditingController(text: '1');
   final TextEditingController _newReceiveBoxBarcode = TextEditingController();
   int? _newReceiveUnitsPerBox;
+  /// Oxirgi muvaffaqiyatli aniqlangan quti shtrix kodi (skan yoki qo'lda).
+  String? _newReceiveResolvedBoxBarcode;
   bool _skipClearNewReceiveBoxOnLoad = false;
   final List<_FormLine> _lines = <_FormLine>[];
   PickerProductDetailResponse? _product;
@@ -537,8 +539,30 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
 
   void _clearNewReceiveBoxState() {
     _newReceiveUnitsPerBox = null;
+    _newReceiveResolvedBoxBarcode = null;
     _newReceiveBoxBarcode.clear();
     _newReceiveBoxCount.text = '1';
+  }
+
+  void _onNewReceiveBoxBarcodeChanged(String value) {
+    final String trimmed = value.trim();
+    setState(() {
+      if (_newReceiveResolvedBoxBarcode != null &&
+          trimmed != _newReceiveResolvedBoxBarcode) {
+        _newReceiveResolvedBoxBarcode = null;
+        _newReceiveUnitsPerBox = null;
+        _syncNewReceiveComputedQty();
+      }
+    });
+  }
+
+  Future<void> _confirmNewReceiveBoxBarcodeManual() async {
+    final String barcode = _newReceiveBoxBarcode.text.trim();
+    if (barcode.isEmpty || barcode == _newReceiveResolvedBoxBarcode) {
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    await _handleNewReceiveBoxBarcode(barcode);
   }
 
   void _clearKirimNewAfterLocationSuccess() {
@@ -643,6 +667,37 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     );
   }
 
+  Widget? _newReceiveBoxBarcodeSuffix(AppLocale appLoc) {
+    final String text = _newReceiveBoxBarcode.text.trim();
+    if (text.isEmpty) {
+      return null;
+    }
+    final bool needsConfirm = text != _newReceiveResolvedBoxBarcode;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        if (needsConfirm)
+          IconButton(
+            tooltip: StringLookup.t(appLoc, 'kirimNewBoxBarcodeConfirm'),
+            onPressed: () => unawaited(_confirmNewReceiveBoxBarcodeManual()),
+            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+            padding: EdgeInsets.zero,
+            splashRadius: 20,
+            icon: const Icon(Icons.check, color: Color(0xFF1A237E)),
+          ),
+        buildInputClearButton(
+          visible: true,
+          onPressed: () => setState(() {
+            _newReceiveBoxBarcode.clear();
+            _newReceiveResolvedBoxBarcode = null;
+            _newReceiveUnitsPerBox = null;
+            _syncNewReceiveComputedQty();
+          }),
+        )!,
+      ],
+    );
+  }
+
   Widget _kirimNewBoxQtyCard(AppLocale appLoc) {
     final int boxCount = int.tryParse(_newReceiveBoxCount.text.trim()) ?? 0;
     final int? unitsPerBox = _newReceiveUnitsPerBox;
@@ -658,12 +713,16 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             Expanded(
               child: TextField(
                 controller: _newReceiveBoxBarcode,
-                readOnly: true,
+                textInputAction: TextInputAction.done,
                 decoration: InputDecoration(
                   labelText: StringLookup.t(appLoc, 'inventoryScanBox'),
                   border: const OutlineInputBorder(),
-                  hintText: StringLookup.t(appLoc, 'kirimNewScanBoxFirst'),
+                  hintText: StringLookup.t(appLoc, 'kirimNewBoxBarcodeHint'),
+                  suffixIcon: _newReceiveBoxBarcodeSuffix(appLoc),
                 ),
+                onChanged: _onNewReceiveBoxBarcodeChanged,
+                onSubmitted: (_) =>
+                    unawaited(_confirmNewReceiveBoxBarcodeManual()),
               ),
             ),
             const SizedBox(width: 8),
@@ -798,6 +857,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
               if (mounted) {
                 setState(() {
                   _newReceiveUnitsPerBox = units;
+                  _newReceiveResolvedBoxBarcode = initialBarcode;
                   _syncNewReceiveComputedQty();
                 });
                 showAppSnackBar(
@@ -830,6 +890,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       if (_product != null && _product!.productId == resolved.productId) {
         setState(() {
           _newReceiveBoxBarcode.text = barcode;
+          _newReceiveResolvedBoxBarcode = barcode;
           _newReceiveUnitsPerBox = resolved.unitsPerBox;
           _syncNewReceiveComputedQty();
         });
@@ -842,6 +903,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       }
       setState(() {
         _newReceiveBoxBarcode.text = barcode;
+        _newReceiveResolvedBoxBarcode = barcode;
         _newReceiveUnitsPerBox = resolved.unitsPerBox;
         _syncNewReceiveComputedQty();
       });
