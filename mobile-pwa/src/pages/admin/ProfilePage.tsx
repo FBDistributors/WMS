@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
@@ -25,9 +25,8 @@ export function ProfilePage() {
   const { t } = useTranslation(['admin', 'common'])
   const [searchParams, setSearchParams] = useSearchParams()
   const tabFromUrl = searchParams.get('tab')
-  const [activeTab, setActiveTab] = useState<SettingsTabId>(() =>
-    isSettingsTabId(tabFromUrl) ? tabFromUrl : 'profile',
-  )
+  // Tab holati faqat URL'dan olinadi — lokal state bilan ikkilanish birinchi bosishda tabni qaytarib yuborardi.
+  const activeTab: SettingsTabId = isSettingsTabId(tabFromUrl) ? tabFromUrl : 'profile'
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -47,17 +46,10 @@ export function ProfilePage() {
     return { full: raw, initials }
   }, [user])
 
-  useEffect(() => {
-    if (isSettingsTabId(tabFromUrl) && tabFromUrl !== activeTab) {
-      setActiveTab(tabFromUrl)
-    }
-  }, [tabFromUrl, activeTab])
-
   const handleTabChange = (tabId: string) => {
     if (!isSettingsTabId(tabId)) {
       return
     }
-    setActiveTab(tabId)
     const next = new URLSearchParams(searchParams)
     if (tabId === 'profile') {
       next.delete('tab')
