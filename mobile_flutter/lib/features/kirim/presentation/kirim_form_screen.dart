@@ -54,6 +54,47 @@ List<PickerProductLocation> _sortFefo(List<PickerProductLocation> locs) {
   return copy;
 }
 
+/// Bir lokatsiya + bir xil muddat (oy-yil) ostidagi lotlar guruhi —
+/// qutili va qutisiz qoldiqlar bitta card'da ko'rsatiladi.
+class _InvLocGroup {
+  _InvLocGroup({required this.lots}) : assert(lots.isNotEmpty);
+
+  final List<PickerProductLocation> lots;
+
+  PickerProductLocation get primary => lots.first;
+  String get locationId => primary.locationId;
+  String get locationCode => primary.locationCode;
+  String? get expiryDate => primary.expiryDate;
+  int get boxCount =>
+      lots.fold(0, (int s, PickerProductLocation l) => s + l.boxCount);
+  int get unitsInBoxes =>
+      lots.fold(0, (int s, PickerProductLocation l) => s + l.unitsInBoxes);
+  int get looseUnits =>
+      lots.fold(0, (int s, PickerProductLocation l) => s + l.looseUnits);
+  double get totalAvailable =>
+      lots.fold(0.0, (double s, PickerProductLocation l) => s + l.availableQty);
+}
+
+List<_InvLocGroup> _groupInvLocations(List<PickerProductLocation> locs) {
+  final Map<String, List<PickerProductLocation>> grouped =
+      <String, List<PickerProductLocation>>{};
+  final List<String> order = <String>[];
+  for (final PickerProductLocation loc in locs) {
+    // Card faqat oy-yil ko'rsatgani uchun muddat kaliti ham oy-yil darajasida.
+    final String key = '${loc.locationId}|${formatExpiryMonthYear(loc.expiryDate)}';
+    final List<PickerProductLocation>? existing = grouped[key];
+    if (existing == null) {
+      grouped[key] = <PickerProductLocation>[loc];
+      order.add(key);
+    } else {
+      existing.add(loc);
+    }
+  }
+  return order
+      .map((String k) => _InvLocGroup(lots: grouped[k]!))
+      .toList(growable: false);
+}
+
 class _FormLine {
   _FormLine({
     required this.id,
@@ -133,7 +174,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   bool _invLoadingContents = false;
   String? _invContentsError;
   final Map<String, String> _invActualQty = <String, String>{};
-  PickerProductLocation? _invScanSelectedLoc;
+  _InvLocGroup? _invScanSelectedGroup;
   final TextEditingController _invScanActualQty = TextEditingController();
   final TextEditingController _invBoxCount = TextEditingController(text: '1');
   int? _invLastUnitsPerBox;
@@ -1204,7 +1245,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           setState(() {
             _invSubMode = 'byScan';
             _invStep = 2;
-            _invScanSelectedLoc = null;
+            _invScanSelectedGroup = null;
           });
           unawaited(_loadProduct(pid));
         }
@@ -1326,7 +1367,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         _invStep = 1;
         if (_invSubMode == 'byScan') {
           _product = null;
-          _invScanSelectedLoc = null;
+          _invScanSelectedGroup = null;
           _productError = null;
         }
       });
@@ -1336,7 +1377,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       setState(() {
         _invStep = 2;
         if (_invSubMode == 'byScan') {
-          _invScanSelectedLoc = null;
+          _invScanSelectedGroup = null;
         }
       });
     }
@@ -1451,7 +1492,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         }
         return;
       }
-      if (_invScanSelectedLoc != null) {
+      if (_invScanSelectedGroup != null) {
         await _placeInventoryBoxAtSelectedLoc(barcode);
       }
       final int boxCount = int.tryParse(_invBoxCount.text.trim()) ?? 1;
@@ -1463,7 +1504,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         initialBarcode: barcode,
         onSaved: (int units) {
           _applyBoxUnitsToActualQty(unitsPerBox: units);
-          if (_invScanSelectedLoc != null) {
+          if (_invScanSelectedGroup != null) {
             unawaited(_placeInventoryBoxAtSelectedLoc(barcode));
           }
         },
@@ -1498,7 +1539,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     setState(() {
       _invSubMode = 'byScan';
       _invStep = 2;
-      _invScanSelectedLoc = null;
+      _invScanSelectedGroup = null;
     });
     unawaited(_loadProduct(productId));
   }
@@ -1572,14 +1613,16 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     }
   }
 
-  Future<void> _submitInvScanAdjust(PickerProductLocation loc) async {
+  /// Birlashtirilgan guruh bo'yicha tuzatish: kamomad qutisiz donasi ko'p
+  /// lotlardan boshlab ayiriladi, ortiqcha qutisiz lotga qo'shiladi.
+  Future<void> _submitInvScanAdjust(_InvLocGroup group) async {
     final AppLocale locale = ref.read(appLocaleProvider);
     final PickerProductDetailResponse? p = _product;
     if (p == null || _invSubmitting) {
       return;
     }
     final int actual = int.tryParse(_invScanActualQty.text.trim()) ?? 0;
-    final double delta = actual.toDouble() - loc.availableQty;
+    final double delta = actual.toDouble() - group.totalAvailable;
     if (delta == 0) {
       showAppSnackBar(
         context,
@@ -1588,21 +1631,67 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       return;
     }
     setState(() => _invSubmitting = true);
+    bool anySent = false;
     try {
-      await ref.read(movementsRepositoryProvider).createStockMovement(
+      final MovementsRepository repo = ref.read(movementsRepositoryProvider);
+      if (delta > 0) {
+        final PickerProductLocation target = group.lots.firstWhere(
+          (PickerProductLocation l) => l.looseUnits > 0,
+          orElse: () => group.primary,
+        );
+        await repo.createStockMovement(
+          productId: p.productId,
+          lotId: target.lotId,
+          locationId: target.locationId,
+          qtyChange: delta,
+          reasonCode: 'inventory_overage',
+        );
+        anySent = true;
+      } else {
+        double remaining = -delta;
+        final List<PickerProductLocation> ordered =
+            List<PickerProductLocation>.from(group.lots)
+              ..sort(
+                (PickerProductLocation a, PickerProductLocation b) =>
+                    b.looseUnits.compareTo(a.looseUnits),
+              );
+        for (final PickerProductLocation lot in ordered) {
+          if (remaining <= 0) {
+            break;
+          }
+          final double take =
+              remaining < lot.availableQty ? remaining : lot.availableQty;
+          if (take <= 0) {
+            continue;
+          }
+          await repo.createStockMovement(
             productId: p.productId,
-            lotId: loc.lotId,
-            locationId: loc.locationId,
-            qtyChange: delta,
-            reasonCode: delta < 0 ? 'inventory_shortage' : 'inventory_overage',
+            lotId: lot.lotId,
+            locationId: lot.locationId,
+            qtyChange: -take,
+            reasonCode: 'inventory_shortage',
           );
+          anySent = true;
+          remaining -= take;
+        }
+        if (remaining > 0) {
+          await repo.createStockMovement(
+            productId: p.productId,
+            lotId: group.primary.lotId,
+            locationId: group.locationId,
+            qtyChange: -remaining,
+            reasonCode: 'inventory_shortage',
+          );
+          anySent = true;
+        }
+      }
       if (mounted) {
         showAppSnackBar(
         context,
           SnackBar(content: Text(StringLookup.t(locale, 'inventoryAdjusted'))),
         );
         setState(() {
-          _invScanSelectedLoc = null;
+          _invScanSelectedGroup = null;
           _invScanActualQty.clear();
           _invBoxCount.text = '1';
           _invLastUnitsPerBox = null;
@@ -1620,7 +1709,17 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       }
     } on Exception catch (e) {
       if (mounted) {
-        showAppSnackBar(context, SnackBar(content: Text('$e')));
+        showAppSnackBar(
+          context,
+          SnackBar(
+            content: Text(
+              anySent ? StringLookup.t(locale, 'inventorySomeRowsFailed') : '$e',
+            ),
+          ),
+        );
+        if (anySent) {
+          await _loadProduct(p.productId);
+        }
       }
     } finally {
       if (mounted) {
@@ -1694,16 +1793,21 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   }
 
   Future<void> _placeInventoryBoxAtSelectedLoc(String boxBarcode) async {
-    final PickerProductLocation? loc = _invScanSelectedLoc;
+    final _InvLocGroup? group = _invScanSelectedGroup;
     final PickerProductDetailResponse? p = _product;
-    if (loc == null || p == null || boxBarcode.trim().isEmpty) {
+    if (group == null || p == null || boxBarcode.trim().isEmpty) {
       return;
     }
+    // Quti allaqachon qutili lot mavjud bo'lsa o'shanga, aks holda birinchi (FEFO) lotga joylanadi.
+    final PickerProductLocation lot = group.lots.firstWhere(
+      (PickerProductLocation l) => l.boxCount > 0,
+      orElse: () => group.primary,
+    );
     try {
       await ref.read(boxLocationRepositoryProvider).placeBox(
             boxBarcode: boxBarcode.trim(),
-            locationId: loc.locationId,
-            lotId: loc.lotId,
+            locationId: group.locationId,
+            lotId: lot.lotId,
           );
       await _loadProduct(p.productId);
     } on Exception catch (e) {
@@ -1714,30 +1818,30 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     }
   }
 
-  bool _invShowBoxBreakdown(PickerProductLocation loc) =>
-      _invProductBoxes.isNotEmpty || loc.boxCount > 0;
+  bool _invShowBoxBreakdown(_InvLocGroup group) =>
+      _invProductBoxes.isNotEmpty || group.boxCount > 0;
 
-  List<Widget> _invBoxBreakdownRowsFromLoc(AppLocale appLoc, PickerProductLocation loc) {
-    if (!_invShowBoxBreakdown(loc)) {
+  List<Widget> _invBoxBreakdownRowsFromLoc(AppLocale appLoc, _InvLocGroup group) {
+    if (!_invShowBoxBreakdown(group)) {
       return const <Widget>[];
     }
     return <Widget>[
       _invValueRow(
         StringLookup.t(appLoc, 'inventoryLocationFullBoxes'),
-        '${loc.boxCount}',
+        '${group.boxCount}',
       ),
       _invValueRow(
         StringLookup.t(appLoc, 'inventoryUnitsInBoxes'),
-        '${loc.unitsInBoxes}',
+        '${group.unitsInBoxes}',
       ),
-      if (loc.looseUnits > 0)
+      if (group.looseUnits > 0)
         _invValueRow(
           StringLookup.t(appLoc, 'inventoryLooseStock'),
-          '${loc.looseUnits}',
+          '${group.looseUnits}',
         ),
       _invValueRow(
         StringLookup.t(appLoc, 'inventoryLocationTotalUnits'),
-        '${loc.availableQty.round()}',
+        '${group.totalAvailable.round()}',
         emphasize: true,
       ),
     ];
@@ -1773,20 +1877,20 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   Widget _invScanLocationCard(
     AppLocale appLoc,
     PickerProductDetailResponse p,
-    PickerProductLocation loc,
+    _InvLocGroup group,
   ) {
     final String ean = (p.mainBarcode ?? '').trim().isEmpty ? '—' : p.mainBarcode!.trim();
-    final String expiry = formatExpiryMonthYear(loc.expiryDate);
-    final List<Widget> boxRows = _invBoxBreakdownRowsFromLoc(appLoc, loc);
+    final String expiry = formatExpiryMonthYear(group.expiryDate);
+    final List<Widget> boxRows = _invBoxBreakdownRowsFromLoc(appLoc, group);
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
           setState(() {
-            _invScanSelectedLoc = loc;
-            _invScanActualQty.text = '${loc.availableQty.round()}';
-            _invScanExpiry = loc.expiryDate;
+            _invScanSelectedGroup = group;
+            _invScanActualQty.text = '${group.totalAvailable.round()}';
+            _invScanExpiry = group.expiryDate;
             _invBoxCount.text = '1';
             _invLastUnitsPerBox = null;
             _invStep = 3;
@@ -1802,7 +1906,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      loc.locationCode,
+                      group.locationCode,
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
@@ -1814,7 +1918,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                     _invValueRow('SKU', p.code.trim().isEmpty ? '—' : p.code.trim()),
                     _invValueRow('Muddat', expiry),
                     if (boxRows.isEmpty)
-                      _invValueRow('Qoldiq', '${loc.availableQty.round()}', emphasize: true)
+                      _invValueRow('Qoldiq', '${group.totalAvailable.round()}', emphasize: true)
                     else ...<Widget>[
                       Padding(
                         padding: const EdgeInsets.only(bottom: 4),
@@ -1872,7 +1976,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
               _invSubMode = 'byScan';
               _invStep = 1;
               _product = null;
-              _invScanSelectedLoc = null;
+              _invScanSelectedGroup = null;
             }),
           ),
         ],
@@ -2062,9 +2166,9 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           if (_product!.locations.isEmpty)
             Text('Qoldiq topilmadi', style: TextStyle(color: Colors.grey.shade700))
           else
-            ..._product!.locations.map(
-              (PickerProductLocation loc) =>
-                  _invScanLocationCard(appLoc, _product!, loc),
+            ..._groupInvLocations(_product!.locations).map(
+              (_InvLocGroup group) =>
+                  _invScanLocationCard(appLoc, _product!, group),
             ),
           TextButton(
             onPressed: () => setState(() {
@@ -2079,7 +2183,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         if (_invSubMode == 'byScan' &&
             _invStep == 3 &&
             _product != null &&
-            _invScanSelectedLoc != null) ...<Widget>[
+            _invScanSelectedGroup != null) ...<Widget>[
           Row(
             children: <Widget>[
               const Expanded(
@@ -2091,7 +2195,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
               TextButton(
                 onPressed: () => setState(() {
                   _invStep = 2;
-                  _invScanSelectedLoc = null;
+                  _invScanSelectedGroup = null;
                   _invBoxCount.text = '1';
                   _invLastUnitsPerBox = null;
                 }),
@@ -2107,7 +2211,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
-                    _invScanSelectedLoc!.locationCode,
+                    _invScanSelectedGroup!.locationCode,
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
@@ -2123,11 +2227,11 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                         ? '—'
                         : _product!.mainBarcode!.trim(),
                   ),
-                  _invValueRow('Muddat', formatExpiryMonthYear(_invScanSelectedLoc!.expiryDate)),
-                  if (!_invShowBoxBreakdown(_invScanSelectedLoc!))
+                  _invValueRow('Muddat', formatExpiryMonthYear(_invScanSelectedGroup!.expiryDate)),
+                  if (!_invShowBoxBreakdown(_invScanSelectedGroup!))
                     _invValueRow(
                       'Qoldiq',
-                      '${_invScanSelectedLoc!.availableQty.round()}',
+                      '${_invScanSelectedGroup!.totalAvailable.round()}',
                       emphasize: true,
                     )
                   else ...<Widget>[
@@ -2142,7 +2246,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                         ),
                       ),
                     ),
-                    ..._invBoxBreakdownRowsFromLoc(appLoc, _invScanSelectedLoc!),
+                    ..._invBoxBreakdownRowsFromLoc(appLoc, _invScanSelectedGroup!),
                   ],
                 ],
               ),
@@ -2212,7 +2316,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           FilledButton(
             onPressed: _invSubmitting
                 ? null
-                : () => unawaited(_submitInvScanAdjust(_invScanSelectedLoc!)),
+                : () => unawaited(_submitInvScanAdjust(_invScanSelectedGroup!)),
             child: _invSubmitting
                 ? const SizedBox(
                     width: 22,
