@@ -4,6 +4,7 @@ import { FileText, Filter, Pencil, RefreshCw, Settings, X, XCircle } from 'lucid
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { AdminTablePagination } from '../../admin/components/AdminTablePagination'
 import { OrdersHubTabs } from '../../admin/components/orders/OrdersHubTabs'
 import { OrdersTableSettings } from '../../admin/components/orders/OrdersTableSettings'
 import { SendToPickingDialog } from '../../admin/components/orders/SendToPickingDialog'
@@ -101,6 +102,8 @@ export function PickListsPage() {
 
   const [items, setItems] = useState<PickList[]>([])
   const [hasMore, setHasMore] = useState(false)
+  /** Arxiv jadvali sahifalab ko'rsatiladi (Ortga/Keyingi). */
+  const [pageOffset, setPageOffset] = useState(0)
   const [query, setQuery] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const { showError } = useAppToast()
@@ -177,15 +180,20 @@ export function PickListsPage() {
         setLoadingMore(true)
       }
       try {
-        const offset = append ? nextOffsetRef.current : 0
+        const offset = append ? nextOffsetRef.current : archive ? pageOffset : 0
         const listOpts: ListPickListsOptions = { processScope, ...(wmsGroupForApi ? { wmsGroup: wmsGroupForApi } : {}) }
         const data = await listPickLists(PAGE_SIZE, offset, listOpts)
         if (append) {
           setItems((prev) => [...prev, ...data])
           nextOffsetRef.current += data.length
         } else {
+          if (archive && data.length === 0 && offset > 0) {
+            // Keyingi sahifa bo'sh chiqdi — bitta sahifa ortga qaytamiz.
+            setPageOffset(Math.max(0, offset - PAGE_SIZE))
+            return
+          }
           setItems(data)
-          nextOffsetRef.current = data.length
+          nextOffsetRef.current = offset + data.length
         }
         setHasMore(data.length === PAGE_SIZE)
       } catch {
@@ -205,8 +213,12 @@ export function PickListsPage() {
         }
       }
     },
-    [processScope, showError, t, wmsGroupForApi]
+    [archive, pageOffset, processScope, showError, t, wmsGroupForApi]
   )
+
+  useEffect(() => {
+    setPageOffset(0)
+  }, [processScope, wmsGroupForApi])
 
   useEffect(() => {
     nextOffsetRef.current = 0
@@ -847,12 +859,28 @@ export function PickListsPage() {
 
         <div className="min-h-[calc(100vh-320px)] overflow-auto">{content}</div>
 
-        {hasMore && !isLoading && items.length > 0 && (
-          <div className="flex justify-center pb-2">
-            <Button variant="secondary" onClick={() => void load({ append: true })} disabled={loadingMore}>
-              {loadingMore ? t('common:messages.loading') : t('picking:load_more')}
-            </Button>
-          </div>
+        {archive ? (
+          !isLoading && (items.length > 0 || pageOffset > 0) ? (
+            <div className="px-1 pb-2">
+              <AdminTablePagination
+                offset={pageOffset}
+                pageSize={PAGE_SIZE}
+                to={pageOffset + items.length}
+                onPrev={() => setPageOffset((prev) => Math.max(0, prev - PAGE_SIZE))}
+                onNext={() => setPageOffset((prev) => prev + PAGE_SIZE)}
+                prevDisabled={pageOffset === 0 || isLoading}
+                nextDisabled={!hasMore || isLoading}
+              />
+            </div>
+          ) : null
+        ) : (
+          hasMore && !isLoading && items.length > 0 && (
+            <div className="flex justify-center pb-2">
+              <Button variant="secondary" onClick={() => void load({ append: true })} disabled={loadingMore}>
+                {loadingMore ? t('common:messages.loading') : t('picking:load_more')}
+              </Button>
+            </div>
+          )
         )}
 
         <OrdersTableSettings
