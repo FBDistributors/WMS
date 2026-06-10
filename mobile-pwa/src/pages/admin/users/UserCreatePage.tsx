@@ -52,6 +52,7 @@ export function UserCreatePage() {
   const [isSaving, setIsSaving] = useState(false)
   const { showError } = useAppToast()
   const [validationError, setValidationError] = useState<string | null>(null)
+  const passwordMinLength = role === 'warehouse_admin' ? 10 : 6
 
   const handleGeneratePassword = () => {
     const newPassword = generateStrongPassword()
@@ -165,10 +166,12 @@ export function UserCreatePage() {
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               required
-              minLength={6}
+              minLength={passwordMinLength}
             />
             <p className="mt-1 text-xs text-slate-500">
-              {t('users:form.password_hint')}
+              {role === 'warehouse_admin'
+                ? t('users:form.password_hint_admin')
+                : t('users:form.password_hint')}
             </p>
           </div>
           <div>
@@ -181,7 +184,7 @@ export function UserCreatePage() {
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
               required
-              minLength={6}
+              minLength={passwordMinLength}
             />
           </div>
           <label className="flex items-center gap-2 text-sm text-slate-700">

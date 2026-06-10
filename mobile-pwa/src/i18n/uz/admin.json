@@ -349,9 +349,7 @@
     },
     "password_title": "Parol",
     "change_password": "Parolimni o‘zgartirish",
-    "password_soon": "Parolni o‘zgartirish tez orada.",
-    "security_title": "Xavfsizlik",
-    "enable_2fa": "Ikki bosqichli autentifikatsiyani yoqish"
+    "password_soon": "Parolni o‘zgartirish tez orada."
   },
   "app_feedback": {
     "title": "Ilova fikrlari",

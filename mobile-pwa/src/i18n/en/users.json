@@ -33,6 +33,7 @@
     "confirm_password": "Confirm password",
     "generate_password": "Generate",
     "password_hint": "Minimum 6 characters (letters, numbers)",
+    "password_hint_admin": "Minimum 10 characters for admins (letters, numbers)",
     "active": "Active",
     "save": "Save changes",
     "create": "Create user",

@@ -1,4 +1,5 @@
 import logging
+import time
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
@@ -24,6 +25,59 @@ ADMIN_ROLE = "warehouse_admin"
 MAX_ADMIN_SESSIONS = 5
 # Picker/controller: 2 sessiya (mobil + bitta boshqa), shunda buyurtmaga kirganda avtomat chiqmasin
 MAX_OTHER_SESSIONS = 2
+
+# Login rate-limiting: oynada N ta noto'g'ri urinishdan keyin vaqtincha bloklash.
+# In-memory (har worker alohida hisoblaydi) — brute-force'ni amalda to'sish uchun yetarli.
+LOGIN_MAX_FAILED_ATTEMPTS = 5
+LOGIN_ATTEMPT_WINDOW_SECONDS = 600
+LOGIN_LOCKOUT_SECONDS = 600
+# key -> list of failed attempt timestamps (monotonic emas, time.time)
+_failed_login_attempts: dict[str, list[float]] = {}
+
+
+def _client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for") or ""
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def _login_rate_key(username: str, request: Request) -> str:
+    return f"{username.strip().lower()}|{_client_ip(request)}"
+
+
+def _prune_login_attempts(now: float) -> None:
+    cutoff = now - max(LOGIN_ATTEMPT_WINDOW_SECONDS, LOGIN_LOCKOUT_SECONDS)
+    stale_keys = [k for k, ts in _failed_login_attempts.items() if not ts or ts[-1] < cutoff]
+    for k in stale_keys:
+        _failed_login_attempts.pop(k, None)
+
+
+def _check_login_rate_limit(key: str) -> None:
+    """429 agar oynada juda ko'p noto'g'ri urinish bo'lgan bo'lsa."""
+    now = time.time()
+    _prune_login_attempts(now)
+    attempts = _failed_login_attempts.get(key, [])
+    recent = [t for t in attempts if t > now - LOGIN_ATTEMPT_WINDOW_SECONDS]
+    if len(recent) >= LOGIN_MAX_FAILED_ATTEMPTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Juda ko'p urinish. Keyinroq qayta urinib ko'ring.",
+        )
+
+
+def _record_failed_login(key: str) -> None:
+    now = time.time()
+    attempts = _failed_login_attempts.setdefault(key, [])
+    attempts.append(now)
+    # Faqat so'nggi oynadagi urinishlarni saqlaymiz
+    _failed_login_attempts[key] = [
+        t for t in attempts if t > now - max(LOGIN_ATTEMPT_WINDOW_SECONDS, LOGIN_LOCKOUT_SECONDS)
+    ]
+
+
+def _clear_failed_logins(key: str) -> None:
+    _failed_login_attempts.pop(key, None)
 
 
 class LoginRequest(BaseModel):
@@ -54,7 +108,17 @@ class UpdateMeRequest(BaseModel):
     full_name: Optional[str] = None
 
 
-def _validate_password(password: str) -> None:
+ADMIN_MIN_PASSWORD_LENGTH = 10
+
+
+def _validate_password(password: str, role: str | None = None) -> None:
+    if role == ADMIN_ROLE:
+        if len(password) < ADMIN_MIN_PASSWORD_LENGTH:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Admin password must be at least {ADMIN_MIN_PASSWORD_LENGTH} characters.",
+            )
+        return
     if len(password) < 6:
         raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
 
@@ -65,11 +129,15 @@ def _get_user_by_username(db: Session, username: str) -> Optional[User]:
 
 @router.post("/login", response_model=TokenResponse, summary="Login")
 async def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
+    rate_key = _login_rate_key(payload.username, request)
+    _check_login_rate_limit(rate_key)
     try:
         user = _get_user_by_username(db, payload.username)
         if not user or not verify_password(payload.password, user.password_hash):
+            _record_failed_login(rate_key)
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
+        _clear_failed_logins(rate_key)
         token = create_access_token({"sub": str(user.id), "role": user.role})
         user_agent = (request.headers.get("user-agent") or "Unknown")[:500]
         user.last_login_at = datetime.utcnow()
@@ -140,7 +208,7 @@ async def change_password(
 ):
     if not verify_password(payload.current_password, current_user.password_hash):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid current password")
-    _validate_password(payload.new_password)
+    _validate_password(payload.new_password, role=current_user.role)
     current_user.password_hash = get_password_hash(payload.new_password)
     db.commit()
     return {"status": "ok"}

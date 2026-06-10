@@ -71,11 +71,23 @@ def _allocate_next_user_code(db: Session) -> str:
             ) from exc
 
 
-def _validate_password(password: str) -> None:
+ADMIN_ROLE = "warehouse_admin"
+ADMIN_MIN_PASSWORD_LENGTH = 10
+
+
+def _validate_password(password: str, role: Optional[str] = None) -> None:
     """
     Simplified password validation for internal warehouse users.
     Minimum 6 characters - easy to remember for operators.
+    Admins (publicly reachable panel) require at least 10 characters.
     """
+    if role == ADMIN_ROLE:
+        if len(password) < ADMIN_MIN_PASSWORD_LENGTH:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Admin password must be at least {ADMIN_MIN_PASSWORD_LENGTH} characters.",
+            )
+        return
     if len(password) < 6:
         raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
 
@@ -181,7 +193,7 @@ async def create_user(
     if payload.role not in VALID_ROLES:
         raise HTTPException(status_code=400, detail="Invalid role")
 
-    _validate_password(payload.password)
+    _validate_password(payload.password, role=payload.role)
 
     existing = db.query(User).filter(User.username == payload.username).one_or_none()
     if existing:
@@ -281,10 +293,10 @@ async def reset_password(
     db: Session = Depends(get_db),
     current_user=Depends(require_permission("users:manage")),
 ):
-    _validate_password(payload.new_password)
     user = db.query(User).filter(User.id == user_id).one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    _validate_password(payload.new_password, role=user.role)
 
     user.password_hash = get_password_hash(payload.new_password)
     log_action(

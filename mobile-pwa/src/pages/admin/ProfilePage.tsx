@@ -195,17 +195,6 @@ export function ProfilePage() {
           </Button>
         </div>
 
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="text-base font-semibold text-slate-900 dark:text-slate-100">
-              {t('admin:profile.security_title')}
-            </div>
-            <Badge variant="neutral">{t('admin:settings.coming_soon')}</Badge>
-          </div>
-          <Button variant="outline" onClick={() => {}}>
-            {t('admin:profile.enable_2fa')}
-          </Button>
-        </div>
           </Card>
         ) : null}
       </div>

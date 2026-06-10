@@ -33,6 +33,7 @@
     "confirm_password": "Parolni tasdiqlash",
     "generate_password": "Parol yaratish",
     "password_hint": "Kamida 6 ta belgi (harflar, raqamlar)",
+    "password_hint_admin": "Admin uchun kamida 10 ta belgi (harflar, raqamlar)",
     "active": "Faol",
     "save": "Saqlash",
     "create": "Yaratish",

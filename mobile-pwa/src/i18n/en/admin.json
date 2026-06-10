@@ -349,9 +349,7 @@
     },
     "password_title": "Password",
     "change_password": "Change my password",
-    "password_soon": "Password change is coming soon.",
-    "security_title": "Security",
-    "enable_2fa": "Enable Two-Factor Authentication"
+    "password_soon": "Password change is coming soon."
   },
   "app_feedback": {
     "title": "App feedback",
