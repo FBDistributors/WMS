@@ -6,14 +6,18 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/app_state/locale_controller.dart';
 import '../../../core/app_state/network_status_provider.dart';
+import '../../../core/router/scanner_args.dart';
 import '../../../core/storage/shared_preferences_provider.dart';
 import '../../../l10n/string_lookup.dart';
 import '../../../shared/feedback/app_top_snackbar.dart';
+import '../../../shared/widgets/scan_action_button.dart';
 import '../data/picking_models.dart';
 import '../data/return_session_storage.dart';
 import '../picking_providers.dart';
 
-/// Xavfsiz bekor: terilganlarni asl joyga qaytarish (avval manzil, keyin mahsulot).
+/// Xavfsiz bekor: terilganlarni asl joyga qaytarish.
+/// Manzil avtomatik tasdiqlanadi (qayerdan olingan bo'lsa o'sha joy ko'rsatiladi),
+/// terimchi faqat mahsulotni skanerlaydi yoki shtrix kodini qo'lda kiritadi.
 class ReturnItemsScreen extends ConsumerStatefulWidget {
   const ReturnItemsScreen({super.key, required this.sessionId});
 
@@ -77,12 +81,12 @@ class _ReturnItemsScreenState extends ConsumerState<ReturnItemsScreen> {
     }
   }
 
-  Future<void> _submitScan() async {
+  Future<void> _submitScan([String? scanned]) async {
     final SafeCancelReturnSession? s = _session;
     if (s == null || _busy) {
       return;
     }
-    final String raw = _scan.text.trim();
+    final String raw = (scanned ?? _scan.text).trim();
     if (raw.isEmpty) {
       showAppSnackBar(context, SnackBar(content: Text(_tr('returnsScanOrCodeRequired'))));
       return;
@@ -100,11 +104,7 @@ class _ReturnItemsScreenState extends ConsumerState<ReturnItemsScreen> {
     }
     SafeCancelReturnLine? next;
     for (final SafeCancelReturnLine l in s.lines) {
-      if (!l.locationConfirmed) {
-        next = l;
-        break;
-      }
-      if (!l.productConfirmed) {
+      if (!l.locationConfirmed || !l.productConfirmed) {
         next = l;
         break;
       }
@@ -114,9 +114,20 @@ class _ReturnItemsScreenState extends ConsumerState<ReturnItemsScreen> {
     }
     setState(() => _busy = true);
     try {
-      final SafeCancelReturnSession updated = !next.locationConfirmed
-          ? await ref.read(pickingRepositoryProvider).scanReturnLocation(s.id, raw)
-          : await ref.read(pickingRepositoryProvider).scanReturnProduct(s.id, raw);
+      // Manzil terimchidan so'ralmaydi: mahsulot qayerdan olingan bo'lsa,
+      // o'sha kutilgan joy avtomatik tasdiqlanadi.
+      if (!next.locationConfirmed) {
+        final SafeCancelReturnSession afterLoc = await ref
+            .read(pickingRepositoryProvider)
+            .scanReturnLocation(s.id, next.expectedLocationCode);
+        if (!mounted) {
+          return;
+        }
+        // Mahsulot skani xato bo'lsa ham manzil tasdig'i lokal holatda saqlanib qolsin.
+        setState(() => _session = afterLoc);
+      }
+      final SafeCancelReturnSession updated =
+          await ref.read(pickingRepositoryProvider).scanReturnProduct(s.id, raw);
       if (!mounted) {
         return;
       }
@@ -136,6 +147,20 @@ class _ReturnItemsScreenState extends ConsumerState<ReturnItemsScreen> {
         setState(() => _busy = false);
       }
     }
+  }
+
+  Future<void> _openCameraScan() async {
+    if (_busy) {
+      return;
+    }
+    final String? barcode = await context.pushNamed<String>(
+      'scanner',
+      extra: const ScannerArgs(returnRawBarcode: true),
+    );
+    if (!mounted || barcode == null || barcode.trim().isEmpty) {
+      return;
+    }
+    await _submitScan(barcode.trim());
   }
 
   Future<void> _finish() async {
@@ -218,10 +243,7 @@ class _ReturnItemsScreenState extends ConsumerState<ReturnItemsScreen> {
     final SafeCancelReturnSession s = _session!;
     final SafeCancelReturnLine? nextLine = () {
       for (final SafeCancelReturnLine l in s.lines) {
-        if (!l.locationConfirmed) {
-          return l;
-        }
-        if (!l.productConfirmed) {
+        if (!l.locationConfirmed || !l.productConfirmed) {
           return l;
         }
       }
@@ -229,9 +251,7 @@ class _ReturnItemsScreenState extends ConsumerState<ReturnItemsScreen> {
     }();
     final String hint = nextLine == null
         ? 'Barcha qatorlar tasdiqlandi.'
-        : (!nextLine.locationConfirmed
-            ? 'Navbat: MANZIL — ${nextLine.expectedLocationCode}'
-            : 'Navbat: MAHSULOT — ${nextLine.barcode ?? nextLine.sku ?? nextLine.productName}');
+        : 'Navbat: MAHSULOT — ${nextLine.barcode ?? nextLine.sku ?? nextLine.productName}';
 
     return PopScope(
       canPop: false,
@@ -261,16 +281,65 @@ class _ReturnItemsScreenState extends ConsumerState<ReturnItemsScreen> {
               ),
             ),
             const SizedBox(height: 12),
+            if (nextLine != null) ...<Widget>[
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'Qaytarish joyi',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        nextLine.expectedLocationCode,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1A237E),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        nextLine.productName,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             Text(hint, style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            TextField(
-              controller: _scan,
-              decoration: const InputDecoration(
-                labelText: 'Skaner / kod',
-                border: OutlineInputBorder(),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Expanded(
+                    child: TextField(
+                      controller: _scan,
+                      decoration: const InputDecoration(
+                        labelText: 'Mahsulot shtrix kodi / SKU',
+                        border: OutlineInputBorder(),
+                      ),
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => unawaited(_submitScan()),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ScanActionButton(
+                    compact: true,
+                    onPressed: _busy ? null : () => unawaited(_openCameraScan()),
+                  ),
+                ],
               ),
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => unawaited(_submitScan()),
             ),
             const SizedBox(height: 8),
             FilledButton(
@@ -286,7 +355,6 @@ class _ReturnItemsScreenState extends ConsumerState<ReturnItemsScreen> {
                 title: Text(l.productName),
                 subtitle: Text(
                   '${l.expectedLocationCode} · ${l.qtyToReturn} · '
-                  '${l.locationConfirmed ? "✓ joy" : "… joy"} · '
                   '${l.productConfirmed ? "✓ mahsulot" : "… mahsulot"}',
                 ),
               ),
