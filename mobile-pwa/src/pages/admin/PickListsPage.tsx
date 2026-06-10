@@ -124,6 +124,12 @@ export function PickListsPage() {
   const nextOffsetRef = useRef(0)
 
   const canCancel = has('documents:edit_status')
+  /** Buyurtmali qator faqat allocated/picking bosqichida bekor qilinadi (backend qoidasi). */
+  const canCancelRow = useCallback((item: PickList) => {
+    if (!item.order_id) return true
+    const wms = (item.order_wms_status ?? '').toLowerCase()
+    return wms === 'allocated' || wms === 'picking'
+  }, [])
   const orderedPickTableColumns = useMemo(() => {
     const rawOrder = tableConfig.columnOrder.filter((id) => PICKLISTS_COLUMN_IDS.includes(id))
     const mergedOrder =
@@ -626,6 +632,9 @@ export function PickListsPage() {
             </td>
           )
         case 'cancel':
+          if (!canCancelRow(item)) {
+            return <td key={colId} className="px-4 py-3" />
+          }
           return (
             <td key={colId} className="px-4 py-3">
               <Button
@@ -672,6 +681,7 @@ export function PickListsPage() {
   }, [
     archive,
     canCancel,
+    canCancelRow,
     cancelled,
     canReassignPickerRow,
     canReassignControllerRow,
