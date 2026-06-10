@@ -11,12 +11,16 @@ class ReceivingRepository {
   Future<Receipt> createReceipt({
     String? docNo,
     required List<ReceiptLineCreate> lines,
+    // True bo'lsa backend qabulni atomik yaratadi va yakunlaydi:
+    // xato bo'lsa qoralama (draft) saqlanib qolmaydi.
+    bool complete = false,
   }) async {
     try {
       final Response<Object?> res = await _dio.post<Object?>(
         '/receiving/receipts',
         data: <String, Object?>{
           if (docNo != null) 'doc_no': docNo,
+          if (complete) 'complete': true,
           'lines': lines.map((ReceiptLineCreate e) => e.toJson()).toList(),
         },
       );

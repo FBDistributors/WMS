@@ -1143,7 +1143,9 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     final int? successUnitsPerBox = _newReceiveUnitsPerBox;
     final String destLocationCode = loc.code;
     try {
-      final receipt = await ref.read(receivingRepositoryProvider).createReceipt(
+      // Atomik: yaratish + yakunlash bitta so'rovda — xato bo'lsa qoralama qolmaydi.
+      await ref.read(receivingRepositoryProvider).createReceipt(
+            complete: true,
             lines: <ReceiptLineCreate>[
               ReceiptLineCreate(
                 productId: p.productId,
@@ -1155,7 +1157,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
               ),
             ],
           );
-      await ref.read(receivingRepositoryProvider).completeReceipt(receipt.id);
       if (mounted) {
         final AppLocale loc = ref.read(appLocaleProvider);
         final String successMessage = submitBoxCount != null && successUnitsPerBox != null

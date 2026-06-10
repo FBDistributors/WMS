@@ -33,6 +33,8 @@ export type ReceiptLineCreate = {
 export type ReceiptCreateInput = {
   doc_no?: string
   lines: ReceiptLineCreate[]
+  /** True bo'lsa backend qabulni atomik yaratadi va yakunlaydi (xatoda qoralama qolmaydi). */
+  complete?: boolean
 }
 
 export type Receiver = {
@@ -148,5 +150,12 @@ export async function getReceipt(receiptId: string) {
 export async function completeReceipt(receiptId: string) {
   return fetchJSON<Receipt>(`/api/v1/receiving/receipts/${receiptId}/complete`, {
     method: 'POST',
+  })
+}
+
+/** Qoralama (draft) qabulni o'chirish — qoldiqqa hech narsa yozilmagan bo'lsagina. */
+export async function deleteReceipt(receiptId: string) {
+  return fetchJSON<void>(`/api/v1/receiving/receipts/${receiptId}`, {
+    method: 'DELETE',
   })
 }

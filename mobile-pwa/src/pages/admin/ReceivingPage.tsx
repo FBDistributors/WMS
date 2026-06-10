@@ -32,11 +32,12 @@ import {
   fetchAllReceipts,
   ReceiptExportTooLargeError,
   getReceivers,
-  completeReceipt,
+  deleteReceipt,
   type Receipt,
   type ReceiptLineCreate,
   type Receiver,
 } from '../../services/receivingApi'
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { getInventorySummary } from '../../services/inventoryApi'
 import {
   buildReceiptListExportLabels,
@@ -124,6 +125,7 @@ export function ReceivingPage() {
   const [lines, setLines] = useState<LineDraft[]>([{ ...EMPTY_LINE }])
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [deleteDraftTarget, setDeleteDraftTarget] = useState<{ receiptId: string; docNo: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const { showSuccess, showError, showInfo } = useAppToast()
   const [inventoryMap, setInventoryMap] = useState<Map<string, number>>(new Map())
@@ -501,8 +503,10 @@ export function ReceivingPage() {
     setIsSubmitting(true)
     setError(null)
     try {
-      const created = await createReceipt({
+      // Atomik: yaratish + yakunlash bitta so'rovda — xato bo'lsa qoralama qolmaydi.
+      await createReceipt({
         doc_no: docNo.trim() || undefined,
+        complete: true,
         lines: lines.map(({ id, ...line }) => ({
           ...line,
           qty: Math.max(1, Math.floor(Number(line.qty))),
@@ -510,7 +514,6 @@ export function ReceivingPage() {
           expiry_date: line.expiry_date || null,
         })),
       })
-      await completeReceipt(created.id)
       setCreateModalOpen(false)
       setDocNo('')
       setLines([{ ...EMPTY_LINE }])
@@ -529,28 +532,26 @@ export function ReceivingPage() {
     }
   }
 
-  const handleComplete = useCallback(
-    async (receiptId: string) => {
-      if (!canAdminReceiveOps) return
-      setIsSubmitting(true)
-      try {
-        await completeReceipt(receiptId)
-        await load()
-        showSuccess(t('receiving:statuses.completed'))
-      } catch (err) {
-        const msg =
-          err && typeof err === 'object' && 'message' in err
-            ? String((err as { message: string }).message)
-            : err instanceof Error
-              ? err.message
-              : t('receiving:complete_failed')
-        showError(msg)
-      } finally {
-        setIsSubmitting(false)
-      }
-    },
-    [canAdminReceiveOps, load, t, showSuccess, showError]
-  )
+  const handleDeleteDraft = useCallback(async () => {
+    if (!canAdminReceiveOps || !deleteDraftTarget) return
+    setIsSubmitting(true)
+    try {
+      await deleteReceipt(deleteDraftTarget.receiptId)
+      await load()
+      showSuccess(t('receiving:delete_draft_success'))
+    } catch (err) {
+      const msg =
+        err && typeof err === 'object' && 'message' in err
+          ? String((err as { message: string }).message)
+          : err instanceof Error
+            ? err.message
+            : t('receiving:delete_draft_failed')
+      showError(msg)
+    } finally {
+      setIsSubmitting(false)
+      setDeleteDraftTarget(null)
+    }
+  }, [canAdminReceiveOps, deleteDraftTarget, load, t, showSuccess, showError])
 
   const renderReceivingCell = useCallback(
     (colId: ReceivingTableColumnId, row: FlatReceiptTableRow) => {
@@ -569,11 +570,13 @@ export function ReceivingPage() {
               </span>
               {row.showComplete && canAdminReceiveOps ? (
                 <Button
-                  className="h-7 px-2 text-xs"
-                  onClick={() => void handleComplete(row.receiptId)}
+                  variant="outline"
+                  className="h-7 border-red-200 bg-red-50 px-2 text-xs text-red-700 hover:bg-red-100 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400 dark:hover:bg-red-900/40"
+                  onClick={() => setDeleteDraftTarget({ receiptId: row.receiptId, docNo: row.docNo })}
                   disabled={isSubmitting}
                 >
-                  {t('receiving:complete')}
+                  <Trash2 size={13} className="mr-1" />
+                  {t('receiving:delete_draft')}
                 </Button>
               ) : null}
             </div>
@@ -621,7 +624,7 @@ export function ReceivingPage() {
           return null
       }
     },
-    [canAdminReceiveOps, handleComplete, isSubmitting, t]
+    [canAdminReceiveOps, isSubmitting, t]
   )
 
   const tableColumns = useMemo((): AdminDataTableColumn<FlatReceiptTableRow>[] => {
@@ -1059,6 +1062,17 @@ export function ReceivingPage() {
         columns={columnOptions}
         onSave={updateTableConfig}
         onReset={resetTableConfig}
+      />
+      <ConfirmDialog
+        open={deleteDraftTarget !== null}
+        title={t('receiving:delete_draft_confirm_title')}
+        message={t('receiving:delete_draft_confirm', { doc: deleteDraftTarget?.docNo ?? '' })}
+        confirmLabel={t('receiving:delete_draft')}
+        cancelLabel={t('common:buttons.cancel')}
+        variant="danger"
+        loading={isSubmitting}
+        onConfirm={() => void handleDeleteDraft()}
+        onCancel={() => setDeleteDraftTarget(null)}
       />
     </AdminLayout>
   )

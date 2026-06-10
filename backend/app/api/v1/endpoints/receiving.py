@@ -51,6 +51,9 @@ class ReceiptLineCreate(BaseModel):
 class ReceiptCreate(BaseModel):
     doc_no: Optional[str] = Field(default=None, max_length=64)
     lines: List[ReceiptLineCreate]
+    # True bo'lsa qabul bitta tranzaksiyada yaratiladi va yakunlanadi:
+    # yakunlash xato bersa hech narsa saqlanmaydi (qoralama qolmaydi).
+    complete: bool = False
 
 
 class ReceiptLineOut(BaseModel):
@@ -346,50 +349,20 @@ async def create_receipt(
         )
 
     db.add(receipt)
+    if payload.complete:
+        # Atomik: yakunlash xato bersa butun tranzaksiya bekor bo'ladi,
+        # qoralama (draft) saqlanib qolmaydi.
+        db.flush()
+        _post_receipt_movements(db, receipt, user)
+        receipt.status = "completed"
     db.commit()
     db.refresh(receipt)
     creator_name = user.full_name or user.username
     return _to_receipt(receipt, created_by_username=creator_name)
 
 
-@router.post(
-    "/receipts/{receipt_id}/complete",
-    response_model=ReceiptOut,
-    status_code=status.HTTP_200_OK,
-    summary="Complete receipt and post stock movements",
-)
-async def complete_receipt(
-    receipt_id: UUID,
-    db: Session = Depends(get_db),
-    user: UserModel = Depends(get_current_user),
-    _guard=Depends(require_any_permission(["receiving:write", "admin:access"])),
-):
-    receipt = (
-        db.query(ReceiptModel)
-        .options(selectinload(ReceiptModel.lines))
-        .filter(ReceiptModel.id == receipt_id)
-        .one_or_none()
-    )
-    if not receipt:
-        raise HTTPException(status_code=404, detail="Receipt not found")
-    if receipt.status == "completed":
-        return _to_receipt(receipt)
-
-    existing_movements = (
-        db.query(StockMovementModel.id)
-        .filter(
-            StockMovementModel.source_document_type == "receipt",
-            StockMovementModel.source_document_id == receipt.id,
-        )
-        .first()
-    )
-    # Guard against double-posting: receipt completion is append-only in the stock ledger.
-    if existing_movements:
-        raise HTTPException(status_code=409, detail="Receipt already posted")
-
-    if not receipt.lines:
-        raise HTTPException(status_code=400, detail="Receipt has no lines")
-
+def _post_receipt_movements(db: Session, receipt: ReceiptModel, user: UserModel) -> None:
+    """Qabul qatorlari bo'yicha stock movement va quti joylashuvlarini yozadi (commit qilmaydi)."""
     for line in receipt.lines:
         expiry_normalized = normalize_expiry_to_first_of_month(line.expiry_date)
         check_location_single_expiry(db, line.location_id, line.product_id, expiry_normalized)
@@ -451,6 +424,47 @@ async def complete_receipt(
                     detail=f"Quti joylashuvi xatosi: {exc}",
                 ) from exc
 
+
+@router.post(
+    "/receipts/{receipt_id}/complete",
+    response_model=ReceiptOut,
+    status_code=status.HTTP_200_OK,
+    summary="Complete receipt and post stock movements",
+)
+async def complete_receipt(
+    receipt_id: UUID,
+    db: Session = Depends(get_db),
+    user: UserModel = Depends(get_current_user),
+    _guard=Depends(require_any_permission(["receiving:write", "admin:access"])),
+):
+    receipt = (
+        db.query(ReceiptModel)
+        .options(selectinload(ReceiptModel.lines))
+        .filter(ReceiptModel.id == receipt_id)
+        .one_or_none()
+    )
+    if not receipt:
+        raise HTTPException(status_code=404, detail="Receipt not found")
+    if receipt.status == "completed":
+        return _to_receipt(receipt)
+
+    existing_movements = (
+        db.query(StockMovementModel.id)
+        .filter(
+            StockMovementModel.source_document_type == "receipt",
+            StockMovementModel.source_document_id == receipt.id,
+        )
+        .first()
+    )
+    # Guard against double-posting: receipt completion is append-only in the stock ledger.
+    if existing_movements:
+        raise HTTPException(status_code=409, detail="Receipt already posted")
+
+    if not receipt.lines:
+        raise HTTPException(status_code=400, detail="Receipt has no lines")
+
+    _post_receipt_movements(db, receipt, user)
+
     receipt.status = "completed"
     db.commit()
     db.refresh(receipt)
@@ -460,3 +474,39 @@ async def complete_receipt(
         if creator:
             created_by_username = creator.full_name or creator.username
     return _to_receipt(receipt, created_by_username=created_by_username)
+
+
+@router.delete(
+    "/receipts/{receipt_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete draft receipt (no stock posted)",
+)
+async def delete_receipt(
+    receipt_id: UUID,
+    db: Session = Depends(get_db),
+    _user: UserModel = Depends(get_current_user),
+    _guard=Depends(require_any_permission(["receiving:write", "admin:access"])),
+):
+    receipt = (
+        db.query(ReceiptModel)
+        .options(selectinload(ReceiptModel.lines))
+        .filter(ReceiptModel.id == receipt_id)
+        .one_or_none()
+    )
+    if not receipt:
+        raise HTTPException(status_code=404, detail="Receipt not found")
+    if receipt.status != "draft":
+        raise HTTPException(status_code=409, detail="Only draft receipts can be deleted")
+    existing_movements = (
+        db.query(StockMovementModel.id)
+        .filter(
+            StockMovementModel.source_document_type == "receipt",
+            StockMovementModel.source_document_id == receipt.id,
+        )
+        .first()
+    )
+    if existing_movements:
+        raise HTTPException(status_code=409, detail="Receipt already posted")
+    db.delete(receipt)
+    db.commit()
+    return None
