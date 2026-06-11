@@ -28,12 +28,13 @@ from app.models.user import User as UserModel
 from app.models.safe_cancel_return import SafeCancelReturnSession as SafeCancelReturnSessionModel
 from app.models.user_fcm_token import UserFCMToken
 from app.models.stock import StockLot as StockLotModel
+from app.models.location_box_placement import PLACEMENT_SEALED, LocationBoxPlacement
+from app.models.product_box import ProductBox as ProductBoxModel
 from app.api.v1.endpoints.picker_inventory import _get_lot_level_balances, _location_ids_for_warehouse
 from app.services.order_reserve_release import release_document_reserve_on_cancel
 from app.services.stock_availability import require_sufficient_reserved
 from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_ip, log_action
 from app.services.box_location_service import (
-    get_breakdown_for_pick,
     remove_sealed_boxes_for_pick,
     require_sufficient_loose_for_unit_pick,
 )
@@ -363,27 +364,54 @@ def _safe_expiry_date(expiry_date) -> Optional[str]:
     return str(expiry_date) if expiry_date else None
 
 
-def _breakdown_kwargs_for_location(
+def _breakdown_kwargs_map_for_pairs(
     db: Session,
-    *,
-    product_id: UUID,
-    lot_id: UUID,
-    location_id: UUID,
-) -> dict:
-    try:
-        bd = get_breakdown_for_pick(
-            db,
-            product_id=product_id,
-            lot_id=lot_id,
-            location_id=location_id,
-        )
-        return {
-            "box_count": bd.box_count,
-            "units_in_boxes": bd.units_in_boxes,
-            "loose_units": bd.loose_units,
-        }
-    except HTTPException:
+    pairs: set[tuple[UUID, UUID]],
+    balances: dict[tuple[UUID, UUID], tuple[float, float]],
+) -> dict[tuple[UUID, UUID], dict]:
+    """
+    `get_breakdown_for_pick` natijasini barcha (lot, lokatsiya) juftliklari uchun
+    bitta guruhlangan so'rovda hisoblaydi — hujjat ekrani uchun N+1 so'rov o'rniga.
+    `balances`: (lot_id, location_id) -> (on_hand, available).
+    """
+    if not pairs:
         return {}
+    box_rows = (
+        db.query(
+            LocationBoxPlacement.lot_id,
+            LocationBoxPlacement.location_id,
+            func.count(LocationBoxPlacement.id).label("box_count"),
+            func.coalesce(func.sum(ProductBoxModel.units_per_box), 0).label("units"),
+        )
+        .join(ProductBoxModel, ProductBoxModel.id == LocationBoxPlacement.product_box_id)
+        .filter(
+            LocationBoxPlacement.lot_id.in_({p[0] for p in pairs}),
+            LocationBoxPlacement.location_id.in_({p[1] for p in pairs}),
+            LocationBoxPlacement.status == PLACEMENT_SEALED,
+            ProductBoxModel.is_active.is_(True),
+        )
+        .group_by(LocationBoxPlacement.lot_id, LocationBoxPlacement.location_id)
+        .all()
+    )
+    boxes = {
+        (r.lot_id, r.location_id): (int(r.box_count), int(r.units)) for r in box_rows
+    }
+    out: dict[tuple[UUID, UUID], dict] = {}
+    for key in pairs:
+        on_hand, available = balances.get(key, (0.0, 0.0))
+        total = max(0, int(on_hand))
+        box_count, units_in_boxes = boxes.get(key, (0, 0))
+        if units_in_boxes > total:
+            # get_breakdown_for_pick bu holatda 409 berib, {} qaytarilar edi.
+            out[key] = {}
+            continue
+        physical_loose = max(0, total - units_in_boxes)
+        out[key] = {
+            "box_count": box_count,
+            "units_in_boxes": units_in_boxes,
+            "loose_units": max(0, min(int(available), physical_loose)),
+        }
+    return out
 
 
 def _picking_expiry_urgency_days() -> int:
@@ -460,12 +488,18 @@ def _balance_rows_by_product(
 
 
 def _line_alternate_locations(
-    db: Session,
     line: DocumentLineModel,
     rows: list[dict],
     *,
+    bd_map: dict[tuple[UUID, UUID], dict],
+    primary_rows: list[dict],
     max_rows: int = 24,
 ) -> List[PickingAlternateLocation]:
+    """
+    Muqobil joylar — DB so'rovsiz, oldindan batch yuklangan xaritalardan:
+    `bd_map` — (lot_id, location_id) -> quti breakdown kwargs;
+    `primary_rows` — qatorning asosiy (product, location) balans qatorlari.
+    """
     if not line.product_id:
         return []
     lid, lot_line = line.location_id, line.lot_id
@@ -477,16 +511,7 @@ def _line_alternate_locations(
         av = float(r["available"] or 0)
         if av <= 0 and not is_pri:
             continue
-        bd_kw = (
-            _breakdown_kwargs_for_location(
-                db,
-                product_id=line.product_id,
-                lot_id=r["lot_id"],
-                location_id=r["location_id"],
-            )
-            if line.product_id
-            else {}
-        )
+        bd_kw = bd_map.get((r["lot_id"], r["location_id"]), {})
         out.append(
             PickingAlternateLocation(
                 location_id=r["location_id"],
@@ -501,16 +526,10 @@ def _line_alternate_locations(
         )
     # Asosiy joy+lott — ombor filtri tufayli `rows`da bo‘lmasa ham, joriy lokatsiya bo‘yicha aniq balans.
     if lid and lot_line and line.product_id:
-        loc_balances = _get_lot_level_balances(db, [line.product_id], location_id=lid)
-        pr = next((r for r in loc_balances if r["lot_id"] == lot_line), None)
+        pr = next((r for r in primary_rows if r["lot_id"] == lot_line), None)
+        pri_bd = bd_map.get((lot_line, lid), {})
         if pr is not None:
             out = [x for x in out if not (x.location_id == lid and x.lot_id == lot_line)]
-            pri_bd = _breakdown_kwargs_for_location(
-                db,
-                product_id=line.product_id,
-                lot_id=lot_line,
-                location_id=lid,
-            )
             out.insert(
                 0,
                 PickingAlternateLocation(
@@ -527,12 +546,6 @@ def _line_alternate_locations(
                 ),
             )
         elif not any(x.is_primary for x in out):
-            pri_bd = _breakdown_kwargs_for_location(
-                db,
-                product_id=line.product_id,
-                lot_id=lot_line,
-                location_id=lid,
-            )
             out.insert(
                 0,
                 PickingAlternateLocation(
@@ -585,6 +598,40 @@ def _picking_lines_with_alternates(
     wh = _picking_warehouse_for_order(order)
     pids = list({ln.product_id for ln in lines if ln.product_id})
     by_pid = _balance_rows_by_product(db, pids, wh)
+
+    # Asosiy (qatordagi) lokatsiyalar balansi — bitta batch so'rov (oldin har qator uchun alohida edi).
+    primary_loc_ids = list(
+        {ln.location_id for ln in lines if ln.location_id and ln.lot_id and ln.product_id}
+    )
+    primary_rows_all = (
+        _get_lot_level_balances(db, pids, location_ids=primary_loc_ids)
+        if primary_loc_ids and pids
+        else []
+    )
+    primary_by_key: dict[tuple[UUID, UUID], list[dict]] = {}
+    for r in primary_rows_all:
+        primary_by_key.setdefault((r["product_id"], r["location_id"]), []).append(r)
+
+    # Quti breakdown — barcha (lot, lokatsiya) juftliklari uchun bitta so'rov
+    # (oldin har bir muqobil joy uchun 3 tadan so'rov bajarilar edi).
+    balances: dict[tuple[UUID, UUID], tuple[float, float]] = {}
+    for rows_ in by_pid.values():
+        for r in rows_:
+            balances[(r["lot_id"], r["location_id"])] = (
+                float(r["on_hand"] or 0),
+                float(r["available"] or 0),
+            )
+    for r in primary_rows_all:
+        balances[(r["lot_id"], r["location_id"])] = (
+            float(r["on_hand"] or 0),
+            float(r["available"] or 0),
+        )
+    pairs: set[tuple[UUID, UUID]] = set(balances.keys())
+    for ln in lines:
+        if ln.product_id and ln.lot_id and ln.location_id:
+            pairs.add((ln.lot_id, ln.location_id))
+    bd_map = _breakdown_kwargs_map_for_pairs(db, pairs, balances)
+
     out: List[PickingLine] = []
     for ln in lines:
         if _line_is_vip_expiry_informational(ln):
@@ -593,7 +640,12 @@ def _picking_lines_with_alternates(
             out.append(
                 _to_picking_line(
                     ln,
-                    alternate_locations=_line_alternate_locations(db, ln, by_pid.get(ln.product_id, [])),
+                    alternate_locations=_line_alternate_locations(
+                        ln,
+                        by_pid.get(ln.product_id, []),
+                        bd_map=bd_map,
+                        primary_rows=primary_by_key.get((ln.product_id, ln.location_id), []),
+                    ),
                 )
             )
     return out
