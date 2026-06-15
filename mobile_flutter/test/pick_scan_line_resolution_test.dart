@@ -82,6 +82,46 @@ void main() {
     });
   });
 
+  group('resolveControllerScanLineByProductId', () {
+    test('prefers unverified action group when product group is verified', () {
+      final List<PickingLine> lines = <PickingLine>[
+        _line(id: 'main', productId: 'p1', lineSource: 'product'),
+        _line(id: 'promo', productId: 'p1', lineSource: 'action'),
+      ];
+      final Set<String> verified = <String>{'main'};
+
+      final PickingLine? resolved =
+          resolveControllerScanLineByProductId(lines, 'p1', verified);
+
+      expect(resolved?.id, 'promo');
+    });
+
+    test('returns first match when all matching groups are verified', () {
+      final List<PickingLine> lines = <PickingLine>[
+        _line(id: 'main', productId: 'p1', lineSource: 'product'),
+        _line(id: 'promo', productId: 'p1', lineSource: 'action'),
+      ];
+      final Set<String> verified = <String>{'main', 'promo'};
+
+      final PickingLine? resolved =
+          resolveControllerScanLineByProductId(lines, 'p1', verified);
+
+      expect(resolved?.id, 'main');
+    });
+
+    test('returns first match when multiple groups are unverified', () {
+      final List<PickingLine> lines = <PickingLine>[
+        _line(id: 'main', productId: 'p1', lineSource: 'product', qtyPicked: 2),
+        _line(id: 'promo', productId: 'p1', lineSource: 'action', qtyPicked: 0),
+      ];
+
+      final PickingLine? resolved =
+          resolveControllerScanLineByProductId(lines, 'p1', <String>{});
+
+      expect(resolved?.id, 'main');
+    });
+  });
+
   group('resolvePickerScanLineByProductId', () {
     test('prefers open line for product id', () {
       final List<PickingLine> lines = <PickingLine>[
