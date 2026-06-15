@@ -372,6 +372,10 @@ abstract final class StringLookup {
     'inventoryUnitsInBoxes': 'Qutilardagi dona',
     'inventoryLooseStock': 'Qutisiz dona',
     'inventoryBoxBarcodeOptional': 'Quti shtrix-kodi (ixtiyoriy)',
+    'inventoryPackIntoBox': 'Qutiga solish',
+    'inventoryPackPlace': 'Joylash',
+    'inventoryPackPlaced': 'Quti joylandi',
+    'inventoryInsufficientLoose': 'Qutisiz qoldiq yetarli emas (kerak {{needed}}, mavjud {{available}})',
     'movementTransferSealedBox': 'Yopiq qutini ko‘chirish',
   };
 
@@ -1078,6 +1082,10 @@ abstract final class StringLookup {
     'inventoryUnitsInBoxes': 'Units in boxes',
     'inventoryLooseStock': 'Loose units',
     'inventoryBoxBarcodeOptional': 'Box barcode (optional)',
+    'inventoryPackIntoBox': 'Pack into box',
+    'inventoryPackPlace': 'Place',
+    'inventoryPackPlaced': 'Box placed',
+    'inventoryInsufficientLoose': 'Not enough loose units (need {{needed}}, have {{available}})',
     'movementTransferSealedBox': 'Transfer sealed box',
   };
 }

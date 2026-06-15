@@ -468,6 +468,10 @@ def _balance_rows_by_product(
     product_ids: list[UUID],
     warehouse: Optional[str],
 ) -> dict[UUID, list[dict]]:
+    """
+    Mahsulot bo'yicha balans qatorlari: expiry_date ASC (NULL oxirida),
+    bir xil muddatda available ASC (eng kam qoldiq), keyin location_code ASC.
+    """
     if not product_ids:
         return {}
     loc_ids = _location_ids_for_warehouse(db, warehouse) if warehouse else None
@@ -481,7 +485,8 @@ def _balance_rows_by_product(
             key=lambda x: (
                 x["expiry_date"] is None,
                 x["expiry_date"] or date.min,
-                -float(x["available"] or 0),
+                float(x["available"] or 0),
+                x.get("location_code") or "",
             )
         )
     return by_pid

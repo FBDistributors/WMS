@@ -488,6 +488,10 @@ def _fefo_available_lots(
     zone_types: list[str] | None = None,
     skip_expiry_floor: bool = False,
 ):
+    """
+    Mavjud lot+joy qatorlari: expiry_date ASC (NULL oxirida),
+    bir xil muddatda available ASC (eng kam qoldiq), keyin location_code ASC.
+    """
     if zone_types is None:
         zone_types = ["NORMAL"]
     on_hand_expr = func.sum(
@@ -518,11 +522,12 @@ def _fefo_available_lots(
         filters.append(
             (StockLotModel.expiry_date.is_(None) | (StockLotModel.expiry_date >= min_expiry_date))
         )
+    available_expr = func.coalesce(on_hand_expr, 0) - func.coalesce(reserved_expr, 0)
     return (
         db.query(
             StockMovementModel.lot_id,
             StockMovementModel.location_id,
-            (func.coalesce(on_hand_expr, 0) - func.coalesce(reserved_expr, 0)).label("qty"),
+            available_expr.label("qty"),
             StockLotModel.batch,
             StockLotModel.expiry_date,
             LocationModel.code.label("location_code"),
@@ -537,8 +542,12 @@ def _fefo_available_lots(
             StockLotModel.expiry_date,
             LocationModel.code,
         )
-        .having(func.coalesce(on_hand_expr, 0) - func.coalesce(reserved_expr, 0) > 0)
-        .order_by(StockLotModel.expiry_date.asc().nullslast(), LocationModel.code.asc())
+        .having(available_expr > 0)
+        .order_by(
+            StockLotModel.expiry_date.asc().nullslast(),
+            available_expr.asc(),
+            LocationModel.code.asc(),
+        )
         .all()
     )
 

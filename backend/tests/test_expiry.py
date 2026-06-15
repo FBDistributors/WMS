@@ -168,6 +168,64 @@ def test_null_expiry_comes_last(db_session, test_product, test_location, test_us
     assert available[1].expiry_date is None
 
 
+def test_fefo_min_qty_same_expiry(db_session, test_product, test_user):
+    """Bir xil muddat, turli lokatsiyalar: eng kam qoldiq birinchi (kod alfavitidan qat'i nazar)."""
+    from app.models.location import Location
+    from app.models.stock import StockLot, StockMovement
+    from app.api.v1.endpoints.orders import _fefo_available_lots
+
+    expiry = date.today() + timedelta(days=60)
+    lot = StockLot(product_id=test_product.id, batch="BATCH-SAME-EXP", expiry_date=expiry)
+    db_session.add(lot)
+    db_session.flush()
+
+    loc_high_code_low_qty = Location(
+        code="ZZZ-MIN-QTY",
+        barcode_value="ZZZ-MIN-QTY",
+        name="Min qty bin",
+        type="bin",
+        is_active=True,
+    )
+    loc_low_code_high_qty = Location(
+        code="AAA-MAX-QTY",
+        barcode_value="AAA-MAX-QTY",
+        name="Max qty bin",
+        type="bin",
+        is_active=True,
+    )
+    db_session.add_all([loc_high_code_low_qty, loc_low_code_high_qty])
+    db_session.flush()
+
+    db_session.add(
+        StockMovement(
+            product_id=test_product.id,
+            lot_id=lot.id,
+            location_id=loc_low_code_high_qty.id,
+            qty_change=Decimal("50"),
+            movement_type="receipt",
+            created_by_user_id=test_user.id,
+        )
+    )
+    db_session.add(
+        StockMovement(
+            product_id=test_product.id,
+            lot_id=lot.id,
+            location_id=loc_high_code_low_qty.id,
+            qty_change=Decimal("8"),
+            movement_type="receipt",
+            created_by_user_id=test_user.id,
+        )
+    )
+    db_session.commit()
+
+    available = _fefo_available_lots(db_session, test_product.id)
+    assert len(available) == 2
+    assert available[0].location_id == loc_high_code_low_qty.id
+    assert float(available[0].qty) == 8.0
+    assert available[1].location_id == loc_low_code_high_qty.id
+    assert float(available[1].qty) == 50.0
+
+
 def test_receiving_creates_new_lot(client, db_session, test_product, test_location, admin_token):
     """Test receiving creates new lot; expiry normalized to first of month"""
     raw_expiry = date.today() + timedelta(days=90)

@@ -36,6 +36,7 @@ class BoxLocationRepository {
     required String boxBarcode,
     required String locationId,
     required String lotId,
+    int boxCount = 1,
   }) async {
     try {
       final Response<Object?> res = await _dio.post<Object?>(
@@ -44,6 +45,7 @@ class BoxLocationRepository {
           'box_barcode': boxBarcode.trim(),
           'location_id': locationId,
           'lot_id': lotId,
+          if (boxCount > 1) 'box_count': boxCount,
         },
       );
       final Object? data = res.data;
