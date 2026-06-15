@@ -25,6 +25,7 @@ from app.models.wave import (
     WaveOrder,
 )
 from app.services.stock_availability import PHYSICAL_ON_HAND_MOVEMENT_TYPES
+from app.services.warehouse_scope import location_ids_for_warehouse_scope
 
 
 STAGING_LOCATION_CODE = "Z-SORT-01"
@@ -59,11 +60,19 @@ def _get_barcode_for_product(db: Session, product_id: UUID) -> Optional[str]:
     return b.barcode if b else None
 
 
-def _fefo_available_for_product(db: Session, product_id: UUID, min_expiry_date: date | None = None):
+def _fefo_available_for_product(
+    db: Session,
+    product_id: UUID,
+    min_expiry_date: date | None = None,
+    *,
+    location_ids: list[UUID] | None = None,
+):
     """Get available (lot_id, location_id, qty, batch, expiry, location_code) for product, FEFO order.
     on_hand = faqat receipt + ship (Kirim - Jo'natish), reserved = allocate/unallocate, available = on_hand - reserved.
     If min_expiry_date is set (VIP wave), only lots with expiry_date >= min_expiry_date or NULL are included.
     """
+    if location_ids is not None and not location_ids:
+        return []
     on_hand_expr = func.sum(
         case(
             (StockMovementModel.movement_type.in_(PHYSICAL_ON_HAND_MOVEMENT_TYPES), StockMovementModel.qty_change),
@@ -89,8 +98,14 @@ def _fefo_available_for_product(db: Session, product_id: UUID, min_expiry_date: 
         )
         .join(StockLotModel, StockLotModel.id == StockMovementModel.lot_id)
         .join(LocationModel, LocationModel.id == StockMovementModel.location_id)
-        .filter(StockLotModel.product_id == product_id)
+        .filter(
+            StockLotModel.product_id == product_id,
+            LocationModel.zone_type == "NORMAL",
+            LocationModel.is_active.is_(True),
+        )
     )
+    if location_ids is not None:
+        query = query.filter(LocationModel.id.in_(location_ids))
     if min_expiry_date is not None:
         query = query.filter(
             (StockLotModel.expiry_date.is_(None) | (StockLotModel.expiry_date >= min_expiry_date))

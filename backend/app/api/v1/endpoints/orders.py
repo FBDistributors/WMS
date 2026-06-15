@@ -20,6 +20,7 @@ from app.services.stock_availability import (
     require_sufficient_available,
 )
 from app.services.vip_service import resolve_vip_min_expiry_months
+from app.services.warehouse_scope import location_ids_for_warehouse_scope, warehouse_scope_for_order
 from pydantic import BaseModel, Field
 from decimal import Decimal
 from sqlalchemy import and_, case, exists, func, or_
@@ -487,6 +488,7 @@ def _fefo_available_lots(
     min_expiry_date: date | None = None,
     zone_types: list[str] | None = None,
     skip_expiry_floor: bool = False,
+    location_ids: list[UUID] | None = None,
 ):
     """
     Mavjud lot+joy qatorlari: expiry_date ASC (NULL oxirida),
@@ -522,6 +524,10 @@ def _fefo_available_lots(
         filters.append(
             (StockLotModel.expiry_date.is_(None) | (StockLotModel.expiry_date >= min_expiry_date))
         )
+    if location_ids is not None:
+        if not location_ids:
+            return []
+        filters.append(LocationModel.id.in_(location_ids))
     available_expr = func.coalesce(on_hand_expr, 0) - func.coalesce(reserved_expr, 0)
     return (
         db.query(
@@ -557,12 +563,16 @@ def _physical_can_cover_remaining(
     product_id: UUID,
     remaining: Decimal,
     alloc_scratch: dict[tuple[UUID, UUID], Decimal],
+    *,
+    location_ids: list[UUID] | None = None,
 ) -> bool:
     """VIP filtrsiz (lekin _fefo_available_lots umumiy qoidalari) zaxira `remaining` ni qoplaydimi — scratch o'qiladi, o'zgartirilmaydi."""
     if remaining <= 0:
         return True
     got = Decimal("0")
-    for lot_row in _fefo_available_lots(db, product_id, min_expiry_date=None):
+    for lot_row in _fefo_available_lots(
+        db, product_id, min_expiry_date=None, location_ids=location_ids
+    ):
         available_qty = Decimal(str(lot_row.qty))
         if available_qty <= 0:
             continue
@@ -625,6 +635,8 @@ def _allocate_order(
     # Bir tranzaksiyada xuddi shu lot+joyga ikkinchi marta ajratishda "available" DB formula o‘zgarmasligi mumkin;
     # scratch bilan joriy ajratishdan keyin qolgan xonani hisoblaymiz.
     alloc_scratch: dict[tuple[UUID, UUID], Decimal] = {}
+    wh = warehouse_scope_for_order(order)
+    scope_location_ids = location_ids_for_warehouse_scope(db, wh)
 
     for line in order.lines:
         product_id = _resolve_product_id(db, line)
@@ -653,12 +665,29 @@ def _allocate_order(
 
         if is_promo:
             lot_phases = [
-                _fefo_available_lots(db, product_id, min_expiry_date=min_expiry_date, zone_types=["EXPIRED"], skip_expiry_floor=True),
-                _fefo_available_lots(db, product_id, min_expiry_date=min_expiry_date),
+                _fefo_available_lots(
+                    db,
+                    product_id,
+                    min_expiry_date=min_expiry_date,
+                    zone_types=["EXPIRED"],
+                    skip_expiry_floor=True,
+                    location_ids=scope_location_ids,
+                ),
+                _fefo_available_lots(
+                    db,
+                    product_id,
+                    min_expiry_date=min_expiry_date,
+                    location_ids=scope_location_ids,
+                ),
             ]
         else:
             lot_phases = [
-                _fefo_available_lots(db, product_id, min_expiry_date=min_expiry_date),
+                _fefo_available_lots(
+                    db,
+                    product_id,
+                    min_expiry_date=min_expiry_date,
+                    location_ids=scope_location_ids,
+                ),
             ]
 
         for available_lots in lot_phases:
@@ -717,7 +746,13 @@ def _allocate_order(
             remaining_need = Decimal(str(line.qty)) - allocated_total
             if (
                 vip_months > 0
-                and _physical_can_cover_remaining(db, product_id, remaining_need, alloc_scratch)
+                and _physical_can_cover_remaining(
+                    db,
+                    product_id,
+                    remaining_need,
+                    alloc_scratch,
+                    location_ids=scope_location_ids,
+                )
             ):
                 document_lines.append(
                     DocumentLineModel(

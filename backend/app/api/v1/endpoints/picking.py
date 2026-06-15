@@ -39,6 +39,10 @@ from app.services.box_location_service import (
     require_sufficient_loose_for_unit_pick,
 )
 from app.services.product_scan_resolve import resolve_product_scan
+from app.services.warehouse_scope import (
+    assert_location_allowed_for_pick,
+    warehouse_scope_for_order,
+)
 from app.services.safe_cancel_return_service import (
     active_return_session_id_for_document,
     finish_safe_cancel_return,
@@ -450,19 +454,6 @@ def _picking_urgency_cutoff_today() -> date:
     return today + timedelta(days=_picking_expiry_urgency_days())
 
 
-def _picking_warehouse_for_order(order: Optional[OrderModel]) -> Optional[str]:
-    """Return picking warehouse filter; default to main to hide showroom in picker flows."""
-    if not order:
-        return "main"
-    for code in (order.from_warehouse_code, order.to_warehouse_code):
-        if not code or not str(code).strip():
-            continue
-        u = str(code).strip().upper()
-        if "SHOWROOM" in u or u in ("SR", "SHR", "SHOR"):
-            return "showroom"
-    return "main"
-
-
 def _balance_rows_by_product(
     db: Session,
     product_ids: list[UUID],
@@ -600,7 +591,7 @@ def _picking_lines_with_alternates(
     order = getattr(document, "order", None)
     if order is None and document.order_id:
         order = db.query(OrderModel).filter(OrderModel.id == document.order_id).one_or_none()
-    wh = _picking_warehouse_for_order(order)
+    wh = warehouse_scope_for_order(order)
     pids = list({ln.product_id for ln in lines if ln.product_id})
     by_pid = _balance_rows_by_product(db, pids, wh)
 
@@ -1299,6 +1290,19 @@ async def consolidated_pick(
         boxes_remaining = payload.box_count
     first_picked_line_id: Optional[UUID] = None
     docs_to_refresh = set()
+    doc_rows = (
+        db.query(DocumentModel.id, DocumentModel.order_id)
+        .filter(DocumentModel.id.in_(doc_ids))
+        .all()
+    )
+    order_ids_for_pick = [r[1] for r in doc_rows if r[1] is not None]
+    orders_by_id: dict[UUID, OrderModel] = {}
+    if order_ids_for_pick:
+        for o in db.query(OrderModel).filter(OrderModel.id.in_(order_ids_for_pick)).all():
+            orders_by_id[o.id] = o
+    doc_order_map: dict[UUID, Optional[OrderModel]] = {
+        r[0]: orders_by_id.get(r[1]) if r[1] else None for r in doc_rows
+    }
     try:
         for line in lines:
             if remaining <= 0:
@@ -1328,6 +1332,11 @@ async def consolidated_pick(
                     status_code=400,
                     detail="Pick only from NORMAL zone. Line location is not NORMAL.",
                 )
+            assert_location_allowed_for_pick(
+                db,
+                line.location_id,
+                order=doc_order_map.get(line.document_id),
+            )
             # Ajratilgan (reserved) zaxiradan teriladi — available=0 bo‘lishi mumkin (waves pick bilan bir xil).
             require_sufficient_reserved(
                 db,
@@ -1708,9 +1717,7 @@ async def change_pick_source(
     new_loc = db.query(LocationModel).filter(LocationModel.id == payload.location_id).one_or_none()
     if not new_loc or new_loc.zone_type != "NORMAL":
         raise HTTPException(status_code=400, detail="Pick only from NORMAL zone")
-    main_location_ids = set(_location_ids_for_warehouse(db, "main") or [])
-    if payload.location_id not in main_location_ids:
-        raise HTTPException(status_code=400, detail="Showroom location cannot be used for picking source")
+    assert_location_allowed_for_pick(db, payload.location_id, order=document.order)
 
     new_lot = db.query(StockLotModel).filter(StockLotModel.id == payload.lot_id).one_or_none()
     if not new_lot or new_lot.product_id != line.product_id:
@@ -1888,6 +1895,12 @@ def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
             detail="Pick only from NORMAL zone. Line location is not NORMAL.",
         )
 
+    order_for_pick: Optional[OrderModel] = None
+    if document.order_id:
+        order_for_pick = (
+            db.query(OrderModel).filter(OrderModel.id == document.order_id).one_or_none()
+        )
+
     line.picked_qty = next_qty
     qty_delta = Decimal(str(payload.delta))
 
@@ -1927,6 +1940,7 @@ def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
         )
 
     if qty_delta > 0:
+        assert_location_allowed_for_pick(db, line.location_id, order=order_for_pick)
         # Yig'ishga yuborilganda allocate qilingan — terish reserved dan, available emas.
         require_sufficient_reserved(
             db,

@@ -47,6 +47,7 @@ from app.services.box_location_service import (
 )
 from app.services.product_scan_resolve import resolve_product_scan
 from app.services.stock_availability import compute_lot_location_available, lock_lot_location
+from app.services.warehouse_scope import assert_location_allowed_for_pick, location_ids_for_warehouse_scope
 
 router = APIRouter()
 
@@ -276,6 +277,8 @@ async def start_wave(
     if not staging_id:
         raise HTTPException(status_code=500, detail=f"Staging location {STAGING_LOCATION_CODE} not found")
 
+    main_location_ids = location_ids_for_warehouse_scope(db, "main")
+
     for wl in wave.lines:
         product = wl.product if getattr(wl, "product", None) is not None else db.get(ProductModel, wl.product_id)
         brand_id = product.brand_id if product else None
@@ -290,7 +293,12 @@ async def start_wave(
             if m > max_vip_months:
                 max_vip_months = m
         min_expiry_date = min_expiry_date_from_months(max_vip_months) if max_vip_months > 0 else None
-        rows = _fefo_available_for_product(db, wl.product_id, min_expiry_date=min_expiry_date)
+        rows = _fefo_available_for_product(
+            db,
+            wl.product_id,
+            min_expiry_date=min_expiry_date,
+            location_ids=main_location_ids,
+        )
         remaining = wl.total_qty
         alloc_scratch: dict[tuple[UUID, UUID], Decimal] = {}
         for row in rows:
@@ -415,6 +423,7 @@ async def pick_scan(
             pick_from_alloc = Decimal(str(line_boxes)) * units_per_box
         else:
             pick_from_alloc = min(to_pick, available)
+        assert_location_allowed_for_pick(db, wa.location_id)
         # Serialise lot+joy (parallel skanlar bir xil ajratishdan ortiq terib qo‘ymasin).
         # unallocate reservedni kamaytiradi — available o‘zgarmaydi; shuning uchun
         # require_sufficient_available bu yerda noto‘g‘ri bloklardi (hammasi reserved bo‘lsa).
