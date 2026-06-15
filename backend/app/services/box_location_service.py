@@ -55,6 +55,18 @@ class ProductBoxSummary:
     loose_units: int = 0
 
 
+def pair_box_loose_from_available(
+    available: int,
+    box_count: int,
+    units_in_boxes: int,
+) -> tuple[int, int, int]:
+    """Mobil get_breakdown bilan bir xil: available asosida quti/qutisiz."""
+    total = max(0, int(available))
+    if units_in_boxes > total:
+        return 0, 0, total
+    return box_count, units_in_boxes, total - units_in_boxes
+
+
 def _units_in_boxes_for_lot_location(
     db: Session, lot_id: UUID, location_id: UUID
 ) -> tuple[int, int, list[SealedBoxInfo]]:
@@ -98,20 +110,20 @@ def get_breakdown(
     if not lot or lot.product_id != product_id:
         raise HTTPException(status_code=400, detail="Invalid lot for product")
     available = compute_lot_location_available(db, lot_id, location_id)
-    total = max(0, int(available))
     box_count, units_in_boxes, sealed = _units_in_boxes_for_lot_location(db, lot_id, location_id)
+    total = max(0, int(available))
     if units_in_boxes > total:
         raise HTTPException(
             status_code=409,
             detail="Qutilardagi dona jami qoldiqdan oshib ketgan (ma'lumot nomuvofiqligi)",
         )
-    loose = total - units_in_boxes
+    bc, uib, loose = pair_box_loose_from_available(total, box_count, units_in_boxes)
     return LocationBoxBreakdown(
         product_id=product_id,
         lot_id=lot_id,
         location_id=location_id,
-        box_count=box_count,
-        units_in_boxes=units_in_boxes,
+        box_count=bc,
+        units_in_boxes=uib,
         loose_units=loose,
         total_units=total,
         sealed_boxes=sealed,
@@ -174,16 +186,20 @@ def get_breakdown_map_for_product(
             )
         except HTTPException:
             available = compute_lot_location_available(db, lot_id, location_id)
-            total = int(available) if available > 0 else 0
+            total = max(0, int(available))
+            box_count, units_in_boxes, sealed = _units_in_boxes_for_lot_location(
+                db, lot_id, location_id
+            )
+            bc, uib, loose = pair_box_loose_from_available(total, box_count, units_in_boxes)
             out[key] = LocationBoxBreakdown(
                 product_id=product_id,
                 lot_id=lot_id,
                 location_id=location_id,
-                box_count=0,
-                units_in_boxes=0,
-                loose_units=total,
+                box_count=bc,
+                units_in_boxes=uib,
+                loose_units=loose,
                 total_units=total,
-                sealed_boxes=[],
+                sealed_boxes=sealed if bc > 0 else [],
             )
     return out
 
@@ -222,7 +238,6 @@ def product_box_summary_map(
             StockLotModel.product_id,
             StockMovementModel.lot_id,
             StockMovementModel.location_id,
-            on_hand_expr.label("on_hand"),
             available_expr.label("available"),
         )
         .join(StockLotModel, StockLotModel.id == StockMovementModel.lot_id)
@@ -236,17 +251,17 @@ def product_box_summary_map(
             StockMovementModel.lot_id,
             StockMovementModel.location_id,
         )
-        .having(on_hand_expr != 0)
+        .having(available_expr != 0)
         .all()
     )
 
     pairs: set[tuple[UUID, UUID]] = set()
-    balances: dict[tuple[UUID, UUID], tuple[int, int]] = {}
+    balances: dict[tuple[UUID, UUID], int] = {}
     product_by_pair: dict[tuple[UUID, UUID], UUID] = {}
     for row in balance_rows:
         key = (row.lot_id, row.location_id)
         pairs.add(key)
-        balances[key] = (int(row.on_hand or 0), int(row.available or 0))
+        balances[key] = int(row.available or 0)
         product_by_pair[key] = row.product_id
 
     boxes: dict[tuple[UUID, UUID], tuple[int, int]] = {}
@@ -275,18 +290,14 @@ def product_box_summary_map(
         }
 
     out: dict[UUID, ProductBoxSummary] = {pid: ProductBoxSummary() for pid in product_ids}
-    for key, (on_hand, available) in balances.items():
+    for key, available in balances.items():
         product_id = product_by_pair[key]
-        total = max(0, on_hand)
         box_count, units_in_boxes = boxes.get(key, (0, 0))
-        if units_in_boxes > total:
-            continue
-        physical_loose = max(0, total - units_in_boxes)
-        loose = max(0, min(available, physical_loose))
+        bc, uib, loose = pair_box_loose_from_available(available, box_count, units_in_boxes)
         prev = out[product_id]
         out[product_id] = ProductBoxSummary(
-            box_count=prev.box_count + box_count,
-            units_in_boxes=prev.units_in_boxes + units_in_boxes,
+            box_count=prev.box_count + bc,
+            units_in_boxes=prev.units_in_boxes + uib,
             loose_units=prev.loose_units + loose,
         )
     return out

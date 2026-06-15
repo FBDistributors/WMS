@@ -107,6 +107,102 @@ def _seed_product_with_boxes_and_loose(
     return product
 
 
+def test_summary_light_includes_box_columns_with_reserved_stock(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """on_hand=100, reserved=50, available=50 — qutilar available asosida hisoblanadi."""
+    product = Product(
+        external_source="test",
+        external_id=f"ext-{uuid.uuid4()}",
+        name="Reserved Box Product",
+        sku=f"SKU-RB-{uuid.uuid4().hex[:8]}",
+        is_active=True,
+    )
+    db_session.add(product)
+    db_session.flush()
+
+    loc = Location(
+        code=f"RB-{uuid.uuid4().hex[:6]}",
+        barcode_value=f"RB-{uuid.uuid4().hex[:6]}",
+        name="Reserved bin",
+        type="bin",
+        is_active=True,
+    )
+    db_session.add(loc)
+    db_session.flush()
+
+    lot = StockLot(product_id=product.id, batch="RB-B1", expiry_date=None)
+    db_session.add(lot)
+    db_session.flush()
+
+    db_session.add(
+        StockMovement(
+            product_id=product.id,
+            lot_id=lot.id,
+            location_id=loc.id,
+            qty_change=Decimal("100"),
+            movement_type="receipt",
+        )
+    )
+    db_session.add(
+        StockMovement(
+            product_id=product.id,
+            lot_id=lot.id,
+            location_id=loc.id,
+            qty_change=Decimal("50"),
+            movement_type="allocate",
+        )
+    )
+
+    box_barcode = f"BOX-RB-{uuid.uuid4().hex[:6]}"
+    db_session.add(
+        ProductBox(
+            box_barcode=box_barcode,
+            product_id=product.id,
+            units_per_box=10,
+            is_active=True,
+        )
+    )
+    db_session.flush()
+
+    inv = User(
+        username=f"inv-rb-{uuid.uuid4().hex[:8]}",
+        password_hash=get_password_hash("testpass123"),
+        role="inventory_controller",
+        is_active=True,
+    )
+    db_session.add(inv)
+    db_session.commit()
+    db_session.refresh(inv)
+
+    place_sealed_boxes(
+        db_session,
+        box_barcode=box_barcode,
+        location_id=loc.id,
+        lot_id=lot.id,
+        user=inv,
+        box_count=5,
+    )
+    db_session.commit()
+    db_session.refresh(product)
+
+    admin = _mk_admin(db_session)
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        res = client.get(
+            "/api/v1/inventory/summary-light",
+            params={"search": product.sku, "limit": 10, "only_available": True},
+        )
+        assert res.status_code == 200, res.text
+        row = next(i for i in res.json()["items"] if i["product_id"] == str(product.id))
+        assert row["box_count"] == 5
+        assert row["units_in_boxes"] == 50
+        assert row["loose_units"] == 0
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
 def test_summary_light_includes_box_columns(
     client: TestClient,
     db_session: Session,
