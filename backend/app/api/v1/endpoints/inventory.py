@@ -21,6 +21,7 @@ from app.auth.deps import get_current_user, require_permission
 from app.auth.guards import check_controller_adjust_reason
 from app.core.stock_rules import check_location_single_expiry
 from app.services.audit_service import ACTION_CREATE, get_client_ip, log_action
+from app.services.box_location_service import product_box_summary_map
 from app.services.stock_availability import (
     compute_lot_location_balances,
     lock_lot_location,
@@ -697,6 +698,9 @@ class InventorySummaryLightRow(BaseModel):
     brand_name: Optional[str] = None
     total_qty: Decimal
     available_qty: Decimal
+    box_count: int = 0
+    units_in_boxes: int = 0
+    loose_units: int = 0
     locations: Optional[List[InventoryByProductRowEmbed]] = None
 
 
@@ -3052,6 +3056,7 @@ async def inventory_summary_light(
     locs_map: dict[UUID, list] = {}
     if include_locations and product_ids:
         locs_map = _fetch_locations_by_products(db, product_ids, warehouse)
+    box_map = product_box_summary_map(db, product_ids, loc_ids)
     items = [
         InventorySummaryLightRow(
             product_id=row.product_id,
@@ -3062,6 +3067,9 @@ async def inventory_summary_light(
             brand_name=row.brand_name or None,
             total_qty=row.total_qty,
             available_qty=row.available_qty,
+            box_count=box_map[row.product_id].box_count,
+            units_in_boxes=box_map[row.product_id].units_in_boxes,
+            loose_units=box_map[row.product_id].loose_units,
             locations=[
                 InventoryByProductRowEmbed(
                     location_code=l["location_code"],

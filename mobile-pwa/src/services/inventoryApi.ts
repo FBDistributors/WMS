@@ -284,6 +284,9 @@ export type InventorySummaryLightRow = {
   brand_name?: string | null
   total_qty: number
   available_qty: number
+  box_count?: number
+  units_in_boxes?: number
+  loose_units?: number
   locations?: InventorySummaryLightLocation[] | null
 }
 

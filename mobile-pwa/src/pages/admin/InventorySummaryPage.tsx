@@ -53,9 +53,21 @@ const COLUMN_OPTIONS = [
   { id: 'brand', labelKey: 'inventory:columns.brand' },
   { id: 'brand_id', labelKey: 'inventory:columns.brand_id' },
   { id: 'total_qty', labelKey: 'inventory:columns.total_qty' },
+  { id: 'box_count', labelKey: 'inventory:columns.box_count' },
+  { id: 'units_in_boxes', labelKey: 'inventory:columns.units_in_boxes' },
+  { id: 'loose_units', labelKey: 'inventory:columns.loose_units' },
   { id: 'smartup_qoldiq', labelKey: 'inventory:columns.smartup_qoldiq' },
   { id: 'smartup_bron', labelKey: 'inventory:columns.smartup_bron' },
 ]
+
+const NUMERIC_COLUMN_IDS = new Set([
+  'total_qty',
+  'box_count',
+  'units_in_boxes',
+  'loose_units',
+  'smartup_qoldiq',
+  'smartup_bron',
+])
 
 const DEBOUNCE_MS = 400
 const PAGE_SIZE = 50
@@ -389,6 +401,9 @@ export function InventorySummaryPage() {
             t('inventory:columns.product'),
             t('inventory:columns.brand'),
             t('inventory:columns.total_qty'),
+            t('inventory:columns.box_count'),
+            t('inventory:columns.units_in_boxes'),
+            t('inventory:columns.loose_units'),
             t('inventory:columns.smartup_qoldiq'),
             t('inventory:columns.smartup_bron'),
           ]
@@ -409,6 +424,9 @@ export function InventorySummaryPage() {
               row.product_name,
               row.brand_name ?? '',
               jami,
+              Math.round(Number(row.box_count ?? 0)),
+              Math.round(Number(row.units_in_boxes ?? 0)),
+              Math.round(Number(row.loose_units ?? 0)),
               smartupQoldiq === 0 ? '' : Math.round(smartupQoldiq),
               farq,
             ]
@@ -504,9 +522,7 @@ export function InventorySummaryPage() {
                           ? 'min-w-[12rem] text-left'
                           : columnId === 'brand_id'
                             ? 'min-w-[14rem] text-left'
-                          : columnId === 'total_qty' ||
-                              columnId === 'smartup_qoldiq' ||
-                              columnId === 'smartup_bron'
+                          : NUMERIC_COLUMN_IDS.has(columnId)
                             ? 'text-right tabular-nums'
                             : 'text-left'
                     }`}
@@ -536,9 +552,7 @@ export function InventorySummaryPage() {
                               ? 'min-w-[12rem]'
                               : columnId === 'brand_id'
                                 ? 'min-w-[14rem]'
-                              : columnId === 'total_qty' ||
-                                  columnId === 'smartup_qoldiq' ||
-                                  columnId === 'smartup_bron'
+                              : NUMERIC_COLUMN_IDS.has(columnId)
                                 ? 'text-right tabular-nums'
                                 : ''
                         }`}
@@ -563,6 +577,9 @@ export function InventorySummaryPage() {
                           <span className="font-mono text-xs">{row.brand_id ?? '—'}</span>
                         )}
                         {columnId === 'total_qty' && formatInt(row.total_qty)}
+                        {columnId === 'box_count' && formatInt(row.box_count ?? 0)}
+                        {columnId === 'units_in_boxes' && formatInt(row.units_in_boxes ?? 0)}
+                        {columnId === 'loose_units' && formatInt(row.loose_units ?? 0)}
                         {columnId === 'smartup_qoldiq' &&
                           (() => {
                             const { q001, q002, total } = getSmartupTotalsForRow(

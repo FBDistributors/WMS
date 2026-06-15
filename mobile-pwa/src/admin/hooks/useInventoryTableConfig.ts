@@ -14,6 +14,9 @@ export const INVENTORY_TABLE_COLUMN_IDS = [
   'brand',
   'brand_id',
   'total_qty',
+  'box_count',
+  'units_in_boxes',
+  'loose_units',
   'smartup_qoldiq',
   'smartup_bron',
 ]
@@ -25,6 +28,9 @@ export const DEFAULT_VISIBLE_COLUMNS = [
   'brand',
   'brand_id',
   'total_qty',
+  'box_count',
+  'units_in_boxes',
+  'loose_units',
   'smartup_qoldiq',
   'smartup_bron',
 ]

@@ -1,6 +1,9 @@
 {
   "title": "Остатки",
-  "tabs": { "main": "Основной остаток", "showroom": "Остаток шоурума" },
+  "tabs": {
+    "main": "Основной остаток",
+    "showroom": "Остаток шоурума"
+  },
   "details_title": "Детали остатков",
   "movements_title": "Движения остатков",
   "back_to_summary": "Назад к сводке",
@@ -122,7 +125,10 @@
     "created_by": "Кто выполнил",
     "created_at": "Создано",
     "smartup_qoldiq": "Остаток SmartUP",
-    "smartup_bron": "Разница"
+    "smartup_bron": "Разница",
+    "box_count": "Коробки",
+    "units_in_boxes": "В коробках",
+    "loose_units": "Без коробки"
   },
   "filters": {
     "apply": "Применить",

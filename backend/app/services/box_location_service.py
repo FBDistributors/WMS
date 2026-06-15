@@ -7,6 +7,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.location_box_placement import (
@@ -16,9 +17,11 @@ from app.models.location_box_placement import (
 )
 from app.models.product_box import ProductBox as ProductBoxModel
 from app.models.stock import StockLot as StockLotModel
+from app.models.stock import StockMovement as StockMovementModel
 from app.models.user import User as UserModel
 from app.services.product_scan_resolve import normalize_scan_barcode
 from app.services.stock_availability import (
+    PHYSICAL_ON_HAND_MOVEMENT_TYPES,
     compute_lot_location_available,
     lock_lot_location,
 )
@@ -43,6 +46,13 @@ class LocationBoxBreakdown:
     loose_units: int
     total_units: int
     sealed_boxes: list[SealedBoxInfo]
+
+
+@dataclass(frozen=True)
+class ProductBoxSummary:
+    box_count: int = 0
+    units_in_boxes: int = 0
+    loose_units: int = 0
 
 
 def _units_in_boxes_for_lot_location(
@@ -175,6 +185,110 @@ def get_breakdown_map_for_product(
                 total_units=total,
                 sealed_boxes=[],
             )
+    return out
+
+
+def product_box_summary_map(
+    db: Session,
+    product_ids: list[UUID],
+    location_ids: list[UUID] | None = None,
+) -> dict[UUID, ProductBoxSummary]:
+    """Mahsulot bo'yicha quti/qutisiz dona yig'indisi (batch, N+1 siz)."""
+    if not product_ids:
+        return {}
+
+    on_hand_expr = func.sum(
+        case(
+            (
+                StockMovementModel.movement_type.in_(PHYSICAL_ON_HAND_MOVEMENT_TYPES),
+                StockMovementModel.qty_change,
+            ),
+            else_=0,
+        )
+    )
+    reserved_expr = func.sum(
+        case(
+            (
+                StockMovementModel.movement_type.in_(("allocate", "unallocate")),
+                StockMovementModel.qty_change,
+            ),
+            else_=0,
+        )
+    )
+    available_expr = on_hand_expr - reserved_expr
+
+    balance_q = (
+        db.query(
+            StockLotModel.product_id,
+            StockMovementModel.lot_id,
+            StockMovementModel.location_id,
+            on_hand_expr.label("on_hand"),
+            available_expr.label("available"),
+        )
+        .join(StockLotModel, StockLotModel.id == StockMovementModel.lot_id)
+        .filter(StockLotModel.product_id.in_(product_ids))
+    )
+    if location_ids is not None:
+        balance_q = balance_q.filter(StockMovementModel.location_id.in_(location_ids))
+    balance_rows = (
+        balance_q.group_by(
+            StockLotModel.product_id,
+            StockMovementModel.lot_id,
+            StockMovementModel.location_id,
+        )
+        .having(on_hand_expr != 0)
+        .all()
+    )
+
+    pairs: set[tuple[UUID, UUID]] = set()
+    balances: dict[tuple[UUID, UUID], tuple[int, int]] = {}
+    product_by_pair: dict[tuple[UUID, UUID], UUID] = {}
+    for row in balance_rows:
+        key = (row.lot_id, row.location_id)
+        pairs.add(key)
+        balances[key] = (int(row.on_hand or 0), int(row.available or 0))
+        product_by_pair[key] = row.product_id
+
+    boxes: dict[tuple[UUID, UUID], tuple[int, int]] = {}
+    if pairs:
+        lot_ids = {p[0] for p in pairs}
+        loc_ids = {p[1] for p in pairs}
+        box_rows = (
+            db.query(
+                LocationBoxPlacement.lot_id,
+                LocationBoxPlacement.location_id,
+                func.count(LocationBoxPlacement.id).label("box_count"),
+                func.coalesce(func.sum(ProductBoxModel.units_per_box), 0).label("units"),
+            )
+            .join(ProductBoxModel, ProductBoxModel.id == LocationBoxPlacement.product_box_id)
+            .filter(
+                LocationBoxPlacement.lot_id.in_(lot_ids),
+                LocationBoxPlacement.location_id.in_(loc_ids),
+                LocationBoxPlacement.status == PLACEMENT_SEALED,
+                ProductBoxModel.is_active.is_(True),
+            )
+            .group_by(LocationBoxPlacement.lot_id, LocationBoxPlacement.location_id)
+            .all()
+        )
+        boxes = {
+            (r.lot_id, r.location_id): (int(r.box_count), int(r.units)) for r in box_rows
+        }
+
+    out: dict[UUID, ProductBoxSummary] = {pid: ProductBoxSummary() for pid in product_ids}
+    for key, (on_hand, available) in balances.items():
+        product_id = product_by_pair[key]
+        total = max(0, on_hand)
+        box_count, units_in_boxes = boxes.get(key, (0, 0))
+        if units_in_boxes > total:
+            continue
+        physical_loose = max(0, total - units_in_boxes)
+        loose = max(0, min(available, physical_loose))
+        prev = out[product_id]
+        out[product_id] = ProductBoxSummary(
+            box_count=prev.box_count + box_count,
+            units_in_boxes=prev.units_in_boxes + units_in_boxes,
+            loose_units=prev.loose_units + loose,
+        )
     return out
 
 
