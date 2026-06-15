@@ -143,7 +143,7 @@ def get_breakdown_for_pick(
     lot = db.get(StockLotModel, lot_id)
     if not lot or lot.product_id != product_id:
         raise HTTPException(status_code=400, detail="Invalid lot for product")
-    on_hand, _reserved, available = compute_lot_location_balances(db, lot_id, location_id)
+    on_hand, _reserved, _available = compute_lot_location_balances(db, lot_id, location_id)
     total = max(0, int(on_hand))
     box_count, units_in_boxes, sealed = _units_in_boxes_for_lot_location(db, lot_id, location_id)
     if units_in_boxes > total:
@@ -152,14 +152,13 @@ def get_breakdown_for_pick(
             detail="Qutilardagi dona jami qoldiqdan oshib ketgan (ma'lumot nomuvofiqligi)",
         )
     physical_loose = max(0, total - units_in_boxes)
-    pickable_loose = max(0, min(int(available), physical_loose))
     return LocationBoxBreakdown(
         product_id=product_id,
         lot_id=lot_id,
         location_id=location_id,
         box_count=box_count,
         units_in_boxes=units_in_boxes,
-        loose_units=pickable_loose,
+        loose_units=physical_loose,
         total_units=total,
         sealed_boxes=sealed,
     )
@@ -613,7 +612,8 @@ def require_sufficient_loose_for_unit_pick(
 ) -> None:
     if qty <= 0:
         return
-    breakdown = get_breakdown(
+    # Terish reserved zaxiradan — available=0 bo'lishi mumkin; fizik qutisiz qoldiq on_hand asosida.
+    breakdown = get_breakdown_for_pick(
         db,
         product_id=product_id,
         lot_id=lot_id,

@@ -19,7 +19,7 @@ from app.models.product_box import ProductBox as ProductBoxModel
 from app.models.stock import StockLot, StockMovement
 from app.models.user import User as UserModel
 from app.auth.security import get_password_hash
-from app.services.box_location_service import get_breakdown, place_sealed_boxes
+from app.services.box_location_service import get_breakdown, get_breakdown_for_pick, place_sealed_boxes
 
 
 def _mk_user(db: Session, *, username: str, role: str) -> UserModel:
@@ -116,6 +116,68 @@ def _seed_box_pick_order(
     db.commit()
     db.refresh(order)
     return order, picker, product, loc, lot, box_barcode
+
+
+def _seed_loose_pick_order(
+    db: Session,
+    *,
+    order_qty: int = 4,
+    stock_qty: int = 4,
+) -> tuple[Order, UserModel, ProductModel, LocationModel, StockLot]:
+    picker = _mk_user(db, username=f"picker-loose-{uuid.uuid4().hex[:8]}", role="picker")
+    product = ProductModel(
+        external_source="test",
+        external_id=f"ext-{uuid.uuid4()}",
+        name="Loose Pick Product",
+        sku=f"SKU-LP-{uuid.uuid4().hex[:8]}",
+        barcode=f"LP{uuid.uuid4().hex[:6]}",
+        is_active=True,
+    )
+    db.add(product)
+    db.flush()
+
+    loc = LocationModel(
+        code=f"LP-{uuid.uuid4().hex[:6]}",
+        barcode_value=f"LP-{uuid.uuid4().hex[:6]}",
+        name="Loose pick bin",
+        type="bin",
+        zone_type="NORMAL",
+        is_active=True,
+    )
+    db.add(loc)
+    db.flush()
+
+    lot = StockLot(product_id=product.id, batch="LP-B1", expiry_date=None)
+    db.add(lot)
+    db.flush()
+    db.add(
+        StockMovement(
+            product_id=product.id,
+            lot_id=lot.id,
+            location_id=loc.id,
+            qty_change=Decimal(str(stock_qty)),
+            movement_type="receipt",
+        )
+    )
+
+    order = Order(
+        source="test",
+        source_external_id=f"order-lp-{uuid.uuid4().hex[:10]}",
+        order_number=f"SO-LP-{uuid.uuid4().hex[:6]}",
+    )
+    order.wms_state = OrderWmsState(status="imported")
+    order.lines = [
+        OrderLine(
+            sku=product.sku,
+            name="Loose pick line",
+            qty=float(order_qty),
+            uom="dona",
+        )
+    ]
+    db.add(order)
+    db.commit()
+    db.refresh(order)
+    return order, picker, product, loc, lot
 
 
 def _send_to_picking(client: TestClient, db: Session, order_id: UUID, picker_id: UUID) -> UUID:
@@ -221,6 +283,49 @@ def test_line_pick_unit_requires_loose(
             },
         )
         assert pick.status_code == 409
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_line_pick_unit_with_fully_reserved_loose_stock(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Ajratilgan (reserved) qutisiz zaxiradan unit skan bilan terish — available=0 bo'lsa ham."""
+    order, picker, product, loc, lot = _seed_loose_pick_order(
+        db_session, order_qty=4, stock_qty=4
+    )
+    doc_id = _send_to_picking(client, db_session, order.id, picker.id)
+
+    bd_avail = get_breakdown(
+        db_session,
+        product_id=product.id,
+        lot_id=lot.id,
+        location_id=loc.id,
+    )
+    assert bd_avail.loose_units == 0
+
+    bd_pick = get_breakdown_for_pick(
+        db_session,
+        product_id=product.id,
+        lot_id=lot.id,
+        location_id=loc.id,
+    )
+    assert bd_pick.loose_units == 4
+
+    app.dependency_overrides[get_current_user] = lambda: picker
+    try:
+        line_id = client.get(f"/api/v1/picking/documents/{doc_id}").json()["lines"][0]["id"]
+        pick = client.post(
+            f"/api/v1/picking/lines/{line_id}/pick",
+            json={
+                "delta": 1,
+                "request_id": f"pick-unit-res-{uuid.uuid4().hex}",
+                "barcode": product.barcode,
+            },
+        )
+        assert pick.status_code == 200, pick.text
+        assert pick.json()["line"]["qty_picked"] == 1
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 

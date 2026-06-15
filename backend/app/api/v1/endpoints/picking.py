@@ -409,7 +409,7 @@ def _breakdown_kwargs_map_for_pairs(
         out[key] = {
             "box_count": box_count,
             "units_in_boxes": units_in_boxes,
-            "loose_units": max(0, min(int(available), physical_loose)),
+            "loose_units": physical_loose,
         }
     return out
 
