@@ -359,10 +359,10 @@ def place_sealed_boxes_for_receipt(
         raise HTTPException(status_code=400, detail="Partiya mahsulotga mos emas")
     units_needed = box.units_per_box * box_count
     qty_dec = Decimal(str(receipt_qty))
-    if qty_dec != Decimal(str(units_needed)):
+    if qty_dec < Decimal(str(units_needed)):
         raise HTTPException(
             status_code=400,
-            detail=f"qty {int(qty_dec)} != box_count * units_per_box ({units_needed})",
+            detail=f"qty {int(qty_dec)} < box_count * units_per_box ({units_needed})",
         )
     lock_lot_location(db, lot_id, location_id)
     available = compute_lot_location_available(db, lot_id, location_id)

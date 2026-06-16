@@ -340,6 +340,8 @@ abstract final class StringLookup {
     'pickLocationBreakdown': '{{breakdown}}',
     'kirimBoxReceiveSuccess':
         'Qabul: {{boxCount}} quti × {{unitsPerBox}} = {{total}} dona\n{{product}} · {{location}}',
+    'kirimBoxReceiveSuccessHybrid':
+        'Qabul: {{boxCount}} quti × {{unitsPerBox}} + {{loose}} = {{total}} dona\n{{product}} · {{location}}',
     'inventoryScannedViaBox': 'Quti skani: {{barcode}} · {{units}} dona/quti',
     'inventoryDetailBoxBreakdown': 'Qoldiq tarkibi',
     'syncFailed': 'Sinxronlash muvaffaqiyatsiz tugadi',
@@ -716,6 +718,8 @@ abstract final class StringLookup {
     'pickLocationBreakdown': '{{breakdown}}',
     'kirimBoxReceiveSuccess':
         'Приём: {{boxCount}} кор. × {{unitsPerBox}} = {{total}} шт.\n{{product}} · {{location}}',
+    'kirimBoxReceiveSuccessHybrid':
+        'Приём: {{boxCount}} кор. × {{unitsPerBox}} + {{loose}} = {{total}} шт.\n{{product}} · {{location}}',
     'inventoryScannedViaBox': 'Скан коробки: {{barcode}} · {{units}} шт./кор.',
     'inventoryDetailBoxBreakdown': 'Состав остатка',
     'syncFailed': 'Синхронизация завершилась с ошибкой',
@@ -1092,6 +1096,8 @@ abstract final class StringLookup {
     'pickLocationBreakdown': '{{breakdown}}',
     'kirimBoxReceiveSuccess':
         'Received: {{boxCount}} boxes × {{unitsPerBox}} = {{total}} units\n{{product}} · {{location}}',
+    'kirimBoxReceiveSuccessHybrid':
+        'Received: {{boxCount}} boxes × {{unitsPerBox}} + {{loose}} = {{total}} units\n{{product}} · {{location}}',
     'inventoryScannedViaBox': 'Box scan: {{barcode}} · {{units}} units/box',
     'inventoryDetailBoxBreakdown': 'Stock breakdown',
     'syncFailed': 'Sync failed',

@@ -92,3 +92,67 @@ def test_complete_receipt_with_box_metadata_places_sealed_boxes(
     assert bd.units_in_boxes == 80
     assert bd.loose_units == 0
     assert bd.total_units == 80
+
+
+def test_complete_receipt_hybrid_box_and_loose_units(
+    client: TestClient,
+    db_session: Session,
+    test_product: Product,
+    test_location: Location,
+    auth_headers: dict[str, str],
+) -> None:
+    box = ProductBox(
+        box_barcode="RCPT-BOX-HYBRID",
+        product_id=test_product.id,
+        units_per_box=6,
+        is_active=True,
+    )
+    db_session.add(box)
+    db_session.flush()
+
+    raw_expiry = date.today() + timedelta(days=90)
+    expiry_sent = raw_expiry.isoformat()
+
+    create = client.post(
+        "/api/v1/receiving/receipts",
+        json={
+            "lines": [
+                {
+                    "product_id": str(test_product.id),
+                    "qty": 36,
+                    "batch": "BOX-HYBRID-1",
+                    "expiry_date": expiry_sent,
+                    "location_id": str(test_location.id),
+                    "box_barcode": "RCPT-BOX-HYBRID",
+                    "box_count": 5,
+                }
+            ]
+        },
+        headers=auth_headers,
+    )
+    assert create.status_code == 201
+
+    receipt_id = create.json()["id"]
+    complete = client.post(
+        f"/api/v1/receiving/receipts/{receipt_id}/complete",
+        headers=auth_headers,
+    )
+    assert complete.status_code == 200
+
+    from app.models.stock import StockLot
+
+    lot = db_session.query(StockLot).filter(
+        StockLot.product_id == test_product.id,
+        StockLot.batch == "BOX-HYBRID-1",
+    ).one()
+
+    bd = get_breakdown(
+        db_session,
+        product_id=test_product.id,
+        lot_id=lot.id,
+        location_id=test_location.id,
+    )
+    assert bd.box_count == 5
+    assert bd.units_in_boxes == 30
+    assert bd.loose_units == 6
+    assert bd.total_units == 36

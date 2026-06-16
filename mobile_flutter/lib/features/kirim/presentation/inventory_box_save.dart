@@ -18,6 +18,34 @@ int currentBoxCountTarget(BoxLocationBreakdown breakdown, String barcode) {
   return breakdown.boxCount;
 }
 
+int? inventoryTargetTotalUnits({
+  required int targetBoxCount,
+  required int targetLooseQty,
+  required int? unitsPerBox,
+  required BoxLocationBreakdown breakdown,
+  required int boxDelta,
+}) {
+  if (unitsPerBox != null && unitsPerBox >= 1) {
+    return targetBoxCount * unitsPerBox + targetLooseQty;
+  }
+  if (boxDelta == 0) {
+    return breakdown.unitsInBoxes + targetLooseQty;
+  }
+  return null;
+}
+
+({int? needed, int? available})? parseInsufficientLooseMessage(String message) {
+  final RegExpMatch? match =
+      RegExp(r'insufficient_loose:(\d+):(\d+)').firstMatch(message);
+  if (match == null) {
+    return null;
+  }
+  return (
+    needed: int.tryParse(match.group(1)!),
+    available: int.tryParse(match.group(2)!),
+  );
+}
+
 class InventoryBoxSavePartialFailure implements Exception {
   InventoryBoxSavePartialFailure({
     required this.boxOpsCompleted,
@@ -47,7 +75,7 @@ typedef InventoryCreateMovementFn = Future<void> Function({
   required String reasonCode,
 });
 
-/// Quti soni + qutisiz dona bo'yicha pack/unpack va loose tuzatish.
+/// Quti soni + qutisiz dona bo'yicha inventarizatsiya: avval jami, keyin quti.
 Future<BoxLocationBreakdown> applyInventoryBoxSave({
   required String? boxBarcode,
   required int? unitsPerBox,
@@ -72,24 +100,45 @@ Future<BoxLocationBreakdown> applyInventoryBoxSave({
     if (barcode.isEmpty || unitsPerBox == null || unitsPerBox < 1) {
       throw Exception('box_barcode_required');
     }
-    if (boxDelta > 0) {
-      final int neededLoose = unitsPerBox * boxDelta;
-      if (breakdown.looseUnits < neededLoose) {
-        throw Exception('insufficient_loose:$neededLoose:${breakdown.looseUnits}');
-      }
-      breakdown = await placeBox(boxBarcode: barcode, boxCount: boxDelta);
-      boxOpsCompleted = true;
-    } else {
-      for (int i = 0; i < -boxDelta; i++) {
-        breakdown = await removeBox(boxBarcode: barcode);
-      }
-      boxOpsCompleted = true;
-    }
   }
 
-  breakdown = await getBreakdown();
+  if (boxDelta < 0) {
+    for (int i = 0; i < -boxDelta; i++) {
+      breakdown = await removeBox(boxBarcode: barcode);
+    }
+    boxOpsCompleted = true;
+    breakdown = await getBreakdown();
+  }
+
+  final int? targetTotal = inventoryTargetTotalUnits(
+    targetBoxCount: targetBoxCount,
+    targetLooseQty: targetLooseQty,
+    unitsPerBox: unitsPerBox,
+    breakdown: breakdown,
+    boxDelta: boxDelta,
+  );
 
   try {
+    if (targetTotal != null) {
+      final int totalDelta = targetTotal - breakdown.totalUnits;
+      if (totalDelta != 0) {
+        await _applyTotalAdjust(
+          totalDelta: totalDelta,
+          productId: productId,
+          lotId: lotId,
+          locationId: locationId,
+          createMovement: createMovement,
+        );
+        breakdown = await getBreakdown();
+      }
+    }
+
+    if (boxDelta > 0) {
+      breakdown = await placeBox(boxBarcode: barcode, boxCount: boxDelta);
+      boxOpsCompleted = true;
+      breakdown = await getBreakdown();
+    }
+
     await _applyLooseAdjust(
       productId: productId,
       locationId: locationId,
@@ -107,6 +156,25 @@ Future<BoxLocationBreakdown> applyInventoryBoxSave({
   }
 
   return getBreakdown();
+}
+
+Future<void> _applyTotalAdjust({
+  required int totalDelta,
+  required String productId,
+  required String lotId,
+  required String locationId,
+  required InventoryCreateMovementFn createMovement,
+}) async {
+  if (totalDelta == 0) {
+    return;
+  }
+  await createMovement(
+    productId: productId,
+    lotId: lotId,
+    locationId: locationId,
+    qtyChange: totalDelta.toDouble(),
+    reasonCode: totalDelta > 0 ? 'inventory_overage' : 'inventory_shortage',
+  );
 }
 
 Future<void> _applyLooseAdjust({

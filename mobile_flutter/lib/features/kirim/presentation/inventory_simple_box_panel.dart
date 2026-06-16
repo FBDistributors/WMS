@@ -406,8 +406,9 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
       }
     } on Exception catch (e) {
       final String msg = '$e';
-      if (msg.contains('insufficient_loose')) {
-        final List<String> parts = msg.split(':');
+      final ({int? needed, int? available})? insufficient =
+          parseInsufficientLooseMessage(msg);
+      if (insufficient != null) {
         if (mounted) {
           showAppSnackBar(
             context,
@@ -417,8 +418,8 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
                   loc,
                   'inventoryInsufficientLoose',
                   <String, String>{
-                    'needed': parts.length > 1 ? parts[1] : '?',
-                    'available': parts.length > 2 ? parts[2] : '?',
+                    'needed': '${insufficient.needed ?? '?'}',
+                    'available': '${insufficient.available ?? '?'}',
                   },
                 ),
               ),

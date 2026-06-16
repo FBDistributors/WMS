@@ -159,10 +159,10 @@ def _validate_box_receipt_line(
     if box.product_id != product_id:
         raise HTTPException(status_code=400, detail="Quti mahsulotga mos emas")
     expected = Decimal(str(box.units_per_box * box_count))
-    if qty != expected:
+    if qty < expected:
         raise HTTPException(
             status_code=400,
-            detail=f"qty {int(qty)} != box_count * units_per_box ({int(expected)})",
+            detail=f"qty {int(qty)} < box_count * units_per_box ({int(expected)})",
         )
     return code, box_count
 

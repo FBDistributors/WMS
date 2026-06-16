@@ -30,6 +30,7 @@ import '../../product_boxes/data/product_box_repository.dart';
 import '../../product_boxes/presentation/register_product_box_sheet.dart';
 import '../../product_boxes/product_box_providers.dart';
 import 'inventory_simple_box_panel.dart';
+import 'kirim_receive_qty.dart';
 import '../../../shared/input/input_clear_button.dart';
 import '../../../shared/layout/sheet_bottom_inset.dart';
 import '../../../shared/input/stock_quantity_input.dart';
@@ -131,9 +132,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   String _warehouse = 'main';
   /// `flow=new` uchun: `byProduct` (standart) yoki `byLocation` (avval saqlash joyi).
   String _newReceiveMode = 'byProduct';
-  /// `flow=new` miqdor kiritish: `byUnit` (dona) yoki `byBox` (quti × hajm).
-  String _newReceiveQtyMode = 'byUnit';
-  final TextEditingController _newReceiveBoxCount = TextEditingController(text: '1');
+  final TextEditingController _newReceiveBoxCount = TextEditingController(text: '0');
   final TextEditingController _newReceiveBoxBarcode = TextEditingController();
   int? _newReceiveUnitsPerBox;
   /// Oxirgi muvaffaqiyatli aniqlangan quti shtrix kodi (skan yoki qo'lda).
@@ -579,7 +578,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     _newReceiveUnitsPerBox = null;
     _newReceiveResolvedBoxBarcode = null;
     _newReceiveBoxBarcode.clear();
-    _newReceiveBoxCount.text = '1';
+    _newReceiveBoxCount.text = '0';
   }
 
   void _onNewReceiveBoxBarcodeChanged(String value) {
@@ -589,7 +588,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           trimmed != _newReceiveResolvedBoxBarcode) {
         _newReceiveResolvedBoxBarcode = null;
         _newReceiveUnitsPerBox = null;
-        _syncNewReceiveComputedQty();
       }
     });
   }
@@ -613,32 +611,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       _handledProductId = null;
       _barcodeFieldKey++;
       _clearNewReceiveBoxState();
-    });
-  }
-
-  void _syncNewReceiveComputedQty() {
-    if (_newReceiveQtyMode != 'byBox') {
-      return;
-    }
-    final int? unitsPerBox = _newReceiveUnitsPerBox;
-    final int boxCount = int.tryParse(_newReceiveBoxCount.text.trim()) ?? 0;
-    if (unitsPerBox != null && boxCount > 0) {
-      _qty.text = '${unitsPerBox * boxCount}';
-    } else {
-      _qty.clear();
-    }
-  }
-
-  void _onNewReceiveQtyModeChanged(Set<String> selection) {
-    setState(() {
-      _newReceiveQtyMode = selection.first;
-      if (_newReceiveQtyMode == 'byUnit') {
-        _clearNewReceiveBoxState();
-        _qty.clear();
-      } else {
-        _qty.clear();
-        _syncNewReceiveComputedQty();
-      }
     });
   }
 
@@ -688,23 +660,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     );
   }
 
-  Widget _kirimNewQtyModeSelector(AppLocale appLoc) {
-    return SegmentedButton<String>(
-      segments: <ButtonSegment<String>>[
-        ButtonSegment<String>(
-          value: 'byUnit',
-          label: Text(StringLookup.t(appLoc, 'kirimNewQtyTabByUnit')),
-        ),
-        ButtonSegment<String>(
-          value: 'byBox',
-          label: Text(StringLookup.t(appLoc, 'kirimNewQtyTabByBox')),
-        ),
-      ],
-      selected: <String>{_newReceiveQtyMode},
-      onSelectionChanged: _onNewReceiveQtyModeChanged,
-    );
-  }
-
   Widget? _newReceiveBoxBarcodeSuffix(AppLocale appLoc) {
     final String text = _newReceiveBoxBarcode.text.trim();
     if (text.isEmpty) {
@@ -729,18 +684,24 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             _newReceiveBoxBarcode.clear();
             _newReceiveResolvedBoxBarcode = null;
             _newReceiveUnitsPerBox = null;
-            _syncNewReceiveComputedQty();
           }),
         )!,
       ],
     );
   }
 
-  Widget _kirimNewBoxQtyCard(AppLocale appLoc) {
+  Widget _kirimNewHybridQtyFields(AppLocale appLoc) {
     final int boxCount = int.tryParse(_newReceiveBoxCount.text.trim()) ?? 0;
+    final int looseQty = int.tryParse(_qty.text.trim()) ?? 0;
     final int? unitsPerBox = _newReceiveUnitsPerBox;
-    final int? totalUnits =
-        unitsPerBox != null && boxCount > 0 ? unitsPerBox * boxCount : null;
+    final int? total = computeKirimReceiveTotal(
+      boxCount: boxCount,
+      looseQty: looseQty,
+      unitsPerBox: unitsPerBox,
+    );
+    final String looseLabel = boxCount > 0 && unitsPerBox != null && unitsPerBox >= 1
+        ? StringLookup.t(appLoc, 'inventoryLooseQtyTarget')
+        : StringLookup.t(appLoc, 'qtyShort');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -753,7 +714,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                 controller: _newReceiveBoxBarcode,
                 textInputAction: TextInputAction.done,
                 decoration: InputDecoration(
-                  labelText: StringLookup.t(appLoc, 'inventoryScanBox'),
+                  labelText: StringLookup.t(appLoc, 'inventoryBoxBarcode'),
                   border: const OutlineInputBorder(),
                   hintText: StringLookup.t(appLoc, 'kirimNewBoxBarcodeHint'),
                   suffixIcon: _newReceiveBoxBarcodeSuffix(appLoc),
@@ -802,28 +763,36 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             border: const OutlineInputBorder(),
             suffixIcon: buildInputClearButton(
               visible: _newReceiveBoxCount.text.trim().isNotEmpty &&
-                  _newReceiveBoxCount.text.trim() != '1',
-              onPressed: () => setState(() {
-                _newReceiveBoxCount.text = '1';
-                _syncNewReceiveComputedQty();
-              }),
+                  _newReceiveBoxCount.text.trim() != '0',
+              onPressed: () => setState(() => _newReceiveBoxCount.text = '0'),
             ),
           ),
-          onChanged: (_) => setState(_syncNewReceiveComputedQty),
+          onChanged: (_) => setState(() {}),
         ),
-        if (totalUnits != null) ...<Widget>[
+        const SizedBox(height: 12),
+        TextField(
+          controller: _qty,
+          keyboardType: kStockQtyKeyboardType,
+          inputFormatters: kStockQtyInputFormatters,
+          decoration: InputDecoration(
+            labelText: looseLabel,
+            border: const OutlineInputBorder(),
+            suffixIcon: buildInputClearButton(
+              visible: _qty.text.trim().isNotEmpty,
+              onPressed: () => setState(() => _qty.clear()),
+            ),
+          ),
+          onChanged: (_) => setState(() {}),
+        ),
+        if (total != null) ...<Widget>[
           const SizedBox(height: 12),
           Text(
             StringLookup.tParams(
               appLoc,
-              'kirimNewTotalUnits',
-              <String, String>{'total': '$totalUnits'},
+              'inventoryTargetTotal',
+              <String, String>{'total': '$total'},
             ),
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1A237E),
-            ),
+            style: const TextStyle(fontWeight: FontWeight.w600),
           ),
         ],
       ],
@@ -837,30 +806,12 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            _kirimNewQtyModeSelector(appLoc),
-            const SizedBox(height: 12),
             ExpiryDatePickerField(
               value: _expiry,
               onChanged: (String? v) => setState(() => _expiry = v),
             ),
             const SizedBox(height: 12),
-            if (_newReceiveQtyMode == 'byUnit')
-              TextField(
-                controller: _qty,
-                keyboardType: kStockQtyKeyboardType,
-                inputFormatters: kStockQtyInputFormatters,
-                decoration: InputDecoration(
-                  labelText: StringLookup.t(appLoc, 'qtyShort'),
-                  border: const OutlineInputBorder(),
-                  suffixIcon: buildInputClearButton(
-                    visible: _qty.text.trim().isNotEmpty,
-                    onPressed: () => setState(() => _qty.clear()),
-                  ),
-                ),
-                onChanged: (_) => setState(() {}),
-              )
-            else
-              _kirimNewBoxQtyCard(appLoc),
+            _kirimNewHybridQtyFields(appLoc),
           ],
         ),
       ),
@@ -896,7 +847,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                 setState(() {
                   _newReceiveUnitsPerBox = units;
                   _newReceiveResolvedBoxBarcode = initialBarcode;
-                  _syncNewReceiveComputedQty();
                 });
                 showAppSnackBar(
                   context,
@@ -930,7 +880,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           _newReceiveBoxBarcode.text = barcode;
           _newReceiveResolvedBoxBarcode = barcode;
           _newReceiveUnitsPerBox = resolved.unitsPerBox;
-          _syncNewReceiveComputedQty();
         });
         return;
       }
@@ -943,7 +892,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         _newReceiveBoxBarcode.text = barcode;
         _newReceiveResolvedBoxBarcode = barcode;
         _newReceiveUnitsPerBox = resolved.unitsPerBox;
-        _syncNewReceiveComputedQty();
       });
     } on ProductBoxNotFoundException {
       final PickerProductDetailResponse? p = _product;
@@ -1090,28 +1038,15 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       showFillAll();
       return;
     }
+
+    final int boxCount = int.tryParse(_newReceiveBoxCount.text.trim()) ?? 0;
+    final int looseQty = int.tryParse(_qty.text.trim()) ?? 0;
+    final int? upb = _newReceiveUnitsPerBox;
     int? submitBoxCount;
-    if (_newReceiveQtyMode == 'byBox') {
-      if (_newReceiveUnitsPerBox == null) {
-        if (mounted) {
-          showAppSnackBar(
-            context,
-            SnackBar(content: Text(StringLookup.t(locMsg, 'kirimNewBoxQtyIncomplete'))),
-          );
-        }
-        return;
-      }
-      if (_newReceiveBoxBarcode.text.trim().isEmpty) {
-        if (mounted) {
-          showAppSnackBar(
-            context,
-            SnackBar(content: Text(StringLookup.t(locMsg, 'kirimNewBoxQtyIncomplete'))),
-          );
-        }
-        return;
-      }
-      final int boxCount = int.tryParse(_newReceiveBoxCount.text.trim()) ?? 0;
-      if (boxCount < 1) {
+    int submitQty;
+
+    if (boxCount > 0) {
+      if (upb == null || _newReceiveBoxBarcode.text.trim().isEmpty) {
         if (mounted) {
           showAppSnackBar(
             context,
@@ -1121,23 +1056,19 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         return;
       }
       submitBoxCount = boxCount;
-      _syncNewReceiveComputedQty();
+      submitQty = boxCount * upb + looseQty;
+    } else {
+      submitQty = looseQty;
     }
-    final int q = int.tryParse(_qty.text.trim()) ?? 0;
-    if (_qty.text.trim().isEmpty || q < 1) {
-      if (_newReceiveQtyMode == 'byBox' && mounted) {
-        showAppSnackBar(
-          context,
-          SnackBar(content: Text(StringLookup.t(locMsg, 'kirimNewBoxQtyIncomplete'))),
-        );
-      } else {
-        showFillAll();
-      }
+
+    if (submitQty < 1) {
+      showFillAll();
       return;
     }
 
     setState(() => _sending = true);
     final int? successUnitsPerBox = _newReceiveUnitsPerBox;
+    final int successLooseQty = looseQty;
     final String destLocationCode = loc.code;
     try {
       // Atomik: yaratish + yakunlash bitta so'rovda — xato bo'lsa qoralama qolmaydi.
@@ -1146,7 +1077,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             lines: <ReceiptLineCreate>[
               ReceiptLineCreate(
                 productId: p.productId,
-                qty: q,
+                qty: submitQty,
                 locationId: loc.id,
                 expiryDate: _expiry,
                 boxBarcode: submitBoxCount != null ? _newReceiveBoxBarcode.text.trim() : null,
@@ -1156,19 +1087,37 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           );
       if (mounted) {
         final AppLocale loc = ref.read(appLocaleProvider);
-        final String successMessage = submitBoxCount != null && successUnitsPerBox != null
-            ? StringLookup.tParams(
-                loc,
-                'kirimBoxReceiveSuccess',
-                <String, String>{
-                  'boxCount': '$submitBoxCount',
-                  'unitsPerBox': '$successUnitsPerBox',
-                  'total': '$q',
-                  'product': p.name,
-                  'location': destLocationCode,
-                },
-              )
-            : StringLookup.t(loc, 'kirimSingleReceiveSuccess');
+        final String successMessage;
+        if (submitBoxCount != null && successUnitsPerBox != null) {
+          if (successLooseQty > 0) {
+            successMessage = StringLookup.tParams(
+              loc,
+              'kirimBoxReceiveSuccessHybrid',
+              <String, String>{
+                'boxCount': '$submitBoxCount',
+                'unitsPerBox': '$successUnitsPerBox',
+                'loose': '$successLooseQty',
+                'total': '$submitQty',
+                'product': p.name,
+                'location': destLocationCode,
+              },
+            );
+          } else {
+            successMessage = StringLookup.tParams(
+              loc,
+              'kirimBoxReceiveSuccess',
+              <String, String>{
+                'boxCount': '$submitBoxCount',
+                'unitsPerBox': '$successUnitsPerBox',
+                'total': '$submitQty',
+                'product': p.name,
+                'location': destLocationCode,
+              },
+            );
+          }
+        } else {
+          successMessage = StringLookup.t(loc, 'kirimSingleReceiveSuccess');
+        }
         if (_newReceiveMode == 'byLocation') {
           _clearKirimNewAfterLocationSuccess();
           showAppSnackBar(
