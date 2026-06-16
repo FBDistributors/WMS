@@ -1419,39 +1419,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     );
   }
 
-  Future<void> _openRegisterProductBoxSheet({
-    required String productId,
-    required String productName,
-    String? initialBarcode,
-    void Function(int unitsPerBox)? onSaved,
-  }) async {
-    final AppLocale loc = ref.read(appLocaleProvider);
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (BuildContext ctx) {
-        return Padding(
-          padding: EdgeInsets.only(bottom: sheetBottomPadding(context)),
-          child: RegisterProductBoxSheet(
-            productId: productId,
-            productName: productName,
-            initialBarcode: initialBarcode,
-            onSaved: (int units) {
-              onSaved?.call(units);
-              if (mounted) {
-                unawaited(_loadInvProductBoxes(productId));
-                showAppSnackBar(
-                  context,
-                  SnackBar(content: Text(StringLookup.t(loc, 'inventoryBoxSaved'))),
-                );
-              }
-            },
-          ),
-        );
-      },
-    );
-  }
-
   Future<void> _openInventoryScannerAndHandleResult() async {
     final bool byLoc = _invSubMode == 'byLocation' && _invLocation != null;
     final String? productId = await context.pushNamed<String>(
@@ -1997,17 +1964,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             barcode: _product!.mainBarcode,
           ),
           const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: () => unawaited(
-              _openRegisterProductBoxSheet(
-                productId: _product!.productId,
-                productName: _product!.name,
-              ),
-            ),
-            icon: const Icon(Icons.qr_code_scanner),
-            label: Text(StringLookup.t(appLoc, 'inventoryAddBox')),
-          ),
-          const SizedBox(height: 12),
           const Text('Tuzatish uchun lokatsiyani tanlang', style: TextStyle(fontWeight: FontWeight.w600)),
           if (_product!.locations.isEmpty)
             Text('Qoldiq topilmadi', style: TextStyle(color: Colors.grey.shade700))
@@ -2029,23 +1985,11 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             _invStep == 3 &&
             _product != null &&
             _invScanSelectedGroup != null) ...<Widget>[
-          Row(
-            children: <Widget>[
-              const Expanded(
-                child: Text(
-                  'Tanlangan lokatsiya',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ),
-              TextButton(
-                onPressed: () => setState(() {
-                  _invStep = 2;
-                  _invScanSelectedGroup = null;
-                }),
-                child: const Text('Ortga'),
-              ),
-            ],
+          const Text(
+            'Tanlangan lokatsiya',
+            style: TextStyle(fontWeight: FontWeight.w600),
           ),
+          const SizedBox(height: 8),
           Card(
             margin: const EdgeInsets.only(bottom: 12),
             child: Padding(
@@ -2068,11 +2012,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    formatExpiryMonthYear(_invScanSelectedGroup!.expiryDate),
-                    style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
-                  ),
                   const SizedBox(height: 8),
                   Text(
                     StringLookup.tParams(
@@ -2090,6 +2029,11 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
               ),
             ),
           ),
+          ExpiryDatePickerField(
+            value: _invScanExpiry,
+            onChanged: (String? v) => setState(() => _invScanExpiry = v),
+          ),
+          const SizedBox(height: 10),
           InventorySimpleBoxPanel(
             key: ValueKey<String>(
               '${_invScanSelectedGroup!.locationId}|${_invScanPackLot(_invScanSelectedGroup!).lotId}',
@@ -2110,11 +2054,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
               }
               unawaited(_loadProduct(_product!.productId));
             },
-          ),
-          const SizedBox(height: 10),
-          ExpiryDatePickerField(
-            value: _invScanExpiry,
-            onChanged: (String? v) => setState(() => _invScanExpiry = v),
           ),
         ],
         if (_invSubMode == 'byScan' && _invStep == 1 && _loadingProduct) const LinearProgressIndicator(),
