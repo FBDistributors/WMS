@@ -161,6 +161,8 @@ export function DashboardPage() {
     try {
       const dateFromQ = dateFrom.trim() || undefined
       const dateToQ = dateTo.trim() || undefined
+      const today = todayIsoDate()
+      const shouldAvgAllTime = dateFrom.trim() === today && dateTo.trim() === today
       const [ordersByStatusData, staffData, pickingStats, stuckMain, stuckShowroom] = await Promise.all([
         getOrdersByStatus().catch(() => []),
         getPickingStaffStats({
@@ -170,6 +172,7 @@ export function DashboardPage() {
         getPickingOrderStats({
           date_from: dateFromQ,
           date_to: dateToQ,
+          avg_all_time: shouldAvgAllTime,
         }).catch(() => null),
         getReserveStuckSummary({ warehouse: 'main', age_hours: 48, sample_limit: 3 }).catch(
           () => null,

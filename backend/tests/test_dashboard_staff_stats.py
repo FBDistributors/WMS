@@ -5,11 +5,14 @@ from datetime import datetime, timezone
 
 from datetime import date
 
+from app.main import app
+from app.auth.deps import get_current_user
 from app.api.v1.endpoints.dashboard import (
     _aggregate_staff_by_user_column,
     _count_completed_documents,
     _resolve_stats_period,
 )
+import app.api.v1.endpoints.dashboard as dashboard_module
 from app.models.document import Document, DocumentLine
 from app.models.user import User
 from app.auth.security import get_password_hash
@@ -172,3 +175,76 @@ def test_count_completed_documents_and_period(db_session):
     period_count = _count_completed_documents(db_session, eff_from, eff_to)
     assert period_count == 2
     assert round(period_count / days, 1) == round(2 / 3, 1)
+
+
+def test_picking_order_stats_avg_all_time_endpoint(client, db_session, monkeypatch):
+    admin = User(
+        username="admin_dash",
+        password_hash=get_password_hash("x"),
+        role="warehouse_admin",
+        is_active=True,
+        full_name="Admin Dashboard",
+    )
+    db_session.add(admin)
+    db_session.commit()
+    db_session.refresh(admin)
+
+    monkeypatch.setattr(dashboard_module, "_today_business", lambda: date(2026, 6, 10))
+
+    d1 = Document(
+        doc_no="SO-C1",
+        doc_type="SO",
+        status="completed",
+        completed_at=datetime(2026, 6, 1, 10, 0, 0, tzinfo=timezone.utc),
+        updated_at=datetime(2026, 6, 1, 10, 0, 0, tzinfo=timezone.utc),
+    )
+    d2 = Document(
+        doc_no="SO-C2",
+        doc_type="SO",
+        status="completed",
+        completed_at=datetime(2026, 6, 3, 10, 0, 0, tzinfo=timezone.utc),
+        updated_at=datetime(2026, 6, 3, 10, 0, 0, tzinfo=timezone.utc),
+    )
+    d3 = Document(
+        doc_no="SO-C3",
+        doc_type="SO",
+        status="completed",
+        completed_at=datetime(2026, 6, 10, 10, 0, 0, tzinfo=timezone.utc),
+        updated_at=datetime(2026, 6, 10, 10, 0, 0, tzinfo=timezone.utc),
+    )
+    db_session.add_all([d1, d2, d3])
+    db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        res_false = client.get(
+            "/api/v1/dashboard/picking-order-stats",
+            params={"date_from": "2026-06-01", "date_to": "2026-06-03"},
+        )
+        assert res_false.status_code == 200
+        data_false = res_false.json()
+        assert data_false["date_from"] == "2026-06-01"
+        assert data_false["date_to"] == "2026-06-03"
+        assert data_false["completed_today"] == 1
+        assert data_false["completed_in_period"] == 2
+        assert data_false["days_in_period"] == 3
+        assert data_false["avg_completed_per_day"] == 0.7
+
+        res_true = client.get(
+            "/api/v1/dashboard/picking-order-stats",
+            params={
+                "date_from": "2026-06-01",
+                "date_to": "2026-06-03",
+                "avg_all_time": "true",
+            },
+        )
+        assert res_true.status_code == 200
+        data_true = res_true.json()
+        assert data_true["date_from"] == "2026-06-01"
+        assert data_true["date_to"] == "2026-06-03"
+        assert data_true["completed_today"] == 1
+        assert data_true["completed_in_period"] == 2
+        assert data_true["days_in_period"] == 10
+        assert data_true["avg_completed_per_day"] == 0.3
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)

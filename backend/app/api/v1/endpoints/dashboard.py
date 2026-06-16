@@ -159,6 +159,33 @@ def _count_completed_documents(
     )
 
 
+def _first_completed_business_date(db: Session) -> Optional[date]:
+    col = _document_completed_at_expr()
+    first_dt = (
+        db.query(func.min(col))
+        .filter(
+            DocumentModel.doc_type == "SO",
+            DocumentModel.status.in_(COMPLETED_DOC_STATUSES),
+        )
+        .scalar()
+    )
+    if first_dt is None:
+        return None
+    if first_dt.tzinfo is None:
+        first_dt = first_dt.replace(tzinfo=timezone.utc)
+    return first_dt.astimezone(BUSINESS_TZ).date()
+
+
+def _compute_all_time_avg(db: Session, today: date) -> tuple[int, float]:
+    """Kunlar soni va kuniga o'rtacha (birinchi completion dan bugungacha)."""
+    first_day = _first_completed_business_date(db)
+    if first_day is None:
+        return 1, 0.0
+    days = max((today - first_day).days + 1, 1)
+    total = _count_completed_documents(db, first_day, today)
+    return days, round(total / days, 1)
+
+
 @router.get("/summary", response_model=DashboardSummaryResponse, summary="Dashboard summary")
 async def get_dashboard_summary(
     db: Session = Depends(get_db),
@@ -473,19 +500,27 @@ async def get_picking_staff_stats(
 async def get_picking_order_stats(
     date_from: Optional[date] = Query(None, description="Period start (UTC date); default today"),
     date_to: Optional[date] = Query(None, description="Period end (UTC date); default today"),
+    avg_all_time: bool = Query(
+        False,
+        description="When true, avg_completed_per_day uses all time from first completion",
+    ),
     db: Session = Depends(get_db),
     _user=Depends(require_any_permission(["reports:read", "audit:read", "admin:access"])),
 ):
-    effective_from, effective_to, days_in_period = _resolve_stats_period(date_from, date_to)
+    effective_from, effective_to, period_days = _resolve_stats_period(date_from, date_to)
     today = _today_business()
     completed_today = _count_completed_documents(db, today, today)
     completed_in_period = _count_completed_documents(db, effective_from, effective_to)
-    avg = round(completed_in_period / days_in_period, 1)
+    if avg_all_time:
+        avg_days, avg = _compute_all_time_avg(db, today)
+    else:
+        avg_days = period_days
+        avg = round(completed_in_period / period_days, 1)
     return PickingOrderStatsResponse(
         date_from=effective_from,
         date_to=effective_to,
         completed_today=completed_today,
         completed_in_period=completed_in_period,
-        days_in_period=days_in_period,
+        days_in_period=avg_days,
         avg_completed_per_day=avg,
     )

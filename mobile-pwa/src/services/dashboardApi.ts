@@ -128,10 +128,12 @@ export type PickingOrderStats = {
 export async function getPickingOrderStats(params?: {
   date_from?: string
   date_to?: string
+  avg_all_time?: boolean
 }): Promise<PickingOrderStats> {
   const query: Record<string, string> = {}
   if (params?.date_from) query.date_from = params.date_from
   if (params?.date_to) query.date_to = params.date_to
+  if (params?.avg_all_time) query.avg_all_time = 'true'
   return fetchJSON<PickingOrderStats>('/api/v1/dashboard/picking-order-stats', { query })
 }
 
