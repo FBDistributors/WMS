@@ -476,6 +476,30 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
     );
   }
 
+  Widget? _buildTotalPreview(AppLocale loc) {
+    final int boxes = int.tryParse(_boxCount.text.trim()) ?? 0;
+    final int loose = int.tryParse(_looseQty.text.trim()) ?? 0;
+    final int? upb = _unitsPerBox ?? int.tryParse(_unitsPerBoxInput.text.trim());
+
+    final int? total;
+    if (upb != null && upb >= 1) {
+      total = boxes * upb + loose;
+    } else if (boxes == 0) {
+      total = loose;
+    } else {
+      return null;
+    }
+
+    return Text(
+      StringLookup.tParams(
+        loc,
+        'inventoryTargetTotal',
+        <String, String>{'total': '$total'},
+      ),
+      style: const TextStyle(fontWeight: FontWeight.w600),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final AppLocale loc = ref.watch(appLocaleProvider);
@@ -486,6 +510,8 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
     if (_breakdownError != null) {
       return Text(_breakdownError!, style: const TextStyle(color: Colors.red));
     }
+
+    final Widget? totalPreview = _buildTotalPreview(loc);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -560,6 +586,10 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
           ),
           onChanged: (_) => setState(() {}),
         ),
+        if (totalPreview != null) ...<Widget>[
+          const SizedBox(height: 12),
+          totalPreview,
+        ],
         const SizedBox(height: 16),
         FilledButton(
           onPressed: _saving ? null : () => unawaited(_save()),
