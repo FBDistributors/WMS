@@ -3,6 +3,7 @@ import 'dart:math' show max, min;
 import 'package:flutter/material.dart';
 
 import '../../core/app_state/app_locale.dart';
+import '../../features/picking/data/picking_models.dart';
 import '../../l10n/string_lookup.dart';
 import '../input/input_clear_button.dart';
 import '../input/stock_quantity_input.dart';
@@ -182,4 +183,225 @@ int? pickBoxCountForSubmit({
   }
   final int bc = int.tryParse(boxCount.text.trim()) ?? 0;
   return bc > 0 ? bc : null;
+}
+
+/// Gibrid terish: quti soni + qo'shimcha dona natijasi.
+class PickHybridQty {
+  const PickHybridQty({
+    required this.total,
+    required this.boxUnits,
+    required this.looseUnits,
+    required this.boxCount,
+    required this.valid,
+  });
+
+  final int total;
+  final int boxUnits;
+  final int looseUnits;
+  final int boxCount;
+  final bool valid;
+}
+
+PickHybridQty computePickHybridQty({
+  required int boxCount,
+  required int looseQty,
+  required int? unitsPerBox,
+  required double maxUnits,
+}) {
+  final int maxPick = max(0, maxUnits.round());
+  final int bc = max(0, boxCount);
+  final int loose = max(0, looseQty);
+  final int? upb = unitsPerBox;
+  if (bc > 0 && (upb == null || upb < 1)) {
+    return PickHybridQty(
+      total: 0,
+      boxUnits: 0,
+      looseUnits: loose,
+      boxCount: bc,
+      valid: false,
+    );
+  }
+  final int boxUnits = bc > 0 && upb != null ? bc * upb : 0;
+  final int total = min(boxUnits + loose, maxPick);
+  final int effectiveBoxUnits =
+      bc > 0 && upb != null ? min(boxUnits, total) : 0;
+  final int effectiveLoose = total - effectiveBoxUnits;
+  final bool valid = total >= 1 && total <= maxPick && (bc == 0 || upb! >= 1);
+  return PickHybridQty(
+    total: total,
+    boxUnits: effectiveBoxUnits,
+    looseUnits: effectiveLoose,
+    boxCount: bc,
+    valid: valid,
+  );
+}
+
+PickHybridQty pickHybridQtyFromControllers({
+  required TextEditingController boxCount,
+  required TextEditingController looseQty,
+  required int? unitsPerBox,
+  required double maxUnits,
+}) {
+  return computePickHybridQty(
+    boxCount: int.tryParse(boxCount.text.trim()) ?? 0,
+    looseQty: int.tryParse(looseQty.text.trim()) ?? 0,
+    unitsPerBox: unitsPerBox,
+    maxUnits: maxUnits,
+  );
+}
+
+/// Qolgan miqdorga qarab quti + qo'shimcha dona maydonlarini to'ldirish.
+void applyHybridQtyDefaults({
+  required TextEditingController boxCount,
+  required TextEditingController looseQty,
+  required int? unitsPerBox,
+  required double maxUnits,
+}) {
+  final int maxPick = max(0, maxUnits.round());
+  final int upb = unitsPerBox ?? 0;
+  if (upb < 1 || maxPick < 1) {
+    boxCount.text = '0';
+    looseQty.text = '$maxPick';
+    return;
+  }
+  boxCount.text = '${maxPick ~/ upb}';
+  looseQty.text = '${maxPick % upb}';
+}
+
+int? unitsPerBoxFromAlternateLocations(List<PickingAlternateLocation> alternates) {
+  for (final PickingAlternateLocation a in alternates) {
+    final int? upb = _unitsPerBoxFromAlternate(a);
+    if (upb != null) {
+      return upb;
+    }
+  }
+  return null;
+}
+
+int? _unitsPerBoxFromAlternate(PickingAlternateLocation a) {
+  final int boxes = a.boxCount ?? 0;
+  final int units = a.unitsInBoxes ?? 0;
+  if (boxes < 1 || units < 1) {
+    return null;
+  }
+  final int upb = units ~/ boxes;
+  return upb >= 1 ? upb : null;
+}
+
+/// Terish: quti soni + qo'shimcha dona (SegmentedButton yo'q).
+class PickHybridQtyFields extends StatelessWidget {
+  const PickHybridQtyFields({
+    super.key,
+    required this.loc,
+    required this.boxCount,
+    required this.looseQty,
+    required this.unitsPerBox,
+    required this.maxUnits,
+    required this.onFieldsChanged,
+    this.looseUnits,
+  });
+
+  final AppLocale loc;
+  final TextEditingController boxCount;
+  final TextEditingController looseQty;
+  final int? unitsPerBox;
+  final double maxUnits;
+  final VoidCallback onFieldsChanged;
+  final int? looseUnits;
+
+  @override
+  Widget build(BuildContext context) {
+    final int? upb = unitsPerBox;
+    final PickHybridQty hybrid = pickHybridQtyFromControllers(
+      boxCount: boxCount,
+      looseQty: looseQty,
+      unitsPerBox: upb,
+      maxUnits: maxUnits,
+    );
+
+    if (upb == null || upb < 1) {
+      return TextField(
+        controller: looseQty,
+        keyboardType: kStockQtyKeyboardType,
+        inputFormatters: kStockQtyInputFormatters,
+        decoration: InputDecoration(
+          labelText: StringLookup.t(loc, 'qtyShort'),
+          border: const OutlineInputBorder(),
+          suffixIcon: buildInputClearButton(
+            visible: looseQty.text.trim().isNotEmpty,
+            onPressed: () {
+              looseQty.clear();
+              onFieldsChanged();
+            },
+          ),
+        ),
+        onChanged: (_) => onFieldsChanged(),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        InputDecorator(
+          decoration: InputDecoration(
+            labelText: StringLookup.t(loc, 'kirimNewUnitsPerBox'),
+            border: const OutlineInputBorder(),
+          ),
+          child: Text('$upb'),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: boxCount,
+          keyboardType: kStockQtyKeyboardType,
+          inputFormatters: kStockQtyInputFormatters,
+          decoration: InputDecoration(
+            labelText: StringLookup.t(loc, 'kirimNewBoxCount'),
+            border: const OutlineInputBorder(),
+            suffixIcon: buildInputClearButton(
+              visible: boxCount.text.trim().isNotEmpty && boxCount.text.trim() != '0',
+              onPressed: () {
+                boxCount.text = '0';
+                onFieldsChanged();
+              },
+            ),
+          ),
+          onChanged: (_) => onFieldsChanged(),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: looseQty,
+          keyboardType: kStockQtyKeyboardType,
+          inputFormatters: kStockQtyInputFormatters,
+          decoration: InputDecoration(
+            labelText: StringLookup.t(loc, 'pickHybridExtraLoose'),
+            border: const OutlineInputBorder(),
+            suffixIcon: buildInputClearButton(
+              visible: looseQty.text.trim().isNotEmpty && looseQty.text.trim() != '0',
+              onPressed: () {
+                looseQty.text = '0';
+                onFieldsChanged();
+              },
+            ),
+          ),
+          onChanged: (_) => onFieldsChanged(),
+        ),
+        if (hybrid.valid) ...<Widget>[
+          const SizedBox(height: 12),
+          Text(
+            StringLookup.tParams(
+              loc,
+              'pickHybridTotal',
+              <String, String>{
+                'boxes': '${hybrid.boxCount}',
+                'upb': '$upb',
+                'loose': '${hybrid.looseUnits}',
+                'total': '${hybrid.total}',
+              },
+            ),
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+        ],
+      ],
+    );
+  }
 }

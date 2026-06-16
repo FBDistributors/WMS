@@ -1,5 +1,4 @@
 import 'dart:async' show unawaited;
-import 'dart:math' show max;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +13,7 @@ import '../feedback/app_top_snackbar.dart';
 import '../layout/sheet_bottom_inset.dart';
 import 'consolidated_pick_success_snackbar.dart';
 import 'pick_box_qty_fields.dart';
+import 'pick_hybrid_submit.dart';
 
 Future<void> showConsolidatedTopPickQtySheet({
   required BuildContext context,
@@ -61,9 +61,10 @@ class _ConsolidatedTopPickQtySheet extends ConsumerStatefulWidget {
 }
 
 class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPickQtySheet> {
-  late final TextEditingController _qty;
   late final TextEditingController _boxCount;
-  String _pickQtyMode = 'byUnit';
+  late final TextEditingController _looseQty;
+  late final TextEditingController _boxBarcode;
+  late final TextEditingController _productBarcode;
   int? _unitsPerBox;
   bool _busy = false;
 
@@ -71,81 +72,126 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
   void initState() {
     super.initState();
     final double rem = widget.product.totalRequired - widget.product.totalPicked;
-    final int maxPick = max(0, rem.round());
-    _qty = TextEditingController(text: '${max(1, maxPick)}');
-    _boxCount = TextEditingController(text: '1');
-    unawaited(_resolveBoxScan());
+    _unitsPerBox = unitsPerBoxFromAlternateLocations(widget.product.alternateLocations);
+    _boxCount = TextEditingController();
+    _looseQty = TextEditingController();
+    _boxBarcode = TextEditingController();
+    _productBarcode = TextEditingController();
+    applyHybridQtyDefaults(
+      boxCount: _boxCount,
+      looseQty: _looseQty,
+      unitsPerBox: _unitsPerBox,
+      maxUnits: rem,
+    );
+    unawaited(_applyInitialScan());
   }
 
-  Future<void> _resolveBoxScan() async {
+  Future<void> _applyInitialScan() async {
+    final String raw = widget.pickBarcode.trim();
+    if (raw.isEmpty) {
+      return;
+    }
     try {
       final ScannerResolveOut out =
-          await ref.read(scannerRepositoryProvider).resolveBarcode(widget.pickBarcode);
+          await ref.read(scannerRepositoryProvider).resolveBarcode(raw);
       if (!mounted) {
         return;
       }
-      if (out.isBoxScan && out.unitsPerScan != null) {
-        final double rem = widget.product.totalRequired - widget.product.totalPicked;
-        setState(() {
-          _pickQtyMode = 'byBox';
+      setState(() {
+        if (out.isBoxScan && out.unitsPerScan != null) {
           _unitsPerBox = out.unitsPerScan;
-          _qty.text = '${out.unitsPerScan}';
-          if (rem < out.unitsPerScan!) {
-            _qty.text = '${rem.round()}';
-          }
-        });
-      }
+          _boxBarcode.text = raw;
+          applyHybridQtyDefaults(
+            boxCount: _boxCount,
+            looseQty: _looseQty,
+            unitsPerBox: _unitsPerBox,
+            maxUnits: widget.product.totalRequired - widget.product.totalPicked,
+          );
+        } else {
+          _productBarcode.text = raw;
+        }
+      });
     } on Object {
-      /* offline */
+      if (mounted) {
+        setState(() => _productBarcode.text = raw);
+      }
     }
   }
 
   @override
   void dispose() {
-    _qty.dispose();
     _boxCount.dispose();
+    _looseQty.dispose();
+    _boxBarcode.dispose();
+    _productBarcode.dispose();
     super.dispose();
+  }
+
+  PickHybridQty _currentHybrid(double rem) => pickHybridQtyFromControllers(
+        boxCount: _boxCount,
+        looseQty: _looseQty,
+        unitsPerBox: _unitsPerBox,
+        maxUnits: rem,
+      );
+
+  Future<void> _scanBox() async {
+    final String? code = await launchHybridRawBarcodeScan(context);
+    if (!mounted || code == null) {
+      return;
+    }
+    setState(() => _boxBarcode.text = code);
+  }
+
+  Future<void> _scanProduct() async {
+    final String? code = await launchHybridRawBarcodeScan(context);
+    if (!mounted || code == null) {
+      return;
+    }
+    setState(() => _productBarcode.text = code);
   }
 
   Future<void> _confirm() async {
     final double rem = widget.product.totalRequired - widget.product.totalPicked;
-    final int maxPick = max(0, rem.round());
-    final int q = pickQtyFromBoxMode(
-      mode: _pickQtyMode,
-      unitQty: _qty,
-      boxCount: _boxCount,
-      unitsPerBox: _unitsPerBox,
+    final PickHybridQty hybrid = _currentHybrid(rem);
+    final String? validation = hybridPickValidationMessage(
+      loc: widget.loc,
+      hybrid: hybrid,
+      boxBarcode: _boxBarcode.text,
+      productBarcode: _productBarcode.text,
       maxUnits: rem,
     );
-    if (q < 1 || q > maxPick) {
+    if (validation != null) {
       if (widget.host.mounted) {
-        showAppSnackBar(
-          widget.host,
-          SnackBar(
-            content: Text(
-              StringLookup.tParams(
-                widget.loc,
-                'qtyRangeError',
-                <String, String>{'max': '$maxPick'},
-              ),
-            ),
-          ),
-        );
+        showAppSnackBar(widget.host, SnackBar(content: Text(validation)));
       }
       return;
     }
     setState(() => _busy = true);
     try {
-      await widget.ref.read(pickingRepositoryProvider).consolidatedPick(
-            barcode: widget.pickBarcode.trim(),
-            qty: q,
-            requestId: 'consolidated-${DateTime.now().millisecondsSinceEpoch}',
-            boxCount: pickBoxCountForSubmit(
-              mode: _pickQtyMode,
-              boxCount: _boxCount,
-              unitsPerBox: _unitsPerBox,
-            ),
-          );
+      await submitHybridPick(
+        hybrid: hybrid,
+        boxBarcode: _boxBarcode.text,
+        productBarcode: _productBarcode.text,
+        pickBox: ({
+          required int qty,
+          required int boxCount,
+          required String barcode,
+        }) async {
+          await widget.ref.read(pickingRepositoryProvider).consolidatedPick(
+                barcode: barcode,
+                qty: qty,
+                requestId: 'consolidated-${DateTime.now().millisecondsSinceEpoch}',
+                boxCount: boxCount,
+              );
+        },
+        pickUnit: ({required int qty, required String barcode}) async {
+          await widget.ref.read(pickingRepositoryProvider).consolidatedPick(
+                barcode: barcode,
+                qty: qty,
+                requestId: 'consolidated-${DateTime.now().millisecondsSinceEpoch}',
+              );
+        },
+      );
       await widget.ref.read(consolidatedViewProvider.notifier).refreshFromNetwork();
       if (!mounted) {
         return;
@@ -155,12 +201,28 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
         showConsolidatedPickSuccessSnackBar(widget.host, widget.loc);
       }
       widget.onSuccess?.call();
-    } on Exception catch (e) {
+    } on HybridPickPartialFailure catch (e) {
       if (widget.host.mounted) {
         showAppSnackBar(
           widget.host,
-          SnackBar(content: Text('$e')),
+          SnackBar(
+            content: Text(
+              StringLookup.tParams(
+                widget.loc,
+                'pickHybridPartialProgress',
+                <String, String>{
+                  'picked': '${e.boxUnitsPicked}',
+                  'total': '${hybrid.total}',
+                },
+              ),
+            ),
+          ),
         );
+      }
+      await widget.ref.read(consolidatedViewProvider.notifier).refreshFromNetwork();
+    } on Exception catch (e) {
+      if (widget.host.mounted) {
+        showAppSnackBar(widget.host, SnackBar(content: Text('$e')));
       }
     } finally {
       if (mounted) {
@@ -174,13 +236,7 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
     final ConsolidatedProduct product = widget.product;
     final AppLocale loc = widget.loc;
     final double rem = product.totalRequired - product.totalPicked;
-    int? primaryLoose;
-    for (final PickingAlternateLocation a in product.alternateLocations) {
-      if (a.isPrimary) {
-        primaryLoose = a.looseUnits;
-        break;
-      }
-    }
+    final PickHybridQty hybrid = _currentHybrid(rem);
     return Padding(
       padding: EdgeInsets.only(bottom: sheetBottomPadding(context)),
       child: SingleChildScrollView(
@@ -225,20 +281,29 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
               ),
             ),
             const SizedBox(height: 12),
-            PickBoxQtyFields(
+            PickHybridQtyFields(
               loc: loc,
-              mode: _pickQtyMode,
-              onModeChanged: (String m) => setState(() => _pickQtyMode = m),
-              unitQty: _qty,
               boxCount: _boxCount,
+              looseQty: _looseQty,
               unitsPerBox: _unitsPerBox,
               maxUnits: rem,
-              looseUnits: primaryLoose,
               onFieldsChanged: () => setState(() {}),
+            ),
+            const SizedBox(height: 12),
+            PickHybridScanFields(
+              loc: loc,
+              hybrid: hybrid,
+              boxBarcode: _boxBarcode,
+              productBarcode: _productBarcode,
+              onBoxBarcodeChanged: () => setState(() {}),
+              onProductBarcodeChanged: () => setState(() {}),
+              onScanBox: () => unawaited(_scanBox()),
+              onScanProduct: () => unawaited(_scanProduct()),
+              busy: _busy,
             ),
             const SizedBox(height: 16),
             FilledButton(
-              onPressed: _busy ? null : _confirm,
+              onPressed: _busy ? null : () => unawaited(_confirm()),
               child: Text(StringLookup.t(loc, 'confirmButton')),
             ),
           ],

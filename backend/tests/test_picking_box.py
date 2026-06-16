@@ -362,3 +362,142 @@ def test_consolidated_pick_five_boxes(
         assert bd.units_in_boxes == 0
     finally:
         app.dependency_overrides.pop(get_current_user, None)
+
+
+def _seed_hybrid_pick_order(
+    db: Session,
+    *,
+    order_qty: int = 14,
+    box_count: int = 2,
+    loose_qty: int = 2,
+) -> tuple[Order, UserModel, ProductModel, LocationModel, StockLot, str]:
+    """2 quti (12 dona) + qo'shimcha 2 dona — gibrid terish testi."""
+    assert box_count * 6 + loose_qty == order_qty
+    picker = _mk_user(db, username=f"picker-hyb-{uuid.uuid4().hex[:8]}", role="picker")
+    product = ProductModel(
+        external_source="test",
+        external_id=f"ext-{uuid.uuid4()}",
+        name="Hybrid Pick Product",
+        sku=f"SKU-HP-{uuid.uuid4().hex[:8]}",
+        barcode=f"HP{uuid.uuid4().hex[:6]}",
+        is_active=True,
+    )
+    db.add(product)
+    db.flush()
+
+    loc = LocationModel(
+        code=f"HP-{uuid.uuid4().hex[:6]}",
+        barcode_value=f"HP-{uuid.uuid4().hex[:6]}",
+        name="Hybrid pick bin",
+        type="bin",
+        zone_type="NORMAL",
+        is_active=True,
+    )
+    db.add(loc)
+    db.flush()
+
+    lot = StockLot(product_id=product.id, batch="HP-B1", expiry_date=None)
+    db.add(lot)
+    db.flush()
+    db.add(
+        StockMovement(
+            product_id=product.id,
+            lot_id=lot.id,
+            location_id=loc.id,
+            qty_change=Decimal(str(order_qty)),
+            movement_type="receipt",
+        )
+    )
+
+    box_barcode = f"BOX-HP-{uuid.uuid4().hex[:6]}"
+    box = ProductBoxModel(
+        box_barcode=box_barcode,
+        product_id=product.id,
+        units_per_box=6,
+        is_active=True,
+    )
+    db.add(box)
+    db.flush()
+
+    inv = _mk_user(db, username=f"inv-hyb-{uuid.uuid4().hex[:8]}", role="inventory_controller")
+    place_sealed_boxes(
+        db,
+        box_barcode=box_barcode,
+        location_id=loc.id,
+        lot_id=lot.id,
+        user=inv,
+        box_count=box_count,
+    )
+
+    bd = get_breakdown(
+        db,
+        product_id=product.id,
+        lot_id=lot.id,
+        location_id=loc.id,
+    )
+    assert bd.box_count == box_count
+    assert bd.units_in_boxes == box_count * 6
+    assert bd.loose_units == loose_qty
+
+    order = Order(
+        source="test",
+        source_external_id=f"order-hp-{uuid.uuid4().hex[:10]}",
+        order_number=f"SO-HP-{uuid.uuid4().hex[:6]}",
+    )
+    order.wms_state = OrderWmsState(status="imported")
+    order.lines = [
+        OrderLine(
+            sku=product.sku,
+            name="Hybrid pick line",
+            qty=float(order_qty),
+            uom="dona",
+        )
+    ]
+    db.add(order)
+    db.commit()
+    db.refresh(order)
+    return order, picker, product, loc, lot, box_barcode
+
+
+def test_consolidated_hybrid_two_boxes_then_two_loose(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Ketma-ket: quti pick (12) + dona pick (2) = 14."""
+    order, picker, product, loc, lot, box_barcode = _seed_hybrid_pick_order(db_session)
+    _send_to_picking(client, db_session, order.id, picker.id)
+
+    app.dependency_overrides[get_current_user] = lambda: picker
+    try:
+        box_pick = client.post(
+            "/api/v1/picking/consolidated/pick",
+            json={
+                "barcode": box_barcode,
+                "qty": 12,
+                "box_count": 2,
+                "request_id": f"cons-hyb-box-{uuid.uuid4().hex}",
+            },
+        )
+        assert box_pick.status_code == 200, box_pick.text
+
+        unit_pick = client.post(
+            "/api/v1/picking/consolidated/pick",
+            json={
+                "barcode": product.barcode,
+                "qty": 2,
+                "request_id": f"cons-hyb-unit-{uuid.uuid4().hex}",
+            },
+        )
+        assert unit_pick.status_code == 200, unit_pick.text
+
+        bd = get_breakdown(
+            db_session,
+            product_id=product.id,
+            lot_id=lot.id,
+            location_id=loc.id,
+        )
+        assert bd.box_count == 0
+        assert bd.units_in_boxes == 0
+        assert bd.loose_units == 0
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
