@@ -139,7 +139,19 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
     if (!mounted || code == null) {
       return;
     }
-    setState(() => _boxBarcode.text = code);
+    final HybridBoxScanResult result = await resolveHybridBoxBarcode(
+      widget.ref.read(scannerRepositoryProvider),
+      code,
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _boxBarcode.text = result.barcode;
+      if (result.unitsPerBox != null) {
+        _unitsPerBox = result.unitsPerBox;
+      }
+    });
   }
 
   Future<void> _scanProduct() async {
@@ -189,6 +201,20 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
                 barcode: barcode,
                 qty: qty,
                 requestId: 'consolidated-${DateTime.now().millisecondsSinceEpoch}',
+              );
+        },
+        pickCombined: ({
+          required int totalQty,
+          required int boxCount,
+          required String productBarcode,
+          required String boxBarcode,
+        }) async {
+          await widget.ref.read(pickingRepositoryProvider).consolidatedPick(
+                barcode: productBarcode,
+                qty: totalQty,
+                requestId: 'consolidated-${DateTime.now().millisecondsSinceEpoch}',
+                boxCount: boxCount,
+                boxBarcode: boxBarcode,
               );
         },
       );
@@ -295,8 +321,30 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
               hybrid: hybrid,
               boxBarcode: _boxBarcode,
               productBarcode: _productBarcode,
-              onBoxBarcodeChanged: () => setState(() {}),
+              onBoxBarcodeChanged: () => setState(() {
+                if (_boxBarcode.text.trim().isEmpty) {
+                  _unitsPerBox = unitsPerBoxFromAlternateLocations(
+                    product.alternateLocations,
+                  );
+                  _boxCount.text = '0';
+                }
+              }),
               onProductBarcodeChanged: () => setState(() {}),
+              onBoxBarcodeSubmitted: (String code) async {
+                final HybridBoxScanResult result = await resolveHybridBoxBarcode(
+                  widget.ref.read(scannerRepositoryProvider),
+                  code,
+                );
+                if (!mounted) {
+                  return;
+                }
+                setState(() {
+                  _boxBarcode.text = result.barcode;
+                  if (result.unitsPerBox != null) {
+                    _unitsPerBox = result.unitsPerBox;
+                  }
+                });
+              },
               onScanBox: () => unawaited(_scanBox()),
               onScanProduct: () => unawaited(_scanProduct()),
               busy: _busy,

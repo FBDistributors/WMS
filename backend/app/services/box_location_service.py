@@ -602,6 +602,73 @@ def remove_box_for_pick_if_needed(
     )
 
 
+def validate_hybrid_pick_qty(
+    db: Session,
+    *,
+    product_id: UUID,
+    box_barcode: str | None,
+    box_count: int | None,
+    total_qty: Decimal,
+) -> tuple[Decimal, Decimal]:
+    """Gibrid terish: jami miqdordan quti va qutisiz qismlarni ajratadi."""
+    has_barcode = box_barcode is not None and box_barcode.strip() != ""
+    has_count = box_count is not None
+    if has_barcode != has_count:
+        raise HTTPException(
+            status_code=400,
+            detail="box_barcode va box_count birgalikda berilishi kerak",
+        )
+    if not has_barcode:
+        return Decimal("0"), total_qty
+    assert box_count is not None
+    if box_count < 1:
+        raise HTTPException(status_code=400, detail="box_count must be >= 1")
+    box = _get_product_box_by_barcode(db, box_barcode)
+    if box.product_id != product_id:
+        raise HTTPException(status_code=400, detail="Quti mahsulotga mos emas")
+    box_units = Decimal(str(box.units_per_box * box_count))
+    qty_dec = Decimal(str(total_qty))
+    if qty_dec < box_units:
+        raise HTTPException(
+            status_code=400,
+            detail=f"qty {int(qty_dec)} < box_count * units_per_box ({int(box_units)})",
+        )
+    return box_units, qty_dec - box_units
+
+
+def apply_hybrid_pick_side_effects(
+    db: Session,
+    *,
+    product_id: UUID,
+    lot_id: UUID,
+    location_id: UUID,
+    user: UserModel,
+    box_barcode: str,
+    box_count: int,
+    box_units: Decimal,
+    loose_units: Decimal,
+) -> None:
+    """Gibrid terish: sealed qutilarni olib tashlash va qutisiz qoldiqni tekshirish."""
+    if box_count > 0 and box_units > 0:
+        remove_sealed_boxes_for_pick(
+            db,
+            box_barcode=box_barcode,
+            location_id=location_id,
+            lot_id=lot_id,
+            user=user,
+            box_count=box_count,
+            pick_qty=box_units,
+        )
+    if loose_units > 0:
+        require_sufficient_loose_for_unit_pick(
+            db,
+            product_id=product_id,
+            lot_id=lot_id,
+            location_id=location_id,
+            qty=loose_units,
+        )
+
+
 def require_sufficient_loose_for_unit_pick(
     db: Session,
     *,

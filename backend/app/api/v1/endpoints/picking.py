@@ -35,8 +35,10 @@ from app.services.order_reserve_release import release_document_reserve_on_cance
 from app.services.stock_availability import require_sufficient_reserved
 from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_ip, log_action
 from app.services.box_location_service import (
+    apply_hybrid_pick_side_effects,
     remove_sealed_boxes_for_pick,
     require_sufficient_loose_for_unit_pick,
+    validate_hybrid_pick_qty,
 )
 from app.services.product_scan_resolve import resolve_product_scan
 from app.services.warehouse_scope import (
@@ -190,6 +192,7 @@ class ConsolidatedPickRequest(BaseModel):
     qty: float
     request_id: str
     box_count: Optional[int] = None
+    box_barcode: Optional[str] = None
 
     @field_validator("box_count")
     @classmethod
@@ -225,6 +228,7 @@ class PickLineRequest(BaseModel):
     request_id: str
     barcode: str | None = None
     box_count: Optional[int] = None
+    box_barcode: Optional[str] = None
 
     @field_validator("box_count")
     @classmethod
@@ -1273,11 +1277,31 @@ async def consolidated_pick(
     lines = sorted(lines_locked, key=lambda L: order_map[L.id])
 
     remaining = Decimal(str(qty))
-    box_pick = resolved is not None and resolved.scan_kind == "box"
-    unit_pick = resolved is not None and resolved.scan_kind == "unit"
+    hybrid_box_barcode = (payload.box_barcode or "").strip()
+    hybrid_pick = bool(hybrid_box_barcode) and payload.box_count is not None
+    box_pick = not hybrid_pick and resolved is not None and resolved.scan_kind == "box"
+    unit_pick = not hybrid_pick and resolved is not None and resolved.scan_kind == "unit"
     units_per_box: Optional[Decimal] = None
     boxes_remaining = 0
-    if box_pick:
+    loose_remaining = Decimal("0")
+    hybrid_upb: Optional[int] = None
+    if hybrid_pick:
+        if resolved is None or resolved.scan_kind != "unit":
+            raise HTTPException(
+                status_code=400,
+                detail="Gibrid terish uchun mahsulot (dona) barcode kerak",
+            )
+        assert payload.box_count is not None
+        box_units_total, loose_remaining = validate_hybrid_pick_qty(
+            db,
+            product_id=resolved.product_id,
+            box_barcode=hybrid_box_barcode,
+            box_count=payload.box_count,
+            total_qty=remaining,
+        )
+        hybrid_upb = int(box_units_total // payload.box_count) if payload.box_count else None
+        boxes_remaining = payload.box_count
+    elif box_pick:
         if payload.box_count is None:
             raise HTTPException(status_code=400, detail="box_count required for box scan")
         units_per_box = Decimal(str(resolved.units_per_scan))
@@ -1310,7 +1334,14 @@ async def consolidated_pick(
             line_remaining = Decimal(str(line.required_qty or 0)) - Decimal(str(line.picked_qty or 0))
             if line_remaining <= 0:
                 continue
-            if box_pick:
+            if hybrid_pick:
+                assert hybrid_upb is not None and hybrid_upb >= 1
+                max_pick = min(remaining, line_remaining)
+                line_boxes = min(boxes_remaining, int(max_pick // hybrid_upb))
+                box_qty = Decimal(str(line_boxes * hybrid_upb))
+                loose_qty = min(loose_remaining, max_pick - box_qty)
+                need = box_qty + loose_qty
+            elif box_pick:
                 assert units_per_box is not None
                 max_pick = min(remaining, line_remaining)
                 line_boxes = min(boxes_remaining, int(max_pick // units_per_box))
@@ -1346,7 +1377,23 @@ async def consolidated_pick(
                 need,
                 lock=True,
             )
-            if box_pick:
+            if hybrid_pick:
+                assert hybrid_upb is not None
+                line_boxes = int(box_qty // hybrid_upb) if hybrid_upb else 0
+                apply_hybrid_pick_side_effects(
+                    db,
+                    product_id=line.product_id,
+                    lot_id=line.lot_id,
+                    location_id=line.location_id,
+                    user=user,
+                    box_barcode=hybrid_box_barcode,
+                    box_count=line_boxes,
+                    box_units=box_qty,
+                    loose_units=loose_qty,
+                )
+                boxes_remaining -= line_boxes
+                loose_remaining -= loose_qty
+            elif box_pick:
                 line_boxes = int(need // units_per_box)
                 remove_sealed_boxes_for_pick(
                     db,
@@ -1951,7 +1998,37 @@ def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
             lock=True,
         )
         scan_barcode = (payload.barcode or "").strip()
-        if scan_barcode:
+        hybrid_box_barcode = (payload.box_barcode or "").strip()
+        if hybrid_box_barcode and payload.box_count is not None:
+            if not scan_barcode:
+                raise HTTPException(status_code=400, detail="barcode required for hybrid pick")
+            resolved = resolve_product_scan(db, scan_barcode)
+            if not resolved or resolved.scan_kind != "unit":
+                raise HTTPException(
+                    status_code=400,
+                    detail="Gibrid terish uchun mahsulot (dona) barcode kerak",
+                )
+            if resolved.product_id != line.product_id:
+                raise HTTPException(status_code=400, detail="Mahsulot mos emas")
+            box_units, loose_units = validate_hybrid_pick_qty(
+                db,
+                product_id=line.product_id,
+                box_barcode=hybrid_box_barcode,
+                box_count=payload.box_count,
+                total_qty=qty_delta,
+            )
+            apply_hybrid_pick_side_effects(
+                db,
+                product_id=line.product_id,
+                lot_id=line.lot_id,
+                location_id=line.location_id,
+                user=user,
+                box_barcode=hybrid_box_barcode,
+                box_count=payload.box_count,
+                box_units=box_units,
+                loose_units=loose_units,
+            )
+        elif scan_barcode:
             resolved = resolve_product_scan(db, scan_barcode)
             if resolved and resolved.scan_kind == "box":
                 if payload.box_count is None:

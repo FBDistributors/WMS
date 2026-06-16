@@ -417,14 +417,43 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                       hybrid: hybrid,
                       boxBarcode: boxBarcodeCtrl,
                       productBarcode: productBarcodeCtrl,
-                      onBoxBarcodeChanged: () => setM(() {}),
+                      onBoxBarcodeChanged: () => setM(() {
+                        if (boxBarcodeCtrl.text.trim().isEmpty) {
+                          sheetUnitsPerBox = unitsPerBoxFromAlternateLocations(
+                            product.alternateLocations,
+                          );
+                          boxCountCtrl.text = '0';
+                        }
+                      }),
                       onProductBarcodeChanged: () => setM(() {}),
+                      onBoxBarcodeSubmitted: (String code) async {
+                        final HybridBoxScanResult result = await resolveHybridBoxBarcode(
+                          ref.read(scannerRepositoryProvider),
+                          code,
+                        );
+                        setM(() {
+                          boxBarcodeCtrl.text = result.barcode;
+                          if (result.unitsPerBox != null) {
+                            sheetUnitsPerBox = result.unitsPerBox;
+                          }
+                        });
+                      },
                       onScanBox: () {
                         unawaited(() async {
                           final String? code = await launchHybridRawBarcodeScan(context);
-                          if (code != null) {
-                            setM(() => boxBarcodeCtrl.text = code);
+                          if (code == null) {
+                            return;
                           }
+                          final HybridBoxScanResult result = await resolveHybridBoxBarcode(
+                            ref.read(scannerRepositoryProvider),
+                            code,
+                          );
+                          setM(() {
+                            boxBarcodeCtrl.text = result.barcode;
+                            if (result.unitsPerBox != null) {
+                              sheetUnitsPerBox = result.unitsPerBox;
+                            }
+                          });
                         }());
                       },
                       onScanProduct: () {
@@ -490,6 +519,21 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                                           qty: qty,
                                           requestId:
                                               'consolidated-${DateTime.now().millisecondsSinceEpoch}',
+                                        );
+                                  },
+                                  pickCombined: ({
+                                    required int totalQty,
+                                    required int boxCount,
+                                    required String productBarcode,
+                                    required String boxBarcode,
+                                  }) async {
+                                    await ref.read(pickingRepositoryProvider).consolidatedPick(
+                                          barcode: productBarcode,
+                                          qty: totalQty,
+                                          requestId:
+                                              'consolidated-${DateTime.now().millisecondsSinceEpoch}',
+                                          boxCount: boxCount,
+                                          boxBarcode: boxBarcode,
                                         );
                                   },
                                 );

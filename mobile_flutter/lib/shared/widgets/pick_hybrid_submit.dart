@@ -1,13 +1,16 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/app_state/app_locale.dart';
 import '../../core/router/scanner_args.dart';
+import '../../features/scanner/data/scanner_repository.dart';
 import '../../l10n/string_lookup.dart';
 import 'pick_box_qty_fields.dart';
 import 'scan_action_button.dart';
 
-/// Birinchi (quti) chaqiruv muvaffaqiyatli, ikkinchisi xato.
+/// Birinchi (quti) chaqiruv muvaffaqiyatli, ikkinchisi xato (eski server fallback).
 class HybridPickPartialFailure implements Exception {
   HybridPickPartialFailure({
     required this.boxUnitsPicked,
@@ -31,6 +34,45 @@ typedef HybridUnitPickFn = Future<void> Function({
   required int qty,
   required String barcode,
 });
+
+typedef HybridCombinedPickFn = Future<void> Function({
+  required int totalQty,
+  required int boxCount,
+  required String productBarcode,
+  required String boxBarcode,
+});
+
+class HybridBoxScanResult {
+  const HybridBoxScanResult({
+    required this.barcode,
+    this.unitsPerBox,
+  });
+
+  final String barcode;
+  final int? unitsPerBox;
+}
+
+Future<HybridBoxScanResult> resolveHybridBoxBarcode(
+  ScannerRepository scanner,
+  String raw,
+) async {
+  final String trimmed = raw.trim();
+  if (trimmed.isEmpty) {
+    return const HybridBoxScanResult(barcode: '');
+  }
+  try {
+    final ScannerResolveOut out = await scanner.resolveBarcode(trimmed);
+    if (out.isBoxScan && out.unitsPerScan != null && out.unitsPerScan! >= 1) {
+      return HybridBoxScanResult(
+        barcode: trimmed,
+        unitsPerBox: out.unitsPerScan,
+      );
+    }
+  } on Object {
+    // Qo'lda kiritilgan kod — faqat matn sifatida saqlanadi.
+  }
+  return HybridBoxScanResult(barcode: trimmed);
+}
 
 String? hybridPickValidationMessage({
   required AppLocale loc,
@@ -63,27 +105,50 @@ Future<void> submitHybridPick({
   required String? productBarcode,
   required HybridBoxPickFn pickBox,
   required HybridUnitPickFn pickUnit,
+  HybridCombinedPickFn? pickCombined,
 }) async {
-  int boxUnitsPicked = 0;
+  if (hybrid.boxCount > 0 && hybrid.looseUnits > 0) {
+    final HybridCombinedPickFn combined = pickCombined ??
+        (({
+          required int totalQty,
+          required int boxCount,
+          required String productBarcode,
+          required String boxBarcode,
+        }) async {
+          int boxUnitsPicked = 0;
+          await pickBox(
+            qty: hybrid.boxUnits,
+            boxCount: boxCount,
+            barcode: boxBarcode,
+          );
+          boxUnitsPicked = hybrid.boxUnits;
+          try {
+            await pickUnit(qty: hybrid.looseUnits, barcode: productBarcode);
+          } on Object catch (e) {
+            if (boxUnitsPicked > 0) {
+              throw HybridPickPartialFailure(boxUnitsPicked: boxUnitsPicked, cause: e);
+            }
+            rethrow;
+          }
+        });
+    await combined(
+      totalQty: hybrid.total,
+      boxCount: hybrid.boxCount,
+      productBarcode: productBarcode!.trim(),
+      boxBarcode: boxBarcode!.trim(),
+    );
+    return;
+  }
   if (hybrid.boxCount > 0) {
-    final String bc = boxBarcode!.trim();
     await pickBox(
       qty: hybrid.boxUnits,
       boxCount: hybrid.boxCount,
-      barcode: bc,
+      barcode: boxBarcode!.trim(),
     );
-    boxUnitsPicked = hybrid.boxUnits;
+    return;
   }
   if (hybrid.looseUnits > 0) {
-    final String pc = productBarcode!.trim();
-    try {
-      await pickUnit(qty: hybrid.looseUnits, barcode: pc);
-    } on Object catch (e) {
-      if (boxUnitsPicked > 0) {
-        throw HybridPickPartialFailure(boxUnitsPicked: boxUnitsPicked, cause: e);
-      }
-      rethrow;
-    }
+    await pickUnit(qty: hybrid.looseUnits, barcode: productBarcode!.trim());
   }
 }
 
@@ -107,6 +172,7 @@ class PickHybridScanFields extends StatelessWidget {
     required this.onProductBarcodeChanged,
     required this.onScanBox,
     required this.onScanProduct,
+    this.onBoxBarcodeSubmitted,
     this.busy = false,
   });
 
@@ -118,6 +184,7 @@ class PickHybridScanFields extends StatelessWidget {
   final VoidCallback onProductBarcodeChanged;
   final VoidCallback onScanBox;
   final VoidCallback onScanProduct;
+  final Future<void> Function(String code)? onBoxBarcodeSubmitted;
   final bool busy;
 
   @override
@@ -137,6 +204,12 @@ class PickHybridScanFields extends StatelessWidget {
                   border: const OutlineInputBorder(),
                 ),
                 onChanged: (_) => onBoxBarcodeChanged(),
+                onSubmitted: (String v) {
+                  final Future<void> Function(String code)? handler = onBoxBarcodeSubmitted;
+                  if (handler != null) {
+                    unawaited(handler(v));
+                  }
+                },
               ),
             ),
             const SizedBox(width: 8),

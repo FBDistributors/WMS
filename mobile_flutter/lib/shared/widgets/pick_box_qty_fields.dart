@@ -312,6 +312,7 @@ class PickHybridQtyFields extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final int? upb = unitsPerBox;
+    final bool canEditBoxCount = upb != null && upb >= 1;
     final PickHybridQty hybrid = pickHybridQtyFromControllers(
       boxCount: boxCount,
       looseQty: looseQty,
@@ -352,13 +353,16 @@ class PickHybridQtyFields extends StatelessWidget {
         const SizedBox(height: 12),
         TextField(
           controller: boxCount,
+          enabled: canEditBoxCount,
           keyboardType: kStockQtyKeyboardType,
           inputFormatters: kStockQtyInputFormatters,
           decoration: InputDecoration(
             labelText: StringLookup.t(loc, 'kirimNewBoxCount'),
             border: const OutlineInputBorder(),
             suffixIcon: buildInputClearButton(
-              visible: boxCount.text.trim().isNotEmpty && boxCount.text.trim() != '0',
+              visible: canEditBoxCount &&
+                  boxCount.text.trim().isNotEmpty &&
+                  boxCount.text.trim() != '0',
               onPressed: () {
                 boxCount.text = '0';
                 onFieldsChanged();

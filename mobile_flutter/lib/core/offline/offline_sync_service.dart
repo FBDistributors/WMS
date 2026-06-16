@@ -35,10 +35,16 @@ class OfflineSyncService {
           case 'PICK_CONFIRM_ITEM':
             final String lineId = payload['itemId']! as String;
             final int count = (payload['qty'] as num?)?.toInt() ?? 1;
+            final int? boxCount = (payload['box_count'] as num?)?.toInt();
+            final String? boxBarcode = payload['box_barcode'] as String?;
+            final String? productBarcode = payload['product_barcode'] as String?;
             await _picking.pickLine(
               lineId,
               count,
               'sync-${item.id}-${DateTime.now().millisecondsSinceEpoch}',
+              barcode: productBarcode,
+              boxCount: boxCount,
+              boxBarcode: boxBarcode,
             );
             break;
           case 'PICK_CLOSE_TASK':

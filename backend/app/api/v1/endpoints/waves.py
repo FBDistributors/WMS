@@ -41,9 +41,11 @@ from app.services.wave_service import (
     get_staging_location_id,
 )
 from app.services.box_location_service import (
+    apply_hybrid_pick_side_effects,
     get_breakdown_for_pick,
     remove_sealed_boxes_for_pick,
     require_sufficient_loose_for_unit_pick,
+    validate_hybrid_pick_qty,
 )
 from app.services.product_scan_resolve import resolve_product_scan
 from app.services.stock_availability import compute_lot_location_available, lock_lot_location
@@ -117,6 +119,7 @@ class PickScanIn(BaseModel):
     qty: Decimal = Field(..., gt=0)
     request_id: UUID
     box_count: Optional[int] = Field(default=None, ge=1, le=500)
+    box_barcode: Optional[str] = None
 
 
 class SortingScanIn(BaseModel):
@@ -388,9 +391,32 @@ async def pick_scan(
 
     box_pick = resolved is not None and resolved.scan_kind == "box"
     unit_pick = resolved is not None and resolved.scan_kind == "unit"
+    hybrid_box_barcode = (payload.box_barcode or "").strip()
+    hybrid_pick = bool(hybrid_box_barcode) and payload.box_count is not None
+    if hybrid_pick:
+        box_pick = False
+        unit_pick = False
     units_per_box: Optional[Decimal] = None
     boxes_remaining = 0
-    if box_pick:
+    loose_remaining = Decimal("0")
+    hybrid_upb: Optional[int] = None
+    if hybrid_pick:
+        if resolved is None or resolved.scan_kind != "unit":
+            raise HTTPException(
+                status_code=400,
+                detail="Gibrid terish uchun mahsulot (dona) barcode kerak",
+            )
+        assert payload.box_count is not None
+        box_units_total, loose_remaining = validate_hybrid_pick_qty(
+            db,
+            product_id=resolved.product_id,
+            box_barcode=hybrid_box_barcode,
+            box_count=payload.box_count,
+            total_qty=Decimal(str(payload.qty)),
+        )
+        hybrid_upb = int(box_units_total // payload.box_count) if payload.box_count else None
+        boxes_remaining = payload.box_count
+    elif box_pick:
         if payload.box_count is None:
             raise HTTPException(status_code=400, detail="box_count required for box scan")
         units_per_box = Decimal(str(resolved.units_per_scan))
@@ -414,7 +440,14 @@ async def pick_scan(
         available = wa.allocated_qty - wa.picked_qty
         if available <= 0:
             continue
-        if box_pick:
+        if hybrid_pick:
+            assert hybrid_upb is not None and hybrid_upb >= 1
+            max_pick = min(to_pick, available)
+            line_boxes = min(boxes_remaining, int(max_pick // hybrid_upb))
+            box_qty = Decimal(str(line_boxes * hybrid_upb))
+            loose_qty = min(loose_remaining, max_pick - box_qty)
+            pick_from_alloc = box_qty + loose_qty
+        elif box_pick:
             assert units_per_box is not None
             max_pick = min(to_pick, available)
             line_boxes = min(boxes_remaining, int(max_pick // units_per_box))
@@ -423,12 +456,30 @@ async def pick_scan(
             pick_from_alloc = Decimal(str(line_boxes)) * units_per_box
         else:
             pick_from_alloc = min(to_pick, available)
+        if pick_from_alloc <= 0:
+            continue
         assert_location_allowed_for_pick(db, wa.location_id)
         # Serialise lot+joy (parallel skanlar bir xil ajratishdan ortiq terib qo‘ymasin).
         # unallocate reservedni kamaytiradi — available o‘zgarmaydi; shuning uchun
         # require_sufficient_available bu yerda noto‘g‘ri bloklardi (hammasi reserved bo‘lsa).
         lock_lot_location(db, wa.stock_lot_id, wa.location_id)
-        if box_pick:
+        if hybrid_pick:
+            assert hybrid_upb is not None
+            line_boxes = int(box_qty // hybrid_upb) if hybrid_upb else 0
+            apply_hybrid_pick_side_effects(
+                db,
+                product_id=wl.product_id,
+                lot_id=wa.stock_lot_id,
+                location_id=wa.location_id,
+                user=user,
+                box_barcode=hybrid_box_barcode,
+                box_count=line_boxes,
+                box_units=box_qty,
+                loose_units=loose_qty,
+            )
+            boxes_remaining -= line_boxes
+            loose_remaining -= loose_qty
+        elif box_pick:
             line_boxes = int(pick_from_alloc // units_per_box)
             remove_sealed_boxes_for_pick(
                 db,

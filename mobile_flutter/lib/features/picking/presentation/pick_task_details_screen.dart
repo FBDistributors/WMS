@@ -1456,14 +1456,43 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                         ),
                         boxBarcode: hybridBoxBarcode,
                         productBarcode: hybridProductBarcode,
-                        onBoxBarcodeChanged: () => setM(() {}),
+                        onBoxBarcodeChanged: () => setM(() {
+                          if (hybridBoxBarcode.text.trim().isEmpty) {
+                            hybridUnitsPerBox = unitsPerBoxFromAlternateLocations(
+                              pickTargetHolder[0].alternateLocations,
+                            );
+                            hybridBoxCount.text = '0';
+                          }
+                        }),
                         onProductBarcodeChanged: () => setM(() {}),
+                        onBoxBarcodeSubmitted: (String code) async {
+                          final HybridBoxScanResult result = await resolveHybridBoxBarcode(
+                            ref.read(scannerRepositoryProvider),
+                            code,
+                          );
+                          setM(() {
+                            hybridBoxBarcode.text = result.barcode;
+                            if (result.unitsPerBox != null) {
+                              hybridUnitsPerBox = result.unitsPerBox;
+                            }
+                          });
+                        },
                         onScanBox: () {
                           unawaited(() async {
                             final String? code = await launchHybridRawBarcodeScan(context);
-                            if (code != null) {
-                              setM(() => hybridBoxBarcode.text = code);
+                            if (code == null) {
+                              return;
                             }
+                            final HybridBoxScanResult result = await resolveHybridBoxBarcode(
+                              ref.read(scannerRepositoryProvider),
+                              code,
+                            );
+                            setM(() {
+                              hybridBoxBarcode.text = result.barcode;
+                              if (result.unitsPerBox != null) {
+                                hybridUnitsPerBox = result.unitsPerBox;
+                              }
+                            });
                           }());
                         },
                         onScanProduct: () {
@@ -1543,6 +1572,25 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                         .read(pickTaskDetailProvider(widget.taskId).notifier)
                                         .applyPickLineResponse(widget.taskId, res);
                                   },
+                                  pickCombined: ({
+                                    required int totalQty,
+                                    required int boxCount,
+                                    required String productBarcode,
+                                    required String boxBarcode,
+                                  }) async {
+                                    final PickLineResponse res =
+                                        await ref.read(pickingRepositoryProvider).pickLine(
+                                              pickTargetHolder[0].id,
+                                              totalQty,
+                                              'scan-${widget.taskId}-${pickTargetHolder[0].id}-${DateTime.now().millisecondsSinceEpoch}',
+                                              barcode: productBarcode,
+                                              boxCount: boxCount,
+                                              boxBarcode: boxBarcode,
+                                            );
+                                    await ref
+                                        .read(pickTaskDetailProvider(widget.taskId).notifier)
+                                        .applyPickLineResponse(widget.taskId, res);
+                                  },
                                 );
                               } else {
                                 final OfflineDatabase? db =
@@ -1555,6 +1603,13 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                       'taskId': widget.taskId,
                                       'itemId': pickTargetHolder[0].id,
                                       'qty': hybrid.total,
+                                      if (hybrid.boxCount > 0) 'box_count': hybrid.boxCount,
+                                      if (hybrid.boxCount > 0 &&
+                                          hybridBoxBarcode.text.trim().isNotEmpty)
+                                        'box_barcode': hybridBoxBarcode.text.trim(),
+                                      if (hybrid.looseUnits > 0 &&
+                                          hybridProductBarcode.text.trim().isNotEmpty)
+                                        'product_barcode': hybridProductBarcode.text.trim(),
                                       'ts': DateTime.now().millisecondsSinceEpoch,
                                     },
                                     'pending',

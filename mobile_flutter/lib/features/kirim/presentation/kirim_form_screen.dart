@@ -588,6 +588,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           trimmed != _newReceiveResolvedBoxBarcode) {
         _newReceiveResolvedBoxBarcode = null;
         _newReceiveUnitsPerBox = null;
+        _newReceiveBoxCount.text = '0';
       }
     });
   }
@@ -684,6 +685,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             _newReceiveBoxBarcode.clear();
             _newReceiveResolvedBoxBarcode = null;
             _newReceiveUnitsPerBox = null;
+            _newReceiveBoxCount.text = '0';
           }),
         )!,
       ],
@@ -694,6 +696,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     final int boxCount = int.tryParse(_newReceiveBoxCount.text.trim()) ?? 0;
     final int looseQty = int.tryParse(_qty.text.trim()) ?? 0;
     final int? unitsPerBox = _newReceiveUnitsPerBox;
+    final bool canEditBoxCount = unitsPerBox != null && unitsPerBox >= 1;
     final int? total = computeKirimReceiveTotal(
       boxCount: boxCount,
       looseQty: looseQty,
@@ -756,13 +759,15 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         const SizedBox(height: 12),
         TextField(
           controller: _newReceiveBoxCount,
+          enabled: canEditBoxCount,
           keyboardType: kStockQtyKeyboardType,
           inputFormatters: kStockQtyInputFormatters,
           decoration: InputDecoration(
             labelText: StringLookup.t(appLoc, 'kirimNewBoxCount'),
             border: const OutlineInputBorder(),
             suffixIcon: buildInputClearButton(
-              visible: _newReceiveBoxCount.text.trim().isNotEmpty &&
+              visible: canEditBoxCount &&
+                  _newReceiveBoxCount.text.trim().isNotEmpty &&
                   _newReceiveBoxCount.text.trim() != '0',
               onPressed: () => setState(() => _newReceiveBoxCount.text = '0'),
             ),

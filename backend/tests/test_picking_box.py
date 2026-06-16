@@ -501,3 +501,75 @@ def test_consolidated_hybrid_two_boxes_then_two_loose(
         assert bd.loose_units == 0
     finally:
         app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_line_pick_hybrid_single_request(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Bitta so'rov: 2 quti (12) + 2 dona = 14."""
+    order, picker, product, loc, lot, box_barcode = _seed_hybrid_pick_order(db_session)
+    doc_id = _send_to_picking(client, db_session, order.id, picker.id)
+
+    app.dependency_overrides[get_current_user] = lambda: picker
+    try:
+        line_id = client.get(f"/api/v1/picking/documents/{doc_id}").json()["lines"][0]["id"]
+        pick = client.post(
+            f"/api/v1/picking/lines/{line_id}/pick",
+            json={
+                "delta": 14,
+                "request_id": f"pick-hyb-line-{uuid.uuid4().hex}",
+                "barcode": product.barcode,
+                "box_barcode": box_barcode,
+                "box_count": 2,
+            },
+        )
+        assert pick.status_code == 200, pick.text
+        assert pick.json()["line"]["qty_picked"] == 14
+
+        bd = get_breakdown(
+            db_session,
+            product_id=product.id,
+            lot_id=lot.id,
+            location_id=loc.id,
+        )
+        assert bd.box_count == 0
+        assert bd.units_in_boxes == 0
+        assert bd.loose_units == 0
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_consolidated_hybrid_single_request(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Bitta so'rov: quti + dona gibrid terish."""
+    order, picker, product, loc, lot, box_barcode = _seed_hybrid_pick_order(db_session)
+    _send_to_picking(client, db_session, order.id, picker.id)
+
+    app.dependency_overrides[get_current_user] = lambda: picker
+    try:
+        hybrid_pick = client.post(
+            "/api/v1/picking/consolidated/pick",
+            json={
+                "barcode": product.barcode,
+                "box_barcode": box_barcode,
+                "box_count": 2,
+                "qty": 14,
+                "request_id": f"cons-hyb-single-{uuid.uuid4().hex}",
+            },
+        )
+        assert hybrid_pick.status_code == 200, hybrid_pick.text
+
+        bd = get_breakdown(
+            db_session,
+            product_id=product.id,
+            lot_id=lot.id,
+            location_id=loc.id,
+        )
+        assert bd.box_count == 0
+        assert bd.units_in_boxes == 0
+        assert bd.loose_units == 0
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
