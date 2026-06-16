@@ -6,7 +6,8 @@ import JsBarcode from 'jsbarcode'
 import QRCode from 'qrcode'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
-import { TableScrollArea } from '../../components/TableScrollArea'
+import { AdminDataTable, type AdminDataTableColumn } from '../../admin/components/AdminDataTable'
+import { AdminTablePagination } from '../../admin/components/AdminTablePagination'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
@@ -48,6 +49,21 @@ function previewCode(
   return '—'
 }
 
+function locationZoneBadgeClass(zoneType: string | null | undefined): string {
+  switch (zoneType) {
+    case 'EXPIRED':
+      return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
+    case 'DAMAGED':
+      return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+    case 'QUARANTINE':
+      return 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-300'
+    case 'NORMAL':
+      return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+    default:
+      return 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
+  }
+}
+
 type DialogState = {
   open: boolean
   mode: 'create' | 'edit'
@@ -73,7 +89,138 @@ export function LocationsPage() {
   const warehouse = (searchParams.get('warehouse') as WarehouseFilter) || 'main'
   const mainZone = (searchParams.get('main_zone') as MainZoneFilter) || 'normal'
   const PAGE_SIZE = 50
-  const locationPage = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10) / PAGE_SIZE)
+  const offset = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10))
+  const locationPage = Math.floor(offset / PAGE_SIZE)
+
+  const openEditDialog = useCallback((loc: Location) => {
+    setDialog({
+      open: true,
+      mode: 'edit',
+      target: loc,
+      isShowroom: (loc as Location & { warehouse_id?: string }).warehouse_id != null,
+    })
+  }, [])
+
+  const tableColumns = useMemo((): AdminDataTableColumn<Location>[] => {
+    return [
+      {
+        id: 'code',
+        header: t('locations:fields.code'),
+        width: '7rem',
+        cell: (loc) => <span className="font-medium">{loc.code}</span>,
+      },
+      {
+        id: 'type',
+        header: t('locations:type_label'),
+        width: '6.5rem',
+        cell: (loc) => <span className="text-slate-600 dark:text-slate-400">{loc.location_type ?? '—'}</span>,
+      },
+      {
+        id: 'zone',
+        header: t('locations:zone_type'),
+        width: '7rem',
+        cell: (loc) => (
+          <span
+            className={`inline-flex rounded px-1.5 py-0.5 text-xs font-medium ${locationZoneBadgeClass(loc.zone_type)}`}
+          >
+            {loc.zone_type ?? 'NORMAL'}
+          </span>
+        ),
+      },
+      {
+        id: 'sector',
+        header: t('locations:sector'),
+        width: '5rem',
+        cell: (loc) => <span className="text-slate-600 dark:text-slate-400">{loc.sector ?? '—'}</span>,
+      },
+      {
+        id: 'level',
+        header: t('locations:level_no'),
+        width: '5rem',
+        cell: (loc) => (
+          <span className="text-slate-600 dark:text-slate-400">
+            {loc.level_no != null ? loc.level_no : '—'}
+          </span>
+        ),
+      },
+      {
+        id: 'row',
+        header: t('locations:row_no'),
+        width: '5rem',
+        cell: (loc) => (
+          <span className="text-slate-600 dark:text-slate-400">{loc.row_no != null ? loc.row_no : '—'}</span>
+        ),
+      },
+      {
+        id: 'pallet',
+        header: t('locations:pallet_no'),
+        width: '5.5rem',
+        cell: (loc) => (
+          <span className="text-slate-600 dark:text-slate-400">
+            {loc.pallet_no != null ? loc.pallet_no : '—'}
+          </span>
+        ),
+      },
+      {
+        id: 'pick_sequence',
+        header: t('locations:pick_sequence'),
+        width: '6rem',
+        cell: (loc) => (
+          <span className="text-slate-600 dark:text-slate-400">
+            {loc.pick_sequence != null ? loc.pick_sequence : '—'}
+          </span>
+        ),
+      },
+      {
+        id: 'status',
+        header: t('locations:status'),
+        width: '6rem',
+        cell: (loc) =>
+          loc.is_active ? (
+            <span className="text-green-600 dark:text-green-400">{t('locations:active')}</span>
+          ) : (
+            <span className="font-medium text-red-600 dark:text-red-400">{t('locations:inactive')}</span>
+          ),
+      },
+      {
+        id: 'actions',
+        header: t('locations:actions'),
+        width: '9rem',
+        cell: (loc) => (
+          <div
+            className="flex flex-nowrap items-center gap-0.5 sm:gap-1"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            role="presentation"
+          >
+            <Button
+              variant="ghost"
+              className="shrink-0 px-1.5 py-1.5 text-xs sm:px-2"
+              onClick={(e) => {
+                e.stopPropagation()
+                openEditDialog(loc)
+              }}
+              aria-label={t('locations:edit')}
+            >
+              <Pencil size={14} />
+            </Button>
+            <Button
+              variant="ghost"
+              className="shrink-0 px-1.5 py-1.5 text-xs sm:px-2"
+              onClick={(e) => {
+                e.stopPropagation()
+                setLocationForQr(loc)
+              }}
+              aria-label={t('locations:qr_download')}
+            >
+              <QrCode size={14} className="sm:mr-1 sm:inline" />
+              <span className="hidden sm:inline">{t('locations:qr_download')}</span>
+            </Button>
+          </div>
+        ),
+      },
+    ]
+  }, [openEditDialog, t])
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -123,15 +270,15 @@ export function LocationsPage() {
     return filteredItems.slice(start, start + PAGE_SIZE)
   }, [filteredItems, locationPage])
 
-  const content = useMemo(() => {
-    if (isLoading) {
+  const tableBody = () => {
+    if (isLoading && items.length === 0) {
       return (
-        <div className="relative flex-1 min-h-[200px]">
+        <div className="relative min-h-[200px] flex-1">
           <LoadingOverlay label={t('common:messages.loading')} />
         </div>
       )
     }
-    if (hasLoadError) {
+    if (hasLoadError && items.length === 0) {
       return (
         <EmptyState
           title={t('locations:load_failed')}
@@ -150,146 +297,27 @@ export function LocationsPage() {
         />
       )
     }
-  return (
-    <TableScrollArea>
-        <table className="w-full min-w-[640px] table-fixed text-left text-sm sm:table-auto">
-          <thead>
-            <tr className="border-b border-slate-200 dark:border-slate-700">
-              <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
-                {t('locations:fields.code')}
-              </th>
-              <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
-                {t('locations:type_label')}
-              </th>
-              <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
-                {t('locations:zone_type')}
-              </th>
-              <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
-                {t('locations:sector')}
-              </th>
-              <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
-                {t('locations:level_no')}
-              </th>
-              <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
-                {t('locations:row_no')}
-              </th>
-              <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
-                {t('locations:pallet_no')}
-              </th>
-              <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
-                {t('locations:pick_sequence')}
-              </th>
-              <th className="whitespace-nowrap pb-2 pr-3 font-semibold text-slate-700 dark:text-slate-300 sm:pr-4">
-                {t('locations:status')}
-              </th>
-              <th className="whitespace-nowrap pb-2 pl-2 font-semibold text-slate-700 dark:text-slate-300">
-                {t('locations:actions')}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedItems.length === 0 ? (
-              <tr>
-                <td colSpan={10} className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
-                  {filterQuery.trim() ? t('locations:filter_no_results') : t('locations:empty')}
-                </td>
-              </tr>
-            ) : (
-              paginatedItems.map((loc) => (
-              <tr
-                key={loc.id}
-                className="cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
-                onClick={() => navigate(`/admin/locations/${loc.id}`)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    navigate(`/admin/locations/${loc.id}`)
-                  }
-                }}
-              >
-                <td className="whitespace-nowrap py-2 pr-3 font-medium text-slate-900 dark:text-slate-100 sm:pr-4">
-                  {loc.code}
-                </td>
-                <td className="whitespace-nowrap py-2 pr-3 text-slate-600 dark:text-slate-400 sm:pr-4">
-                  {loc.location_type ?? '—'}
-                </td>
-                <td className="whitespace-nowrap py-2 pr-3 sm:pr-4">
-                  <span className={`inline-flex rounded px-1.5 py-0.5 text-xs font-medium ${
-                    loc.zone_type === 'NORMAL' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-                    loc.zone_type === 'EXPIRED' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' :
-                    loc.zone_type === 'DAMAGED' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
-                    loc.zone_type === 'QUARANTINE' ? 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-300' :
-                    'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
-                  }`}>
-                    {loc.zone_type ?? 'NORMAL'}
-                  </span>
-                </td>
-                <td className="whitespace-nowrap py-2 pr-3 text-slate-600 dark:text-slate-400 sm:pr-4">{loc.sector ?? '—'}</td>
-                <td className="whitespace-nowrap py-2 pr-3 text-slate-600 dark:text-slate-400 sm:pr-4">
-                  {loc.level_no != null ? loc.level_no : '—'}
-                </td>
-                <td className="whitespace-nowrap py-2 pr-3 text-slate-600 dark:text-slate-400 sm:pr-4">
-                  {loc.row_no != null ? loc.row_no : '—'}
-                </td>
-                <td className="whitespace-nowrap py-2 pr-3 text-slate-600 dark:text-slate-400 sm:pr-4">
-                  {loc.pallet_no != null ? loc.pallet_no : '—'}
-                </td>
-                <td className="whitespace-nowrap py-2 pr-3 text-slate-600 dark:text-slate-400 sm:pr-4">
-                  {loc.pick_sequence != null ? loc.pick_sequence : '—'}
-                </td>
-                <td className="whitespace-nowrap py-2 pr-3 sm:pr-4">
-                  {loc.is_active ? (
-                    <span className="text-green-600 dark:text-green-400">
-                      {t('locations:active')}
-                    </span>
-                  ) : (
-                    <span className="font-medium text-red-600 dark:text-red-400">
-                      {t('locations:inactive')}
-                    </span>
-                  )}
-                </td>
-                <td className="py-2 pl-2" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex flex-nowrap items-center gap-0.5 sm:gap-1">
-                    <Button
-                      variant="ghost"
-                      className="shrink-0 py-1.5 px-1.5 text-xs sm:px-2"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setDialog({
-                          open: true,
-                          mode: 'edit',
-                          target: loc,
-                          isShowroom: (loc as Location & { warehouse_id?: string }).warehouse_id != null,
-                        })
-                      }}
-                      aria-label={t('locations:edit')}
-                    >
-                      <Pencil size={14} />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="shrink-0 py-1.5 px-1.5 text-xs sm:px-2"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setLocationForQr(loc)
-                      }}
-                      aria-label={t('locations:qr_download')}
-                    >
-                      <QrCode size={14} className="sm:mr-1 sm:inline" />
-                      <span className="hidden sm:inline">{t('locations:qr_download')}</span>
-                    </Button>
-                  </div>
-                </td>
-              </tr>
-            ))
-            )}
-          </tbody>
-        </table>
-      </TableScrollArea>
+    if (filteredItems.length === 0) {
+      return (
+        <EmptyState
+          title={t('locations:filter_no_results')}
+          actionLabel={t('common:buttons.clear')}
+          onAction={() => setFilterQuery('')}
+        />
+      )
+    }
+    return (
+      <AdminDataTable
+        columns={tableColumns}
+        rows={paginatedItems}
+        getRowKey={(loc) => loc.id}
+        minWidth="min-w-[64rem]"
+        onRowClick={(loc) => navigate(`/admin/locations/${loc.id}`)}
+        refreshing={isLoading && items.length > 0}
+        refreshingLabel={t('common:messages.loading')}
+      />
     )
-  }, [hasLoadError, isLoading, items, filteredItems, paginatedItems, load, navigate, t, filterQuery])
+  }
 
   const warehouseTabs = (
     <div className="flex items-center gap-1 overflow-x-auto rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
@@ -404,48 +432,36 @@ export function LocationsPage() {
             <span className="hidden sm:inline">{t('locations:add')}</span>
           </Button>
         </div>
-        {content}
-        {!isLoading && !hasLoadError && filteredItems.length > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-4 dark:border-slate-800">
+        {tableBody()}
+        {!isLoading && !hasLoadError && filteredItems.length > 0 ? (
+          <div className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-800">
             <Button variant="outline" onClick={() => void load()} disabled={isLoading}>
               <RefreshCw size={16} className={isLoading ? 'animate-spin shrink-0' : 'shrink-0'} />
               {t('common:buttons.refresh')}
             </Button>
-            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-              <span>
-                {filteredItems.length > 0
-                  ? `${locationPage * PAGE_SIZE + 1}–${Math.min((locationPage + 1) * PAGE_SIZE, filteredItems.length)} / ${filteredItems.length}`
-                  : '0 / 0'}
-              </span>
-              <Button
-                variant="secondary"
-                disabled={locationPage === 0}
-                onClick={() => {
-                  setSearchParams((prev) => {
-                    const next = new URLSearchParams(prev)
-                    next.set('offset', String((locationPage - 1) * PAGE_SIZE))
-                    return next
-                  })
-                }}
-              >
-                {t('common:buttons.back')}
-              </Button>
-              <Button
-                variant="secondary"
-                disabled={(locationPage + 1) * PAGE_SIZE >= filteredItems.length}
-                onClick={() => {
-                  setSearchParams((prev) => {
-                    const next = new URLSearchParams(prev)
-                    next.set('offset', String((locationPage + 1) * PAGE_SIZE))
-                    return next
-                  })
-                }}
-              >
-                {t('orders:pagination.next', 'Keyingi')}
-              </Button>
-            </div>
+            <AdminTablePagination
+              offset={offset}
+              pageSize={PAGE_SIZE}
+              total={filteredItems.length}
+              onPrev={() => {
+                const newOffset = Math.max(0, offset - PAGE_SIZE)
+                setSearchParams((prev) => {
+                  const next = new URLSearchParams(prev)
+                  if (newOffset > 0) next.set('offset', String(newOffset))
+                  else next.delete('offset')
+                  return next
+                })
+              }}
+              onNext={() => {
+                setSearchParams((prev) => {
+                  const next = new URLSearchParams(prev)
+                  next.set('offset', String(offset + PAGE_SIZE))
+                  return next
+                })
+              }}
+            />
           </div>
-        )}
+        ) : null}
       </Card>
 
       {dialog.open ? (

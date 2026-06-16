@@ -4,7 +4,7 @@ import { ArrowLeft, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
-import { TableScrollArea } from '../../components/TableScrollArea'
+import { AdminDataTable, type AdminDataTableColumn } from '../../admin/components/AdminDataTable'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -45,6 +45,56 @@ export function LocationDetailPage() {
     })
   }, [items, filterQuery])
 
+  const tableColumns = useMemo((): AdminDataTableColumn<InventoryByLocationRow>[] => {
+    return [
+      {
+        id: 'code',
+        header: t('locations:detail_col_code'),
+        width: '6rem',
+        cell: (row) => <span className="font-medium">{row.product_code}</span>,
+      },
+      {
+        id: 'name',
+        header: t('locations:detail_col_product_name'),
+        width: '14rem',
+        cell: (row) => <span className="line-clamp-2 block">{row.product_name}</span>,
+      },
+      {
+        id: 'barcode',
+        header: t('locations:detail_col_barcode'),
+        width: '8rem',
+        cell: (row) => (
+          <span className="font-mono text-xs text-slate-700 dark:text-slate-200">{row.barcode ?? '—'}</span>
+        ),
+      },
+      {
+        id: 'brand',
+        header: t('locations:detail_col_brand'),
+        width: '7rem',
+        cell: (row) => <span>{row.brand ?? '—'}</span>,
+      },
+      {
+        id: 'batch',
+        header: t('locations:detail_col_batch'),
+        width: '5rem',
+        cell: (row) => <span>{row.batch}</span>,
+      },
+      {
+        id: 'expiry',
+        header: t('locations:detail_col_expiry'),
+        width: '7rem',
+        cell: (row) => <span>{row.expiry_date ?? '—'}</span>,
+      },
+      {
+        id: 'qty',
+        header: t('locations:detail_col_qty'),
+        width: '5rem',
+        align: 'right',
+        cell: (row) => <span className="font-medium">{Math.round(Number(row.available))}</span>,
+      },
+    ]
+  }, [t])
+
   const load = useCallback(async () => {
     if (!id) return
     setIsLoading(true)
@@ -70,15 +120,15 @@ export function LocationDetailPage() {
     void load()
   }, [load])
 
-  const content = useMemo(() => {
-    if (isLoading) {
+  const tableBody = () => {
+    if (isLoading && items.length === 0) {
       return (
-        <div className="relative flex-1 min-h-[200px]">
+        <div className="relative min-h-[200px] flex-1">
           <LoadingOverlay label={t('common:messages.loading')} />
         </div>
       )
     }
-    if (hasLoadError) {
+    if (hasLoadError && items.length === 0) {
       return (
         <EmptyState
           title={t('locations:load_failed')}
@@ -119,62 +169,25 @@ export function LocationDetailPage() {
             )}
           </div>
         </label>
-        <div className="w-full max-h-[calc(100vh-320px)] min-h-0 overflow-auto">
-          <TableScrollArea inline className="w-full">
-            <table className="w-full min-w-[600px] text-sm table-fixed">
-              <thead className="text-xs uppercase text-slate-500 dark:text-slate-400">
-                <tr className="border-b border-slate-200 dark:border-slate-800">
-                  <th className="w-24 px-3 py-3 text-center">{t('locations:detail_col_code')}</th>
-                  <th className="min-w-0 px-3 py-3 text-center" style={{ width: '30%' }}>{t('locations:detail_col_product_name')}</th>
-                  <th className="w-28 px-3 py-3 text-center">{t('locations:detail_col_barcode')}</th>
-                  <th className="w-28 px-3 py-3 text-center">{t('locations:detail_col_brand')}</th>
-                  <th className="w-20 px-3 py-3 text-center">{t('locations:detail_col_batch')}</th>
-                  <th className="w-28 px-3 py-3 text-center">{t('locations:detail_col_expiry')}</th>
-                  <th className="w-20 px-3 py-3 text-center">{t('locations:detail_col_qty')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredItems.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
-                      {filterQuery.trim() ? t('locations:filter_no_results') : t('locations:detail_empty')}
-                    </td>
-                  </tr>
-                ) : (
-                  filteredItems.map((row) => (
-                    <tr
-                      key={`${row.lot_id}`}
-                      className="border-b border-slate-100 dark:border-slate-800"
-                    >
-                      <td className="px-3 py-3 text-center font-medium text-slate-800 dark:text-slate-200">
-                        {row.product_code}
-                      </td>
-                      <td className="min-w-0 px-3 py-3 text-center text-slate-700 dark:text-slate-200" style={{ width: '30%' }}>
-                        <span className="line-clamp-2 block">{row.product_name}</span>
-                      </td>
-                      <td className="px-3 py-3 text-center font-mono text-xs text-slate-700 dark:text-slate-200">
-                        {row.barcode ?? '—'}
-                      </td>
-                      <td className="px-3 py-3 text-center text-slate-700 dark:text-slate-200">
-                        {row.brand ?? '—'}
-                      </td>
-                      <td className="px-3 py-3 text-center text-slate-700 dark:text-slate-200">{row.batch}</td>
-                      <td className="px-3 py-3 text-center text-slate-700 dark:text-slate-200">
-                        {row.expiry_date ?? '—'}
-                      </td>
-                      <td className="px-3 py-3 text-center font-medium text-slate-800 dark:text-slate-200">
-                        {Math.round(Number(row.available))}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </TableScrollArea>
-        </div>
+        {filteredItems.length === 0 ? (
+          <EmptyState
+            title={t('locations:filter_no_results')}
+            actionLabel={t('common:buttons.clear')}
+            onAction={() => setFilterQuery('')}
+          />
+        ) : (
+          <AdminDataTable
+            columns={tableColumns}
+            rows={filteredItems}
+            getRowKey={(row) => row.lot_id}
+            minWidth="min-w-[48rem]"
+            refreshing={isLoading && items.length > 0}
+            refreshingLabel={t('common:messages.loading')}
+          />
+        )}
       </>
     )
-  }, [hasLoadError, isLoading, items, filteredItems, filterQuery, load, navigate, t])
+  }
 
   const title = location ? location.code : (id ?? '')
 
@@ -191,7 +204,7 @@ export function LocationDetailPage() {
             <ArrowLeft size={20} />
           </Button>
         </div>
-        {content}
+        {tableBody()}
       </Card>
     </AdminLayout>
   )
