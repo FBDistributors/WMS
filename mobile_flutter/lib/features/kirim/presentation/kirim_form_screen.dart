@@ -30,6 +30,7 @@ import '../../product_boxes/data/product_box_repository.dart';
 import '../../product_boxes/presentation/register_product_box_sheet.dart';
 import '../../product_boxes/product_box_providers.dart';
 import 'inventory_pack_box_panel.dart';
+import 'inventory_unpack_box_panel.dart';
 import '../../../shared/input/input_clear_button.dart';
 import '../../../shared/layout/sheet_bottom_inset.dart';
 import '../../../shared/input/stock_quantity_input.dart';
@@ -184,6 +185,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   bool _invSubmitting = false;
   String? _invHandledLocationStr;
   LocationContentsItem? _invLocPackItem;
+  String _invLocBoxAction = 'pack';
 
   @override
   void dispose() {
@@ -1386,6 +1388,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         }
         if (_invSubMode == 'byLocation') {
           _invLocPackItem = null;
+          _invLocBoxAction = 'pack';
         }
       });
     }
@@ -2046,10 +2049,21 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                       OutlinedButton.icon(
                         onPressed: () => setState(() {
                           _invLocPackItem = item;
+                          _invLocBoxAction = 'pack';
                           _invStep = 3;
                         }),
                         icon: const Icon(Icons.inventory_2_outlined),
                         label: Text(StringLookup.t(appLoc, 'inventoryPackIntoBox')),
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: () => setState(() {
+                          _invLocPackItem = item;
+                          _invLocBoxAction = 'unpack';
+                          _invStep = 3;
+                        }),
+                        icon: const Icon(Icons.unarchive_outlined),
+                        label: Text(StringLookup.t(appLoc, 'inventoryUnpackFromBox')),
                       ),
                       const SizedBox(height: 8),
                       TextField(
@@ -2087,7 +2101,12 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             children: <Widget>[
               Expanded(
                 child: Text(
-                  StringLookup.t(appLoc, 'inventoryPackIntoBox'),
+                  StringLookup.t(
+                    appLoc,
+                    _invLocBoxAction == 'unpack'
+                        ? 'inventoryUnpackFromBox'
+                        : 'inventoryPackIntoBox',
+                  ),
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
@@ -2095,13 +2114,34 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                 onPressed: () => setState(() {
                   _invStep = 2;
                   _invLocPackItem = null;
+                  _invLocBoxAction = 'pack';
                 }),
                 child: Text(StringLookup.t(appLoc, 'back')),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          InventoryPackBoxPanel(
+          if (_invLocBoxAction == 'unpack')
+            InventoryUnpackBoxPanel(
+              productId: _invLocPackItem!.productId,
+              productName: _invLocPackItem!.productName,
+              locationId: _invLocPackItem!.locationId,
+              lotId: _invLocPackItem!.lotId,
+              locationCode: _invLocation!.code,
+              expiryDate: _invLocPackItem!.expiryDate,
+              onRemoved: (_) {
+                unawaited(_refreshInvLocationContents());
+                if (mounted) {
+                  setState(() {
+                    _invStep = 2;
+                    _invLocPackItem = null;
+                    _invLocBoxAction = 'pack';
+                  });
+                }
+              },
+            )
+          else
+            InventoryPackBoxPanel(
             productId: _invLocPackItem!.productId,
             productName: _invLocPackItem!.productName,
             locationId: _invLocPackItem!.locationId,
@@ -2114,6 +2154,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                 setState(() {
                   _invStep = 2;
                   _invLocPackItem = null;
+                  _invLocBoxAction = 'pack';
                 });
               }
             },
@@ -2252,6 +2293,26 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             locationCode: _invScanSelectedGroup!.locationCode,
             expiryDate: _invScanSelectedGroup!.expiryDate,
             onPlaced: (_) => unawaited(_loadProduct(_product!.productId)),
+          ),
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 12),
+          Text(
+            StringLookup.t(appLoc, 'inventoryUnpackFromBox'),
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          InventoryUnpackBoxPanel(
+            key: ValueKey<String>(
+              'unpack|${_invScanSelectedGroup!.locationId}|${_invScanPackLot(_invScanSelectedGroup!).lotId}',
+            ),
+            productId: _product!.productId,
+            productName: _product!.name,
+            locationId: _invScanSelectedGroup!.locationId,
+            lotId: _invScanPackLot(_invScanSelectedGroup!).lotId,
+            locationCode: _invScanSelectedGroup!.locationCode,
+            expiryDate: _invScanSelectedGroup!.expiryDate,
+            onRemoved: (_) => unawaited(_loadProduct(_product!.productId)),
           ),
           if (_invLastUnitsPerBox != null) ...<Widget>[
             const SizedBox(height: 8),
