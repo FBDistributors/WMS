@@ -29,8 +29,7 @@ import '../../product_boxes/data/product_box_models.dart';
 import '../../product_boxes/data/product_box_repository.dart';
 import '../../product_boxes/presentation/register_product_box_sheet.dart';
 import '../../product_boxes/product_box_providers.dart';
-import 'inventory_pack_box_panel.dart';
-import 'inventory_unpack_box_panel.dart';
+import 'inventory_simple_box_panel.dart';
 import '../../../shared/input/input_clear_button.dart';
 import '../../../shared/layout/sheet_bottom_inset.dart';
 import '../../../shared/input/stock_quantity_input.dart';
@@ -177,23 +176,17 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   String? _invContentsError;
   final Map<String, String> _invActualQty = <String, String>{};
   _InvLocGroup? _invScanSelectedGroup;
-  final TextEditingController _invScanActualQty = TextEditingController();
-  final TextEditingController _invBoxCount = TextEditingController(text: '1');
-  int? _invLastUnitsPerBox;
   List<ProductBoxSummary> _invProductBoxes = const <ProductBoxSummary>[];
   String? _invScanExpiry;
   bool _invSubmitting = false;
   String? _invHandledLocationStr;
   LocationContentsItem? _invLocPackItem;
-  String _invLocBoxAction = 'pack';
 
   @override
   void dispose() {
     _customerDebounce?.cancel();
     _customerSearchController.dispose();
     _invLocSearch.dispose();
-    _invScanActualQty.dispose();
-    _invBoxCount.dispose();
     _newReceiveBoxCount.dispose();
     _newReceiveBoxBarcode.dispose();
     _kirimPutawaySearch.dispose();
@@ -1383,12 +1376,9 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         _invStep = 2;
         if (_invSubMode == 'byScan') {
           _invScanSelectedGroup = null;
-          _invLastUnitsPerBox = null;
-          _invBoxCount.text = '1';
         }
         if (_invSubMode == 'byLocation') {
           _invLocPackItem = null;
-          _invLocBoxAction = 'pack';
         }
       });
     }
@@ -1449,7 +1439,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             onSaved: (int units) {
               onSaved?.call(units);
               if (mounted) {
-                setState(() => _invLastUnitsPerBox = units);
                 unawaited(_loadInvProductBoxes(productId));
                 showAppSnackBar(
                   context,
@@ -1461,14 +1450,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         );
       },
     );
-  }
-
-  void _applyBoxUnitsToActualQty({required int unitsPerBox, int boxCount = 1}) {
-    setState(() {
-      _invLastUnitsPerBox = unitsPerBox;
-      _invBoxCount.text = '$boxCount';
-      _invScanActualQty.text = '${unitsPerBox * boxCount}';
-    });
   }
 
   Future<void> _openInventoryScannerAndHandleResult() async {
@@ -1559,121 +1540,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           );
           setState(() => _invActualQty.clear());
           await _refreshInvLocationContents();
-        }
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _invSubmitting = false);
-      }
-    }
-  }
-
-  /// Birlashtirilgan guruh bo'yicha tuzatish: kamomad qutisiz donasi ko'p
-  /// lotlardan boshlab ayiriladi, ortiqcha qutisiz lotga qo'shiladi.
-  Future<void> _submitInvScanAdjust(_InvLocGroup group) async {
-    final AppLocale locale = ref.read(appLocaleProvider);
-    final PickerProductDetailResponse? p = _product;
-    if (p == null || _invSubmitting) {
-      return;
-    }
-    final int actual = int.tryParse(_invScanActualQty.text.trim()) ?? 0;
-    final double delta = actual.toDouble() - group.totalAvailable;
-    if (delta == 0) {
-      showAppSnackBar(
-        context,
-        SnackBar(content: Text(StringLookup.t(locale, 'inventoryNoChanges'))),
-      );
-      return;
-    }
-    setState(() => _invSubmitting = true);
-    bool anySent = false;
-    try {
-      final MovementsRepository repo = ref.read(movementsRepositoryProvider);
-      if (delta > 0) {
-        final PickerProductLocation target = group.lots.firstWhere(
-          (PickerProductLocation l) => l.looseUnits > 0,
-          orElse: () => group.primary,
-        );
-        await repo.createStockMovement(
-          productId: p.productId,
-          lotId: target.lotId,
-          locationId: target.locationId,
-          qtyChange: delta,
-          reasonCode: 'inventory_overage',
-        );
-        anySent = true;
-      } else {
-        double remaining = -delta;
-        final List<PickerProductLocation> ordered =
-            List<PickerProductLocation>.from(group.lots)
-              ..sort(
-                (PickerProductLocation a, PickerProductLocation b) =>
-                    b.looseUnits.compareTo(a.looseUnits),
-              );
-        for (final PickerProductLocation lot in ordered) {
-          if (remaining <= 0) {
-            break;
-          }
-          final double take =
-              remaining < lot.availableQty ? remaining : lot.availableQty;
-          if (take <= 0) {
-            continue;
-          }
-          await repo.createStockMovement(
-            productId: p.productId,
-            lotId: lot.lotId,
-            locationId: lot.locationId,
-            qtyChange: -take,
-            reasonCode: 'inventory_shortage',
-          );
-          anySent = true;
-          remaining -= take;
-        }
-        if (remaining > 0) {
-          await repo.createStockMovement(
-            productId: p.productId,
-            lotId: group.primary.lotId,
-            locationId: group.locationId,
-            qtyChange: -remaining,
-            reasonCode: 'inventory_shortage',
-          );
-          anySent = true;
-        }
-      }
-      if (mounted) {
-        showAppSnackBar(
-        context,
-          SnackBar(content: Text(StringLookup.t(locale, 'inventoryAdjusted'))),
-        );
-        setState(() {
-          _invScanSelectedGroup = null;
-          _invScanActualQty.clear();
-          _invBoxCount.text = '1';
-          _invLastUnitsPerBox = null;
-          _invScanExpiry = null;
-          _invStep = 2;
-        });
-        await _loadProduct(p.productId);
-      }
-    } on StockMovementForbiddenException {
-      if (mounted) {
-        showAppSnackBar(
-        context,
-          SnackBar(content: Text(StringLookup.t(locale, 'inventoryPermissionDenied'))),
-        );
-      }
-    } on Exception catch (e) {
-      if (mounted) {
-        showAppSnackBar(
-          context,
-          SnackBar(
-            content: Text(
-              anySent ? StringLookup.t(locale, 'inventorySomeRowsFailed') : '$e',
-            ),
-          ),
-        );
-        if (anySent) {
-          await _loadProduct(p.productId);
         }
       }
     } finally {
@@ -1825,10 +1691,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         onTap: () {
           setState(() {
             _invScanSelectedGroup = group;
-            _invScanActualQty.text = '${group.totalAvailable.round()}';
             _invScanExpiry = group.expiryDate;
-            _invBoxCount.text = '1';
-            _invLastUnitsPerBox = null;
             _invStep = 3;
           });
         },
@@ -2049,21 +1912,10 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                       OutlinedButton.icon(
                         onPressed: () => setState(() {
                           _invLocPackItem = item;
-                          _invLocBoxAction = 'pack';
                           _invStep = 3;
                         }),
                         icon: const Icon(Icons.inventory_2_outlined),
-                        label: Text(StringLookup.t(appLoc, 'inventoryPackIntoBox')),
-                      ),
-                      const SizedBox(height: 8),
-                      OutlinedButton.icon(
-                        onPressed: () => setState(() {
-                          _invLocPackItem = item;
-                          _invLocBoxAction = 'unpack';
-                          _invStep = 3;
-                        }),
-                        icon: const Icon(Icons.unarchive_outlined),
-                        label: Text(StringLookup.t(appLoc, 'inventoryUnpackFromBox')),
+                        label: Text(StringLookup.t(appLoc, 'inventoryOpenBoxCount')),
                       ),
                       const SizedBox(height: 8),
                       TextField(
@@ -2101,12 +1953,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             children: <Widget>[
               Expanded(
                 child: Text(
-                  StringLookup.t(
-                    appLoc,
-                    _invLocBoxAction == 'unpack'
-                        ? 'inventoryUnpackFromBox'
-                        : 'inventoryPackIntoBox',
-                  ),
+                  StringLookup.t(appLoc, 'inventoryOpenBoxCount'),
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
@@ -2114,47 +1961,22 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                 onPressed: () => setState(() {
                   _invStep = 2;
                   _invLocPackItem = null;
-                  _invLocBoxAction = 'pack';
                 }),
                 child: Text(StringLookup.t(appLoc, 'back')),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          if (_invLocBoxAction == 'unpack')
-            InventoryUnpackBoxPanel(
-              productId: _invLocPackItem!.productId,
-              productName: _invLocPackItem!.productName,
-              locationId: _invLocPackItem!.locationId,
-              lotId: _invLocPackItem!.lotId,
-              locationCode: _invLocation!.code,
-              expiryDate: _invLocPackItem!.expiryDate,
-              onRemoved: (_) {
-                unawaited(_refreshInvLocationContents());
-                if (mounted) {
-                  setState(() {
-                    _invStep = 2;
-                    _invLocPackItem = null;
-                    _invLocBoxAction = 'pack';
-                  });
-                }
-              },
-            )
-          else
-            InventoryPackBoxPanel(
+          InventorySimpleBoxPanel(
             productId: _invLocPackItem!.productId,
-            productName: _invLocPackItem!.productName,
             locationId: _invLocPackItem!.locationId,
             lotId: _invLocPackItem!.lotId,
-            locationCode: _invLocation!.code,
-            expiryDate: _invLocPackItem!.expiryDate,
-            onPlaced: (_) {
+            onSaved: (_) {
               unawaited(_refreshInvLocationContents());
               if (mounted) {
                 setState(() {
                   _invStep = 2;
                   _invLocPackItem = null;
-                  _invLocBoxAction = 'pack';
                 });
               }
             },
@@ -2199,7 +2021,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
               _product = null;
               _invStep = 1;
               _invProductBoxes = const <ProductBoxSummary>[];
-              _invLastUnitsPerBox = null;
             }),
             child: const Text('Boshqa mahsulot skanerlash'),
           ),
@@ -2220,8 +2041,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                 onPressed: () => setState(() {
                   _invStep = 2;
                   _invScanSelectedGroup = null;
-                  _invBoxCount.text = '1';
-                  _invLastUnitsPerBox = null;
                 }),
                 child: const Text('Ortga'),
               ),
@@ -2242,115 +2061,60 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                       color: Color(0xFF1A237E),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  _invValueRow('Nomi', _product!.name),
-                  _invValueRow('SKU', _product!.code.trim().isEmpty ? '—' : _product!.code.trim()),
-                  _invValueRow(
-                    'Shtrix kod',
-                    (_product!.mainBarcode ?? '').trim().isEmpty
-                        ? '—'
-                        : _product!.mainBarcode!.trim(),
+                  const SizedBox(height: 4),
+                  Text(
+                    _product!.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
-                  _invValueRow('Muddat', formatExpiryMonthYear(_invScanSelectedGroup!.expiryDate)),
-                  if (!_invShowBoxBreakdown(_invScanSelectedGroup!))
-                    _invValueRow(
-                      'Qoldiq',
-                      '${_invScanSelectedGroup!.totalAvailable.round()}',
-                      emphasize: true,
-                    )
-                  else ...<Widget>[
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text(
-                        StringLookup.t(appLoc, 'inventoryLocationStockComputed'),
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey.shade700,
-                        ),
-                      ),
+                  const SizedBox(height: 4),
+                  Text(
+                    formatExpiryMonthYear(_invScanSelectedGroup!.expiryDate),
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    StringLookup.tParams(
+                      appLoc,
+                      'inventoryCompactBreakdown',
+                      <String, String>{
+                        'boxes': '${_invScanSelectedGroup!.boxCount}',
+                        'loose': '${_invScanSelectedGroup!.looseUnits}',
+                        'total': '${_invScanSelectedGroup!.totalAvailable.round()}',
+                      },
                     ),
-                    ..._invBoxBreakdownRowsFromLoc(appLoc, _invScanSelectedGroup!),
-                  ],
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
+                  ),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 12),
-          Text(
-            StringLookup.t(appLoc, 'inventoryPackIntoBox'),
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          InventoryPackBoxPanel(
+          InventorySimpleBoxPanel(
             key: ValueKey<String>(
               '${_invScanSelectedGroup!.locationId}|${_invScanPackLot(_invScanSelectedGroup!).lotId}',
             ),
             productId: _product!.productId,
-            productName: _product!.name,
             locationId: _invScanSelectedGroup!.locationId,
             lotId: _invScanPackLot(_invScanSelectedGroup!).lotId,
-            locationCode: _invScanSelectedGroup!.locationCode,
-            expiryDate: _invScanSelectedGroup!.expiryDate,
-            onPlaced: (_) => unawaited(_loadProduct(_product!.productId)),
-          ),
-          const SizedBox(height: 16),
-          const Divider(),
-          const SizedBox(height: 12),
-          Text(
-            StringLookup.t(appLoc, 'inventoryUnpackFromBox'),
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          InventoryUnpackBoxPanel(
-            key: ValueKey<String>(
-              'unpack|${_invScanSelectedGroup!.locationId}|${_invScanPackLot(_invScanSelectedGroup!).lotId}',
-            ),
-            productId: _product!.productId,
-            productName: _product!.name,
-            locationId: _invScanSelectedGroup!.locationId,
-            lotId: _invScanPackLot(_invScanSelectedGroup!).lotId,
-            locationCode: _invScanSelectedGroup!.locationCode,
-            expiryDate: _invScanSelectedGroup!.expiryDate,
-            onRemoved: (_) => unawaited(_loadProduct(_product!.productId)),
-          ),
-          if (_invLastUnitsPerBox != null) ...<Widget>[
-            const SizedBox(height: 8),
-            OutlinedButton(
-              onPressed: () => _applyBoxUnitsToActualQty(
-                unitsPerBox: _invLastUnitsPerBox!,
-                boxCount: int.tryParse(_invBoxCount.text.trim()) ?? 1,
-              ),
-              child: Text(StringLookup.t(appLoc, 'inventoryFullBox')),
-            ),
-          ],
-          const SizedBox(height: 10),
-          TextField(
-            controller: _invScanActualQty,
-            keyboardType: kStockQtyKeyboardType,
-            inputFormatters: kStockQtyInputFormatters,
-            decoration: const InputDecoration(
-              labelText: 'Haqiqiy miqdor',
-              border: OutlineInputBorder(),
-            ),
+            initialBoxCount: _invScanSelectedGroup!.boxCount,
+            initialLooseQty: _invScanSelectedGroup!.looseUnits,
+            looseAdjustLots: _invScanSelectedGroup!.lots,
+            onSaved: (_) {
+              if (mounted) {
+                setState(() {
+                  _invScanSelectedGroup = null;
+                  _invScanExpiry = null;
+                  _invStep = 2;
+                });
+              }
+              unawaited(_loadProduct(_product!.productId));
+            },
           ),
           const SizedBox(height: 10),
           ExpiryDatePickerField(
             value: _invScanExpiry,
             onChanged: (String? v) => setState(() => _invScanExpiry = v),
-          ),
-          const SizedBox(height: 12),
-          FilledButton(
-            onPressed: _invSubmitting
-                ? null
-                : () => unawaited(_submitInvScanAdjust(_invScanSelectedGroup!)),
-            child: _invSubmitting
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                  )
-                : const Text('Tuzatishni yuborish'),
           ),
         ],
         if (_invSubMode == 'byScan' && _invStep == 1 && _loadingProduct) const LinearProgressIndicator(),
