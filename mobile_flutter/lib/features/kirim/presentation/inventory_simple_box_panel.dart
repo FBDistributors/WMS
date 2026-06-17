@@ -172,6 +172,9 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
     _boxBarcode.text = code;
     _resolvedBarcode = code;
     _resolvedBoxId = first.productBoxId;
+    if (b.dataInconsistent) {
+      return;
+    }
     _unitsPerBox = first.unitsPerBox;
     _unitsPerBoxInput.text = '${first.unitsPerBox}';
     _boxCount.text = '${sealedBoxCountForBarcode(b, code)}';
@@ -558,6 +561,13 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
                 ),
               ),
             ),
+          );
+        }
+      } else if (isBreakdownInconsistentMessage(msg)) {
+        if (mounted) {
+          showAppSnackBar(
+            context,
+            SnackBar(content: Text(StringLookup.t(loc, 'inventoryDataInconsistent'))),
           );
         }
       } else if (mounted) {

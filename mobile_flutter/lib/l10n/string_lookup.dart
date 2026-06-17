@@ -401,7 +401,7 @@ abstract final class StringLookup {
     'inventorySealedAvailableForBarcode': 'Bu shtrix-kod bo‘yicha sealed quti: {{count}}',
     'inventoryInsufficientLoose': 'Qutisiz qoldiq yetarli emas (kerak {{needed}}, mavjud {{available}})',
     'inventoryDataInconsistent':
-        'Quti joylashuvi zaxira bilan mos emas. Quti sonini 0 qilib saqlang — tizim avval eski qutilarni tozalaydi.',
+        'Eski quti yozuvlari zaxira bilan mos emas. Saqlashda tizim avval ularni tozalaydi, keyin kiritgan qiymatlaringizni yozadi.',
     'movementTransferSealedBox': 'Yopiq qutini ko‘chirish',
   };
 
@@ -784,7 +784,7 @@ abstract final class StringLookup {
     'inventorySealedAvailableForBarcode': 'Sealed коробок по штрих-коду: {{count}}',
     'inventoryInsufficientLoose': 'Недостаточно штук без коробки (нужно {{needed}}, есть {{available}})',
     'inventoryDataInconsistent':
-        'Размещение коробок не совпадает с остатком. Сохраните 0 коробок — система сначала очистит старые записи.',
+        'Старые записи коробок не совпадают с остатком. При сохранении система сначала очистит их, затем запишет ваши значения.',
     'movementTransferSealedBox': 'Переместить закрытую коробку',
   };
 
@@ -1167,7 +1167,7 @@ abstract final class StringLookup {
     'inventorySealedAvailableForBarcode': 'Sealed boxes for this barcode: {{count}}',
     'inventoryInsufficientLoose': 'Not enough loose units (need {{needed}}, have {{available}})',
     'inventoryDataInconsistent':
-        'Box placements do not match stock. Save with 0 boxes — the system will clear orphaned placements first.',
+        'Orphaned box records do not match stock. On save, the system clears them first, then applies your values.',
     'movementTransferSealedBox': 'Transfer sealed box',
   };
 }

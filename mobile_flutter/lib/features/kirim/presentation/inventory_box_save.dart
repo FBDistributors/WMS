@@ -12,6 +12,9 @@ int sealedBoxCountForBarcode(BoxLocationBreakdown breakdown, String barcode) {
 }
 
 int currentBoxCountTarget(BoxLocationBreakdown breakdown, String barcode) {
+  if (breakdown.dataInconsistent) {
+    return breakdown.boxCount;
+  }
   if (barcode.trim().isNotEmpty) {
     return sealedBoxCountForBarcode(breakdown, barcode);
   }
@@ -93,9 +96,7 @@ Future<BoxLocationBreakdown> applyInventoryBoxSave({
   final String barcode = boxBarcode?.trim() ?? '';
   BoxLocationBreakdown breakdown = await getBreakdown();
 
-  if (breakdown.dataInconsistent &&
-      targetBoxCount == 0 &&
-      breakdown.sealedBoxes.isNotEmpty) {
+  if (breakdown.dataInconsistent && breakdown.sealedBoxes.isNotEmpty) {
     final List<SealedBoxInfo> sealed =
         List<SealedBoxInfo>.from(breakdown.sealedBoxes);
     for (final SealedBoxInfo sealedBox in sealed) {

@@ -256,4 +256,113 @@ void main() {
     expect(ops, <String>['remove:ORPHAN']);
     expect(state.dataInconsistent, isFalse);
   });
+
+  test('inventoryBoxSaveHasChanges uses displayed box count when inconsistent', () {
+    final BoxLocationBreakdown b = _breakdown(
+      boxCount: 0,
+      looseUnits: 4,
+      totalUnits: 4,
+      dataInconsistent: true,
+      sealedBoxes: List<SealedBoxInfo>.generate(
+        8,
+        (int i) => SealedBoxInfo(
+          placementId: 'pl$i',
+          productBoxId: 'pb1',
+          boxBarcode: '14607953913772',
+          unitsPerBox: 12,
+        ),
+      ),
+    );
+    expect(
+      inventoryBoxSaveHasChanges(
+        breakdown: b,
+        boxBarcode: '14607953913772',
+        targetBoxCount: 8,
+        targetLooseQty: 4,
+      ),
+      isTrue,
+    );
+    expect(currentBoxCountTarget(b, '14607953913772'), 0);
+  });
+
+  test('applyInventoryBoxSave reconciles then places when inconsistent and 8 boxes',
+      () async {
+    BoxLocationBreakdown state = _breakdown(
+      boxCount: 0,
+      looseUnits: 4,
+      totalUnits: 4,
+      dataInconsistent: true,
+      sealedBoxes: List<SealedBoxInfo>.generate(
+        8,
+        (int i) => SealedBoxInfo(
+          placementId: 'pl$i',
+          productBoxId: 'pb1',
+          boxBarcode: 'BOX-A',
+          unitsPerBox: 12,
+        ),
+      ),
+    );
+    final List<String> ops = <String>[];
+
+    Future<BoxLocationBreakdown> getBreakdown() async => state;
+
+    Future<BoxLocationBreakdown> removeBox({required String boxBarcode}) async {
+      ops.add('remove:$boxBarcode');
+      state = _breakdown(
+        boxCount: 0,
+        looseUnits: 4,
+        totalUnits: 4,
+        dataInconsistent: false,
+      );
+      return state;
+    }
+
+    Future<BoxLocationBreakdown> placeBox({
+      required String boxBarcode,
+      required int boxCount,
+    }) async {
+      ops.add('place:$boxCount');
+      state = _breakdown(
+        boxCount: boxCount,
+        unitsInBoxes: boxCount * 12,
+        looseUnits: 4,
+        totalUnits: 100,
+        dataInconsistent: false,
+      );
+      return state;
+    }
+
+    await applyInventoryBoxSave(
+      boxBarcode: 'BOX-A',
+      unitsPerBox: 12,
+      targetBoxCount: 8,
+      targetLooseQty: 4,
+      productId: 'p1',
+      locationId: 'loc1',
+      lotId: 'lot1',
+      getBreakdown: getBreakdown,
+      placeBox: placeBox,
+      removeBox: removeBox,
+      createMovement: ({
+        required String productId,
+        required String lotId,
+        required String locationId,
+        required double qtyChange,
+        required String reasonCode,
+      }) async {
+        ops.add('movement:$reasonCode:$qtyChange');
+        state = _breakdown(
+          boxCount: state.boxCount,
+          unitsInBoxes: state.unitsInBoxes,
+          looseUnits: state.looseUnits,
+          totalUnits: state.totalUnits + qtyChange.round(),
+          dataInconsistent: false,
+        );
+      },
+    );
+
+    expect(ops.where((String o) => o.startsWith('remove:')).length, 8);
+    expect(ops.any((String o) => o == 'movement:inventory_overage:96.0'), isTrue);
+    expect(ops.any((String o) => o == 'place:8'), isTrue);
+  });
 }
