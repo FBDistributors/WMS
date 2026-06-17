@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile_flutter/features/inventory/data/models/picker_inventory_models.dart';
 import 'package:mobile_flutter/features/kirim/presentation/inventory_box_save.dart';
 import 'package:mobile_flutter/features/product_boxes/data/box_location_models.dart';
 
@@ -364,5 +365,78 @@ void main() {
     expect(ops.where((String o) => o.startsWith('remove:')).length, 8);
     expect(ops.any((String o) => o == 'movement:inventory_overage:96.0'), isTrue);
     expect(ops.any((String o) => o == 'place:8'), isTrue);
+  });
+
+  test('applyInventoryBoxSave does not double-count loose when looseAdjustLots set',
+      () async {
+    final List<SealedBoxInfo> sealed = List<SealedBoxInfo>.generate(
+      73,
+      (int i) => SealedBoxInfo(
+        placementId: 'pl$i',
+        productBoxId: 'pb1',
+        boxBarcode: '14607953918135',
+        unitsPerBox: 12,
+      ),
+    );
+    BoxLocationBreakdown state = _breakdown(
+      boxCount: 73,
+      unitsInBoxes: 876,
+      looseUnits: 6,
+      totalUnits: 882,
+      sealedBoxes: sealed,
+    );
+    final List<String> ops = <String>[];
+    final List<PickerProductLocation> lots = <PickerProductLocation>[
+      const PickerProductLocation(
+        locationId: 'loc1',
+        locationCode: 'P-AR-03',
+        lotId: 'lot1',
+        batchNo: 'B1',
+        expiryDate: '2029-01-01',
+        onHandQty: 882,
+        reservedQty: 0,
+        availableQty: 882,
+        boxCount: 73,
+        unitsInBoxes: 876,
+        looseUnits: 6,
+      ),
+    ];
+
+    Future<BoxLocationBreakdown> getBreakdown() async => state;
+
+    Future<void> createMovement({
+      required String productId,
+      required String lotId,
+      required String locationId,
+      required double qtyChange,
+      required String reasonCode,
+    }) async {
+      ops.add('movement:$reasonCode:$qtyChange');
+      state = _breakdown(
+        boxCount: state.boxCount,
+        unitsInBoxes: state.unitsInBoxes,
+        looseUnits: state.looseUnits + qtyChange.round(),
+        totalUnits: state.totalUnits + qtyChange.round(),
+      );
+    }
+
+    await applyInventoryBoxSave(
+      boxBarcode: '14607953918135',
+      unitsPerBox: 12,
+      targetBoxCount: 73,
+      targetLooseQty: 8,
+      productId: 'p1',
+      locationId: 'loc1',
+      lotId: 'lot1',
+      looseAdjustLots: lots,
+      getBreakdown: getBreakdown,
+      placeBox: ({required String boxBarcode, required int boxCount}) async => state,
+      removeBox: ({required String boxBarcode}) async => state,
+      createMovement: createMovement,
+    );
+
+    expect(ops, <String>['movement:inventory_overage:2.0']);
+    expect(state.looseUnits, 8);
+    expect(state.totalUnits, 884);
   });
 }

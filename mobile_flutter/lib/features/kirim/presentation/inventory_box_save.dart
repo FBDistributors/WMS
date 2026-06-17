@@ -132,9 +132,11 @@ Future<BoxLocationBreakdown> applyInventoryBoxSave({
   );
 
   try {
+    int appliedTotalDelta = 0;
     if (targetTotal != null) {
       final int totalDelta = targetTotal - breakdown.totalUnits;
       if (totalDelta != 0) {
+        appliedTotalDelta = totalDelta;
         await _applyTotalAdjust(
           totalDelta: totalDelta,
           productId: productId,
@@ -152,15 +154,18 @@ Future<BoxLocationBreakdown> applyInventoryBoxSave({
       breakdown = await getBreakdown();
     }
 
-    await _applyLooseAdjust(
-      productId: productId,
-      locationId: locationId,
-      lotId: lotId,
-      breakdownLoose: breakdown.looseUnits,
-      targetLooseQty: targetLooseQty,
-      createMovement: createMovement,
-      looseAdjustLots: looseAdjustLots,
-    );
+    final bool looseCoveredByTotalAdjust = boxDelta == 0 && appliedTotalDelta != 0;
+    if (!looseCoveredByTotalAdjust) {
+      await _applyLooseAdjust(
+        productId: productId,
+        locationId: locationId,
+        lotId: lotId,
+        breakdownLoose: breakdown.looseUnits,
+        targetLooseQty: targetLooseQty,
+        createMovement: createMovement,
+        looseAdjustLots: looseAdjustLots,
+      );
+    }
   } on Object catch (e) {
     if (boxOpsCompleted) {
       throw InventoryBoxSavePartialFailure(boxOpsCompleted: true, cause: e);
