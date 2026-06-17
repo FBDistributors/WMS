@@ -71,6 +71,27 @@ class ProductBoxCreate {
       };
 }
 
+class ProductBoxReplaceBarcode {
+  const ProductBoxReplaceBarcode({
+    required this.oldBoxId,
+    required this.newBarcode,
+    required this.productId,
+    required this.unitsPerBox,
+  });
+
+  final String oldBoxId;
+  final String newBarcode;
+  final String productId;
+  final int unitsPerBox;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+        'old_box_id': oldBoxId,
+        'new_barcode': newBarcode.trim(),
+        'product_id': productId,
+        'units_per_box': unitsPerBox,
+      };
+}
+
 int _int(Object? v) {
   if (v is int) {
     return v;

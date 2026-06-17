@@ -7,12 +7,13 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth.deps import require_any_permission, require_permission
 from app.db import get_db
+from app.models.location_box_placement import PLACEMENT_SEALED, LocationBoxPlacement
 from app.models.product import Product as ProductModel
 from app.models.product_box import ProductBox as ProductBoxModel
 from app.models.user import User as UserModel
@@ -54,6 +55,13 @@ class ProductBoxUpdate(BaseModel):
     is_active: bool | None = None
 
 
+class ProductBoxReplaceBarcodeRequest(BaseModel):
+    old_box_id: UUID
+    new_barcode: str = Field(..., min_length=1, max_length=64)
+    product_id: UUID
+    units_per_box: int = Field(..., gt=0)
+
+
 class ProductBoxResolveOut(BaseModel):
     product_id: UUID
     units_per_box: int
@@ -87,6 +95,44 @@ def _to_out(item: ProductBoxModel) -> ProductBoxOut:
 
 def _normalize_box_barcode(raw: str) -> str:
     return (raw or "").strip()
+
+
+def _resolve_out_from_box(box: ProductBoxModel) -> ProductBoxResolveOut:
+    if not box.product or not box.product.is_active:
+        raise HTTPException(status_code=404, detail="Quti topilmadi")
+    return ProductBoxResolveOut(
+        product_id=box.product_id,
+        units_per_box=box.units_per_box,
+        scan_kind="box",
+        product_name=box.product.name,
+        product_sku=box.product.sku,
+        product_barcode=box.product.barcode,
+        box_id=box.id,
+    )
+
+
+def _has_sealed_placement(db: Session, product_box_id: UUID) -> bool:
+    count = (
+        db.query(func.count(LocationBoxPlacement.id))
+        .filter(
+            LocationBoxPlacement.product_box_id == product_box_id,
+            LocationBoxPlacement.status == PLACEMENT_SEALED,
+        )
+        .scalar()
+    )
+    return int(count or 0) > 0
+
+
+def _duplicate_active_box(
+    db: Session, code: str, exclude_id: UUID | None = None
+) -> ProductBoxModel | None:
+    query = db.query(ProductBoxModel).filter(
+        ProductBoxModel.box_barcode == code,
+        ProductBoxModel.is_active.is_(True),
+    )
+    if exclude_id is not None:
+        query = query.filter(ProductBoxModel.id != exclude_id)
+    return query.one_or_none()
 
 
 @router.get("", response_model=List[ProductBoxOut], summary="List product boxes")
@@ -151,15 +197,142 @@ async def resolve_box_by_barcode(
     )
     if not box or not box.product or not box.product.is_active:
         raise HTTPException(status_code=404, detail="Quti topilmadi")
-    return ProductBoxResolveOut(
-        product_id=box.product_id,
-        units_per_box=box.units_per_box,
-        scan_kind="box",
-        product_name=box.product.name,
-        product_sku=box.product.sku,
-        product_barcode=box.product.barcode,
-        box_id=box.id,
+    return _resolve_out_from_box(box)
+
+
+@router.post(
+    "/replace-barcode",
+    response_model=ProductBoxResolveOut,
+    summary="Replace box barcode (PATCH if sealed placement, else deactivate old and create new)",
+)
+async def replace_product_box_barcode(
+    request: Request,
+    payload: ProductBoxReplaceBarcodeRequest,
+    db: Session = Depends(get_db),
+    user: UserModel = Depends(
+        require_any_permission(["products:write", "inventory:adjust"])
+    ),
+):
+    new_code = _normalize_box_barcode(payload.new_barcode)
+    if not new_code:
+        raise HTTPException(status_code=400, detail="box_barcode required")
+
+    old_box = (
+        db.query(ProductBoxModel)
+        .options(joinedload(ProductBoxModel.product))
+        .filter(ProductBoxModel.id == payload.old_box_id)
+        .one_or_none()
     )
+    if not old_box or not old_box.is_active:
+        raise HTTPException(status_code=404, detail="Box not found")
+    if old_box.product_id != payload.product_id:
+        raise HTTPException(status_code=400, detail="Product mismatch for box")
+
+    product = db.query(ProductModel).filter(ProductModel.id == payload.product_id).one_or_none()
+    if not product or not product.is_active:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    if new_code == old_box.box_barcode:
+        old_box.units_per_box = payload.units_per_box
+        db.commit()
+        db.refresh(old_box)
+        return _resolve_out_from_box(old_box)
+
+    dup = _duplicate_active_box(db, new_code, exclude_id=old_box.id)
+    if dup:
+        raise HTTPException(status_code=409, detail="Box barcode already exists")
+
+    old_data = {
+        "box_barcode": old_box.box_barcode,
+        "product_id": str(old_box.product_id),
+        "units_per_box": old_box.units_per_box,
+        "is_active": old_box.is_active,
+    }
+
+    if _has_sealed_placement(db, old_box.id):
+        old_box.box_barcode = new_code
+        old_box.units_per_box = payload.units_per_box
+        try:
+            db.flush()
+            log_action(
+                db,
+                user_id=user.id,
+                action=ACTION_UPDATE,
+                entity_type="product_box",
+                entity_id=str(old_box.id),
+                ip_address=get_client_ip(request),
+                old_data=old_data,
+                new_data={
+                    "box_barcode": old_box.box_barcode,
+                    "product_id": str(old_box.product_id),
+                    "units_per_box": old_box.units_per_box,
+                    "is_active": old_box.is_active,
+                    "replace_mode": "patch_in_place",
+                },
+            )
+            db.commit()
+            db.refresh(old_box)
+            return _resolve_out_from_box(old_box)
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(status_code=409, detail="Box barcode already exists")
+
+    old_box.is_active = False
+    inactive_match = (
+        db.query(ProductBoxModel)
+        .options(joinedload(ProductBoxModel.product))
+        .filter(ProductBoxModel.box_barcode == new_code, ProductBoxModel.id != old_box.id)
+        .one_or_none()
+    )
+    reactivated = inactive_match is not None
+    if inactive_match:
+        inactive_match.is_active = True
+        inactive_match.product_id = payload.product_id
+        inactive_match.units_per_box = payload.units_per_box
+        result_box = inactive_match
+    else:
+        result_box = ProductBoxModel(
+            box_barcode=new_code,
+            product_id=payload.product_id,
+            units_per_box=payload.units_per_box,
+            label=old_box.label,
+            is_active=True,
+        )
+        db.add(result_box)
+
+    try:
+        db.flush()
+        log_action(
+            db,
+            user_id=user.id,
+            action=ACTION_UPDATE,
+            entity_type="product_box",
+            entity_id=str(old_box.id),
+            ip_address=get_client_ip(request),
+            old_data=old_data,
+            new_data={"is_active": False, "replace_mode": "deactivate_old"},
+        )
+        log_action(
+            db,
+            user_id=user.id,
+            action=ACTION_CREATE if not reactivated else ACTION_UPDATE,
+            entity_type="product_box",
+            entity_id=str(result_box.id),
+            ip_address=get_client_ip(request),
+            new_data={
+                "box_barcode": result_box.box_barcode,
+                "product_id": str(result_box.product_id),
+                "units_per_box": result_box.units_per_box,
+                "replace_mode": "new_box",
+                "replaced_from": str(old_box.id),
+            },
+        )
+        db.commit()
+        db.refresh(result_box)
+        return _resolve_out_from_box(result_box)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Box barcode already exists")
 
 
 @router.post("", response_model=ProductBoxOut, status_code=status.HTTP_201_CREATED)

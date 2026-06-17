@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { PackagePlus, RefreshCw, Search, Trash2 } from 'lucide-react'
+import { PackagePlus, Pencil, RefreshCw, Search, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { AddProductBoxDialog } from '../../admin/components/product_boxes/AddProductBoxDialog'
+import { EditProductBoxDialog } from '../../admin/components/product_boxes/EditProductBoxDialog'
 import { Button } from '../../components/ui/button'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
@@ -26,6 +27,8 @@ export function ProductBoxesPage() {
   const [activeSearch, setActiveSearch] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isAddOpen, setIsAddOpen] = useState(false)
+  const [editItem, setEditItem] = useState<ProductBox | null>(null)
+  const [isEditOpen, setIsEditOpen] = useState(false)
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -129,14 +132,27 @@ export function ProductBoxesPage() {
                   <td className="px-4 py-3 text-slate-500">{item.label ?? '—'}</td>
                   {canManage ? (
                     <td className="px-4 py-3">
-                      <button
-                        type="button"
-                        className="rounded p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
-                        title={t('common:delete')}
-                        onClick={() => void handleDelete(item)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          className="rounded p-1 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                          title={t('productBoxes:edit')}
+                          onClick={() => {
+                            setEditItem(item)
+                            setIsEditOpen(true)
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+                          title={t('common:delete')}
+                          onClick={() => void handleDelete(item)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   ) : null}
                 </tr>
@@ -151,6 +167,18 @@ export function ProductBoxesPage() {
         onOpenChange={setIsAddOpen}
         onCreated={() => {
           showSuccess(t('productBoxes:created'))
+          void load()
+        }}
+      />
+      <EditProductBoxDialog
+        open={isEditOpen}
+        item={editItem}
+        onOpenChange={(open) => {
+          setIsEditOpen(open)
+          if (!open) setEditItem(null)
+        }}
+        onUpdated={() => {
+          showSuccess(t('productBoxes:updated'))
           void load()
         }}
       />

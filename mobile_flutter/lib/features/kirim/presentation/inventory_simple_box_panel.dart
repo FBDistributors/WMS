@@ -53,8 +53,10 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
   final TextEditingController _boxCount = TextEditingController();
   final TextEditingController _looseQty = TextEditingController();
   String? _resolvedBarcode;
+  String? _resolvedBoxId;
   int? _unitsPerBox;
   bool _pendingBoxRegistration = false;
+  bool _boxPrefilledFromBreakdown = false;
   BoxLocationBreakdown? _breakdown;
   bool _loadingBreakdown = true;
   bool _saving = false;
@@ -107,6 +109,7 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
         _loadingBreakdown = false;
       });
       _applyDefaultsFromBreakdown(b);
+      _prefillBoxFromBreakdown(b);
       if (mounted) {
         setState(() {});
       }
@@ -127,10 +130,111 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
     );
   }
 
+  void _prefillBoxFromBreakdown(BoxLocationBreakdown b) {
+    if (_boxPrefilledFromBreakdown || _resolvedBarcode != null) {
+      return;
+    }
+    if (b.sealedBoxes.isEmpty) {
+      return;
+    }
+    final SealedBoxInfo first = b.sealedBoxes.first;
+    final String code = first.boxBarcode.trim();
+    if (code.isEmpty) {
+      return;
+    }
+    _boxPrefilledFromBreakdown = true;
+    _boxBarcode.text = code;
+    _resolvedBarcode = code;
+    _resolvedBoxId = first.productBoxId;
+    _unitsPerBox = first.unitsPerBox;
+    _unitsPerBoxInput.text = '${first.unitsPerBox}';
+    _boxCount.text = '${sealedBoxCountForBarcode(b, code)}';
+  }
+
+  int? _unitsPerBoxForReplace() {
+    final int? fromField = int.tryParse(_unitsPerBoxInput.text.trim());
+    if (fromField != null && fromField >= 1) {
+      return fromField;
+    }
+    return _unitsPerBox;
+  }
+
+  String _boxReplaceErrorMessage(AppLocale loc, String msg) {
+    if (msg.contains('already exists') || msg.contains('409')) {
+      return StringLookup.t(loc, 'inventoryBoxBarcodeTaken');
+    }
+    return StringLookup.t(loc, 'inventoryBoxReplaceFailed');
+  }
+
+  void _applyResolvedBox(ProductBoxResolve resolved, String barcode, BoxLocationBreakdown? b) {
+    _resolvedBarcode = barcode;
+    _resolvedBoxId = resolved.boxId;
+    _unitsPerBox = resolved.unitsPerBox;
+    _pendingBoxRegistration = false;
+    _unitsPerBoxInput.text = '${resolved.unitsPerBox}';
+    _boxBarcode.text = barcode;
+    if (b != null) {
+      _boxCount.text = '${sealedBoxCountForBarcode(b, barcode)}';
+    }
+  }
+
+  Future<bool> _tryReplaceBarcode(String newBarcode) async {
+    final String? oldBoxId = _resolvedBoxId;
+    final String? oldBarcode = _resolvedBarcode;
+    if (oldBoxId == null || oldBarcode == null) {
+      return false;
+    }
+    if (newBarcode == oldBarcode.trim()) {
+      return false;
+    }
+    final AppLocale loc = ref.read(appLocaleProvider);
+    final int? units = _unitsPerBoxForReplace();
+    if (units == null || units < 1) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          SnackBar(content: Text(StringLookup.t(loc, 'kirimNewReceiveFillAll'))),
+        );
+      }
+      return true;
+    }
+    try {
+      final ProductBoxResolve replaced =
+          await ref.read(productBoxRepositoryProvider).replaceBarcode(
+                ProductBoxReplaceBarcode(
+                  oldBoxId: oldBoxId,
+                  newBarcode: newBarcode,
+                  productId: widget.productId,
+                  unitsPerBox: units,
+                ),
+              );
+      if (!mounted) {
+        return true;
+      }
+      setState(() {
+        _applyResolvedBox(replaced, newBarcode, _breakdown);
+      });
+      showAppTopSuccess(context, StringLookup.t(loc, 'inventoryBoxBarcodeReplaced'));
+      await _loadBreakdown();
+      return true;
+    } on Exception catch (e) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          SnackBar(content: Text(_boxReplaceErrorMessage(loc, '$e'))),
+        );
+      }
+      return true;
+    }
+  }
+
   Future<void> _resolveBarcode(String raw) async {
     final AppLocale loc = ref.read(appLocaleProvider);
     final String barcode = raw.trim();
     if (barcode.isEmpty) {
+      return;
+    }
+    if (await _tryReplaceBarcode(barcode)) {
       return;
     }
     try {
@@ -149,19 +253,10 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
         return;
       }
       setState(() {
-        _resolvedBarcode = barcode;
-        _unitsPerBox = resolved.unitsPerBox;
-        _pendingBoxRegistration = false;
-        _unitsPerBoxInput.text = '${resolved.unitsPerBox}';
-        _boxBarcode.text = barcode;
+        _applyResolvedBox(resolved, barcode, _breakdown);
       });
-      final BoxLocationBreakdown? b = _breakdown;
-      if (b != null) {
-        final int sealed = sealedBoxCountForBarcode(b, barcode);
-        _boxCount.text = '$sealed';
-        if (mounted) {
-          setState(() {});
-        }
+      if (mounted) {
+        setState(() {});
       }
     } on ProductBoxNotFoundException {
       if (!mounted) {
@@ -170,6 +265,7 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
       setState(() {
         _boxBarcode.text = barcode;
         _resolvedBarcode = null;
+        _resolvedBoxId = null;
         _unitsPerBox = null;
         _pendingBoxRegistration = true;
         _unitsPerBoxInput.clear();
@@ -220,6 +316,7 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
             setState(() {
               _boxBarcode.clear();
               _resolvedBarcode = null;
+              _resolvedBoxId = null;
               _unitsPerBox = null;
               _pendingBoxRegistration = false;
               _unitsPerBoxInput.clear();
@@ -238,6 +335,14 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
     }
     if (_resolvedBarcode == code && _unitsPerBox != null && _unitsPerBox! >= 1) {
       return true;
+    }
+    if (_resolvedBoxId != null &&
+        _resolvedBarcode != null &&
+        _resolvedBarcode!.trim() != code) {
+      final bool handled = await _tryReplaceBarcode(code);
+      if (handled) {
+        return _resolvedBarcode == code && _unitsPerBox != null && _unitsPerBox! >= 1;
+      }
     }
     final int units = int.tryParse(_unitsPerBoxInput.text.trim()) ?? 0;
     if (units < 1) {
@@ -263,6 +368,7 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
       }
       setState(() {
         _resolvedBarcode = code;
+        _resolvedBoxId = created.boxId;
         _unitsPerBox = created.unitsPerBox;
         _pendingBoxRegistration = false;
         _unitsPerBoxInput.text = '${created.unitsPerBox}';
@@ -385,8 +491,10 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
         _fieldsInitialized = false;
         _boxBarcode.clear();
         _resolvedBarcode = null;
+        _resolvedBoxId = null;
         _unitsPerBox = null;
         _pendingBoxRegistration = false;
+        _boxPrefilledFromBreakdown = false;
         _unitsPerBoxInput.clear();
       });
       _applyDefaultsFromBreakdown(result);

@@ -1,9 +1,13 @@
 {
   "title": "Qutilar (karobkalar)",
   "add": "Quti yaratish",
+  "edit": "Tahrirlash",
+  "edit_title": "Qutini tahrirlash",
   "add_title": "Yangi quti",
   "save": "Saqlash",
   "created": "Quti saqlandi",
+  "updated": "Quti yangilandi",
+  "update_failed": "Qutini yangilab bo‘lmadi",
   "deleted": "Quti o‘chirildi",
   "delete_failed": "Qutini o‘chirib bo‘lmadi",
   "load_error": "Qutilar ro‘yxatini yuklab bo‘lmadi",

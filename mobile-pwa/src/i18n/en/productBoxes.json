@@ -1,9 +1,13 @@
 {
   "title": "Product boxes",
   "add": "Create box",
+  "edit": "Edit",
+  "edit_title": "Edit box",
   "add_title": "New box",
   "save": "Save",
   "created": "Box saved",
+  "updated": "Box updated",
+  "update_failed": "Could not update box",
   "deleted": "Box removed",
   "delete_failed": "Could not remove box",
   "load_error": "Could not load boxes",

@@ -84,4 +84,20 @@ class ProductBoxRepository {
       throw Exception(mapDioExceptionToMessage(e));
     }
   }
+
+  Future<ProductBoxResolve> replaceBarcode(ProductBoxReplaceBarcode payload) async {
+    try {
+      final Response<Object?> res = await _dio.post<Object?>(
+        '/product-boxes/replace-barcode',
+        data: payload.toJson(),
+      );
+      final Object? data = res.data;
+      if (data is! Map) {
+        throw const FormatException('product-box replace-barcode');
+      }
+      return ProductBoxResolve.fromJson(Map<String, Object?>.from(data));
+    } on DioException catch (e) {
+      throw Exception(mapDioExceptionToMessage(e));
+    }
+  }
 }
