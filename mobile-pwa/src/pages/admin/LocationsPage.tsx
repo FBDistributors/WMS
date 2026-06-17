@@ -424,21 +424,23 @@ export function LocationsPage() {
               {t('locations:show_inactive')}
             </label>
           </div>
-          <Button
-            onClick={() => setDialog({ open: true, mode: 'create', isShowroom: warehouse === 'showroom' })}
-            className="shrink-0"
-          >
-            <Plus size={16} />
-            <span className="hidden sm:inline">{t('locations:add')}</span>
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button variant="outline" onClick={() => void load()} disabled={isLoading}>
+              <RefreshCw size={16} className={isLoading ? 'animate-spin shrink-0' : 'shrink-0'} />
+              <span className="hidden sm:inline">{t('common:buttons.refresh')}</span>
+            </Button>
+            <Button
+              onClick={() => setDialog({ open: true, mode: 'create', isShowroom: warehouse === 'showroom' })}
+              className="shrink-0"
+            >
+              <Plus size={16} />
+              <span className="hidden sm:inline">{t('locations:add')}</span>
+            </Button>
+          </div>
         </div>
         {tableBody()}
         {!isLoading && !hasLoadError && filteredItems.length > 0 ? (
-          <div className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-800">
-            <Button variant="outline" onClick={() => void load()} disabled={isLoading}>
-              <RefreshCw size={16} className={isLoading ? 'animate-spin shrink-0' : 'shrink-0'} />
-              {t('common:buttons.refresh')}
-            </Button>
+          <div className="border-t border-slate-200 pt-3 dark:border-slate-800">
             <AdminTablePagination
               offset={offset}
               pageSize={PAGE_SIZE}
