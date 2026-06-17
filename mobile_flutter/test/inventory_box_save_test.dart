@@ -8,6 +8,7 @@ BoxLocationBreakdown _breakdown({
   int looseUnits = 6,
   int totalUnits = 6,
   List<SealedBoxInfo> sealedBoxes = const <SealedBoxInfo>[],
+  bool dataInconsistent = false,
 }) {
   return BoxLocationBreakdown(
     productId: 'p1',
@@ -18,10 +19,45 @@ BoxLocationBreakdown _breakdown({
     looseUnits: looseUnits,
     totalUnits: totalUnits,
     sealedBoxes: sealedBoxes,
+    dataInconsistent: dataInconsistent,
   );
 }
 
 void main() {
+  test('BoxLocationBreakdown parses data_inconsistent flag', () {
+    final BoxLocationBreakdown parsed = BoxLocationBreakdown.fromJson(<String, Object?>{
+      'product_id': 'p1',
+      'lot_id': 'lot1',
+      'location_id': 'loc1',
+      'box_count': 0,
+      'units_in_boxes': 0,
+      'loose_units': 100,
+      'total_units': 100,
+      'data_inconsistent': true,
+      'sealed_boxes': <Map<String, Object?>>[
+        <String, Object?>{
+          'placement_id': 'pl1',
+          'product_box_id': 'pb1',
+          'box_barcode': 'BOX-X',
+          'units_per_box': 120,
+        },
+      ],
+    });
+    expect(parsed.dataInconsistent, isTrue);
+    expect(parsed.sealedBoxes, hasLength(1));
+    expect(parsed.looseUnits, 100);
+  });
+
+  test('isBreakdownInconsistentMessage detects backend detail', () {
+    expect(
+      isBreakdownInconsistentMessage(
+        'Exception: Qutilardagi dona jami qoldiqdan oshib ketgan (ma\'lumot nomuvofiqligi)',
+      ),
+      isTrue,
+    );
+    expect(isBreakdownInconsistentMessage('Exception: not found'), isFalse);
+  });
+
   test('parseInsufficientLooseMessage handles Exception prefix', () {
     final ({int? needed, int? available})? parsed = parseInsufficientLooseMessage(
       'Exception: insufficient_loose:30:6',
@@ -166,5 +202,58 @@ void main() {
       ops.where((String o) => o.startsWith('movement:inventory_shortage')).length,
       greaterThanOrEqualTo(1),
     );
+  });
+
+  test('applyInventoryBoxSave reconciles orphaned sealed when inconsistent and 0 boxes',
+      () async {
+    BoxLocationBreakdown state = _breakdown(
+      looseUnits: 100,
+      totalUnits: 100,
+      dataInconsistent: true,
+      sealedBoxes: <SealedBoxInfo>[
+        const SealedBoxInfo(
+          placementId: 'pl1',
+          productBoxId: 'pb1',
+          boxBarcode: 'ORPHAN',
+          unitsPerBox: 120,
+        ),
+      ],
+    );
+    final List<String> ops = <String>[];
+
+    Future<BoxLocationBreakdown> getBreakdown() async => state;
+
+    Future<BoxLocationBreakdown> removeBox({required String boxBarcode}) async {
+      ops.add('remove:$boxBarcode');
+      state = _breakdown(
+        looseUnits: 100,
+        totalUnits: 100,
+        dataInconsistent: false,
+      );
+      return state;
+    }
+
+    await applyInventoryBoxSave(
+      boxBarcode: null,
+      unitsPerBox: null,
+      targetBoxCount: 0,
+      targetLooseQty: 100,
+      productId: 'p1',
+      locationId: 'loc1',
+      lotId: 'lot1',
+      getBreakdown: getBreakdown,
+      placeBox: ({required String boxBarcode, required int boxCount}) async => state,
+      removeBox: removeBox,
+      createMovement: ({
+        required String productId,
+        required String lotId,
+        required String locationId,
+        required double qtyChange,
+        required String reasonCode,
+      }) async {},
+    );
+
+    expect(ops, <String>['remove:ORPHAN']);
+    expect(state.dataInconsistent, isFalse);
   });
 }

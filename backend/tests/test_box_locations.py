@@ -16,6 +16,7 @@ from app.models.user import User as UserModel
 from app.auth.security import get_password_hash
 from app.services.box_location_service import (
     get_breakdown,
+    get_breakdown_tolerant,
     place_sealed_box,
     place_sealed_boxes,
     remove_sealed_box,
@@ -265,3 +266,93 @@ def test_remove_sealed_boxes_for_pick_multi(
     )
     assert bd.box_count == 2
     assert bd.units_in_boxes == 12
+
+
+def test_get_breakdown_strict_raises_when_inconsistent(
+    db_session: Session,
+    inv_user: UserModel,
+    sample_product: ProductModel,
+    sample_location: LocationModel,
+) -> None:
+    lot = _seed_stock(db_session, sample_product, sample_location, 100)
+    box = ProductBoxModel(
+        box_barcode="BOX-INCON",
+        product_id=sample_product.id,
+        units_per_box=12,
+        is_active=True,
+    )
+    db_session.add(box)
+    db_session.flush()
+    place_sealed_box(
+        db_session,
+        box_barcode="BOX-INCON",
+        location_id=sample_location.id,
+        lot_id=lot.id,
+        user=inv_user,
+    )
+    box.units_per_box = 120
+    db_session.flush()
+
+    with pytest.raises(HTTPException) as exc:
+        get_breakdown(
+            db_session,
+            product_id=sample_product.id,
+            lot_id=lot.id,
+            location_id=sample_location.id,
+        )
+    assert exc.value.status_code == 409
+
+    tolerant = get_breakdown_tolerant(
+        db_session,
+        product_id=sample_product.id,
+        lot_id=lot.id,
+        location_id=sample_location.id,
+    )
+    assert tolerant.data_inconsistent is True
+    assert tolerant.box_count == 0
+    assert tolerant.units_in_boxes == 0
+    assert tolerant.loose_units == 100
+    assert tolerant.total_units == 100
+    assert len(tolerant.sealed_boxes) == 1
+    assert tolerant.sealed_boxes[0].units_per_box == 120
+
+
+def test_remove_box_returns_tolerant_when_still_inconsistent(
+    db_session: Session,
+    inv_user: UserModel,
+    sample_product: ProductModel,
+    sample_location: LocationModel,
+) -> None:
+    lot = _seed_stock(db_session, sample_product, sample_location, 100)
+    box = ProductBoxModel(
+        box_barcode="BOX-INCON-RM",
+        product_id=sample_product.id,
+        units_per_box=12,
+        is_active=True,
+    )
+    db_session.add(box)
+    db_session.flush()
+    place_sealed_boxes(
+        db_session,
+        box_barcode="BOX-INCON-RM",
+        location_id=sample_location.id,
+        lot_id=lot.id,
+        user=inv_user,
+        box_count=2,
+    )
+    box.units_per_box = 120
+    db_session.flush()
+
+    result = remove_sealed_box(
+        db_session,
+        box_barcode="BOX-INCON-RM",
+        user=inv_user,
+        reason="inventory_reconcile",
+        location_id=sample_location.id,
+        lot_id=lot.id,
+    )
+    assert result.data_inconsistent is True
+    assert result.box_count == 0
+    assert result.loose_units == 100
+    assert len(result.sealed_boxes) == 1
+    assert result.sealed_boxes[0].units_per_box == 120

@@ -12,7 +12,7 @@ from app.db import get_db
 from app.models.user import User as UserModel
 from app.services.box_location_service import (
     LocationBoxBreakdown,
-    get_breakdown,
+    get_breakdown_tolerant,
     place_sealed_boxes,
     relocate_sealed_box,
     remove_sealed_box,
@@ -38,6 +38,7 @@ class BoxBreakdownOut(BaseModel):
     loose_units: int
     total_units: int
     sealed_boxes: list[SealedBoxOut]
+    data_inconsistent: bool = False
 
 
 class BoxPlaceIn(BaseModel):
@@ -69,6 +70,7 @@ def _to_out(b: LocationBoxBreakdown) -> BoxBreakdownOut:
         units_in_boxes=b.units_in_boxes,
         loose_units=b.loose_units,
         total_units=b.total_units,
+        data_inconsistent=b.data_inconsistent,
         sealed_boxes=[
             SealedBoxOut(
                 placement_id=s.placement_id,
@@ -93,7 +95,9 @@ async def box_breakdown(
     ),
 ):
     return _to_out(
-        get_breakdown(db, product_id=product_id, lot_id=lot_id, location_id=location_id)
+        get_breakdown_tolerant(
+            db, product_id=product_id, lot_id=lot_id, location_id=location_id
+        )
     )
 
 

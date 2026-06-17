@@ -1,7 +1,7 @@
 """Lokatsiyada yopiq quti joylashuvi va qutisiz dona hisobi."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
@@ -36,6 +36,11 @@ class SealedBoxInfo:
     label: str | None
 
 
+_BREAKDOWN_INCONSISTENT_DETAIL = (
+    "Qutilardagi dona jami qoldiqdan oshib ketgan (ma'lumot nomuvofiqligi)"
+)
+
+
 @dataclass(frozen=True)
 class LocationBoxBreakdown:
     product_id: UUID
@@ -45,7 +50,8 @@ class LocationBoxBreakdown:
     units_in_boxes: int
     loose_units: int
     total_units: int
-    sealed_boxes: list[SealedBoxInfo]
+    sealed_boxes: list[SealedBoxInfo] = field(default_factory=list)
+    data_inconsistent: bool = False
 
 
 @dataclass(frozen=True)
@@ -99,12 +105,13 @@ def _units_in_boxes_for_lot_location(
     return len(sealed), units, sealed
 
 
-def get_breakdown(
+def get_breakdown_with_mode(
     db: Session,
     *,
     product_id: UUID,
     lot_id: UUID,
     location_id: UUID,
+    strict: bool = True,
 ) -> LocationBoxBreakdown:
     lot = db.get(StockLotModel, lot_id)
     if not lot or lot.product_id != product_id:
@@ -112,11 +119,9 @@ def get_breakdown(
     available = compute_lot_location_available(db, lot_id, location_id)
     box_count, units_in_boxes, sealed = _units_in_boxes_for_lot_location(db, lot_id, location_id)
     total = max(0, int(available))
-    if units_in_boxes > total:
-        raise HTTPException(
-            status_code=409,
-            detail="Qutilardagi dona jami qoldiqdan oshib ketgan (ma'lumot nomuvofiqligi)",
-        )
+    inconsistent = units_in_boxes > total
+    if inconsistent and strict:
+        raise HTTPException(status_code=409, detail=_BREAKDOWN_INCONSISTENT_DETAIL)
     bc, uib, loose = pair_box_loose_from_available(total, box_count, units_in_boxes)
     return LocationBoxBreakdown(
         product_id=product_id,
@@ -127,6 +132,39 @@ def get_breakdown(
         loose_units=loose,
         total_units=total,
         sealed_boxes=sealed,
+        data_inconsistent=inconsistent,
+    )
+
+
+def get_breakdown(
+    db: Session,
+    *,
+    product_id: UUID,
+    lot_id: UUID,
+    location_id: UUID,
+) -> LocationBoxBreakdown:
+    return get_breakdown_with_mode(
+        db,
+        product_id=product_id,
+        lot_id=lot_id,
+        location_id=location_id,
+        strict=True,
+    )
+
+
+def get_breakdown_tolerant(
+    db: Session,
+    *,
+    product_id: UUID,
+    lot_id: UUID,
+    location_id: UUID,
+) -> LocationBoxBreakdown:
+    return get_breakdown_with_mode(
+        db,
+        product_id=product_id,
+        lot_id=lot_id,
+        location_id=location_id,
+        strict=False,
     )
 
 
@@ -147,10 +185,7 @@ def get_breakdown_for_pick(
     total = max(0, int(on_hand))
     box_count, units_in_boxes, sealed = _units_in_boxes_for_lot_location(db, lot_id, location_id)
     if units_in_boxes > total:
-        raise HTTPException(
-            status_code=409,
-            detail="Qutilardagi dona jami qoldiqdan oshib ketgan (ma'lumot nomuvofiqligi)",
-        )
+        raise HTTPException(status_code=409, detail=_BREAKDOWN_INCONSISTENT_DETAIL)
     physical_loose = max(0, total - units_in_boxes)
     return LocationBoxBreakdown(
         product_id=product_id,
@@ -161,6 +196,7 @@ def get_breakdown_for_pick(
         loose_units=physical_loose,
         total_units=total,
         sealed_boxes=sealed,
+        data_inconsistent=False,
     )
 
 
@@ -176,30 +212,12 @@ def get_breakdown_map_for_product(
         key = (lot_id, location_id)
         if key in out:
             continue
-        try:
-            out[key] = get_breakdown(
-                db,
-                product_id=product_id,
-                lot_id=lot_id,
-                location_id=location_id,
-            )
-        except HTTPException:
-            available = compute_lot_location_available(db, lot_id, location_id)
-            total = max(0, int(available))
-            box_count, units_in_boxes, sealed = _units_in_boxes_for_lot_location(
-                db, lot_id, location_id
-            )
-            bc, uib, loose = pair_box_loose_from_available(total, box_count, units_in_boxes)
-            out[key] = LocationBoxBreakdown(
-                product_id=product_id,
-                lot_id=lot_id,
-                location_id=location_id,
-                box_count=bc,
-                units_in_boxes=uib,
-                loose_units=loose,
-                total_units=total,
-                sealed_boxes=sealed if bc > 0 else [],
-            )
+        out[key] = get_breakdown_tolerant(
+            db,
+            product_id=product_id,
+            lot_id=lot_id,
+            location_id=location_id,
+        )
     return out
 
 
@@ -404,7 +422,7 @@ def place_sealed_boxes(
     if not lot or lot.product_id != box.product_id:
         raise HTTPException(status_code=400, detail="Partiya mahsulotga mos emas")
     lock_lot_location(db, lot_id, location_id)
-    breakdown = get_breakdown(
+    breakdown = get_breakdown_tolerant(
         db,
         product_id=box.product_id,
         lot_id=lot_id,
@@ -429,7 +447,7 @@ def place_sealed_boxes(
             )
         )
     db.flush()
-    return get_breakdown(
+    return get_breakdown_tolerant(
         db,
         product_id=box.product_id,
         lot_id=lot_id,
@@ -478,7 +496,7 @@ def remove_sealed_box(
     placement.removed_by_user_id = user.id
     placement.remove_reason = reason
     db.flush()
-    return get_breakdown(
+    return get_breakdown_tolerant(
         db,
         product_id=box.product_id,
         lot_id=placement.lot_id,
@@ -503,7 +521,7 @@ def relocate_sealed_box(
     if not placement:
         raise HTTPException(status_code=404, detail="Quti joylashmagan")
     if placement.location_id == to_location_id:
-        return get_breakdown(
+        return get_breakdown_tolerant(
             db,
             product_id=box.product_id,
             lot_id=placement.lot_id,
@@ -513,7 +531,7 @@ def relocate_sealed_box(
     lock_lot_location(db, placement.lot_id, to_location_id)
     placement.location_id = to_location_id
     db.flush()
-    return get_breakdown(
+    return get_breakdown_tolerant(
         db,
         product_id=box.product_id,
         lot_id=placement.lot_id,

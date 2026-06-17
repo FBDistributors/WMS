@@ -233,7 +233,8 @@ async def replace_product_box_barcode(
         raise HTTPException(status_code=404, detail="Product not found")
 
     if new_code == old_box.box_barcode:
-        old_box.units_per_box = payload.units_per_box
+        if not _has_sealed_placement(db, old_box.id):
+            old_box.units_per_box = payload.units_per_box
         db.commit()
         db.refresh(old_box)
         return _resolve_out_from_box(old_box)
@@ -251,7 +252,6 @@ async def replace_product_box_barcode(
 
     if _has_sealed_placement(db, old_box.id):
         old_box.box_barcode = new_code
-        old_box.units_per_box = payload.units_per_box
         try:
             db.flush()
             log_action(

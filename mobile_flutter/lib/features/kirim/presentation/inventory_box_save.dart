@@ -92,6 +92,18 @@ Future<BoxLocationBreakdown> applyInventoryBoxSave({
 }) async {
   final String barcode = boxBarcode?.trim() ?? '';
   BoxLocationBreakdown breakdown = await getBreakdown();
+
+  if (breakdown.dataInconsistent &&
+      targetBoxCount == 0 &&
+      breakdown.sealedBoxes.isNotEmpty) {
+    final List<SealedBoxInfo> sealed =
+        List<SealedBoxInfo>.from(breakdown.sealedBoxes);
+    for (final SealedBoxInfo sealedBox in sealed) {
+      breakdown = await removeBox(boxBarcode: sealedBox.boxBarcode);
+    }
+    breakdown = await getBreakdown();
+  }
+
   final int currentBoxes = currentBoxCountTarget(breakdown, barcode);
   final int boxDelta = targetBoxCount - currentBoxes;
   bool boxOpsCompleted = false;

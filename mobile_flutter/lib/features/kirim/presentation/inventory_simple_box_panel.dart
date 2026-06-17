@@ -114,12 +114,38 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
         setState(() {});
       }
     } on Exception catch (e) {
-      if (mounted) {
-        setState(() {
-          _breakdownError = '$e';
-          _loadingBreakdown = false;
-        });
+      if (!mounted) {
+        return;
       }
+      final String msg = '$e';
+      if (isBreakdownInconsistentMessage(msg)) {
+        final int loose = widget.initialLooseQty ?? 0;
+        final int total = loose > 0 ? loose : (widget.initialBoxCount ?? 0);
+        final BoxLocationBreakdown fallback = BoxLocationBreakdown(
+          productId: widget.productId,
+          lotId: widget.lotId,
+          locationId: widget.locationId,
+          boxCount: 0,
+          unitsInBoxes: 0,
+          looseUnits: loose,
+          totalUnits: total,
+          dataInconsistent: true,
+        );
+        setState(() {
+          _breakdown = fallback;
+          _loadingBreakdown = false;
+          _breakdownError = null;
+        });
+        _applyDefaultsFromBreakdown(fallback);
+        if (mounted) {
+          setState(() {});
+        }
+        return;
+      }
+      setState(() {
+        _breakdownError = msg;
+        _loadingBreakdown = false;
+      });
     }
   }
 
@@ -609,6 +635,14 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
     );
   }
 
+  Widget _buildInconsistentBanner(AppLocale loc) {
+    return MaterialBanner(
+      content: Text(StringLookup.t(loc, 'inventoryDataInconsistent')),
+      backgroundColor: Colors.amber.shade100,
+      actions: const <Widget>[SizedBox.shrink()],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final AppLocale loc = ref.watch(appLocaleProvider);
@@ -619,12 +653,17 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
     if (_breakdownError != null) {
       return Text(_breakdownError!, style: const TextStyle(color: Colors.red));
     }
+    final BoxLocationBreakdown? breakdown = _breakdown;
+    if (breakdown == null) {
+      return const SizedBox.shrink();
+    }
 
     final Widget? totalPreview = _buildTotalPreview(loc);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
+        if (breakdown.dataInconsistent) _buildInconsistentBanner(loc),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[

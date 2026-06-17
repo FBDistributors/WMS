@@ -8,6 +8,7 @@ class BoxLocationBreakdown {
     required this.looseUnits,
     required this.totalUnits,
     this.sealedBoxes = const <SealedBoxInfo>[],
+    this.dataInconsistent = false,
   });
 
   final String productId;
@@ -18,6 +19,7 @@ class BoxLocationBreakdown {
   final int looseUnits;
   final int totalUnits;
   final List<SealedBoxInfo> sealedBoxes;
+  final bool dataInconsistent;
 
   factory BoxLocationBreakdown.fromJson(Map<String, Object?> json) {
     final Object? boxes = json['sealed_boxes'];
@@ -40,8 +42,13 @@ class BoxLocationBreakdown {
       looseUnits: _int(json['loose_units']),
       totalUnits: _int(json['total_units']),
       sealedBoxes: sealed,
+      dataInconsistent: json['data_inconsistent'] == true,
     );
   }
+}
+
+bool isBreakdownInconsistentMessage(String message) {
+  return message.contains('nomuvofiqligi') || message.contains('nomuvofiqlik');
 }
 
 class SealedBoxInfo {

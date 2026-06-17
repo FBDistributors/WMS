@@ -96,12 +96,31 @@ class _InventoryUnpackBoxPanelState extends ConsumerState<InventoryUnpackBoxPane
         });
       }
     } on Exception catch (e) {
-      if (mounted) {
-        setState(() {
-          _breakdownError = '$e';
-          _loadingBreakdown = false;
-        });
+      if (!mounted) {
+        return;
       }
+      final String msg = '$e';
+      if (isBreakdownInconsistentMessage(msg)) {
+        setState(() {
+          _breakdown = BoxLocationBreakdown(
+            productId: widget.productId,
+            lotId: widget.lotId,
+            locationId: widget.locationId,
+            boxCount: 0,
+            unitsInBoxes: 0,
+            looseUnits: 0,
+            totalUnits: 0,
+            dataInconsistent: true,
+          );
+          _loadingBreakdown = false;
+          _breakdownError = null;
+        });
+        return;
+      }
+      setState(() {
+        _breakdownError = msg;
+        _loadingBreakdown = false;
+      });
     }
   }
 
@@ -358,6 +377,12 @@ class _InventoryUnpackBoxPanelState extends ConsumerState<InventoryUnpackBoxPane
         else if (_breakdownError != null)
           Text(_breakdownError!, style: const TextStyle(color: Colors.red))
         else if (b != null) ...<Widget>[
+          if (b.dataInconsistent)
+            MaterialBanner(
+              content: Text(StringLookup.t(loc, 'inventoryDataInconsistent')),
+              backgroundColor: Colors.amber.shade100,
+              actions: const <Widget>[SizedBox.shrink()],
+            ),
           Text(
             StringLookup.t(loc, 'inventoryLocationStockComputed'),
             style: TextStyle(
