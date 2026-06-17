@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_state/app_locale.dart';
 import '../../core/app_state/locale_controller.dart';
+import '../../core/errors/api_error_localization.dart';
 import '../../core/app_state/network_status_provider.dart';
 import '../../features/picking/alternate_location_menu_label.dart'
     show mergeAlternateLocationsForDisplay, MergedAlternateLocationRow;
@@ -229,7 +230,7 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
       }
     } on Exception catch (e) {
       if (modalCtx.mounted) {
-        showAppSnackBar(host, SnackBar(content: Text('$e')));
+        showAppSnackBar(host, SnackBar(content: Text(localizeApiErrorMessage(loc, e))));
       }
     } finally {
       if (sheetBodyContext.mounted) {
@@ -570,7 +571,7 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                                     .refreshFromNetwork();
                               } on Exception catch (e) {
                                 if (ctx.mounted) {
-                                  showAppSnackBar(host, SnackBar(content: Text('$e')));
+                                  showAppSnackBar(host, SnackBar(content: Text(localizeApiErrorMessage(loc, e))));
                                 }
                               } finally {
                                 if (context.mounted) {

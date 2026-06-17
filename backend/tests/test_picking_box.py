@@ -16,6 +16,7 @@ from app.models.location import Location as LocationModel
 from app.models.order import Order, OrderLine, OrderWmsState
 from app.models.product import Product as ProductModel
 from app.models.product_box import ProductBox as ProductBoxModel
+from app.models.location_box_placement import LocationBoxPlacement, PLACEMENT_SEALED
 from app.models.stock import StockLot, StockMovement
 from app.models.user import User as UserModel
 from app.auth.security import get_password_hash
@@ -321,6 +322,62 @@ def test_line_pick_unit_with_fully_reserved_loose_stock(
             json={
                 "delta": 1,
                 "request_id": f"pick-unit-res-{uuid.uuid4().hex}",
+                "barcode": product.barcode,
+            },
+        )
+        assert pick.status_code == 200, pick.text
+        assert pick.json()["line"]["qty_picked"] == 1
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_line_pick_unit_with_orphan_sealed_placements(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Orphan sealed yozuvlari on_hand dan katta bo'lsa ham dona terish ishlaydi."""
+    order, picker, product, loc, lot = _seed_loose_pick_order(
+        db_session, order_qty=1, stock_qty=10
+    )
+    box = ProductBoxModel(
+        box_barcode=f"BOX-ORPH-{uuid.uuid4().hex[:6]}",
+        product_id=product.id,
+        units_per_box=10,
+        is_active=True,
+    )
+    db_session.add(box)
+    db_session.flush()
+    for _ in range(5):
+        db_session.add(
+            LocationBoxPlacement(
+                product_box_id=box.id,
+                location_id=loc.id,
+                lot_id=lot.id,
+                status=PLACEMENT_SEALED,
+                placed_by_user_id=picker.id,
+            )
+        )
+    db_session.commit()
+
+    bd_pick = get_breakdown_for_pick(
+        db_session,
+        product_id=product.id,
+        lot_id=lot.id,
+        location_id=loc.id,
+    )
+    assert bd_pick.data_inconsistent is True
+    assert bd_pick.loose_units == 10
+
+    doc_id = _send_to_picking(client, db_session, order.id, picker.id)
+
+    app.dependency_overrides[get_current_user] = lambda: picker
+    try:
+        line_id = client.get(f"/api/v1/picking/documents/{doc_id}").json()["lines"][0]["id"]
+        pick = client.post(
+            f"/api/v1/picking/lines/{line_id}/pick",
+            json={
+                "delta": 1,
+                "request_id": f"pick-orphan-{uuid.uuid4().hex}",
                 "barcode": product.barcode,
             },
         )

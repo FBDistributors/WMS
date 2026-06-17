@@ -36,6 +36,7 @@ from app.services.stock_availability import require_sufficient_reserved
 from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_ip, log_action
 from app.services.box_location_service import (
     apply_hybrid_pick_side_effects,
+    pair_box_loose_from_available,
     remove_sealed_boxes_for_pick,
     require_sufficient_loose_for_unit_pick,
     validate_hybrid_pick_qty,
@@ -409,15 +410,11 @@ def _breakdown_kwargs_map_for_pairs(
         on_hand, available = balances.get(key, (0.0, 0.0))
         total = max(0, int(on_hand))
         box_count, units_in_boxes = boxes.get(key, (0, 0))
-        if units_in_boxes > total:
-            # get_breakdown_for_pick bu holatda 409 berib, {} qaytarilar edi.
-            out[key] = {}
-            continue
-        physical_loose = max(0, total - units_in_boxes)
+        bc, uib, loose = pair_box_loose_from_available(total, box_count, units_in_boxes)
         out[key] = {
-            "box_count": box_count,
-            "units_in_boxes": units_in_boxes,
-            "loose_units": physical_loose,
+            "box_count": bc,
+            "units_in_boxes": uib,
+            "loose_units": loose,
         }
     return out
 

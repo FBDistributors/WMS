@@ -330,6 +330,10 @@ abstract final class StringLookup {
     'kirimNewBoxBarcodeConfirm': 'Shtrix kodni tasdiqlash',
     'kirimNewBoxQtyIncomplete': 'Quti skani, hajmi va sonini to‘ldiring',
     'pickUseBoxScan': 'Dona terish uchun qoldiq yetmaydi — quti skan qiling',
+    'pickDataInconsistent':
+        'Ma\'lumot nomuvofiqligi: quti yozuvlari qoldiq bilan mos emas. Quti skan qiling yoki administrator bilan bog\'laning.',
+    'pickInsufficientLoose':
+        'Qutisiz qoldiq yetarli emas (kerak {{needed}}, mavjud {{available}}). Quti skan qiling.',
     'pickHybridExtraLoose': 'Qo‘shimcha dona (qutisiz)',
     'pickHybridTotal': 'Jami: {{boxes}} × {{upb}} + {{loose}} = {{total}} dona',
     'pickHybridScanBox': 'Quti skan',
@@ -713,6 +717,10 @@ abstract final class StringLookup {
     'kirimNewBoxBarcodeConfirm': 'Подтвердить штрихкод',
     'kirimNewBoxQtyIncomplete': 'Укажите скан коробки, размер и количество',
     'pickUseBoxScan': 'Недостаточно штук — отсканируйте коробку',
+    'pickDataInconsistent':
+        'Несоответствие данных: записи коробок не совпадают с остатком. Отсканируйте коробку или обратитесь к администратору.',
+    'pickInsufficientLoose':
+        'Недостаточно штук без коробки (нужно {{needed}}, есть {{available}}). Отсканируйте коробку.',
     'pickHybridExtraLoose': 'Доп. штуки (без коробки)',
     'pickHybridTotal': 'Итого: {{boxes}} × {{upb}} + {{loose}} = {{total}} шт.',
     'pickHybridScanBox': 'Скан коробки',
@@ -1096,6 +1104,10 @@ abstract final class StringLookup {
     'kirimNewBoxBarcodeConfirm': 'Confirm barcode',
     'kirimNewBoxQtyIncomplete': 'Complete box scan, size, and count',
     'pickUseBoxScan': 'Not enough loose units — scan a box',
+    'pickDataInconsistent':
+        'Data mismatch: box records do not match stock. Scan a box or contact an administrator.',
+    'pickInsufficientLoose':
+        'Not enough loose units (need {{needed}}, have {{available}}). Scan a box.',
     'pickHybridExtraLoose': 'Extra loose units',
     'pickHybridTotal': 'Total: {{boxes}} × {{upb}} + {{loose}} = {{total}} units',
     'pickHybridScanBox': 'Scan box',

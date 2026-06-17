@@ -184,19 +184,18 @@ def get_breakdown_for_pick(
     on_hand, _reserved, _available = compute_lot_location_balances(db, lot_id, location_id)
     total = max(0, int(on_hand))
     box_count, units_in_boxes, sealed = _units_in_boxes_for_lot_location(db, lot_id, location_id)
-    if units_in_boxes > total:
-        raise HTTPException(status_code=409, detail=_BREAKDOWN_INCONSISTENT_DETAIL)
-    physical_loose = max(0, total - units_in_boxes)
+    inconsistent = units_in_boxes > total
+    bc, uib, loose = pair_box_loose_from_available(total, box_count, units_in_boxes)
     return LocationBoxBreakdown(
         product_id=product_id,
         lot_id=lot_id,
         location_id=location_id,
-        box_count=box_count,
-        units_in_boxes=units_in_boxes,
-        loose_units=physical_loose,
+        box_count=bc,
+        units_in_boxes=uib,
+        loose_units=loose,
         total_units=total,
         sealed_boxes=sealed,
-        data_inconsistent=False,
+        data_inconsistent=inconsistent,
     )
 
 

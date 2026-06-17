@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/errors/api_error_localization.dart';
 import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../core/app_state/network_status_provider.dart';
@@ -29,16 +30,10 @@ import '../data/return_session_storage.dart';
 import '../data/picking_models.dart';
 import '../../scanner/data/scanner_repository.dart';
 import '../../scanner/scanner_providers.dart';
+import '../domain/pick_line_list_logic.dart';
 import '../domain/pick_scan_resolution.dart';
 import '../domain/profile_type_param.dart';
 import '../picking_providers.dart';
-
-class _LineGroup {
-  const _LineGroup({required this.virtual, required this.members});
-
-  final PickingLine virtual;
-  final List<PickingLine> members;
-}
 
 String? _lineSourceBadgeKey(PickingLine line) {
   final String src = (line.lineSource ?? 'product').trim();
@@ -47,136 +42,12 @@ String? _lineSourceBadgeKey(PickingLine line) {
   return null;
 }
 
-bool _pickingLineEffectivelyDone(PickingLine l) =>
-    l.isVipExpiryInformational || l.qtyPicked >= l.qtyRequired;
-
-bool _lineGroupEffectivelyDone(_LineGroup g) =>
-    g.members.every(_pickingLineEffectivelyDone);
-
-/// Yig‘ish uchun keyingi ochiq qator (bir nechta joy/lot bo‘lsa).
-PickingLine _activePickMember(_LineGroup g) {
-  for (final PickingLine l in g.members) {
-    if (!l.isVipExpiryInformational && l.qtyPicked < l.qtyRequired) {
-      return l;
-    }
-  }
-  return g.members.first;
-}
-
-String _groupLocationQtyLine(_LineGroup g) {
-  final List<PickingLine> physical = g.members
-      .where((PickingLine l) => !l.isVipExpiryInformational)
-      .toList();
-  if (physical.length <= 1) {
-    final PickingLine l = physical.isNotEmpty ? physical.first : g.members.first;
-    final String? breakdown = pickLocationBreakdownLabel(l);
-    final String base =
-        '${l.locationCode} · ${formatPickQty(g.virtual.qtyPicked)}/${formatPickQty(g.virtual.qtyRequired)}';
-    if (breakdown != null && breakdown.isNotEmpty) {
-      return '$base · $breakdown';
-    }
-    return base;
-  }
-  return physical
-      .map(
-        (PickingLine l) =>
-            '${l.locationCode}: ${formatPickQty(l.qtyPicked)}/${formatPickQty(l.qtyRequired)}',
-      )
-      .join(' · ');
-}
-
 double _aggregateQtyPicked(Iterable<PickingLine> lines) {
   return lines.fold<double>(0, (double s, PickingLine l) => s + l.qtyPicked);
 }
 
 double _aggregateQtyRequired(Iterable<PickingLine> lines) {
   return lines.fold<double>(0, (double s, PickingLine l) => s + l.qtyRequired);
-}
-
-List<_LineGroup> _groupLinesByProduct(List<PickingLine> lines) {
-  final Map<String, List<PickingLine>> map = <String, List<PickingLine>>{};
-  for (final PickingLine l in lines) {
-    final String key = pickLineGroupKey(l);
-    map.putIfAbsent(key, () => <PickingLine>[]).add(l);
-  }
-  return map.values.map((List<PickingLine> groupLines) {
-    final PickingLine first = groupLines.first;
-    final double required = groupLines.fold<double>(
-      0,
-      (double s, PickingLine l) => s + l.qtyRequired,
-    );
-    final double picked = groupLines.fold<double>(
-      0,
-      (double s, PickingLine l) => s + l.qtyPicked,
-    );
-    final PickingLine virtual = PickingLine(
-      id: first.id,
-      productName: first.productName,
-      sku: first.sku,
-      barcode: first.barcode,
-      locationCode: '—',
-      batch: first.batch,
-      expiryDate: first.expiryDate,
-      qtyRequired: required,
-      qtyPicked: picked,
-      skipReason: first.skipReason,
-      productId: first.productId,
-      alternateLocations: first.alternateLocations,
-      isVipExpiryInformational: first.isVipExpiryInformational,
-      vipExpiryInformationKey: first.vipExpiryInformationKey,
-      lineSource: first.lineSource,
-    );
-    return _LineGroup(virtual: virtual, members: groupLines);
-  }).toList(growable: false);
-}
-
-/// Kartochka yig‘indisi bilan bir xil — `_groupLinesByProduct` a’zolari (kalit farqi bo‘lsa ham).
-List<PickingLine> _membersOfSameCardAs(PickingDocument doc, PickingLine anchor) {
-  final List<_LineGroup> groups = _groupLinesByProduct(doc.lines);
-  for (final _LineGroup g in groups) {
-    if (g.members.any((PickingLine l) => l.id == anchor.id)) {
-      return List<PickingLine>.from(g.members);
-    }
-  }
-  return <PickingLine>[anchor];
-}
-
-/// Noyakuniy qatorlar yuqorida, to‘liq terilganlar pastda (nisbiy tartib saqlanadi).
-List<_LineGroup> _orderedLineGroups(List<_LineGroup> groups) {
-  final List<_LineGroup> incomplete = groups
-      .where((_LineGroup g) => !_lineGroupEffectivelyDone(g))
-      .toList();
-  final List<_LineGroup> complete = groups
-      .where((_LineGroup g) => _lineGroupEffectivelyDone(g))
-      .toList();
-  return <_LineGroup>[...incomplete, ...complete];
-}
-
-bool _groupFullyVerified(_LineGroup g, Set<String> verifiedLineIds) {
-  return g.members.every((PickingLine l) => verifiedLineIds.contains(l.id));
-}
-
-/// Kontroller: tekshirilmaganlar yuqorida (ichida miqdor bo‘yicha), to‘liq tekshirilganlar pastda.
-List<_LineGroup> _orderedLineGroupsController(
-  List<_LineGroup> groups,
-  Set<String> verifiedLineIds,
-) {
-  final List<_LineGroup> pending = <_LineGroup>[];
-  final List<_LineGroup> done = <_LineGroup>[];
-  for (final _LineGroup g in groups) {
-    if (_groupFullyVerified(g, verifiedLineIds)) {
-      done.add(g);
-    } else {
-      pending.add(g);
-    }
-  }
-  final List<_LineGroup> pendingInc = pending
-      .where((_LineGroup g) => !_lineGroupEffectivelyDone(g))
-      .toList();
-  final List<_LineGroup> pendingRest = pending
-      .where((_LineGroup g) => _lineGroupEffectivelyDone(g))
-      .toList();
-  return <_LineGroup>[...pendingInc, ...pendingRest, ...done];
 }
 
 String _barcodeSkuSubtitle(PickingLine l) => '${l.barcode ?? '—'} / ${l.sku ?? '—'}';
@@ -327,7 +198,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
 
   Future<void> _clearVerifiedForGroup(PickingDocument doc, PickingLine anchor) async {
     final Set<String> ids =
-        _membersOfSameCardAs(doc, anchor).map((PickingLine l) => l.id).toSet();
+        membersOfSameCardAs(doc, anchor).map((PickingLine l) => l.id).toSet();
     if (!ids.any(_verifiedLineIds.contains)) {
       return;
     }
@@ -395,7 +266,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     } on Exception catch (e) {
       if (mounted) {
         _rejectScanHaptic();
-        showAppSnackBar(context, SnackBar(content: Text('$e')));
+        showAppSnackBar(context, SnackBar(content: Text(localizeApiErrorMessage(ref.read(appLocaleProvider), e))));
       }
     } finally {
       if (mounted) {
@@ -440,7 +311,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
   Future<void> _submitControllerSheetScan({
     required String raw,
     required PickingDocument doc,
-    required _LineGroup group,
+    required PickLineGroup group,
     required void Function(void Function()) setM,
     required TextEditingController qty,
     required TextEditingController boxCountCtrl,
@@ -688,21 +559,9 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
         ? (remaining < resolved.unitsPerScan ? remaining : resolved.unitsPerScan.toDouble())
         : remaining;
     _topScan.clear();
-    final List<_LineGroup> groups = _groupLinesByProduct(doc.lines);
-    _LineGroup? group;
-    for (final _LineGroup g in groups) {
-      if (g.members.any((PickingLine m) => m.id == line.id)) {
-        group = g;
-        break;
-      }
-    }
     await _openLineSheet(
       doc,
-      group ??
-          _LineGroup(
-            virtual: line,
-            members: <PickingLine>[line],
-          ),
+      pickLineGroupFromSingle(line),
       PickerProfileParam.picker,
       presetScannedBarcode: normalized,
       presetPickQty: presetQty,
@@ -719,7 +578,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
   }) async {
     final AppLocale loc = ref.read(appLocaleProvider);
     final BuildContext hostContext = context;
-    final List<PickingLine> groupLines = _membersOfSameCardAs(doc, physical);
+    final List<PickingLine> groupLines = membersOfSameCardAs(doc, physical);
     final double aggPicked = _aggregateQtyPicked(groupLines);
     final double aggRequired = _aggregateQtyRequired(groupLines);
     final TextEditingController qty = TextEditingController();
@@ -875,7 +734,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       } on Exception catch (e) {
         if (mounted) {
           _rejectScanHaptic();
-          showAppSnackBar(context, SnackBar(content: Text('$e')));
+          showAppSnackBar(context, SnackBar(content: Text(localizeApiErrorMessage(ref.read(appLocaleProvider), e))));
         }
       } finally {
         if (mounted) {
@@ -895,7 +754,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     } on Exception catch (e) {
       if (mounted) {
         _rejectScanHaptic();
-        showAppSnackBar(context, SnackBar(content: Text('$e')));
+        showAppSnackBar(context, SnackBar(content: Text(localizeApiErrorMessage(ref.read(appLocaleProvider), e))));
       }
     } finally {
       if (mounted) {
@@ -933,7 +792,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
 
     if (profile == PickerProfileParam.picker) {
       final List<PickingLine> incomplete = doc.lines
-          .where((PickingLine l) => !_pickingLineEffectivelyDone(l))
+          .where((PickingLine l) => !pickingLineEffectivelyDone(l))
           .toList();
       if (incomplete.isNotEmpty) {
         if (!online) {
@@ -1037,7 +896,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
           }
         } on Exception catch (e) {
           if (mounted) {
-            showAppSnackBar(context, SnackBar(content: Text('$e')));
+            showAppSnackBar(context, SnackBar(content: Text(localizeApiErrorMessage(ref.read(appLocaleProvider), e))));
           }
         } finally {
           if (mounted) {
@@ -1096,7 +955,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     } on Exception catch (e) {
       if (mounted) {
         _rejectScanHaptic();
-        showAppSnackBar(context, SnackBar(content: Text('$e')));
+        showAppSnackBar(context, SnackBar(content: Text(localizeApiErrorMessage(ref.read(appLocaleProvider), e))));
       }
     } finally {
       if (mounted) {
@@ -1107,7 +966,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
 
   Future<void> _openLineSheet(
     PickingDocument doc,
-    _LineGroup group,
+    PickLineGroup group,
     PickerProfileParam profile, {
     String? presetScannedBarcode,
     double? presetPickQty,
@@ -1116,7 +975,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
   }) async {
     final AppLocale loc = ref.read(appLocaleProvider);
     final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
-    final List<PickingLine> pickTargetHolder = <PickingLine>[_activePickMember(group)];
+    final List<PickingLine> pickTargetHolder = <PickingLine>[activePickMember(group)];
 
     if (pickTargetHolder[0].isVipExpiryInformational) {
       await showModalBottomSheet<void>(
@@ -1259,20 +1118,13 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      _groupLocationQtyLine(group),
+                      profile == PickerProfileParam.picker
+                          ? (pickTargetHolder[0].isVipExpiryInformational
+                              ? StringLookup.t(loc, 'vipExpiryNotPickedDetail')
+                              : pickerLocationQtyLine(pickTargetHolder[0]))
+                          : groupLocationQtyLine(group),
                       style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                     ),
-                    if (group.members.length > 1 &&
-                        profile == PickerProfileParam.picker) ...<Widget>[
-                      const SizedBox(height: 6),
-                      Text(
-                        StringLookup.t(loc, 'pickMultiLocationHint'),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
                     if (pickTargetHolder[0].skipReason != null &&
                         pickTargetHolder[0].skipReason!.isNotEmpty) ...<Widget>[
                       const SizedBox(height: 8),
@@ -1644,7 +1496,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                 _rejectScanHaptic();
                                 showAppSnackBar(
                                   context,
-                                  SnackBar(content: Text('$e')),
+                                  SnackBar(content: Text(localizeApiErrorMessage(ref.read(appLocaleProvider), e))),
                                 );
                               }
                             } finally {
@@ -1729,7 +1581,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                   _rejectScanHaptic();
                                   showAppSnackBar(
                                     context,
-                                    SnackBar(content: Text('$e')),
+                                    SnackBar(content: Text(localizeApiErrorMessage(ref.read(appLocaleProvider), e))),
                                   );
                                 }
                               } finally {
@@ -1805,7 +1657,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                   } on Exception catch (e) {
                     if (mounted) {
                       _rejectScanHaptic();
-                      showAppSnackBar(context, SnackBar(content: Text('$e')));
+                      showAppSnackBar(context, SnackBar(content: Text(localizeApiErrorMessage(ref.read(appLocaleProvider), e))));
                     }
                   }
                 },
@@ -1954,7 +1806,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                           _rejectScanHaptic();
                                           showAppSnackBar(
                                             this.context,
-                                            SnackBar(content: Text('$e')),
+                                            SnackBar(content: Text(localizeApiErrorMessage(ref.read(appLocaleProvider), e))),
                                           );
                                         }
                                       } finally {
@@ -2066,10 +1918,15 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       ),
       body: docAsync.when(
         data: (PickingDocument d) {
-          final List<_LineGroup> groups = _groupLinesByProduct(d.lines);
-          final List<_LineGroup> orderedGroups = profile == PickerProfileParam.controller
-              ? _orderedLineGroupsController(groups, _verifiedLineIds)
-              : _orderedLineGroups(groups);
+          final bool isPickerList = profile == PickerProfileParam.picker;
+          final List<PickLineGroup> groups = groupLinesByProduct(d.lines);
+          final List<PickLineGroup> orderedGroups = isPickerList
+              ? const <PickLineGroup>[]
+              : orderedLineGroupsController(groups, _verifiedLineIds);
+          final List<PickingLine> orderedPickerLinesList =
+              isPickerList ? orderedPickerLines(d.lines) : const <PickingLine>[];
+          final int listItemCount =
+              isPickerList ? orderedPickerLinesList.length : orderedGroups.length;
 
           final String? sidRaw = d.safeCancelReturnSessionId;
           final bool cancelBlock = profile == PickerProfileParam.picker &&
@@ -2159,21 +2016,119 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
               Expanded(
                 child: ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-                  itemCount: orderedGroups.length,
+                  itemCount: listItemCount,
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (BuildContext context, int i) {
-                    final _LineGroup g = orderedGroups[i];
-                    final bool groupVerified = profile == PickerProfileParam.controller
-                        ? g.members.every((PickingLine l) => _verifiedLineIds.contains(l.id))
-                        : false;
-                    final bool lineComplete = _lineGroupEffectivelyDone(g);
-                    final bool useGreenCard = profile == PickerProfileParam.controller
-                        ? groupVerified
-                        : lineComplete;
-                    final bool controllerIncomplete =
-                        profile == PickerProfileParam.controller && !lineComplete;
                     final ColorScheme cs = Theme.of(context).colorScheme;
                     final bool isDark = Theme.of(context).brightness == Brightness.dark;
+
+                    if (isPickerList) {
+                      final PickingLine line = orderedPickerLinesList[i];
+                      final bool lineComplete = pickingLineEffectivelyDone(line);
+                      final Color cardBg = lineComplete
+                          ? Colors.green.withValues(alpha: isDark ? 0.20 : 0.14)
+                          : cs.surfaceContainerHighest.withValues(alpha: 0.35);
+                      final IconData leadingIcon = lineComplete
+                          ? Icons.check_circle_rounded
+                          : Icons.inventory_2_rounded;
+                      final Color iconColor = lineComplete
+                          ? Colors.green.shade700
+                          : cs.primary;
+                      return Material(
+                        color: cardBg,
+                        borderRadius: BorderRadius.circular(12),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => _openLineSheet(
+                            d,
+                            pickLineGroupFromSingle(line),
+                            profile,
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Row(
+                              children: <Widget>[
+                                Icon(leadingIcon, color: iconColor),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: <Widget>[
+                                      Wrap(
+                                        spacing: 8,
+                                        runSpacing: 4,
+                                        crossAxisAlignment: WrapCrossAlignment.center,
+                                        children: <Widget>[
+                                          Text(
+                                            line.productName,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 15,
+                                            ),
+                                          ),
+                                          if (_lineSourceBadgeKey(line) != null)
+                                            Chip(
+                                              label: Text(
+                                                StringLookup.t(
+                                                  loc,
+                                                  _lineSourceBadgeKey(line)!,
+                                                ),
+                                              ),
+                                              visualDensity: VisualDensity.compact,
+                                              padding: EdgeInsets.zero,
+                                              materialTapTargetSize:
+                                                  MaterialTapTargetSize.shrinkWrap,
+                                            ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        _barcodeSkuSubtitle(line),
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: cs.onSurfaceVariant,
+                                          fontFamily: 'monospace',
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        line.isVipExpiryInformational
+                                            ? StringLookup.t(loc, 'vipExpiryNotPickedDetail')
+                                            : pickerLocationQtyLine(line),
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: line.isVipExpiryInformational
+                                              ? Colors.red.shade800
+                                              : cs.onSurfaceVariant,
+                                        ),
+                                        maxLines: 4,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if ((ref.watch(networkOnlineProvider).valueOrNull ?? true) &&
+                                    !lineComplete)
+                                  IconButton(
+                                    icon: const Icon(Icons.flag_rounded),
+                                    tooltip: StringLookup.t(loc, 'lineReasonModalTitle'),
+                                    onPressed: () => _showSkipReasonSheet(line),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+
+                    final PickLineGroup g = orderedGroups[i];
+                    final bool groupVerified = g.members
+                        .every((PickingLine l) => _verifiedLineIds.contains(l.id));
+                    final bool lineComplete = pickLineGroupEffectivelyDone(g);
+                    final bool useGreenCard = groupVerified;
+                    final bool controllerIncomplete = !lineComplete;
                     final Color cardBg = useGreenCard
                         ? Colors.green.withValues(alpha: isDark ? 0.20 : 0.14)
                         : controllerIncomplete
@@ -2183,25 +2138,15 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                             : cs.surfaceContainerHighest.withValues(alpha: 0.35);
                     final IconData leadingIcon;
                     final Color iconColor;
-                    if (profile == PickerProfileParam.controller) {
-                      if (groupVerified) {
-                        leadingIcon = Icons.verified_rounded;
-                        iconColor = Colors.green.shade700;
-                      } else if (lineComplete) {
-                        leadingIcon = Icons.check_circle_outline_rounded;
-                        iconColor = cs.primary;
-                      } else {
-                        leadingIcon = Icons.inventory_2_rounded;
-                        iconColor = cs.primary;
-                      }
+                    if (groupVerified) {
+                      leadingIcon = Icons.verified_rounded;
+                      iconColor = Colors.green.shade700;
+                    } else if (lineComplete) {
+                      leadingIcon = Icons.check_circle_outline_rounded;
+                      iconColor = cs.primary;
                     } else {
-                      if (lineComplete) {
-                        leadingIcon = Icons.check_circle_rounded;
-                        iconColor = Colors.green.shade700;
-                      } else {
-                        leadingIcon = Icons.inventory_2_rounded;
-                        iconColor = cs.primary;
-                      }
+                      leadingIcon = Icons.inventory_2_rounded;
+                      iconColor = cs.primary;
                     }
                     return Material(
                       color: cardBg,
@@ -2262,7 +2207,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      _groupLocationQtyLine(g),
+                                      groupLocationQtyLine(g),
                                       style: TextStyle(
                                         fontSize: 13,
                                         color: cs.onSurfaceVariant,
@@ -2273,15 +2218,6 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                   ],
                                 ),
                               ),
-                              if (profile == PickerProfileParam.picker &&
-                                  (ref.watch(networkOnlineProvider).valueOrNull ?? true) &&
-                                  !_lineGroupEffectivelyDone(g))
-                                IconButton(
-                                  icon: const Icon(Icons.flag_rounded),
-                                  tooltip: StringLookup.t(loc, 'lineReasonModalTitle'),
-                                  onPressed: () =>
-                                      _showSkipReasonSheet(_activePickMember(g)),
-                                ),
                             ],
                           ),
                         ),
