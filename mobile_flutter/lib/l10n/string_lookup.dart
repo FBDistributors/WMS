@@ -334,6 +334,9 @@ abstract final class StringLookup {
         'Ma\'lumot nomuvofiqligi: quti yozuvlari qoldiq bilan mos emas. Quti skan qiling yoki administrator bilan bog\'laning.',
     'pickInsufficientLoose':
         'Qutisiz qoldiq yetarli emas (kerak {{needed}}, mavjud {{available}}). Quti skan qiling.',
+    'pickBoxCountRequired': 'Quti skan qilish uchun quti sonini kiriting',
+    'pickBarcodeRequiredHybrid':
+        'Gibrid terish uchun mahsulot (dona) shtrix-kodi kerak',
     'pickHybridExtraLoose': 'Qo‘shimcha dona (qutisiz)',
     'pickHybridTotal': 'Jami: {{boxes}} × {{upb}} + {{loose}} = {{total}} dona',
     'pickHybridScanBox': 'Quti skan',
@@ -721,6 +724,9 @@ abstract final class StringLookup {
         'Несоответствие данных: записи коробок не совпадают с остатком. Отсканируйте коробку или обратитесь к администратору.',
     'pickInsufficientLoose':
         'Недостаточно штук без коробки (нужно {{needed}}, есть {{available}}). Отсканируйте коробку.',
+    'pickBoxCountRequired': 'Укажите количество коробок для скана коробки',
+    'pickBarcodeRequiredHybrid':
+        'Для гибридного отбора нужен штрихкод товара (штука)',
     'pickHybridExtraLoose': 'Доп. штуки (без коробки)',
     'pickHybridTotal': 'Итого: {{boxes}} × {{upb}} + {{loose}} = {{total}} шт.',
     'pickHybridScanBox': 'Скан коробки',
@@ -1108,6 +1114,9 @@ abstract final class StringLookup {
         'Data mismatch: box records do not match stock. Scan a box or contact an administrator.',
     'pickInsufficientLoose':
         'Not enough loose units (need {{needed}}, have {{available}}). Scan a box.',
+    'pickBoxCountRequired': 'Enter box count for box scan',
+    'pickBarcodeRequiredHybrid':
+        'Product unit barcode required for hybrid pick',
     'pickHybridExtraLoose': 'Extra loose units',
     'pickHybridTotal': 'Total: {{boxes}} × {{upb}} + {{loose}} = {{total}} units',
     'pickHybridScanBox': 'Scan box',

@@ -54,5 +54,14 @@ String localizeApiErrorMessage(AppLocale loc, Object error) {
     return StringLookup.t(loc, 'pickUseBoxScan');
   }
 
+  if (raw.contains('box_count required for box scan')) {
+    return StringLookup.t(loc, 'pickBoxCountRequired');
+  }
+
+  if (raw.contains('barcode required for hybrid pick') ||
+      raw.contains('Gibrid terish uchun mahsulot')) {
+    return StringLookup.t(loc, 'pickBarcodeRequiredHybrid');
+  }
+
   return raw;
 }

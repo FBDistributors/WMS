@@ -41,7 +41,7 @@ from app.services.box_location_service import (
     require_sufficient_loose_for_unit_pick,
     validate_hybrid_pick_qty,
 )
-from app.services.product_scan_resolve import resolve_product_scan
+from app.services.product_scan_resolve import is_explicit_box_pick, resolve_product_scan
 from app.services.warehouse_scope import (
     assert_location_allowed_for_pick,
     warehouse_scope_for_order,
@@ -1276,8 +1276,8 @@ async def consolidated_pick(
     remaining = Decimal(str(qty))
     hybrid_box_barcode = (payload.box_barcode or "").strip()
     hybrid_pick = bool(hybrid_box_barcode) and payload.box_count is not None
-    box_pick = not hybrid_pick and resolved is not None and resolved.scan_kind == "box"
-    unit_pick = not hybrid_pick and resolved is not None and resolved.scan_kind == "unit"
+    box_pick = not hybrid_pick and is_explicit_box_pick(resolved, payload.box_count)
+    unit_pick = not hybrid_pick and resolved is not None and not box_pick
     units_per_box: Optional[Decimal] = None
     boxes_remaining = 0
     loose_remaining = Decimal("0")
@@ -1299,8 +1299,6 @@ async def consolidated_pick(
         hybrid_upb = int(box_units_total // payload.box_count) if payload.box_count else None
         boxes_remaining = payload.box_count
     elif box_pick:
-        if payload.box_count is None:
-            raise HTTPException(status_code=400, detail="box_count required for box scan")
         units_per_box = Decimal(str(resolved.units_per_scan))
         expected_qty = units_per_box * Decimal(str(payload.box_count))
         if remaining != expected_qty:
@@ -2027,9 +2025,7 @@ def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
             )
         elif scan_barcode:
             resolved = resolve_product_scan(db, scan_barcode)
-            if resolved and resolved.scan_kind == "box":
-                if payload.box_count is None:
-                    raise HTTPException(status_code=400, detail="box_count required for box scan")
+            if is_explicit_box_pick(resolved, payload.box_count):
                 remove_sealed_boxes_for_pick(
                     db,
                     box_barcode=scan_barcode,
@@ -2039,7 +2035,7 @@ def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
                     box_count=payload.box_count,
                     pick_qty=qty_delta,
                 )
-            elif resolved and resolved.scan_kind == "unit":
+            elif resolved:
                 require_sufficient_loose_for_unit_pick(
                     db,
                     product_id=line.product_id,

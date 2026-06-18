@@ -47,7 +47,7 @@ from app.services.box_location_service import (
     require_sufficient_loose_for_unit_pick,
     validate_hybrid_pick_qty,
 )
-from app.services.product_scan_resolve import resolve_product_scan
+from app.services.product_scan_resolve import is_explicit_box_pick, resolve_product_scan
 from app.services.stock_availability import compute_lot_location_available, lock_lot_location
 from app.services.warehouse_scope import assert_location_allowed_for_pick, location_ids_for_warehouse_scope
 
@@ -389,8 +389,8 @@ async def pick_scan(
     if payload.qty > remaining:
         raise HTTPException(status_code=400, detail=f"Qty {payload.qty} exceeds remaining {remaining}")
 
-    box_pick = resolved is not None and resolved.scan_kind == "box"
-    unit_pick = resolved is not None and resolved.scan_kind == "unit"
+    box_pick = is_explicit_box_pick(resolved, payload.box_count)
+    unit_pick = resolved is not None and not box_pick
     hybrid_box_barcode = (payload.box_barcode or "").strip()
     hybrid_pick = bool(hybrid_box_barcode) and payload.box_count is not None
     if hybrid_pick:
@@ -417,8 +417,6 @@ async def pick_scan(
         hybrid_upb = int(box_units_total // payload.box_count) if payload.box_count else None
         boxes_remaining = payload.box_count
     elif box_pick:
-        if payload.box_count is None:
-            raise HTTPException(status_code=400, detail="box_count required for box scan")
         units_per_box = Decimal(str(resolved.units_per_scan))
         expected_qty = units_per_box * Decimal(str(payload.box_count))
         if payload.qty != expected_qty:

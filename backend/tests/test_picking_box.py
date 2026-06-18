@@ -288,6 +288,43 @@ def test_line_pick_unit_requires_loose(
         app.dependency_overrides.pop(get_current_user, None)
 
 
+def test_line_pick_loose_when_barcode_is_also_box_barcode(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Mahsulot barcode quti kodi bilan bir xil bo'lsa ham qutisiz terish ishlaydi."""
+    order, picker, product, loc, lot = _seed_loose_pick_order(
+        db_session, order_qty=2, stock_qty=5
+    )
+    db_session.add(
+        ProductBoxModel(
+            box_barcode=product.barcode,
+            product_id=product.id,
+            units_per_box=8,
+            is_active=True,
+        )
+    )
+    db_session.commit()
+
+    doc_id = _send_to_picking(client, db_session, order.id, picker.id)
+
+    app.dependency_overrides[get_current_user] = lambda: picker
+    try:
+        line_id = client.get(f"/api/v1/picking/documents/{doc_id}").json()["lines"][0]["id"]
+        pick = client.post(
+            f"/api/v1/picking/lines/{line_id}/pick",
+            json={
+                "delta": 2,
+                "request_id": f"pick-dual-bc-{uuid.uuid4().hex}",
+                "barcode": product.barcode,
+            },
+        )
+        assert pick.status_code == 200, pick.text
+        assert pick.json()["line"]["qty_picked"] == 2
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
 def test_line_pick_unit_with_fully_reserved_loose_stock(
     client: TestClient,
     db_session: Session,

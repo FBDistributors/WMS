@@ -24,6 +24,19 @@ class ProductScanResolve:
     box_id: UUID | None = None
 
 
+def is_explicit_box_pick(
+    resolved: ProductScanResolve | None,
+    box_count: int | None,
+) -> bool:
+    """Quti terish: faqat box_count >= 1 bo'lganda (qutisiz terish box barcode bilan ham mumkin)."""
+    return (
+        resolved is not None
+        and resolved.scan_kind == "box"
+        and box_count is not None
+        and int(box_count) >= 1
+    )
+
+
 def resolve_product_scan(db: Session, raw_barcode: str) -> ProductScanResolve | None:
     """Quti kodi birinchi, keyin dona (product barcode / sku)."""
     barcode = normalize_scan_barcode(raw_barcode)

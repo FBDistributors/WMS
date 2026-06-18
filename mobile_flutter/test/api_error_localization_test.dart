@@ -31,4 +31,20 @@ void main() {
     );
     expect(msg, 'Some other error');
   });
+
+  test('localizeApiErrorMessage maps box_count required for box scan', () {
+    final String ru = localizeApiErrorMessage(
+      AppLocale.ru,
+      Exception('box_count required for box scan'),
+    );
+    expect(ru, contains('коробок'));
+  });
+
+  test('localizeApiErrorMessage maps hybrid barcode required', () {
+    final String ru = localizeApiErrorMessage(
+      AppLocale.ru,
+      Exception('barcode required for hybrid pick'),
+    );
+    expect(ru, contains('гибридного'));
+  });
 }
