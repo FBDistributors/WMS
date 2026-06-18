@@ -329,6 +329,36 @@ int? _unitsPerBoxFromAlternate(PickingAlternateLocation a) {
   return (looseUnits: null, boxCount: null);
 }
 
+/// Terish qatori lokatsiyasi bo'yicha qutisiz/quti zaxira (kod bo'yicha).
+({int? looseUnits, int? boxCount}) alternateBoxHintForLocation(
+  List<PickingAlternateLocation> alternates,
+  String locationCode,
+) {
+  final String code = locationCode.trim().toLowerCase();
+  if (code.isNotEmpty) {
+    for (final PickingAlternateLocation a in alternates) {
+      if (a.locationCode.trim().toLowerCase() == code) {
+        return (looseUnits: a.looseUnits, boxCount: a.boxCount);
+      }
+    }
+  }
+  return primaryAlternateBoxHint(alternates);
+}
+
+/// Quti soni 0 bo'lsa quti barcode maydonini tozalash.
+void syncHybridBoxBarcodeWithQty({
+  required TextEditingController boxCount,
+  TextEditingController? boxBarcode,
+}) {
+  if (boxBarcode == null) {
+    return;
+  }
+  final int bc = int.tryParse(boxCount.text.trim()) ?? 0;
+  if (bc < 1 && boxBarcode.text.isNotEmpty) {
+    boxBarcode.clear();
+  }
+}
+
 int? hybridUnitsPerBoxHint({
   required int? unitsPerBox,
   required List<PickingAlternateLocation> alternates,
@@ -543,7 +573,13 @@ class PickHybridQtyFields extends StatelessWidget {
               },
             ),
           ),
-          onChanged: (_) => onFieldsChanged(),
+          onChanged: (_) {
+            syncHybridBoxBarcodeWithQty(
+              boxCount: boxCount,
+              boxBarcode: boxBarcode,
+            );
+            onFieldsChanged();
+          },
         ),
         const SizedBox(height: 16),
         if (showHybridScans) ...<Widget>[

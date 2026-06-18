@@ -1064,8 +1064,11 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       unitsPerBox: presetUnitsPerBox,
       alternates: pickTargetHolder[0].alternateLocations,
     );
-    final ({int? looseUnits, int? boxCount}) primaryAltHint =
-        primaryAlternateBoxHint(pickTargetHolder[0].alternateLocations);
+    final ({int? looseUnits, int? boxCount}) locationAltHint =
+        alternateBoxHintForLocation(
+      pickTargetHolder[0].alternateLocations,
+      pickTargetHolder[0].locationCode,
+    );
     final TextEditingController hybridBoxCount = TextEditingController();
     final TextEditingController hybridLooseQty = TextEditingController();
     final TextEditingController hybridBoxBarcode = TextEditingController();
@@ -1114,10 +1117,6 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
           );
           if (boxHint.unitsPerBox != null && boxHint.unitsPerBox! >= 1) {
             hybridUnitsPerBox = boxHint.unitsPerBox;
-            if ((boxHint.boxBarcode ?? '').trim().isNotEmpty &&
-                hybridBoxBarcode.text.trim().isEmpty) {
-              hybridBoxBarcode.text = boxHint.boxBarcode!.trim();
-            }
             applyHybridQtyDefaults(
               boxCount: hybridBoxCount,
               looseQty: hybridLooseQty,
@@ -1335,8 +1334,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                         unitsPerBox: hybridUnitsPerBox,
                         maxUnits: pickTargetHolder[0].qtyRequired -
                             pickTargetHolder[0].qtyPicked,
-                        looseUnits: primaryAltHint.looseUnits,
-                        stockBoxCount: primaryAltHint.boxCount,
+                        looseUnits: locationAltHint.looseUnits,
+                        stockBoxCount: locationAltHint.boxCount,
                         onFieldsChanged: () => setM(() {}),
                         boxBarcode: hybridBoxBarcode,
                         productBarcode: hybridProductBarcode,
@@ -1452,35 +1451,12 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                               if (boxHint.unitsPerBox != null &&
                                   boxHint.unitsPerBox! >= 1) {
                                 hybridUnitsPerBox = boxHint.unitsPerBox;
-                                if (hybridBoxBarcode.text.trim().isEmpty &&
-                                    (boxHint.boxBarcode ?? '').trim().isNotEmpty) {
-                                  hybridBoxBarcode.text = boxHint.boxBarcode!.trim();
-                                }
-                                applyHybridQtyDefaults(
-                                  boxCount: hybridBoxCount,
-                                  looseQty: hybridLooseQty,
-                                  unitsPerBox: hybridUnitsPerBox,
-                                  maxUnits: rem,
-                                );
                               }
                             }
-                            if (hybridProductBarcode.text.trim().isNotEmpty) {
-                              final HybridBoxScanResult productRes =
-                                  await resolveHybridProductBarcode(
-                                ref.read(scannerRepositoryProvider),
-                                hybridProductBarcode.text,
-                              );
-                              if (productRes.unitsPerBox != null &&
-                                  productRes.unitsPerBox! >= 1) {
-                                hybridUnitsPerBox = productRes.unitsPerBox;
-                                applyHybridQtyDefaults(
-                                  boxCount: hybridBoxCount,
-                                  looseQty: hybridLooseQty,
-                                  unitsPerBox: hybridUnitsPerBox,
-                                  maxUnits: rem,
-                                );
-                              }
-                            }
+                            syncHybridBoxBarcodeWithQty(
+                              boxCount: hybridBoxCount,
+                              boxBarcode: hybridBoxBarcode,
+                            );
                             PickHybridQty hybrid = pickHybridQtyFromControllers(
                               boxCount: hybridBoxCount,
                               looseQty: hybridLooseQty,
@@ -1491,8 +1467,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                 hybridBoxOnlyStockValidationMessage(
                               loc: loc,
                               hybrid: hybrid,
-                              primaryLooseUnits: primaryAltHint.looseUnits,
-                              primaryBoxCount: primaryAltHint.boxCount,
+                              primaryLooseUnits: locationAltHint.looseUnits,
+                              primaryBoxCount: locationAltHint.boxCount,
                             );
                             if (boxOnlyValidation != null) {
                               _rejectScanHaptic();

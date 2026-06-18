@@ -269,8 +269,16 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
       unitsPerBox: null,
       alternates: product.alternateLocations,
     );
-    final ({int? looseUnits, int? boxCount}) primaryAltHint =
-        primaryAlternateBoxHint(product.alternateLocations);
+    final List<ConsolidatedLineItem> openPickLines = product.lines
+        .where((ConsolidatedLineItem l) => l.qtyPicked < l.qtyRequired)
+        .toList();
+    final String pickLocationCode =
+        openPickLines.isNotEmpty ? openPickLines.first.locationCode : '';
+    final ({int? looseUnits, int? boxCount}) locationAltHint =
+        alternateBoxHintForLocation(
+      product.alternateLocations,
+      pickLocationCode,
+    );
     final TextEditingController boxCountCtrl = TextEditingController();
     final TextEditingController looseQtyCtrl = TextEditingController();
     final TextEditingController boxBarcodeCtrl = TextEditingController();
@@ -309,10 +317,6 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
         );
         if (boxHint.unitsPerBox != null && boxHint.unitsPerBox! >= 1) {
           unitsPerBox = boxHint.unitsPerBox;
-          if ((boxHint.boxBarcode ?? '').trim().isNotEmpty &&
-              boxBarcodeCtrl.text.trim().isEmpty) {
-            boxBarcodeCtrl.text = boxHint.boxBarcode!.trim();
-          }
           applyHybridQtyDefaults(
             boxCount: boxCountCtrl,
             looseQty: looseQtyCtrl,
@@ -430,8 +434,8 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                       looseQty: looseQtyCtrl,
                       unitsPerBox: sheetUnitsPerBox,
                       maxUnits: rem,
-                      looseUnits: primaryAltHint.looseUnits,
-                      stockBoxCount: primaryAltHint.boxCount,
+                      looseUnits: locationAltHint.looseUnits,
+                      stockBoxCount: locationAltHint.boxCount,
                       onFieldsChanged: () => setM(() {}),
                       boxBarcode: boxBarcodeCtrl,
                       productBarcode: productBarcodeCtrl,
@@ -541,35 +545,12 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                                 if (boxHint.unitsPerBox != null &&
                                     boxHint.unitsPerBox! >= 1) {
                                   sheetUnitsPerBox = boxHint.unitsPerBox;
-                                  if (boxBarcodeCtrl.text.trim().isEmpty &&
-                                      (boxHint.boxBarcode ?? '').trim().isNotEmpty) {
-                                    boxBarcodeCtrl.text = boxHint.boxBarcode!.trim();
-                                  }
-                                  applyHybridQtyDefaults(
-                                    boxCount: boxCountCtrl,
-                                    looseQty: looseQtyCtrl,
-                                    unitsPerBox: sheetUnitsPerBox,
-                                    maxUnits: rem,
-                                  );
                                 }
                               }
-                              if (productBarcodeCtrl.text.trim().isNotEmpty) {
-                                final HybridBoxScanResult productRes =
-                                    await resolveHybridProductBarcode(
-                                  ref.read(scannerRepositoryProvider),
-                                  productBarcodeCtrl.text,
-                                );
-                                if (productRes.unitsPerBox != null &&
-                                    productRes.unitsPerBox! >= 1) {
-                                  sheetUnitsPerBox = productRes.unitsPerBox;
-                                  applyHybridQtyDefaults(
-                                    boxCount: boxCountCtrl,
-                                    looseQty: looseQtyCtrl,
-                                    unitsPerBox: sheetUnitsPerBox,
-                                    maxUnits: rem,
-                                  );
-                                }
-                              }
+                              syncHybridBoxBarcodeWithQty(
+                                boxCount: boxCountCtrl,
+                                boxBarcode: boxBarcodeCtrl,
+                              );
                               final PickHybridQty submitHybrid =
                                   pickHybridQtyFromControllers(
                                 boxCount: boxCountCtrl,
@@ -581,8 +562,8 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                                   hybridBoxOnlyStockValidationMessage(
                                 loc: loc,
                                 hybrid: submitHybrid,
-                                primaryLooseUnits: primaryAltHint.looseUnits,
-                                primaryBoxCount: primaryAltHint.boxCount,
+                                primaryLooseUnits: locationAltHint.looseUnits,
+                                primaryBoxCount: locationAltHint.boxCount,
                               );
                               if (boxOnlyValidation != null) {
                                 showAppSnackBar(

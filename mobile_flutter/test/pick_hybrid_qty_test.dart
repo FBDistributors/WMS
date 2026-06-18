@@ -1,7 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile_flutter/features/picking/data/picking_models.dart';
 import 'package:mobile_flutter/shared/widgets/pick_box_qty_fields.dart';
-import 'package:mobile_flutter/shared/widgets/pick_hybrid_submit.dart';
+
+PickingAlternateLocation _alt({
+  required String locationCode,
+  required bool isPrimary,
+  int? looseUnits,
+  int? boxCount,
+  int unitsInBoxes = 0,
+}) {
+  return PickingAlternateLocation(
+    locationId: 'loc-$locationCode',
+    locationCode: locationCode,
+    lotId: 'lot-1',
+    availableQty: 10,
+    batch: null,
+    expiryDate: null,
+    isPrimary: isPrimary,
+    boxCount: boxCount,
+    unitsInBoxes: unitsInBoxes,
+    looseUnits: looseUnits,
+  );
+}
 
 void main() {
   test('capHybridQtyToMax reduces loose before boxes', () {
@@ -86,5 +107,34 @@ void main() {
     expect(hybrid.boxCount, 0);
     expect(hybrid.looseUnits, 4);
     expect(hybrid.valid, isTrue);
+  });
+
+  test('syncHybridBoxBarcodeWithQty clears barcode when box count is zero', () {
+    final TextEditingController boxCount = TextEditingController(text: '0');
+    final TextEditingController boxBarcode = TextEditingController(text: 'BOX-1');
+    syncHybridBoxBarcodeWithQty(boxCount: boxCount, boxBarcode: boxBarcode);
+    expect(boxBarcode.text, isEmpty);
+  });
+
+  test('alternateBoxHintForLocation matches location code', () {
+    final List<PickingAlternateLocation> alts = <PickingAlternateLocation>[
+      _alt(
+        locationCode: 'A-01',
+        isPrimary: true,
+        looseUnits: 0,
+        boxCount: 2,
+        unitsInBoxes: 24,
+      ),
+      _alt(
+        locationCode: 'B-02',
+        isPrimary: false,
+        looseUnits: 5,
+        boxCount: 0,
+      ),
+    ];
+    final ({int? looseUnits, int? boxCount}) hint =
+        alternateBoxHintForLocation(alts, 'B-02');
+    expect(hint.looseUnits, 5);
+    expect(hint.boxCount, 0);
   });
 }

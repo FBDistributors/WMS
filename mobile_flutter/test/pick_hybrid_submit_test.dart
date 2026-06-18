@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile_flutter/core/app_state/app_locale.dart';
 import 'package:mobile_flutter/features/scanner/data/scanner_repository.dart';
 import 'package:mobile_flutter/shared/widgets/pick_box_qty_fields.dart';
 import 'package:mobile_flutter/shared/widgets/pick_hybrid_submit.dart';
@@ -181,6 +182,31 @@ void main() {
     expect(result.routedToBox, isFalse);
     expect(productBarcode.text, 'UNIT-1');
     expect(looseQty.text, '2');
+  });
+
+  test('hybridBoxOnlyStockValidationMessage uses location loose stock', () {
+    const PickHybridQty hybrid = PickHybridQty(
+      total: 4,
+      boxUnits: 0,
+      looseUnits: 4,
+      boxCount: 0,
+      valid: true,
+    );
+    final String? blocked = hybridBoxOnlyStockValidationMessage(
+      loc: AppLocale.uz,
+      hybrid: hybrid,
+      primaryLooseUnits: 0,
+      primaryBoxCount: 2,
+    );
+    expect(blocked, isNotNull);
+
+    final String? allowed = hybridBoxOnlyStockValidationMessage(
+      loc: AppLocale.uz,
+      hybrid: hybrid,
+      primaryLooseUnits: 5,
+      primaryBoxCount: 0,
+    );
+    expect(allowed, isNull);
   });
 }
 
