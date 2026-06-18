@@ -214,6 +214,72 @@ Future<void> submitHybridPick({
   }
 }
 
+typedef HybridScanApplyResult = ({int? unitsPerBox, bool routedToBox});
+
+Future<HybridScanApplyResult> applyHybridBoxScan({
+  required ScannerRepository scanner,
+  required String raw,
+  required TextEditingController boxCount,
+  required TextEditingController looseQty,
+  required TextEditingController boxBarcode,
+  required int? unitsPerBox,
+  required double maxUnits,
+  bool bumpCount = true,
+}) async {
+  final HybridBoxScanResult result = await resolveHybridBoxBarcode(scanner, raw);
+  final int? newUpb = result.unitsPerBox ?? unitsPerBox;
+  boxBarcode.text = result.barcode;
+  if (bumpCount && result.barcode.isNotEmpty) {
+    final int bc = int.tryParse(boxCount.text.trim()) ?? 0;
+    boxCount.text = '${bc + 1}';
+    capHybridQtyToMax(
+      boxCount: boxCount,
+      looseQty: looseQty,
+      unitsPerBox: newUpb,
+      maxUnits: maxUnits,
+    );
+  }
+  return (unitsPerBox: newUpb, routedToBox: true);
+}
+
+Future<HybridScanApplyResult> applyHybridProductScan({
+  required ScannerRepository scanner,
+  required String raw,
+  required TextEditingController boxCount,
+  required TextEditingController looseQty,
+  required TextEditingController boxBarcode,
+  required TextEditingController productBarcode,
+  required int? unitsPerBox,
+  required double maxUnits,
+  bool bumpCount = true,
+}) async {
+  final HybridBoxScanResult result = await resolveHybridProductBarcode(scanner, raw);
+  if (result.unitsPerBox != null) {
+    return applyHybridBoxScan(
+      scanner: scanner,
+      raw: raw,
+      boxCount: boxCount,
+      looseQty: looseQty,
+      boxBarcode: boxBarcode,
+      unitsPerBox: result.unitsPerBox ?? unitsPerBox,
+      maxUnits: maxUnits,
+      bumpCount: bumpCount,
+    );
+  }
+  productBarcode.text = result.barcode;
+  if (bumpCount && result.barcode.isNotEmpty) {
+    final int lq = int.tryParse(looseQty.text.trim()) ?? 0;
+    looseQty.text = '${lq + 1}';
+    capHybridQtyToMax(
+      boxCount: boxCount,
+      looseQty: looseQty,
+      unitsPerBox: unitsPerBox,
+      maxUnits: maxUnits,
+    );
+  }
+  return (unitsPerBox: unitsPerBox, routedToBox: false);
+}
+
 Future<String?> launchHybridRawBarcodeScan(BuildContext context) async {
   final String? code = await context.pushNamed<String>(
     'scanner',
@@ -223,6 +289,7 @@ Future<String?> launchHybridRawBarcodeScan(BuildContext context) async {
   return trimmed.isEmpty ? null : trimmed;
 }
 
+/// @deprecated Use [PickHybridQtyFields] with integrated scan rows.
 class PickHybridScanFields extends StatelessWidget {
   const PickHybridScanFields({
     super.key,

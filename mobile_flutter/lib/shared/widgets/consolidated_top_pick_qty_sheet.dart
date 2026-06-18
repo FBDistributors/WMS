@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_state/app_locale.dart';
 import '../../features/picking/data/picking_models.dart';
 import '../../features/picking/picking_providers.dart';
-import '../../features/scanner/data/scanner_repository.dart';
 import '../../features/scanner/scanner_providers.dart';
 import '../../l10n/string_lookup.dart';
 import '../feedback/app_top_snackbar.dart';
@@ -92,23 +91,23 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
       return;
     }
     try {
-      final ScannerResolveOut out =
-          await ref.read(scannerRepositoryProvider).resolveBarcode(raw);
+      final double rem = widget.product.totalRequired - widget.product.totalPicked;
+      final HybridScanApplyResult scanRes = await applyHybridProductScan(
+        scanner: ref.read(scannerRepositoryProvider),
+        raw: raw,
+        boxCount: _boxCount,
+        looseQty: _looseQty,
+        boxBarcode: _boxBarcode,
+        productBarcode: _productBarcode,
+        unitsPerBox: _unitsPerBox,
+        maxUnits: rem,
+      );
       if (!mounted) {
         return;
       }
       setState(() {
-        if (out.isBoxScan && out.unitsPerScan != null) {
-          _unitsPerBox = out.unitsPerScan;
-          _boxBarcode.text = raw;
-          applyHybridQtyDefaults(
-            boxCount: _boxCount,
-            looseQty: _looseQty,
-            unitsPerBox: _unitsPerBox,
-            maxUnits: widget.product.totalRequired - widget.product.totalPicked,
-          );
-        } else {
-          _productBarcode.text = raw;
+        if (scanRes.unitsPerBox != null) {
+          _unitsPerBox = scanRes.unitsPerBox;
         }
       });
     } on Object {
@@ -139,15 +138,20 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
     if (!mounted || code == null) {
       return;
     }
-    final HybridBoxScanResult result = await resolveHybridBoxBarcode(
-      widget.ref.read(scannerRepositoryProvider),
-      code,
+    final double rem = widget.product.totalRequired - widget.product.totalPicked;
+    final HybridScanApplyResult result = await applyHybridBoxScan(
+      scanner: widget.ref.read(scannerRepositoryProvider),
+      raw: code,
+      boxCount: _boxCount,
+      looseQty: _looseQty,
+      boxBarcode: _boxBarcode,
+      unitsPerBox: _unitsPerBox,
+      maxUnits: rem,
     );
     if (!mounted) {
       return;
     }
     setState(() {
-      _boxBarcode.text = result.barcode;
       if (result.unitsPerBox != null) {
         _unitsPerBox = result.unitsPerBox;
       }
@@ -159,7 +163,25 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
     if (!mounted || code == null) {
       return;
     }
-    setState(() => _productBarcode.text = code);
+    final double rem = widget.product.totalRequired - widget.product.totalPicked;
+    final HybridScanApplyResult result = await applyHybridProductScan(
+      scanner: widget.ref.read(scannerRepositoryProvider),
+      raw: code,
+      boxCount: _boxCount,
+      looseQty: _looseQty,
+      boxBarcode: _boxBarcode,
+      productBarcode: _productBarcode,
+      unitsPerBox: _unitsPerBox,
+      maxUnits: rem,
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      if (result.unitsPerBox != null) {
+        _unitsPerBox = result.unitsPerBox;
+      }
+    });
   }
 
   Future<void> _confirm() async {
@@ -262,7 +284,6 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
     final ConsolidatedProduct product = widget.product;
     final AppLocale loc = widget.loc;
     final double rem = product.totalRequired - product.totalPicked;
-    final PickHybridQty hybrid = _currentHybrid(rem);
     return Padding(
       padding: EdgeInsets.only(bottom: sheetBottomPadding(context)),
       child: SingleChildScrollView(
@@ -314,13 +335,9 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
               unitsPerBox: _unitsPerBox,
               maxUnits: rem,
               onFieldsChanged: () => setState(() {}),
-            ),
-            const SizedBox(height: 12),
-            PickHybridScanFields(
-              loc: loc,
-              hybrid: hybrid,
               boxBarcode: _boxBarcode,
               productBarcode: _productBarcode,
+              busy: _busy,
               onBoxBarcodeChanged: () => setState(() {
                 if (_boxBarcode.text.trim().isEmpty) {
                   _unitsPerBox = unitsPerBoxFromAlternateLocations(
@@ -331,15 +348,39 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
               }),
               onProductBarcodeChanged: () => setState(() {}),
               onBoxBarcodeSubmitted: (String code) async {
-                final HybridBoxScanResult result = await resolveHybridBoxBarcode(
-                  widget.ref.read(scannerRepositoryProvider),
-                  code,
+                final HybridScanApplyResult result = await applyHybridBoxScan(
+                  scanner: widget.ref.read(scannerRepositoryProvider),
+                  raw: code,
+                  boxCount: _boxCount,
+                  looseQty: _looseQty,
+                  boxBarcode: _boxBarcode,
+                  unitsPerBox: _unitsPerBox,
+                  maxUnits: rem,
                 );
                 if (!mounted) {
                   return;
                 }
                 setState(() {
-                  _boxBarcode.text = result.barcode;
+                  if (result.unitsPerBox != null) {
+                    _unitsPerBox = result.unitsPerBox;
+                  }
+                });
+              },
+              onProductBarcodeSubmitted: (String code) async {
+                final HybridScanApplyResult result = await applyHybridProductScan(
+                  scanner: widget.ref.read(scannerRepositoryProvider),
+                  raw: code,
+                  boxCount: _boxCount,
+                  looseQty: _looseQty,
+                  boxBarcode: _boxBarcode,
+                  productBarcode: _productBarcode,
+                  unitsPerBox: _unitsPerBox,
+                  maxUnits: rem,
+                );
+                if (!mounted) {
+                  return;
+                }
+                setState(() {
                   if (result.unitsPerBox != null) {
                     _unitsPerBox = result.unitsPerBox;
                   }
@@ -347,7 +388,6 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
               },
               onScanBox: () => unawaited(_scanBox()),
               onScanProduct: () => unawaited(_scanProduct()),
-              busy: _busy,
             ),
             const SizedBox(height: 16),
             FilledButton(

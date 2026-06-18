@@ -1080,28 +1080,28 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       if (pickerPreset != null) {
         if (presetIsBoxScan && presetUnitsPerBox != null) {
           hybridUnitsPerBox = presetUnitsPerBox;
-          hybridBoxBarcode.text = pickerPreset;
-          applyHybridQtyDefaults(
+          final HybridScanApplyResult scanRes = await applyHybridBoxScan(
+            scanner: ref.read(scannerRepositoryProvider),
+            raw: pickerPreset,
             boxCount: hybridBoxCount,
             looseQty: hybridLooseQty,
+            boxBarcode: hybridBoxBarcode,
             unitsPerBox: hybridUnitsPerBox,
             maxUnits: remPick,
           );
+          hybridUnitsPerBox = scanRes.unitsPerBox ?? hybridUnitsPerBox;
         } else {
-          hybridProductBarcode.text = pickerPreset;
-          final HybridBoxScanResult productRes = await resolveHybridProductBarcode(
-            ref.read(scannerRepositoryProvider),
-            pickerPreset,
+          final HybridScanApplyResult scanRes = await applyHybridProductScan(
+            scanner: ref.read(scannerRepositoryProvider),
+            raw: pickerPreset,
+            boxCount: hybridBoxCount,
+            looseQty: hybridLooseQty,
+            boxBarcode: hybridBoxBarcode,
+            productBarcode: hybridProductBarcode,
+            unitsPerBox: hybridUnitsPerBox,
+            maxUnits: remPick,
           );
-          if (productRes.unitsPerBox != null) {
-            hybridUnitsPerBox = productRes.unitsPerBox;
-            applyHybridQtyDefaults(
-              boxCount: hybridBoxCount,
-              looseQty: hybridLooseQty,
-              unitsPerBox: hybridUnitsPerBox,
-              maxUnits: remPick,
-            );
-          }
+          hybridUnitsPerBox = scanRes.unitsPerBox ?? hybridUnitsPerBox;
         }
       }
       if (hybridUnitsPerBox == null || hybridUnitsPerBox < 1) {
@@ -1338,19 +1338,9 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                         looseUnits: primaryAltHint.looseUnits,
                         stockBoxCount: primaryAltHint.boxCount,
                         onFieldsChanged: () => setM(() {}),
-                      ),
-                      const SizedBox(height: 12),
-                      PickHybridScanFields(
-                        loc: loc,
-                        hybrid: pickHybridQtyFromControllers(
-                          boxCount: hybridBoxCount,
-                          looseQty: hybridLooseQty,
-                          unitsPerBox: hybridUnitsPerBox,
-                          maxUnits: pickTargetHolder[0].qtyRequired -
-                              pickTargetHolder[0].qtyPicked,
-                        ),
                         boxBarcode: hybridBoxBarcode,
                         productBarcode: hybridProductBarcode,
+                        busy: sheetBusy,
                         onBoxBarcodeChanged: () => setM(() {
                           if (hybridBoxBarcode.text.trim().isEmpty) {
                             hybridUnitsPerBox = unitsPerBoxFromAlternateLocations(
@@ -1360,33 +1350,37 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                           }
                         }),
                         onProductBarcodeChanged: () => setM(() {}),
-                        onProductBarcodeSubmitted: (String code) async {
-                          final HybridBoxScanResult result =
-                              await resolveHybridProductBarcode(
-                            ref.read(scannerRepositoryProvider),
-                            code,
+                        onBoxBarcodeSubmitted: (String code) async {
+                          final HybridScanApplyResult result = await applyHybridBoxScan(
+                            scanner: ref.read(scannerRepositoryProvider),
+                            raw: code,
+                            boxCount: hybridBoxCount,
+                            looseQty: hybridLooseQty,
+                            boxBarcode: hybridBoxBarcode,
+                            unitsPerBox: hybridUnitsPerBox,
+                            maxUnits: pickTargetHolder[0].qtyRequired -
+                                pickTargetHolder[0].qtyPicked,
                           );
                           setM(() {
-                            hybridProductBarcode.text = result.barcode;
                             if (result.unitsPerBox != null) {
                               hybridUnitsPerBox = result.unitsPerBox;
-                              applyHybridQtyDefaults(
-                                boxCount: hybridBoxCount,
-                                looseQty: hybridLooseQty,
-                                unitsPerBox: hybridUnitsPerBox,
-                                maxUnits: pickTargetHolder[0].qtyRequired -
-                                    pickTargetHolder[0].qtyPicked,
-                              );
                             }
                           });
                         },
-                        onBoxBarcodeSubmitted: (String code) async {
-                          final HybridBoxScanResult result = await resolveHybridBoxBarcode(
-                            ref.read(scannerRepositoryProvider),
-                            code,
+                        onProductBarcodeSubmitted: (String code) async {
+                          final HybridScanApplyResult result =
+                              await applyHybridProductScan(
+                            scanner: ref.read(scannerRepositoryProvider),
+                            raw: code,
+                            boxCount: hybridBoxCount,
+                            looseQty: hybridLooseQty,
+                            boxBarcode: hybridBoxBarcode,
+                            productBarcode: hybridProductBarcode,
+                            unitsPerBox: hybridUnitsPerBox,
+                            maxUnits: pickTargetHolder[0].qtyRequired -
+                                pickTargetHolder[0].qtyPicked,
                           );
                           setM(() {
-                            hybridBoxBarcode.text = result.barcode;
                             if (result.unitsPerBox != null) {
                               hybridUnitsPerBox = result.unitsPerBox;
                             }
@@ -1398,12 +1392,17 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                             if (code == null) {
                               return;
                             }
-                            final HybridBoxScanResult result = await resolveHybridBoxBarcode(
-                              ref.read(scannerRepositoryProvider),
-                              code,
+                            final HybridScanApplyResult result = await applyHybridBoxScan(
+                              scanner: ref.read(scannerRepositoryProvider),
+                              raw: code,
+                              boxCount: hybridBoxCount,
+                              looseQty: hybridLooseQty,
+                              boxBarcode: hybridBoxBarcode,
+                              unitsPerBox: hybridUnitsPerBox,
+                              maxUnits: pickTargetHolder[0].qtyRequired -
+                                  pickTargetHolder[0].qtyPicked,
                             );
                             setM(() {
-                              hybridBoxBarcode.text = result.barcode;
                               if (result.unitsPerBox != null) {
                                 hybridUnitsPerBox = result.unitsPerBox;
                               }
@@ -1416,27 +1415,25 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                             if (code == null) {
                               return;
                             }
-                            final HybridBoxScanResult result =
-                                await resolveHybridProductBarcode(
-                              ref.read(scannerRepositoryProvider),
-                              code,
+                            final HybridScanApplyResult result =
+                                await applyHybridProductScan(
+                              scanner: ref.read(scannerRepositoryProvider),
+                              raw: code,
+                              boxCount: hybridBoxCount,
+                              looseQty: hybridLooseQty,
+                              boxBarcode: hybridBoxBarcode,
+                              productBarcode: hybridProductBarcode,
+                              unitsPerBox: hybridUnitsPerBox,
+                              maxUnits: pickTargetHolder[0].qtyRequired -
+                                  pickTargetHolder[0].qtyPicked,
                             );
                             setM(() {
-                              hybridProductBarcode.text = result.barcode;
                               if (result.unitsPerBox != null) {
                                 hybridUnitsPerBox = result.unitsPerBox;
-                                applyHybridQtyDefaults(
-                                  boxCount: hybridBoxCount,
-                                  looseQty: hybridLooseQty,
-                                  unitsPerBox: hybridUnitsPerBox,
-                                  maxUnits: pickTargetHolder[0].qtyRequired -
-                                      pickTargetHolder[0].qtyPicked,
-                                );
                               }
                             });
                           }());
                         },
-                        busy: sheetBusy,
                       ),
                       const SizedBox(height: 16),
                       FilledButton(

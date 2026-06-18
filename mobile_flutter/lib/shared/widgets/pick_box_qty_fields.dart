@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:math' show max, min;
 
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import '../../features/picking/data/picking_models.dart';
 import '../../l10n/string_lookup.dart';
 import '../input/input_clear_button.dart';
 import '../input/stock_quantity_input.dart';
+import 'scan_action_button.dart';
 
 /// Terish modali: Dona / Quti bo'yicha (kirim uslubida).
 class PickBoxQtyFields extends StatelessWidget {
@@ -250,6 +252,33 @@ PickHybridQty pickHybridQtyFromControllers({
   );
 }
 
+/// Gibrid miqdorni qolgan chegaraga sig'dirish (avval dona, keyin quti kamayadi).
+void capHybridQtyToMax({
+  required TextEditingController boxCount,
+  required TextEditingController looseQty,
+  required int? unitsPerBox,
+  required double maxUnits,
+}) {
+  final int maxPick = max(0, maxUnits.round());
+  int bc = max(0, int.tryParse(boxCount.text.trim()) ?? 0);
+  int loose = max(0, int.tryParse(looseQty.text.trim()) ?? 0);
+  final int upb = unitsPerBox ?? 0;
+
+  int total() => (bc > 0 && upb >= 1 ? bc * upb : 0) + loose;
+
+  while (total() > maxPick) {
+    if (loose > 0) {
+      loose--;
+    } else if (bc > 0 && upb >= 1) {
+      bc--;
+    } else {
+      break;
+    }
+  }
+  boxCount.text = '$bc';
+  looseQty.text = '$loose';
+}
+
 /// Qolgan miqdorga qarab quti + qo'shimcha dona maydonlarini to'ldirish.
 void applyHybridQtyDefaults({
   required TextEditingController boxCount,
@@ -320,7 +349,7 @@ bool hybridShowBoxOnlyHint({
   return (stockBoxCount ?? 0) > 0 && looseUnits == null;
 }
 
-/// Terish: quti soni + qo'shimcha dona (SegmentedButton yo'q).
+/// Terish: quti + qutisiz dona bitta panelda (skan avval, soni keyin).
 class PickHybridQtyFields extends StatelessWidget {
   const PickHybridQtyFields({
     super.key,
@@ -332,6 +361,15 @@ class PickHybridQtyFields extends StatelessWidget {
     required this.onFieldsChanged,
     this.looseUnits,
     this.stockBoxCount,
+    this.boxBarcode,
+    this.productBarcode,
+    this.onBoxBarcodeChanged,
+    this.onProductBarcodeChanged,
+    this.onScanBox,
+    this.onScanProduct,
+    this.onBoxBarcodeSubmitted,
+    this.onProductBarcodeSubmitted,
+    this.busy = false,
   });
 
   final AppLocale loc;
@@ -342,6 +380,52 @@ class PickHybridQtyFields extends StatelessWidget {
   final VoidCallback onFieldsChanged;
   final int? looseUnits;
   final int? stockBoxCount;
+  final TextEditingController? boxBarcode;
+  final TextEditingController? productBarcode;
+  final VoidCallback? onBoxBarcodeChanged;
+  final VoidCallback? onProductBarcodeChanged;
+  final VoidCallback? onScanBox;
+  final VoidCallback? onScanProduct;
+  final Future<void> Function(String code)? onBoxBarcodeSubmitted;
+  final Future<void> Function(String code)? onProductBarcodeSubmitted;
+  final bool busy;
+
+  Widget _barcodeScanRow({
+    required TextEditingController controller,
+    required String label,
+    required VoidCallback? onScan,
+    required Future<void> Function(String code)? onSubmitted,
+    required VoidCallback? onChanged,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: <Widget>[
+        Expanded(
+          child: TextField(
+            controller: controller,
+            enabled: !busy,
+            decoration: InputDecoration(
+              labelText: label,
+              border: const OutlineInputBorder(),
+            ),
+            onChanged: (_) => onChanged?.call(),
+            onSubmitted: (String v) {
+              final Future<void> Function(String code)? handler = onSubmitted;
+              if (handler != null) {
+                unawaited(handler(v));
+              }
+            },
+          ),
+        ),
+        const SizedBox(width: 8),
+        ScanActionButton(
+          onPressed: busy || onScan == null ? null : onScan,
+          label: label,
+          compact: true,
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -357,6 +441,8 @@ class PickHybridQtyFields extends StatelessWidget {
       looseUnits: looseUnits,
       stockBoxCount: stockBoxCount,
     );
+    final bool showHybridScans =
+        canEditBoxCount && boxBarcode != null && productBarcode != null;
 
     if (upb == null || upb < 1) {
       return Column(
@@ -368,6 +454,16 @@ class PickHybridQtyFields extends StatelessWidget {
               style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
             ),
             const SizedBox(height: 8),
+          ],
+          if (productBarcode != null && onScanProduct != null) ...<Widget>[
+            _barcodeScanRow(
+              controller: productBarcode!,
+              label: StringLookup.t(loc, 'pickHybridScanProduct'),
+              onScan: onScanProduct,
+              onSubmitted: onProductBarcodeSubmitted,
+              onChanged: onProductBarcodeChanged,
+            ),
+            const SizedBox(height: 12),
           ],
           TextField(
             controller: looseQty,
@@ -386,6 +482,17 @@ class PickHybridQtyFields extends StatelessWidget {
             ),
             onChanged: (_) => onFieldsChanged(),
           ),
+          if (hybrid.valid && hybrid.total >= 1) ...<Widget>[
+            const SizedBox(height: 12),
+            Text(
+              StringLookup.tParams(
+                loc,
+                'kirimNewTotalUnits',
+                <String, String>{'total': '${hybrid.total}'},
+              ),
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ],
         ],
       );
     }
@@ -408,9 +515,19 @@ class PickHybridQtyFields extends StatelessWidget {
           child: Text('$upb'),
         ),
         const SizedBox(height: 12),
+        if (showHybridScans) ...<Widget>[
+          _barcodeScanRow(
+            controller: boxBarcode!,
+            label: StringLookup.t(loc, 'pickHybridScanBox'),
+            onScan: onScanBox,
+            onSubmitted: onBoxBarcodeSubmitted,
+            onChanged: onBoxBarcodeChanged,
+          ),
+          const SizedBox(height: 12),
+        ],
         TextField(
           controller: boxCount,
-          enabled: canEditBoxCount,
+          enabled: canEditBoxCount && !busy,
           keyboardType: kStockQtyKeyboardType,
           inputFormatters: kStockQtyInputFormatters,
           decoration: InputDecoration(
@@ -428,9 +545,20 @@ class PickHybridQtyFields extends StatelessWidget {
           ),
           onChanged: (_) => onFieldsChanged(),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
+        if (showHybridScans) ...<Widget>[
+          _barcodeScanRow(
+            controller: productBarcode!,
+            label: StringLookup.t(loc, 'pickHybridScanProduct'),
+            onScan: onScanProduct,
+            onSubmitted: onProductBarcodeSubmitted,
+            onChanged: onProductBarcodeChanged,
+          ),
+          const SizedBox(height: 12),
+        ],
         TextField(
           controller: looseQty,
+          enabled: !busy,
           keyboardType: kStockQtyKeyboardType,
           inputFormatters: kStockQtyInputFormatters,
           decoration: InputDecoration(
@@ -446,18 +574,13 @@ class PickHybridQtyFields extends StatelessWidget {
           ),
           onChanged: (_) => onFieldsChanged(),
         ),
-        if (hybrid.valid) ...<Widget>[
+        if (hybrid.valid && hybrid.total >= 1) ...<Widget>[
           const SizedBox(height: 12),
           Text(
             StringLookup.tParams(
               loc,
-              'pickHybridTotal',
-              <String, String>{
-                'boxes': '${hybrid.boxCount}',
-                'upb': '$upb',
-                'loose': '${hybrid.looseUnits}',
-                'total': '${hybrid.total}',
-              },
+              'kirimNewTotalUnits',
+              <String, String>{'total': '${hybrid.total}'},
             ),
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
