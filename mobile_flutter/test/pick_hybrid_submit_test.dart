@@ -208,6 +208,23 @@ void main() {
     );
     expect(allowed, isNull);
   });
+
+  test('hybridBoxOnlyStockValidationMessage blocks null loose with boxes', () {
+    const PickHybridQty hybrid = PickHybridQty(
+      total: 4,
+      boxUnits: 0,
+      looseUnits: 4,
+      boxCount: 0,
+      valid: true,
+    );
+    final String? blocked = hybridBoxOnlyStockValidationMessage(
+      loc: AppLocale.uz,
+      hybrid: hybrid,
+      primaryLooseUnits: null,
+      primaryBoxCount: 2,
+    );
+    expect(blocked, isNotNull);
+  });
 }
 
 class _RecordingScanner extends ScannerRepository {

@@ -379,6 +379,17 @@ bool hybridShowBoxOnlyHint({
   return (stockBoxCount ?? 0) > 0 && looseUnits == null;
 }
 
+/// Quti skan qilingandan keyin quti hajmi maydonini ko'rsatish.
+bool hybridShowUnitsPerBoxField({
+  required TextEditingController? boxBarcode,
+  required TextEditingController boxCount,
+}) {
+  if (boxBarcode != null && boxBarcode.text.trim().isNotEmpty) {
+    return true;
+  }
+  return (int.tryParse(boxCount.text.trim()) ?? 0) > 0;
+}
+
 /// Terish: quti + qutisiz dona bitta panelda (skan avval, soni keyin).
 class PickHybridQtyFields extends StatelessWidget {
   const PickHybridQtyFields({
@@ -473,6 +484,10 @@ class PickHybridQtyFields extends StatelessWidget {
     );
     final bool showHybridScans =
         canEditBoxCount && boxBarcode != null && productBarcode != null;
+    final bool showUnitsPerBox = hybridShowUnitsPerBoxField(
+      boxBarcode: boxBarcode,
+      boxCount: boxCount,
+    );
 
     if (upb == null || upb < 1) {
       return Column(
@@ -537,14 +552,6 @@ class PickHybridQtyFields extends StatelessWidget {
           ),
           const SizedBox(height: 8),
         ],
-        InputDecorator(
-          decoration: InputDecoration(
-            labelText: StringLookup.t(loc, 'kirimNewUnitsPerBox'),
-            border: const OutlineInputBorder(),
-          ),
-          child: Text('$upb'),
-        ),
-        const SizedBox(height: 12),
         if (showHybridScans) ...<Widget>[
           _barcodeScanRow(
             controller: boxBarcode!,
@@ -552,6 +559,16 @@ class PickHybridQtyFields extends StatelessWidget {
             onScan: onScanBox,
             onSubmitted: onBoxBarcodeSubmitted,
             onChanged: onBoxBarcodeChanged,
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (showUnitsPerBox) ...<Widget>[
+          InputDecorator(
+            decoration: InputDecoration(
+              labelText: StringLookup.t(loc, 'kirimNewUnitsPerBox'),
+              border: const OutlineInputBorder(),
+            ),
+            child: Text('$upb'),
           ),
           const SizedBox(height: 12),
         ],

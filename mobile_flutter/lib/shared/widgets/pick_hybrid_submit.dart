@@ -129,8 +129,8 @@ String? hybridBoxOnlyStockValidationMessage({
   if (hybrid.boxCount > 0 || hybrid.looseUnits < 1) {
     return null;
   }
-  if (primaryLooseUnits == 0 ||
-      (primaryLooseUnits == null && (primaryBoxCount ?? 0) > 0)) {
+  final int loose = primaryLooseUnits ?? 0;
+  if (loose < 1 && (primaryBoxCount ?? 0) > 0) {
     return StringLookup.t(loc, 'pickUseBoxScan');
   }
   return null;

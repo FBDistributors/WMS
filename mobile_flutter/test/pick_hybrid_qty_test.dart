@@ -137,4 +137,24 @@ void main() {
     expect(hint.looseUnits, 5);
     expect(hint.boxCount, 0);
   });
+
+  test('hybridShowUnitsPerBoxField hidden until box scan or box count', () {
+    final TextEditingController boxCount = TextEditingController(text: '0');
+    final TextEditingController boxBarcode = TextEditingController();
+    expect(
+      hybridShowUnitsPerBoxField(boxBarcode: boxBarcode, boxCount: boxCount),
+      isFalse,
+    );
+    boxBarcode.text = 'BOX-99';
+    expect(
+      hybridShowUnitsPerBoxField(boxBarcode: boxBarcode, boxCount: boxCount),
+      isTrue,
+    );
+    boxBarcode.clear();
+    boxCount.text = '2';
+    expect(
+      hybridShowUnitsPerBoxField(boxBarcode: boxBarcode, boxCount: boxCount),
+      isTrue,
+    );
+  });
 }
