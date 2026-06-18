@@ -794,9 +794,8 @@ class PickHybridQtyFields extends StatelessWidget {
       final bool needsBox = hybrid.boxCount > 0;
       final bool needsProduct = hybrid.looseUnits > 0;
       final bool canShowBoxFields = upb != null && upb >= 1;
-      final String? hintKey = needsBox && !needsProduct
-          ? 'controllerVerifyScanBoxHint'
-          : (!needsBox && needsProduct ? 'controllerVerifyScanProductHint' : null);
+      final String? hintKey =
+          needsBox && !needsProduct ? 'controllerVerifyScanBoxHint' : null;
 
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
