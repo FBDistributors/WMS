@@ -975,6 +975,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                           );
                           return PickHybridQtyFields(
                             loc: loc,
+                            controllerVerifyMode: true,
                             boxCount: hybridBoxCount,
                             looseQty: hybridLooseQty,
                             unitsPerBox: hybridUnitsPerBox,
@@ -1084,11 +1085,6 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                         onPressed: sheetBusy
                             ? null
                             : () async {
-                                final ({int? looseUnits, int? boxCount}) submitLocationHint =
-                                    alternateBoxHintForLocation(
-                                  pickTargetHolder[0].alternateLocations,
-                                  pickTargetHolder[0].locationCode,
-                                );
                                 final PickHybridQty hybrid = pickHybridQtyFromControllers(
                                   boxCount: hybridBoxCount,
                                   looseQty: hybridLooseQty,
@@ -1102,8 +1098,6 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                   aggPicked: aggPicked,
                                   boxBarcode: hybridBoxBarcode.text,
                                   productBarcode: hybridProductBarcode.text,
-                                  primaryLooseUnits: submitLocationHint.looseUnits,
-                                  primaryBoxCount: submitLocationHint.boxCount,
                                 );
                                 if (validation != null) {
                                   _rejectScanHaptic();

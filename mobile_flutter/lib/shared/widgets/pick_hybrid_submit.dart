@@ -161,35 +161,34 @@ String? hybridPickValidationMessage({
   return null;
 }
 
+bool controllerVerifyRequiresBoxScan(PickHybridQty hybrid) => hybrid.boxCount > 0;
+
+bool controllerVerifyRequiresProductScan(PickHybridQty hybrid) => hybrid.looseUnits > 0;
+
 String? controllerHybridVerifyValidationMessage({
   required AppLocale loc,
   required PickHybridQty hybrid,
   required double aggPicked,
   required String? boxBarcode,
   required String? productBarcode,
-  int? primaryLooseUnits,
-  int? primaryBoxCount,
 }) {
-  final String? boxOnly = hybridBoxOnlyStockValidationMessage(
-    loc: loc,
-    hybrid: hybrid,
-    primaryLooseUnits: primaryLooseUnits,
-    primaryBoxCount: primaryBoxCount,
-  );
-  if (boxOnly != null) {
-    return boxOnly;
+  final int maxPick = aggPicked.round();
+  if (!hybrid.valid || hybrid.total < 1 || hybrid.total > maxPick) {
+    return StringLookup.tParams(
+      loc,
+      'qtyRangeError',
+      <String, String>{'max': '$maxPick'},
+    );
   }
-  final String? hybridValidation = hybridPickValidationMessage(
-    loc: loc,
-    hybrid: hybrid,
-    boxBarcode: boxBarcode,
-    productBarcode: productBarcode,
-    maxUnits: aggPicked,
-  );
-  if (hybridValidation != null) {
-    return hybridValidation;
+  if (controllerVerifyRequiresBoxScan(hybrid) &&
+      (boxBarcode == null || boxBarcode.trim().isEmpty)) {
+    return StringLookup.t(loc, 'pickHybridScanBoxFirst');
   }
-  if (hybrid.total != aggPicked.round()) {
+  if (controllerVerifyRequiresProductScan(hybrid) &&
+      (productBarcode == null || productBarcode.trim().isEmpty)) {
+    return StringLookup.t(loc, 'pickHybridScanProductFirst');
+  }
+  if (hybrid.total != maxPick) {
     return StringLookup.t(loc, 'qtyMismatch');
   }
   return null;

@@ -187,6 +187,9 @@ abstract final class StringLookup {
         'Bir nechta joydan yig‘iladi — skaner qiling, keyin shu joydagi qoldiq miqdorini kiriting.',
     'controllerPositionVerified': 'Pozitsiya tekshirildi',
     'controllerPositionAlreadyVerified': 'Bu pozitsiya allaqachon tekshirilgan',
+    'controllerVerifyScanProductHint':
+        'Olingan mahsulotni skan qiling. Quti joyida qoladi — quti skan shart emas.',
+    'controllerVerifyScanBoxHint': 'To‘liq quti bo‘yicha yig‘ilgan — quti skan qiling.',
     'productNotInOrder': 'Bu mahsulot ushbu buyurtmada yo‘q.',
     'success': 'Muvaffaqiyat',
     'loadError': 'Yuklash xatosi',
@@ -591,6 +594,9 @@ abstract final class StringLookup {
         'Сбор с нескольких ячеек — отсканируйте и введите количество для текущей ячейки.',
     'controllerPositionVerified': 'Позиция проверена',
     'controllerPositionAlreadyVerified': 'Эта позиция уже проверена',
+    'controllerVerifyScanProductHint':
+        'Отсканируйте собранный товар. Короб остаётся на месте — скан короба не нужен.',
+    'controllerVerifyScanBoxHint': 'Собрано целыми коробами — отсканируйте короб.',
     'productNotInOrder': 'Этого товара нет в данном заказе.',
     'success': 'Успешно',
     'loadError': 'Ошибка загрузки',
@@ -996,6 +1002,9 @@ abstract final class StringLookup {
         'Picked from multiple locations — scan, then enter qty for the current location.',
     'controllerPositionVerified': 'Position verified',
     'controllerPositionAlreadyVerified': 'This position is already verified',
+    'controllerVerifyScanProductHint':
+        'Scan the picked product. The box stays on the shelf — no box scan required.',
+    'controllerVerifyScanBoxHint': 'Picked as full box(es) — scan the box.',
     'productNotInOrder': 'This product is not in this order.',
     'success': 'Success',
     'loadError': 'Load error',
