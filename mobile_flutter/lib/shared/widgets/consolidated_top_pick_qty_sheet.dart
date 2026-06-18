@@ -76,11 +76,14 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
     _looseQty = TextEditingController();
     _boxBarcode = TextEditingController();
     _productBarcode = TextEditingController();
-    applyHybridQtyDefaults(
+    applyConsolidatedHybridQtyDefaults(
       boxCount: _boxCount,
       looseQty: _looseQty,
       unitsPerBox: _unitsPerBox,
       maxUnits: rem,
+      lines: widget.product.lines,
+      suggestedBoxCount: widget.product.suggestedBoxCount,
+      suggestedLooseQty: widget.product.suggestedLooseQty,
     );
     unawaited(_applyInitialScan());
   }
@@ -110,6 +113,18 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
           _unitsPerBox = scanRes.unitsPerBox;
         }
       });
+      if (mounted) {
+        final double rem = widget.product.totalRequired - widget.product.totalPicked;
+        applyConsolidatedHybridQtyDefaults(
+          boxCount: _boxCount,
+          looseQty: _looseQty,
+          unitsPerBox: _unitsPerBox,
+          maxUnits: rem,
+          lines: widget.product.lines,
+          suggestedBoxCount: widget.product.suggestedBoxCount,
+          suggestedLooseQty: widget.product.suggestedLooseQty,
+        );
+      }
     } on Object {
       if (mounted) {
         setState(() => _productBarcode.text = raw);
@@ -328,6 +343,11 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
               ),
             ),
             const SizedBox(height: 12),
+            ConsolidatedPickPlanBanner(
+              loc: loc,
+              product: product,
+              unitsPerBox: _unitsPerBox,
+            ),
             PickHybridQtyFields(
               loc: loc,
               boxCount: _boxCount,

@@ -74,6 +74,47 @@ class HybridPickPlan:
     total_boxes_consumed: int
 
 
+def compute_consolidated_box_loose_plan(
+    line_remainders: list[int],
+    units_per_box: int,
+) -> tuple[int, int]:
+    """Umumiy yig'ish: har buyurtma qoldig'i bo'yicha quti/dona, keyin yig'indi."""
+    if units_per_box < 1:
+        loose_total = sum(max(0, int(q)) for q in line_remainders)
+        return 0, loose_total
+    boxes = 0
+    loose = 0
+    for q in line_remainders:
+        rem = max(0, int(q))
+        if rem <= 0:
+            continue
+        boxes += rem // units_per_box
+        loose += rem % units_per_box
+    return boxes, loose
+
+
+def consolidated_remainders_by_document(
+    lines: list,
+) -> list[int]:
+    """Bir hujjatdagi bir nechta qatorlarni yig'ib, har buyurtma uchun qoldiq."""
+    by_doc: dict[UUID, int] = {}
+    for line in lines:
+        if getattr(line, "is_vip_expiry_informational", False):
+            continue
+        rem = max(
+            0,
+            int(getattr(line, "qty_required", 0) or 0)
+            - int(getattr(line, "qty_picked", 0) or 0),
+        )
+        if rem <= 0:
+            continue
+        doc_id = getattr(line, "document_id", None)
+        if doc_id is None:
+            continue
+        by_doc[doc_id] = by_doc.get(doc_id, 0) + rem
+    return list(by_doc.values())
+
+
 def compute_hybrid_pick_plan(
     total: int,
     units_per_box: int,

@@ -283,11 +283,14 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
     final TextEditingController looseQtyCtrl = TextEditingController();
     final TextEditingController boxBarcodeCtrl = TextEditingController();
     final TextEditingController productBarcodeCtrl = TextEditingController();
-    applyHybridQtyDefaults(
+    applyConsolidatedHybridQtyDefaults(
       boxCount: boxCountCtrl,
       looseQty: looseQtyCtrl,
       unitsPerBox: unitsPerBox,
       maxUnits: rem,
+      lines: product.lines,
+      suggestedBoxCount: product.suggestedBoxCount,
+      suggestedLooseQty: product.suggestedLooseQty,
     );
     if (verifiedBarcode != null && verifiedBarcode.trim().isNotEmpty) {
       final String raw = verifiedBarcode.trim();
@@ -317,11 +320,14 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
         );
         if (boxHint.unitsPerBox != null && boxHint.unitsPerBox! >= 1) {
           unitsPerBox = boxHint.unitsPerBox;
-          applyHybridQtyDefaults(
+          applyConsolidatedHybridQtyDefaults(
             boxCount: boxCountCtrl,
             looseQty: looseQtyCtrl,
             unitsPerBox: unitsPerBox,
             maxUnits: rem,
+            lines: product.lines,
+            suggestedBoxCount: product.suggestedBoxCount,
+            suggestedLooseQty: product.suggestedLooseQty,
           );
         }
       }
@@ -428,6 +434,11 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                       ),
                     ),
                     const SizedBox(height: 12),
+                    ConsolidatedPickPlanBanner(
+                      loc: loc,
+                      product: product,
+                      unitsPerBox: sheetUnitsPerBox,
+                    ),
                     PickHybridQtyFields(
                       loc: loc,
                       boxCount: boxCountCtrl,
@@ -818,6 +829,19 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      if (p.lines.where((ConsolidatedLineItem l) => l.qtyPicked < l.qtyRequired).length >=
+                          2) ...<Widget>[
+                        const SizedBox(height: 4),
+                        Text(
+                          '${StringLookup.t(loc, 'consolidatedProductByOrder')}: ${consolidatedOpenLinesByOrderText(lines: p.lines, countTaLabel: StringLookup.t(loc, 'countTa').trim())}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: cs.onSurfaceVariant,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                       const SizedBox(height: 10),
                       Row(
                         children: <Widget>[

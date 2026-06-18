@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_state/app_locale.dart';
 import '../../features/picking/data/picking_models.dart';
+import '../../features/product_boxes/box_qty_breakdown.dart';
 import '../../l10n/string_lookup.dart';
 import '../input/input_clear_button.dart';
 import '../input/stock_quantity_input.dart';
@@ -295,6 +296,198 @@ void applyHybridQtyDefaults({
   }
   boxCount.text = '${maxPick ~/ upb}';
   looseQty.text = '${maxPick % upb}';
+}
+
+/// Umumiy yig'ish: 2+ buyurtmada har buyurtma bo'yicha quti/dona defaultlari.
+void applyConsolidatedHybridQtyDefaults({
+  required TextEditingController boxCount,
+  required TextEditingController looseQty,
+  required int? unitsPerBox,
+  required double maxUnits,
+  required List<ConsolidatedLineItem> lines,
+  int? suggestedBoxCount,
+  int? suggestedLooseQty,
+}) {
+  final int maxPick = max(0, maxUnits.round());
+  if (maxPick < 1) {
+    boxCount.text = '0';
+    looseQty.text = '0';
+    return;
+  }
+  if (suggestedBoxCount != null && suggestedLooseQty != null) {
+    boxCount.text = '${max(0, suggestedBoxCount)}';
+    looseQty.text = '${max(0, suggestedLooseQty)}';
+    return;
+  }
+  final List<ConsolidatedLineItem> openLines = lines
+      .where((ConsolidatedLineItem l) => l.qtyPicked < l.qtyRequired)
+      .toList(growable: false);
+  final List<int> remainders = consolidatedRemaindersByDocument(
+    lines: openLines
+        .map(
+          (ConsolidatedLineItem l) => (
+            documentId: l.documentId,
+            qtyRequired: l.qtyRequired,
+            qtyPicked: l.qtyPicked,
+          ),
+        )
+        .toList(growable: false),
+  );
+  final int upb = unitsPerBox ?? 0;
+  if (remainders.length >= 2 && upb >= 1) {
+    final ({int boxCount, int looseQty})? plan = computeConsolidatedBoxLoosePlan(
+      lineRemainders: remainders,
+      unitsPerBox: upb,
+    );
+    if (plan != null) {
+      boxCount.text = '${plan.boxCount}';
+      looseQty.text = '${plan.looseQty}';
+      return;
+    }
+  }
+  applyHybridQtyDefaults(
+    boxCount: boxCount,
+    looseQty: looseQty,
+    unitsPerBox: unitsPerBox,
+    maxUnits: maxUnits,
+  );
+}
+
+/// Umumiy yig'ish terish rejasi matni (buyurtma bo'yicha).
+String? consolidatedPickPlanHintMessage({
+  required AppLocale loc,
+  required List<ConsolidatedLineItem> lines,
+  required int? unitsPerBox,
+  int? suggestedBoxCount,
+  int? suggestedLooseQty,
+}) {
+  final List<ConsolidatedLineItem> openLines = lines
+      .where((ConsolidatedLineItem l) => l.qtyPicked < l.qtyRequired)
+      .toList(growable: false);
+  if (openLines.length < 2) {
+    return null;
+  }
+  final int upb = unitsPerBox ?? 0;
+  int boxes;
+  int loose;
+  if (suggestedBoxCount != null && suggestedLooseQty != null) {
+    boxes = max(0, suggestedBoxCount);
+    loose = max(0, suggestedLooseQty);
+  } else if (upb >= 1) {
+    final List<int> remainders = consolidatedRemaindersByDocument(
+      lines: openLines
+          .map(
+            (ConsolidatedLineItem l) => (
+              documentId: l.documentId,
+              qtyRequired: l.qtyRequired,
+              qtyPicked: l.qtyPicked,
+            ),
+          )
+          .toList(growable: false),
+    );
+    final ({int boxCount, int looseQty})? plan = computeConsolidatedBoxLoosePlan(
+      lineRemainders: remainders,
+      unitsPerBox: upb,
+    );
+    if (plan == null) {
+      return null;
+    }
+    boxes = plan.boxCount;
+    loose = plan.looseQty;
+  } else {
+    return null;
+  }
+  if (boxes < 1 && loose > 0) {
+    return StringLookup.tParams(
+      loc,
+      'consolidatedPickPlanAllLoose',
+      <String, String>{'loose': '$loose'},
+    );
+  }
+  if (boxes > 0) {
+    return StringLookup.tParams(
+      loc,
+      'consolidatedPickPlanByOrder',
+      <String, String>{
+        'boxes': '$boxes',
+        'loose': '$loose',
+      },
+    );
+  }
+  return null;
+}
+
+/// Buyurtma bo'yicha ochiq qatorlar matni.
+String consolidatedOpenLinesByOrderText({
+  required List<ConsolidatedLineItem> lines,
+  required String countTaLabel,
+}) {
+  final List<ConsolidatedLineItem> openLines = lines
+      .where((ConsolidatedLineItem l) => l.qtyPicked < l.qtyRequired)
+      .toList(growable: false);
+  return openLines
+      .map(
+        (ConsolidatedLineItem l) =>
+            '${l.referenceNumber}: ${(l.qtyRequired - l.qtyPicked).round()} $countTaLabel',
+      )
+      .join(', ');
+}
+
+/// Umumiy yig'ish: buyurtma bo'yicha ro'yxat va terish rejasi.
+class ConsolidatedPickPlanBanner extends StatelessWidget {
+  const ConsolidatedPickPlanBanner({
+    super.key,
+    required this.loc,
+    required this.product,
+    required this.unitsPerBox,
+  });
+
+  final AppLocale loc;
+  final ConsolidatedProduct product;
+  final int? unitsPerBox;
+
+  @override
+  Widget build(BuildContext context) {
+    final List<ConsolidatedLineItem> openLines = product.lines
+        .where((ConsolidatedLineItem l) => l.qtyPicked < l.qtyRequired)
+        .toList(growable: false);
+    if (openLines.length < 2) {
+      return const SizedBox.shrink();
+    }
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    final String byOrder = consolidatedOpenLinesByOrderText(
+      lines: product.lines,
+      countTaLabel: StringLookup.t(loc, 'countTa').trim(),
+    );
+    final String? planHint = consolidatedPickPlanHintMessage(
+      loc: loc,
+      lines: product.lines,
+      unitsPerBox: unitsPerBox,
+      suggestedBoxCount: product.suggestedBoxCount,
+      suggestedLooseQty: product.suggestedLooseQty,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Text(
+          '${StringLookup.t(loc, 'consolidatedProductByOrder')}: $byOrder',
+          style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+        ),
+        if (planHint != null) ...<Widget>[
+          const SizedBox(height: 8),
+          Text(
+            planHint,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: cs.primary,
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
+      ],
+    );
+  }
 }
 
 int? unitsPerBoxFromAlternateLocations(List<PickingAlternateLocation> alternates) {

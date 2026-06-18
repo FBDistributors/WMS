@@ -76,3 +76,42 @@ BoxQtyBreakdown? computeBoxQtyBreakdown({
     unitsPerBox: unitsPerBox,
   );
 }
+
+/// Umumiy yig'ish: har buyurtma qoldig'i bo'yicha quti/dona, keyin yig'indi.
+({int boxCount, int looseQty})? computeConsolidatedBoxLoosePlan({
+  required List<int> lineRemainders,
+  required int unitsPerBox,
+}) {
+  if (unitsPerBox < 1) {
+    final int looseTotal = lineRemainders
+        .map((int q) => q < 0 ? 0 : q)
+        .fold<int>(0, (int a, int b) => a + b);
+    return (boxCount: 0, looseQty: looseTotal);
+  }
+  int boxes = 0;
+  int loose = 0;
+  for (final int q in lineRemainders) {
+    final int rem = q < 0 ? 0 : q;
+    if (rem <= 0) {
+      continue;
+    }
+    boxes += rem ~/ unitsPerBox;
+    loose += rem % unitsPerBox;
+  }
+  return (boxCount: boxes, looseQty: loose);
+}
+
+/// Har hujjat uchun qoldiq (bir nechta qator bo'lsa yig'iladi).
+List<int> consolidatedRemaindersByDocument({
+  required List<({String documentId, double qtyRequired, double qtyPicked})> lines,
+}) {
+  final Map<String, int> byDoc = <String, int>{};
+  for (final ({String documentId, double qtyRequired, double qtyPicked}) line in lines) {
+    final int rem = (line.qtyRequired - line.qtyPicked).round();
+    if (rem <= 0) {
+      continue;
+    }
+    byDoc[line.documentId] = (byDoc[line.documentId] ?? 0) + rem;
+  }
+  return byDoc.values.toList(growable: false);
+}

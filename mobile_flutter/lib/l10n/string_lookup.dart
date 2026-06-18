@@ -178,6 +178,11 @@ abstract final class StringLookup {
     'consolidatedEmptyRows': 'Hozircha qatorlar yo‘q',
     'consolidatedPickSuccess': 'Yig‘ildi',
     'consolidatedNothingToPick': 'Bu mahsulot uchun yig‘ish qoldig‘i yo‘q.',
+    'consolidatedProductByOrder': 'Buyurtma bo‘yicha',
+    'consolidatedPickPlanAllLoose':
+        'Har bir buyurtma quti hajmidan kam — faqat dona tering ({{loose}} dona)',
+    'consolidatedPickPlanByOrder':
+        'Buyurtma bo‘yicha: {{boxes}} quti + {{loose}} dona',
     'pickMultiLocationHint':
         'Bir nechta joydan yig‘iladi — skaner qiling, keyin shu joydagi qoldiq miqdorini kiriting.',
     'controllerPositionVerified': 'Pozitsiya tekshirildi',
@@ -571,6 +576,11 @@ abstract final class StringLookup {
     'consolidatedEmptyRows': 'Пока нет строк',
     'consolidatedPickSuccess': 'Собрано',
     'consolidatedNothingToPick': 'Для этого товара нечего собирать.',
+    'consolidatedProductByOrder': 'По заказам',
+    'consolidatedPickPlanAllLoose':
+        'В каждом заказе меньше коробки — берите только штуки ({{loose}} шт.)',
+    'consolidatedPickPlanByOrder':
+        'По заказам: {{boxes}} кор. + {{loose}} шт.',
     'pickMultiLocationHint':
         'Сбор с нескольких ячеек — отсканируйте и введите количество для текущей ячейки.',
     'controllerPositionVerified': 'Позиция проверена',
@@ -964,6 +974,11 @@ abstract final class StringLookup {
     'consolidatedEmptyRows': 'No lines yet',
     'consolidatedPickSuccess': 'Recorded',
     'consolidatedNothingToPick': 'Nothing left to pick for this product.',
+    'consolidatedProductByOrder': 'By order',
+    'consolidatedPickPlanAllLoose':
+        'Each order is less than one box — pick loose units only ({{loose}} pcs)',
+    'consolidatedPickPlanByOrder':
+        'By order: {{boxes}} box(es) + {{loose}} loose',
     'pickMultiLocationHint':
         'Picked from multiple locations — scan, then enter qty for the current location.',
     'controllerPositionVerified': 'Position verified',

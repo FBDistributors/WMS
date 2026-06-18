@@ -37,6 +37,8 @@ from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_
 from app.services.box_location_service import (
     apply_hybrid_pick_side_effects,
     apply_scan_pick_side_effects,
+    compute_consolidated_box_loose_plan,
+    consolidated_remainders_by_document,
     pair_box_loose_from_available,
     remove_sealed_boxes_for_pick,
     require_sufficient_loose_for_unit_pick,
@@ -174,6 +176,8 @@ class ConsolidatedProduct(BaseModel):
     expiry_date: Optional[str] = None  # representative (e.g. first line's) for display
     alternate_locations: List[PickingAlternateLocation] = Field(default_factory=list)
     lines: List[ConsolidatedLineItem]
+    suggested_box_count: int = 0
+    suggested_loose_qty: int = 0
 
 
 class ConsolidatedDocumentSummary(BaseModel):
@@ -1071,6 +1075,32 @@ def _consolidated_product_group_key(line: DocumentLineModel) -> tuple:
     )
 
 
+def _units_per_box_from_alternates(alt: List[PickingAlternateLocation]) -> Optional[int]:
+    for a in alt:
+        boxes = a.box_count
+        units = a.units_in_boxes
+        if boxes is not None and units is not None and boxes >= 1 and units >= 1:
+            upb = units // boxes
+            if upb >= 1:
+                return upb
+    return None
+
+
+def _suggested_consolidated_pick_qty(
+    lines_list: List[ConsolidatedLineItem],
+    units_per_box: Optional[int],
+) -> tuple[int, int]:
+    remainders = consolidated_remainders_by_document(lines_list)
+    if not remainders:
+        return 0, 0
+    total_rem = sum(remainders)
+    if not units_per_box or units_per_box < 1:
+        return 0, total_rem
+    if len(remainders) >= 2:
+        return compute_consolidated_box_loose_plan(remainders, units_per_box)
+    return total_rem // units_per_box, total_rem % units_per_box
+
+
 def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedViewResponse:
     """Build consolidated view response (shared by GET and after POST). doc_ids must be non-empty."""
     # Fresh query for doc_no/status to avoid touching expired attributes after consolidated_pick commit (500 fix)
@@ -1142,6 +1172,18 @@ def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedView
             if row.barcode and str(row.barcode).strip():
                 product_barcode_map[row.id] = row.barcode
     all_pids = list({first_line_attrs[k][2] for k in first_line_attrs if first_line_attrs[k][2]})
+    product_upb_map: dict = {}
+    if all_pids:
+        for row in (
+            db.query(ProductBoxModel.product_id, ProductBoxModel.units_per_box)
+            .filter(
+                ProductBoxModel.product_id.in_(all_pids),
+                ProductBoxModel.is_active.is_(True),
+            )
+            .all()
+        ):
+            if row.product_id not in product_upb_map and row.units_per_box and row.units_per_box >= 1:
+                product_upb_map[row.product_id] = int(row.units_per_box)
     # Picker consolidated alternates should never suggest showroom bins by default.
     by_pid_consolidated = _balance_rows_by_product(db, all_pids, "main")
     products = []
@@ -1161,6 +1203,10 @@ def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedView
             if first_product_id
             else []
         )
+        upb = product_upb_map.get(first_product_id) if first_product_id else None
+        if not upb:
+            upb = _units_per_box_from_alternates(alt)
+        suggested_boxes, suggested_loose = _suggested_consolidated_pick_qty(lines_list, upb)
         products.append(
             ConsolidatedProduct(
                 barcode=barcode if (barcode and str(barcode).strip()) else None,
@@ -1172,6 +1218,8 @@ def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedView
                 expiry_date=expiry_display,
                 alternate_locations=alt,
                 lines=lines_list,
+                suggested_box_count=suggested_boxes,
+                suggested_loose_qty=suggested_loose,
             )
         )
     # doc_ids orqali yig'amiz — document ORM obyektlariga tayanmaslik (commit dan keyin 500 oldini olish)

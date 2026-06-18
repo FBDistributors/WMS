@@ -64,4 +64,43 @@ void main() {
     expect(p.boxesToOpen, 0);
     expect(p.totalBoxesConsumed, 1);
   });
+
+  test('computeConsolidatedBoxLoosePlan A4 B5 C6 UPB8', () {
+    final ({int boxCount, int looseQty})? plan = computeConsolidatedBoxLoosePlan(
+      lineRemainders: <int>[4, 5, 6],
+      unitsPerBox: 8,
+    );
+    expect(plan, isNotNull);
+    expect(plan!.boxCount, 0);
+    expect(plan.looseQty, 15);
+  });
+
+  test('computeConsolidatedBoxLoosePlan A4 B5 C8 UPB8', () {
+    final ({int boxCount, int looseQty})? plan = computeConsolidatedBoxLoosePlan(
+      lineRemainders: <int>[4, 5, 8],
+      unitsPerBox: 8,
+    );
+    expect(plan!.boxCount, 1);
+    expect(plan.looseQty, 9);
+  });
+
+  test('computeConsolidatedBoxLoosePlan A4 B5 C16 UPB8', () {
+    final ({int boxCount, int looseQty})? plan = computeConsolidatedBoxLoosePlan(
+      lineRemainders: <int>[4, 5, 16],
+      unitsPerBox: 8,
+    );
+    expect(plan!.boxCount, 2);
+    expect(plan.looseQty, 9);
+  });
+
+  test('consolidatedRemaindersByDocument bir hujjat qatorlari yigiladi', () {
+    final List<int> rem = consolidatedRemaindersByDocument(
+      lines: <({String documentId, double qtyRequired, double qtyPicked})>[
+        (documentId: 'd1', qtyRequired: 4, qtyPicked: 0),
+        (documentId: 'd1', qtyRequired: 2, qtyPicked: 0),
+        (documentId: 'd2', qtyRequired: 5, qtyPicked: 0),
+      ],
+    );
+    expect(rem, <int>[6, 5]);
+  });
 }

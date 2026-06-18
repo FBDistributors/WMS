@@ -474,6 +474,8 @@ class ConsolidatedProduct {
     required this.expiryDate,
     required this.alternateLocations,
     required this.lines,
+    this.suggestedBoxCount,
+    this.suggestedLooseQty,
   });
 
   final String? barcode;
@@ -485,6 +487,8 @@ class ConsolidatedProduct {
   final String? expiryDate;
   final List<PickingAlternateLocation> alternateLocations;
   final List<ConsolidatedLineItem> lines;
+  final int? suggestedBoxCount;
+  final int? suggestedLooseQty;
 
   factory ConsolidatedProduct.fromJson(Map<String, Object?> json) {
     final Object? alts = json['alternate_locations'];
@@ -514,6 +518,8 @@ class ConsolidatedProduct {
       expiryDate: json['expiry_date'] as String?,
       alternateLocations: al,
       lines: lines,
+      suggestedBoxCount: (json['suggested_box_count'] as num?)?.toInt(),
+      suggestedLooseQty: (json['suggested_loose_qty'] as num?)?.toInt(),
     );
   }
 
@@ -528,6 +534,8 @@ class ConsolidatedProduct {
         'alternate_locations':
             alternateLocations.map((PickingAlternateLocation a) => a.toJson()).toList(),
         'lines': lines.map((ConsolidatedLineItem l) => l.toJson()).toList(),
+        'suggested_box_count': suggestedBoxCount,
+        'suggested_loose_qty': suggestedLooseQty,
       };
 }
 

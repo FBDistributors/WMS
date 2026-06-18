@@ -21,6 +21,7 @@ from app.models.stock import StockLot, StockMovement
 from app.models.user import User as UserModel
 from app.auth.security import get_password_hash
 from app.services.box_location_service import (
+    compute_consolidated_box_loose_plan,
     compute_hybrid_pick_plan,
     get_breakdown,
     get_breakdown_for_pick,
@@ -1022,6 +1023,13 @@ def test_consolidated_hybrid_single_request(
         assert bd.loose_units == 0
     finally:
         app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_compute_consolidated_box_loose_plan() -> None:
+    assert compute_consolidated_box_loose_plan([4, 5, 6], 8) == (0, 15)
+    assert compute_consolidated_box_loose_plan([4, 5, 8], 8) == (1, 9)
+    assert compute_consolidated_box_loose_plan([4, 5, 16], 8) == (2, 9)
+    assert compute_consolidated_box_loose_plan([4, 5, 6], 0) == (0, 15)
 
 
 def test_compute_hybrid_pick_plan() -> None:
