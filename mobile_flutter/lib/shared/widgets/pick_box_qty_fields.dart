@@ -293,6 +293,7 @@ bool isLooseOnlyLocation({
   required int? unitsPerBox,
   int? stockBoxCount,
   int? stockLooseUnits,
+  bool forControllerVerify = false,
 }) {
   if (maxPick < 1) {
     return (boxCount: 0, looseQty: 0);
@@ -306,6 +307,9 @@ bool isLooseOnlyLocation({
     stockBoxCount: stockBoxCount,
     stockLooseUnits: stockLooseUnits,
   )) {
+    if (forControllerVerify) {
+      return (boxCount: 0, looseQty: maxPick);
+    }
     final int looseQty = looseStock > 0 ? min(maxPick, looseStock) : maxPick;
     return (boxCount: 0, looseQty: looseQty);
   }
@@ -348,6 +352,7 @@ void applyHybridQtyDefaults({
   required double maxUnits,
   int? stockBoxCount,
   int? stockLooseUnits,
+  bool forControllerVerify = false,
 }) {
   final int maxPick = max(0, maxUnits.round());
   final ({int boxCount, int looseQty}) defaults = computeLocationAwareHybridDefaults(
@@ -355,6 +360,7 @@ void applyHybridQtyDefaults({
     unitsPerBox: unitsPerBox,
     stockBoxCount: stockBoxCount,
     stockLooseUnits: stockLooseUnits,
+    forControllerVerify: forControllerVerify,
   );
   boxCount.text = '${defaults.boxCount}';
   looseQty.text = '${defaults.looseQty}';

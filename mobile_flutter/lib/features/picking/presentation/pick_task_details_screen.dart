@@ -849,6 +849,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       }
     }
     final bool isPickerProfile = profile == PickerProfileParam.picker;
+    final bool bumpScanQty = isPickerProfile;
     final double hybridMaxUnits = isPickerProfile ? remPick : aggPicked;
     int? hybridUnitsPerBox = hybridUnitsPerBoxHint(
       unitsPerBox: presetUnitsPerBox,
@@ -870,6 +871,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       maxUnits: hybridMaxUnits,
       stockBoxCount: locationAltHint.boxCount,
       stockLooseUnits: locationAltHint.looseUnits,
+      forControllerVerify: !isPickerProfile,
     );
     if (scanPreset != null) {
       if (presetIsBoxScan && presetUnitsPerBox != null) {
@@ -882,6 +884,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
           boxBarcode: hybridBoxBarcode,
           unitsPerBox: hybridUnitsPerBox,
           maxUnits: hybridMaxUnits,
+          bumpCount: bumpScanQty,
         );
         hybridUnitsPerBox = scanRes.unitsPerBox ?? hybridUnitsPerBox;
       } else {
@@ -894,6 +897,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
           productBarcode: hybridProductBarcode,
           unitsPerBox: hybridUnitsPerBox,
           maxUnits: hybridMaxUnits,
+          bumpCount: bumpScanQty,
         );
         hybridUnitsPerBox = scanRes.unitsPerBox ?? hybridUnitsPerBox;
       }
@@ -915,6 +919,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
             maxUnits: hybridMaxUnits,
             stockBoxCount: locationAltHint.boxCount,
             stockLooseUnits: locationAltHint.looseUnits,
+            forControllerVerify: !isPickerProfile,
           );
         }
       }
@@ -1004,6 +1009,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                 boxBarcode: hybridBoxBarcode,
                                 unitsPerBox: hybridUnitsPerBox,
                                 maxUnits: aggPicked,
+                                bumpCount: false,
                               );
                               setM(() {
                                 if (result.unitsPerBox != null) {
@@ -1022,6 +1028,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                 productBarcode: hybridProductBarcode,
                                 unitsPerBox: hybridUnitsPerBox,
                                 maxUnits: aggPicked,
+                                bumpCount: false,
                               );
                               setM(() {
                                 if (result.unitsPerBox != null) {
@@ -1044,6 +1051,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                   boxBarcode: hybridBoxBarcode,
                                   unitsPerBox: hybridUnitsPerBox,
                                   maxUnits: aggPicked,
+                                  bumpCount: false,
                                 );
                                 setM(() {
                                   if (result.unitsPerBox != null) {
@@ -1069,6 +1077,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                   productBarcode: hybridProductBarcode,
                                   unitsPerBox: hybridUnitsPerBox,
                                   maxUnits: aggPicked,
+                                  bumpCount: false,
                                 );
                                 setM(() {
                                   if (result.unitsPerBox != null) {

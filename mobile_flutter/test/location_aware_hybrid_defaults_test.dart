@@ -18,6 +18,19 @@ void main() {
     );
   });
 
+  test('computeLocationAwareHybridDefaults controller verify loose-only uses full picked qty', () {
+    final ({int boxCount, int looseQty}) defaults =
+        computeLocationAwareHybridDefaults(
+      maxPick: 44,
+      unitsPerBox: 8,
+      stockBoxCount: 0,
+      stockLooseUnits: 5,
+      forControllerVerify: true,
+    );
+    expect(defaults.boxCount, 0);
+    expect(defaults.looseQty, 44);
+  });
+
   test('computeLocationAwareHybridDefaults loose-only 30 dona', () {
     final ({int boxCount, int looseQty}) defaults =
         computeLocationAwareHybridDefaults(
