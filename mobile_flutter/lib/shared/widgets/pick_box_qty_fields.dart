@@ -379,6 +379,45 @@ bool hybridShowBoxOnlyHint({
   return (stockBoxCount ?? 0) > 0 && looseUnits == null;
 }
 
+/// Terish: quti-only zaxira yoki qisman ochish bo'yicha ogohlantirish matni.
+String? hybridPickStockHintMessage({
+  required AppLocale loc,
+  required PickHybridQty hybrid,
+  int? stockLooseUnits,
+  int? stockBoxCount,
+}) {
+  final int stockLoose = stockLooseUnits ?? 0;
+  final int stockBoxes = stockBoxCount ?? 0;
+  if (hybrid.boxCount > 0 &&
+      hybrid.looseUnits > 0 &&
+      stockLoose < hybrid.looseUnits) {
+    return StringLookup.tParams(
+      loc,
+      'pickHybridPickPlanHint',
+      <String, String>{
+        'boxes': '${hybrid.boxCount}',
+        'loose': '${hybrid.looseUnits}',
+      },
+    );
+  }
+  if (hybrid.looseUnits > 0 && hybrid.boxCount == 0 && stockLoose < 1 && stockBoxes > 0) {
+    return StringLookup.t(loc, 'pickUseBoxScan');
+  }
+  if (hybrid.looseUnits > 0 &&
+      hybrid.boxCount == 0 &&
+      stockLoose < hybrid.looseUnits) {
+    return StringLookup.tParams(
+      loc,
+      'pickHybridOpenBoxHint',
+      <String, String>{'loose': '${hybrid.looseUnits}'},
+    );
+  }
+  if (stockLoose == 0 && stockBoxes > 0 && hybrid.looseUnits < 1) {
+    return StringLookup.t(loc, 'pickUseBoxScan');
+  }
+  return null;
+}
+
 /// Quti skan qilingandan keyin quti hajmi maydonini ko'rsatish.
 bool hybridShowUnitsPerBoxField({
   required TextEditingController? boxBarcode,
@@ -478,24 +517,20 @@ class PickHybridQtyFields extends StatelessWidget {
       unitsPerBox: upb,
       maxUnits: maxUnits,
     );
-    final bool showBoxOnlyHint = hybridShowBoxOnlyHint(
-      looseUnits: looseUnits,
+    final String? stockHint = hybridPickStockHintMessage(
+      loc: loc,
+      hybrid: hybrid,
+      stockLooseUnits: looseUnits,
       stockBoxCount: stockBoxCount,
-    );
-    final bool showHybridScans =
-        canEditBoxCount && boxBarcode != null && productBarcode != null;
-    final bool showUnitsPerBox = hybridShowUnitsPerBoxField(
-      boxBarcode: boxBarcode,
-      boxCount: boxCount,
     );
 
     if (upb == null || upb < 1) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          if (showBoxOnlyHint) ...<Widget>[
+          if (stockHint != null) ...<Widget>[
             Text(
-              StringLookup.t(loc, 'pickUseBoxScan'),
+              stockHint,
               style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
             ),
             const SizedBox(height: 8),
@@ -542,12 +577,19 @@ class PickHybridQtyFields extends StatelessWidget {
       );
     }
 
+    final bool showHybridScans =
+        canEditBoxCount && boxBarcode != null && productBarcode != null;
+    final bool showUnitsPerBox = hybridShowUnitsPerBoxField(
+      boxBarcode: boxBarcode,
+      boxCount: boxCount,
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        if (showBoxOnlyHint) ...<Widget>[
+        if (stockHint != null) ...<Widget>[
           Text(
-            StringLookup.t(loc, 'pickUseBoxScan'),
+            stockHint,
             style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
           ),
           const SizedBox(height: 8),

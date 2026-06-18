@@ -65,6 +65,40 @@ class ProductBoxSummary:
     loose_units: int = 0
 
 
+@dataclass(frozen=True)
+class HybridPickPlan:
+    full_boxes: int
+    loose_needed: int
+    loose_from_stock: int
+    boxes_to_open: int
+    total_boxes_consumed: int
+
+
+def compute_hybrid_pick_plan(
+    total: int,
+    units_per_box: int,
+    available_loose: int = 0,
+) -> HybridPickPlan | None:
+    """Gibrid terish: to'liq qutilar + qisman dona uchun ochiladigan quti."""
+    if units_per_box < 1 or total < 0:
+        return None
+    total_i = max(0, int(total))
+    upb = int(units_per_box)
+    avail_loose = max(0, int(available_loose))
+    full_boxes = total_i // upb
+    loose_needed = total_i % upb
+    loose_from_stock = min(loose_needed, avail_loose)
+    loose_deficit = loose_needed - loose_from_stock
+    boxes_to_open = (loose_deficit + upb - 1) // upb if loose_deficit > 0 else 0
+    return HybridPickPlan(
+        full_boxes=full_boxes,
+        loose_needed=loose_needed,
+        loose_from_stock=loose_from_stock,
+        boxes_to_open=boxes_to_open,
+        total_boxes_consumed=full_boxes + boxes_to_open,
+    )
+
+
 def pair_box_loose_from_available(
     available: int,
     box_count: int,
@@ -608,6 +642,58 @@ def remove_sealed_boxes_for_pick(
         db.flush()
 
 
+def open_sealed_boxes_for_pick(
+    db: Session,
+    *,
+    box_barcode: str,
+    location_id: UUID,
+    lot_id: UUID,
+    user: UserModel,
+    box_count: int,
+) -> None:
+    """Terishda qisman dona uchun sealed qutini ochish (ichidagi donalar ochiq qoldiqka o'tadi)."""
+    if box_count < 1:
+        raise HTTPException(status_code=400, detail="box_count must be >= 1")
+    if box_count > 500:
+        raise HTTPException(status_code=400, detail="box_count too large")
+    box = _get_product_box_by_barcode(db, box_barcode)
+    lot = db.get(StockLotModel, lot_id)
+    if not lot or lot.product_id != box.product_id:
+        raise HTTPException(status_code=400, detail="Partiya mahsulotga mos emas")
+    lock_lot_location(db, lot_id, location_id)
+    sealed_count = (
+        db.query(LocationBoxPlacement)
+        .filter(
+            LocationBoxPlacement.product_box_id == box.id,
+            LocationBoxPlacement.lot_id == lot_id,
+            LocationBoxPlacement.location_id == location_id,
+            LocationBoxPlacement.status == PLACEMENT_SEALED,
+        )
+        .count()
+    )
+    if sealed_count < box_count:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Sealed quti yetarli emas (kerak {box_count}, mavjud {sealed_count})"
+            ),
+        )
+    for _ in range(box_count):
+        placement = _find_sealed_at(
+            db,
+            box.id,
+            location_id=location_id,
+            lot_id=lot_id,
+        )
+        if not placement:
+            raise HTTPException(status_code=404, detail="Quti bu lokatsiyada joylashmagan")
+        placement.status = PLACEMENT_REMOVED
+        placement.removed_at = datetime.now(timezone.utc)
+        placement.removed_by_user_id = user.id
+        placement.remove_reason = "pick_open"
+        db.flush()
+
+
 def remove_box_for_pick_if_needed(
     db: Session,
     *,
@@ -675,7 +761,28 @@ def apply_hybrid_pick_side_effects(
     box_units: Decimal,
     loose_units: Decimal,
 ) -> None:
-    """Gibrid terish: sealed qutilarni olib tashlash va qutisiz qoldiqni tekshirish."""
+    """Gibrid terish: to'liq quti, kerak bo'lsa quti ochish, qutisiz dona tekshiruvi."""
+    boxes_to_open = 0
+    if loose_units > 0:
+        from app.services.stock_availability import compute_lot_location_balances
+
+        on_hand, _reserved, _available = compute_lot_location_balances(
+            db, lot_id, location_id
+        )
+        box_count_pl, units_in_boxes, _ = _units_in_boxes_for_lot_location(
+            db, lot_id, location_id
+        )
+        _bc, _uib, loose_on_hand = pair_box_loose_from_available(
+            max(0, int(on_hand)), box_count_pl, units_in_boxes
+        )
+        loose_int = int(loose_units)
+        deficit = loose_int - loose_on_hand
+        if deficit > 0:
+            box = _get_product_box_by_barcode(db, box_barcode)
+            upb = box.units_per_box
+            if upb < 1:
+                raise HTTPException(status_code=400, detail="Invalid units_per_box")
+            boxes_to_open = (deficit + upb - 1) // upb
     if box_count > 0 and box_units > 0:
         remove_sealed_boxes_for_pick(
             db,
@@ -685,6 +792,15 @@ def apply_hybrid_pick_side_effects(
             user=user,
             box_count=box_count,
             pick_qty=box_units,
+        )
+    if boxes_to_open > 0:
+        open_sealed_boxes_for_pick(
+            db,
+            box_barcode=box_barcode,
+            location_id=location_id,
+            lot_id=lot_id,
+            user=user,
+            box_count=boxes_to_open,
         )
     if loose_units > 0:
         require_sufficient_loose_for_unit_pick(

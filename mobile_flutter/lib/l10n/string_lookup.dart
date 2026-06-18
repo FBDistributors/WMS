@@ -344,6 +344,9 @@ abstract final class StringLookup {
     'pickHybridScanBoxFirst': 'Avval quti skan qiling',
     'pickHybridScanProductFirst': 'Qo‘shimcha dona uchun mahsulot skan qiling',
     'pickHybridPartialProgress': '{{picked}}/{{total}} yig‘ildi — qolganini qayta urinib ko‘ring',
+    'pickHybridOpenBoxHint': '{{loose}} dona uchun qutini oching',
+    'pickHybridPickPlanHint':
+        '{{boxes}} to\'liq quti + {{loose}} dona (quti ochiladi)',
     'pickLocationBreakdown': '{{breakdown}}',
     'kirimBoxReceiveSuccess':
         'Qabul: {{boxCount}} quti × {{unitsPerBox}} = {{total}} dona\n{{product}} · {{location}}',
@@ -734,6 +737,9 @@ abstract final class StringLookup {
     'pickHybridScanBoxFirst': 'Сначала отсканируйте коробку',
     'pickHybridScanProductFirst': 'Для доп. штук отсканируйте товар',
     'pickHybridPartialProgress': 'Собрано {{picked}}/{{total}} — повторите остаток',
+    'pickHybridOpenBoxHint': 'Откройте коробку для {{loose}} шт.',
+    'pickHybridPickPlanHint':
+        '{{boxes}} полн. кор. + {{loose}} шт. (коробку открыть)',
     'pickLocationBreakdown': '{{breakdown}}',
     'kirimBoxReceiveSuccess':
         'Приём: {{boxCount}} кор. × {{unitsPerBox}} = {{total}} шт.\n{{product}} · {{location}}',
@@ -1124,6 +1130,9 @@ abstract final class StringLookup {
     'pickHybridScanBoxFirst': 'Scan the box first',
     'pickHybridScanProductFirst': 'Scan the product for loose units',
     'pickHybridPartialProgress': 'Picked {{picked}}/{{total}} — retry the remainder',
+    'pickHybridOpenBoxHint': 'Open a box for {{loose}} loose units',
+    'pickHybridPickPlanHint':
+        '{{boxes}} full box(es) + {{loose}} loose (box will be opened)',
     'pickLocationBreakdown': '{{breakdown}}',
     'kirimBoxReceiveSuccess':
         'Received: {{boxCount}} boxes × {{unitsPerBox}} = {{total}} units\n{{product}} · {{location}}',

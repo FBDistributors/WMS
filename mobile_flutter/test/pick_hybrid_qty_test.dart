@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile_flutter/core/app_state/app_locale.dart';
 import 'package:mobile_flutter/features/picking/data/picking_models.dart';
 import 'package:mobile_flutter/shared/widgets/pick_box_qty_fields.dart';
 
@@ -156,5 +157,24 @@ void main() {
       hybridShowUnitsPerBoxField(boxBarcode: boxBarcode, boxCount: boxCount),
       isTrue,
     );
+  });
+
+  test('hybridPickStockHintMessage shows open box plan for partial pick', () {
+    const PickHybridQty hybrid = PickHybridQty(
+      total: 10,
+      boxUnits: 8,
+      looseUnits: 2,
+      boxCount: 1,
+      valid: true,
+    );
+    final String? hint = hybridPickStockHintMessage(
+      loc: AppLocale.uz,
+      hybrid: hybrid,
+      stockLooseUnits: 0,
+      stockBoxCount: 10,
+    );
+    expect(hint, isNotNull);
+    expect(hint, contains('1'));
+    expect(hint, contains('2'));
   });
 }

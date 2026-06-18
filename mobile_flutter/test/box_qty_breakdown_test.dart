@@ -40,4 +40,28 @@ void main() {
     expect(b.fullBoxes, 4);
     expect(b.looseUnits, 2);
   });
+
+  test('computeHybridPickPlan 10 dona 8/quti ochiq dona yo\'q', () {
+    final HybridPickPlan? p = computeHybridPickPlan(
+      total: 10,
+      unitsPerBox: 8,
+      availableLoose: 0,
+    );
+    expect(p, isNotNull);
+    expect(p!.fullBoxes, 1);
+    expect(p.looseNeeded, 2);
+    expect(p.boxesToOpen, 1);
+    expect(p.totalBoxesConsumed, 2);
+  });
+
+  test('computeHybridPickPlan ochiq dona yetganda quti ochilmaydi', () {
+    final HybridPickPlan? p = computeHybridPickPlan(
+      total: 10,
+      unitsPerBox: 8,
+      availableLoose: 5,
+    );
+    expect(p!.looseFromStock, 2);
+    expect(p.boxesToOpen, 0);
+    expect(p.totalBoxesConsumed, 1);
+  });
 }

@@ -21,6 +21,7 @@ from app.models.stock import StockLot, StockMovement
 from app.models.user import User as UserModel
 from app.auth.security import get_password_hash
 from app.services.box_location_service import (
+    compute_hybrid_pick_plan,
     get_breakdown,
     get_breakdown_for_pick,
     get_breakdown_tolerant,
@@ -1019,5 +1020,157 @@ def test_consolidated_hybrid_single_request(
         assert bd.box_count == 0
         assert bd.units_in_boxes == 0
         assert bd.loose_units == 0
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_compute_hybrid_pick_plan() -> None:
+    plan = compute_hybrid_pick_plan(10, 8, 0)
+    assert plan is not None
+    assert plan.full_boxes == 1
+    assert plan.loose_needed == 2
+    assert plan.loose_from_stock == 0
+    assert plan.boxes_to_open == 1
+    assert plan.total_boxes_consumed == 2
+
+    plan_with_loose = compute_hybrid_pick_plan(10, 8, 5)
+    assert plan_with_loose is not None
+    assert plan_with_loose.loose_from_stock == 2
+    assert plan_with_loose.boxes_to_open == 0
+    assert plan_with_loose.total_boxes_consumed == 1
+
+
+def _seed_box_only_partial_pick_order(
+    db: Session,
+    *,
+    order_qty: int = 10,
+    stock_qty: int = 80,
+    box_count: int = 10,
+    units_per_box: int = 8,
+) -> tuple[Order, UserModel, ProductModel, LocationModel, StockLot, str]:
+    """Faqat qutida zaxira — qisman dona uchun quti ochiladi."""
+    assert box_count * units_per_box == stock_qty
+    picker = _mk_user(db, username=f"picker-bpp-{uuid.uuid4().hex[:8]}", role="picker")
+    product = ProductModel(
+        external_source="test",
+        external_id=f"ext-{uuid.uuid4()}",
+        name="Box Only Partial Pick Product",
+        sku=f"SKU-BPP-{uuid.uuid4().hex[:8]}",
+        barcode=f"BPP{uuid.uuid4().hex[:6]}",
+        is_active=True,
+    )
+    db.add(product)
+    db.flush()
+
+    loc = LocationModel(
+        code=f"BPP-{uuid.uuid4().hex[:6]}",
+        barcode_value=f"BPP-{uuid.uuid4().hex[:6]}",
+        name="Box only partial bin",
+        type="bin",
+        zone_type="NORMAL",
+        is_active=True,
+    )
+    db.add(loc)
+    db.flush()
+
+    lot = StockLot(product_id=product.id, batch="BPP-B1", expiry_date=None)
+    db.add(lot)
+    db.flush()
+    db.add(
+        StockMovement(
+            product_id=product.id,
+            lot_id=lot.id,
+            location_id=loc.id,
+            qty_change=Decimal(str(stock_qty)),
+            movement_type="receipt",
+        )
+    )
+
+    box_barcode = f"BOX-BPP-{uuid.uuid4().hex[:6]}"
+    db.add(
+        ProductBoxModel(
+            box_barcode=box_barcode,
+            product_id=product.id,
+            units_per_box=units_per_box,
+            is_active=True,
+        )
+    )
+    db.flush()
+
+    inv = _mk_user(db, username=f"inv-bpp-{uuid.uuid4().hex[:8]}", role="inventory_controller")
+    place_sealed_boxes(
+        db,
+        box_barcode=box_barcode,
+        location_id=loc.id,
+        lot_id=lot.id,
+        user=inv,
+        box_count=box_count,
+    )
+
+    order = Order(
+        source="test",
+        source_external_id=f"order-bpp-{uuid.uuid4().hex[:10]}",
+        order_number=f"SO-BPP-{uuid.uuid4().hex[:6]}",
+    )
+    order.wms_state = OrderWmsState(status="imported")
+    order.lines = [
+        OrderLine(
+            sku=product.sku,
+            name="Box only partial pick line",
+            qty=float(order_qty),
+            uom="dona",
+        )
+    ]
+    db.add(order)
+    db.commit()
+    db.refresh(order)
+    return order, picker, product, loc, lot, box_barcode
+
+
+def test_line_pick_hybrid_opens_box_for_partial_loose(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """10 dona, 8/quti, faqat qutilar: 1 to'liq quti + 1 ochilgan qutidan 2 dona."""
+    order, picker, product, loc, lot, box_barcode = _seed_box_only_partial_pick_order(
+        db_session
+    )
+
+    bd_before = get_breakdown_for_pick(
+        db_session,
+        product_id=product.id,
+        lot_id=lot.id,
+        location_id=loc.id,
+    )
+    assert bd_before.loose_units == 0
+    assert bd_before.box_count == 10
+
+    doc_id = _send_to_picking(client, db_session, order.id, picker.id)
+
+    app.dependency_overrides[get_current_user] = lambda: picker
+    try:
+        line_id = client.get(f"/api/v1/picking/documents/{doc_id}").json()["lines"][0]["id"]
+        pick = client.post(
+            f"/api/v1/picking/lines/{line_id}/pick",
+            json={
+                "delta": 10,
+                "request_id": f"pick-bpp-{uuid.uuid4().hex}",
+                "barcode": product.barcode,
+                "box_barcode": box_barcode,
+                "box_count": 1,
+            },
+        )
+        assert pick.status_code == 200, pick.text
+        assert pick.json()["line"]["qty_picked"] == 10
+
+        bd_after = get_breakdown_for_pick(
+            db_session,
+            product_id=product.id,
+            lot_id=lot.id,
+            location_id=loc.id,
+        )
+        assert bd_after.box_count == 8
+        assert bd_after.units_in_boxes == 64
+        assert bd_after.loose_units == 6
     finally:
         app.dependency_overrides.pop(get_current_user, None)
