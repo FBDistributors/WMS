@@ -750,6 +750,72 @@ def apply_scan_pick_side_effects(
                 )
                 return
         raise HTTPException(status_code=400, detail="box_count required for box scan")
+    _apply_unit_scan_pick_side_effects(
+        db,
+        product_id=product_id,
+        lot_id=lot_id,
+        location_id=location_id,
+        user=user,
+        qty_delta=qty_delta,
+    )
+
+
+def _active_product_box(db: Session, product_id: UUID) -> ProductBoxModel | None:
+    return (
+        db.query(ProductBoxModel)
+        .filter(
+            ProductBoxModel.product_id == product_id,
+            ProductBoxModel.is_active.is_(True),
+        )
+        .order_by(ProductBoxModel.id)
+        .first()
+    )
+
+
+def _apply_unit_scan_pick_side_effects(
+    db: Session,
+    *,
+    product_id: UUID,
+    lot_id: UUID,
+    location_id: UUID,
+    user: UserModel,
+    qty_delta: Decimal,
+) -> None:
+    """Dona skan: qutisiz yetmasa, faqat qutida zaxiradan avto quti yoki box_count talab."""
+    breakdown = get_breakdown_for_pick(
+        db,
+        product_id=product_id,
+        lot_id=lot_id,
+        location_id=location_id,
+    )
+    qty_int = int(qty_delta)
+    if qty_int <= breakdown.loose_units:
+        require_sufficient_loose_for_unit_pick(
+            db,
+            product_id=product_id,
+            lot_id=lot_id,
+            location_id=location_id,
+            qty=qty_delta,
+        )
+        return
+    if breakdown.box_count > 0:
+        box = _active_product_box(db, product_id)
+        if box:
+            upb = box.units_per_box
+            if upb >= 1 and qty_int % upb == 0:
+                boxes = qty_int // upb
+                if breakdown.box_count >= boxes:
+                    remove_sealed_boxes_for_pick(
+                        db,
+                        box_barcode=box.box_barcode,
+                        location_id=location_id,
+                        lot_id=lot_id,
+                        user=user,
+                        box_count=boxes,
+                        pick_qty=qty_delta,
+                    )
+                    return
+        raise HTTPException(status_code=400, detail="box_count required for box scan")
     require_sufficient_loose_for_unit_pick(
         db,
         product_id=product_id,
@@ -777,6 +843,8 @@ def require_sufficient_loose_for_unit_pick(
         location_id=location_id,
     )
     if int(qty) > breakdown.loose_units:
+        if breakdown.loose_units == 0 and breakdown.box_count > 0:
+            raise HTTPException(status_code=400, detail="box_count required for box scan")
         raise HTTPException(
             status_code=409,
             detail=(

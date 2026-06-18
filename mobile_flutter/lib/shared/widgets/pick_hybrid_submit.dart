@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/app_state/app_locale.dart';
 import '../../core/router/scanner_args.dart';
+import '../../features/product_boxes/data/product_box_models.dart';
+import '../../features/product_boxes/data/product_box_repository.dart';
 import '../../features/scanner/data/scanner_repository.dart';
 import '../../l10n/string_lookup.dart';
 import 'pick_box_qty_fields.dart';
@@ -95,6 +97,43 @@ Future<HybridBoxScanResult> resolveHybridProductBarcode(
     // Qo'lda kiritilgan kod — faqat matn sifatida saqlanadi.
   }
   return HybridBoxScanResult(barcode: trimmed);
+}
+
+/// Mahsulot uchun ro'yxatdan o'tgan quti (dona barcode dan farq qilishi mumkin).
+Future<({int? unitsPerBox, String? boxBarcode})> loadHybridProductBoxHint(
+  ProductBoxRepository repo,
+  String? productId,
+) async {
+  final String id = productId?.trim() ?? '';
+  if (id.isEmpty) {
+    return (unitsPerBox: null, boxBarcode: null);
+  }
+  try {
+    final List<ProductBoxSummary> boxes = await repo.listByProduct(id);
+    if (boxes.isEmpty) {
+      return (unitsPerBox: null, boxBarcode: null);
+    }
+    final ProductBoxSummary first = boxes.first;
+    return (unitsPerBox: first.unitsPerBox, boxBarcode: first.boxBarcode);
+  } on Object {
+    return (unitsPerBox: null, boxBarcode: null);
+  }
+}
+
+String? hybridBoxOnlyStockValidationMessage({
+  required AppLocale loc,
+  required PickHybridQty hybrid,
+  int? primaryLooseUnits,
+  int? primaryBoxCount,
+}) {
+  if (hybrid.boxCount > 0 || hybrid.looseUnits < 1) {
+    return null;
+  }
+  if (primaryLooseUnits == 0 ||
+      (primaryLooseUnits == null && (primaryBoxCount ?? 0) > 0)) {
+    return StringLookup.t(loc, 'pickUseBoxScan');
+  }
+  return null;
 }
 
 String? hybridPickValidationMessage({

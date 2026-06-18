@@ -310,6 +310,16 @@ int? hybridUnitsPerBoxHint({
   return unitsPerBoxFromAlternateLocations(alternates);
 }
 
+bool hybridShowBoxOnlyHint({
+  int? looseUnits,
+  int? stockBoxCount,
+}) {
+  if (looseUnits == 0) {
+    return true;
+  }
+  return (stockBoxCount ?? 0) > 0 && looseUnits == null;
+}
+
 /// Terish: quti soni + qo'shimcha dona (SegmentedButton yo'q).
 class PickHybridQtyFields extends StatelessWidget {
   const PickHybridQtyFields({
@@ -321,6 +331,7 @@ class PickHybridQtyFields extends StatelessWidget {
     required this.maxUnits,
     required this.onFieldsChanged,
     this.looseUnits,
+    this.stockBoxCount,
   });
 
   final AppLocale loc;
@@ -330,6 +341,7 @@ class PickHybridQtyFields extends StatelessWidget {
   final double maxUnits;
   final VoidCallback onFieldsChanged;
   final int? looseUnits;
+  final int? stockBoxCount;
 
   @override
   Widget build(BuildContext context) {
@@ -341,12 +353,16 @@ class PickHybridQtyFields extends StatelessWidget {
       unitsPerBox: upb,
       maxUnits: maxUnits,
     );
+    final bool showBoxOnlyHint = hybridShowBoxOnlyHint(
+      looseUnits: looseUnits,
+      stockBoxCount: stockBoxCount,
+    );
 
     if (upb == null || upb < 1) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          if (looseUnits != null && looseUnits == 0) ...<Widget>[
+          if (showBoxOnlyHint) ...<Widget>[
             Text(
               StringLookup.t(loc, 'pickUseBoxScan'),
               style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
@@ -377,7 +393,7 @@ class PickHybridQtyFields extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        if (looseUnits != null && looseUnits == 0) ...<Widget>[
+        if (showBoxOnlyHint) ...<Widget>[
           Text(
             StringLookup.t(loc, 'pickUseBoxScan'),
             style: TextStyle(fontSize: 12, color: Colors.orange.shade800),

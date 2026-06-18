@@ -14,6 +14,7 @@ import '../../features/picking/data/picking_models.dart';
 import '../../features/scanner/data/scanner_repository.dart';
 import '../../features/scanner/scanner_providers.dart';
 import '../../features/picking/picking_providers.dart';
+import '../../features/product_boxes/product_box_providers.dart';
 import '../../l10n/string_lookup.dart';
 import '../feedback/app_top_snackbar.dart';
 import '../layout/sheet_bottom_inset.dart';
@@ -314,6 +315,29 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
         productBarcodeCtrl.text = raw;
       }
     }
+    if (unitsPerBox == null || unitsPerBox < 1) {
+      final String? productId = product.productId;
+      if (productId != null && productId.trim().isNotEmpty) {
+        final ({int? unitsPerBox, String? boxBarcode}) boxHint =
+            await loadHybridProductBoxHint(
+          ref.read(productBoxRepositoryProvider),
+          productId,
+        );
+        if (boxHint.unitsPerBox != null && boxHint.unitsPerBox! >= 1) {
+          unitsPerBox = boxHint.unitsPerBox;
+          if ((boxHint.boxBarcode ?? '').trim().isNotEmpty &&
+              boxBarcodeCtrl.text.trim().isEmpty) {
+            boxBarcodeCtrl.text = boxHint.boxBarcode!.trim();
+          }
+          applyHybridQtyDefaults(
+            boxCount: boxCountCtrl,
+            looseQty: looseQtyCtrl,
+            unitsPerBox: unitsPerBox,
+            maxUnits: rem,
+          );
+        }
+      }
+    }
 
     await showModalBottomSheet<void>(
       context: host,
@@ -429,6 +453,7 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                       unitsPerBox: sheetUnitsPerBox,
                       maxUnits: rem,
                       looseUnits: primaryAltHint.looseUnits,
+                      stockBoxCount: primaryAltHint.boxCount,
                       onFieldsChanged: () => setM(() {}),
                     ),
                     const SizedBox(height: 12),
@@ -527,12 +552,66 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                       onPressed: sheetBusy
                           ? null
                           : () async {
-                              final PickHybridQty submitHybrid = pickHybridQtyFromControllers(
+                              if ((sheetUnitsPerBox == null || sheetUnitsPerBox! < 1) &&
+                                  product.productId != null) {
+                                final ({int? unitsPerBox, String? boxBarcode}) boxHint =
+                                    await loadHybridProductBoxHint(
+                                  ref.read(productBoxRepositoryProvider),
+                                  product.productId,
+                                );
+                                if (boxHint.unitsPerBox != null &&
+                                    boxHint.unitsPerBox! >= 1) {
+                                  sheetUnitsPerBox = boxHint.unitsPerBox;
+                                  if (boxBarcodeCtrl.text.trim().isEmpty &&
+                                      (boxHint.boxBarcode ?? '').trim().isNotEmpty) {
+                                    boxBarcodeCtrl.text = boxHint.boxBarcode!.trim();
+                                  }
+                                  applyHybridQtyDefaults(
+                                    boxCount: boxCountCtrl,
+                                    looseQty: looseQtyCtrl,
+                                    unitsPerBox: sheetUnitsPerBox,
+                                    maxUnits: rem,
+                                  );
+                                }
+                              }
+                              if (productBarcodeCtrl.text.trim().isNotEmpty) {
+                                final HybridBoxScanResult productRes =
+                                    await resolveHybridProductBarcode(
+                                  ref.read(scannerRepositoryProvider),
+                                  productBarcodeCtrl.text,
+                                );
+                                if (productRes.unitsPerBox != null &&
+                                    productRes.unitsPerBox! >= 1) {
+                                  sheetUnitsPerBox = productRes.unitsPerBox;
+                                  applyHybridQtyDefaults(
+                                    boxCount: boxCountCtrl,
+                                    looseQty: looseQtyCtrl,
+                                    unitsPerBox: sheetUnitsPerBox,
+                                    maxUnits: rem,
+                                  );
+                                }
+                              }
+                              final PickHybridQty submitHybrid =
+                                  pickHybridQtyFromControllers(
                                 boxCount: boxCountCtrl,
                                 looseQty: looseQtyCtrl,
                                 unitsPerBox: sheetUnitsPerBox,
                                 maxUnits: rem,
                               );
+                              final String? boxOnlyValidation =
+                                  hybridBoxOnlyStockValidationMessage(
+                                loc: loc,
+                                hybrid: submitHybrid,
+                                primaryLooseUnits: primaryAltHint.looseUnits,
+                                primaryBoxCount: primaryAltHint.boxCount,
+                              );
+                              if (boxOnlyValidation != null) {
+                                showAppSnackBar(
+                                  host,
+                                  SnackBar(content: Text(boxOnlyValidation)),
+                                );
+                                return;
+                              }
                               final String? validation = hybridPickValidationMessage(
                                 loc: loc,
                                 hybrid: submitHybrid,

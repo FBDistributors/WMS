@@ -30,6 +30,7 @@ import '../data/return_session_storage.dart';
 import '../data/picking_models.dart';
 import '../../scanner/data/scanner_repository.dart';
 import '../../scanner/scanner_providers.dart';
+import '../../product_boxes/product_box_providers.dart';
 import '../domain/pick_line_list_logic.dart';
 import '../domain/pick_scan_resolution.dart';
 import '../domain/profile_type_param.dart';
@@ -1103,6 +1104,29 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
           }
         }
       }
+      if (hybridUnitsPerBox == null || hybridUnitsPerBox < 1) {
+        final String? productId = pickTargetHolder[0].productId;
+        if (productId != null && productId.trim().isNotEmpty) {
+          final ({int? unitsPerBox, String? boxBarcode}) boxHint =
+              await loadHybridProductBoxHint(
+            ref.read(productBoxRepositoryProvider),
+            productId,
+          );
+          if (boxHint.unitsPerBox != null && boxHint.unitsPerBox! >= 1) {
+            hybridUnitsPerBox = boxHint.unitsPerBox;
+            if ((boxHint.boxBarcode ?? '').trim().isNotEmpty &&
+                hybridBoxBarcode.text.trim().isEmpty) {
+              hybridBoxBarcode.text = boxHint.boxBarcode!.trim();
+            }
+            applyHybridQtyDefaults(
+              boxCount: hybridBoxCount,
+              looseQty: hybridLooseQty,
+              unitsPerBox: hybridUnitsPerBox,
+              maxUnits: remPick,
+            );
+          }
+        }
+      }
     }
 
     try {
@@ -1312,6 +1336,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                         maxUnits: pickTargetHolder[0].qtyRequired -
                             pickTargetHolder[0].qtyPicked,
                         looseUnits: primaryAltHint.looseUnits,
+                        stockBoxCount: primaryAltHint.boxCount,
                         onFieldsChanged: () => setM(() {}),
                       ),
                       const SizedBox(height: 12),
@@ -1420,12 +1445,66 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                             : () async {
                             final double rem = pickTargetHolder[0].qtyRequired -
                                 pickTargetHolder[0].qtyPicked;
-                            final PickHybridQty hybrid = pickHybridQtyFromControllers(
+                            if ((hybridUnitsPerBox == null || hybridUnitsPerBox! < 1) &&
+                                pickTargetHolder[0].productId != null) {
+                              final ({int? unitsPerBox, String? boxBarcode}) boxHint =
+                                  await loadHybridProductBoxHint(
+                                ref.read(productBoxRepositoryProvider),
+                                pickTargetHolder[0].productId,
+                              );
+                              if (boxHint.unitsPerBox != null &&
+                                  boxHint.unitsPerBox! >= 1) {
+                                hybridUnitsPerBox = boxHint.unitsPerBox;
+                                if (hybridBoxBarcode.text.trim().isEmpty &&
+                                    (boxHint.boxBarcode ?? '').trim().isNotEmpty) {
+                                  hybridBoxBarcode.text = boxHint.boxBarcode!.trim();
+                                }
+                                applyHybridQtyDefaults(
+                                  boxCount: hybridBoxCount,
+                                  looseQty: hybridLooseQty,
+                                  unitsPerBox: hybridUnitsPerBox,
+                                  maxUnits: rem,
+                                );
+                              }
+                            }
+                            if (hybridProductBarcode.text.trim().isNotEmpty) {
+                              final HybridBoxScanResult productRes =
+                                  await resolveHybridProductBarcode(
+                                ref.read(scannerRepositoryProvider),
+                                hybridProductBarcode.text,
+                              );
+                              if (productRes.unitsPerBox != null &&
+                                  productRes.unitsPerBox! >= 1) {
+                                hybridUnitsPerBox = productRes.unitsPerBox;
+                                applyHybridQtyDefaults(
+                                  boxCount: hybridBoxCount,
+                                  looseQty: hybridLooseQty,
+                                  unitsPerBox: hybridUnitsPerBox,
+                                  maxUnits: rem,
+                                );
+                              }
+                            }
+                            PickHybridQty hybrid = pickHybridQtyFromControllers(
                               boxCount: hybridBoxCount,
                               looseQty: hybridLooseQty,
                               unitsPerBox: hybridUnitsPerBox,
                               maxUnits: rem,
                             );
+                            final String? boxOnlyValidation =
+                                hybridBoxOnlyStockValidationMessage(
+                              loc: loc,
+                              hybrid: hybrid,
+                              primaryLooseUnits: primaryAltHint.looseUnits,
+                              primaryBoxCount: primaryAltHint.boxCount,
+                            );
+                            if (boxOnlyValidation != null) {
+                              _rejectScanHaptic();
+                              showAppSnackBar(
+                                context,
+                                SnackBar(content: Text(boxOnlyValidation)),
+                              );
+                              return;
+                            }
                             final String? validation = hybridPickValidationMessage(
                               loc: loc,
                               hybrid: hybrid,
