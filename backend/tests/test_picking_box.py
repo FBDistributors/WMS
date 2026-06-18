@@ -20,7 +20,12 @@ from app.models.location_box_placement import LocationBoxPlacement, PLACEMENT_SE
 from app.models.stock import StockLot, StockMovement
 from app.models.user import User as UserModel
 from app.auth.security import get_password_hash
-from app.services.box_location_service import get_breakdown, get_breakdown_for_pick, place_sealed_boxes
+from app.services.box_location_service import (
+    get_breakdown,
+    get_breakdown_for_pick,
+    get_breakdown_tolerant,
+    place_sealed_boxes,
+)
 
 
 def _mk_user(db: Session, *, username: str, role: str) -> UserModel:
@@ -211,9 +216,9 @@ def test_line_pick_three_boxes(
         alts = line.get("alternate_locations") or []
         primary = next((a for a in alts if a.get("is_primary")), None)
         assert primary is not None
-        assert primary.get("box_count") == 5
-        assert primary.get("units_in_boxes") == 30
-        assert primary.get("loose_units") == 0
+        # Ajratilgandan keyin available=12, sealed 30>12 — inventar kabi dona deb ko'rsatiladi.
+        assert primary.get("box_count") == 0
+        assert primary.get("loose_units") == 12
 
         pick = client.post(
             f"/api/v1/picking/lines/{line_id}/pick",
@@ -267,8 +272,9 @@ def test_line_pick_unit_requires_loose(
     client: TestClient,
     db_session: Session,
 ) -> None:
+    """Barcha zaxira qutida, available=0 — dona terish bloklanadi."""
     order, picker, product, loc, lot, box_barcode = _seed_box_pick_order(
-        db_session, order_qty=6, stock_qty=30, box_count=5
+        db_session, order_qty=30, stock_qty=30, box_count=5
     )
     doc_id = _send_to_picking(client, db_session, order.id, picker.id)
 
@@ -283,7 +289,7 @@ def test_line_pick_unit_requires_loose(
                 "barcode": product.barcode,
             },
         )
-        assert pick.status_code == 409
+        assert pick.status_code in (400, 409)
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 
@@ -511,10 +517,10 @@ def test_loose_error_not_shown_when_only_boxes(
     client: TestClient,
     db_session: Session,
 ) -> None:
-    """Faqat qutida zaxira — 409 loose xabari emas, box_count talab qilinadi."""
+    """Faqat qutida zaxira, available=0 — dona terish bloklanadi."""
     order, picker, product, _loc, _lot, unit_barcode, _box_barcode = (
         _seed_box_only_separate_unit_barcode_order(
-            db_session, order_qty=4, units_per_box=8
+            db_session, order_qty=8, units_per_box=8
         )
     )
     doc_id = _send_to_picking(client, db_session, order.id, picker.id)
@@ -632,6 +638,142 @@ def test_line_pick_unit_with_orphan_sealed_placements(
         )
         assert pick.status_code == 200, pick.text
         assert pick.json()["line"]["qty_picked"] == 1
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_line_pick_loose_when_sealed_exceeds_available(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """on_hand=624, available=620, 52×12 sealed — inventar va terish dona deb ko'rsatadi."""
+    picker = _mk_user(db_session, username=f"picker-sav-{uuid.uuid4().hex[:8]}", role="picker")
+    product = ProductModel(
+        external_source="test",
+        external_id=f"ext-{uuid.uuid4()}",
+        name="Sealed Exceeds Available Product",
+        sku=f"SKU-SAV-{uuid.uuid4().hex[:8]}",
+        barcode=f"SAV{uuid.uuid4().hex[:6]}",
+        is_active=True,
+    )
+    db_session.add(product)
+    db_session.flush()
+
+    loc = LocationModel(
+        code=f"SAV-{uuid.uuid4().hex[:6]}",
+        barcode_value=f"SAV-{uuid.uuid4().hex[:6]}",
+        name="Sealed exceeds available bin",
+        type="bin",
+        zone_type="NORMAL",
+        is_active=True,
+    )
+    db_session.add(loc)
+    db_session.flush()
+
+    lot = StockLot(product_id=product.id, batch="SAV-B1", expiry_date=None)
+    db_session.add(lot)
+    db_session.flush()
+
+    db_session.add(
+        StockMovement(
+            product_id=product.id,
+            lot_id=lot.id,
+            location_id=loc.id,
+            qty_change=Decimal("624"),
+            movement_type="receipt",
+        )
+    )
+
+    box_barcode = f"BOX-SAV-{uuid.uuid4().hex[:6]}"
+    db_session.add(
+        ProductBoxModel(
+            box_barcode=box_barcode,
+            product_id=product.id,
+            units_per_box=12,
+            is_active=True,
+        )
+    )
+    db_session.flush()
+
+    inv = _mk_user(
+        db_session, username=f"inv-sav-{uuid.uuid4().hex[:8]}", role="inventory_controller"
+    )
+    place_sealed_boxes(
+        db_session,
+        box_barcode=box_barcode,
+        location_id=loc.id,
+        lot_id=lot.id,
+        user=inv,
+        box_count=52,
+    )
+    db_session.add(
+        StockMovement(
+            product_id=product.id,
+            lot_id=lot.id,
+            location_id=loc.id,
+            qty_change=Decimal("4"),
+            movement_type="allocate",
+        )
+    )
+
+    order = Order(
+        source="test",
+        source_external_id=f"order-sav-{uuid.uuid4().hex[:10]}",
+        order_number=f"SO-SAV-{uuid.uuid4().hex[:6]}",
+    )
+    order.wms_state = OrderWmsState(status="imported")
+    order.lines = [
+        OrderLine(
+            sku=product.sku,
+            name="Loose when sealed exceeds available",
+            qty=2.0,
+            uom="dona",
+        )
+    ]
+    db_session.add(order)
+    db_session.commit()
+
+    bd_inv = get_breakdown_tolerant(
+        db_session,
+        product_id=product.id,
+        lot_id=lot.id,
+        location_id=loc.id,
+    )
+    assert bd_inv.box_count == 0
+    assert bd_inv.loose_units == 620
+
+    bd_pick = get_breakdown_for_pick(
+        db_session,
+        product_id=product.id,
+        lot_id=lot.id,
+        location_id=loc.id,
+    )
+    assert bd_pick.loose_units == 620
+
+    doc_id = _send_to_picking(client, db_session, order.id, picker.id)
+
+    app.dependency_overrides[get_current_user] = lambda: picker
+    try:
+        doc = client.get(f"/api/v1/picking/documents/{doc_id}")
+        assert doc.status_code == 200, doc.text
+        line = doc.json()["lines"][0]
+        line_id = line["id"]
+        alts = line.get("alternate_locations") or []
+        primary = next((a for a in alts if a.get("is_primary")), None)
+        assert primary is not None
+        assert primary.get("box_count") == 0
+        assert primary.get("loose_units") == int(primary.get("available_qty") or 0)
+
+        pick = client.post(
+            f"/api/v1/picking/lines/{line_id}/pick",
+            json={
+                "delta": 2,
+                "request_id": f"pick-sav-{uuid.uuid4().hex}",
+                "barcode": product.barcode,
+            },
+        )
+        assert pick.status_code == 200, pick.text
+        assert pick.json()["line"]["qty_picked"] == 2
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 

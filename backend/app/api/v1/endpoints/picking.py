@@ -380,8 +380,8 @@ def _breakdown_kwargs_map_for_pairs(
     balances: dict[tuple[UUID, UUID], tuple[float, float]],
 ) -> dict[tuple[UUID, UUID], dict]:
     """
-    `get_breakdown_for_pick` natijasini barcha (lot, lokatsiya) juftliklari uchun
-    bitta guruhlangan so'rovda hisoblaydi — hujjat ekrani uchun N+1 so'rov o'rniga.
+    Inventar bilan bir xil: barcha (lot, lokatsiya) juftliklari uchun quti breakdown
+    `available` asosida — hujjat ekrani uchun N+1 so'rov o'rniga.
     `balances`: (lot_id, location_id) -> (on_hand, available).
     """
     if not pairs:
@@ -408,8 +408,8 @@ def _breakdown_kwargs_map_for_pairs(
     }
     out: dict[tuple[UUID, UUID], dict] = {}
     for key in pairs:
-        on_hand, available = balances.get(key, (0.0, 0.0))
-        total = max(0, int(on_hand))
+        _on_hand, available = balances.get(key, (0.0, 0.0))
+        total = max(0, int(available))
         box_count, units_in_boxes = boxes.get(key, (0, 0))
         bc, uib, loose = pair_box_loose_from_available(total, box_count, units_in_boxes)
         out[key] = {

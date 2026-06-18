@@ -185,11 +185,17 @@ def get_breakdown_for_pick(
     lot = db.get(StockLotModel, lot_id)
     if not lot or lot.product_id != product_id:
         raise HTTPException(status_code=400, detail="Invalid lot for product")
-    on_hand, _reserved, _available = compute_lot_location_balances(db, lot_id, location_id)
-    total = max(0, int(on_hand))
+    on_hand, _reserved, available = compute_lot_location_balances(db, lot_id, location_id)
+    total_oh = max(0, int(on_hand))
+    total_av = max(0, int(available))
     box_count, units_in_boxes, sealed = _units_in_boxes_for_lot_location(db, lot_id, location_id)
-    inconsistent = units_in_boxes > total
-    bc, uib, loose = pair_box_loose_from_available(total, box_count, units_in_boxes)
+    bc, uib, loose_oh = pair_box_loose_from_available(total_oh, box_count, units_in_boxes)
+    if units_in_boxes > total_av:
+        _, _, loose_av = pair_box_loose_from_available(total_av, box_count, units_in_boxes)
+        loose = max(loose_oh, loose_av)
+    else:
+        loose = loose_oh
+    inconsistent = units_in_boxes > total_oh or units_in_boxes > total_av
     return LocationBoxBreakdown(
         product_id=product_id,
         lot_id=lot_id,
@@ -197,7 +203,7 @@ def get_breakdown_for_pick(
         box_count=bc,
         units_in_boxes=uib,
         loose_units=loose,
-        total_units=total,
+        total_units=total_oh,
         sealed_boxes=sealed,
         data_inconsistent=inconsistent,
     )
