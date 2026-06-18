@@ -91,8 +91,7 @@ class _AppFeedbackSheetState extends ConsumerState<AppFeedbackSheet> {
       );
     } on Exception catch (e) {
       if (mounted) {
-        final String msg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
-        showAppSnackBar(context, SnackBar(content: Text(msg)));
+        showAppLocalizedError(context, loc, e);
       }
     } finally {
       if (mounted) {

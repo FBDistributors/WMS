@@ -15,6 +15,7 @@ import '../../product_boxes/data/box_location_models.dart';
 import '../../product_boxes/data/product_box_models.dart';
 import '../../product_boxes/data/product_box_repository.dart';
 import '../../product_boxes/product_box_providers.dart';
+import '../../../core/errors/api_error_localization.dart';
 import '../../../shared/feedback/app_top_snackbar.dart';
 import '../../../shared/input/input_clear_button.dart';
 import '../../../shared/input/stock_quantity_input.dart';
@@ -301,7 +302,7 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
       });
     } on Exception catch (e) {
       if (mounted) {
-        showAppSnackBar(context, SnackBar(content: Text('$e')));
+        showAppLocalizedError(context, loc, e);
       }
     }
   }
@@ -409,7 +410,7 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
         final String msg = '$e';
         final String text = msg.contains('already exists')
             ? StringLookup.t(loc, 'inventoryBoxAlreadyExists')
-            : msg;
+            : localizeApiErrorMessage(loc, e);
         showAppSnackBar(context, SnackBar(content: Text(text)));
       }
       return false;
@@ -532,7 +533,7 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
     } on InventoryBoxSavePartialFailure catch (e) {
       await _loadBreakdown();
       if (mounted) {
-        showAppSnackBar(context, SnackBar(content: Text('${e.cause}')));
+        showAppLocalizedError(context, loc, e.cause ?? e);
       }
     } on StockMovementForbiddenException {
       if (mounted) {
@@ -571,7 +572,7 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
           );
         }
       } else if (mounted) {
-        showAppSnackBar(context, SnackBar(content: Text(msg)));
+        showAppLocalizedError(context, loc, e);
       }
     } finally {
       if (mounted) {

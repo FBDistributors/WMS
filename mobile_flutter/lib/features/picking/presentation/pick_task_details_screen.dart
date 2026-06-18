@@ -160,21 +160,10 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       if (!mounted) {
         return;
       }
-      final Color iconColor = Colors.green.shade700;
-      showAppSnackBar(context,
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 3),
-          content: Row(
-            children: <Widget>[
-              Icon(Icons.check_circle_rounded, color: iconColor, size: 22),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(StringLookup.t(loc, 'controllerPositionVerified')),
-              ),
-            ],
-          ),
-        ),
+      showAppTopSuccess(
+        context,
+        StringLookup.t(loc, 'controllerPositionVerified'),
+        duration: const Duration(seconds: 3),
       );
     });
   }
@@ -1912,6 +1901,9 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
               isPickerList ? orderedPickerLines(d.lines) : const <PickingLine>[];
           final int listItemCount =
               isPickerList ? orderedPickerLinesList.length : orderedGroups.length;
+          final PickPositionProgress positionProgress = isPickerList
+              ? pickPositionProgressPicker(d.lines)
+              : pickPositionProgressController(d.lines, _verifiedLineIds);
 
           final String? sidRaw = d.safeCancelReturnSessionId;
           final bool cancelBlock = profile == PickerProfileParam.picker &&
@@ -1941,7 +1933,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                           visualDensity: VisualDensity.compact,
                         ),
                         Text(
-                          '${StringLookup.t(loc, 'picked')}: ${formatPickQty(d.progress.picked)} / ${formatPickQty(d.progress.required)}',
+                          '${StringLookup.t(loc, 'picked')}: ${positionProgress.done} / ${positionProgress.total}',
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),

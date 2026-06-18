@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_flutter/core/app_state/app_locale.dart';
 import 'package:mobile_flutter/core/errors/api_error_localization.dart';
+import 'package:mobile_flutter/l10n/string_lookup.dart';
 
 void main() {
   test('localizeApiErrorMessage maps inconsistent breakdown to Russian', () {
@@ -24,12 +25,20 @@ void main() {
     expect(ru, contains('коробку'));
   });
 
-  test('localizeApiErrorMessage strips Exception prefix', () {
+  test('localizeApiErrorMessage strips Exception prefix and falls back for unknown', () {
     final String msg = localizeApiErrorMessage(
       AppLocale.uz,
       Exception('Some other error'),
     );
-    expect(msg, 'Some other error');
+    expect(msg, StringLookup.t(AppLocale.uz, 'operationFailed'));
+  });
+
+  test('localizeApiErrorMessage operationFailed in English', () {
+    final String en = localizeApiErrorMessage(
+      AppLocale.en,
+      Exception('Network timeout'),
+    );
+    expect(en, StringLookup.t(AppLocale.en, 'operationFailed'));
   });
 
   test('localizeApiErrorMessage maps box_count required for box scan', () {

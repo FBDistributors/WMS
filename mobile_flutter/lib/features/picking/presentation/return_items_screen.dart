@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../core/app_state/network_status_provider.dart';
 import '../../../core/router/scanner_args.dart';
@@ -137,10 +138,7 @@ class _ReturnItemsScreenState extends ConsumerState<ReturnItemsScreen> {
       });
     } on Exception catch (e) {
       if (mounted) {
-        showAppSnackBar(
-          context,
-          SnackBar(content: Text('$e'), backgroundColor: Colors.red.shade800),
-        );
+        showAppLocalizedError(context, ref.read(appLocaleProvider), e);
       }
     } finally {
       if (mounted) {
@@ -199,10 +197,7 @@ class _ReturnItemsScreenState extends ConsumerState<ReturnItemsScreen> {
           context.goNamed('pickerHome', queryParameters: const <String, String>{'profile': 'picker'});
           return;
         }
-        showAppSnackBar(
-          context,
-          SnackBar(content: Text(msg), backgroundColor: Colors.red.shade800),
-        );
+        showAppLocalizedError(context, ref.read(appLocaleProvider), e);
       }
     } finally {
       if (mounted) {

@@ -343,11 +343,7 @@ class _CustomerReturnDetailScreenState
                               }
                             } on Exception catch (e) {
                               if (mounted) {
-                                showAppSnackBar(
-                                  context,
-                                  SnackBar(content: Text('$e')),
-                                  type: AppToastType.error,
-                                );
+                                showAppLocalizedError(context, loc, e);
                               }
                             }
                           },
@@ -408,17 +404,13 @@ class _CustomerReturnDetailScreenState
       if (!mounted) {
         return;
       }
-      showAppTopSuccess(context, 'Yakunlandi');
+      showAppTopSuccess(context, StringLookup.t(loc, 'returnsCompleted'));
       context.pop();
     } on Exception catch (e) {
       if (!mounted) {
         return;
       }
-      showAppSnackBar(
-        context,
-        SnackBar(content: Text('$e')),
-        type: AppToastType.error,
-      );
+      showAppLocalizedError(context, loc, e);
     } finally {
       if (mounted) {
         setState(() => _submitting = false);

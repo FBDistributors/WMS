@@ -295,7 +295,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
       }
     } on Exception catch (e) {
       if (mounted) {
-        showAppSnackBar(context, SnackBar(content: Text('$e')));
+        showAppLocalizedError(context, ref.read(appLocaleProvider), e);
       }
     } finally {
       if (mounted) {
@@ -379,7 +379,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
       }
     } on Exception catch (e) {
       if (mounted) {
-        showAppSnackBar(context, SnackBar(content: Text('$e')));
+        showAppLocalizedError(context, ref.read(appLocaleProvider), e);
       }
     } finally {
       if (mounted) {
@@ -473,7 +473,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
       }
     } on Exception catch (e) {
       if (mounted) {
-        showAppSnackBar(context, SnackBar(content: Text('$e')));
+        showAppLocalizedError(context, ref.read(appLocaleProvider), e);
       }
     } finally {
       if (mounted) {

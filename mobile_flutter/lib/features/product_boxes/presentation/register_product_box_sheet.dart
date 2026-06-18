@@ -6,6 +6,7 @@ import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../core/router/scanner_args.dart';
 import '../../../l10n/string_lookup.dart';
+import '../../../core/errors/api_error_localization.dart';
 import '../../../shared/feedback/app_top_snackbar.dart';
 import '../../../shared/input/stock_quantity_input.dart';
 import '../../../shared/widgets/scan_action_button.dart';
@@ -90,7 +91,7 @@ class _RegisterProductBoxSheetState extends ConsumerState<RegisterProductBoxShee
       final String msg = '$e';
       final String text = msg.contains('already exists')
           ? StringLookup.t(loc, 'inventoryBoxAlreadyExists')
-          : msg;
+          : localizeApiErrorMessage(loc, e);
       showAppSnackBar(context, SnackBar(content: Text(text)));
     } finally {
       if (mounted) {

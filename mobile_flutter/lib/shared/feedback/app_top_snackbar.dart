@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../core/app_state/app_locale.dart';
+import '../../core/errors/api_error_localization.dart';
+
 enum AppToastType { success, error, warning, info }
 
 const Duration _kTopSnackMinComfort = Duration(seconds: 3);
@@ -220,6 +223,14 @@ void showAppTopSuccess(
       showCloseIcon: false,
     ),
     type: AppToastType.success,
+  );
+}
+
+void showAppLocalizedError(BuildContext context, AppLocale loc, Object error) {
+  showAppSnackBar(
+    context,
+    SnackBar(content: Text(localizeApiErrorMessage(loc, error))),
+    type: AppToastType.error,
   );
 }
 

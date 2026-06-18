@@ -63,5 +63,5 @@ String localizeApiErrorMessage(AppLocale loc, Object error) {
     return StringLookup.t(loc, 'pickBarcodeRequiredHybrid');
   }
 
-  return raw;
+  return StringLookup.t(loc, 'operationFailed');
 }

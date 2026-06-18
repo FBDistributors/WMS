@@ -159,7 +159,7 @@ class _InventoryPackBoxPanelState extends ConsumerState<InventoryPackBoxPanel> {
     } on ProductBoxNotFoundException {
       await _openRegisterSheet(barcode);
     } on Exception catch (e) {
-      showAppSnackBar(context, SnackBar(content: Text('$e')));
+      showAppLocalizedError(context, loc, e);
     }
   }
 
@@ -274,7 +274,7 @@ class _InventoryPackBoxPanelState extends ConsumerState<InventoryPackBoxPanel> {
       widget.onPlaced?.call(result);
     } on Exception catch (e) {
       if (mounted) {
-        showAppSnackBar(context, SnackBar(content: Text('$e')));
+        showAppLocalizedError(context, loc, e);
       }
     } finally {
       if (mounted) {

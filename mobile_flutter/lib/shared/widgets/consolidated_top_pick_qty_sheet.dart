@@ -303,7 +303,7 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
       await widget.ref.read(consolidatedViewProvider.notifier).refreshFromNetwork();
     } on Exception catch (e) {
       if (widget.host.mounted) {
-        showAppSnackBar(widget.host, SnackBar(content: Text('$e')));
+        showAppLocalizedError(widget.host, widget.loc, e);
       }
     } finally {
       if (mounted) {

@@ -158,7 +158,7 @@ class _InventoryUnpackBoxPanelState extends ConsumerState<InventoryUnpackBoxPane
         SnackBar(content: Text(StringLookup.t(loc, 'inventoryBoxNotFound'))),
       );
     } on Exception catch (e) {
-      showAppSnackBar(context, SnackBar(content: Text('$e')));
+      showAppLocalizedError(context, loc, e);
     }
   }
 
@@ -305,7 +305,7 @@ class _InventoryUnpackBoxPanelState extends ConsumerState<InventoryUnpackBoxPane
             widget.onRemoved?.call(result);
           }
         } else {
-          showAppSnackBar(context, SnackBar(content: Text('$e')));
+          showAppLocalizedError(context, loc, e);
         }
       }
     } finally {

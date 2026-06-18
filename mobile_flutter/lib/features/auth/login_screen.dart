@@ -103,7 +103,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final String lower = raw.toLowerCase();
       final bool badCreds = raw.contains(unauthorizedMessage) ||
           lower.contains('invalid credentials');
-      msg = badCreds ? StringLookup.t(loc, 'invalidCredentialsError') : raw;
+      msg = badCreds ? StringLookup.t(loc, 'invalidCredentialsError') : StringLookup.t(loc, 'operationFailed');
     } else {
       msg = StringLookup.t(loc, 'loginError');
     }

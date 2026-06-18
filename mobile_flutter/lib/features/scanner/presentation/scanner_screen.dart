@@ -10,6 +10,7 @@ import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../core/router/scanner_args.dart';
 import '../../../l10n/string_lookup.dart';
+import '../../../core/errors/api_error_localization.dart';
 import '../../../shared/feedback/app_top_snackbar.dart';
 import '../../customer_returns/customer_returns_providers.dart';
 import '../../inventory/presentation/inventory_barcode_resolve_extra.dart';
@@ -163,7 +164,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         }
       } on Exception catch (e) {
         if (mounted) {
-          _showError('$e');
+          _showLocalizedError(locProduct, e);
           _resumeScan();
         }
       } finally {
@@ -214,7 +215,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         }
       } on Exception catch (e) {
         if (mounted) {
-          _showError('$e');
+          _showLocalizedError(locResolve, e);
           _resumeScan();
         }
       } finally {
@@ -245,15 +246,18 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
             queryParameters: <String, String>{'scannedLocationCode': out.locationCode!},
           );
         } else if (out.type == ScannerResolveType.product) {
-          _showError('Lokatsiya kutilmoqda (palet), mahsulot emas');
+          _showError(StringLookup.t(ref.read(appLocaleProvider), 'movementPalletExpectLocation'));
           _resumeScan();
         } else {
-          _showError(out.message ?? 'Lokatsiya aniqlanmadi');
+          _showError(
+            out.message ??
+                StringLookup.t(ref.read(appLocaleProvider), 'returnsLocationScanUnknown'),
+          );
           _resumeScan();
         }
       } on Exception catch (e) {
         if (mounted) {
-          _showError('$e');
+          _showLocalizedError(ref.read(appLocaleProvider), e);
           _resumeScan();
         }
       } finally {
@@ -288,15 +292,18 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
             },
           );
         } else if (out.type == ScannerResolveType.product) {
-          _showError('Lokatsiya skanerlang');
+          _showError(StringLookup.t(ref.read(appLocaleProvider), 'movementScanLocationRequired'));
           _resumeScan();
         } else {
-          _showError(out.message ?? 'Lokatsiya topilmadi');
+          _showError(
+            out.message ??
+                StringLookup.t(ref.read(appLocaleProvider), 'movementLocationNotFound'),
+          );
           _resumeScan();
         }
       } on Exception catch (e) {
         if (mounted) {
-          _showError('$e');
+          _showLocalizedError(ref.read(appLocaleProvider), e);
           _resumeScan();
         }
       } finally {
@@ -362,6 +369,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     HapticFeedback.heavyImpact();
     showAppSnackBar(context, SnackBar(content: Text(msg)));
     _resetScanGuards();
+  }
+
+  void _showLocalizedError(AppLocale loc, Object error) {
+    _showError(localizeApiErrorMessage(loc, error));
   }
 
   void _handleBack() {

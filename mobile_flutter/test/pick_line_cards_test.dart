@@ -112,4 +112,74 @@ void main() {
       expect(resolved?.locationCode, 'P-B-02');
     });
   });
+
+  group('pickPositionProgressPicker', () {
+    test('counts done lines not quantities', () {
+      final List<PickingLine> lines = <PickingLine>[
+        _line(id: 'a', locationCode: 'P-AO-01', qtyRequired: 3, qtyPicked: 3),
+        _line(id: 'b', locationCode: 'P-B-02', qtyRequired: 2, qtyPicked: 0),
+      ];
+
+      final PickPositionProgress progress = pickPositionProgressPicker(lines);
+
+      expect(progress.done, 1);
+      expect(progress.total, 2);
+    });
+
+    test('all lines done gives full position count', () {
+      final List<PickingLine> lines = <PickingLine>[
+        _line(id: 'a', locationCode: 'P-AO-01', qtyRequired: 2, qtyPicked: 2),
+        _line(id: 'b', locationCode: 'P-AS-03', qtyRequired: 1, qtyPicked: 1),
+      ];
+
+      final PickPositionProgress progress = pickPositionProgressPicker(lines);
+
+      expect(progress.done, 2);
+      expect(progress.total, 2);
+    });
+  });
+
+  group('pickPositionProgressController', () {
+    test('counts product groups not unit quantities', () {
+      final List<PickingLine> lines = <PickingLine>[
+        _line(
+          id: 'scrub-a',
+          locationCode: 'P-AU-01',
+          productId: 'prod-strawberry',
+          barcode: '4607953918404',
+          qtyRequired: 2,
+          qtyPicked: 2,
+        ),
+        _line(
+          id: 'scrub-b',
+          locationCode: 'P-AS-03',
+          productId: 'prod-mango',
+          barcode: '4607953918350',
+          qtyRequired: 1,
+          qtyPicked: 1,
+        ),
+      ];
+
+      final PickPositionProgress progress =
+          pickPositionProgressController(lines, <String>{});
+
+      expect(progress.done, 2);
+      expect(progress.total, 2);
+    });
+
+    test('verified group counts as done even if not fully picked', () {
+      final List<PickingLine> lines = <PickingLine>[
+        _line(id: 'a', locationCode: 'P-AO-01', productId: 'p1', qtyRequired: 3, qtyPicked: 1),
+        _line(id: 'b', locationCode: 'P-B-02', productId: 'p2', qtyRequired: 2, qtyPicked: 0),
+      ];
+
+      final PickPositionProgress progress = pickPositionProgressController(
+        lines,
+        <String>{'a'},
+      );
+
+      expect(progress.done, 1);
+      expect(progress.total, 2);
+    });
+  });
 }

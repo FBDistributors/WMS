@@ -113,6 +113,32 @@ bool pickLineGroupFullyVerified(PickLineGroup g, Set<String> verifiedLineIds) {
   return g.members.every((PickingLine l) => verifiedLineIds.contains(l.id));
 }
 
+typedef PickPositionProgress = ({int done, int total});
+
+bool pickPositionDonePicker(PickingLine line) => pickingLineEffectivelyDone(line);
+
+bool pickPositionDoneController(PickLineGroup group, Set<String> verifiedLineIds) =>
+    pickLineGroupEffectivelyDone(group) ||
+    pickLineGroupFullyVerified(group, verifiedLineIds);
+
+PickPositionProgress pickPositionProgressPicker(List<PickingLine> lines) {
+  final int total = lines.length;
+  final int done = lines.where(pickPositionDonePicker).length;
+  return (done: done, total: total);
+}
+
+PickPositionProgress pickPositionProgressController(
+  List<PickingLine> lines,
+  Set<String> verifiedLineIds,
+) {
+  final List<PickLineGroup> groups = groupLinesByProduct(lines);
+  final int total = groups.length;
+  final int done = groups
+      .where((PickLineGroup g) => pickPositionDoneController(g, verifiedLineIds))
+      .length;
+  return (done: done, total: total);
+}
+
 List<PickLineGroup> orderedLineGroupsController(
   List<PickLineGroup> groups,
   Set<String> verifiedLineIds,

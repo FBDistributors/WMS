@@ -916,7 +916,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       );
     } on Exception catch (e) {
       if (mounted) {
-        showAppSnackBar(context, SnackBar(content: Text('$e')));
+        showAppLocalizedError(context, loc, e);
       }
     }
   }
@@ -1008,7 +1008,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       }
     } on Exception catch (e) {
       if (mounted) {
-        showAppSnackBar(context, SnackBar(content: Text('$e')));
+        showAppLocalizedError(context, locMsg, e);
       }
     } finally {
       if (mounted) {
@@ -1151,7 +1151,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       }
     } on Exception catch (e) {
       if (mounted) {
-        showAppSnackBar(context, SnackBar(content: Text('$e')));
+        showAppLocalizedError(context, locMsg, e);
       }
     } finally {
       if (mounted) {

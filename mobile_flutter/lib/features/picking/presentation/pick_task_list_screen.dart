@@ -219,10 +219,7 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
       }
     } on Exception catch (e) {
       if (mounted) {
-        showAppSnackBar(
-          context,
-          SnackBar(content: Text('$e')),
-        );
+        showAppLocalizedError(context, ref.read(appLocaleProvider), e);
       }
       return;
     }
@@ -311,7 +308,7 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
                   await _openControllerModal(doc);
                 } on Exception catch (e) {
                   if (ctx.mounted) {
-                    showAppSnackBar(ctx, SnackBar(content: Text('$e')));
+                    showAppLocalizedError(ctx, ref.read(appLocaleProvider), e);
                   }
                 } finally {
                   if (context.mounted) {
@@ -390,10 +387,7 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
       }
     } on Exception catch (e) {
       if (mounted) {
-        showAppSnackBar(
-          context,
-          SnackBar(content: Text('$e')),
-        );
+        showAppLocalizedError(context, ref.read(appLocaleProvider), e);
       }
       return;
     }
@@ -542,10 +536,7 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
       );
     } on Exception catch (e) {
       if (mounted) {
-        showAppSnackBar(
-          context,
-          SnackBar(content: Text('$e')),
-        );
+        showAppLocalizedError(context, loc, e);
       }
     }
   }
