@@ -1059,8 +1059,12 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       }
     }
     final bool isPickerProfile = profile == PickerProfileParam.picker;
-    int? hybridUnitsPerBox = presetUnitsPerBox ??
-        unitsPerBoxFromAlternateLocations(pickTargetHolder[0].alternateLocations);
+    int? hybridUnitsPerBox = hybridUnitsPerBoxHint(
+      unitsPerBox: presetUnitsPerBox,
+      alternates: pickTargetHolder[0].alternateLocations,
+    );
+    final ({int? looseUnits, int? boxCount}) primaryAltHint =
+        primaryAlternateBoxHint(pickTargetHolder[0].alternateLocations);
     final TextEditingController hybridBoxCount = TextEditingController();
     final TextEditingController hybridLooseQty = TextEditingController();
     final TextEditingController hybridBoxBarcode = TextEditingController();
@@ -1084,6 +1088,19 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
           );
         } else {
           hybridProductBarcode.text = pickerPreset;
+          final HybridBoxScanResult productRes = await resolveHybridProductBarcode(
+            ref.read(scannerRepositoryProvider),
+            pickerPreset,
+          );
+          if (productRes.unitsPerBox != null) {
+            hybridUnitsPerBox = productRes.unitsPerBox;
+            applyHybridQtyDefaults(
+              boxCount: hybridBoxCount,
+              looseQty: hybridLooseQty,
+              unitsPerBox: hybridUnitsPerBox,
+              maxUnits: remPick,
+            );
+          }
         }
       }
     }
@@ -1294,6 +1311,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                         unitsPerBox: hybridUnitsPerBox,
                         maxUnits: pickTargetHolder[0].qtyRequired -
                             pickTargetHolder[0].qtyPicked,
+                        looseUnits: primaryAltHint.looseUnits,
                         onFieldsChanged: () => setM(() {}),
                       ),
                       const SizedBox(height: 12),
@@ -1317,6 +1335,26 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                           }
                         }),
                         onProductBarcodeChanged: () => setM(() {}),
+                        onProductBarcodeSubmitted: (String code) async {
+                          final HybridBoxScanResult result =
+                              await resolveHybridProductBarcode(
+                            ref.read(scannerRepositoryProvider),
+                            code,
+                          );
+                          setM(() {
+                            hybridProductBarcode.text = result.barcode;
+                            if (result.unitsPerBox != null) {
+                              hybridUnitsPerBox = result.unitsPerBox;
+                              applyHybridQtyDefaults(
+                                boxCount: hybridBoxCount,
+                                looseQty: hybridLooseQty,
+                                unitsPerBox: hybridUnitsPerBox,
+                                maxUnits: pickTargetHolder[0].qtyRequired -
+                                    pickTargetHolder[0].qtyPicked,
+                              );
+                            }
+                          });
+                        },
                         onBoxBarcodeSubmitted: (String code) async {
                           final HybridBoxScanResult result = await resolveHybridBoxBarcode(
                             ref.read(scannerRepositoryProvider),
@@ -1350,9 +1388,27 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                         onScanProduct: () {
                           unawaited(() async {
                             final String? code = await launchHybridRawBarcodeScan(context);
-                            if (code != null) {
-                              setM(() => hybridProductBarcode.text = code);
+                            if (code == null) {
+                              return;
                             }
+                            final HybridBoxScanResult result =
+                                await resolveHybridProductBarcode(
+                              ref.read(scannerRepositoryProvider),
+                              code,
+                            );
+                            setM(() {
+                              hybridProductBarcode.text = result.barcode;
+                              if (result.unitsPerBox != null) {
+                                hybridUnitsPerBox = result.unitsPerBox;
+                                applyHybridQtyDefaults(
+                                  boxCount: hybridBoxCount,
+                                  looseQty: hybridLooseQty,
+                                  unitsPerBox: hybridUnitsPerBox,
+                                  maxUnits: pickTargetHolder[0].qtyRequired -
+                                      pickTargetHolder[0].qtyPicked,
+                                );
+                              }
+                            });
                           }());
                         },
                         busy: sheetBusy,

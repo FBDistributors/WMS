@@ -325,6 +325,94 @@ def test_line_pick_loose_when_barcode_is_also_box_barcode(
         app.dependency_overrides.pop(get_current_user, None)
 
 
+def _seed_box_only_pick_order(
+    db: Session,
+    *,
+    order_qty: int = 8,
+    units_per_box: int = 8,
+) -> tuple[Order, UserModel, ProductModel, LocationModel, StockLot, str]:
+    """Barcha zaxira faqat sealed qutida (loose=0), mahsulot barcode = quti barcode."""
+    order, picker, product, loc, lot, box_barcode = _seed_box_pick_order(
+        db,
+        order_qty=order_qty,
+        stock_qty=order_qty,
+        box_count=1,
+    )
+    box = (
+        db.query(ProductBoxModel)
+        .filter(ProductBoxModel.box_barcode == box_barcode)
+        .one()
+    )
+    box.units_per_box = units_per_box
+    product.barcode = box_barcode
+    db.commit()
+    db.refresh(product)
+    return order, picker, product, loc, lot, box_barcode
+
+
+def test_line_pick_auto_box_when_loose_zero_and_qty_matches_upb(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Qutisiz 0, to'liq quti miqdori — box_count yuborilmasa ham avto quti terish."""
+    order, picker, product, loc, lot, box_barcode = _seed_box_only_pick_order(
+        db_session, order_qty=8, units_per_box=8
+    )
+    bd = get_breakdown_for_pick(
+        db_session,
+        product_id=product.id,
+        lot_id=lot.id,
+        location_id=loc.id,
+    )
+    assert bd.loose_units == 0
+    assert bd.box_count >= 1
+
+    doc_id = _send_to_picking(client, db_session, order.id, picker.id)
+
+    app.dependency_overrides[get_current_user] = lambda: picker
+    try:
+        line_id = client.get(f"/api/v1/picking/documents/{doc_id}").json()["lines"][0]["id"]
+        pick = client.post(
+            f"/api/v1/picking/lines/{line_id}/pick",
+            json={
+                "delta": 8,
+                "request_id": f"pick-auto-box-{uuid.uuid4().hex}",
+                "barcode": box_barcode,
+            },
+        )
+        assert pick.status_code == 200, pick.text
+        assert pick.json()["line"]["qty_picked"] == 8
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_line_pick_box_required_when_partial_box_qty(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Qutisiz 0, qisman miqdor — box_count talab qilinadi."""
+    order, picker, product, _loc, _lot, box_barcode = _seed_box_only_pick_order(
+        db_session, order_qty=8, units_per_box=8
+    )
+    doc_id = _send_to_picking(client, db_session, order.id, picker.id)
+
+    app.dependency_overrides[get_current_user] = lambda: picker
+    try:
+        line_id = client.get(f"/api/v1/picking/documents/{doc_id}").json()["lines"][0]["id"]
+        pick = client.post(
+            f"/api/v1/picking/lines/{line_id}/pick",
+            json={
+                "delta": 2,
+                "request_id": f"pick-partial-box-{uuid.uuid4().hex}",
+                "barcode": box_barcode,
+            },
+        )
+        assert pick.status_code == 400
+        assert "box_count required for box scan" in pick.text
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
 def test_line_pick_unit_with_fully_reserved_loose_stock(
     client: TestClient,
     db_session: Session,

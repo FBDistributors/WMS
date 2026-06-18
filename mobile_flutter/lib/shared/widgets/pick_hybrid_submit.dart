@@ -74,6 +74,29 @@ Future<HybridBoxScanResult> resolveHybridBoxBarcode(
   return HybridBoxScanResult(barcode: trimmed);
 }
 
+/// Mahsulot skan: agar kod quti kodi bo'lsa unitsPerBox qaytariladi.
+Future<HybridBoxScanResult> resolveHybridProductBarcode(
+  ScannerRepository scanner,
+  String raw,
+) async {
+  final String trimmed = raw.trim();
+  if (trimmed.isEmpty) {
+    return const HybridBoxScanResult(barcode: '');
+  }
+  try {
+    final ScannerResolveOut out = await scanner.resolveBarcode(trimmed);
+    if (out.isBoxScan && out.unitsPerScan != null && out.unitsPerScan! >= 1) {
+      return HybridBoxScanResult(
+        barcode: trimmed,
+        unitsPerBox: out.unitsPerScan,
+      );
+    }
+  } on Object {
+    // Qo'lda kiritilgan kod — faqat matn sifatida saqlanadi.
+  }
+  return HybridBoxScanResult(barcode: trimmed);
+}
+
 String? hybridPickValidationMessage({
   required AppLocale loc,
   required PickHybridQty hybrid,
@@ -173,6 +196,7 @@ class PickHybridScanFields extends StatelessWidget {
     required this.onScanBox,
     required this.onScanProduct,
     this.onBoxBarcodeSubmitted,
+    this.onProductBarcodeSubmitted,
     this.busy = false,
   });
 
@@ -185,6 +209,7 @@ class PickHybridScanFields extends StatelessWidget {
   final VoidCallback onScanBox;
   final VoidCallback onScanProduct;
   final Future<void> Function(String code)? onBoxBarcodeSubmitted;
+  final Future<void> Function(String code)? onProductBarcodeSubmitted;
   final bool busy;
 
   @override
@@ -237,6 +262,13 @@ class PickHybridScanFields extends StatelessWidget {
                   border: const OutlineInputBorder(),
                 ),
                 onChanged: (_) => onProductBarcodeChanged(),
+                onSubmitted: (String v) {
+                  final Future<void> Function(String code)? handler =
+                      onProductBarcodeSubmitted;
+                  if (handler != null) {
+                    unawaited(handler(v));
+                  }
+                },
               ),
             ),
             const SizedBox(width: 8),

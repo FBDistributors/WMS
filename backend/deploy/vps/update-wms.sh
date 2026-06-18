@@ -67,8 +67,26 @@ sudo systemctl restart wms-api
 sudo systemctl restart wms-smartup-worker
 
 echo "==> health"
-sleep 2
-curl -sf "http://127.0.0.1:8000/health" && echo " — OK" || echo "WARN: /health javob bermadi"
-curl -sf "http://127.0.0.1:8000/health/db" | head -c 200 || true
+WMS_PORT="${WMS_PORT:-8000}"
+HEALTH_URL="http://127.0.0.1:${WMS_PORT}/health"
+HEALTH_OK=0
+for _ in 1 2 3 4 5; do
+  if systemctl is-active --quiet wms-api 2>/dev/null && curl -sf "$HEALTH_URL" >/dev/null 2>&1; then
+    HEALTH_OK=1
+    break
+  fi
+  sleep 3
+done
+if [[ "$HEALTH_OK" -eq 1 ]]; then
+  curl -sf "$HEALTH_URL" && echo " — OK"
+  curl -sf "http://127.0.0.1:${WMS_PORT}/health/db" | head -c 200 || true
+  echo ""
+else
+  echo "WARN: /health javob bermadi (${HEALTH_URL})"
+  echo "--- wms-api status ---"
+  systemctl status wms-api --no-pager -l 2>/dev/null | head -20 || true
+  echo "--- journalctl (oxirgi 20) ---"
+  journalctl -u wms-api -n 20 --no-pager 2>/dev/null || true
+fi
 echo ""
 echo "Tugadi. Log: journalctl -u wms-api -n 30 --no-pager"

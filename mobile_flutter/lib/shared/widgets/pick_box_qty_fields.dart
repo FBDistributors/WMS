@@ -288,6 +288,28 @@ int? _unitsPerBoxFromAlternate(PickingAlternateLocation a) {
   return upb >= 1 ? upb : null;
 }
 
+/// Asosiy lokatsiyada qutisiz qoldiq va quti soni (ogohlantirish / upb uchun).
+({int? looseUnits, int? boxCount}) primaryAlternateBoxHint(
+  List<PickingAlternateLocation> alternates,
+) {
+  for (final PickingAlternateLocation a in alternates) {
+    if (a.isPrimary) {
+      return (looseUnits: a.looseUnits, boxCount: a.boxCount);
+    }
+  }
+  return (looseUnits: null, boxCount: null);
+}
+
+int? hybridUnitsPerBoxHint({
+  required int? unitsPerBox,
+  required List<PickingAlternateLocation> alternates,
+}) {
+  if (unitsPerBox != null && unitsPerBox >= 1) {
+    return unitsPerBox;
+  }
+  return unitsPerBoxFromAlternateLocations(alternates);
+}
+
 /// Terish: quti soni + qo'shimcha dona (SegmentedButton yo'q).
 class PickHybridQtyFields extends StatelessWidget {
   const PickHybridQtyFields({
@@ -321,28 +343,47 @@ class PickHybridQtyFields extends StatelessWidget {
     );
 
     if (upb == null || upb < 1) {
-      return TextField(
-        controller: looseQty,
-        keyboardType: kStockQtyKeyboardType,
-        inputFormatters: kStockQtyInputFormatters,
-        decoration: InputDecoration(
-          labelText: StringLookup.t(loc, 'qtyShort'),
-          border: const OutlineInputBorder(),
-          suffixIcon: buildInputClearButton(
-            visible: looseQty.text.trim().isNotEmpty,
-            onPressed: () {
-              looseQty.clear();
-              onFieldsChanged();
-            },
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          if (looseUnits != null && looseUnits == 0) ...<Widget>[
+            Text(
+              StringLookup.t(loc, 'pickUseBoxScan'),
+              style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
+            ),
+            const SizedBox(height: 8),
+          ],
+          TextField(
+            controller: looseQty,
+            keyboardType: kStockQtyKeyboardType,
+            inputFormatters: kStockQtyInputFormatters,
+            decoration: InputDecoration(
+              labelText: StringLookup.t(loc, 'qtyShort'),
+              border: const OutlineInputBorder(),
+              suffixIcon: buildInputClearButton(
+                visible: looseQty.text.trim().isNotEmpty,
+                onPressed: () {
+                  looseQty.clear();
+                  onFieldsChanged();
+                },
+              ),
+            ),
+            onChanged: (_) => onFieldsChanged(),
           ),
-        ),
-        onChanged: (_) => onFieldsChanged(),
+        ],
       );
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
+        if (looseUnits != null && looseUnits == 0) ...<Widget>[
+          Text(
+            StringLookup.t(loc, 'pickUseBoxScan'),
+            style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
+          ),
+          const SizedBox(height: 8),
+        ],
         InputDecorator(
           decoration: InputDecoration(
             labelText: StringLookup.t(loc, 'kirimNewUnitsPerBox'),

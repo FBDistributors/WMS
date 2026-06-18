@@ -19,7 +19,11 @@ from app.models.product_box import ProductBox as ProductBoxModel
 from app.models.stock import StockLot as StockLotModel
 from app.models.stock import StockMovement as StockMovementModel
 from app.models.user import User as UserModel
-from app.services.product_scan_resolve import normalize_scan_barcode
+from app.services.product_scan_resolve import (
+    ProductScanResolve,
+    is_explicit_box_pick,
+    normalize_scan_barcode,
+)
 from app.services.stock_availability import (
     PHYSICAL_ON_HAND_MOVEMENT_TYPES,
     compute_lot_location_available,
@@ -684,6 +688,75 @@ def apply_hybrid_pick_side_effects(
             location_id=location_id,
             qty=loose_units,
         )
+
+
+def apply_scan_pick_side_effects(
+    db: Session,
+    *,
+    resolved: ProductScanResolve | None,
+    box_count: int | None,
+    qty_delta: Decimal,
+    product_id: UUID,
+    lot_id: UUID,
+    location_id: UUID,
+    user: UserModel,
+    scan_barcode: str,
+) -> None:
+    """Skan asosida quti yoki qutisiz terish side-effectlari (pick_line, consolidated, waves)."""
+    if qty_delta <= 0:
+        return
+    if is_explicit_box_pick(resolved, box_count):
+        remove_sealed_boxes_for_pick(
+            db,
+            box_barcode=scan_barcode,
+            location_id=location_id,
+            lot_id=lot_id,
+            user=user,
+            box_count=int(box_count),
+            pick_qty=qty_delta,
+        )
+        return
+    if not resolved:
+        return
+    if resolved.scan_kind == "box":
+        breakdown = get_breakdown_for_pick(
+            db,
+            product_id=product_id,
+            lot_id=lot_id,
+            location_id=location_id,
+        )
+        qty_int = int(qty_delta)
+        if qty_int <= breakdown.loose_units:
+            require_sufficient_loose_for_unit_pick(
+                db,
+                product_id=product_id,
+                lot_id=lot_id,
+                location_id=location_id,
+                qty=qty_delta,
+            )
+            return
+        upb = resolved.units_per_scan
+        if upb >= 1 and qty_int % upb == 0:
+            boxes = qty_int // upb
+            if breakdown.box_count >= boxes:
+                remove_sealed_boxes_for_pick(
+                    db,
+                    box_barcode=scan_barcode,
+                    location_id=location_id,
+                    lot_id=lot_id,
+                    user=user,
+                    box_count=boxes,
+                    pick_qty=qty_delta,
+                )
+                return
+        raise HTTPException(status_code=400, detail="box_count required for box scan")
+    require_sufficient_loose_for_unit_pick(
+        db,
+        product_id=product_id,
+        lot_id=lot_id,
+        location_id=location_id,
+        qty=qty_delta,
+    )
 
 
 def require_sufficient_loose_for_unit_pick(

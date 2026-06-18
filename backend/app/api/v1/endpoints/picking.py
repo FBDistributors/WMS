@@ -36,6 +36,7 @@ from app.services.stock_availability import require_sufficient_reserved
 from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_ip, log_action
 from app.services.box_location_service import (
     apply_hybrid_pick_side_effects,
+    apply_scan_pick_side_effects,
     pair_box_loose_from_available,
     remove_sealed_boxes_for_pick,
     require_sufficient_loose_for_unit_pick,
@@ -1401,12 +1402,16 @@ async def consolidated_pick(
                 )
                 boxes_remaining -= line_boxes
             elif unit_pick:
-                require_sufficient_loose_for_unit_pick(
+                apply_scan_pick_side_effects(
                     db,
+                    resolved=resolved,
+                    box_count=payload.box_count,
+                    qty_delta=need,
                     product_id=line.product_id,
                     lot_id=line.lot_id,
                     location_id=line.location_id,
-                    qty=need,
+                    user=user,
+                    scan_barcode=barcode,
                 )
             line.picked_qty = float(Decimal(str(line.picked_qty or 0)) + need)
             docs_to_refresh.add(line.document_id)
@@ -2025,24 +2030,17 @@ def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
             )
         elif scan_barcode:
             resolved = resolve_product_scan(db, scan_barcode)
-            if is_explicit_box_pick(resolved, payload.box_count):
-                remove_sealed_boxes_for_pick(
-                    db,
-                    box_barcode=scan_barcode,
-                    location_id=line.location_id,
-                    lot_id=line.lot_id,
-                    user=user,
-                    box_count=payload.box_count,
-                    pick_qty=qty_delta,
-                )
-            elif resolved:
-                require_sufficient_loose_for_unit_pick(
-                    db,
-                    product_id=line.product_id,
-                    lot_id=line.lot_id,
-                    location_id=line.location_id,
-                    qty=qty_delta,
-                )
+            apply_scan_pick_side_effects(
+                db,
+                resolved=resolved,
+                box_count=payload.box_count,
+                qty_delta=qty_delta,
+                product_id=line.product_id,
+                lot_id=line.lot_id,
+                location_id=line.location_id,
+                user=user,
+                scan_barcode=scan_barcode,
+            )
 
     try:
         db.add(

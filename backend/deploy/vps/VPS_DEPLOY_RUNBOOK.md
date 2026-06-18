@@ -147,6 +147,16 @@ Loyiha endpointlari **prefixsiz**:
 
 `/api/v1/health` — 404 (normal).
 
+**`update-wms.sh` da WARN: /health javob bermadi** — API sekin ishga tushgan yoki `wms-api` xato bilan to‘xtagan. Skript endi 15s gacha qayta urinadi; muvaffaqiyatsiz bo‘lsa `journalctl -u wms-api -n 20` chiqaradi.
+
+```bash
+systemctl status wms-api --no-pager
+journalctl -u wms-api -n 50 --no-pager
+curl -v http://127.0.0.1:8000/health
+```
+
+Agar servis `active` va bir necha soniyadan keyin `/health` 200 bo‘lsa — faqat sekin start (normal). Agar `failed` — logdagi import/env xatosini tuzating.
+
 ---
 
 ## Work zone — PWA «Saqlab bo'lmadi» / CORS + 500

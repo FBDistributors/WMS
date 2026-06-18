@@ -264,7 +264,12 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
 
     final AppLocale loc = ref.read(appLocaleProvider);
     final double rem = product.totalRequired - product.totalPicked;
-    int? unitsPerBox = unitsPerBoxFromAlternateLocations(product.alternateLocations);
+    int? unitsPerBox = hybridUnitsPerBoxHint(
+      unitsPerBox: null,
+      alternates: product.alternateLocations,
+    );
+    final ({int? looseUnits, int? boxCount}) primaryAltHint =
+        primaryAlternateBoxHint(product.alternateLocations);
     final TextEditingController boxCountCtrl = TextEditingController();
     final TextEditingController looseQtyCtrl = TextEditingController();
     final TextEditingController boxBarcodeCtrl = TextEditingController();
@@ -291,6 +296,19 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
           );
         } else {
           productBarcodeCtrl.text = raw;
+          final HybridBoxScanResult productRes = await resolveHybridProductBarcode(
+            ref.read(scannerRepositoryProvider),
+            raw,
+          );
+          if (productRes.unitsPerBox != null) {
+            unitsPerBox = productRes.unitsPerBox;
+            applyHybridQtyDefaults(
+              boxCount: boxCountCtrl,
+              looseQty: looseQtyCtrl,
+              unitsPerBox: unitsPerBox,
+              maxUnits: rem,
+            );
+          }
         }
       } on Object {
         productBarcodeCtrl.text = raw;
@@ -410,6 +428,7 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                       looseQty: looseQtyCtrl,
                       unitsPerBox: sheetUnitsPerBox,
                       maxUnits: rem,
+                      looseUnits: primaryAltHint.looseUnits,
                       onFieldsChanged: () => setM(() {}),
                     ),
                     const SizedBox(height: 12),
@@ -427,6 +446,25 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                         }
                       }),
                       onProductBarcodeChanged: () => setM(() {}),
+                      onProductBarcodeSubmitted: (String code) async {
+                        final HybridBoxScanResult result =
+                            await resolveHybridProductBarcode(
+                          ref.read(scannerRepositoryProvider),
+                          code,
+                        );
+                        setM(() {
+                          productBarcodeCtrl.text = result.barcode;
+                          if (result.unitsPerBox != null) {
+                            sheetUnitsPerBox = result.unitsPerBox;
+                            applyHybridQtyDefaults(
+                              boxCount: boxCountCtrl,
+                              looseQty: looseQtyCtrl,
+                              unitsPerBox: sheetUnitsPerBox,
+                              maxUnits: rem,
+                            );
+                          }
+                        });
+                      },
                       onBoxBarcodeSubmitted: (String code) async {
                         final HybridBoxScanResult result = await resolveHybridBoxBarcode(
                           ref.read(scannerRepositoryProvider),
@@ -460,9 +498,26 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                       onScanProduct: () {
                         unawaited(() async {
                           final String? code = await launchHybridRawBarcodeScan(context);
-                          if (code != null) {
-                            setM(() => productBarcodeCtrl.text = code);
+                          if (code == null) {
+                            return;
                           }
+                          final HybridBoxScanResult result =
+                              await resolveHybridProductBarcode(
+                            ref.read(scannerRepositoryProvider),
+                            code,
+                          );
+                          setM(() {
+                            productBarcodeCtrl.text = result.barcode;
+                            if (result.unitsPerBox != null) {
+                              sheetUnitsPerBox = result.unitsPerBox;
+                              applyHybridQtyDefaults(
+                                boxCount: boxCountCtrl,
+                                looseQty: looseQtyCtrl,
+                                unitsPerBox: sheetUnitsPerBox,
+                                maxUnits: rem,
+                              );
+                            }
+                          });
                         }());
                       },
                       busy: sheetBusy,

@@ -42,6 +42,7 @@ from app.services.wave_service import (
 )
 from app.services.box_location_service import (
     apply_hybrid_pick_side_effects,
+    apply_scan_pick_side_effects,
     get_breakdown_for_pick,
     remove_sealed_boxes_for_pick,
     require_sufficient_loose_for_unit_pick,
@@ -490,12 +491,16 @@ async def pick_scan(
             )
             boxes_remaining -= line_boxes
         elif unit_pick:
-            require_sufficient_loose_for_unit_pick(
+            apply_scan_pick_side_effects(
                 db,
+                resolved=resolved,
+                box_count=payload.box_count,
+                qty_delta=pick_from_alloc,
                 product_id=wl.product_id,
                 lot_id=wa.stock_lot_id,
                 location_id=wa.location_id,
-                qty=pick_from_alloc,
+                user=user,
+                scan_barcode=scan_barcode,
             )
         wa.picked_qty += pick_from_alloc
         db.add(StockMovementModel(
