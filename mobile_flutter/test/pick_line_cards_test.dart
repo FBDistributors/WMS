@@ -140,7 +140,7 @@ void main() {
   });
 
   group('pickPositionProgressController', () {
-    test('counts product groups not unit quantities', () {
+    test('fully picked but not verified counts as zero done', () {
       final List<PickingLine> lines = <PickingLine>[
         _line(
           id: 'scrub-a',
@@ -162,6 +162,33 @@ void main() {
 
       final PickPositionProgress progress =
           pickPositionProgressController(lines, <String>{});
+
+      expect(progress.done, 0);
+      expect(progress.total, 2);
+    });
+
+    test('all groups verified counts as done', () {
+      final List<PickingLine> lines = <PickingLine>[
+        _line(
+          id: 'scrub-a',
+          locationCode: 'P-AU-01',
+          productId: 'prod-strawberry',
+          qtyRequired: 2,
+          qtyPicked: 2,
+        ),
+        _line(
+          id: 'scrub-b',
+          locationCode: 'P-AS-03',
+          productId: 'prod-mango',
+          qtyRequired: 1,
+          qtyPicked: 1,
+        ),
+      ];
+
+      final PickPositionProgress progress = pickPositionProgressController(
+        lines,
+        <String>{'scrub-a', 'scrub-b'},
+      );
 
       expect(progress.done, 2);
       expect(progress.total, 2);

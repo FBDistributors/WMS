@@ -118,7 +118,6 @@ typedef PickPositionProgress = ({int done, int total});
 bool pickPositionDonePicker(PickingLine line) => pickingLineEffectivelyDone(line);
 
 bool pickPositionDoneController(PickLineGroup group, Set<String> verifiedLineIds) =>
-    pickLineGroupEffectivelyDone(group) ||
     pickLineGroupFullyVerified(group, verifiedLineIds);
 
 PickPositionProgress pickPositionProgressPicker(List<PickingLine> lines) {

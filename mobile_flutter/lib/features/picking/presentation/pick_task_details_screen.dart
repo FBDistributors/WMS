@@ -1933,7 +1933,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                           visualDensity: VisualDensity.compact,
                         ),
                         Text(
-                          '${StringLookup.t(loc, 'picked')}: ${positionProgress.done} / ${positionProgress.total}',
+                          '${StringLookup.t(loc, isPickerList ? 'picked' : 'verified')}: ${positionProgress.done} / ${positionProgress.total}',
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
