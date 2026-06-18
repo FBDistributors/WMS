@@ -161,6 +161,40 @@ String? hybridPickValidationMessage({
   return null;
 }
 
+String? controllerHybridVerifyValidationMessage({
+  required AppLocale loc,
+  required PickHybridQty hybrid,
+  required double aggPicked,
+  required String? boxBarcode,
+  required String? productBarcode,
+  int? primaryLooseUnits,
+  int? primaryBoxCount,
+}) {
+  final String? boxOnly = hybridBoxOnlyStockValidationMessage(
+    loc: loc,
+    hybrid: hybrid,
+    primaryLooseUnits: primaryLooseUnits,
+    primaryBoxCount: primaryBoxCount,
+  );
+  if (boxOnly != null) {
+    return boxOnly;
+  }
+  final String? hybridValidation = hybridPickValidationMessage(
+    loc: loc,
+    hybrid: hybrid,
+    boxBarcode: boxBarcode,
+    productBarcode: productBarcode,
+    maxUnits: aggPicked,
+  );
+  if (hybridValidation != null) {
+    return hybridValidation;
+  }
+  if (hybrid.total != aggPicked.round()) {
+    return StringLookup.t(loc, 'qtyMismatch');
+  }
+  return null;
+}
+
 Future<void> submitHybridPick({
   required PickHybridQty hybrid,
   required String? boxBarcode,

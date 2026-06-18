@@ -280,22 +280,84 @@ void capHybridQtyToMax({
   looseQty.text = '$loose';
 }
 
+/// Lokatsiyada faqat qutisiz dona (yopiq quti yo'q).
+bool isLooseOnlyLocation({
+  int? stockBoxCount,
+  int? stockLooseUnits,
+}) =>
+    (stockBoxCount ?? 0) < 1 && (stockLooseUnits ?? 0) > 0;
+
+/// Terish defaultlari: lokatsiya quti/qutisiz zaxirasiga mos.
+({int boxCount, int looseQty}) computeLocationAwareHybridDefaults({
+  required int maxPick,
+  required int? unitsPerBox,
+  int? stockBoxCount,
+  int? stockLooseUnits,
+}) {
+  if (maxPick < 1) {
+    return (boxCount: 0, looseQty: 0);
+  }
+
+  final int boxes = stockBoxCount ?? 0;
+  final int looseStock = stockLooseUnits ?? 0;
+  final int upb = unitsPerBox ?? 0;
+
+  if (isLooseOnlyLocation(
+    stockBoxCount: stockBoxCount,
+    stockLooseUnits: stockLooseUnits,
+  )) {
+    final int looseQty = looseStock > 0 ? min(maxPick, looseStock) : maxPick;
+    return (boxCount: 0, looseQty: looseQty);
+  }
+
+  if (upb < 1) {
+    return (boxCount: 0, looseQty: maxPick);
+  }
+
+  if (stockBoxCount != null || stockLooseUnits != null) {
+    if (looseStock < 1 && boxes > 0) {
+      final HybridPickPlan? plan = computeHybridPickPlan(
+        total: maxPick,
+        unitsPerBox: upb,
+        availableLoose: 0,
+      );
+      if (plan != null) {
+        return (boxCount: plan.fullBoxes, looseQty: plan.looseNeeded);
+      }
+    }
+    if (boxes > 0 || looseStock > 0) {
+      final HybridPickPlan? plan = computeHybridPickPlan(
+        total: maxPick,
+        unitsPerBox: upb,
+        availableLoose: looseStock,
+      );
+      if (plan != null) {
+        return (boxCount: plan.fullBoxes, looseQty: plan.looseNeeded);
+      }
+    }
+  }
+
+  return (boxCount: maxPick ~/ upb, looseQty: maxPick % upb);
+}
+
 /// Qolgan miqdorga qarab quti + qo'shimcha dona maydonlarini to'ldirish.
 void applyHybridQtyDefaults({
   required TextEditingController boxCount,
   required TextEditingController looseQty,
   required int? unitsPerBox,
   required double maxUnits,
+  int? stockBoxCount,
+  int? stockLooseUnits,
 }) {
   final int maxPick = max(0, maxUnits.round());
-  final int upb = unitsPerBox ?? 0;
-  if (upb < 1 || maxPick < 1) {
-    boxCount.text = '0';
-    looseQty.text = '$maxPick';
-    return;
-  }
-  boxCount.text = '${maxPick ~/ upb}';
-  looseQty.text = '${maxPick % upb}';
+  final ({int boxCount, int looseQty}) defaults = computeLocationAwareHybridDefaults(
+    maxPick: maxPick,
+    unitsPerBox: unitsPerBox,
+    stockBoxCount: stockBoxCount,
+    stockLooseUnits: stockLooseUnits,
+  );
+  boxCount.text = '${defaults.boxCount}';
+  looseQty.text = '${defaults.looseQty}';
 }
 
 /// Umumiy yig'ish: 2+ buyurtmada har buyurtma bo'yicha quti/dona defaultlari.
@@ -307,6 +369,8 @@ void applyConsolidatedHybridQtyDefaults({
   required List<ConsolidatedLineItem> lines,
   int? suggestedBoxCount,
   int? suggestedLooseQty,
+  int? stockBoxCount,
+  int? stockLooseUnits,
 }) {
   final int maxPick = max(0, maxUnits.round());
   if (maxPick < 1) {
@@ -350,6 +414,8 @@ void applyConsolidatedHybridQtyDefaults({
     looseQty: looseQty,
     unitsPerBox: unitsPerBox,
     maxUnits: maxUnits,
+    stockBoxCount: stockBoxCount,
+    stockLooseUnits: stockLooseUnits,
   );
 }
 
@@ -581,6 +647,12 @@ String? hybridPickStockHintMessage({
 }) {
   final int stockLoose = stockLooseUnits ?? 0;
   final int stockBoxes = stockBoxCount ?? 0;
+  if (isLooseOnlyLocation(
+    stockBoxCount: stockBoxCount,
+    stockLooseUnits: stockLooseUnits,
+  )) {
+    return StringLookup.t(loc, 'pickLooseOnlyLocationHint');
+  }
   if (hybrid.boxCount > 0 &&
       hybrid.looseUnits > 0 &&
       stockLoose < hybrid.looseUnits) {
@@ -703,11 +775,15 @@ class PickHybridQtyFields extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final int? upb = unitsPerBox;
-    final bool canEditBoxCount = upb != null && upb >= 1;
+    final bool looseOnly = isLooseOnlyLocation(
+      stockBoxCount: stockBoxCount,
+      stockLooseUnits: looseUnits,
+    );
+    final bool canEditBoxCount = !looseOnly && upb != null && upb >= 1;
     final PickHybridQty hybrid = pickHybridQtyFromControllers(
       boxCount: boxCount,
       looseQty: looseQty,
-      unitsPerBox: upb,
+      unitsPerBox: looseOnly ? null : upb,
       maxUnits: maxUnits,
     );
     final String? stockHint = hybridPickStockHintMessage(
@@ -717,7 +793,7 @@ class PickHybridQtyFields extends StatelessWidget {
       stockBoxCount: stockBoxCount,
     );
 
-    if (upb == null || upb < 1) {
+    if (looseOnly || upb == null || upb < 1) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
@@ -743,7 +819,9 @@ class PickHybridQtyFields extends StatelessWidget {
             keyboardType: kStockQtyKeyboardType,
             inputFormatters: kStockQtyInputFormatters,
             decoration: InputDecoration(
-              labelText: StringLookup.t(loc, 'qtyShort'),
+              labelText: looseOnly
+                  ? StringLookup.t(loc, 'pickHybridExtraLoose')
+                  : StringLookup.t(loc, 'qtyShort'),
               border: const OutlineInputBorder(),
               suffixIcon: buildInputClearButton(
                 visible: looseQty.text.trim().isNotEmpty,

@@ -291,6 +291,8 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
       lines: product.lines,
       suggestedBoxCount: product.suggestedBoxCount,
       suggestedLooseQty: product.suggestedLooseQty,
+      stockBoxCount: locationAltHint.boxCount,
+      stockLooseUnits: locationAltHint.looseUnits,
     );
     if (verifiedBarcode != null && verifiedBarcode.trim().isNotEmpty) {
       final String raw = verifiedBarcode.trim();
@@ -328,6 +330,8 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
             lines: product.lines,
             suggestedBoxCount: product.suggestedBoxCount,
             suggestedLooseQty: product.suggestedLooseQty,
+            stockBoxCount: locationAltHint.boxCount,
+            stockLooseUnits: locationAltHint.looseUnits,
           );
         }
       }

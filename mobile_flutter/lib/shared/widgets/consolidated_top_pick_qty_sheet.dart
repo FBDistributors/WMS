@@ -67,10 +67,23 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
   int? _unitsPerBox;
   bool _busy = false;
 
+  ({int? looseUnits, int? boxCount}) _locationAltHint() {
+    final List<ConsolidatedLineItem> openPickLines = widget.product.lines
+        .where((ConsolidatedLineItem l) => l.qtyPicked < l.qtyRequired)
+        .toList();
+    final String pickLocationCode =
+        openPickLines.isNotEmpty ? openPickLines.first.locationCode : '';
+    return alternateBoxHintForLocation(
+      widget.product.alternateLocations,
+      pickLocationCode,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
     final double rem = widget.product.totalRequired - widget.product.totalPicked;
+    final ({int? looseUnits, int? boxCount}) locationAltHint = _locationAltHint();
     _unitsPerBox = unitsPerBoxFromAlternateLocations(widget.product.alternateLocations);
     _boxCount = TextEditingController();
     _looseQty = TextEditingController();
@@ -84,6 +97,8 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
       lines: widget.product.lines,
       suggestedBoxCount: widget.product.suggestedBoxCount,
       suggestedLooseQty: widget.product.suggestedLooseQty,
+      stockBoxCount: locationAltHint.boxCount,
+      stockLooseUnits: locationAltHint.looseUnits,
     );
     unawaited(_applyInitialScan());
   }
@@ -115,6 +130,7 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
       });
       if (mounted) {
         final double rem = widget.product.totalRequired - widget.product.totalPicked;
+        final ({int? looseUnits, int? boxCount}) locationAltHint = _locationAltHint();
         applyConsolidatedHybridQtyDefaults(
           boxCount: _boxCount,
           looseQty: _looseQty,
@@ -123,6 +139,8 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
           lines: widget.product.lines,
           suggestedBoxCount: widget.product.suggestedBoxCount,
           suggestedLooseQty: widget.product.suggestedLooseQty,
+          stockBoxCount: locationAltHint.boxCount,
+          stockLooseUnits: locationAltHint.looseUnits,
         );
       }
     } on Object {
@@ -299,6 +317,7 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
     final ConsolidatedProduct product = widget.product;
     final AppLocale loc = widget.loc;
     final double rem = product.totalRequired - product.totalPicked;
+    final ({int? looseUnits, int? boxCount}) locationAltHint = _locationAltHint();
     return Padding(
       padding: EdgeInsets.only(bottom: sheetBottomPadding(context)),
       child: SingleChildScrollView(
@@ -354,6 +373,8 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
               looseQty: _looseQty,
               unitsPerBox: _unitsPerBox,
               maxUnits: rem,
+              looseUnits: locationAltHint.looseUnits,
+              stockBoxCount: locationAltHint.boxCount,
               onFieldsChanged: () => setState(() {}),
               boxBarcode: _boxBarcode,
               productBarcode: _productBarcode,

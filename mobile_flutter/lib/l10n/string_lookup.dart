@@ -352,6 +352,7 @@ abstract final class StringLookup {
     'pickHybridOpenBoxHint': '{{loose}} dona uchun qutini oching',
     'pickHybridPickPlanHint':
         '{{boxes}} to\'liq quti + {{loose}} dona (quti ochiladi)',
+    'pickLooseOnlyLocationHint': 'Bu joyda faqat qutisiz dona — mahsulot skan qiling',
     'pickLocationBreakdown': '{{breakdown}}',
     'kirimBoxReceiveSuccess':
         'Qabul: {{boxCount}} quti × {{unitsPerBox}} = {{total}} dona\n{{product}} · {{location}}',
@@ -750,6 +751,8 @@ abstract final class StringLookup {
     'pickHybridOpenBoxHint': 'Откройте коробку для {{loose}} шт.',
     'pickHybridPickPlanHint':
         '{{boxes}} полн. кор. + {{loose}} шт. (коробку открыть)',
+    'pickLooseOnlyLocationHint':
+        'Только штучный остаток — отсканируйте товар',
     'pickLocationBreakdown': '{{breakdown}}',
     'kirimBoxReceiveSuccess':
         'Приём: {{boxCount}} кор. × {{unitsPerBox}} = {{total}} шт.\n{{product}} · {{location}}',
@@ -1148,6 +1151,8 @@ abstract final class StringLookup {
     'pickHybridOpenBoxHint': 'Open a box for {{loose}} loose units',
     'pickHybridPickPlanHint':
         '{{boxes}} full box(es) + {{loose}} loose (box will be opened)',
+    'pickLooseOnlyLocationHint':
+        'Loose units only at this location — scan the product',
     'pickLocationBreakdown': '{{breakdown}}',
     'kirimBoxReceiveSuccess':
         'Received: {{boxCount}} boxes × {{unitsPerBox}} = {{total}} units\n{{product}} · {{location}}',
