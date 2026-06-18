@@ -1129,7 +1129,9 @@ def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedView
     groups: dict = {}
     first_line_attrs: dict = {}  # key -> (barcode, sku, product_id) from first line in group
     doc_line_stats: dict = {}  # doc_id -> {"total": int, "done": int}
+    line_pick_meta: dict[UUID, tuple[Optional[UUID], Optional[UUID]]] = {}
     for line, loc in lines_with_loc:
+        line_pick_meta[line.id] = (line.location_id, line.lot_id)
         doc_id = line.document_id
         doc_line_stats.setdefault(doc_id, {"total": 0, "done": 0})
         doc_line_stats[doc_id]["total"] += 1
@@ -1186,6 +1188,18 @@ def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedView
                 product_upb_map[row.product_id] = int(row.units_per_box)
     # Picker consolidated alternates should never suggest showroom bins by default.
     by_pid_consolidated = _balance_rows_by_product(db, all_pids, "main")
+    balances: dict[tuple[UUID, UUID], tuple[float, float]] = {}
+    for rows_ in by_pid_consolidated.values():
+        for r in rows_:
+            balances[(r["lot_id"], r["location_id"])] = (
+                float(r["on_hand"] or 0),
+                float(r["available"] or 0),
+            )
+    pairs: set[tuple[UUID, UUID]] = set(balances.keys())
+    for line, _loc in lines_with_loc:
+        if line.lot_id and line.location_id:
+            pairs.add((line.lot_id, line.location_id))
+    consolidated_bd_map = _breakdown_kwargs_map_for_pairs(db, pairs, balances)
     products = []
     for key, product_name, sku, expiry_display in product_order:
         lines_list = groups[key]
@@ -1198,8 +1212,22 @@ def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedView
             first_barcode if (first_barcode and str(first_barcode).strip()) else
             (product_barcode_map.get(first_product_id) if first_product_id else None)
         )
+        primary_location_id: Optional[UUID] = None
+        primary_lot_id: Optional[UUID] = None
+        for li in lines_list:
+            if li.is_vip_expiry_informational or li.qty_picked >= li.qty_required:
+                continue
+            loc_id, lot_id = line_pick_meta.get(li.line_id, (None, None))
+            primary_location_id = loc_id
+            primary_lot_id = lot_id
+            break
         alt = (
-            _product_level_alternates(by_pid_consolidated.get(first_product_id, []))
+            _product_level_alternates(
+                by_pid_consolidated.get(first_product_id, []),
+                bd_map=consolidated_bd_map,
+                primary_location_id=primary_location_id,
+                primary_lot_id=primary_lot_id,
+            )
             if first_product_id
             else []
         )
@@ -1730,14 +1758,28 @@ async def mark_controller_verification_started(
     return _to_picking_document(document, db)
 
 
-def _product_level_alternates(rows: list[dict], *, max_rows: int = 24) -> List[PickingAlternateLocation]:
+def _product_level_alternates(
+    rows: list[dict],
+    *,
+    bd_map: dict[tuple[UUID, UUID], dict],
+    primary_location_id: Optional[UUID] = None,
+    primary_lot_id: Optional[UUID] = None,
+    max_rows: int = 24,
+) -> List[PickingAlternateLocation]:
     out: List[PickingAlternateLocation] = []
     for r in rows:
         if len(out) >= max_rows:
             break
         av = float(r["available"] or 0)
-        if av <= 0:
+        is_pri = (
+            primary_location_id is not None
+            and primary_lot_id is not None
+            and r["location_id"] == primary_location_id
+            and r["lot_id"] == primary_lot_id
+        )
+        if av <= 0 and not is_pri:
             continue
+        bd_kw = bd_map.get((r["lot_id"], r["location_id"]), {})
         out.append(
             PickingAlternateLocation(
                 location_id=r["location_id"],
@@ -1746,7 +1788,8 @@ def _product_level_alternates(rows: list[dict], *, max_rows: int = 24) -> List[P
                 available_qty=av,
                 batch=r.get("batch"),
                 expiry_date=_safe_expiry_date(r.get("expiry_date")),
-                is_primary=False,
+                is_primary=is_pri,
+                **bd_kw,
             )
         )
     return out

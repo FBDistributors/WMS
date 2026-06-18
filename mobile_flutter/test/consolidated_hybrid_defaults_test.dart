@@ -62,6 +62,29 @@ void main() {
     looseQty.dispose();
   });
 
+  test('applyConsolidatedHybridQtyDefaults loose-only ignores API suggested', () {
+    final TextEditingController boxCount = TextEditingController();
+    final TextEditingController looseQty = TextEditingController();
+    final List<ConsolidatedLineItem> lines = <ConsolidatedLineItem>[
+      _line(docId: 'a', ref: 'A', req: 6),
+    ];
+    applyConsolidatedHybridQtyDefaults(
+      boxCount: boxCount,
+      looseQty: looseQty,
+      unitsPerBox: 8,
+      maxUnits: 6,
+      lines: lines,
+      suggestedBoxCount: 1,
+      suggestedLooseQty: 1,
+      stockBoxCount: 0,
+      stockLooseUnits: 953,
+    );
+    expect(boxCount.text, '0');
+    expect(looseQty.text, '6');
+    boxCount.dispose();
+    looseQty.dispose();
+  });
+
   test('applyConsolidatedHybridQtyDefaults API suggested ustun', () {
     final TextEditingController boxCount = TextEditingController();
     final TextEditingController looseQty = TextEditingController();

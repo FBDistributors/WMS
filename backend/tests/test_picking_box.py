@@ -780,6 +780,88 @@ def test_line_pick_loose_when_sealed_exceeds_available(
         app.dependency_overrides.pop(get_current_user, None)
 
 
+def test_consolidated_view_loose_only_alternate_breakdown(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Umumiy yig'ish alternate_locations qutisiz dona breakdown bilan kelishi kerak."""
+    picker = _mk_user(db_session, username=f"picker-cons-loose-{uuid.uuid4().hex[:8]}", role="picker")
+    product = ProductModel(
+        external_source="test",
+        external_id=f"ext-{uuid.uuid4()}",
+        name="Consolidated Loose Product",
+        sku=f"SKU-CL-{uuid.uuid4().hex[:8]}",
+        barcode=f"CL{uuid.uuid4().hex[:6]}",
+        is_active=True,
+    )
+    db_session.add(product)
+    db_session.flush()
+
+    loc = LocationModel(
+        code=f"CL-{uuid.uuid4().hex[:6]}",
+        barcode_value=f"CL-{uuid.uuid4().hex[:6]}",
+        name="Consolidated loose bin",
+        type="bin",
+        zone_type="NORMAL",
+        is_active=True,
+    )
+    db_session.add(loc)
+    db_session.flush()
+
+    lot = StockLot(product_id=product.id, batch="CL-B1", expiry_date=None)
+    db_session.add(lot)
+    db_session.flush()
+    db_session.add(
+        StockMovement(
+            product_id=product.id,
+            lot_id=lot.id,
+            location_id=loc.id,
+            qty_change=Decimal("12"),
+            movement_type="receipt",
+        )
+    )
+
+    order = Order(
+        source="test",
+        source_external_id=f"order-cl-{uuid.uuid4().hex[:10]}",
+        order_number=f"SO-CL-{uuid.uuid4().hex[:6]}",
+    )
+    order.wms_state = OrderWmsState(status="imported")
+    order.lines = [
+        OrderLine(
+            sku=product.sku,
+            name="Consolidated loose pick",
+            qty=6.0,
+            uom="dona",
+        )
+    ]
+    db_session.add(order)
+    db_session.commit()
+
+    _send_to_picking(client, db_session, order.id, picker.id)
+
+    app.dependency_overrides[get_current_user] = lambda: picker
+    try:
+        res = client.get("/api/v1/picking/consolidated")
+        assert res.status_code == 200, res.text
+        products = res.json().get("products") or []
+        match = next(
+            (p for p in products if p.get("barcode") == product.barcode),
+            None,
+        )
+        assert match is not None, res.text
+        alts = match.get("alternate_locations") or []
+        assert len(alts) >= 1
+        target = next(
+            (a for a in alts if a.get("location_code") == loc.code),
+            alts[0],
+        )
+        assert target.get("box_count") == 0
+        assert (target.get("loose_units") or 0) > 0
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
 def test_consolidated_pick_five_boxes(
     client: TestClient,
     db_session: Session,

@@ -384,6 +384,20 @@ void applyConsolidatedHybridQtyDefaults({
     looseQty.text = '0';
     return;
   }
+  if (isLooseOnlyLocation(
+    stockBoxCount: stockBoxCount,
+    stockLooseUnits: stockLooseUnits,
+  )) {
+    applyHybridQtyDefaults(
+      boxCount: boxCount,
+      looseQty: looseQty,
+      unitsPerBox: unitsPerBox,
+      maxUnits: maxUnits,
+      stockBoxCount: stockBoxCount,
+      stockLooseUnits: stockLooseUnits,
+    );
+    return;
+  }
   if (suggestedBoxCount != null && suggestedLooseQty != null) {
     boxCount.text = '${max(0, suggestedBoxCount)}';
     looseQty.text = '${max(0, suggestedLooseQty)}';
