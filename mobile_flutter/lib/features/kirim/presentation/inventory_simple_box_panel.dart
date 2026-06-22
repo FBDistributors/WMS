@@ -534,7 +534,7 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
       }
     }
 
-    final BoxLocationBreakdown? breakdownForSave = _breakdown ?? b;
+    final BoxLocationBreakdown breakdownForSave = _breakdown ?? b;
     final int currentBoxes = currentBoxCountTarget(breakdownForSave, barcode);
     final int boxDelta = targetBoxCount - currentBoxes;
     if (boxDelta != 0) {
