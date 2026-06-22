@@ -44,7 +44,11 @@ from app.services.box_location_service import (
     require_sufficient_loose_for_unit_pick,
     validate_hybrid_pick_qty,
 )
-from app.services.product_scan_resolve import is_explicit_box_pick, resolve_product_scan
+from app.services.product_scan_resolve import (
+    ProductScanResolve,
+    is_explicit_box_pick,
+    resolve_product_scan,
+)
 from app.services.warehouse_scope import (
     assert_location_allowed_for_pick,
     warehouse_scope_for_order,
@@ -97,6 +101,7 @@ class PickingLine(BaseModel):
         default="product",
         description="product | action | gift — SmartUP buyurtma qatori manbasi",
     )
+    picked_box_barcode: Optional[str] = None
 
 
 class PickingProgress(BaseModel):
@@ -586,7 +591,28 @@ def _to_picking_line(
         is_vip_expiry_informational=is_vip_info,
         vip_expiry_information_key="vip_expiry_not_picked" if is_vip_info else None,
         line_source=(getattr(line, "line_source", None) or "product").strip(),
+        picked_box_barcode=getattr(line, "picked_box_barcode", None),
     )
+
+
+def _picked_box_barcode_from_pick_payload(
+    *,
+    scan_barcode: str,
+    box_barcode: str | None,
+    box_count: int | None,
+    resolved: ProductScanResolve | None,
+) -> str | None:
+    hybrid = (box_barcode or "").strip()
+    if hybrid and box_count is not None:
+        return hybrid
+    code = scan_barcode.strip()
+    if not code:
+        return None
+    if resolved and is_explicit_box_pick(resolved, box_count):
+        return code
+    if resolved and resolved.scan_kind == "box" and box_count is not None and int(box_count) >= 1:
+        return code
+    return None
 
 
 def _picking_lines_with_alternates(
@@ -1489,6 +1515,14 @@ async def consolidated_pick(
                     user=user,
                     scan_barcode=barcode,
                 )
+            picked_box = _picked_box_barcode_from_pick_payload(
+                scan_barcode=barcode,
+                box_barcode=payload.box_barcode,
+                box_count=payload.box_count,
+                resolved=resolved,
+            )
+            if picked_box:
+                line.picked_box_barcode = picked_box
             line.picked_qty = float(Decimal(str(line.picked_qty or 0)) + need)
             docs_to_refresh.add(line.document_id)
             db.add(
@@ -2090,6 +2124,7 @@ def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
         )
         scan_barcode = (payload.barcode or "").strip()
         hybrid_box_barcode = (payload.box_barcode or "").strip()
+        resolved: ProductScanResolve | None = None
         if hybrid_box_barcode and payload.box_count is not None:
             if not scan_barcode:
                 raise HTTPException(status_code=400, detail="barcode required for hybrid pick")
@@ -2132,6 +2167,14 @@ def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
                 user=user,
                 scan_barcode=scan_barcode,
             )
+        picked_box = _picked_box_barcode_from_pick_payload(
+            scan_barcode=scan_barcode,
+            box_barcode=payload.box_barcode,
+            box_count=payload.box_count,
+            resolved=resolved,
+        )
+        if picked_box:
+            line.picked_box_barcode = picked_box
 
     try:
         db.add(
@@ -2338,6 +2381,8 @@ async def unpick_line(
 
     qty_to_rollback = Decimal(str(payload.delta))
     line.picked_qty = float(Decimal(str(line.picked_qty)) - qty_to_rollback)
+    if line.picked_qty <= 0:
+        line.picked_box_barcode = None
     line.skip_reason = reason
 
     # rollback invariant: pick=+delta, unallocate=+delta (stock and reserve are restored)

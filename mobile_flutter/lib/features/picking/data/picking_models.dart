@@ -71,6 +71,7 @@ class PickingLine {
     this.isVipExpiryInformational = false,
     this.vipExpiryInformationKey,
     this.lineSource = 'product',
+    this.pickedBoxBarcode,
   });
 
   final String id;
@@ -90,6 +91,8 @@ class PickingLine {
   final String? vipExpiryInformationKey;
   /// product | action | gift
   final String? lineSource;
+  /// Yig'uvchi skan qilgan oxirgi quti shtrix-kodi (controller tekshiruvi).
+  final String? pickedBoxBarcode;
 
   factory PickingLine.fromJson(Map<String, Object?> json) {
     final Object? alts = json['alternate_locations'];
@@ -119,6 +122,7 @@ class PickingLine {
       lineSource: (json['line_source'] as String?)?.trim().isNotEmpty == true
           ? (json['line_source'] as String).trim()
           : 'product',
+      pickedBoxBarcode: json['picked_box_barcode'] as String?,
     );
   }
 
@@ -139,6 +143,7 @@ class PickingLine {
         'is_vip_expiry_informational': isVipExpiryInformational,
         'vip_expiry_information_key': vipExpiryInformationKey,
         'line_source': lineSource ?? 'product',
+        if (pickedBoxBarcode != null) 'picked_box_barcode': pickedBoxBarcode,
       };
 }
 
@@ -822,3 +827,10 @@ String? pickLocationBreakdownLabel(PickingLine line) {
   final int perBox = boxes > 0 ? unitsInBoxes ~/ boxes : 0;
   return '$boxes × $perBox · $loose loose';
 }
+
+/// Controller modalida ko'rsatiladigan yig'ilgan quti shtrix-kodi.
+String? displayPickedBoxBarcode(PickingLine line) {
+  final String trimmed = line.pickedBoxBarcode?.trim() ?? '';
+  return trimmed.isEmpty ? null : trimmed;
+}
+

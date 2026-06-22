@@ -119,6 +119,7 @@ class DocumentLine(Base):
         server_default=text("false"),
     )
     line_source: Mapped[str | None] = mapped_column(String(16), nullable=True, default="product")
+    picked_box_barcode: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     document: Mapped[Document] = relationship("Document", back_populates="lines")
 

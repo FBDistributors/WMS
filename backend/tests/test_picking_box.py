@@ -233,6 +233,7 @@ def test_line_pick_three_boxes(
         )
         assert pick.status_code == 200, pick.text
         assert pick.json()["line"]["qty_picked"] == 18
+        assert pick.json()["line"]["picked_box_barcode"] == box_barcode
 
         bd = get_breakdown(
             db_session,
@@ -329,6 +330,7 @@ def test_line_pick_loose_when_barcode_is_also_box_barcode(
         )
         assert pick.status_code == 200, pick.text
         assert pick.json()["line"]["qty_picked"] == 2
+        assert pick.json()["line"].get("picked_box_barcode") in (None, "")
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 
@@ -1058,6 +1060,7 @@ def test_line_pick_hybrid_single_request(
         )
         assert pick.status_code == 200, pick.text
         assert pick.json()["line"]["qty_picked"] == 14
+        assert pick.json()["line"]["picked_box_barcode"] == box_barcode
 
         bd = get_breakdown(
             db_session,
@@ -1305,5 +1308,44 @@ def test_line_pick_hybrid_open_box_single_unit(
         )
         assert bd_after.loose_units == 11
         assert bd_after.box_count == 9
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_picked_box_barcode_cleared_on_full_unpick(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    order, picker, _product, _loc, _lot, box_barcode = _seed_box_pick_order(db_session)
+    doc_id = _send_to_picking(client, db_session, order.id, picker.id)
+
+    app.dependency_overrides[get_current_user] = lambda: picker
+    try:
+        line = client.get(f"/api/v1/picking/documents/{doc_id}").json()["lines"][0]
+        line_id = line["id"]
+        pick_qty = 6
+        pick = client.post(
+            f"/api/v1/picking/lines/{line_id}/pick",
+            json={
+                "delta": pick_qty,
+                "request_id": f"pick-box-unpick-{uuid.uuid4().hex}",
+                "barcode": box_barcode,
+                "box_count": 1,
+            },
+        )
+        assert pick.status_code == 200, pick.text
+        assert pick.json()["line"]["picked_box_barcode"] == box_barcode
+
+        unpick = client.post(
+            f"/api/v1/picking/lines/{line_id}/unpick",
+            json={
+                "delta": pick_qty,
+                "reason": "wrong_location",
+                "request_id": f"unpick-box-{uuid.uuid4().hex}",
+            },
+        )
+        assert unpick.status_code == 200, unpick.text
+        assert unpick.json()["line"]["qty_picked"] == 0
+        assert unpick.json()["line"].get("picked_box_barcode") in (None, "")
     finally:
         app.dependency_overrides.pop(get_current_user, None)

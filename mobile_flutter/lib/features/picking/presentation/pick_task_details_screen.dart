@@ -957,6 +957,28 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                         fontFamily: 'monospace',
                       ),
                     ),
+                    if (profile == PickerProfileParam.controller) ...<Widget>[
+                      Builder(
+                        builder: (BuildContext context) {
+                          final String? pickedBox =
+                              displayPickedBoxBarcode(pickTargetHolder[0]);
+                          if (pickedBox == null) {
+                            return const SizedBox.shrink();
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              pickedBox,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     Text(
                       profile == PickerProfileParam.picker
