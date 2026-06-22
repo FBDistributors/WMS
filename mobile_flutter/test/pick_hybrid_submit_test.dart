@@ -212,10 +212,82 @@ void main() {
       boxBarcode: boxBarcode,
       unitsPerBox: 12,
       maxUnits: 1,
+      stockBoxCount: 5,
+      stockLooseUnits: 0,
     );
     expect(result.routedToBox, isTrue);
     expect(boxBarcode.text, 'BOX-99');
     expect(boxCount.text, '0');
+  });
+
+  test('applyHybridProductScan does not exceed prefilled loose for open-box', () async {
+    final TextEditingController boxCount = TextEditingController(text: '0');
+    final TextEditingController looseQty = TextEditingController(text: '1');
+    final TextEditingController boxBarcode = TextEditingController(text: 'BOX-1');
+    final TextEditingController productBarcode = TextEditingController();
+    final _RecordingScanner scanner = _RecordingScanner(
+      onResolve: (String raw) async => ScannerResolveOut(
+        type: ScannerResolveType.product,
+        productId: 'p1',
+        productName: 'P',
+        productBarcode: raw,
+        locationId: null,
+        locationCode: null,
+        entityId: null,
+        displayLabel: null,
+        message: null,
+        scanKind: 'unit',
+      ),
+    );
+    await applyHybridProductScan(
+      scanner: scanner,
+      raw: 'UNIT-1',
+      boxCount: boxCount,
+      looseQty: looseQty,
+      boxBarcode: boxBarcode,
+      productBarcode: productBarcode,
+      unitsPerBox: 12,
+      maxUnits: 1,
+      stockBoxCount: 5,
+      stockLooseUnits: 0,
+    );
+    expect(productBarcode.text, 'UNIT-1');
+    expect(looseQty.text, '1');
+  });
+
+  test('applyHybridBoxScan does not exceed prefilled box count', () async {
+    final TextEditingController boxCount = TextEditingController(text: '1');
+    final TextEditingController looseQty = TextEditingController(text: '2');
+    final TextEditingController boxBarcode = TextEditingController();
+    final _RecordingScanner scanner = _RecordingScanner(
+      onResolve: (String raw) async => ScannerResolveOut(
+        type: ScannerResolveType.product,
+        productId: 'p1',
+        productName: 'P',
+        productBarcode: raw,
+        locationId: null,
+        locationCode: null,
+        entityId: null,
+        displayLabel: null,
+        message: null,
+        scanKind: 'box',
+        unitsPerScan: 8,
+      ),
+    );
+    await applyHybridBoxScan(
+      scanner: scanner,
+      raw: 'BOX-99',
+      boxCount: boxCount,
+      looseQty: looseQty,
+      boxBarcode: boxBarcode,
+      unitsPerBox: 8,
+      maxUnits: 10,
+      stockBoxCount: 5,
+      stockLooseUnits: 0,
+    );
+    expect(boxBarcode.text, 'BOX-99');
+    expect(boxCount.text, '1');
+    expect(looseQty.text, '2');
   });
 
   test('submitHybridPick open-box uses combined pick with boxesToOpen', () async {

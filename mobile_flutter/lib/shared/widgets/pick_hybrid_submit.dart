@@ -295,6 +295,21 @@ Future<void> submitHybridPick({
 
 typedef HybridScanApplyResult = ({int? unitsPerBox, bool routedToBox});
 
+/// Skan bump uchun maqsadli quti/dona (defaultlar bilan bir xil mantiq).
+({int boxCount, int looseQty}) hybridScanTargetQty({
+  required int maxPick,
+  required int? unitsPerBox,
+  int? stockBoxCount,
+  int? stockLooseUnits,
+}) {
+  return computeLocationAwareHybridDefaults(
+    maxPick: maxPick,
+    unitsPerBox: unitsPerBox,
+    stockBoxCount: stockBoxCount,
+    stockLooseUnits: stockLooseUnits,
+  );
+}
+
 Future<HybridScanApplyResult> applyHybridBoxScan({
   required ScannerRepository scanner,
   required String raw,
@@ -304,6 +319,8 @@ Future<HybridScanApplyResult> applyHybridBoxScan({
   required int? unitsPerBox,
   required double maxUnits,
   bool bumpCount = true,
+  int? stockBoxCount,
+  int? stockLooseUnits,
 }) async {
   final HybridBoxScanResult result = await resolveHybridBoxBarcode(scanner, raw);
   final int? newUpb = result.unitsPerBox ?? unitsPerBox;
@@ -312,16 +329,26 @@ Future<HybridScanApplyResult> applyHybridBoxScan({
     final int upbVal = newUpb ?? unitsPerBox ?? 0;
     if (upbVal >= 1) {
       final int maxPick = max(0, maxUnits.round());
+      final int looseStock = stockLooseUnits ?? 0;
       final HybridPickPlan? plan = computeHybridPickPlan(
         total: maxPick,
         unitsPerBox: upbVal,
-        availableLoose: 0,
+        availableLoose: looseStock,
       );
-      final bool shouldBump = plan != null &&
-          (plan.fullBoxes > 0 || maxPick >= upbVal);
-      if (shouldBump) {
+      final ({int boxCount, int looseQty}) target = hybridScanTargetQty(
+        maxPick: maxPick,
+        unitsPerBox: upbVal,
+        stockBoxCount: stockBoxCount,
+        stockLooseUnits: stockLooseUnits,
+      );
+      final bool isOpenBoxOnly = plan != null &&
+          plan.fullBoxes == 0 &&
+          plan.boxesToOpen > 0;
+      if (!isOpenBoxOnly) {
         final int bc = int.tryParse(boxCount.text.trim()) ?? 0;
-        boxCount.text = '${bc + 1}';
+        if (bc < target.boxCount) {
+          boxCount.text = '${bc + 1}';
+        }
       }
     }
     capHybridQtyToMax(
@@ -344,6 +371,8 @@ Future<HybridScanApplyResult> applyHybridProductScan({
   required int? unitsPerBox,
   required double maxUnits,
   bool bumpCount = true,
+  int? stockBoxCount,
+  int? stockLooseUnits,
 }) async {
   final HybridBoxScanResult result = await resolveHybridProductBarcode(scanner, raw);
   if (result.unitsPerBox != null) {
@@ -356,12 +385,23 @@ Future<HybridScanApplyResult> applyHybridProductScan({
       unitsPerBox: result.unitsPerBox ?? unitsPerBox,
       maxUnits: maxUnits,
       bumpCount: bumpCount,
+      stockBoxCount: stockBoxCount,
+      stockLooseUnits: stockLooseUnits,
     );
   }
   productBarcode.text = result.barcode;
   if (bumpCount && result.barcode.isNotEmpty) {
+    final int maxPick = max(0, maxUnits.round());
+    final ({int boxCount, int looseQty}) target = hybridScanTargetQty(
+      maxPick: maxPick,
+      unitsPerBox: unitsPerBox,
+      stockBoxCount: stockBoxCount,
+      stockLooseUnits: stockLooseUnits,
+    );
     final int lq = int.tryParse(looseQty.text.trim()) ?? 0;
-    looseQty.text = '${lq + 1}';
+    if (lq < target.looseQty) {
+      looseQty.text = '${lq + 1}';
+    }
     capHybridQtyToMax(
       boxCount: boxCount,
       looseQty: looseQty,

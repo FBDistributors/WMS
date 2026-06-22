@@ -306,6 +306,8 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
           productBarcode: productBarcodeCtrl,
           unitsPerBox: unitsPerBox,
           maxUnits: rem,
+          stockBoxCount: locationAltHint.boxCount,
+          stockLooseUnits: locationAltHint.looseUnits,
         );
         unitsPerBox = scanRes.unitsPerBox ?? unitsPerBox;
       } on Object {
@@ -473,6 +475,8 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                           boxBarcode: boxBarcodeCtrl,
                           unitsPerBox: sheetUnitsPerBox,
                           maxUnits: rem,
+                          stockBoxCount: locationAltHint.boxCount,
+                          stockLooseUnits: locationAltHint.looseUnits,
                         );
                         setM(() {
                           if (result.unitsPerBox != null) {
@@ -491,6 +495,8 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                           productBarcode: productBarcodeCtrl,
                           unitsPerBox: sheetUnitsPerBox,
                           maxUnits: rem,
+                          stockBoxCount: locationAltHint.boxCount,
+                          stockLooseUnits: locationAltHint.looseUnits,
                         );
                         setM(() {
                           if (result.unitsPerBox != null) {
@@ -512,6 +518,8 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                             boxBarcode: boxBarcodeCtrl,
                             unitsPerBox: sheetUnitsPerBox,
                             maxUnits: rem,
+                            stockBoxCount: locationAltHint.boxCount,
+                            stockLooseUnits: locationAltHint.looseUnits,
                           );
                           setM(() {
                             if (result.unitsPerBox != null) {
@@ -536,6 +544,8 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                             productBarcode: productBarcodeCtrl,
                             unitsPerBox: sheetUnitsPerBox,
                             maxUnits: rem,
+                            stockBoxCount: locationAltHint.boxCount,
+                            stockLooseUnits: locationAltHint.looseUnits,
                           );
                           setM(() {
                             if (result.unitsPerBox != null) {

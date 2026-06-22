@@ -110,6 +110,7 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
     }
     try {
       final double rem = widget.product.totalRequired - widget.product.totalPicked;
+      final ({int? looseUnits, int? boxCount}) locationAltHint = _locationAltHint();
       final HybridScanApplyResult scanRes = await applyHybridProductScan(
         scanner: ref.read(scannerRepositoryProvider),
         raw: raw,
@@ -119,6 +120,8 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
         productBarcode: _productBarcode,
         unitsPerBox: _unitsPerBox,
         maxUnits: rem,
+        stockBoxCount: locationAltHint.boxCount,
+        stockLooseUnits: locationAltHint.looseUnits,
       );
       if (!mounted) {
         return;
@@ -172,6 +175,7 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
       return;
     }
     final double rem = widget.product.totalRequired - widget.product.totalPicked;
+    final ({int? looseUnits, int? boxCount}) locationAltHint = _locationAltHint();
     final HybridScanApplyResult result = await applyHybridBoxScan(
       scanner: widget.ref.read(scannerRepositoryProvider),
       raw: code,
@@ -180,6 +184,8 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
       boxBarcode: _boxBarcode,
       unitsPerBox: _unitsPerBox,
       maxUnits: rem,
+      stockBoxCount: locationAltHint.boxCount,
+      stockLooseUnits: locationAltHint.looseUnits,
     );
     if (!mounted) {
       return;
@@ -197,6 +203,7 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
       return;
     }
     final double rem = widget.product.totalRequired - widget.product.totalPicked;
+    final ({int? looseUnits, int? boxCount}) locationAltHint = _locationAltHint();
     final HybridScanApplyResult result = await applyHybridProductScan(
       scanner: widget.ref.read(scannerRepositoryProvider),
       raw: code,
@@ -206,6 +213,8 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
       productBarcode: _productBarcode,
       unitsPerBox: _unitsPerBox,
       maxUnits: rem,
+      stockBoxCount: locationAltHint.boxCount,
+      stockLooseUnits: locationAltHint.looseUnits,
     );
     if (!mounted) {
       return;
@@ -417,6 +426,8 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
                   boxBarcode: _boxBarcode,
                   unitsPerBox: _unitsPerBox,
                   maxUnits: rem,
+                  stockBoxCount: locationAltHint.boxCount,
+                  stockLooseUnits: locationAltHint.looseUnits,
                 );
                 if (!mounted) {
                   return;
@@ -437,6 +448,8 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
                   productBarcode: _productBarcode,
                   unitsPerBox: _unitsPerBox,
                   maxUnits: rem,
+                  stockBoxCount: locationAltHint.boxCount,
+                  stockLooseUnits: locationAltHint.looseUnits,
                 );
                 if (!mounted) {
                   return;

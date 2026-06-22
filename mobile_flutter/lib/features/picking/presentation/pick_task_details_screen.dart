@@ -885,6 +885,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
           unitsPerBox: hybridUnitsPerBox,
           maxUnits: hybridMaxUnits,
           bumpCount: bumpScanQty,
+          stockBoxCount: locationAltHint.boxCount,
+          stockLooseUnits: locationAltHint.looseUnits,
         );
         hybridUnitsPerBox = scanRes.unitsPerBox ?? hybridUnitsPerBox;
       } else {
@@ -898,6 +900,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
           unitsPerBox: hybridUnitsPerBox,
           maxUnits: hybridMaxUnits,
           bumpCount: bumpScanQty,
+          stockBoxCount: locationAltHint.boxCount,
+          stockLooseUnits: locationAltHint.looseUnits,
         );
         hybridUnitsPerBox = scanRes.unitsPerBox ?? hybridUnitsPerBox;
       }
@@ -1205,6 +1209,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                             unitsPerBox: hybridUnitsPerBox,
                             maxUnits: pickTargetHolder[0].qtyRequired -
                                 pickTargetHolder[0].qtyPicked,
+                            stockBoxCount: activeLocationHint.boxCount,
+                            stockLooseUnits: activeLocationHint.looseUnits,
                           );
                           setM(() {
                             if (result.unitsPerBox != null) {
@@ -1224,6 +1230,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                             unitsPerBox: hybridUnitsPerBox,
                             maxUnits: pickTargetHolder[0].qtyRequired -
                                 pickTargetHolder[0].qtyPicked,
+                            stockBoxCount: activeLocationHint.boxCount,
+                            stockLooseUnits: activeLocationHint.looseUnits,
                           );
                           setM(() {
                             if (result.unitsPerBox != null) {
@@ -1246,6 +1254,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                               unitsPerBox: hybridUnitsPerBox,
                               maxUnits: pickTargetHolder[0].qtyRequired -
                                   pickTargetHolder[0].qtyPicked,
+                              stockBoxCount: activeLocationHint.boxCount,
+                              stockLooseUnits: activeLocationHint.looseUnits,
                             );
                             setM(() {
                               if (result.unitsPerBox != null) {
@@ -1271,6 +1281,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                               unitsPerBox: hybridUnitsPerBox,
                               maxUnits: pickTargetHolder[0].qtyRequired -
                                   pickTargetHolder[0].qtyPicked,
+                              stockBoxCount: activeLocationHint.boxCount,
+                              stockLooseUnits: activeLocationHint.looseUnits,
                             );
                             setM(() {
                               if (result.unitsPerBox != null) {
