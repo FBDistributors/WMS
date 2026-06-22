@@ -783,6 +783,17 @@ def validate_hybrid_pick_qty(
     box_units = Decimal(str(box.units_per_box * box_count))
     qty_dec = Decimal(str(total_qty))
     if qty_dec < box_units:
+        plan = compute_hybrid_pick_plan(
+            int(qty_dec),
+            box.units_per_box,
+            available_loose=0,
+        )
+        if (
+            plan is not None
+            and plan.full_boxes == 0
+            and plan.boxes_to_open > 0
+        ):
+            return Decimal("0"), qty_dec
         raise HTTPException(
             status_code=400,
             detail=f"qty {int(qty_dec)} < box_count * units_per_box ({int(box_units)})",

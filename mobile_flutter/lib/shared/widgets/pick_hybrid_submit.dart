@@ -1,10 +1,12 @@
 import 'dart:async' show unawaited;
+import 'dart:math' show max;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/app_state/app_locale.dart';
 import '../../core/router/scanner_args.dart';
+import '../../features/product_boxes/box_qty_breakdown.dart';
 import '../../features/product_boxes/data/product_box_models.dart';
 import '../../features/product_boxes/data/product_box_repository.dart';
 import '../../features/scanner/data/scanner_repository.dart';
@@ -125,13 +127,17 @@ String? hybridBoxOnlyStockValidationMessage({
   required PickHybridQty hybrid,
   int? primaryLooseUnits,
   int? primaryBoxCount,
+  String? boxBarcode,
 }) {
   if (hybrid.boxCount > 0 || hybrid.looseUnits < 1) {
     return null;
   }
+  if (boxBarcode != null && boxBarcode.trim().isNotEmpty) {
+    return null;
+  }
   final int loose = primaryLooseUnits ?? 0;
   if (loose < 1 && (primaryBoxCount ?? 0) > 0) {
-    return StringLookup.t(loc, 'pickUseBoxScan');
+    return StringLookup.t(loc, 'pickHybridScanBoxFirst');
   }
   return null;
 }
@@ -201,7 +207,47 @@ Future<void> submitHybridPick({
   required HybridBoxPickFn pickBox,
   required HybridUnitPickFn pickUnit,
   HybridCombinedPickFn? pickCombined,
+  int? unitsPerBox,
 }) async {
+  final String? boxCode = boxBarcode?.trim();
+  final String? productCode = productBarcode?.trim();
+  final bool hasBoxCode = boxCode != null && boxCode.isNotEmpty;
+
+  if (hybrid.looseUnits > 0 &&
+      hybrid.boxCount == 0 &&
+      hasBoxCode &&
+      productCode != null &&
+      productCode.isNotEmpty) {
+    int openBoxCount = 1;
+    final int upb = unitsPerBox ?? 0;
+    if (upb >= 1) {
+      final HybridPickPlan? plan = computeHybridPickPlan(
+        total: hybrid.total,
+        unitsPerBox: upb,
+        availableLoose: 0,
+      );
+      if (plan != null && plan.boxesToOpen > 0) {
+        openBoxCount = plan.boxesToOpen;
+      }
+    }
+    final HybridCombinedPickFn combined = pickCombined ??
+        (({
+          required int totalQty,
+          required int boxCount,
+          required String productBarcode,
+          required String boxBarcode,
+        }) async {
+          await pickUnit(qty: hybrid.looseUnits, barcode: productBarcode);
+        });
+    await combined(
+      totalQty: hybrid.total,
+      boxCount: openBoxCount,
+      productBarcode: productCode,
+      boxBarcode: boxCode,
+    );
+    return;
+  }
+
   if (hybrid.boxCount > 0 && hybrid.looseUnits > 0) {
     final HybridCombinedPickFn combined = pickCombined ??
         (({
@@ -263,8 +309,21 @@ Future<HybridScanApplyResult> applyHybridBoxScan({
   final int? newUpb = result.unitsPerBox ?? unitsPerBox;
   boxBarcode.text = result.barcode;
   if (bumpCount && result.barcode.isNotEmpty) {
-    final int bc = int.tryParse(boxCount.text.trim()) ?? 0;
-    boxCount.text = '${bc + 1}';
+    final int upbVal = newUpb ?? unitsPerBox ?? 0;
+    if (upbVal >= 1) {
+      final int maxPick = max(0, maxUnits.round());
+      final HybridPickPlan? plan = computeHybridPickPlan(
+        total: maxPick,
+        unitsPerBox: upbVal,
+        availableLoose: 0,
+      );
+      final bool shouldBump = plan != null &&
+          (plan.fullBoxes > 0 || maxPick >= upbVal);
+      if (shouldBump) {
+        final int bc = int.tryParse(boxCount.text.trim()) ?? 0;
+        boxCount.text = '${bc + 1}';
+      }
+    }
     capHybridQtyToMax(
       boxCount: boxCount,
       looseQty: looseQty,

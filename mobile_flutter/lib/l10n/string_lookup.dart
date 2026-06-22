@@ -340,6 +340,20 @@ abstract final class StringLookup {
     'kirimNewBoxBarcodeHint': 'Skanerlang yoki shtrix kodni qo‘lda kiriting',
     'kirimNewBoxBarcodeConfirm': 'Shtrix kodni tasdiqlash',
     'kirimNewBoxQtyIncomplete': 'Quti skani, hajmi va sonini to‘ldiring',
+    'receivingLocationSingleExpiry':
+        'Bitta lokatsiyaga ikki xil muddati bor mahsulotni kirg\'azish taqiqlanadi. Ushbu lokatsiyada bu mahsulot boshqa muddat bilan mavjud.',
+    'receivingBoxBarcodeCountRequired':
+        'Quti shtrix-kodi va quti soni birgalikda berilishi kerak',
+    'receivingQtyBelowBoxUnits':
+        'Miqdor ({{qty}}) quti hajmidan kam: kamida {{expected}} dona kerak',
+    'receivingInsufficientStock':
+        'Qabul qilingan qoldiq yetarli emas (kerak {{needed}}, mavjud {{available}})',
+    'receivingBoxPlacementNotConfigured':
+        'Quti joylashuvi sozlanmagan. Administrator bilan bog\'laning.',
+    'receivingExpiryInPast': 'Yaroqlilik muddati o\'tgan — qabul qilish mumkin emas',
+    'receivingProductNotFound': 'Mahsulot topilmadi',
+    'receivingLocationNotFound': 'Lokatsiya topilmadi',
+    'receivingLotProductMismatch': 'Partiya mahsulotga mos emas',
     'pickUseBoxScan': 'Dona terish uchun qoldiq yetmaydi — quti skan qiling',
     'pickDataInconsistent':
         'Ma\'lumot nomuvofiqligi: quti yozuvlari qoldiq bilan mos emas. Quti skan qiling yoki administrator bilan bog\'laning.',
@@ -351,6 +365,7 @@ abstract final class StringLookup {
     'pickHybridExtraLoose': 'Qo‘shimcha dona (qutisiz)',
     'pickHybridTotal': 'Jami: {{boxes}} × {{upb}} + {{loose}} = {{total}} dona',
     'pickHybridScanBox': 'Quti skan',
+    'pickHybridBoxBarcode': 'Quti shtrix-kodi',
     'pickHybridScanProduct': 'Mahsulot skan',
     'pickHybridScanBoxFirst': 'Avval quti skan qiling',
     'pickHybridScanProductFirst': 'Qo‘shimcha dona uchun mahsulot skan qiling',
@@ -745,6 +760,20 @@ abstract final class StringLookup {
     'kirimNewBoxBarcodeHint': 'Отсканируйте или введите штрихкод вручную',
     'kirimNewBoxBarcodeConfirm': 'Подтвердить штрихкод',
     'kirimNewBoxQtyIncomplete': 'Укажите скан коробки, размер и количество',
+    'receivingLocationSingleExpiry':
+        'На одну ячейку нельзя размещать один товар с разными сроками годности. В этой ячейке товар уже есть с другим сроком.',
+    'receivingBoxBarcodeCountRequired':
+        'Штрих-код коробки и количество коробок должны быть указаны вместе',
+    'receivingQtyBelowBoxUnits':
+        'Количество ({{qty}}) меньше объёма коробок: нужно минимум {{expected}} шт.',
+    'receivingInsufficientStock':
+        'Недостаточно принятого остатка (нужно {{needed}}, доступно {{available}})',
+    'receivingBoxPlacementNotConfigured':
+        'Размещение коробок не настроено. Обратитесь к администратору.',
+    'receivingExpiryInPast': 'Срок годности истёк — приёмка невозможна',
+    'receivingProductNotFound': 'Товар не найден',
+    'receivingLocationNotFound': 'Ячейка не найдена',
+    'receivingLotProductMismatch': 'Партия не соответствует товару',
     'pickUseBoxScan': 'Недостаточно штук — отсканируйте коробку',
     'pickDataInconsistent':
         'Несоответствие данных: записи коробок не совпадают с остатком. Отсканируйте коробку или обратитесь к администратору.',
@@ -756,6 +785,7 @@ abstract final class StringLookup {
     'pickHybridExtraLoose': 'Доп. штуки (без коробки)',
     'pickHybridTotal': 'Итого: {{boxes}} × {{upb}} + {{loose}} = {{total}} шт.',
     'pickHybridScanBox': 'Скан коробки',
+    'pickHybridBoxBarcode': 'Штрих-код коробки',
     'pickHybridScanProduct': 'Скан товара',
     'pickHybridScanBoxFirst': 'Сначала отсканируйте коробку',
     'pickHybridScanProductFirst': 'Для доп. штук отсканируйте товар',
@@ -1151,6 +1181,20 @@ abstract final class StringLookup {
     'kirimNewBoxBarcodeHint': 'Scan or enter the barcode manually',
     'kirimNewBoxBarcodeConfirm': 'Confirm barcode',
     'kirimNewBoxQtyIncomplete': 'Complete box scan, size, and count',
+    'receivingLocationSingleExpiry':
+        'A location cannot hold the same product with different expiry dates. This location already has this product with a different expiry.',
+    'receivingBoxBarcodeCountRequired':
+        'Box barcode and box count must be provided together',
+    'receivingQtyBelowBoxUnits':
+        'Quantity ({{qty}}) is below box total: at least {{expected}} units required',
+    'receivingInsufficientStock':
+        'Insufficient received stock (need {{needed}}, available {{available}})',
+    'receivingBoxPlacementNotConfigured':
+        'Box placement is not configured. Contact an administrator.',
+    'receivingExpiryInPast': 'Expiry date is in the past — receiving is not allowed',
+    'receivingProductNotFound': 'Product not found',
+    'receivingLocationNotFound': 'Location not found',
+    'receivingLotProductMismatch': 'Lot does not match the product',
     'pickUseBoxScan': 'Not enough loose units — scan a box',
     'pickDataInconsistent':
         'Data mismatch: box records do not match stock. Scan a box or contact an administrator.',
@@ -1162,6 +1206,7 @@ abstract final class StringLookup {
     'pickHybridExtraLoose': 'Extra loose units',
     'pickHybridTotal': 'Total: {{boxes}} × {{upb}} + {{loose}} = {{total}} units',
     'pickHybridScanBox': 'Scan box',
+    'pickHybridBoxBarcode': 'Box barcode',
     'pickHybridScanProduct': 'Scan product',
     'pickHybridScanBoxFirst': 'Scan the box first',
     'pickHybridScanProductFirst': 'Scan the product for loose units',

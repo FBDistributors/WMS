@@ -565,6 +565,7 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                               syncHybridBoxBarcodeWithQty(
                                 boxCount: boxCountCtrl,
                                 boxBarcode: boxBarcodeCtrl,
+                                looseQty: looseQtyCtrl,
                               );
                               final PickHybridQty submitHybrid =
                                   pickHybridQtyFromControllers(
@@ -579,6 +580,7 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                                 hybrid: submitHybrid,
                                 primaryLooseUnits: locationAltHint.looseUnits,
                                 primaryBoxCount: locationAltHint.boxCount,
+                                boxBarcode: boxBarcodeCtrl.text,
                               );
                               if (boxOnlyValidation != null) {
                                 showAppSnackBar(
@@ -607,6 +609,7 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                                   hybrid: submitHybrid,
                                   boxBarcode: boxBarcodeCtrl.text,
                                   productBarcode: productBarcodeCtrl.text,
+                                  unitsPerBox: sheetUnitsPerBox,
                                   pickBox: ({
                                     required int qty,
                                     required int boxCount,

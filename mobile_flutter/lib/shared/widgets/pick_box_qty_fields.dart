@@ -265,9 +265,18 @@ void capHybridQtyToMax({
   int loose = max(0, int.tryParse(looseQty.text.trim()) ?? 0);
   final int upb = unitsPerBox ?? 0;
 
-  int total() => (bc > 0 && upb >= 1 ? bc * upb : 0) + loose;
+  int rawTotal() => (bc > 0 && upb >= 1 ? bc * upb : 0) + loose;
 
-  while (total() > maxPick) {
+  while (rawTotal() > maxPick) {
+    if (computePickHybridQty(
+          boxCount: bc,
+          looseQty: loose,
+          unitsPerBox: upb >= 1 ? upb : null,
+          maxUnits: maxUnits,
+        ).total <=
+        maxPick) {
+      break;
+    }
     if (loose > 0) {
       loose--;
     } else if (bc > 0 && upb >= 1) {
@@ -624,15 +633,22 @@ int? _unitsPerBoxFromAlternate(PickingAlternateLocation a) {
   return primaryAlternateBoxHint(alternates);
 }
 
-/// Quti soni 0 bo'lsa quti barcode maydonini tozalash.
+/// Quti soni 0 bo'lsa quti barcode maydonini tozalash (open-box qisman terishda saqlanadi).
 void syncHybridBoxBarcodeWithQty({
   required TextEditingController boxCount,
   TextEditingController? boxBarcode,
+  TextEditingController? looseQty,
 }) {
   if (boxBarcode == null) {
     return;
   }
   final int bc = int.tryParse(boxCount.text.trim()) ?? 0;
+  final int loose = looseQty != null
+      ? (int.tryParse(looseQty.text.trim()) ?? 0)
+      : 0;
+  if (bc < 1 && loose > 0 && boxBarcode.text.trim().isNotEmpty) {
+    return;
+  }
   if (bc < 1 && boxBarcode.text.isNotEmpty) {
     boxBarcode.clear();
   }
@@ -664,6 +680,7 @@ String? hybridPickStockHintMessage({
   required PickHybridQty hybrid,
   int? stockLooseUnits,
   int? stockBoxCount,
+  String? boxBarcode,
 }) {
   final int stockLoose = stockLooseUnits ?? 0;
   final int stockBoxes = stockBoxCount ?? 0;
@@ -686,6 +703,13 @@ String? hybridPickStockHintMessage({
     );
   }
   if (hybrid.looseUnits > 0 && hybrid.boxCount == 0 && stockLoose < 1 && stockBoxes > 0) {
+    if (boxBarcode != null && boxBarcode.trim().isNotEmpty) {
+      return StringLookup.tParams(
+        loc,
+        'pickHybridOpenBoxHint',
+        <String, String>{'loose': '${hybrid.looseUnits}'},
+      );
+    }
     return StringLookup.t(loc, 'pickUseBoxScan');
   }
   if (hybrid.looseUnits > 0 &&
@@ -761,6 +785,7 @@ class PickHybridQtyFields extends StatelessWidget {
   Widget _barcodeScanRow({
     required TextEditingController controller,
     required String label,
+    required String fieldLabel,
     required VoidCallback? onScan,
     required Future<void> Function(String code)? onSubmitted,
     required VoidCallback? onChanged,
@@ -773,7 +798,7 @@ class PickHybridQtyFields extends StatelessWidget {
             controller: controller,
             enabled: !busy,
             decoration: InputDecoration(
-              labelText: label,
+              labelText: fieldLabel,
               border: const OutlineInputBorder(),
             ),
             onChanged: (_) => onChanged?.call(),
@@ -814,8 +839,19 @@ class PickHybridQtyFields extends StatelessWidget {
       final bool needsBox = hybrid.boxCount > 0;
       final bool needsProduct = hybrid.looseUnits > 0;
       final bool canShowBoxFields = upb != null && upb >= 1;
+      final bool looseOnly = isLooseOnlyLocation(
+        stockBoxCount: stockBoxCount,
+        stockLooseUnits: looseUnits,
+      );
+      final bool showBoxBarcodeField = !looseOnly &&
+          canShowBoxFields &&
+          boxBarcode != null &&
+          onScanBox != null;
       final String? hintKey =
           needsBox && !needsProduct ? 'controllerVerifyScanBoxHint' : null;
+      final String boxFieldLabel = StringLookup.t(loc, 'pickHybridBoxBarcode');
+      final String boxScanLabel = StringLookup.t(loc, 'pickHybridScanBox');
+      final String productFieldLabel = StringLookup.t(loc, 'pickHybridScanProduct');
 
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -827,17 +863,18 @@ class PickHybridQtyFields extends StatelessWidget {
             ),
             const SizedBox(height: 12),
           ],
-          if (needsBox && boxBarcode != null && onScanBox != null) ...<Widget>[
+          if (showBoxBarcodeField) ...<Widget>[
             _barcodeScanRow(
               controller: boxBarcode!,
-              label: StringLookup.t(loc, 'pickHybridScanBox'),
+              label: boxScanLabel,
+              fieldLabel: boxFieldLabel,
               onScan: onScanBox,
               onSubmitted: onBoxBarcodeSubmitted,
               onChanged: onBoxBarcodeChanged,
             ),
             const SizedBox(height: 12),
           ],
-          if (needsBox && canShowBoxFields) ...<Widget>[
+          if ((needsBox || showBoxBarcodeField) && canShowBoxFields) ...<Widget>[
             if (hybridShowUnitsPerBoxField(
               boxBarcode: boxBarcode,
               boxCount: boxCount,
@@ -851,19 +888,21 @@ class PickHybridQtyFields extends StatelessWidget {
               ),
               const SizedBox(height: 12),
             ],
-            InputDecorator(
-              decoration: InputDecoration(
-                labelText: StringLookup.t(loc, 'kirimNewBoxCount'),
-                border: const OutlineInputBorder(),
+            if (needsBox)
+              InputDecorator(
+                decoration: InputDecoration(
+                  labelText: StringLookup.t(loc, 'kirimNewBoxCount'),
+                  border: const OutlineInputBorder(),
+                ),
+                child: Text(boxCount.text.trim().isEmpty ? '0' : boxCount.text),
               ),
-              child: Text(boxCount.text.trim().isEmpty ? '0' : boxCount.text),
-            ),
           ],
-          if (needsBox && needsProduct) const SizedBox(height: 16),
+          if (showBoxBarcodeField && needsProduct) const SizedBox(height: 16),
           if (needsProduct && productBarcode != null && onScanProduct != null) ...<Widget>[
             _barcodeScanRow(
               controller: productBarcode!,
-              label: StringLookup.t(loc, 'pickHybridScanProduct'),
+              label: productFieldLabel,
+              fieldLabel: productFieldLabel,
               onScan: onScanProduct,
               onSubmitted: onProductBarcodeSubmitted,
               onChanged: onProductBarcodeChanged,
@@ -899,11 +938,20 @@ class PickHybridQtyFields extends StatelessWidget {
       stockLooseUnits: looseUnits,
     );
     final bool canEditBoxCount = !looseOnly && upb != null && upb >= 1;
+    final bool showBoxBarcodeField = canEditBoxCount &&
+        boxBarcode != null &&
+        onScanBox != null;
+    final bool showProductBarcodeField =
+        productBarcode != null && onScanProduct != null;
+    final String boxFieldLabel = StringLookup.t(loc, 'pickHybridBoxBarcode');
+    final String boxScanLabel = StringLookup.t(loc, 'pickHybridScanBox');
+    final String productFieldLabel = StringLookup.t(loc, 'pickHybridScanProduct');
     final String? stockHint = hybridPickStockHintMessage(
       loc: loc,
       hybrid: hybrid,
       stockLooseUnits: looseUnits,
       stockBoxCount: stockBoxCount,
+      boxBarcode: boxBarcode?.text,
     );
 
     if (looseOnly || upb == null || upb < 1) {
@@ -920,7 +968,8 @@ class PickHybridQtyFields extends StatelessWidget {
           if (productBarcode != null && onScanProduct != null) ...<Widget>[
             _barcodeScanRow(
               controller: productBarcode!,
-              label: StringLookup.t(loc, 'pickHybridScanProduct'),
+              label: productFieldLabel,
+              fieldLabel: productFieldLabel,
               onScan: onScanProduct,
               onSubmitted: onProductBarcodeSubmitted,
               onChanged: onProductBarcodeChanged,
@@ -961,8 +1010,6 @@ class PickHybridQtyFields extends StatelessWidget {
       );
     }
 
-    final bool showHybridScans =
-        canEditBoxCount && boxBarcode != null && productBarcode != null;
     final bool showUnitsPerBox = hybridShowUnitsPerBoxField(
       boxBarcode: boxBarcode,
       boxCount: boxCount,
@@ -978,10 +1025,11 @@ class PickHybridQtyFields extends StatelessWidget {
           ),
           const SizedBox(height: 8),
         ],
-        if (showHybridScans) ...<Widget>[
+        if (showBoxBarcodeField) ...<Widget>[
           _barcodeScanRow(
             controller: boxBarcode!,
-            label: StringLookup.t(loc, 'pickHybridScanBox'),
+            label: boxScanLabel,
+            fieldLabel: boxFieldLabel,
             onScan: onScanBox,
             onSubmitted: onBoxBarcodeSubmitted,
             onChanged: onBoxBarcodeChanged,
@@ -1020,15 +1068,17 @@ class PickHybridQtyFields extends StatelessWidget {
             syncHybridBoxBarcodeWithQty(
               boxCount: boxCount,
               boxBarcode: boxBarcode,
+              looseQty: looseQty,
             );
             onFieldsChanged();
           },
         ),
         const SizedBox(height: 16),
-        if (showHybridScans) ...<Widget>[
+        if (showProductBarcodeField) ...<Widget>[
           _barcodeScanRow(
             controller: productBarcode!,
-            label: StringLookup.t(loc, 'pickHybridScanProduct'),
+            label: productFieldLabel,
+            fieldLabel: productFieldLabel,
             onScan: onScanProduct,
             onSubmitted: onProductBarcodeSubmitted,
             onChanged: onProductBarcodeChanged,

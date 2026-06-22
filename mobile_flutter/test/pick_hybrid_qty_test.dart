@@ -48,7 +48,7 @@ void main() {
     );
   });
 
-  test('capHybridQtyToMax trims overflow from loose then boxes', () {
+  test('capHybridQtyToMax keeps controllers when partial box fits within max', () {
     final TextEditingController boxCount = TextEditingController(text: '2');
     final TextEditingController looseQty = TextEditingController(text: '5');
     capHybridQtyToMax(
@@ -57,8 +57,17 @@ void main() {
       unitsPerBox: 6,
       maxUnits: 10,
     );
-    expect(boxCount.text, '1');
-    expect(looseQty.text, '0');
+    expect(boxCount.text, '2');
+    expect(looseQty.text, '5');
+    expect(
+      computePickHybridQty(
+        boxCount: 2,
+        looseQty: 5,
+        unitsPerBox: 6,
+        maxUnits: 10,
+      ).total,
+      10,
+    );
   });
 
   test('capHybridQtyToMax loose only within max unchanged', () {
@@ -108,6 +117,31 @@ void main() {
     expect(hybrid.boxCount, 0);
     expect(hybrid.looseUnits, 4);
     expect(hybrid.valid, isTrue);
+  });
+
+  test('capHybridQtyToMax keeps box count for partial pick within max', () {
+    final TextEditingController boxCount = TextEditingController(text: '1');
+    final TextEditingController looseQty = TextEditingController(text: '0');
+    capHybridQtyToMax(
+      boxCount: boxCount,
+      looseQty: looseQty,
+      unitsPerBox: 12,
+      maxUnits: 1,
+    );
+    expect(boxCount.text, '1');
+    expect(looseQty.text, '0');
+  });
+
+  test('syncHybridBoxBarcodeWithQty keeps barcode for open-box loose pick', () {
+    final TextEditingController boxCount = TextEditingController(text: '0');
+    final TextEditingController looseQty = TextEditingController(text: '1');
+    final TextEditingController boxBarcode = TextEditingController(text: 'BOX-1');
+    syncHybridBoxBarcodeWithQty(
+      boxCount: boxCount,
+      boxBarcode: boxBarcode,
+      looseQty: looseQty,
+    );
+    expect(boxBarcode.text, 'BOX-1');
   });
 
   test('syncHybridBoxBarcodeWithQty clears barcode when box count is zero', () {

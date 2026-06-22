@@ -1264,3 +1264,46 @@ def test_line_pick_hybrid_opens_box_for_partial_loose(
         assert bd_after.loose_units == 6
     finally:
         app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_line_pick_hybrid_open_box_single_unit(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """1 dona, 12/quti, faqat qutilar — quti ochib gibrid terish."""
+    order, picker, product, loc, lot, box_barcode = _seed_box_only_partial_pick_order(
+        db_session,
+        order_qty=1,
+        stock_qty=120,
+        box_count=10,
+        units_per_box=12,
+    )
+
+    doc_id = _send_to_picking(client, db_session, order.id, picker.id)
+
+    app.dependency_overrides[get_current_user] = lambda: picker
+    try:
+        line_id = client.get(f"/api/v1/picking/documents/{doc_id}").json()["lines"][0]["id"]
+        pick = client.post(
+            f"/api/v1/picking/lines/{line_id}/pick",
+            json={
+                "delta": 1,
+                "request_id": f"pick-open-box-1-{uuid.uuid4().hex}",
+                "barcode": product.barcode,
+                "box_barcode": box_barcode,
+                "box_count": 1,
+            },
+        )
+        assert pick.status_code == 200, pick.text
+        assert pick.json()["line"]["qty_picked"] == 1
+
+        bd_after = get_breakdown_for_pick(
+            db_session,
+            product_id=product.id,
+            lot_id=lot.id,
+            location_id=loc.id,
+        )
+        assert bd_after.loose_units == 11
+        assert bd_after.box_count == 9
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)

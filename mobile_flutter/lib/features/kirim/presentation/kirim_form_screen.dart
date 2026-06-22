@@ -1051,7 +1051,10 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     int submitQty;
 
     if (boxCount > 0) {
-      if (upb == null || _newReceiveBoxBarcode.text.trim().isEmpty) {
+      final String barcode = _newReceiveBoxBarcode.text.trim();
+      if (upb == null ||
+          barcode.isEmpty ||
+          barcode != _newReceiveResolvedBoxBarcode) {
         if (mounted) {
           showAppSnackBar(
             context,

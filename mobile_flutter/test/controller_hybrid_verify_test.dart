@@ -132,7 +132,7 @@ void main() {
       primaryLooseUnits: 0,
       primaryBoxCount: 131,
     );
-    expect(stockMsg, StringLookup.t(AppLocale.uz, 'pickUseBoxScan'));
+    expect(stockMsg, StringLookup.t(AppLocale.uz, 'pickHybridScanBoxFirst'));
 
     final String? verifyMsg = controllerHybridVerifyValidationMessage(
       loc: AppLocale.uz,

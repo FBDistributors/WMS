@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_flutter/core/app_state/app_locale.dart';
 import 'package:mobile_flutter/features/scanner/data/scanner_repository.dart';
+import 'package:mobile_flutter/l10n/string_lookup.dart';
 import 'package:mobile_flutter/shared/widgets/pick_box_qty_fields.dart';
 import 'package:mobile_flutter/shared/widgets/pick_hybrid_submit.dart';
 
@@ -184,6 +185,89 @@ void main() {
     expect(looseQty.text, '2');
   });
 
+  test('applyHybridBoxScan does not bump when open-box only', () async {
+    final TextEditingController boxCount = TextEditingController(text: '0');
+    final TextEditingController looseQty = TextEditingController(text: '1');
+    final TextEditingController boxBarcode = TextEditingController();
+    final _RecordingScanner scanner = _RecordingScanner(
+      onResolve: (String raw) async => ScannerResolveOut(
+        type: ScannerResolveType.product,
+        productId: 'p1',
+        productName: 'P',
+        productBarcode: raw,
+        locationId: null,
+        locationCode: null,
+        entityId: null,
+        displayLabel: null,
+        message: null,
+        scanKind: 'box',
+        unitsPerScan: 12,
+      ),
+    );
+    final HybridScanApplyResult result = await applyHybridBoxScan(
+      scanner: scanner,
+      raw: 'BOX-99',
+      boxCount: boxCount,
+      looseQty: looseQty,
+      boxBarcode: boxBarcode,
+      unitsPerBox: 12,
+      maxUnits: 1,
+    );
+    expect(result.routedToBox, isTrue);
+    expect(boxBarcode.text, 'BOX-99');
+    expect(boxCount.text, '0');
+  });
+
+  test('submitHybridPick open-box uses combined pick with boxesToOpen', () async {
+    const PickHybridQty hybrid = PickHybridQty(
+      total: 1,
+      boxUnits: 0,
+      looseUnits: 1,
+      boxCount: 0,
+      valid: true,
+    );
+    int? combinedBoxCount;
+    await submitHybridPick(
+      hybrid: hybrid,
+      boxBarcode: 'BOX-OPEN',
+      productBarcode: 'PROD-1',
+      unitsPerBox: 12,
+      pickBox: ({
+        required int qty,
+        required int boxCount,
+        required String barcode,
+      }) async {},
+      pickUnit: ({required int qty, required String barcode}) async {},
+      pickCombined: ({
+        required int totalQty,
+        required int boxCount,
+        required String productBarcode,
+        required String boxBarcode,
+      }) async {
+        combinedBoxCount = boxCount;
+      },
+    );
+    expect(combinedBoxCount, 1);
+  });
+
+  test('hybridBoxOnlyStockValidationMessage allows when box barcode scanned', () {
+    const PickHybridQty hybrid = PickHybridQty(
+      total: 1,
+      boxUnits: 0,
+      looseUnits: 1,
+      boxCount: 0,
+      valid: true,
+    );
+    final String? allowed = hybridBoxOnlyStockValidationMessage(
+      loc: AppLocale.uz,
+      hybrid: hybrid,
+      primaryLooseUnits: 0,
+      primaryBoxCount: 2,
+      boxBarcode: 'BOX-1',
+    );
+    expect(allowed, isNull);
+  });
+
   test('hybridBoxOnlyStockValidationMessage uses location loose stock', () {
     const PickHybridQty hybrid = PickHybridQty(
       total: 4,
@@ -198,32 +282,7 @@ void main() {
       primaryLooseUnits: 0,
       primaryBoxCount: 2,
     );
-    expect(blocked, isNotNull);
-
-    final String? allowed = hybridBoxOnlyStockValidationMessage(
-      loc: AppLocale.uz,
-      hybrid: hybrid,
-      primaryLooseUnits: 5,
-      primaryBoxCount: 0,
-    );
-    expect(allowed, isNull);
-  });
-
-  test('hybridBoxOnlyStockValidationMessage blocks null loose with boxes', () {
-    const PickHybridQty hybrid = PickHybridQty(
-      total: 4,
-      boxUnits: 0,
-      looseUnits: 4,
-      boxCount: 0,
-      valid: true,
-    );
-    final String? blocked = hybridBoxOnlyStockValidationMessage(
-      loc: AppLocale.uz,
-      hybrid: hybrid,
-      primaryLooseUnits: null,
-      primaryBoxCount: 2,
-    );
-    expect(blocked, isNotNull);
+    expect(blocked, StringLookup.t(AppLocale.uz, 'pickHybridScanBoxFirst'));
   });
 }
 

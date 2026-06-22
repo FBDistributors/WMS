@@ -219,7 +219,26 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
 
   Future<void> _confirm() async {
     final double rem = widget.product.totalRequired - widget.product.totalPicked;
+    syncHybridBoxBarcodeWithQty(
+      boxCount: _boxCount,
+      boxBarcode: _boxBarcode,
+      looseQty: _looseQty,
+    );
     final PickHybridQty hybrid = _currentHybrid(rem);
+    final ({int? looseUnits, int? boxCount}) locationAltHint = _locationAltHint();
+    final String? boxOnlyValidation = hybridBoxOnlyStockValidationMessage(
+      loc: widget.loc,
+      hybrid: hybrid,
+      primaryLooseUnits: locationAltHint.looseUnits,
+      primaryBoxCount: locationAltHint.boxCount,
+      boxBarcode: _boxBarcode.text,
+    );
+    if (boxOnlyValidation != null) {
+      if (widget.host.mounted) {
+        showAppSnackBar(widget.host, SnackBar(content: Text(boxOnlyValidation)));
+      }
+      return;
+    }
     final String? validation = hybridPickValidationMessage(
       loc: widget.loc,
       hybrid: hybrid,
@@ -239,6 +258,7 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
         hybrid: hybrid,
         boxBarcode: _boxBarcode.text,
         productBarcode: _productBarcode.text,
+        unitsPerBox: _unitsPerBox,
         pickBox: ({
           required int qty,
           required int boxCount,

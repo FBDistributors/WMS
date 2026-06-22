@@ -1304,6 +1304,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                             syncHybridBoxBarcodeWithQty(
                               boxCount: hybridBoxCount,
                               boxBarcode: hybridBoxBarcode,
+                              looseQty: hybridLooseQty,
                             );
                             PickHybridQty hybrid = pickHybridQtyFromControllers(
                               boxCount: hybridBoxCount,
@@ -1322,6 +1323,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                               hybrid: hybrid,
                               primaryLooseUnits: submitLocationHint.looseUnits,
                               primaryBoxCount: submitLocationHint.boxCount,
+                              boxBarcode: hybridBoxBarcode.text,
                             );
                             if (boxOnlyValidation != null) {
                               _rejectScanHaptic();
@@ -1353,6 +1355,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                   hybrid: hybrid,
                                   boxBarcode: hybridBoxBarcode.text,
                                   productBarcode: hybridProductBarcode.text,
+                                  unitsPerBox: hybridUnitsPerBox,
                                   pickBox: ({
                                     required int qty,
                                     required int boxCount,
