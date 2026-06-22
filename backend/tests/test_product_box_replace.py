@@ -205,3 +205,51 @@ def test_replace_barcode_conflict_when_new_exists(client, db_session) -> None:
         assert res.status_code == 409
     finally:
         app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_replace_barcode_updates_units_per_box_with_sealed_placement(
+    client, db_session,
+) -> None:
+    """Bir xil barcode — sealed qutilar bo'lsa ham quti hajmi yangilanadi."""
+    admin = _admin(db_session)
+    inv = _inv_user(db_session)
+    product = _product(db_session)
+    location = _location(db_session)
+    lot = _seed_stock(db_session, product, location, 230)
+    box = ProductBoxModel(
+        box_barcode="BOX-UPB-FIX",
+        product_id=product.id,
+        units_per_box=10,
+        is_active=True,
+    )
+    db_session.add(box)
+    db_session.commit()
+    place_sealed_box(
+        db_session,
+        box_barcode=box.box_barcode,
+        location_id=location.id,
+        lot_id=lot.id,
+        user=inv,
+    )
+    db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        res = client.post(
+            "/api/v1/product-boxes/replace-barcode",
+            json={
+                "old_box_id": str(box.id),
+                "new_barcode": "BOX-UPB-FIX",
+                "product_id": str(product.id),
+                "units_per_box": 12,
+            },
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["units_per_box"] == 12
+
+        db_session.refresh(box)
+        assert box.box_barcode == "BOX-UPB-FIX"
+        assert box.units_per_box == 12
+        assert box.is_active is True
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)

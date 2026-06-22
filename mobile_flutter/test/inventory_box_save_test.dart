@@ -439,4 +439,21 @@ void main() {
     expect(state.looseUnits, 8);
     expect(state.totalUnits, 884);
   });
+
+  test('inventoryTargetTotalUnits uses corrected units per box', () {
+    final BoxLocationBreakdown b = _breakdown(
+      boxCount: 23,
+      unitsInBoxes: 230,
+      looseUnits: 0,
+      totalUnits: 230,
+    );
+    final int? total = inventoryTargetTotalUnits(
+      targetBoxCount: 23,
+      targetLooseQty: 0,
+      unitsPerBox: 12,
+      breakdown: b,
+      boxDelta: 0,
+    );
+    expect(total, 276);
+  });
 }

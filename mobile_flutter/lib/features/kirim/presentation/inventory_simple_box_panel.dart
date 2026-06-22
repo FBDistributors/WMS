@@ -56,6 +56,7 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
   String? _resolvedBarcode;
   String? _resolvedBoxId;
   int? _unitsPerBox;
+  int? _originalUnitsPerBox;
   bool _pendingBoxRegistration = false;
   bool _boxPrefilledFromBreakdown = false;
   BoxLocationBreakdown? _breakdown;
@@ -177,6 +178,7 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
       return;
     }
     _unitsPerBox = first.unitsPerBox;
+    _originalUnitsPerBox = first.unitsPerBox;
     _unitsPerBoxInput.text = '${first.unitsPerBox}';
     _boxCount.text = '${sealedBoxCountForBarcode(b, code)}';
   }
@@ -200,6 +202,7 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
     _resolvedBarcode = barcode;
     _resolvedBoxId = resolved.boxId;
     _unitsPerBox = resolved.unitsPerBox;
+    _originalUnitsPerBox = resolved.unitsPerBox;
     _pendingBoxRegistration = false;
     _unitsPerBoxInput.text = '${resolved.unitsPerBox}';
     _boxBarcode.text = barcode;
@@ -296,8 +299,9 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
         _boxBarcode.text = barcode;
         _resolvedBarcode = null;
         _resolvedBoxId = null;
-        _unitsPerBox = null;
-        _pendingBoxRegistration = true;
+              _unitsPerBox = null;
+              _originalUnitsPerBox = null;
+              _pendingBoxRegistration = true;
         _unitsPerBoxInput.clear();
       });
     } on Exception catch (e) {
@@ -348,6 +352,7 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
               _resolvedBarcode = null;
               _resolvedBoxId = null;
               _unitsPerBox = null;
+              _originalUnitsPerBox = null;
               _pendingBoxRegistration = false;
               _unitsPerBoxInput.clear();
             });
@@ -400,6 +405,7 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
         _resolvedBarcode = code;
         _resolvedBoxId = created.boxId;
         _unitsPerBox = created.unitsPerBox;
+        _originalUnitsPerBox = created.unitsPerBox;
         _pendingBoxRegistration = false;
         _unitsPerBoxInput.text = '${created.unitsPerBox}';
         _boxBarcode.text = code;
@@ -412,6 +418,58 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
             ? StringLookup.t(loc, 'inventoryBoxAlreadyExists')
             : localizeApiErrorMessage(loc, e);
         showAppSnackBar(context, SnackBar(content: Text(text)));
+      }
+      return false;
+    }
+  }
+
+  Future<bool> _updateUnitsPerBoxIfNeeded(AppLocale loc) async {
+    final int? newUpb = _unitsPerBoxForReplace();
+    if (newUpb == null || newUpb < 1) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          SnackBar(content: Text(StringLookup.t(loc, 'kirimNewReceiveFillAll'))),
+        );
+      }
+      return false;
+    }
+    final bool upbChanged =
+        _originalUnitsPerBox != null && newUpb != _originalUnitsPerBox;
+    if (!upbChanged) {
+      return true;
+    }
+    final String? boxId = _resolvedBoxId;
+    final String? barcode = _resolvedBarcode;
+    if (boxId == null || barcode == null || barcode.trim().isEmpty) {
+      return false;
+    }
+    try {
+      final ProductBoxResolve replaced =
+          await ref.read(productBoxRepositoryProvider).replaceBarcode(
+                ProductBoxReplaceBarcode(
+                  oldBoxId: boxId,
+                  newBarcode: barcode.trim(),
+                  productId: widget.productId,
+                  unitsPerBox: newUpb,
+                ),
+              );
+      if (!mounted) {
+        return false;
+      }
+      setState(() {
+        _unitsPerBox = replaced.unitsPerBox;
+        _originalUnitsPerBox = replaced.unitsPerBox;
+        _unitsPerBoxInput.text = '${replaced.unitsPerBox}';
+      });
+      await _loadBreakdown();
+      return true;
+    } on Exception catch (e) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          SnackBar(content: Text(_boxReplaceErrorMessage(loc, '$e'))),
+        );
       }
       return false;
     }
@@ -436,13 +494,18 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
       return;
     }
 
+    final int? newUpb = _unitsPerBoxForReplace();
+    final bool upbChanged =
+        _originalUnitsPerBox != null && newUpb != null && newUpb != _originalUnitsPerBox;
+
     if (!inventoryBoxSaveHasChanges(
       breakdown: b,
       boxBarcode: barcode.isEmpty ? null : barcode,
       targetBoxCount: targetBoxCount,
       targetLooseQty: targetLooseQty,
       looseAdjustLots: widget.looseAdjustLots,
-    )) {
+    ) &&
+        !upbChanged) {
       showAppSnackBar(
         context,
         SnackBar(content: Text(StringLookup.t(loc, 'inventoryNoChanges'))),
@@ -450,7 +513,29 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
       return;
     }
 
-    final int currentBoxes = currentBoxCountTarget(b, barcode);
+    if (upbChanged && barcode.isNotEmpty) {
+      if (_resolvedBoxId == null || _resolvedBarcode == null) {
+        final bool registered = await _ensureBoxRegistered(barcode);
+        if (!registered) {
+          return;
+        }
+      }
+      final bool upbUpdated = await _updateUnitsPerBoxIfNeeded(loc);
+      if (!upbUpdated) {
+        return;
+      }
+    } else if (newUpb == null || newUpb < 1) {
+      if (targetBoxCount > 0 || barcode.isNotEmpty) {
+        showAppSnackBar(
+          context,
+          SnackBar(content: Text(StringLookup.t(loc, 'kirimNewReceiveFillAll'))),
+        );
+        return;
+      }
+    }
+
+    final BoxLocationBreakdown? breakdownForSave = _breakdown ?? b;
+    final int currentBoxes = currentBoxCountTarget(breakdownForSave, barcode);
     final int boxDelta = targetBoxCount - currentBoxes;
     if (boxDelta != 0) {
       if (barcode.isEmpty) {
@@ -460,13 +545,15 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
         );
         return;
       }
-      if (_resolvedBarcode == null || _unitsPerBox == null || _unitsPerBox! < 1) {
+      if (_resolvedBarcode == null || newUpb == null || newUpb < 1) {
         final bool registered = await _ensureBoxRegistered(barcode);
-        if (!registered || _unitsPerBox == null) {
+        if (!registered || _unitsPerBoxForReplace() == null) {
           return;
         }
       }
     }
+
+    final int? saveUpb = _unitsPerBoxForReplace();
 
     setState(() => _saving = true);
     try {
@@ -474,7 +561,7 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
       final MovementsRepository movements = ref.read(movementsRepositoryProvider);
       final BoxLocationBreakdown result = await applyInventoryBoxSave(
         boxBarcode: barcode.isEmpty ? null : barcode,
-        unitsPerBox: _unitsPerBox,
+        unitsPerBox: saveUpb,
         targetBoxCount: targetBoxCount,
         targetLooseQty: targetLooseQty,
         productId: widget.productId,
@@ -523,6 +610,7 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
         _resolvedBarcode = null;
         _resolvedBoxId = null;
         _unitsPerBox = null;
+        _originalUnitsPerBox = null;
         _pendingBoxRegistration = false;
         _boxPrefilledFromBreakdown = false;
         _unitsPerBoxInput.clear();
@@ -582,9 +670,9 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
   }
 
   Widget _buildUnitsPerBoxField(AppLocale loc) {
-    final int? upb = _unitsPerBox;
-    final bool editable =
-        _pendingBoxRegistration || (upb == null && _boxBarcode.text.trim().isNotEmpty);
+    final bool editable = _pendingBoxRegistration ||
+        _resolvedBoxId != null ||
+        (_unitsPerBox == null && _boxBarcode.text.trim().isNotEmpty);
     if (editable) {
       return TextField(
         controller: _unitsPerBoxInput,
@@ -613,19 +701,40 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
         border: const OutlineInputBorder(),
       ),
       child: Text(
-        upb?.toString() ?? '—',
+        _unitsPerBox?.toString() ?? '—',
         style: TextStyle(
           fontSize: 16,
-          color: upb != null ? null : Colors.grey.shade600,
+          color: _unitsPerBox != null ? null : Colors.grey.shade600,
         ),
       ),
     );
   }
 
+  Widget? _buildUnitsPerBoxHint(AppLocale loc) {
+    if (_resolvedBoxId == null) {
+      return null;
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Text(
+        StringLookup.t(loc, 'inventoryBoxUnitsPerBoxEditHint'),
+        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+      ),
+    );
+  }
+
+  int? _effectiveUnitsPerBox() {
+    final int? fromField = int.tryParse(_unitsPerBoxInput.text.trim());
+    if (fromField != null && fromField >= 1) {
+      return fromField;
+    }
+    return _unitsPerBox;
+  }
+
   Widget? _buildTotalPreview(AppLocale loc) {
     final int boxes = int.tryParse(_boxCount.text.trim()) ?? 0;
     final int loose = int.tryParse(_looseQty.text.trim()) ?? 0;
-    final int? upb = _unitsPerBox ?? int.tryParse(_unitsPerBoxInput.text.trim());
+    final int? upb = _effectiveUnitsPerBox();
 
     final int? total;
     if (upb != null && upb >= 1) {
@@ -703,6 +812,7 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
         ),
         const SizedBox(height: 12),
         _buildUnitsPerBoxField(loc),
+        if (_buildUnitsPerBoxHint(loc) != null) _buildUnitsPerBoxHint(loc)!,
         const SizedBox(height: 12),
         TextField(
           controller: _boxCount,

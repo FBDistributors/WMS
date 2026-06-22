@@ -132,7 +132,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   String _warehouse = 'main';
   /// `flow=new` uchun: `byProduct` (standart) yoki `byLocation` (avval saqlash joyi).
   String _newReceiveMode = 'byProduct';
-  final TextEditingController _newReceiveBoxCount = TextEditingController(text: '0');
+  final TextEditingController _newReceiveBoxCount = TextEditingController();
   final TextEditingController _newReceiveBoxBarcode = TextEditingController();
   int? _newReceiveUnitsPerBox;
   /// Oxirgi muvaffaqiyatli aniqlangan quti shtrix kodi (skan yoki qo'lda).
@@ -578,7 +578,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     _newReceiveUnitsPerBox = null;
     _newReceiveResolvedBoxBarcode = null;
     _newReceiveBoxBarcode.clear();
-    _newReceiveBoxCount.text = '0';
+    _newReceiveBoxCount.clear();
   }
 
   void _onNewReceiveBoxBarcodeChanged(String value) {
@@ -588,7 +588,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           trimmed != _newReceiveResolvedBoxBarcode) {
         _newReceiveResolvedBoxBarcode = null;
         _newReceiveUnitsPerBox = null;
-        _newReceiveBoxCount.text = '0';
+        _newReceiveBoxCount.clear();
       }
     });
   }
@@ -685,7 +685,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             _newReceiveBoxBarcode.clear();
             _newReceiveResolvedBoxBarcode = null;
             _newReceiveUnitsPerBox = null;
-            _newReceiveBoxCount.text = '0';
+            _newReceiveBoxCount.clear();
           }),
         )!,
       ],
@@ -767,9 +767,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             border: const OutlineInputBorder(),
             suffixIcon: buildInputClearButton(
               visible: canEditBoxCount &&
-                  _newReceiveBoxCount.text.trim().isNotEmpty &&
-                  _newReceiveBoxCount.text.trim() != '0',
-              onPressed: () => setState(() => _newReceiveBoxCount.text = '0'),
+                  _newReceiveBoxCount.text.trim().isNotEmpty,
+              onPressed: () => setState(() => _newReceiveBoxCount.clear()),
             ),
           ),
           onChanged: (_) => setState(() {}),
