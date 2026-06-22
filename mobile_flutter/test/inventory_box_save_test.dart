@@ -456,4 +456,327 @@ void main() {
     );
     expect(total, 276);
   });
+
+  test('computeInventoryPreviewTotal matches box×upb+loose formula', () {
+    expect(
+      computeInventoryPreviewTotal(
+        targetBoxCount: 108,
+        targetLooseQty: 0,
+        unitsPerBox: 8,
+      ),
+      864,
+    );
+    expect(
+      computeInventoryPreviewTotal(
+        targetBoxCount: 100,
+        targetLooseQty: 0,
+        unitsPerBox: 8,
+      ),
+      800,
+    );
+    expect(
+      computeInventoryPreviewTotal(
+        targetBoxCount: 0,
+        targetLooseQty: 5,
+        unitsPerBox: 8,
+      ),
+      5,
+    );
+  });
+
+  test('applyInventoryBoxSave 108→0 boxes with 0 loose zeros stock', () async {
+    final _InventorySaveSimulator sim = _InventorySaveSimulator(
+      barcode: '14607953910108',
+      unitsPerBox: 8,
+      sealedCount: 108,
+      looseUnits: 0,
+    );
+    final List<String> ops = <String>[];
+
+    Future<BoxLocationBreakdown> getBreakdown() async => sim.snapshot();
+
+    Future<BoxLocationBreakdown> removeBox({required String boxBarcode}) async {
+      ops.add('remove');
+      sim.removeOneBox();
+      return sim.snapshot();
+    }
+
+    Future<void> createMovement({
+      required String productId,
+      required String lotId,
+      required String locationId,
+      required double qtyChange,
+      required String reasonCode,
+    }) async {
+      ops.add('movement:$reasonCode:$qtyChange');
+      sim.applyMovement(qtyChange);
+    }
+
+    final BoxLocationBreakdown result = await applyInventoryBoxSave(
+      boxBarcode: sim.barcode,
+      unitsPerBox: sim.unitsPerBox,
+      targetBoxCount: 0,
+      targetLooseQty: 0,
+      productId: 'p1',
+      locationId: 'loc1',
+      lotId: 'lot1',
+      getBreakdown: getBreakdown,
+      placeBox: ({required String boxBarcode, required int boxCount}) async =>
+          sim.snapshot(),
+      removeBox: removeBox,
+      createMovement: createMovement,
+    );
+
+    expect(ops.where((String o) => o == 'remove').length, 108);
+    expect(
+      ops.where((String o) => o == 'movement:inventory_shortage:-864.0').length,
+      1,
+    );
+    expect(result.boxCount, 0);
+    expect(result.looseUnits, 0);
+    expect(result.totalUnits, 0);
+  });
+
+  test('applyInventoryBoxSave 108→0 boxes keeps 5 loose', () async {
+    final _InventorySaveSimulator sim = _InventorySaveSimulator(
+      barcode: '14607953910108',
+      unitsPerBox: 8,
+      sealedCount: 108,
+      looseUnits: 5,
+    );
+    final List<String> ops = <String>[];
+
+    Future<BoxLocationBreakdown> getBreakdown() async => sim.snapshot();
+
+    Future<BoxLocationBreakdown> removeBox({required String boxBarcode}) async {
+      ops.add('remove');
+      sim.removeOneBox();
+      return sim.snapshot();
+    }
+
+    Future<void> createMovement({
+      required String productId,
+      required String lotId,
+      required String locationId,
+      required double qtyChange,
+      required String reasonCode,
+    }) async {
+      ops.add('movement:$reasonCode:$qtyChange');
+      sim.applyMovement(qtyChange);
+    }
+
+    final BoxLocationBreakdown result = await applyInventoryBoxSave(
+      boxBarcode: sim.barcode,
+      unitsPerBox: sim.unitsPerBox,
+      targetBoxCount: 0,
+      targetLooseQty: 5,
+      productId: 'p1',
+      locationId: 'loc1',
+      lotId: 'lot1',
+      getBreakdown: getBreakdown,
+      placeBox: ({required String boxBarcode, required int boxCount}) async =>
+          sim.snapshot(),
+      removeBox: removeBox,
+      createMovement: createMovement,
+    );
+
+    expect(ops.where((String o) => o == 'remove').length, 108);
+    expect(
+      ops.where((String o) => o == 'movement:inventory_shortage:-864.0').length,
+      1,
+    );
+    expect(result.boxCount, 0);
+    expect(result.looseUnits, 5);
+    expect(result.totalUnits, 5);
+  });
+
+  test('applyInventoryBoxSave loose→0 keeps 108 boxes', () async {
+    final _InventorySaveSimulator sim = _InventorySaveSimulator(
+      barcode: '14607953910108',
+      unitsPerBox: 8,
+      sealedCount: 108,
+      looseUnits: 5,
+    );
+    final List<String> ops = <String>[];
+
+    Future<BoxLocationBreakdown> getBreakdown() async => sim.snapshot();
+
+    Future<void> createMovement({
+      required String productId,
+      required String lotId,
+      required String locationId,
+      required double qtyChange,
+      required String reasonCode,
+    }) async {
+      ops.add('movement:$reasonCode:$qtyChange');
+      sim.applyMovement(qtyChange);
+    }
+
+    final BoxLocationBreakdown result = await applyInventoryBoxSave(
+      boxBarcode: sim.barcode,
+      unitsPerBox: sim.unitsPerBox,
+      targetBoxCount: 108,
+      targetLooseQty: 0,
+      productId: 'p1',
+      locationId: 'loc1',
+      lotId: 'lot1',
+      getBreakdown: getBreakdown,
+      placeBox: ({required String boxBarcode, required int boxCount}) async =>
+          sim.snapshot(),
+      removeBox: ({required String boxBarcode}) async => sim.snapshot(),
+      createMovement: createMovement,
+    );
+
+    expect(ops, <String>['movement:inventory_shortage:-5.0']);
+    expect(result.boxCount, 108);
+    expect(result.looseUnits, 0);
+    expect(result.totalUnits, 864);
+  });
+
+  test('applyInventoryBoxSave 108→100 decreases by 64 only', () async {
+    final _InventorySaveSimulator sim = _InventorySaveSimulator(
+      barcode: '14607953910108',
+      unitsPerBox: 8,
+      sealedCount: 108,
+      looseUnits: 0,
+    );
+    final List<String> ops = <String>[];
+
+    Future<BoxLocationBreakdown> getBreakdown() async => sim.snapshot();
+
+    Future<BoxLocationBreakdown> removeBox({required String boxBarcode}) async {
+      ops.add('remove');
+      sim.removeOneBox();
+      return sim.snapshot();
+    }
+
+    Future<void> createMovement({
+      required String productId,
+      required String lotId,
+      required String locationId,
+      required double qtyChange,
+      required String reasonCode,
+    }) async {
+      ops.add('movement:$reasonCode:$qtyChange');
+      sim.applyMovement(qtyChange);
+    }
+
+    final BoxLocationBreakdown result = await applyInventoryBoxSave(
+      boxBarcode: sim.barcode,
+      unitsPerBox: sim.unitsPerBox,
+      targetBoxCount: 100,
+      targetLooseQty: 0,
+      productId: 'p1',
+      locationId: 'loc1',
+      lotId: 'lot1',
+      getBreakdown: getBreakdown,
+      placeBox: ({required String boxBarcode, required int boxCount}) async =>
+          sim.snapshot(),
+      removeBox: removeBox,
+      createMovement: createMovement,
+    );
+
+    expect(ops.where((String o) => o == 'remove').length, 8);
+    expect(
+      ops.where((String o) => o == 'movement:inventory_shortage:-64.0').length,
+      1,
+    );
+    expect(result.boxCount, 100);
+    expect(result.looseUnits, 0);
+    expect(result.totalUnits, 800);
+  });
+
+  test('applyInventoryBoxSave upb increase without box change', () async {
+    final _InventorySaveSimulator sim = _InventorySaveSimulator(
+      barcode: '14607953910108',
+      unitsPerBox: 8,
+      sealedCount: 108,
+      looseUnits: 0,
+    );
+    final List<String> ops = <String>[];
+
+    Future<BoxLocationBreakdown> getBreakdown() async => sim.snapshot();
+
+    Future<void> createMovement({
+      required String productId,
+      required String lotId,
+      required String locationId,
+      required double qtyChange,
+      required String reasonCode,
+    }) async {
+      ops.add('movement:$reasonCode:$qtyChange');
+      sim.applyMovement(qtyChange);
+    }
+
+    final BoxLocationBreakdown result = await applyInventoryBoxSave(
+      boxBarcode: sim.barcode,
+      unitsPerBox: 10,
+      targetBoxCount: 108,
+      targetLooseQty: 0,
+      productId: 'p1',
+      locationId: 'loc1',
+      lotId: 'lot1',
+      getBreakdown: getBreakdown,
+      placeBox: ({required String boxBarcode, required int boxCount}) async =>
+          sim.snapshot(),
+      removeBox: ({required String boxBarcode}) async => sim.snapshot(),
+      createMovement: createMovement,
+    );
+
+    expect(ops, <String>['movement:inventory_overage:216.0']);
+    expect(result.boxCount, 108);
+    expect(result.totalUnits, 1080);
+  });
+}
+
+List<SealedBoxInfo> _sealedBoxes(int count, String barcode, int upb) {
+  return List<SealedBoxInfo>.generate(
+    count,
+    (int i) => SealedBoxInfo(
+      placementId: 'pl$i',
+      productBoxId: 'pb1',
+      boxBarcode: barcode,
+      unitsPerBox: upb,
+    ),
+  );
+}
+
+class _InventorySaveSimulator {
+  _InventorySaveSimulator({
+    required this.barcode,
+    required this.unitsPerBox,
+    required int sealedCount,
+    required this.looseUnits,
+  }) : sealedCount = sealedCount;
+
+  final String barcode;
+  final int unitsPerBox;
+  int sealedCount;
+  int looseUnits;
+
+  int get boxCount => sealedCount;
+  int get unitsInBoxes => sealedCount * unitsPerBox;
+  int get totalUnits => unitsInBoxes + looseUnits;
+
+  BoxLocationBreakdown snapshot() {
+    return _breakdown(
+      boxCount: boxCount,
+      unitsInBoxes: unitsInBoxes,
+      looseUnits: looseUnits,
+      totalUnits: totalUnits,
+      sealedBoxes: _sealedBoxes(sealedCount, barcode, unitsPerBox),
+    );
+  }
+
+  void removeOneBox() {
+    if (sealedCount <= 0) {
+      return;
+    }
+    sealedCount--;
+    looseUnits += unitsPerBox;
+  }
+
+  void applyMovement(double qtyChange) {
+    looseUnits += qtyChange.round();
+  }
 }

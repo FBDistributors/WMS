@@ -735,23 +735,63 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
     final int boxes = int.tryParse(_boxCount.text.trim()) ?? 0;
     final int loose = int.tryParse(_looseQty.text.trim()) ?? 0;
     final int? upb = _effectiveUnitsPerBox();
-
-    final int? total;
-    if (upb != null && upb >= 1) {
-      total = boxes * upb + loose;
-    } else if (boxes == 0) {
-      total = loose;
-    } else {
+    final int? total = computeInventoryPreviewTotal(
+      targetBoxCount: boxes,
+      targetLooseQty: loose,
+      unitsPerBox: upb,
+    );
+    if (total == null) {
       return null;
     }
 
-    return Text(
-      StringLookup.tParams(
-        loc,
-        'inventoryTargetTotal',
-        <String, String>{'total': '$total'},
+    final List<Widget> children = <Widget>[
+      Text(
+        StringLookup.tParams(
+          loc,
+          'inventoryTotalBreakdown',
+          <String, String>{
+            'boxes': '$boxes',
+            'upb': upb != null ? '$upb' : '—',
+            'loose': '$loose',
+            'total': '$total',
+          },
+        ),
+        style: const TextStyle(fontWeight: FontWeight.w600),
       ),
-      style: const TextStyle(fontWeight: FontWeight.w600),
+      Text(
+        StringLookup.tParams(
+          loc,
+          'inventoryTargetTotal',
+          <String, String>{'total': '$total'},
+        ),
+        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+      ),
+    ];
+    if (total == 0) {
+      children.add(
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            StringLookup.t(loc, 'inventoryZeroStockHint'),
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children,
+    );
+  }
+
+  Widget _fieldHint(AppLocale loc, String key) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Text(
+        StringLookup.t(loc, key),
+        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+      ),
     );
   }
 
@@ -834,6 +874,7 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
           ),
           onChanged: (_) => setState(() {}),
         ),
+        _fieldHint(loc, 'inventoryBoxZeroHint'),
         const SizedBox(height: 12),
         TextField(
           controller: _looseQty,
@@ -855,6 +896,7 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
           ),
           onChanged: (_) => setState(() {}),
         ),
+        _fieldHint(loc, 'inventoryLooseZeroHint'),
         if (totalPreview != null) ...<Widget>[
           const SizedBox(height: 12),
           totalPreview,

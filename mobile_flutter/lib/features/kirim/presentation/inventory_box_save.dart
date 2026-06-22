@@ -28,11 +28,31 @@ int? inventoryTargetTotalUnits({
   required BoxLocationBreakdown breakdown,
   required int boxDelta,
 }) {
-  if (unitsPerBox != null && unitsPerBox >= 1) {
-    return targetBoxCount * unitsPerBox + targetLooseQty;
+  final int? preview = computeInventoryPreviewTotal(
+    targetBoxCount: targetBoxCount,
+    targetLooseQty: targetLooseQty,
+    unitsPerBox: unitsPerBox,
+  );
+  if (preview != null) {
+    return preview;
   }
   if (boxDelta == 0) {
     return breakdown.unitsInBoxes + targetLooseQty;
+  }
+  return null;
+}
+
+/// Preview va saqlash uchun bir xil jami: quti×hajm + qutisiz.
+int? computeInventoryPreviewTotal({
+  required int targetBoxCount,
+  required int targetLooseQty,
+  required int? unitsPerBox,
+}) {
+  if (unitsPerBox != null && unitsPerBox >= 1) {
+    return targetBoxCount * unitsPerBox + targetLooseQty;
+  }
+  if (targetBoxCount == 0) {
+    return targetLooseQty;
   }
   return null;
 }
@@ -154,7 +174,8 @@ Future<BoxLocationBreakdown> applyInventoryBoxSave({
       breakdown = await getBreakdown();
     }
 
-    final bool looseCoveredByTotalAdjust = boxDelta == 0 && appliedTotalDelta != 0;
+    final bool looseCoveredByTotalAdjust =
+        targetTotal != null && appliedTotalDelta != 0;
     if (!looseCoveredByTotalAdjust) {
       await _applyLooseAdjust(
         productId: productId,
