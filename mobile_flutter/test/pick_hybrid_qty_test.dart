@@ -140,8 +140,24 @@ void main() {
       boxCount: boxCount,
       boxBarcode: boxBarcode,
       looseQty: looseQty,
+      stockBoxCount: 5,
+      stockLooseUnits: 0,
     );
     expect(boxBarcode.text, 'BOX-1');
+  });
+
+  test('syncHybridBoxBarcodeWithQty clears barcode for loose-only location', () {
+    final TextEditingController boxCount = TextEditingController(text: '0');
+    final TextEditingController looseQty = TextEditingController(text: '3');
+    final TextEditingController boxBarcode = TextEditingController(text: 'BOX-1');
+    syncHybridBoxBarcodeWithQty(
+      boxCount: boxCount,
+      boxBarcode: boxBarcode,
+      looseQty: looseQty,
+      stockBoxCount: 0,
+      stockLooseUnits: 24,
+    );
+    expect(boxBarcode.text, isEmpty);
   });
 
   test('syncHybridBoxBarcodeWithQty clears barcode when box count is zero', () {

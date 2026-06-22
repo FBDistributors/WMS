@@ -638,8 +638,17 @@ void syncHybridBoxBarcodeWithQty({
   required TextEditingController boxCount,
   TextEditingController? boxBarcode,
   TextEditingController? looseQty,
+  int? stockBoxCount,
+  int? stockLooseUnits,
 }) {
   if (boxBarcode == null) {
+    return;
+  }
+  if (isLooseOnlyLocation(
+    stockBoxCount: stockBoxCount,
+    stockLooseUnits: stockLooseUnits,
+  )) {
+    boxBarcode.clear();
     return;
   }
   final int bc = int.tryParse(boxCount.text.trim()) ?? 0;
@@ -1069,6 +1078,8 @@ class PickHybridQtyFields extends StatelessWidget {
               boxCount: boxCount,
               boxBarcode: boxBarcode,
               looseQty: looseQty,
+              stockBoxCount: stockBoxCount,
+              stockLooseUnits: looseUnits,
             );
             onFieldsChanged();
           },

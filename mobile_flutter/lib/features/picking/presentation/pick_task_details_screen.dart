@@ -1313,21 +1313,23 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                 hybridUnitsPerBox = boxHint.unitsPerBox;
                               }
                             }
+                            final ({int? looseUnits, int? boxCount}) submitLocationHint =
+                                alternateBoxHintForLocation(
+                              pickTargetHolder[0].alternateLocations,
+                              pickTargetHolder[0].locationCode,
+                            );
                             syncHybridBoxBarcodeWithQty(
                               boxCount: hybridBoxCount,
                               boxBarcode: hybridBoxBarcode,
                               looseQty: hybridLooseQty,
+                              stockBoxCount: submitLocationHint.boxCount,
+                              stockLooseUnits: submitLocationHint.looseUnits,
                             );
                             PickHybridQty hybrid = pickHybridQtyFromControllers(
                               boxCount: hybridBoxCount,
                               looseQty: hybridLooseQty,
                               unitsPerBox: hybridUnitsPerBox,
                               maxUnits: rem,
-                            );
-                            final ({int? looseUnits, int? boxCount}) submitLocationHint =
-                                alternateBoxHintForLocation(
-                              pickTargetHolder[0].alternateLocations,
-                              pickTargetHolder[0].locationCode,
                             );
                             final String? boxOnlyValidation =
                                 hybridBoxOnlyStockValidationMessage(
@@ -1368,6 +1370,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                   boxBarcode: hybridBoxBarcode.text,
                                   productBarcode: hybridProductBarcode.text,
                                   unitsPerBox: hybridUnitsPerBox,
+                                  stockBoxCount: submitLocationHint.boxCount,
+                                  stockLooseUnits: submitLocationHint.looseUnits,
                                   pickBox: ({
                                     required int qty,
                                     required int boxCount,

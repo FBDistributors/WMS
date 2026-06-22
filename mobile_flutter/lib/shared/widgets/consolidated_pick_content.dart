@@ -576,6 +576,8 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                                 boxCount: boxCountCtrl,
                                 boxBarcode: boxBarcodeCtrl,
                                 looseQty: looseQtyCtrl,
+                                stockBoxCount: locationAltHint.boxCount,
+                                stockLooseUnits: locationAltHint.looseUnits,
                               );
                               final PickHybridQty submitHybrid =
                                   pickHybridQtyFromControllers(
@@ -620,6 +622,8 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                                   boxBarcode: boxBarcodeCtrl.text,
                                   productBarcode: productBarcodeCtrl.text,
                                   unitsPerBox: sheetUnitsPerBox,
+                                  stockBoxCount: locationAltHint.boxCount,
+                                  stockLooseUnits: locationAltHint.looseUnits,
                                   pickBox: ({
                                     required int qty,
                                     required int boxCount,

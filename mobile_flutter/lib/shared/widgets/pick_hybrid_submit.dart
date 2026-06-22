@@ -208,12 +208,19 @@ Future<void> submitHybridPick({
   required HybridUnitPickFn pickUnit,
   HybridCombinedPickFn? pickCombined,
   int? unitsPerBox,
+  int? stockBoxCount,
+  int? stockLooseUnits,
 }) async {
   final String? boxCode = boxBarcode?.trim();
   final String? productCode = productBarcode?.trim();
   final bool hasBoxCode = boxCode != null && boxCode.isNotEmpty;
+  final bool looseOnly = isLooseOnlyLocation(
+    stockBoxCount: stockBoxCount,
+    stockLooseUnits: stockLooseUnits,
+  );
 
-  if (hybrid.looseUnits > 0 &&
+  if (!looseOnly &&
+      hybrid.looseUnits > 0 &&
       hybrid.boxCount == 0 &&
       hasBoxCode &&
       productCode != null &&

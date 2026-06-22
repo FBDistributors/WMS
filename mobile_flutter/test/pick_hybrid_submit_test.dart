@@ -304,6 +304,8 @@ void main() {
       boxBarcode: 'BOX-OPEN',
       productBarcode: 'PROD-1',
       unitsPerBox: 12,
+      stockBoxCount: 5,
+      stockLooseUnits: 0,
       pickBox: ({
         required int qty,
         required int boxCount,
@@ -320,6 +322,44 @@ void main() {
       },
     );
     expect(combinedBoxCount, 1);
+  });
+
+  test('submitHybridPick loose-only location uses pickUnit not pickCombined', () async {
+    const PickHybridQty hybrid = PickHybridQty(
+      total: 3,
+      boxUnits: 0,
+      looseUnits: 3,
+      boxCount: 0,
+      valid: true,
+    );
+    int unitPickQty = 0;
+    var combinedCalled = false;
+    await submitHybridPick(
+      hybrid: hybrid,
+      boxBarcode: 'BOX-STALE',
+      productBarcode: '3713760812451',
+      stockBoxCount: 0,
+      stockLooseUnits: 24,
+      pickBox: ({
+        required int qty,
+        required int boxCount,
+        required String barcode,
+      }) async {},
+      pickUnit: ({required int qty, required String barcode}) async {
+        unitPickQty = qty;
+        expect(barcode, '3713760812451');
+      },
+      pickCombined: ({
+        required int totalQty,
+        required int boxCount,
+        required String productBarcode,
+        required String boxBarcode,
+      }) async {
+        combinedCalled = true;
+      },
+    );
+    expect(unitPickQty, 3);
+    expect(combinedCalled, isFalse);
   });
 
   test('hybridBoxOnlyStockValidationMessage allows when box barcode scanned', () {
