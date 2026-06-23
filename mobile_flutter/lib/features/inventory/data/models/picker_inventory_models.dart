@@ -140,6 +140,32 @@ class PickerLocationOption {
   }
 }
 
+class PickerSealedBoxLine {
+  const PickerSealedBoxLine({
+    required this.boxBarcode,
+    required this.unitsPerBox,
+    this.count = 1,
+  });
+
+  final String boxBarcode;
+  final int unitsPerBox;
+  final int count;
+
+  factory PickerSealedBoxLine.fromJson(Map<String, Object?> json) {
+    return PickerSealedBoxLine(
+      boxBarcode: json['box_barcode'] as String? ?? '',
+      unitsPerBox: _int(json['units_per_box']),
+      count: _int(json['count']) < 1 ? 1 : _int(json['count']),
+    );
+  }
+
+  Map<String, Object?> toJson() => <String, Object?>{
+        'box_barcode': boxBarcode,
+        'units_per_box': unitsPerBox,
+        'count': count,
+      };
+}
+
 class PickerProductLocation {
   const PickerProductLocation({
     required this.locationId,
@@ -153,6 +179,7 @@ class PickerProductLocation {
     this.boxCount = 0,
     this.unitsInBoxes = 0,
     this.looseUnits = 0,
+    this.sealedBoxes = const <PickerSealedBoxLine>[],
   });
 
   final String locationId;
@@ -166,6 +193,7 @@ class PickerProductLocation {
   final int boxCount;
   final int unitsInBoxes;
   final int looseUnits;
+  final List<PickerSealedBoxLine> sealedBoxes;
 
   factory PickerProductLocation.fromJson(Map<String, Object?> json) {
     return PickerProductLocation(
@@ -180,6 +208,7 @@ class PickerProductLocation {
       boxCount: _int(json['box_count']),
       unitsInBoxes: _int(json['units_in_boxes']),
       looseUnits: _int(json['loose_units']),
+      sealedBoxes: parsePickerSealedBoxes(json['sealed_boxes']),
     );
   }
 }
@@ -192,6 +221,71 @@ int _int(Object? v) {
     return v.round();
   }
   return int.tryParse('$v') ?? 0;
+}
+
+List<PickerSealedBoxLine> parsePickerSealedBoxes(Object? raw) {
+  if (raw is! List) {
+    return const <PickerSealedBoxLine>[];
+  }
+  return raw
+      .whereType<Map<dynamic, dynamic>>()
+      .map(
+        (Map<dynamic, dynamic> m) => PickerSealedBoxLine.fromJson(
+          Map<String, Object?>.from(m),
+        ),
+      )
+      .where((PickerSealedBoxLine line) => line.boxBarcode.trim().isNotEmpty)
+      .toList(growable: false);
+}
+
+List<PickerSealedBoxLine> mergePickerSealedBoxLines(
+  List<PickerSealedBoxLine> a,
+  List<PickerSealedBoxLine> b,
+) {
+  final Map<String, PickerSealedBoxLine> byKey = <String, PickerSealedBoxLine>{};
+  for (final PickerSealedBoxLine line in <PickerSealedBoxLine>[...a, ...b]) {
+    final String key = '${line.boxBarcode.trim()}\u0000${line.unitsPerBox}';
+    final PickerSealedBoxLine? existing = byKey[key];
+    if (existing == null) {
+      byKey[key] = line;
+    } else {
+      byKey[key] = PickerSealedBoxLine(
+        boxBarcode: existing.boxBarcode,
+        unitsPerBox: existing.unitsPerBox,
+        count: existing.count + line.count,
+      );
+    }
+  }
+  final List<PickerSealedBoxLine> sorted = byKey.values.toList(growable: false)
+    ..sort((PickerSealedBoxLine x, PickerSealedBoxLine y) {
+      return x.boxBarcode.compareTo(y.boxBarcode);
+    });
+  return sorted;
+}
+
+/// Detail UI: label faqat birinchi qatorda, keyingilari indent.
+List<String> sealedBoxBarcodeDisplayLines({
+  required String label,
+  required List<PickerSealedBoxLine> sealedBoxes,
+}) {
+  if (sealedBoxes.isEmpty) {
+    return const <String>[];
+  }
+  final List<PickerSealedBoxLine> sorted = List<PickerSealedBoxLine>.from(sealedBoxes)
+    ..sort((PickerSealedBoxLine a, PickerSealedBoxLine b) {
+      return a.boxBarcode.compareTo(b.boxBarcode);
+    });
+  final List<String> lines = <String>[];
+  for (int i = 0; i < sorted.length; i++) {
+    final PickerSealedBoxLine line = sorted[i];
+    final String suffix = line.count > 1 ? ' (${line.count} × ${line.unitsPerBox})' : '';
+    if (i == 0) {
+      lines.add('$label: ${line.boxBarcode}$suffix');
+    } else {
+      lines.add('${line.boxBarcode}$suffix');
+    }
+  }
+  return lines;
 }
 
 class PickerProductDetailResponse {

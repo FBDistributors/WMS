@@ -248,3 +248,84 @@ def test_picker_inventory_detail(
     assert loc["available_qty"] == 5
     assert "lot_id" in loc
     assert "batch_no" in loc
+
+
+def test_picker_inventory_detail_sealed_boxes(
+    client: TestClient,
+    picker_user: User,
+    test_product_with_barcode: Product,
+    test_location: Location,
+    db_session: Session,
+) -> None:
+    """Detail includes aggregated sealed box barcodes per location."""
+    from app.models.location_box_placement import LocationBoxPlacement, PLACEMENT_SEALED
+    from app.models.product_box import ProductBox as ProductBoxModel
+
+    lot = StockLot(
+        product_id=test_product_with_barcode.id,
+        batch="B-BOX",
+        expiry_date=date.today() + timedelta(days=90),
+    )
+    db_session.add(lot)
+    db_session.flush()
+    db_session.add(
+        StockMovement(
+            product_id=test_product_with_barcode.id,
+            lot_id=lot.id,
+            location_id=test_location.id,
+            qty_change=Decimal("80"),
+            movement_type="receipt",
+        )
+    )
+    boxes: list[ProductBoxModel] = []
+    for code, upb in (("BOX-DETAIL-A", 12), ("BOX-DETAIL-B", 10)):
+        box = ProductBoxModel(
+            box_barcode=code,
+            product_id=test_product_with_barcode.id,
+            units_per_box=upb,
+            is_active=True,
+        )
+        db_session.add(box)
+        boxes.append(box)
+    db_session.flush()
+    for _ in range(2):
+        db_session.add(
+            LocationBoxPlacement(
+                product_box_id=boxes[0].id,
+                location_id=test_location.id,
+                lot_id=lot.id,
+                status=PLACEMENT_SEALED,
+                placed_by_user_id=picker_user.id,
+            )
+        )
+    db_session.add(
+        LocationBoxPlacement(
+            product_box_id=boxes[1].id,
+            location_id=test_location.id,
+            lot_id=lot.id,
+            status=PLACEMENT_SEALED,
+            placed_by_user_id=picker_user.id,
+        )
+    )
+    db_session.commit()
+
+    login = client.post("/api/v1/auth/login", json={"username": "picker_test", "password": "testpass123"})
+    token = login.json()["access_token"]
+
+    resp = client.get(
+        f"/api/v1/inventory/picker/{test_product_with_barcode.id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200, resp.text
+    loc = next(
+        row
+        for row in resp.json()["locations"]
+        if row["location_code"] == test_location.code and len(row.get("sealed_boxes") or []) > 0
+    )
+    sealed = loc.get("sealed_boxes") or []
+    assert len(sealed) == 2
+    by_code = {row["box_barcode"]: row for row in sealed}
+    assert by_code["BOX-DETAIL-A"]["count"] == 2
+    assert by_code["BOX-DETAIL-A"]["units_per_box"] == 12
+    assert by_code["BOX-DETAIL-B"]["count"] == 1
+    assert by_code["BOX-DETAIL-B"]["units_per_box"] == 10

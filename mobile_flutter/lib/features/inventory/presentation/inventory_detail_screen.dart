@@ -169,6 +169,7 @@ List<PickerProductLocation> mergePickerProductLocationsForDisplay(
         boxCount: ex.boxCount + p.boxCount,
         unitsInBoxes: ex.unitsInBoxes + p.unitsInBoxes,
         looseUnits: ex.looseUnits + p.looseUnits,
+        sealedBoxes: mergePickerSealedBoxLines(ex.sealedBoxes, p.sealedBoxes),
       );
     }
   }
@@ -209,16 +210,55 @@ List<Widget> inventoryLocTiles(
     ];
   }
   return merged.map((PickerProductLocation l) {
-    final List<String> boxLines = <String>[];
+    final List<Widget> boxSubtitleChildren = <Widget>[];
     if (l.boxCount > 0 || l.unitsInBoxes > 0) {
-      boxLines.add(
-        '${StringLookup.t(appLoc, 'inventoryLocationFullBoxes')}: ${l.boxCount}',
+      boxSubtitleChildren.add(
+        Text(
+          '${StringLookup.t(appLoc, 'inventoryLocationFullBoxes')}: ${l.boxCount}',
+          style: TextStyle(
+            fontSize: 12,
+            color: isDark ? Colors.white60 : Colors.black54,
+          ),
+        ),
       );
-      boxLines.add(
-        '${StringLookup.t(appLoc, 'inventoryUnitsInBoxes')}: ${l.unitsInBoxes}',
+      boxSubtitleChildren.add(
+        Text(
+          '${StringLookup.t(appLoc, 'inventoryUnitsInBoxes')}: ${l.unitsInBoxes}',
+          style: TextStyle(
+            fontSize: 12,
+            color: isDark ? Colors.white60 : Colors.black54,
+          ),
+        ),
       );
-      boxLines.add(
-        '${StringLookup.t(appLoc, 'inventoryLocationLooseUnits')}: ${l.looseUnits}',
+      if (l.unitsInBoxes > 0) {
+        final List<String> barcodeLines = sealedBoxBarcodeDisplayLines(
+          label: StringLookup.t(appLoc, 'inventoryBoxBarcode'),
+          sealedBoxes: l.sealedBoxes,
+        );
+        for (int i = 0; i < barcodeLines.length; i++) {
+          boxSubtitleChildren.add(
+            Padding(
+              padding: EdgeInsets.only(left: i == 0 ? 0 : 16),
+              child: Text(
+                barcodeLines[i],
+                style: TextStyle(
+                  fontSize: 12,
+                  fontFamily: 'monospace',
+                  color: isDark ? Colors.white60 : Colors.black54,
+                ),
+              ),
+            ),
+          );
+        }
+      }
+      boxSubtitleChildren.add(
+        Text(
+          '${StringLookup.t(appLoc, 'inventoryLocationLooseUnits')}: ${l.looseUnits}',
+          style: TextStyle(
+            fontSize: 12,
+            color: isDark ? Colors.white60 : Colors.black54,
+          ),
+        ),
       );
     }
     return Card(
@@ -232,17 +272,9 @@ List<Widget> inventoryLocTiles(
               formatExpiryMonthYear(l.expiryDate),
               style: TextStyle(color: isDark ? Colors.white54 : Colors.black45),
             ),
-            if (boxLines.isNotEmpty) ...<Widget>[
+            if (boxSubtitleChildren.isNotEmpty) ...<Widget>[
               const SizedBox(height: 4),
-              ...boxLines.map(
-                (String line) => Text(
-                  line,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isDark ? Colors.white60 : Colors.black54,
-                  ),
-                ),
-              ),
+              ...boxSubtitleChildren,
             ],
           ],
         ),

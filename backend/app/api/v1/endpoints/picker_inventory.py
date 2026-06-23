@@ -24,7 +24,7 @@ from app.models.stock import ON_HAND_MOVEMENT_TYPES
 from app.models.stock import StockLot as StockLotModel
 from app.models.stock import StockMovement as StockMovementModel
 from app.models.user import User as UserModel
-from app.services.box_location_service import get_breakdown_map_for_product
+from app.services.box_location_service import SealedBoxInfo, get_breakdown_map_for_product
 from app.services.expired_zone_labels import get_labels_row, resolve_expired_display_label
 from app.services.product_scan_resolve import resolve_product_scan
 
@@ -67,6 +67,21 @@ def _location_ids_for_warehouse(db: Session, warehouse: Optional[str]) -> Option
     return [r[0] for r in rows]
 
 
+def _aggregate_sealed_boxes(sealed: list[SealedBoxInfo]) -> list[PickerSealedBoxLine]:
+    counts: dict[tuple[str, int], int] = {}
+    for item in sealed:
+        code = (item.box_barcode or "").strip()
+        if not code:
+            continue
+        upb = int(item.units_per_box)
+        key = (code, upb)
+        counts[key] = counts.get(key, 0) + 1
+    return [
+        PickerSealedBoxLine(box_barcode=code, units_per_box=upb, count=cnt)
+        for (code, upb), cnt in sorted(counts.items(), key=lambda row: row[0][0])
+    ]
+
+
 class PickerLotInfo(BaseModel):
     location_code: str
     batch_no: str
@@ -92,6 +107,12 @@ class PickerInventoryListResponse(BaseModel):
     next_cursor: str | None
 
 
+class PickerSealedBoxLine(BaseModel):
+    box_barcode: str
+    units_per_box: int
+    count: int = 1
+
+
 class PickerProductLocation(BaseModel):
     location_id: UUID
     location_code: str
@@ -104,6 +125,7 @@ class PickerProductLocation(BaseModel):
     box_count: int = 0
     units_in_boxes: int = 0
     loose_units: int = 0
+    sealed_boxes: list[PickerSealedBoxLine] = []
 
 
 class PickerProductDetailResponse(BaseModel):
@@ -563,6 +585,7 @@ async def get_picker_product_detail(
                 box_count=bd.box_count if bd else 0,
                 units_in_boxes=bd.units_in_boxes if bd else 0,
                 loose_units=bd.loose_units if bd else int(available) if available > 0 else 0,
+                sealed_boxes=_aggregate_sealed_boxes(bd.sealed_boxes if bd else []),
             )
         )
     if negative_rows:
