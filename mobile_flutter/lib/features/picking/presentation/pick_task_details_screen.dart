@@ -1493,6 +1493,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                               boxBarcode: hybridBoxBarcode.text,
                               productBarcode: hybridProductBarcode.text,
                               maxUnits: rem,
+                              stockBoxCount: submitLocationHint.boxCount,
                             );
                             if (validation != null) {
                               _rejectScanHaptic();

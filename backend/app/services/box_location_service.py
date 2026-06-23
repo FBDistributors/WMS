@@ -247,6 +247,32 @@ def get_breakdown_tolerant(
     )
 
 
+def breakdown_kwargs_for_pick(
+    on_hand: int,
+    available: int,
+    sealed_box_count: int,
+    sealed_units_in_boxes: int,
+) -> dict[str, int]:
+    """Terish API/UI: on_hand asosida quti/qutisiz (reserved zaxira bilan ham)."""
+    total_oh = max(0, int(on_hand))
+    total_av = max(0, int(available))
+    bc, uib, loose_oh = pair_box_loose_from_available(
+        total_oh, sealed_box_count, sealed_units_in_boxes
+    )
+    if sealed_units_in_boxes > total_av:
+        _, _, loose_av = pair_box_loose_from_available(
+            total_av, sealed_box_count, sealed_units_in_boxes
+        )
+        loose = max(loose_oh, loose_av)
+    else:
+        loose = loose_oh
+    return {
+        "box_count": bc,
+        "units_in_boxes": uib,
+        "loose_units": loose,
+    }
+
+
 def get_breakdown_for_pick(
     db: Session,
     *,
@@ -264,20 +290,15 @@ def get_breakdown_for_pick(
     total_oh = max(0, int(on_hand))
     total_av = max(0, int(available))
     box_count, units_in_boxes, sealed = _units_in_boxes_for_lot_location(db, lot_id, location_id)
-    bc, uib, loose_oh = pair_box_loose_from_available(total_oh, box_count, units_in_boxes)
-    if units_in_boxes > total_av:
-        _, _, loose_av = pair_box_loose_from_available(total_av, box_count, units_in_boxes)
-        loose = max(loose_oh, loose_av)
-    else:
-        loose = loose_oh
+    bd_kw = breakdown_kwargs_for_pick(total_oh, total_av, box_count, units_in_boxes)
     inconsistent = units_in_boxes > total_oh or units_in_boxes > total_av
     return LocationBoxBreakdown(
         product_id=product_id,
         lot_id=lot_id,
         location_id=location_id,
-        box_count=bc,
-        units_in_boxes=uib,
-        loose_units=loose,
+        box_count=bd_kw["box_count"],
+        units_in_boxes=bd_kw["units_in_boxes"],
+        loose_units=bd_kw["loose_units"],
         total_units=total_oh,
         sealed_boxes=sealed,
         data_inconsistent=inconsistent,

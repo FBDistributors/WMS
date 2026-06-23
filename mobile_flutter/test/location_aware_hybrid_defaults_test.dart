@@ -84,7 +84,7 @@ void main() {
     looseQty.dispose();
   });
 
-  test('applyHybridQtyDefaults breakdown noma\'lum — matematik bo\'linish', () {
+  test('applyHybridQtyDefaults breakdown noma\'lum — faqat qutisiz default', () {
     final TextEditingController boxCount = TextEditingController();
     final TextEditingController looseQty = TextEditingController();
     applyHybridQtyDefaults(
@@ -93,8 +93,8 @@ void main() {
       unitsPerBox: 20,
       maxUnits: 30,
     );
-    expect(boxCount.text, '1');
-    expect(looseQty.text, '10');
+    expect(boxCount.text, '0');
+    expect(looseQty.text, '30');
     boxCount.dispose();
     looseQty.dispose();
   });

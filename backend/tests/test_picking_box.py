@@ -218,9 +218,14 @@ def test_line_pick_three_boxes(
         alts = line.get("alternate_locations") or []
         primary = next((a for a in alts if a.get("is_primary")), None)
         assert primary is not None
-        # Ajratilgandan keyin available=12, sealed 30>12 — inventar kabi dona deb ko'rsatiladi.
-        assert primary.get("box_count") == 0
-        assert primary.get("loose_units") == 12
+        bd_pick = get_breakdown_for_pick(
+            db_session,
+            product_id=product.id,
+            lot_id=lot.id,
+            location_id=loc.id,
+        )
+        assert primary.get("box_count") == bd_pick.box_count
+        assert primary.get("loose_units") == bd_pick.loose_units
 
         pick = client.post(
             f"/api/v1/picking/lines/{line_id}/pick",
@@ -575,7 +580,16 @@ def test_line_pick_unit_with_fully_reserved_loose_stock(
 
     app.dependency_overrides[get_current_user] = lambda: picker
     try:
-        line_id = client.get(f"/api/v1/picking/documents/{doc_id}").json()["lines"][0]["id"]
+        doc = client.get(f"/api/v1/picking/documents/{doc_id}")
+        assert doc.status_code == 200, doc.text
+        line = doc.json()["lines"][0]
+        line_id = line["id"]
+        alts = line.get("alternate_locations") or []
+        primary = next((a for a in alts if a.get("is_primary")), None)
+        assert primary is not None
+        assert primary.get("box_count") == 0
+        assert (primary.get("loose_units") or 0) == bd_pick.loose_units
+        assert (primary.get("loose_units") or 0) > 0
         pick = client.post(
             f"/api/v1/picking/lines/{line_id}/pick",
             json={
@@ -756,6 +770,13 @@ def test_line_pick_loose_when_sealed_exceeds_available(
 
     doc_id = _send_to_picking(client, db_session, order.id, picker.id)
 
+    bd_pick_doc = get_breakdown_for_pick(
+        db_session,
+        product_id=product.id,
+        lot_id=lot.id,
+        location_id=loc.id,
+    )
+
     app.dependency_overrides[get_current_user] = lambda: picker
     try:
         doc = client.get(f"/api/v1/picking/documents/{doc_id}")
@@ -765,8 +786,8 @@ def test_line_pick_loose_when_sealed_exceeds_available(
         alts = line.get("alternate_locations") or []
         primary = next((a for a in alts if a.get("is_primary")), None)
         assert primary is not None
-        assert primary.get("box_count") == 0
-        assert primary.get("loose_units") == int(primary.get("available_qty") or 0)
+        assert primary.get("box_count") == bd_pick_doc.box_count
+        assert primary.get("loose_units") == bd_pick_doc.loose_units
 
         pick = client.post(
             f"/api/v1/picking/lines/{line_id}/pick",

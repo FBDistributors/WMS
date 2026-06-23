@@ -271,6 +271,7 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
       boxBarcode: _boxBarcode.text,
       productBarcode: _productBarcode.text,
       maxUnits: rem,
+      stockBoxCount: _locationAltHint().boxCount,
     );
     if (validation != null) {
       if (widget.host.mounted) {

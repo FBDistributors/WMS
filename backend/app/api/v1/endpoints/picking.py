@@ -37,9 +37,9 @@ from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_
 from app.services.box_location_service import (
     apply_hybrid_pick_side_effects,
     apply_scan_pick_side_effects,
+    breakdown_kwargs_for_pick,
     compute_consolidated_box_loose_plan,
     consolidated_remainders_by_document,
-    pair_box_loose_from_available,
     remove_sealed_boxes_for_pick,
     require_sufficient_loose_for_unit_pick,
     validate_hybrid_pick_qty,
@@ -389,8 +389,8 @@ def _breakdown_kwargs_map_for_pairs(
     balances: dict[tuple[UUID, UUID], tuple[float, float]],
 ) -> dict[tuple[UUID, UUID], dict]:
     """
-    Inventar bilan bir xil: barcha (lot, lokatsiya) juftliklari uchun quti breakdown
-    `available` asosida — hujjat ekrani uchun N+1 so'rov o'rniga.
+    Terish alternate_locations: barcha (lot, lokatsiya) juftliklari uchun quti breakdown
+    `get_breakdown_for_pick` bilan bir xil (on_hand asosida, reserved bilan ham).
     `balances`: (lot_id, location_id) -> (on_hand, available).
     """
     if not pairs:
@@ -417,15 +417,14 @@ def _breakdown_kwargs_map_for_pairs(
     }
     out: dict[tuple[UUID, UUID], dict] = {}
     for key in pairs:
-        _on_hand, available = balances.get(key, (0.0, 0.0))
-        total = max(0, int(available))
+        on_hand, available = balances.get(key, (0.0, 0.0))
         box_count, units_in_boxes = boxes.get(key, (0, 0))
-        bc, uib, loose = pair_box_loose_from_available(total, box_count, units_in_boxes)
-        out[key] = {
-            "box_count": bc,
-            "units_in_boxes": uib,
-            "loose_units": loose,
-        }
+        out[key] = breakdown_kwargs_for_pick(
+            int(on_hand),
+            int(available),
+            box_count,
+            units_in_boxes,
+        )
     return out
 
 
@@ -615,6 +614,21 @@ def _picked_box_barcode_from_pick_payload(
     return None
 
 
+def _fill_pick_balances_for_pairs(
+    db: Session,
+    pairs: set[tuple[UUID, UUID]],
+    balances: dict[tuple[UUID, UUID], tuple[float, float]],
+) -> None:
+    """Terish breakdown: to'liq reserved (available=0) bo'lsa ham on_hand saqlansin."""
+    from app.services.stock_availability import compute_lot_location_balances
+
+    for lot_id, location_id in pairs:
+        on_hand, _reserved, available = compute_lot_location_balances(
+            db, lot_id, location_id
+        )
+        balances[(lot_id, location_id)] = (float(on_hand), float(available))
+
+
 def _picking_lines_with_alternates(
     db: Session,
     document: DocumentModel,
@@ -658,6 +672,7 @@ def _picking_lines_with_alternates(
     for ln in lines:
         if ln.product_id and ln.lot_id and ln.location_id:
             pairs.add((ln.lot_id, ln.location_id))
+    _fill_pick_balances_for_pairs(db, pairs, balances)
     bd_map = _breakdown_kwargs_map_for_pairs(db, pairs, balances)
 
     out: List[PickingLine] = []
@@ -1225,6 +1240,7 @@ def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedView
     for line, _loc in lines_with_loc:
         if line.lot_id and line.location_id:
             pairs.add((line.lot_id, line.location_id))
+    _fill_pick_balances_for_pairs(db, pairs, balances)
     consolidated_bd_map = _breakdown_kwargs_map_for_pairs(db, pairs, balances)
     products = []
     for key, product_name, sku, expiry_display in product_order:

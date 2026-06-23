@@ -296,6 +296,12 @@ bool isLooseOnlyLocation({
 }) =>
     (stockBoxCount ?? 0) < 1 && (stockLooseUnits ?? 0) > 0;
 
+/// Terish modali: quti skan/maydonlari faqat joyda yopiq quti (box_count >= 1) bo'lsa.
+bool shouldUseLooseOnlyPickUi({
+  int? stockBoxCount,
+}) =>
+    (stockBoxCount ?? 0) < 1;
+
 /// Terish defaultlari: lokatsiya quti/qutisiz zaxirasiga mos.
 ({int boxCount, int looseQty}) computeLocationAwareHybridDefaults({
   required int maxPick,
@@ -312,10 +318,7 @@ bool isLooseOnlyLocation({
   final int looseStock = stockLooseUnits ?? 0;
   final int upb = unitsPerBox ?? 0;
 
-  if (isLooseOnlyLocation(
-    stockBoxCount: stockBoxCount,
-    stockLooseUnits: stockLooseUnits,
-  )) {
+  if (boxes < 1) {
     if (forControllerVerify) {
       return (boxCount: 0, looseQty: maxPick);
     }
@@ -1006,10 +1009,7 @@ class PickHybridQtyFields extends StatelessWidget {
       );
     }
 
-    final bool looseOnly = isLooseOnlyLocation(
-      stockBoxCount: stockBoxCount,
-      stockLooseUnits: looseUnits,
-    );
+    final bool looseOnly = shouldUseLooseOnlyPickUi(stockBoxCount: stockBoxCount);
     final bool hasBoxStock = !looseOnly && (stockBoxCount ?? 0) >= 1;
     final bool canEditBoxCount = hasBoxStock;
     final bool showBoxBarcodeField = canEditBoxCount &&

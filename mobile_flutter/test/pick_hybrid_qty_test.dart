@@ -307,6 +307,24 @@ void main() {
     );
   });
 
+  test('computeLocationAwareHybridDefaults zero breakdown uses loose not catalog math', () {
+    final ({int boxCount, int looseQty}) defaults =
+        computeLocationAwareHybridDefaults(
+      maxPick: 17,
+      unitsPerBox: 8,
+      stockBoxCount: 0,
+      stockLooseUnits: 0,
+    );
+    expect(defaults.boxCount, 0);
+    expect(defaults.looseQty, 17);
+  });
+
+  test('shouldUseLooseOnlyPickUi when no sealed stock at location', () {
+    expect(shouldUseLooseOnlyPickUi(stockBoxCount: 0), isTrue);
+    expect(shouldUseLooseOnlyPickUi(stockBoxCount: null), isTrue);
+    expect(shouldUseLooseOnlyPickUi(stockBoxCount: 2), isFalse);
+  });
+
   test('hybridShowUnitsPerBoxField hidden until box scan or box count', () {
     final TextEditingController boxCount = TextEditingController(text: '0');
     final TextEditingController boxBarcode = TextEditingController();

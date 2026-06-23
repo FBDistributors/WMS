@@ -150,6 +150,7 @@ String? hybridPickValidationMessage({
   required String? boxBarcode,
   required String? productBarcode,
   required double maxUnits,
+  int? stockBoxCount,
 }) {
   final int maxPick = maxUnits.round();
   if (!hybrid.valid || hybrid.total < 1 || hybrid.total > maxPick) {
@@ -158,6 +159,13 @@ String? hybridPickValidationMessage({
       'qtyRangeError',
       <String, String>{'max': '$maxPick'},
     );
+  }
+  if ((stockBoxCount ?? 0) < 1) {
+    if (hybrid.looseUnits > 0 &&
+        (productBarcode == null || productBarcode.trim().isEmpty)) {
+      return StringLookup.t(loc, 'pickHybridScanProductFirst');
+    }
+    return null;
   }
   if (hybrid.boxCount > 0 && (boxBarcode == null || boxBarcode.trim().isEmpty)) {
     return StringLookup.t(loc, 'pickHybridScanBoxFirst');

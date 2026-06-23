@@ -624,6 +624,7 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                                 boxBarcode: boxBarcodeCtrl.text,
                                 productBarcode: productBarcodeCtrl.text,
                                 maxUnits: rem,
+                                stockBoxCount: locationAltHint.boxCount,
                               );
                               if (validation != null) {
                                 showAppSnackBar(
