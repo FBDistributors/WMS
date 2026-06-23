@@ -233,6 +233,69 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     _showControllerVerifiedSnackBar();
   }
 
+  void _showControllerBarcodeError(BuildContext ctx, String message) {
+    _rejectScanHaptic();
+    showAppSnackBar(ctx, SnackBar(content: Text(message)));
+  }
+
+  Future<bool> _validateControllerBoxBarcodeInSheet({
+    required BuildContext ctx,
+    required AppLocale loc,
+    required List<PickingLine> verifyLines,
+    required PickingLine productLine,
+    required TextEditingController boxBarcode,
+    required void Function(void Function()) setM,
+  }) async {
+    final String? syncErr = controllerVerifyEnteredBoxBarcodeMessage(
+      loc: loc,
+      boxBarcode: boxBarcode.text,
+      verifyLines: verifyLines,
+    );
+    if (syncErr != null) {
+      _showControllerBarcodeError(ctx, syncErr);
+      setM(() => boxBarcode.clear());
+      return false;
+    }
+    if (expectedPickedBoxBarcodeList(verifyLines).isEmpty &&
+        boxBarcode.text.trim().isNotEmpty) {
+      final String? asyncErr = await controllerVerifyBoxBarcodeAsyncFallback(
+        scanner: ref.read(scannerRepositoryProvider),
+        loc: loc,
+        boxBarcode: boxBarcode.text,
+        line: productLine,
+        verifyLines: verifyLines,
+      );
+      if (asyncErr != null) {
+        if (ctx.mounted) {
+          _showControllerBarcodeError(ctx, asyncErr);
+          setM(() => boxBarcode.clear());
+        }
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool _validateControllerProductBarcodeInSheet({
+    required BuildContext ctx,
+    required AppLocale loc,
+    required PickingLine productLine,
+    required TextEditingController productBarcode,
+    required void Function(void Function()) setM,
+  }) {
+    final String? err = controllerVerifyEnteredProductBarcodeMessage(
+      loc: loc,
+      productBarcode: productBarcode.text,
+      line: productLine,
+    );
+    if (err != null) {
+      _showControllerBarcodeError(ctx, err);
+      setM(() => productBarcode.clear());
+      return false;
+    }
+    return true;
+  }
+
   Future<void> _runPickTaskRouteScanWorkflow({
     required String sb,
     required String? lineId,
@@ -1042,6 +1105,14 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                   hybridUnitsPerBox = result.unitsPerBox;
                                 }
                               });
+                              await _validateControllerBoxBarcodeInSheet(
+                                ctx: ctx,
+                                loc: loc,
+                                verifyLines: group.members,
+                                productLine: pickTargetHolder[0],
+                                boxBarcode: hybridBoxBarcode,
+                                setM: setM,
+                              );
                             },
                             onProductBarcodeSubmitted: (String code) async {
                               final HybridScanApplyResult result =
@@ -1061,6 +1132,13 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                   hybridUnitsPerBox = result.unitsPerBox;
                                 }
                               });
+                              _validateControllerProductBarcodeInSheet(
+                                ctx: ctx,
+                                loc: loc,
+                                productLine: pickTargetHolder[0],
+                                productBarcode: hybridProductBarcode,
+                                setM: setM,
+                              );
                             },
                             onScanBox: () {
                               unawaited(() async {
@@ -1084,6 +1162,14 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                     hybridUnitsPerBox = result.unitsPerBox;
                                   }
                                 });
+                                await _validateControllerBoxBarcodeInSheet(
+                                  ctx: ctx,
+                                  loc: loc,
+                                  verifyLines: group.members,
+                                  productLine: pickTargetHolder[0],
+                                  boxBarcode: hybridBoxBarcode,
+                                  setM: setM,
+                                );
                               }());
                             },
                             onScanProduct: () {
@@ -1110,6 +1196,13 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                     hybridUnitsPerBox = result.unitsPerBox;
                                   }
                                 });
+                                _validateControllerProductBarcodeInSheet(
+                                  ctx: ctx,
+                                  loc: loc,
+                                  productLine: pickTargetHolder[0],
+                                  productBarcode: hybridProductBarcode,
+                                  setM: setM,
+                                );
                               }());
                             },
                           );
@@ -1133,6 +1226,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                   aggPicked: aggPicked,
                                   boxBarcode: hybridBoxBarcode.text,
                                   productBarcode: hybridProductBarcode.text,
+                                  verifyLines: group.members,
                                 );
                                 if (validation != null) {
                                   _rejectScanHaptic();
@@ -1144,6 +1238,30 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                     SnackBar(content: Text(message)),
                                   );
                                   return;
+                                }
+                                if (controllerVerifyRequiresBoxScan(hybrid) &&
+                                    expectedPickedBoxBarcodeList(group.members).isEmpty) {
+                                  setM(() => sheetBusy = true);
+                                  try {
+                                    final String? asyncErr =
+                                        await controllerVerifyBoxBarcodeAsyncFallback(
+                                      scanner: ref.read(scannerRepositoryProvider),
+                                      loc: loc,
+                                      boxBarcode: hybridBoxBarcode.text,
+                                      line: pickTargetHolder[0],
+                                      verifyLines: group.members,
+                                    );
+                                    if (asyncErr != null) {
+                                      if (ctx.mounted) {
+                                        _showControllerBarcodeError(ctx, asyncErr);
+                                      }
+                                      return;
+                                    }
+                                  } finally {
+                                    if (ctx.mounted) {
+                                      setM(() => sheetBusy = false);
+                                    }
+                                  }
                                 }
                                 await _markControllerGroupVerified(group.members);
                                 if (ctx.mounted) {

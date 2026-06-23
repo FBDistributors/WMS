@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/app_state/app_locale.dart';
 import '../../core/router/scanner_args.dart';
+import '../../features/picking/data/picking_models.dart';
+import '../../features/picking/domain/pick_scan_resolution.dart';
 import '../../features/product_boxes/box_qty_breakdown.dart';
 import '../../features/product_boxes/data/product_box_models.dart';
 import '../../features/product_boxes/data/product_box_repository.dart';
@@ -171,12 +173,83 @@ bool controllerVerifyRequiresBoxScan(PickHybridQty hybrid) => hybrid.boxCount > 
 
 bool controllerVerifyRequiresProductScan(PickHybridQty hybrid) => hybrid.looseUnits > 0;
 
+String controllerWrongBarcodeMessage(AppLocale loc, String expected) {
+  return '${StringLookup.t(loc, 'wrongBarcodeMessage')}$expected';
+}
+
+String? controllerVerifyEnteredBoxBarcodeMessage({
+  required AppLocale loc,
+  required String? boxBarcode,
+  required List<PickingLine> verifyLines,
+}) {
+  final String entered = boxBarcode?.trim() ?? '';
+  if (entered.isEmpty) {
+    return null;
+  }
+  final List<String> expected = expectedPickedBoxBarcodeList(verifyLines);
+  if (expected.isEmpty) {
+    return null;
+  }
+  if (!boxBarcodeMatchesPickedExpectation(entered, expected)) {
+    return controllerWrongBarcodeMessage(loc, expected.join(', '));
+  }
+  return null;
+}
+
+String? controllerVerifyEnteredProductBarcodeMessage({
+  required AppLocale loc,
+  required String? productBarcode,
+  required PickingLine line,
+}) {
+  final String entered = productBarcode?.trim() ?? '';
+  if (entered.isEmpty) {
+    return null;
+  }
+  if (!barcodeMatchesPickLine(entered, line)) {
+    return controllerWrongBarcodeMessage(
+      loc,
+      pickLineExpectedBarcodeLabel(line) ?? '',
+    );
+  }
+  return null;
+}
+
+/// `picked_box_barcode` yo'q bo'lganda quti kodini API orqali tekshirish.
+Future<String?> controllerVerifyBoxBarcodeAsyncFallback({
+  required ScannerRepository scanner,
+  required AppLocale loc,
+  required String? boxBarcode,
+  required PickingLine line,
+  required List<PickingLine> verifyLines,
+}) async {
+  if (expectedPickedBoxBarcodeList(verifyLines).isNotEmpty) {
+    return null;
+  }
+  final String code = boxBarcode?.trim() ?? '';
+  if (code.isEmpty) {
+    return null;
+  }
+  try {
+    final ScannerResolveOut out = await scanner.resolveBarcode(code);
+    if (out.isBoxScan &&
+        out.productId != null &&
+        productIdMatchesPickLine(out.productId!, line)) {
+      return null;
+    }
+  } on Object {
+    // API xato — noto'g'ri kod sifatida rad etiladi.
+  }
+  final String? label = pickLineExpectedBarcodeLabel(line);
+  return controllerWrongBarcodeMessage(loc, label ?? code);
+}
+
 String? controllerHybridVerifyValidationMessage({
   required AppLocale loc,
   required PickHybridQty hybrid,
   required double aggPicked,
   required String? boxBarcode,
   required String? productBarcode,
+  required List<PickingLine> verifyLines,
 }) {
   final int maxPick = aggPicked.round();
   if (!hybrid.valid || hybrid.total < 1 || hybrid.total > maxPick) {
@@ -196,6 +269,26 @@ String? controllerHybridVerifyValidationMessage({
   }
   if (hybrid.total != maxPick) {
     return StringLookup.t(loc, 'qtyMismatch');
+  }
+  if (controllerVerifyRequiresBoxScan(hybrid)) {
+    final String? boxErr = controllerVerifyEnteredBoxBarcodeMessage(
+      loc: loc,
+      boxBarcode: boxBarcode,
+      verifyLines: verifyLines,
+    );
+    if (boxErr != null) {
+      return boxErr;
+    }
+  }
+  if (controllerVerifyRequiresProductScan(hybrid) && verifyLines.isNotEmpty) {
+    final String? productErr = controllerVerifyEnteredProductBarcodeMessage(
+      loc: loc,
+      productBarcode: productBarcode,
+      line: verifyLines.first,
+    );
+    if (productErr != null) {
+      return productErr;
+    }
   }
   return null;
 }

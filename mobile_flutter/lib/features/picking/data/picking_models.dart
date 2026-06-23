@@ -834,3 +834,55 @@ String? displayPickedBoxBarcode(PickingLine line) {
   return trimmed.isEmpty ? null : trimmed;
 }
 
+bool barcodesEqual(String? a, String? b) {
+  final String x = a?.trim() ?? '';
+  final String y = b?.trim() ?? '';
+  if (x.isEmpty || y.isEmpty) {
+    return false;
+  }
+  return x.toLowerCase() == y.toLowerCase();
+}
+
+/// Guruh a'zolaridagi noyob `picked_box_barcode` (asl registratsiya).
+List<String> expectedPickedBoxBarcodeList(List<PickingLine> members) {
+  final List<String> out = <String>[];
+  final Set<String> seen = <String>{};
+  for (final PickingLine line in members) {
+    final String? code = displayPickedBoxBarcode(line);
+    if (code == null) {
+      continue;
+    }
+    final String key = code.toLowerCase();
+    if (seen.add(key)) {
+      out.add(code);
+    }
+  }
+  return out;
+}
+
+bool boxBarcodeMatchesPickedExpectation(String entered, List<String> expected) {
+  final String code = entered.trim();
+  if (code.isEmpty || expected.isEmpty) {
+    return false;
+  }
+  for (final String exp in expected) {
+    if (barcodesEqual(code, exp)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/// Controller tekshiruvida mahsulot shtrixi kutilgan qiymat (ko'rsatish uchun).
+String? pickLineExpectedBarcodeLabel(PickingLine line) {
+  final String? barcode = line.barcode?.trim();
+  if (barcode != null && barcode.isNotEmpty) {
+    return barcode;
+  }
+  final String? sku = line.sku?.trim();
+  if (sku != null && sku.isNotEmpty) {
+    return sku;
+  }
+  return null;
+}
+
