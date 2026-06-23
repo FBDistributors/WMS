@@ -79,12 +79,27 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
     );
   }
 
+  PickingAlternateLocation? _activeAlternate() {
+    final List<ConsolidatedLineItem> openPickLines = widget.product.lines
+        .where((ConsolidatedLineItem l) => l.qtyPicked < l.qtyRequired)
+        .toList();
+    final String pickLocationCode =
+        openPickLines.isNotEmpty ? openPickLines.first.locationCode : '';
+    return pickActiveAlternate(
+      widget.product.alternateLocations,
+      locationCode: pickLocationCode,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
     final double rem = widget.product.totalRequired - widget.product.totalPicked;
     final ({int? looseUnits, int? boxCount}) locationAltHint = _locationAltHint();
-    _unitsPerBox = unitsPerBoxFromAlternateLocations(widget.product.alternateLocations);
+    _unitsPerBox = hybridUnitsPerBoxHint(
+      unitsPerBox: null,
+      activeAlternate: _activeAlternate(),
+    );
     _boxCount = TextEditingController();
     _looseQty = TextEditingController();
     _boxBarcode = TextEditingController();
@@ -414,9 +429,7 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
               busy: _busy,
               onBoxBarcodeChanged: () => setState(() {
                 if (_boxBarcode.text.trim().isEmpty) {
-                  _unitsPerBox = unitsPerBoxFromAlternateLocations(
-                    product.alternateLocations,
-                  );
+                  _unitsPerBox = unitsPerBoxForActiveAlternate(_activeAlternate());
                   _boxCount.text = '0';
                 }
               }),

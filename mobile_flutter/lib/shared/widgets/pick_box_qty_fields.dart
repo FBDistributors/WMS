@@ -605,6 +605,64 @@ int? _unitsPerBoxFromAlternate(PickingAlternateLocation a) {
   return upb >= 1 ? upb : null;
 }
 
+/// Terish qatori uchun aktiv alternate: primary, keyin locationCode, oxirgi fallback.
+PickingAlternateLocation? pickActiveAlternate(
+  List<PickingAlternateLocation> alternates, {
+  String? locationCode,
+}) {
+  if (alternates.isEmpty) {
+    return null;
+  }
+  final String preferCode = locationCode?.trim().toLowerCase() ?? '';
+  if (preferCode.isNotEmpty) {
+    for (final PickingAlternateLocation a in alternates) {
+      if (a.isPrimary && a.locationCode.trim().toLowerCase() == preferCode) {
+        return a;
+      }
+    }
+    PickingAlternateLocation? fallback;
+    for (final PickingAlternateLocation a in alternates) {
+      if (a.locationCode.trim().toLowerCase() == preferCode) {
+        if (a.isPrimary) {
+          return a;
+        }
+        fallback ??= a;
+      }
+    }
+    if (fallback != null) {
+      return fallback;
+    }
+  }
+  for (final PickingAlternateLocation a in alternates) {
+    if (a.isPrimary) {
+      return a;
+    }
+  }
+  return alternates.first;
+}
+
+PickingAlternateLocation? pickLineActiveAlternate(PickingLine line) {
+  return pickActiveAlternate(
+    line.alternateLocations,
+    locationCode: line.locationCode,
+  );
+}
+
+({int? looseUnits, int? boxCount}) activeBoxHintForPickLine(PickingLine line) {
+  final PickingAlternateLocation? active = pickLineActiveAlternate(line);
+  if (active == null) {
+    return (looseUnits: null, boxCount: null);
+  }
+  return (looseUnits: active.looseUnits, boxCount: active.boxCount);
+}
+
+int? unitsPerBoxForActiveAlternate(PickingAlternateLocation? active) {
+  if (active == null) {
+    return null;
+  }
+  return _unitsPerBoxFromAlternate(active);
+}
+
 /// Asosiy lokatsiyada qutisiz qoldiq va quti soni (ogohlantirish / upb uchun).
 ({int? looseUnits, int? boxCount}) primaryAlternateBoxHint(
   List<PickingAlternateLocation> alternates,
@@ -617,20 +675,19 @@ int? _unitsPerBoxFromAlternate(PickingAlternateLocation a) {
   return (looseUnits: null, boxCount: null);
 }
 
-/// Terish qatori lokatsiyasi bo'yicha qutisiz/quti zaxira (kod bo'yicha).
+/// Terish qatori lokatsiyasi bo'yicha qutisiz/quti zaxira (primary-first).
 ({int? looseUnits, int? boxCount}) alternateBoxHintForLocation(
   List<PickingAlternateLocation> alternates,
   String locationCode,
 ) {
-  final String code = locationCode.trim().toLowerCase();
-  if (code.isNotEmpty) {
-    for (final PickingAlternateLocation a in alternates) {
-      if (a.locationCode.trim().toLowerCase() == code) {
-        return (looseUnits: a.looseUnits, boxCount: a.boxCount);
-      }
-    }
+  final PickingAlternateLocation? active = pickActiveAlternate(
+    alternates,
+    locationCode: locationCode,
+  );
+  if (active == null) {
+    return (looseUnits: null, boxCount: null);
   }
-  return primaryAlternateBoxHint(alternates);
+  return (looseUnits: active.looseUnits, boxCount: active.boxCount);
 }
 
 /// Quti soni 0 bo'lsa quti barcode maydonini tozalash (open-box qisman terishda saqlanadi).
@@ -665,12 +722,19 @@ void syncHybridBoxBarcodeWithQty({
 
 int? hybridUnitsPerBoxHint({
   required int? unitsPerBox,
-  required List<PickingAlternateLocation> alternates,
+  PickingAlternateLocation? activeAlternate,
+  List<PickingAlternateLocation>? alternates,
 }) {
   if (unitsPerBox != null && unitsPerBox >= 1) {
     return unitsPerBox;
   }
-  return unitsPerBoxFromAlternateLocations(alternates);
+  if (activeAlternate != null) {
+    return unitsPerBoxForActiveAlternate(activeAlternate);
+  }
+  if (alternates != null && alternates.isNotEmpty) {
+    return unitsPerBoxFromAlternateLocations(alternates);
+  }
+  return null;
 }
 
 bool hybridShowBoxOnlyHint({
@@ -946,7 +1010,8 @@ class PickHybridQtyFields extends StatelessWidget {
       stockBoxCount: stockBoxCount,
       stockLooseUnits: looseUnits,
     );
-    final bool canEditBoxCount = !looseOnly && upb != null && upb >= 1;
+    final bool hasBoxStock = !looseOnly && (stockBoxCount ?? 0) >= 1;
+    final bool canEditBoxCount = hasBoxStock;
     final bool showBoxBarcodeField = canEditBoxCount &&
         boxBarcode != null &&
         onScanBox != null;
@@ -963,7 +1028,7 @@ class PickHybridQtyFields extends StatelessWidget {
       boxBarcode: boxBarcode?.text,
     );
 
-    if (looseOnly || upb == null || upb < 1) {
+    if (looseOnly) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[

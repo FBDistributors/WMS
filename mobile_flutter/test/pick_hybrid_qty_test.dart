@@ -189,6 +189,124 @@ void main() {
     expect(hint.boxCount, 0);
   });
 
+  test('pickActiveAlternate prefers primary for duplicate location code', () {
+    final List<PickingAlternateLocation> alts = <PickingAlternateLocation>[
+      _alt(
+        locationCode: 'P-AX-08',
+        isPrimary: false,
+        looseUnits: 0,
+        boxCount: 2,
+        unitsInBoxes: 24,
+      ),
+      _alt(
+        locationCode: 'P-AX-08',
+        isPrimary: true,
+        looseUnits: 13,
+        boxCount: 0,
+      ),
+    ];
+    final PickingAlternateLocation? active =
+        pickActiveAlternate(alts, locationCode: 'P-AX-08');
+    expect(active?.isPrimary, isTrue);
+    expect(active?.boxCount, 0);
+    expect(active?.looseUnits, 13);
+    final ({int? looseUnits, int? boxCount}) hint =
+        alternateBoxHintForLocation(alts, 'P-AX-08');
+    expect(hint.boxCount, 0);
+    expect(hint.looseUnits, 13);
+  });
+
+  test('hybridUnitsPerBoxHint loose-only active ignores other alternate UPB', () {
+    final List<PickingAlternateLocation> alts = <PickingAlternateLocation>[
+      _alt(
+        locationCode: 'P-AX-08',
+        isPrimary: true,
+        looseUnits: 50,
+        boxCount: 0,
+      ),
+      _alt(
+        locationCode: 'P-H-10',
+        isPrimary: false,
+        looseUnits: 0,
+        boxCount: 5,
+        unitsInBoxes: 50,
+      ),
+    ];
+    final PickingAlternateLocation? active =
+        pickActiveAlternate(alts, locationCode: 'P-AX-08');
+    expect(
+      hybridUnitsPerBoxHint(unitsPerBox: null, activeAlternate: active),
+      isNull,
+    );
+    expect(
+      hybridUnitsPerBoxHint(unitsPerBox: null, alternates: alts),
+      10,
+    );
+  });
+
+  test('activeBoxHintForPickLine uses primary alternate for line location', () {
+    final List<PickingAlternateLocation> alts = <PickingAlternateLocation>[
+      _alt(
+        locationCode: 'P-AX-08',
+        isPrimary: false,
+        boxCount: 2,
+        looseUnits: 0,
+        unitsInBoxes: 24,
+      ),
+      _alt(
+        locationCode: 'P-AX-08',
+        isPrimary: true,
+        boxCount: 0,
+        looseUnits: 13,
+      ),
+    ];
+    final PickingLine line = PickingLine(
+      id: 'line-1',
+      productName: 'Test',
+      sku: 'SKU',
+      barcode: 'BAR',
+      locationCode: 'P-AX-08',
+      batch: null,
+      expiryDate: null,
+      qtyRequired: 18,
+      qtyPicked: 0,
+      skipReason: null,
+      productId: 'prod-1',
+      alternateLocations: alts,
+    );
+    final ({int? looseUnits, int? boxCount}) hint =
+        activeBoxHintForPickLine(line);
+    expect(hint.boxCount, 0);
+    expect(hint.looseUnits, 13);
+    expect(
+      isLooseOnlyLocation(
+        stockBoxCount: hint.boxCount,
+        stockLooseUnits: hint.looseUnits,
+      ),
+      isTrue,
+    );
+  });
+
+  test('hybridUnitsPerBoxHint box stock without UPB returns null not loose-only', () {
+    final PickingAlternateLocation active = _alt(
+      locationCode: 'P-AX-08',
+      isPrimary: true,
+      boxCount: 2,
+      looseUnits: 2,
+    );
+    expect(
+      hybridUnitsPerBoxHint(unitsPerBox: null, activeAlternate: active),
+      isNull,
+    );
+    expect(
+      isLooseOnlyLocation(
+        stockBoxCount: active.boxCount,
+        stockLooseUnits: active.looseUnits,
+      ),
+      isFalse,
+    );
+  });
+
   test('hybridShowUnitsPerBoxField hidden until box scan or box count', () {
     final TextEditingController boxCount = TextEditingController(text: '0');
     final TextEditingController boxBarcode = TextEditingController();

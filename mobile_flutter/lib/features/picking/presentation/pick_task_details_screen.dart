@@ -916,13 +916,10 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     final double hybridMaxUnits = isPickerProfile ? remPick : aggPicked;
     int? hybridUnitsPerBox = hybridUnitsPerBoxHint(
       unitsPerBox: presetUnitsPerBox,
-      alternates: pickTargetHolder[0].alternateLocations,
+      activeAlternate: pickLineActiveAlternate(pickTargetHolder[0]),
     );
     final ({int? looseUnits, int? boxCount}) locationAltHint =
-        alternateBoxHintForLocation(
-      pickTargetHolder[0].alternateLocations,
-      pickTargetHolder[0].locationCode,
-    );
+        activeBoxHintForPickLine(pickTargetHolder[0]);
     final TextEditingController hybridBoxCount = TextEditingController();
     final TextEditingController hybridLooseQty = TextEditingController();
     final TextEditingController hybridBoxBarcode = TextEditingController();
@@ -969,7 +966,11 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
         hybridUnitsPerBox = scanRes.unitsPerBox ?? hybridUnitsPerBox;
       }
     }
-    if (hybridUnitsPerBox == null || hybridUnitsPerBox < 1) {
+    if ((hybridUnitsPerBox == null || hybridUnitsPerBox < 1) &&
+        !isLooseOnlyLocation(
+          stockBoxCount: locationAltHint.boxCount,
+          stockLooseUnits: locationAltHint.looseUnits,
+        )) {
       final String? productId = pickTargetHolder[0].productId;
       if (productId != null && productId.trim().isNotEmpty) {
         final ({int? unitsPerBox, String? boxBarcode}) boxHint =
@@ -1063,10 +1064,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                       Builder(
                         builder: (BuildContext context) {
                           final ({int? looseUnits, int? boxCount}) activeLocationHint =
-                              alternateBoxHintForLocation(
-                            pickTargetHolder[0].alternateLocations,
-                            pickTargetHolder[0].locationCode,
-                          );
+                              activeBoxHintForPickLine(pickTargetHolder[0]);
                           return PickHybridQtyFields(
                             loc: loc,
                             controllerVerifyMode: true,
@@ -1082,8 +1080,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                             busy: sheetBusy,
                             onBoxBarcodeChanged: () => setM(() {
                               if (hybridBoxBarcode.text.trim().isEmpty) {
-                                hybridUnitsPerBox = unitsPerBoxFromAlternateLocations(
-                                  pickTargetHolder[0].alternateLocations,
+                                hybridUnitsPerBox = unitsPerBoxForActiveAlternate(
+                                  pickLineActiveAlternate(pickTargetHolder[0]),
                                 );
                                 hybridBoxCount.text = '0';
                               }
@@ -1313,10 +1311,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                       Builder(
                         builder: (BuildContext context) {
                           final ({int? looseUnits, int? boxCount}) activeLocationHint =
-                              alternateBoxHintForLocation(
-                            pickTargetHolder[0].alternateLocations,
-                            pickTargetHolder[0].locationCode,
-                          );
+                              activeBoxHintForPickLine(pickTargetHolder[0]);
                           return PickHybridQtyFields(
                         loc: loc,
                         boxCount: hybridBoxCount,
@@ -1332,8 +1327,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                         busy: sheetBusy,
                         onBoxBarcodeChanged: () => setM(() {
                           if (hybridBoxBarcode.text.trim().isEmpty) {
-                            hybridUnitsPerBox = unitsPerBoxFromAlternateLocations(
-                              pickTargetHolder[0].alternateLocations,
+                            hybridUnitsPerBox = unitsPerBoxForActiveAlternate(
+                              pickLineActiveAlternate(pickTargetHolder[0]),
                             );
                             hybridBoxCount.text = '0';
                           }
@@ -1442,7 +1437,15 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                             final double rem = pickTargetHolder[0].qtyRequired -
                                 pickTargetHolder[0].qtyPicked;
                             if ((hybridUnitsPerBox == null || hybridUnitsPerBox! < 1) &&
-                                pickTargetHolder[0].productId != null) {
+                                pickTargetHolder[0].productId != null &&
+                                !isLooseOnlyLocation(
+                                  stockBoxCount: activeBoxHintForPickLine(
+                                    pickTargetHolder[0],
+                                  ).boxCount,
+                                  stockLooseUnits: activeBoxHintForPickLine(
+                                    pickTargetHolder[0],
+                                  ).looseUnits,
+                                )) {
                               final ({int? unitsPerBox, String? boxBarcode}) boxHint =
                                   await loadHybridProductBoxHint(
                                 ref.read(productBoxRepositoryProvider),
@@ -1454,10 +1457,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                               }
                             }
                             final ({int? looseUnits, int? boxCount}) submitLocationHint =
-                                alternateBoxHintForLocation(
-                              pickTargetHolder[0].alternateLocations,
-                              pickTargetHolder[0].locationCode,
-                            );
+                                activeBoxHintForPickLine(pickTargetHolder[0]);
                             syncHybridBoxBarcodeWithQty(
                               boxCount: hybridBoxCount,
                               boxBarcode: hybridBoxBarcode,
@@ -1698,9 +1698,10 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                 final double remAfterSwitch =
                                     res.line.qtyRequired - res.line.qtyPicked;
                                 final ({int? looseUnits, int? boxCount}) newHint =
-                                    alternateBoxHintForLocation(
-                                  res.line.alternateLocations,
-                                  res.line.locationCode,
+                                    activeBoxHintForPickLine(res.line);
+                                hybridUnitsPerBox = hybridUnitsPerBoxHint(
+                                  unitsPerBox: hybridUnitsPerBox,
+                                  activeAlternate: pickLineActiveAlternate(res.line),
                                 );
                                 hybridBoxBarcode.clear();
                                 applyHybridQtyDefaults(

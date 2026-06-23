@@ -265,15 +265,19 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
 
     final AppLocale loc = ref.read(appLocaleProvider);
     final double rem = product.totalRequired - product.totalPicked;
-    int? unitsPerBox = hybridUnitsPerBoxHint(
-      unitsPerBox: null,
-      alternates: product.alternateLocations,
-    );
     final List<ConsolidatedLineItem> openPickLines = product.lines
         .where((ConsolidatedLineItem l) => l.qtyPicked < l.qtyRequired)
         .toList();
     final String pickLocationCode =
         openPickLines.isNotEmpty ? openPickLines.first.locationCode : '';
+    final PickingAlternateLocation? activeAlternate = pickActiveAlternate(
+      product.alternateLocations,
+      locationCode: pickLocationCode,
+    );
+    int? unitsPerBox = hybridUnitsPerBoxHint(
+      unitsPerBox: null,
+      activeAlternate: activeAlternate,
+    );
     final ({int? looseUnits, int? boxCount}) locationAltHint =
         alternateBoxHintForLocation(
       product.alternateLocations,
@@ -314,7 +318,11 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
         productBarcodeCtrl.text = raw;
       }
     }
-    if (unitsPerBox == null || unitsPerBox < 1) {
+    if ((unitsPerBox == null || unitsPerBox < 1) &&
+        !isLooseOnlyLocation(
+          stockBoxCount: locationAltHint.boxCount,
+          stockLooseUnits: locationAltHint.looseUnits,
+        )) {
       final String? productId = product.productId;
       if (productId != null && productId.trim().isNotEmpty) {
         final ({int? unitsPerBox, String? boxBarcode}) boxHint =
@@ -459,8 +467,13 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                       busy: sheetBusy,
                       onBoxBarcodeChanged: () => setM(() {
                         if (boxBarcodeCtrl.text.trim().isEmpty) {
-                          sheetUnitsPerBox = unitsPerBoxFromAlternateLocations(
-                            product.alternateLocations,
+                          sheetUnitsPerBox = unitsPerBoxForActiveAlternate(
+                            pickActiveAlternate(
+                              product.alternateLocations,
+                              locationCode: openPickLines.isNotEmpty
+                                  ? openPickLines.first.locationCode
+                                  : '',
+                            ),
                           );
                           boxCountCtrl.text = '0';
                         }
@@ -561,7 +574,11 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                           ? null
                           : () async {
                               if ((sheetUnitsPerBox == null || sheetUnitsPerBox! < 1) &&
-                                  product.productId != null) {
+                                  product.productId != null &&
+                                  !isLooseOnlyLocation(
+                                    stockBoxCount: locationAltHint.boxCount,
+                                    stockLooseUnits: locationAltHint.looseUnits,
+                                  )) {
                                 final ({int? unitsPerBox, String? boxBarcode}) boxHint =
                                     await loadHybridProductBoxHint(
                                   ref.read(productBoxRepositoryProvider),
