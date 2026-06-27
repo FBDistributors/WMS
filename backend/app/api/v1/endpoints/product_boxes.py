@@ -15,6 +15,7 @@ from app.auth.deps import require_any_permission, require_permission
 from app.db import get_db
 from app.models.location_box_placement import PLACEMENT_SEALED, LocationBoxPlacement
 from app.models.product import Product as ProductModel
+from app.models.product import ProductBarcode
 from app.models.product_box import ProductBox as ProductBoxModel
 from app.models.user import User as UserModel
 from app.services.audit_service import ACTION_CREATE, ACTION_DELETE, ACTION_UPDATE, get_client_ip, log_action
@@ -121,6 +122,32 @@ def _has_sealed_placement(db: Session, product_box_id: UUID) -> bool:
         .scalar()
     )
     return int(count or 0) > 0
+
+
+def _assert_box_barcode_not_product(db: Session, code: str) -> None:
+    """Quti kodi mavjud (faol) mahsulot dona/SKU kodi bilan to'qnashmasligi kerak.
+
+    Aks holda skaner kodni quti deb hal qiladi (quti birinchi tekshiriladi) va
+    dona terish/tekshiruv buziladi. Faqat faol mahsulotlar bo'yicha — resolve
+    mantig'i bilan bir xil.
+    """
+    hit = (
+        db.query(ProductModel.id)
+        .filter(ProductModel.barcode == code, ProductModel.is_active.is_(True))
+        .first()
+    )
+    if hit is None:
+        hit = (
+            db.query(ProductBarcode.product_id)
+            .join(ProductModel, ProductModel.id == ProductBarcode.product_id)
+            .filter(ProductBarcode.barcode == code, ProductModel.is_active.is_(True))
+            .first()
+        )
+    if hit is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="Bu kod mahsulot (dona) shtrix-kodi sifatida band — quti kodi qilib bo'lmaydi",
+        )
 
 
 def _duplicate_active_box(
@@ -241,6 +268,7 @@ async def replace_product_box_barcode(
     dup = _duplicate_active_box(db, new_code, exclude_id=old_box.id)
     if dup:
         raise HTTPException(status_code=409, detail="Box barcode already exists")
+    _assert_box_barcode_not_product(db, new_code)
 
     old_data = {
         "box_barcode": old_box.box_barcode,
@@ -353,6 +381,7 @@ async def create_product_box(
     existing = db.query(ProductBoxModel).filter(ProductBoxModel.box_barcode == code).one_or_none()
     if existing:
         raise HTTPException(status_code=409, detail="Box barcode already exists")
+    _assert_box_barcode_not_product(db, code)
     item = ProductBoxModel(
         box_barcode=code,
         product_id=payload.product_id,
@@ -417,6 +446,8 @@ async def update_product_box(
         )
         if dup:
             raise HTTPException(status_code=409, detail="Box barcode already exists")
+        if code != item.box_barcode:
+            _assert_box_barcode_not_product(db, code)
         item.box_barcode = code
     if payload.product_id is not None:
         product = db.query(ProductModel).filter(ProductModel.id == payload.product_id).one_or_none()

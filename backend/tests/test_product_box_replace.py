@@ -253,3 +253,91 @@ def test_replace_barcode_updates_units_per_box_with_sealed_placement(
         assert box.is_active is True
     finally:
         app.dependency_overrides.pop(get_current_user, None)
+
+
+def _product_with_barcode(db_session, barcode: str) -> ProductModel:
+    p = ProductModel(
+        external_source="test",
+        external_id=f"ext-{uuid.uuid4()}",
+        name="Barcoded Product",
+        sku=f"SKU-PB-{uuid.uuid4().hex[:6]}",
+        barcode=barcode,
+        is_active=True,
+    )
+    db_session.add(p)
+    db_session.commit()
+    db_session.refresh(p)
+    return p
+
+
+def test_create_box_barcode_colliding_with_product_barcode_rejected(client, db_session) -> None:
+    admin = _admin(db_session)
+    product = _product_with_barcode(db_session, "COLLIDE-123")
+    box_product = _product(db_session)
+    db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        res = client.post(
+            "/api/v1/product-boxes",
+            json={
+                "box_barcode": "COLLIDE-123",
+                "product_id": str(box_product.id),
+                "units_per_box": 6,
+            },
+        )
+        assert res.status_code == 409, res.text
+        assert "mahsulot" in res.json()["detail"].lower()
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_create_box_barcode_unique_ok(client, db_session) -> None:
+    admin = _admin(db_session)
+    _product_with_barcode(db_session, "PRODUCT-ONLY-1")
+    box_product = _product(db_session)
+    db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        res = client.post(
+            "/api/v1/product-boxes",
+            json={
+                "box_barcode": "BOX-UNIQUE-1",
+                "product_id": str(box_product.id),
+                "units_per_box": 6,
+            },
+        )
+        assert res.status_code == 201, res.text
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_replace_barcode_to_product_barcode_rejected(client, db_session) -> None:
+    admin = _admin(db_session)
+    _product_with_barcode(db_session, "COLLIDE-RPL")
+    product = _product(db_session)
+    box = ProductBoxModel(
+        box_barcode="BOX-RPL-OLD",
+        product_id=product.id,
+        units_per_box=6,
+        is_active=True,
+    )
+    db_session.add(box)
+    db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        res = client.post(
+            "/api/v1/product-boxes/replace-barcode",
+            json={
+                "old_box_id": str(box.id),
+                "new_barcode": "COLLIDE-RPL",
+                "product_id": str(product.id),
+                "units_per_box": 6,
+            },
+        )
+        assert res.status_code == 409, res.text
+        assert "mahsulot" in res.json()["detail"].lower()
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
