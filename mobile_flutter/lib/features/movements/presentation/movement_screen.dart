@@ -250,25 +250,10 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
         _showValidation('movementQtyOrLocationInvalid');
         return;
       }
-      final MovementsRepository repo = ref.read(movementsRepositoryProvider);
-      final String baseKey = _productSubmitKey ?? const Uuid().v4();
-      _productSubmitKey = baseKey;
-      await repo.createStockMovement(
-        productId: p.productId,
-        lotId: from.lotId,
-        locationId: from.locationId,
-        qtyChange: -n.toDouble(),
-        reasonCode: 'inventory_shortage',
-        idempotencyKey: '$baseKey-box-out',
-      );
-      await repo.createStockMovement(
-        productId: p.productId,
-        lotId: from.lotId,
-        locationId: to.id,
-        qtyChange: n.toDouble(),
-        reasonCode: 'inventory_overage',
-        idempotencyKey: '$baseKey-box-in',
-      );
+      // Quti ko'chirish atomik: relocate_sealed_box fizik qoldiq va placement'ni
+      // birga ko'chiradi. Qo'lda shortage/overage qo'shilsa, stock IKKI marta
+      // ko'chardi (manbada manfiy, manzilda ikki barobar) — shuning uchun
+      // faqat transferBox chaqiriladi.
       await ref.read(boxLocationRepositoryProvider).transferBox(
             boxBarcode: barcode.trim(),
             fromLocationId: from.locationId,
