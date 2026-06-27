@@ -37,15 +37,14 @@ from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_
 from app.services.box_location_service import (
     apply_hybrid_pick_side_effects,
     apply_scan_pick_side_effects,
-    assert_box_invariant,
     breakdown_kwargs_for_pick,
     compute_consolidated_box_loose_plan,
     consolidated_remainders_by_document,
     remove_sealed_boxes_for_pick,
     require_sufficient_loose_for_unit_pick,
-    restore_sealed_boxes_for_unpick,
     validate_hybrid_pick_qty,
 )
+from app.services.stock_box_gateway import record_pick, record_pick_rollback
 from app.services.product_scan_resolve import (
     ProductScanResolve,
     is_explicit_box_pick,
@@ -1559,29 +1558,14 @@ async def consolidated_pick(
                 line.picked_box_barcode = picked_box
             line.picked_qty = float(Decimal(str(line.picked_qty or 0)) + need)
             docs_to_refresh.add(line.document_id)
-            db.add(
-                StockMovementModel(
-                    product_id=line.product_id,
-                    lot_id=line.lot_id,
-                    location_id=line.location_id,
-                    qty_change=-need,
-                    movement_type="pick",
-                    source_document_type="document",
-                    source_document_id=line.document_id,
-                    created_by_user_id=user.id,
-                )
-            )
-            db.add(
-                StockMovementModel(
-                    product_id=line.product_id,
-                    lot_id=line.lot_id,
-                    location_id=line.location_id,
-                    qty_change=-need,
-                    movement_type="unallocate",
-                    source_document_type="document",
-                    source_document_id=line.document_id,
-                    created_by_user_id=user.id,
-                )
+            record_pick(
+                db,
+                product_id=line.product_id,
+                lot_id=line.lot_id,
+                location_id=line.location_id,
+                qty=need,
+                document_id=line.document_id,
+                created_by_user_id=user.id,
             )
             if first_picked_line_id is None:
                 first_picked_line_id = line.id
@@ -2213,29 +2197,14 @@ def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
             line.picked_box_barcode = picked_box
 
     try:
-        db.add(
-            StockMovementModel(
-                product_id=line.product_id,
-                lot_id=line.lot_id,
-                location_id=line.location_id,
-                qty_change=-qty_delta,
-                movement_type="pick",
-                source_document_type="document",
-                source_document_id=document.id,
-                created_by_user_id=user.id,
-            )
-        )
-        db.add(
-            StockMovementModel(
-                product_id=line.product_id,
-                lot_id=line.lot_id,
-                location_id=line.location_id,
-                qty_change=-qty_delta,
-                movement_type="unallocate",
-                source_document_type="document",
-                source_document_id=document.id,
-                created_by_user_id=user.id,
-            )
+        record_pick(
+            db,
+            product_id=line.product_id,
+            lot_id=line.lot_id,
+            location_id=line.location_id,
+            qty=qty_delta,
+            document_id=document.id,
+            created_by_user_id=user.id,
         )
         if document.order_id:
             order = (
@@ -2421,41 +2390,16 @@ async def unpick_line(
         line.picked_box_barcode = None
     line.skip_reason = reason
 
-    # rollback invariant: pick=+delta, unallocate=+delta (stock and reserve are restored)
-    db.add(
-        StockMovementModel(
-            product_id=line.product_id,
-            lot_id=line.lot_id,
-            location_id=line.location_id,
-            qty_change=qty_to_rollback,
-            movement_type="pick",
-            source_document_type="document",
-            source_document_id=document.id,
-            created_by_user_id=user.id,
-        )
-    )
-    db.add(
-        StockMovementModel(
-            product_id=line.product_id,
-            lot_id=line.lot_id,
-            location_id=line.location_id,
-            qty_change=qty_to_rollback,
-            movement_type="unallocate",
-            source_document_type="document",
-            source_document_id=document.id,
-            created_by_user_id=user.id,
-        )
-    )
-    db.flush()
-    # Butun-quti pick qaytarilsa, quti yopiq holatda joyiga qaytadi (ochilgan quti emas).
-    restore_sealed_boxes_for_unpick(
+    # Stock+rezerv tiklash + butun-quti pick'larini yopiq qaytarish + invariant.
+    record_pick_rollback(
         db,
+        product_id=line.product_id,
         lot_id=line.lot_id,
         location_id=line.location_id,
-        source_document_id=document.id,
-        returned_qty=qty_to_rollback,
+        qty=qty_to_rollback,
+        document_id=document.id,
+        created_by_user_id=user.id,
     )
-    assert_box_invariant(db, line.lot_id, line.location_id)
 
     lines = (
         db.query(DocumentLineModel)
@@ -2561,45 +2505,19 @@ async def skip_line(
 
     qty_to_reverse = Decimal(str(line.picked_qty))
 
-    # Reverse stock: return picked qty to location (pick + unallocate with positive qty)
-    db.add(
-        StockMovementModel(
-            product_id=line.product_id,
-            lot_id=line.lot_id,
-            location_id=line.location_id,
-            qty_change=qty_to_reverse,
-            movement_type="pick",
-            source_document_type="document",
-            source_document_id=document.id,
-            created_by_user_id=user.id,
-        )
-    )
-    db.add(
-        StockMovementModel(
-            product_id=line.product_id,
-            lot_id=line.lot_id,
-            location_id=line.location_id,
-            qty_change=qty_to_reverse,
-            movement_type="unallocate",
-            source_document_type="document",
-            source_document_id=document.id,
-            created_by_user_id=user.id,
-        )
-    )
-
     line.picked_qty = 0
     line.picked_box_barcode = None
     line.skip_reason = reason
-    db.flush()
-    # Butun-quti pick qaytarilsa, quti yopiq holatda joyiga qaytadi (ochilgan quti emas).
-    restore_sealed_boxes_for_unpick(
+    # Stock+rezerv tiklash + butun-quti pick'larini yopiq qaytarish + invariant.
+    record_pick_rollback(
         db,
+        product_id=line.product_id,
         lot_id=line.lot_id,
         location_id=line.location_id,
-        source_document_id=document.id,
-        returned_qty=qty_to_reverse,
+        qty=qty_to_reverse,
+        document_id=document.id,
+        created_by_user_id=user.id,
     )
-    assert_box_invariant(db, line.lot_id, line.location_id)
 
     lines = (
         db.query(DocumentLineModel)
