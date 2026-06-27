@@ -30,6 +30,19 @@ from app.services.box_location_service import (
 )
 
 
+def _sealed_count(db: Session, lot_id: UUID, location_id: UUID) -> int:
+    """Fizik sealed quti soni (rezervdan mustaqil) — to'g'ridan-to'g'ri jadvaldan."""
+    return (
+        db.query(LocationBoxPlacement)
+        .filter(
+            LocationBoxPlacement.lot_id == lot_id,
+            LocationBoxPlacement.location_id == location_id,
+            LocationBoxPlacement.status == PLACEMENT_SEALED,
+        )
+        .count()
+    )
+
+
 def _mk_user(db: Session, *, username: str, role: str) -> UserModel:
     user = UserModel(
         username=username,
@@ -1368,5 +1381,139 @@ def test_picked_box_barcode_cleared_on_full_unpick(
         assert unpick.status_code == 200, unpick.text
         assert unpick.json()["line"]["qty_picked"] == 0
         assert unpick.json()["line"].get("picked_box_barcode") in (None, "")
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_full_box_unpick_restores_sealed_boxes(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Butun-quti pick to'liq qaytarilsa, sealed qutilar joyiga tiklanadi."""
+    order, picker, product, loc, lot, box_barcode = _seed_box_pick_order(db_session)
+    doc_id = _send_to_picking(client, db_session, order.id, picker.id)
+
+    app.dependency_overrides[get_current_user] = lambda: picker
+    try:
+        line_id = client.get(f"/api/v1/picking/documents/{doc_id}").json()["lines"][0]["id"]
+        # 3 quti teriladi (18 dona) -> 5 dan 2 quti qoladi
+        pick = client.post(
+            f"/api/v1/picking/lines/{line_id}/pick",
+            json={
+                "delta": 18,
+                "request_id": f"pick-restore-{uuid.uuid4().hex}",
+                "barcode": box_barcode,
+                "box_count": 3,
+            },
+        )
+        assert pick.status_code == 200, pick.text
+        bd_after_pick = get_breakdown_for_pick(
+            db_session, product_id=product.id, lot_id=lot.id, location_id=loc.id
+        )
+        assert bd_after_pick.box_count == 2
+        assert bd_after_pick.units_in_boxes == 12
+
+        # To'liq unpick -> 5 quti tiklanadi
+        unpick = client.post(
+            f"/api/v1/picking/lines/{line_id}/unpick",
+            json={
+                "delta": 18,
+                "reason": "wrong_location",
+                "request_id": f"unpick-restore-{uuid.uuid4().hex}",
+            },
+        )
+        assert unpick.status_code == 200, unpick.text
+        bd_after_unpick = get_breakdown_for_pick(
+            db_session, product_id=product.id, lot_id=lot.id, location_id=loc.id
+        )
+        assert bd_after_unpick.box_count == 5
+        assert bd_after_unpick.units_in_boxes == 30
+        assert _sealed_count(db_session, lot.id, loc.id) == 5
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_partial_unpick_restores_proportional_boxes(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Qisman unpick: faqat to'liq qutiga yetadigan qism sealed tiklanadi."""
+    order, picker, product, loc, lot, box_barcode = _seed_box_pick_order(db_session)
+    doc_id = _send_to_picking(client, db_session, order.id, picker.id)
+
+    app.dependency_overrides[get_current_user] = lambda: picker
+    try:
+        line_id = client.get(f"/api/v1/picking/documents/{doc_id}").json()["lines"][0]["id"]
+        client.post(
+            f"/api/v1/picking/lines/{line_id}/pick",
+            json={
+                "delta": 18,
+                "request_id": f"pick-ppart-{uuid.uuid4().hex}",
+                "barcode": box_barcode,
+                "box_count": 3,
+            },
+        )
+        # 6 dona qaytar (1 quti) -> box_count 2 -> 3
+        unpick = client.post(
+            f"/api/v1/picking/lines/{line_id}/unpick",
+            json={
+                "delta": 6,
+                "reason": "wrong_location",
+                "request_id": f"unpick-ppart-{uuid.uuid4().hex}",
+            },
+        )
+        assert unpick.status_code == 200, unpick.text
+        bd = get_breakdown_for_pick(
+            db_session, product_id=product.id, lot_id=lot.id, location_id=loc.id
+        )
+        assert bd.box_count == 3
+        assert bd.units_in_boxes == 18
+        assert _sealed_count(db_session, lot.id, loc.id) == 3
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_hybrid_opened_box_not_restored_on_unpick(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Gibrid terishda ochilgan quti unpick'da tiklanmaydi; faqat to'liq quti tiklanadi."""
+    order, picker, product, loc, lot, box_barcode = _seed_box_only_partial_pick_order(
+        db_session
+    )
+    doc_id = _send_to_picking(client, db_session, order.id, picker.id)
+
+    app.dependency_overrides[get_current_user] = lambda: picker
+    try:
+        line_id = client.get(f"/api/v1/picking/documents/{doc_id}").json()["lines"][0]["id"]
+        # 10 dona = 1 to'liq quti (8) + 1 ochilgan qutidan 2 dona
+        pick = client.post(
+            f"/api/v1/picking/lines/{line_id}/pick",
+            json={
+                "delta": 10,
+                "request_id": f"pick-hyb-unpick-{uuid.uuid4().hex}",
+                "barcode": product.barcode,
+                "box_barcode": box_barcode,
+                "box_count": 1,
+            },
+        )
+        assert pick.status_code == 200, pick.text
+
+        unpick = client.post(
+            f"/api/v1/picking/lines/{line_id}/unpick",
+            json={
+                "delta": 10,
+                "reason": "wrong_location",
+                "request_id": f"unpick-hyb-{uuid.uuid4().hex}",
+            },
+        )
+        assert unpick.status_code == 200, unpick.text
+        bd = get_breakdown_for_pick(
+            db_session, product_id=product.id, lot_id=lot.id, location_id=loc.id
+        )
+        # 10 dan 8 quti edi; 1 to'liq quti tiklandi -> 9; ochilgan quti loose qoladi
+        assert bd.box_count == 9
+        assert bd.units_in_boxes == 72
+        assert _sealed_count(db_session, lot.id, loc.id) == 9
     finally:
         app.dependency_overrides.pop(get_current_user, None)

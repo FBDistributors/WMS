@@ -46,6 +46,11 @@ class LocationBoxPlacement(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     remove_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Terishda olib/ochilganda qaysi SO hujjat uchun ekani — unpick/cancel'da
+    # sealed-restore'ni aynan shu hujjat bo'yicha cheklash uchun.
+    source_document_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
+    )
 
     product_box = relationship("ProductBox", lazy="joined")
     location = relationship("Location", lazy="joined")
@@ -55,4 +60,5 @@ class LocationBoxPlacement(Base):
         Index("ix_location_box_placements_location_lot", "location_id", "lot_id"),
         Index("ix_location_box_placements_product_box_id", "product_box_id"),
         Index("ix_location_box_placements_status", "status"),
+        Index("ix_location_box_placements_source_document_id", "source_document_id"),
     )

@@ -37,11 +37,13 @@ from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_
 from app.services.box_location_service import (
     apply_hybrid_pick_side_effects,
     apply_scan_pick_side_effects,
+    assert_box_invariant,
     breakdown_kwargs_for_pick,
     compute_consolidated_box_loose_plan,
     consolidated_remainders_by_document,
     remove_sealed_boxes_for_pick,
     require_sufficient_loose_for_unit_pick,
+    restore_sealed_boxes_for_unpick,
     validate_hybrid_pick_qty,
 )
 from app.services.product_scan_resolve import (
@@ -1504,6 +1506,7 @@ async def consolidated_pick(
                     box_count=line_boxes,
                     box_units=box_qty,
                     loose_units=loose_qty,
+                    source_document_id=line.document_id,
                 )
                 boxes_remaining -= line_boxes
                 loose_remaining -= loose_qty
@@ -1517,6 +1520,7 @@ async def consolidated_pick(
                     user=user,
                     box_count=line_boxes,
                     pick_qty=need,
+                    source_document_id=line.document_id,
                 )
                 boxes_remaining -= line_boxes
             elif unit_pick:
@@ -1530,6 +1534,7 @@ async def consolidated_pick(
                     location_id=line.location_id,
                     user=user,
                     scan_barcode=barcode,
+                    source_document_id=line.document_id,
                 )
             picked_box = _picked_box_barcode_from_pick_payload(
                 scan_barcode=barcode,
@@ -2169,6 +2174,7 @@ def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
                 box_count=payload.box_count,
                 box_units=box_units,
                 loose_units=loose_units,
+                source_document_id=document.id,
             )
         elif scan_barcode:
             resolved = resolve_product_scan(db, scan_barcode)
@@ -2182,6 +2188,7 @@ def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
                 location_id=line.location_id,
                 user=user,
                 scan_barcode=scan_barcode,
+                source_document_id=document.id,
             )
         picked_box = _picked_box_barcode_from_pick_payload(
             scan_barcode=scan_barcode,
@@ -2426,6 +2433,16 @@ async def unpick_line(
             created_by_user_id=user.id,
         )
     )
+    db.flush()
+    # Butun-quti pick qaytarilsa, quti yopiq holatda joyiga qaytadi (ochilgan quti emas).
+    restore_sealed_boxes_for_unpick(
+        db,
+        lot_id=line.lot_id,
+        location_id=line.location_id,
+        source_document_id=document.id,
+        returned_qty=qty_to_rollback,
+    )
+    assert_box_invariant(db, line.lot_id, line.location_id)
 
     lines = (
         db.query(DocumentLineModel)
@@ -2558,7 +2575,18 @@ async def skip_line(
     )
 
     line.picked_qty = 0
+    line.picked_box_barcode = None
     line.skip_reason = reason
+    db.flush()
+    # Butun-quti pick qaytarilsa, quti yopiq holatda joyiga qaytadi (ochilgan quti emas).
+    restore_sealed_boxes_for_unpick(
+        db,
+        lot_id=line.lot_id,
+        location_id=line.location_id,
+        source_document_id=document.id,
+        returned_qty=qty_to_reverse,
+    )
+    assert_box_invariant(db, line.lot_id, line.location_id)
 
     lines = (
         db.query(DocumentLineModel)

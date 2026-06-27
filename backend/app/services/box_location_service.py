@@ -27,6 +27,7 @@ from app.services.product_scan_resolve import (
 from app.services.stock_availability import (
     PHYSICAL_ON_HAND_MOVEMENT_TYPES,
     compute_lot_location_available,
+    compute_lot_location_balances,
     lock_lot_location,
 )
 
@@ -182,6 +183,35 @@ def _units_in_boxes_for_lot_location(
         )
         units += box.units_per_box
     return len(sealed), units, sealed
+
+
+def box_invariant_holds(db: Session, lot_id: UUID, location_id: UUID) -> bool:
+    """Invariant: sealed qutilardagi dona jami fizik qoldiqdan (on_hand) oshmasligi kerak.
+
+    `units_in_boxes <= on_hand`. Buzilsa — sealed chelak "drift" qilgan (oqimlardan biri
+    total'ni o'zgartirib, sealed placement'ni mos saqlamagan) degani.
+    """
+    on_hand, _reserved, _available = compute_lot_location_balances(db, lot_id, location_id)
+    _box_count, units_in_boxes, _sealed = _units_in_boxes_for_lot_location(db, lot_id, location_id)
+    return units_in_boxes <= max(0, int(on_hand))
+
+
+def assert_box_invariant(db: Session, lot_id: UUID, location_id: UUID) -> None:
+    """Mutatsiyadan keyin chaqiriladigan himoya: invariant buzilsa 409.
+
+    Stock+quti o'zgartirgan oqimlar oxirida chaqirib, sealed chelak total bilan
+    moslshini kafolatlaydi. Buzilsa tranzaksiya rollback bo'lishi kerak.
+    """
+    if not box_invariant_holds(db, lot_id, location_id):
+        _bc, units_in_boxes, _ = _units_in_boxes_for_lot_location(db, lot_id, location_id)
+        on_hand, _r, _a = compute_lot_location_balances(db, lot_id, location_id)
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Quti invariant buzildi: qutilardagi dona ({units_in_boxes}) "
+                f"fizik qoldiqdan ({int(on_hand)}) oshib ketdi"
+            ),
+        )
 
 
 def get_breakdown_with_mode(
@@ -653,8 +683,9 @@ def remove_sealed_boxes_for_pick(
     user: UserModel,
     box_count: int,
     pick_qty: Decimal,
+    source_document_id: UUID | None = None,
 ) -> None:
-    """Terishda bir yoki bir nechta sealed qutini olib tashlaydi."""
+    """Terishda bir yoki bir nechta sealed qutini olib tashlaydi (butun quti terish)."""
     if box_count < 1:
         raise HTTPException(status_code=400, detail="box_count must be >= 1")
     if box_count > 500:
@@ -701,6 +732,7 @@ def remove_sealed_boxes_for_pick(
         placement.removed_at = datetime.now(timezone.utc)
         placement.removed_by_user_id = user.id
         placement.remove_reason = "pick"
+        placement.source_document_id = source_document_id
         db.flush()
 
 
@@ -712,6 +744,7 @@ def open_sealed_boxes_for_pick(
     lot_id: UUID,
     user: UserModel,
     box_count: int,
+    source_document_id: UUID | None = None,
 ) -> None:
     """Terishda qisman dona uchun sealed qutini ochish (ichidagi donalar ochiq qoldiqka o'tadi)."""
     if box_count < 1:
@@ -753,28 +786,60 @@ def open_sealed_boxes_for_pick(
         placement.removed_at = datetime.now(timezone.utc)
         placement.removed_by_user_id = user.id
         placement.remove_reason = "pick_open"
+        placement.source_document_id = source_document_id
         db.flush()
 
 
-def remove_box_for_pick_if_needed(
+def restore_sealed_boxes_for_unpick(
     db: Session,
     *,
-    box_barcode: str,
-    location_id: UUID,
     lot_id: UUID,
-    user: UserModel,
-    pick_qty: Decimal,
-) -> None:
-    """Quti skan bilan terishda bitta sealed yozuvni olib tashlaydi (orqaga moslik)."""
-    remove_sealed_boxes_for_pick(
-        db,
-        box_barcode=box_barcode,
-        location_id=location_id,
-        lot_id=lot_id,
-        user=user,
-        box_count=1,
-        pick_qty=pick_qty,
+    location_id: UUID,
+    source_document_id: UUID,
+    returned_qty: Decimal,
+) -> int:
+    """Unpick/skip/cancel'da butun-quti pick (reason='pick') yozuvlarini qaytaradi.
+
+    Qutilar almashtiriladigani (fungible) uchun aynan qaysi quti emas, *soni* muhim:
+    qaytarilgan miqdor nechta to'liq qutini qoplasa, shuncha sealed yozuv tiklanadi
+    (eng oxirgi olinganidan boshlab — LIFO). Ochilgan qutilar (reason='pick_open')
+    qaytarilmaydi — fizik qayta yopib bo'lmaydi.
+
+    Returns: tiklangan qutilar soni.
+    """
+    qty = int(max(0, int(returned_qty)))
+    if qty <= 0:
+        return 0
+    removed = (
+        db.query(LocationBoxPlacement)
+        .options(joinedload(LocationBoxPlacement.product_box))
+        .filter(
+            LocationBoxPlacement.lot_id == lot_id,
+            LocationBoxPlacement.location_id == location_id,
+            LocationBoxPlacement.status == PLACEMENT_REMOVED,
+            LocationBoxPlacement.remove_reason == "pick",
+            LocationBoxPlacement.source_document_id == source_document_id,
+        )
+        .order_by(LocationBoxPlacement.removed_at.desc())
+        .all()
     )
+    restored = 0
+    for placement in removed:
+        box = placement.product_box
+        if not box or not box.is_active:
+            continue
+        upb = int(box.units_per_box or 0)
+        if upb < 1 or qty < upb:
+            continue
+        placement.status = PLACEMENT_SEALED
+        placement.removed_at = None
+        placement.removed_by_user_id = None
+        placement.remove_reason = None
+        placement.source_document_id = None
+        qty -= upb
+        restored += 1
+        db.flush()
+    return restored
 
 
 def validate_hybrid_pick_qty(
@@ -833,6 +898,7 @@ def apply_hybrid_pick_side_effects(
     box_count: int,
     box_units: Decimal,
     loose_units: Decimal,
+    source_document_id: UUID | None = None,
 ) -> None:
     """Gibrid terish: to'liq quti, kerak bo'lsa quti ochish, qutisiz dona tekshiruvi."""
     boxes_to_open = 0
@@ -865,6 +931,7 @@ def apply_hybrid_pick_side_effects(
             user=user,
             box_count=box_count,
             pick_qty=box_units,
+            source_document_id=source_document_id,
         )
     if boxes_to_open > 0:
         open_sealed_boxes_for_pick(
@@ -874,6 +941,7 @@ def apply_hybrid_pick_side_effects(
             lot_id=lot_id,
             user=user,
             box_count=boxes_to_open,
+            source_document_id=source_document_id,
         )
     if loose_units > 0:
         require_sufficient_loose_for_unit_pick(
@@ -896,6 +964,7 @@ def apply_scan_pick_side_effects(
     location_id: UUID,
     user: UserModel,
     scan_barcode: str,
+    source_document_id: UUID | None = None,
 ) -> None:
     """Skan asosida quti yoki qutisiz terish side-effectlari (pick_line, consolidated, waves)."""
     if qty_delta <= 0:
@@ -909,6 +978,7 @@ def apply_scan_pick_side_effects(
             user=user,
             box_count=int(box_count),
             pick_qty=qty_delta,
+            source_document_id=source_document_id,
         )
         return
     if not resolved:
@@ -942,6 +1012,7 @@ def apply_scan_pick_side_effects(
                     user=user,
                     box_count=boxes,
                     pick_qty=qty_delta,
+                    source_document_id=source_document_id,
                 )
                 return
         raise HTTPException(status_code=400, detail="box_count required for box scan")
@@ -952,6 +1023,7 @@ def apply_scan_pick_side_effects(
         location_id=location_id,
         user=user,
         qty_delta=qty_delta,
+        source_document_id=source_document_id,
     )
 
 
@@ -975,6 +1047,7 @@ def _apply_unit_scan_pick_side_effects(
     location_id: UUID,
     user: UserModel,
     qty_delta: Decimal,
+    source_document_id: UUID | None = None,
 ) -> None:
     """Dona skan: qutisiz yetmasa, faqat qutida zaxiradan avto quti yoki box_count talab."""
     breakdown = get_breakdown_for_pick(
@@ -1008,6 +1081,7 @@ def _apply_unit_scan_pick_side_effects(
                         user=user,
                         box_count=boxes,
                         pick_qty=qty_delta,
+                        source_document_id=source_document_id,
                     )
                     return
         raise HTTPException(status_code=400, detail="box_count required for box scan")
