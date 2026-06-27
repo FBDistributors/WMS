@@ -159,4 +159,52 @@ void main() {
       expect(resolved?.id, 'promo');
     });
   });
+
+  group('scanPresetIsBoxForLine', () {
+    final PickingLine line = _line(id: 'l1', productId: 'p1', barcode: 'BC123', sku: 'SKU123');
+
+    test('box scan matching product barcode is treated as unit (collision)', () {
+      expect(
+        scanPresetIsBoxForLine(
+          isBoxScan: true,
+          scannedBarcode: 'BC123',
+          line: line,
+        ),
+        isFalse,
+      );
+    });
+
+    test('box scan matching sku is treated as unit', () {
+      expect(
+        scanPresetIsBoxForLine(
+          isBoxScan: true,
+          scannedBarcode: 'SKU123',
+          line: line,
+        ),
+        isFalse,
+      );
+    });
+
+    test('genuine box code (no product match) stays box', () {
+      expect(
+        scanPresetIsBoxForLine(
+          isBoxScan: true,
+          scannedBarcode: 'BOX-XYZ',
+          line: line,
+        ),
+        isTrue,
+      );
+    });
+
+    test('unit scan is never box', () {
+      expect(
+        scanPresetIsBoxForLine(
+          isBoxScan: false,
+          scannedBarcode: 'BOX-XYZ',
+          line: line,
+        ),
+        isFalse,
+      );
+    });
+  });
 }

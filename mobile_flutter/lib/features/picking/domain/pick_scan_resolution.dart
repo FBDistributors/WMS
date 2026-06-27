@@ -73,6 +73,20 @@ bool isControllerPickGroupFullyVerified(
       .every((PickingLine l) => verifiedLineIds.contains(l.id));
 }
 
+/// Tekshiruv/terish: skan qiluvni quti rejimida ochish kerakmi.
+///
+/// Skaner kodni quti deb hal qilsa ham (`isBoxScan`), agar o'sha kod aynan
+/// shu qatorning mahsulot/SKU dona kodiga mos kelsa — bu dona skan deb
+/// hisoblanadi. Bu quti kodi mahsulot kodi bilan to'qnashgan holatda skan
+/// ko'rinmaydigan quti maydoniga ketib qolishini oldini oladi.
+bool scanPresetIsBoxForLine({
+  required bool isBoxScan,
+  required String scannedBarcode,
+  required PickingLine line,
+}) {
+  return isBoxScan && !barcodeMatchesPickLine(scannedBarcode, line);
+}
+
 /// Quti skani: mahsulot ID bo'yicha ochiq qator.
 PickingLine? resolvePickerScanLineByProductId(List<PickingLine> lines, String productId) {
   final List<PickingLine> matches = findAllLinesByProductId(lines, productId);

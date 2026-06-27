@@ -212,13 +212,21 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       _showControllerAlreadyVerifiedSnackBar();
       return;
     }
+    // Quti kodi mahsulotning dona/SKU kodi bilan to'qnashsa (bir xil qiymat),
+    // tekshiruvni dona skan sifatida ochamiz — aks holda skan ko'rsatilmaydigan
+    // quti maydoniga ketib, "Mahsulot skan" bo'sh qoladi.
+    final bool treatAsBox = scanPresetIsBoxForLine(
+      isBoxScan: resolved.isBoxScan,
+      scannedBarcode: scannedBarcode,
+      line: resolved.line,
+    );
     await _openLineSheet(
       doc,
       _pickLineGroupForLine(doc, resolved.line),
       PickerProfileParam.controller,
       presetScannedBarcode: scannedBarcode,
-      presetIsBoxScan: resolved.isBoxScan,
-      presetUnitsPerBox: resolved.isBoxScan ? resolved.unitsPerScan : null,
+      presetIsBoxScan: treatAsBox,
+      presetUnitsPerBox: treatAsBox ? resolved.unitsPerScan : null,
     );
   }
 
