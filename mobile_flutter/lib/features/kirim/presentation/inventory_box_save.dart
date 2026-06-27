@@ -294,6 +294,37 @@ Future<void> _applyLooseAdjust({
   );
 }
 
+/// Atomik `/box-locations/count` yo'liga o'tish mumkinmi.
+///
+/// Bitta lot, bitta quti turi va izchil ma'lumot bo'lganda sanoqni bitta atomik
+/// chaqiruv bilan saqlash mumkin (total + sealed birga, server invariant kafolati).
+/// Murakkab holatlar (multi-lot loose, nomuvofiq ma'lumot, begona quti turlari)
+/// eski ko'p qadamli yo'lda qoladi.
+bool inventoryCountAtomicEligible({
+  required BoxLocationBreakdown breakdown,
+  required String boxBarcode,
+  required int? unitsPerBox,
+  List<PickerProductLocation>? looseAdjustLots,
+}) {
+  final String barcode = boxBarcode.trim();
+  if (barcode.isEmpty) {
+    return false;
+  }
+  if (unitsPerBox == null || unitsPerBox < 1) {
+    return false;
+  }
+  if (breakdown.dataInconsistent) {
+    return false;
+  }
+  if (looseAdjustLots != null && looseAdjustLots.isNotEmpty) {
+    return false;
+  }
+  // Lokatsiyada faqat shu quti turi bo'lsa (begona tur sealed yo'q).
+  final bool onlyThisBoxType = breakdown.sealedBoxes
+      .every((SealedBoxInfo s) => s.boxBarcode.trim() == barcode);
+  return onlyThisBoxType;
+}
+
 bool inventoryBoxSaveHasChanges({
   required BoxLocationBreakdown breakdown,
   required String? boxBarcode,

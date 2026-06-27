@@ -84,6 +84,36 @@ class BoxLocationRepository {
     }
   }
 
+  /// Inventarizatsiya sanog'i: yopiq quti soni va qutisiz dona aniq belgilanadi
+  /// (total va sealed chelagi birga to'g'rilanadi).
+  Future<BoxLocationBreakdown> countBox({
+    required String boxBarcode,
+    required String locationId,
+    required String lotId,
+    required int boxCount,
+    required int looseUnits,
+  }) async {
+    try {
+      final Response<Object?> res = await _dio.post<Object?>(
+        '/box-locations/count',
+        data: <String, Object?>{
+          'box_barcode': boxBarcode.trim(),
+          'location_id': locationId,
+          'lot_id': lotId,
+          'box_count': boxCount,
+          'loose_units': looseUnits,
+        },
+      );
+      final Object? data = res.data;
+      if (data is! Map) {
+        throw const FormatException('box count');
+      }
+      return BoxLocationBreakdown.fromJson(Map<String, Object?>.from(data));
+    } on DioException catch (e) {
+      throw Exception(mapDioExceptionToMessage(e));
+    }
+  }
+
   Future<BoxLocationBreakdown> transferBox({
     required String boxBarcode,
     required String fromLocationId,

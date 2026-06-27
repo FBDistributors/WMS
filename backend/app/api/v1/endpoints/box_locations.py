@@ -14,6 +14,7 @@ from app.services.box_location_service import (
     LocationBoxBreakdown,
     get_breakdown_tolerant,
     place_sealed_boxes,
+    reconcile_count,
     relocate_sealed_box,
     remove_sealed_box,
 )
@@ -59,6 +60,14 @@ class BoxTransferIn(BaseModel):
     box_barcode: str = Field(..., min_length=1, max_length=64)
     from_location_id: UUID
     to_location_id: UUID
+
+
+class BoxCountIn(BaseModel):
+    box_barcode: str = Field(..., min_length=1, max_length=64)
+    location_id: UUID
+    lot_id: UUID
+    box_count: int = Field(..., ge=0, le=500)
+    loose_units: int = Field(..., ge=0)
 
 
 def _to_out(b: LocationBoxBreakdown) -> BoxBreakdownOut:
@@ -136,6 +145,25 @@ async def box_remove(
         reason=payload.reason,
         location_id=payload.location_id,
         lot_id=payload.lot_id,
+    )
+    db.commit()
+    return _to_out(result)
+
+
+@router.post("/count", response_model=BoxBreakdownOut, summary="Inventarizatsiya: quti + dona sanog'i")
+async def box_count(
+    payload: BoxCountIn,
+    db: Session = Depends(get_db),
+    user: UserModel = Depends(require_permission("inventory:adjust")),
+):
+    result = reconcile_count(
+        db,
+        box_barcode=payload.box_barcode,
+        location_id=payload.location_id,
+        lot_id=payload.lot_id,
+        user=user,
+        box_count=payload.box_count,
+        loose_units=payload.loose_units,
     )
     db.commit()
     return _to_out(result)

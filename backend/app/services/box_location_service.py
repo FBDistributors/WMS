@@ -700,6 +700,100 @@ def relocate_sealed_box(
     )
 
 
+def reconcile_count(
+    db: Session,
+    *,
+    box_barcode: str,
+    location_id: UUID,
+    lot_id: UUID,
+    user: UserModel,
+    box_count: int,
+    loose_units: int,
+) -> LocationBoxBreakdown:
+    """Inventarizatsiya sanog'i: yopiq quti soni va qutisiz donani aniq belgilaydi.
+
+    Q3: sanoqchi "nechta yopiq quti + nechta dona" kiritadi. Funksiya:
+      - fizik qoldiqni target = box_count*upb + loose_units ga keltiradi (adjust),
+      - shu quti turining sealed placement'larini box_count ga moslaydi,
+      - invariantni tekshiradi.
+    Bu ikkala chelakni (total va sealed) birga to'g'rilab, drift'ni yo'qotadi.
+
+    Eslatma: bitta quti turi (box_barcode) bo'yicha ishlaydi. Bir lot/joyda boshqa
+    tur sealed qutilar bo'lsa, ular alohida sanalishi kerak.
+    """
+    if box_count < 0:
+        raise HTTPException(status_code=400, detail="box_count manfiy bo'lmasligi kerak")
+    if box_count > 500:
+        raise HTTPException(status_code=400, detail="box_count juda katta")
+    if loose_units < 0:
+        raise HTTPException(status_code=400, detail="loose_units manfiy bo'lmasligi kerak")
+    box = _get_product_box_by_barcode(db, box_barcode)
+    lot = db.get(StockLotModel, lot_id)
+    if not lot or lot.product_id != box.product_id:
+        raise HTTPException(status_code=400, detail="Partiya mahsulotga mos emas")
+    upb = int(box.units_per_box)
+    if upb < 1:
+        raise HTTPException(status_code=400, detail="Quti ichidagi dona soni noto'g'ri")
+
+    lock_lot_location(db, lot_id, location_id)
+
+    # 1) Fizik qoldiqni target jamiga keltirish.
+    target_total = Decimal(str(box_count * upb + int(loose_units)))
+    on_hand, _reserved, _available = compute_lot_location_balances(db, lot_id, location_id)
+    delta = target_total - Decimal(str(on_hand))
+    if delta != 0:
+        db.add(
+            StockMovementModel(
+                product_id=box.product_id,
+                lot_id=lot_id,
+                location_id=location_id,
+                qty_change=delta,
+                movement_type="adjust",
+                reason_code="inventory_overage" if delta > 0 else "inventory_shortage",
+                created_by_user_id=user.id,
+            )
+        )
+
+    # 2) Shu quti turining sealed soni = box_count bo'lsin.
+    current_sealed = (
+        db.query(LocationBoxPlacement)
+        .filter(
+            LocationBoxPlacement.product_box_id == box.id,
+            LocationBoxPlacement.lot_id == lot_id,
+            LocationBoxPlacement.location_id == location_id,
+            LocationBoxPlacement.status == PLACEMENT_SEALED,
+        )
+        .order_by(LocationBoxPlacement.placed_at.asc())
+        .all()
+    )
+    diff = box_count - len(current_sealed)
+    if diff > 0:
+        for _ in range(diff):
+            db.add(
+                LocationBoxPlacement(
+                    product_box_id=box.id,
+                    location_id=location_id,
+                    lot_id=lot_id,
+                    status=PLACEMENT_SEALED,
+                    placed_by_user_id=user.id,
+                )
+            )
+    elif diff < 0:
+        for placement in current_sealed[: -diff]:
+            placement.status = PLACEMENT_REMOVED
+            placement.removed_at = datetime.now(timezone.utc)
+            placement.removed_by_user_id = user.id
+            placement.remove_reason = "count"
+    db.flush()
+    assert_box_invariant(db, lot_id, location_id)
+    return get_breakdown_tolerant(
+        db,
+        product_id=box.product_id,
+        lot_id=lot_id,
+        location_id=location_id,
+    )
+
+
 def remove_sealed_boxes_for_pick(
     db: Session,
     *,

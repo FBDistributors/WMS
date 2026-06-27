@@ -81,6 +81,97 @@ void main() {
     );
   });
 
+  group('inventoryCountAtomicEligible', () {
+    const SealedBoxInfo boxA = SealedBoxInfo(
+      placementId: 'pl1',
+      productBoxId: 'pb1',
+      boxBarcode: 'BOX-A',
+      unitsPerBox: 6,
+    );
+    const SealedBoxInfo boxB = SealedBoxInfo(
+      placementId: 'pl2',
+      productBoxId: 'pb2',
+      boxBarcode: 'BOX-B',
+      unitsPerBox: 8,
+    );
+
+    test('eligible for single lot, single box type, consistent', () {
+      expect(
+        inventoryCountAtomicEligible(
+          breakdown: _breakdown(sealedBoxes: <SealedBoxInfo>[boxA]),
+          boxBarcode: 'BOX-A',
+          unitsPerBox: 6,
+        ),
+        isTrue,
+      );
+    });
+
+    test('not eligible when data inconsistent', () {
+      expect(
+        inventoryCountAtomicEligible(
+          breakdown: _breakdown(dataInconsistent: true),
+          boxBarcode: 'BOX-A',
+          unitsPerBox: 6,
+        ),
+        isFalse,
+      );
+    });
+
+    test('not eligible with multi-lot loose adjust', () {
+      expect(
+        inventoryCountAtomicEligible(
+          breakdown: _breakdown(),
+          boxBarcode: 'BOX-A',
+          unitsPerBox: 6,
+          looseAdjustLots: <PickerProductLocation>[
+            const PickerProductLocation(
+              locationId: 'locX',
+              locationCode: 'X',
+              lotId: 'lotX',
+              batchNo: 'B1',
+              expiryDate: null,
+              onHandQty: 5,
+              reservedQty: 0,
+              availableQty: 5,
+              looseUnits: 5,
+            ),
+          ],
+        ),
+        isFalse,
+      );
+    });
+
+    test('not eligible when a foreign box type is present', () {
+      expect(
+        inventoryCountAtomicEligible(
+          breakdown: _breakdown(sealedBoxes: <SealedBoxInfo>[boxA, boxB]),
+          boxBarcode: 'BOX-A',
+          unitsPerBox: 6,
+        ),
+        isFalse,
+      );
+    });
+
+    test('not eligible without barcode or units', () {
+      expect(
+        inventoryCountAtomicEligible(
+          breakdown: _breakdown(),
+          boxBarcode: '',
+          unitsPerBox: 6,
+        ),
+        isFalse,
+      );
+      expect(
+        inventoryCountAtomicEligible(
+          breakdown: _breakdown(),
+          boxBarcode: 'BOX-A',
+          unitsPerBox: null,
+        ),
+        isFalse,
+      );
+    });
+  });
+
   test('applyInventoryBoxSave overage before pack when increasing boxes', () async {
     BoxLocationBreakdown state = _breakdown();
     final List<String> ops = <String>[];

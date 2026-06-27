@@ -20,6 +20,7 @@ from app.services.box_location_service import (
     get_breakdown_tolerant,
     place_sealed_box,
     place_sealed_boxes,
+    reconcile_count,
     relocate_sealed_box,
     remove_sealed_box,
     remove_sealed_boxes_for_pick,
@@ -118,6 +119,65 @@ def test_place_and_breakdown(
     assert result.units_in_boxes == 12
     assert result.loose_units == 38
     assert result.total_units == 50
+
+
+def test_reconcile_count_sets_boxes_and_loose_and_fixes_drift(
+    db_session: Session,
+    inv_user: UserModel,
+    sample_product: ProductModel,
+    sample_location: LocationModel,
+) -> None:
+    """Sanoq: quti+dona aniq belgilanadi; total va sealed birga to'g'rilanadi."""
+    lot = _seed_stock(db_session, sample_product, sample_location, 30)
+    box = ProductBoxModel(
+        box_barcode="BOX-COUNT-1",
+        product_id=sample_product.id,
+        units_per_box=12,
+        is_active=True,
+    )
+    db_session.add(box)
+    db_session.flush()
+    # Boshlang'ich: 1 yopiq quti (12) + 18 loose
+    place_sealed_boxes(
+        db_session,
+        box_barcode="BOX-COUNT-1",
+        location_id=sample_location.id,
+        lot_id=lot.id,
+        user=inv_user,
+        box_count=1,
+    )
+
+    # Sanoq: 2 quti + 10 dona -> target total 34
+    bd = reconcile_count(
+        db_session,
+        box_barcode="BOX-COUNT-1",
+        location_id=sample_location.id,
+        lot_id=lot.id,
+        user=inv_user,
+        box_count=2,
+        loose_units=10,
+    )
+    assert bd.box_count == 2
+    assert bd.units_in_boxes == 24
+    assert bd.loose_units == 10
+    assert bd.total_units == 34
+    assert box_invariant_holds(db_session, lot.id, sample_location.id)
+
+    # Sanoq pasaytirish: 0 quti + 5 dona
+    bd2 = reconcile_count(
+        db_session,
+        box_barcode="BOX-COUNT-1",
+        location_id=sample_location.id,
+        lot_id=lot.id,
+        user=inv_user,
+        box_count=0,
+        loose_units=5,
+    )
+    assert bd2.box_count == 0
+    assert bd2.units_in_boxes == 0
+    assert bd2.loose_units == 5
+    assert bd2.total_units == 5
+    assert box_invariant_holds(db_session, lot.id, sample_location.id)
 
 
 def test_relocate_sealed_box_moves_stock_and_keeps_invariant(

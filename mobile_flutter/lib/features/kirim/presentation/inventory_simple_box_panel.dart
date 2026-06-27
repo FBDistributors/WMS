@@ -559,47 +559,62 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
     try {
       final boxRepo = ref.read(boxLocationRepositoryProvider);
       final MovementsRepository movements = ref.read(movementsRepositoryProvider);
-      final BoxLocationBreakdown result = await applyInventoryBoxSave(
-        boxBarcode: barcode.isEmpty ? null : barcode,
+      // Sodda holatda (bitta lot, bitta quti turi) atomik sanoq: total va sealed
+      // birga, server invariant kafolati bilan.
+      final BoxLocationBreakdown result = inventoryCountAtomicEligible(
+        breakdown: breakdownForSave,
+        boxBarcode: barcode,
         unitsPerBox: saveUpb,
-        targetBoxCount: targetBoxCount,
-        targetLooseQty: targetLooseQty,
-        productId: widget.productId,
-        locationId: widget.locationId,
-        lotId: widget.lotId,
         looseAdjustLots: widget.looseAdjustLots,
-        getBreakdown: () => boxRepo.getBreakdown(
-          productId: widget.productId,
-          lotId: widget.lotId,
-          locationId: widget.locationId,
-        ),
-        placeBox: ({required String boxBarcode, required int boxCount}) =>
-            boxRepo.placeBox(
-              boxBarcode: boxBarcode,
+      )
+          ? await boxRepo.countBox(
+              boxBarcode: barcode,
               locationId: widget.locationId,
               lotId: widget.lotId,
-              boxCount: boxCount,
-            ),
-        removeBox: ({required String boxBarcode}) => boxRepo.removeBox(
-          boxBarcode: boxBarcode,
-          locationId: widget.locationId,
-          lotId: widget.lotId,
-        ),
-        createMovement: ({
-          required String productId,
-          required String lotId,
-          required String locationId,
-          required double qtyChange,
-          required String reasonCode,
-        }) =>
-            movements.createStockMovement(
-              productId: productId,
-              lotId: lotId,
-              locationId: locationId,
-              qtyChange: qtyChange,
-              reasonCode: reasonCode,
-            ),
-      );
+              boxCount: targetBoxCount,
+              looseUnits: targetLooseQty,
+            )
+          : await applyInventoryBoxSave(
+              boxBarcode: barcode.isEmpty ? null : barcode,
+              unitsPerBox: saveUpb,
+              targetBoxCount: targetBoxCount,
+              targetLooseQty: targetLooseQty,
+              productId: widget.productId,
+              locationId: widget.locationId,
+              lotId: widget.lotId,
+              looseAdjustLots: widget.looseAdjustLots,
+              getBreakdown: () => boxRepo.getBreakdown(
+                productId: widget.productId,
+                lotId: widget.lotId,
+                locationId: widget.locationId,
+              ),
+              placeBox: ({required String boxBarcode, required int boxCount}) =>
+                  boxRepo.placeBox(
+                    boxBarcode: boxBarcode,
+                    locationId: widget.locationId,
+                    lotId: widget.lotId,
+                    boxCount: boxCount,
+                  ),
+              removeBox: ({required String boxBarcode}) => boxRepo.removeBox(
+                boxBarcode: boxBarcode,
+                locationId: widget.locationId,
+                lotId: widget.lotId,
+              ),
+              createMovement: ({
+                required String productId,
+                required String lotId,
+                required String locationId,
+                required double qtyChange,
+                required String reasonCode,
+              }) =>
+                  movements.createStockMovement(
+                    productId: productId,
+                    lotId: lotId,
+                    locationId: locationId,
+                    qtyChange: qtyChange,
+                    reasonCode: reasonCode,
+                  ),
+            );
       if (!mounted) {
         return;
       }
