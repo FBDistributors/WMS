@@ -481,9 +481,12 @@ Future<HybridScanApplyResult> applyHybridProductScan({
   bool bumpCount = true,
   int? stockBoxCount,
   int? stockLooseUnits,
+  bool forceProduct = false,
 }) async {
   final HybridBoxScanResult result = await resolveHybridProductBarcode(scanner, raw);
-  if (result.unitsPerBox != null) {
+  // forceProduct: kod quti sifatida hal qilinsa ham (quti kodi mahsulot kodi
+  // bilan to'qnashganda), uni dona skan deb qabul qilamiz — quti yo'liga emas.
+  if (!forceProduct && result.unitsPerBox != null) {
     return applyHybridBoxScan(
       scanner: scanner,
       raw: raw,

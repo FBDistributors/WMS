@@ -958,6 +958,8 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
         );
         hybridUnitsPerBox = scanRes.unitsPerBox ?? hybridUnitsPerBox;
       } else {
+        // Bu yo'l dona skan uchun: kod quti bilan to'qnashsa ham dona deb
+        // qabul qilamiz (aks holda "Mahsulot skan" bo'sh qoladi).
         final HybridScanApplyResult scanRes = await applyHybridProductScan(
           scanner: ref.read(scannerRepositoryProvider),
           raw: scanPreset,
@@ -970,6 +972,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
           bumpCount: bumpScanQty,
           stockBoxCount: locationAltHint.boxCount,
           stockLooseUnits: locationAltHint.looseUnits,
+          forceProduct: true,
         );
         hybridUnitsPerBox = scanRes.unitsPerBox ?? hybridUnitsPerBox;
       }

@@ -151,6 +151,43 @@ void main() {
     expect(productBarcode.text, isEmpty);
   });
 
+  test('applyHybridProductScan forceProduct keeps unit scan despite box resolve', () async {
+    final TextEditingController boxCount = TextEditingController(text: '0');
+    final TextEditingController looseQty = TextEditingController(text: '2');
+    final TextEditingController boxBarcode = TextEditingController();
+    final TextEditingController productBarcode = TextEditingController();
+    final _RecordingScanner scanner = _RecordingScanner(
+      onResolve: (String raw) async => ScannerResolveOut(
+        type: ScannerResolveType.product,
+        productId: 'p1',
+        productName: 'P',
+        productBarcode: raw,
+        locationId: null,
+        locationCode: null,
+        entityId: null,
+        displayLabel: null,
+        message: null,
+        scanKind: 'box',
+        unitsPerScan: 12,
+      ),
+    );
+    final HybridScanApplyResult result = await applyHybridProductScan(
+      scanner: scanner,
+      raw: '4780015571578',
+      boxCount: boxCount,
+      looseQty: looseQty,
+      boxBarcode: boxBarcode,
+      productBarcode: productBarcode,
+      unitsPerBox: 12,
+      maxUnits: 20,
+      bumpCount: false,
+      forceProduct: true,
+    );
+    expect(result.routedToBox, isFalse);
+    expect(productBarcode.text, '4780015571578');
+    expect(boxBarcode.text, isEmpty);
+  });
+
   test('applyHybridProductScan bumps loose for unit barcode', () async {
     final TextEditingController boxCount = TextEditingController(text: '0');
     final TextEditingController looseQty = TextEditingController(text: '1');
