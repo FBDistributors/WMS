@@ -25,6 +25,7 @@ from app.services.box_location_service import (
     assert_box_invariant,
     get_breakdown_tolerant,
     product_box_summary_map,
+    units_in_boxes_at,
 )
 from app.services.stock_availability import (
     compute_lot_location_balances,
@@ -2196,6 +2197,25 @@ async def create_stock_movement(
             created_by_user_id=user.id,
             reason_code=payload.reason_code,
         )
+        # Kamaytiruvchi tuzatish (adjust) qoldiqni quti ichidagi donadan past
+        # tushirmasligi kerak — aks holda sealed chelak total'dan oshib drift bo'ladi.
+        # Movement qo'shishdan oldin proyeksiya tekshiriladi.
+        if payload.movement_type == "adjust" and Decimal(str(payload.qty_change)) < 0:
+            cur_on_hand, _res, _avail = compute_lot_location_balances(
+                db, payload.lot_id, payload.location_id
+            )
+            new_on_hand = Decimal(str(cur_on_hand)) + Decimal(str(payload.qty_change))
+            sealed_units = units_in_boxes_at(db, payload.lot_id, payload.location_id)
+            if Decimal(str(sealed_units)) > new_on_hand:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Qoldiqni quti ichidagi donadan past tushirib bo'lmaydi "
+                        f"(qutida {sealed_units} dona). Avval qutini oching (unpack) "
+                        "yoki quti sanog'ini (count) ishlating."
+                    ),
+                )
+
         db.add(movement)
         log_action(
             db,

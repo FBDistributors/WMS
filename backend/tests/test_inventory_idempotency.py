@@ -221,6 +221,69 @@ def test_transfer_location_idempotency_replays_without_duplicate(
     assert in_rows == 1
 
 
+def test_adjust_cannot_reduce_total_below_boxed_units(
+    client: TestClient,
+    db_session: Session,
+    admin_user: User,
+    prod: Product,
+    bin_loc: Location,
+) -> None:
+    """Kamaytiruvchi adjust qoldiqni quti ichidagi donadan past tushira olmaydi."""
+    from app.models.product_box import ProductBox
+    from app.services.box_location_service import box_invariant_holds, place_sealed_boxes
+
+    lot = _seed_receipt(db_session, prod, bin_loc, qty="30")  # 30 jami
+    box = ProductBox(box_barcode="BOX-ADJ-T", product_id=prod.id, units_per_box=12, is_active=True)
+    db_session.add(box)
+    db_session.commit()
+    # 1 yopiq quti (12 dona) -> loose 18
+    place_sealed_boxes(
+        db_session,
+        box_barcode="BOX-ADJ-T",
+        location_id=bin_loc.id,
+        lot_id=lot.id,
+        user=admin_user,
+        box_count=1,
+    )
+    db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: admin_user
+    try:
+        # -20 -> on_hand 10 < quti 12 -> rad
+        bad = client.post(
+            "/api/v1/inventory/movements",
+            json={
+                "product_id": str(prod.id),
+                "lot_id": str(lot.id),
+                "location_id": str(bin_loc.id),
+                "qty_change": "-20",
+                "movement_type": "adjust",
+                "reason_code": "inventory_shortage",
+            },
+            headers={"Idempotency-Key": "adj-bad-1"},
+        )
+        assert bad.status_code == 409, bad.text
+
+        # -18 -> on_hand 12 == quti 12 -> ok
+        ok = client.post(
+            "/api/v1/inventory/movements",
+            json={
+                "product_id": str(prod.id),
+                "lot_id": str(lot.id),
+                "location_id": str(bin_loc.id),
+                "qty_change": "-18",
+                "movement_type": "adjust",
+                "reason_code": "inventory_shortage",
+            },
+            headers={"Idempotency-Key": "adj-ok-1"},
+        )
+        assert ok.status_code == 201, ok.text
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    assert box_invariant_holds(db_session, lot.id, bin_loc.id)
+
+
 def test_transfer_location_loose_only_blocks_boxed_stock(
     client: TestClient,
     db_session: Session,

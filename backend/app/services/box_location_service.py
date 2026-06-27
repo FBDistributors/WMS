@@ -185,6 +185,12 @@ def _units_in_boxes_for_lot_location(
     return len(sealed), units, sealed
 
 
+def units_in_boxes_at(db: Session, lot_id: UUID, location_id: UUID) -> int:
+    """Lot/joydagi sealed qutilardagi jami dona (faol qutilar bo'yicha)."""
+    _box_count, units_in_boxes, _sealed = _units_in_boxes_for_lot_location(db, lot_id, location_id)
+    return units_in_boxes
+
+
 def box_invariant_holds(db: Session, lot_id: UUID, location_id: UUID) -> bool:
     """Invariant: sealed qutilardagi dona jami fizik qoldiqdan (on_hand) oshmasligi kerak.
 
