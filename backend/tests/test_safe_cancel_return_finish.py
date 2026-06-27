@@ -133,3 +133,75 @@ def test_safe_cancel_finish_return_after_pick(
         .all()
     )
     assert all(float(ln.picked_qty or 0) == 0 for ln in picked_lines)
+
+
+def test_safe_cancel_finish_restores_sealed_boxes(
+    client: TestClient, db_session: Session
+) -> None:
+    """Box pick → cancel → finish return: yopiq qutilar joyiga tiklanadi."""
+    from tests.test_picking_box import (
+        _seed_box_pick_order,
+        _send_to_picking,
+        _sealed_count,
+    )
+
+    order, picker, product, loc, lot, box_barcode = _seed_box_pick_order(db_session)
+    doc_id = _send_to_picking(client, db_session, order.id, picker.id)
+
+    # Picker 3 qutini teradi (18 dona) — 5 dan 2 quti qoladi.
+    app.dependency_overrides[get_current_user] = lambda: picker
+    try:
+        line_id = client.get(f"/api/v1/picking/documents/{doc_id}").json()["lines"][0]["id"]
+        pick = client.post(
+            f"/api/v1/picking/lines/{line_id}/pick",
+            json={
+                "delta": 18,
+                "request_id": f"pick-scr-box-{uuid.uuid4().hex}",
+                "barcode": box_barcode,
+                "box_count": 3,
+            },
+        )
+        assert pick.status_code == 200, pick.text
+        assert _sealed_count(db_session, lot.id, loc.id) == 2
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    # Admin bekor qiladi -> cancelling_in_progress (terilgan bor).
+    admin = _mk_user(db_session, username=f"adm-scrb-{uuid.uuid4().hex[:8]}", role="warehouse_admin")
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        cancel = client.patch(f"/api/v1/orders/{order.id}/status", json={"status": "cancelled"})
+        assert cancel.status_code == 200, cancel.text
+        assert cancel.json()["status"] == "cancelling_in_progress"
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    # Picker qaytarishni skanlab yakunlaydi.
+    app.dependency_overrides[get_current_user] = lambda: picker
+    try:
+        mine = client.get("/api/v1/picking/return-session/mine")
+        assert mine.status_code == 200, mine.text
+        session_id = UUID(mine.json()["id"])
+        for sl in mine.json()["lines"]:
+            r_loc = client.post(
+                f"/api/v1/picking/return-session/{session_id}/scan-location",
+                json={"raw": sl["expected_location_code"]},
+            )
+            assert r_loc.status_code == 200, r_loc.text
+            r_prod = client.post(
+                f"/api/v1/picking/return-session/{session_id}/scan-product",
+                json={"raw": sl.get("barcode") or sl.get("sku") or ""},
+            )
+            assert r_prod.status_code == 200, r_prod.text
+        finish = client.post(f"/api/v1/picking/return-session/{session_id}/finish")
+        assert finish.status_code == 200, finish.text
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    db_session.refresh(order)
+    assert order.wms_state.status == "cancelled"
+    # 3 to'liq quti qaytdi -> 5 sealed, on_hand 30, reserved 0.
+    assert _sealed_count(db_session, lot.id, loc.id) == 5
+    on_hand, reserved, _available = compute_lot_location_balances(db_session, lot.id, loc.id)
+    assert on_hand == Decimal("30")
+    assert reserved == 0

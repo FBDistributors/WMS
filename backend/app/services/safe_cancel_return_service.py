@@ -20,6 +20,10 @@ from app.models.order import OrderWmsState as OrderWmsStateModel
 from app.models.product import ProductBarcode
 from app.models.safe_cancel_return import SafeCancelReturnLine, SafeCancelReturnSession
 from app.models.stock import StockMovement as StockMovementModel
+from app.services.box_location_service import (
+    assert_box_invariant,
+    restore_sealed_boxes_for_unpick,
+)
 from app.services.order_reserve_release import release_document_reserve_on_cancel
 from app.services.order_transition_policy import require_transition_rule
 
@@ -313,6 +317,8 @@ def finish_safe_cancel_return(db: Session, *, session_id: UUID, picker_user_id: 
     if order.wms_state.status != "cancelling_in_progress":
         raise HTTPException(status_code=409, detail="Buyurtma holati kutilganidan farq qiladi")
 
+    # Quti yopiq holatda joyiga qaytishi uchun (lot, joy, qaytarilgan miqdor).
+    restore_targets: list[tuple[UUID, UUID, Decimal]] = []
     for rline in ordered:
         dline = next((x for x in document.lines if x.id == rline.document_line_id), None)
         if not dline:
@@ -352,10 +358,22 @@ def finish_safe_cancel_return(db: Session, *, session_id: UUID, picker_user_id: 
             )
         )
         dline.picked_qty = 0.0
+        restore_targets.append((rline.lot_id, rline.expected_location_id, qty))
 
     # Terish bekor qilish (pick+/unallocate+) yozuvlari SQL balansda ko'rinishi kerak;
     # aks holda release_document_reserve_on_cancel reserved=0 deb o'qiydi (409).
     db.flush()
+    # Butun-quti terilganlari qaytarilganda quti yopiq holatda joyiga qaytadi
+    # (unpick bilan bir xil; ochilgan quti tiklanmaydi). Stock qaytgach chaqiriladi.
+    for lot_id, location_id, qty in restore_targets:
+        restore_sealed_boxes_for_unpick(
+            db,
+            lot_id=lot_id,
+            location_id=location_id,
+            source_document_id=document.id,
+            returned_qty=qty,
+        )
+        assert_box_invariant(db, lot_id, location_id)
     release_document_reserve_on_cancel(db, document, document.lines, picker_user_id)
 
     require_transition_rule(order.wms_state.status, "cancelled")

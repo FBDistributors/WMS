@@ -1417,8 +1417,21 @@ async def consolidated_pick(
             box_count=payload.box_count,
             total_qty=remaining,
         )
-        hybrid_upb = int(box_units_total // payload.box_count) if payload.box_count else None
-        boxes_remaining = payload.box_count
+        # upb ni qutidan to'g'ridan-to'g'ri olamiz: box_units_total==0 (miqdor bir
+        # qutidan kam — quti ochib qutisiz olish) bo'lsa ham bo'linish/assert buzilmasin.
+        hybrid_box = (
+            db.query(ProductBoxModel)
+            .filter(
+                ProductBoxModel.box_barcode == hybrid_box_barcode,
+                ProductBoxModel.is_active.is_(True),
+            )
+            .one_or_none()
+        )
+        if hybrid_box is None or int(hybrid_box.units_per_box) < 1:
+            raise HTTPException(status_code=400, detail="Quti topilmadi yoki noto'g'ri")
+        hybrid_upb = int(hybrid_box.units_per_box)
+        # box_units_total==0 -> to'liq quti terilmaydi, faqat qutisiz (quti ochiladi).
+        boxes_remaining = payload.box_count if box_units_total > 0 else 0
     elif box_pick:
         units_per_box = Decimal(str(resolved.units_per_scan))
         expected_qty = units_per_box * Decimal(str(payload.box_count))

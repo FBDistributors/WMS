@@ -1144,6 +1144,45 @@ def test_consolidated_hybrid_single_request(
         app.dependency_overrides.pop(get_current_user, None)
 
 
+def test_consolidated_hybrid_partial_open_below_one_box(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """Konsolidatsiya: miqdor bir qutidan kam -> quti ochiladi, crash bo'lmasligi kerak."""
+    order, picker, product, loc, lot, box_barcode = _seed_box_only_partial_pick_order(
+        db_session,
+        order_qty=2,
+        stock_qty=80,
+        box_count=10,
+        units_per_box=8,
+    )
+    _send_to_picking(client, db_session, order.id, picker.id)
+
+    app.dependency_overrides[get_current_user] = lambda: picker
+    try:
+        pick = client.post(
+            "/api/v1/picking/consolidated/pick",
+            json={
+                "barcode": product.barcode,
+                "box_barcode": box_barcode,
+                "box_count": 1,
+                "qty": 2,
+                "request_id": f"cons-hyb-partial-{uuid.uuid4().hex}",
+            },
+        )
+        assert pick.status_code == 200, pick.text
+
+        bd = get_breakdown_for_pick(
+            db_session, product_id=product.id, lot_id=lot.id, location_id=loc.id
+        )
+        # 1 quti ochildi (8 dona), 2 olindi -> 6 loose; 9 quti yopiq qoldi.
+        assert bd.box_count == 9
+        assert bd.units_in_boxes == 72
+        assert _sealed_count(db_session, lot.id, loc.id) == 9
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
 def test_compute_consolidated_box_loose_plan() -> None:
     assert compute_consolidated_box_loose_plan([4, 5, 6], 8) == (0, 15)
     assert compute_consolidated_box_loose_plan([4, 5, 8], 8) == (1, 9)
