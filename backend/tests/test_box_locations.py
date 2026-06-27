@@ -15,13 +15,16 @@ from app.models.stock import StockLot, StockMovement
 from app.models.user import User as UserModel
 from app.auth.security import get_password_hash
 from app.services.box_location_service import (
+    box_invariant_holds,
     get_breakdown,
     get_breakdown_tolerant,
     place_sealed_box,
     place_sealed_boxes,
+    relocate_sealed_box,
     remove_sealed_box,
     remove_sealed_boxes_for_pick,
 )
+from app.services.stock_availability import compute_lot_location_balances
 
 
 @pytest.fixture()
@@ -115,6 +118,69 @@ def test_place_and_breakdown(
     assert result.units_in_boxes == 12
     assert result.loose_units == 38
     assert result.total_units == 50
+
+
+def test_relocate_sealed_box_moves_stock_and_keeps_invariant(
+    db_session: Session,
+    inv_user: UserModel,
+    sample_product: ProductModel,
+    sample_location: LocationModel,
+) -> None:
+    """Quti ko'chirilganda fizik qoldiq ham birga ko'chadi; invariant ikki joyda saqlanadi."""
+    lot = _seed_stock(db_session, sample_product, sample_location, 50)
+    box = ProductBoxModel(
+        box_barcode="BOX-RELOC-001",
+        product_id=sample_product.id,
+        units_per_box=12,
+        is_active=True,
+    )
+    db_session.add(box)
+    db_session.flush()
+    place_sealed_box(
+        db_session,
+        box_barcode="BOX-RELOC-001",
+        location_id=sample_location.id,
+        lot_id=lot.id,
+        user=inv_user,
+    )
+
+    dest = LocationModel(
+        code=f"DST-{uuid.uuid4().hex[:6]}",
+        barcode_value=f"DST-{uuid.uuid4().hex[:6]}",
+        name="Dest bin",
+        type="bin",
+        is_active=True,
+    )
+    db_session.add(dest)
+    db_session.flush()
+
+    relocate_sealed_box(
+        db_session,
+        box_barcode="BOX-RELOC-001",
+        to_location_id=dest.id,
+        user=inv_user,
+        from_location_id=sample_location.id,
+    )
+
+    src_on_hand, _r, _a = compute_lot_location_balances(db_session, lot.id, sample_location.id)
+    dst_on_hand, _r2, _a2 = compute_lot_location_balances(db_session, lot.id, dest.id)
+    assert src_on_hand == Decimal("38")
+    assert dst_on_hand == Decimal("12")
+    assert box_invariant_holds(db_session, lot.id, sample_location.id)
+    assert box_invariant_holds(db_session, lot.id, dest.id)
+
+    bd_dst = get_breakdown_tolerant(
+        db_session, product_id=sample_product.id, lot_id=lot.id, location_id=dest.id
+    )
+    assert bd_dst.box_count == 1
+    assert bd_dst.units_in_boxes == 12
+    assert bd_dst.loose_units == 0
+
+    bd_src = get_breakdown_tolerant(
+        db_session, product_id=sample_product.id, lot_id=lot.id, location_id=sample_location.id
+    )
+    assert bd_src.box_count == 0
+    assert bd_src.loose_units == 38
 
 
 def test_place_multiple_boxes_same_barcode(

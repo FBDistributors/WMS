@@ -221,6 +221,74 @@ def test_transfer_location_idempotency_replays_without_duplicate(
     assert in_rows == 1
 
 
+def test_transfer_location_loose_only_blocks_boxed_stock(
+    client: TestClient,
+    db_session: Session,
+    admin_user: User,
+    prod: Product,
+    bin_loc: Location,
+) -> None:
+    """Dona ko'chirish faqat qutisizdan: qutidagi zaxirani dona ko'chirib bo'lmaydi."""
+    from app.models.product_box import ProductBox
+    from app.services.box_location_service import box_invariant_holds, place_sealed_boxes
+
+    dest = Location(code="LOOSE-DEST", barcode_value="LOOSE-DEST", name="Dest", type="bin", is_active=True)
+    db_session.add(dest)
+    lot = _seed_receipt(db_session, prod, bin_loc, qty="30")  # 30 jami
+    box = ProductBox(box_barcode="BOX-LOOSE-T", product_id=prod.id, units_per_box=12, is_active=True)
+    db_session.add(box)
+    db_session.commit()
+    # 1 yopiq quti (12 dona) -> loose = 18
+    place_sealed_boxes(
+        db_session,
+        box_barcode="BOX-LOOSE-T",
+        location_id=bin_loc.id,
+        lot_id=lot.id,
+        user=admin_user,
+        box_count=1,
+    )
+    db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: admin_user
+    try:
+        # 20 dona (> 18 loose) -> rad etiladi
+        too_much = client.post(
+            "/api/v1/inventory/movements/transfer-location",
+            json={
+                "from_location_id": str(bin_loc.id),
+                "to_location_id": str(dest.id),
+                "mode": "partial",
+                "lines": [{"product_id": str(prod.id), "lot_id": str(lot.id), "qty": "20"}],
+            },
+            headers={"Idempotency-Key": "loose-block-1"},
+        )
+        assert too_much.status_code == 400, too_much.text
+
+        # 18 dona (= loose) -> o'tadi, quti joyida qoladi
+        ok = client.post(
+            "/api/v1/inventory/movements/transfer-location",
+            json={
+                "from_location_id": str(bin_loc.id),
+                "to_location_id": str(dest.id),
+                "mode": "partial",
+                "lines": [{"product_id": str(prod.id), "lot_id": str(lot.id), "qty": "18"}],
+            },
+            headers={"Idempotency-Key": "loose-ok-1"},
+        )
+        assert ok.status_code == 200, ok.text
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    # Manbada 1 quti (12) qoldi, invariant saqlanadi
+    sealed = (
+        db_session.query(StockMovement)  # sanity: stock moved
+        .filter(StockMovement.location_id == dest.id, StockMovement.lot_id == lot.id)
+        .count()
+    )
+    assert sealed >= 1
+    assert box_invariant_holds(db_session, lot.id, bin_loc.id)
+
+
 def test_zero_brand_stock_resets_only_selected_brand(
     client: TestClient,
     db_session: Session,

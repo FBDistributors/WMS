@@ -662,14 +662,40 @@ def relocate_sealed_box(
             lot_id=placement.lot_id,
             location_id=to_location_id,
         )
-    lock_lot_location(db, placement.lot_id, placement.location_id)
-    lock_lot_location(db, placement.lot_id, to_location_id)
+    from_location_id_actual = placement.location_id
+    lot_id = placement.lot_id
+    lock_lot_location(db, lot_id, from_location_id_actual)
+    lock_lot_location(db, lot_id, to_location_id)
+    # Q4: quti butun ko'chadi (ochilmaydi) — placement bilan birga fizik qoldiq ham ko'chadi.
+    upb = Decimal(str(box.units_per_box))
+    db.add(
+        StockMovementModel(
+            product_id=box.product_id,
+            lot_id=lot_id,
+            location_id=from_location_id_actual,
+            qty_change=-upb,
+            movement_type="transfer_out",
+            created_by_user_id=user.id,
+        )
+    )
+    db.add(
+        StockMovementModel(
+            product_id=box.product_id,
+            lot_id=lot_id,
+            location_id=to_location_id,
+            qty_change=upb,
+            movement_type="transfer_in",
+            created_by_user_id=user.id,
+        )
+    )
     placement.location_id = to_location_id
     db.flush()
+    assert_box_invariant(db, lot_id, from_location_id_actual)
+    assert_box_invariant(db, lot_id, to_location_id)
     return get_breakdown_tolerant(
         db,
         product_id=box.product_id,
-        lot_id=placement.lot_id,
+        lot_id=lot_id,
         location_id=to_location_id,
     )
 

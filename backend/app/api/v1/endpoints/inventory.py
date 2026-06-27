@@ -21,7 +21,11 @@ from app.auth.deps import get_current_user, require_permission
 from app.auth.guards import check_controller_adjust_reason
 from app.core.stock_rules import check_location_single_expiry
 from app.services.audit_service import ACTION_CREATE, get_client_ip, log_action
-from app.services.box_location_service import product_box_summary_map
+from app.services.box_location_service import (
+    assert_box_invariant,
+    get_breakdown_tolerant,
+    product_box_summary_map,
+)
 from app.services.stock_availability import (
     compute_lot_location_balances,
     lock_lot_location,
@@ -2298,6 +2302,22 @@ async def transfer_location_stock(
                         status_code=400,
                         detail=f"Requested qty exceeds available for lot {line.lot_id}",
                     )
+                # Q4: dona ko'chirish faqat qutisiz (loose) zaxiradan. Qutidagi
+                # donalarni dona qilib ko'chirib bo'lmaydi — quti yopiq ko'chiriladi.
+                loose_at_src = get_breakdown_tolerant(
+                    db,
+                    product_id=r["product_id"],
+                    lot_id=r["lot_id"],
+                    location_id=payload.from_location_id,
+                ).loose_units
+                if line.qty > Decimal(loose_at_src):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "Qutidagi zaxirani dona qilib ko'chirib bo'lmaydi "
+                            f"(qutisiz mavjud {loose_at_src}). Avval qutini ko'chiring yoki oching."
+                        ),
+                    )
                 transfer_rows.append(
                     {
                         "product_id": r["product_id"],
@@ -2306,14 +2326,24 @@ async def transfer_location_stock(
                     }
                 )
         else:
-            transfer_rows = [
-                {
-                    "product_id": r["product_id"],
-                    "lot_id": r["lot_id"],
-                    "qty": Decimal(str(r["available"])),
-                }
-                for r in rows
-            ]
+            # Q4: ommaviy (full) ko'chirishda ham faqat qutisiz qism ko'chadi;
+            # yopiq qutilar joyida qoladi (ularni quti-ko'chirish orqali ko'chiring).
+            for r in rows:
+                loose_at_src = get_breakdown_tolerant(
+                    db,
+                    product_id=r["product_id"],
+                    lot_id=r["lot_id"],
+                    location_id=payload.from_location_id,
+                ).loose_units
+                qty_loose = min(Decimal(str(r["available"])), Decimal(loose_at_src))
+                if qty_loose > 0:
+                    transfer_rows.append(
+                        {
+                            "product_id": r["product_id"],
+                            "lot_id": r["lot_id"],
+                            "qty": qty_loose,
+                        }
+                    )
 
         if not transfer_rows:
             raise HTTPException(status_code=400, detail="No transfer lines selected")
@@ -2407,6 +2437,9 @@ async def transfer_location_stock(
                     (r["lot_id"], payload.to_location_id) for r in transfer_rows
                 ],
             )
+            # Faqat loose ko'chgani uchun quti invariant manbada saqlanishi shart.
+            for r in transfer_rows:
+                assert_box_invariant(db, r["lot_id"], payload.from_location_id)
             db.commit()
         except HTTPException:
             db.rollback()
