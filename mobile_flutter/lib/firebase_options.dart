@@ -52,7 +52,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCQIzjski4DIy0PPSvTkrBYq00CigHPfH4',
-    appId: '1:270662903150:android:c55a60617df918ffc60d7f',
+    appId: '1:270662903150:android:94344eadd33f61cbc60d7f',
     messagingSenderId: '270662903150',
     projectId: 'fb-warehouse-76a0c',
     storageBucket: 'fb-warehouse-76a0c.firebasestorage.app',
@@ -60,11 +60,11 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyAd1f2zFxuX4CgIxZ1JlGRUWzv_gx_rW3U',
-    appId: '1:270662903150:ios:2d86ff6048799b17c60d7f',
+    appId: '1:270662903150:ios:a6cfcd7a9b059335c60d7f',
     messagingSenderId: '270662903150',
     projectId: 'fb-warehouse-76a0c',
     storageBucket: 'fb-warehouse-76a0c.firebasestorage.app',
-    iosBundleId: 'com.example.mobileFlutter',
+    iosBundleId: 'uz.fbwarehouse.app',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -85,4 +85,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'fb-warehouse-76a0c.firebasestorage.app',
     measurementId: 'G-H2M05KBP4D',
   );
+
 }

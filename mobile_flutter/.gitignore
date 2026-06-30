@@ -1,3 +1,8 @@
+# Release signing — HECH QACHON git'ga qo'shilmasin (yo'qolsa ilova yangilanmaydi)
+android/key.properties
+*.jks
+*.keystore
+
 # Miscellaneous
 *.class
 *.log
