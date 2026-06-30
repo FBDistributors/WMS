@@ -11,6 +11,7 @@ import {
   Loader2,
   AlertTriangle,
   RefreshCw,
+  BarChart3,
   type LucideIcon,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
@@ -226,8 +227,9 @@ function WeeklyActivityCard({
           <LoadingOverlay label="" />
         </div>
       ) : points.length === 0 ? (
-        <div className="flex h-[210px] items-center justify-center text-sm text-slate-400">
-          {dash}
+        <div className="flex h-[210px] flex-col items-center justify-center gap-2 text-slate-400">
+          <BarChart3 size={28} className="opacity-50" aria-hidden />
+          <span className="text-sm font-medium">{t('admin:dashboard.weekly_no_data')}</span>
         </div>
       ) : (
         <div className="flex h-[210px] items-end justify-between gap-3.5 border-t border-slate-100 pt-2 dark:border-slate-800">
@@ -690,7 +692,7 @@ export function DashboardPage() {
           </div>
 
           {/* O'rta qator: grafik + pipeline/alert */}
-          <div className="grid grid-cols-1 gap-[22px] lg:grid-cols-[1.55fr_1fr]">
+          <div className="grid grid-cols-1 items-start gap-[22px] lg:grid-cols-[1.55fr_1fr]">
             <WeeklyActivityCard
               daily={pickingOrderStats?.daily}
               todayCompleted={pickingOrderStats?.completed_today ?? 0}

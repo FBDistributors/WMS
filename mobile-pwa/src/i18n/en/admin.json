@@ -155,6 +155,7 @@
     "weekly_today": "Completed today",
     "weekly_period_total": "Total in period",
     "weekly_avg": "Average per day",
+    "weekly_no_data": "No daily data yet",
     "pipeline_title": "Orders pipeline",
     "pipeline_sub": "Across {{count}} orders",
     "leaderboard_rating_sub": "Ranked by units",

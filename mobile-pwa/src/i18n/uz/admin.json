@@ -155,6 +155,7 @@
     "weekly_today": "Bugun yakunlangan",
     "weekly_period_total": "Oraliqda jami",
     "weekly_avg": "Kuniga o'rtacha",
+    "weekly_no_data": "Kunlik ma'lumot hozircha yo'q",
     "pipeline_title": "Buyurtmalar oqimi",
     "pipeline_sub": "Jami {{count}} ta buyurtma bo'yicha",
     "leaderboard_rating_sub": "Dona bo'yicha reyting",

@@ -155,6 +155,7 @@
     "weekly_today": "Завершено сегодня",
     "weekly_period_total": "Всего за период",
     "weekly_avg": "В среднем в день",
+    "weekly_no_data": "Дневные данные пока недоступны",
     "pipeline_title": "Поток заказов",
     "pipeline_sub": "Из {{count}} заказов",
     "leaderboard_rating_sub": "Рейтинг по штукам",
