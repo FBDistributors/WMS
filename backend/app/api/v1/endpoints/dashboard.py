@@ -89,6 +89,11 @@ class PickingStaffStatsResponse(BaseModel):
     controllers: List[PickingStaffStatsRow]
 
 
+class DailyCompletedPoint(BaseModel):
+    date: date
+    count: int
+
+
 class PickingOrderStatsResponse(BaseModel):
     date_from: date
     date_to: date
@@ -96,6 +101,7 @@ class PickingOrderStatsResponse(BaseModel):
     completed_in_period: int
     days_in_period: int
     avg_completed_per_day: float
+    daily: List[DailyCompletedPoint] = []
 
 
 def _today_utc() -> date:
@@ -157,6 +163,19 @@ def _count_completed_documents(
         .scalar()
         or 0
     )
+
+
+def _recent_daily_completed(db: Session, days: int = 7) -> List["DailyCompletedPoint"]:
+    """Oxirgi `days` ish kunidagi yakunlangan SO soni (bugun bilan tugaydi).
+
+    Haftalik faollik grafigi uchun. Har kun uchun bitta arzon count so'rovi.
+    """
+    today = _today_business()
+    points: List[DailyCompletedPoint] = []
+    for offset in range(days - 1, -1, -1):
+        day = today - timedelta(days=offset)
+        points.append(DailyCompletedPoint(date=day, count=_count_completed_documents(db, day, day)))
+    return points
 
 
 def _first_completed_business_date(db: Session) -> Optional[date]:
@@ -523,4 +542,5 @@ async def get_picking_order_stats(
         completed_in_period=completed_in_period,
         days_in_period=avg_days,
         avg_completed_per_day=avg,
+        daily=_recent_daily_completed(db, days=7),
     )

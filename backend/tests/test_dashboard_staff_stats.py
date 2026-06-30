@@ -248,3 +248,52 @@ def test_picking_order_stats_avg_all_time_endpoint(client, db_session, monkeypat
         assert data_true["avg_completed_per_day"] == 0.3
     finally:
         app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_picking_order_stats_daily_breakdown(client, db_session, monkeypatch):
+    admin = User(
+        username="admin_daily",
+        password_hash=get_password_hash("x"),
+        role="warehouse_admin",
+        is_active=True,
+        full_name="Admin Daily",
+    )
+    db_session.add(admin)
+    db_session.commit()
+    db_session.refresh(admin)
+
+    monkeypatch.setattr(dashboard_module, "_today_business", lambda: date(2026, 6, 10))
+
+    # 6/10 (bugun) ichida, 6/1 7-kunlik oynadan tashqarida
+    db_session.add_all(
+        [
+            Document(
+                doc_no="SO-D1",
+                doc_type="SO",
+                status="completed",
+                completed_at=datetime(2026, 6, 10, 9, 0, 0, tzinfo=timezone.utc),
+                updated_at=datetime(2026, 6, 10, 9, 0, 0, tzinfo=timezone.utc),
+            ),
+            Document(
+                doc_no="SO-D2",
+                doc_type="SO",
+                status="completed",
+                completed_at=datetime(2026, 6, 1, 9, 0, 0, tzinfo=timezone.utc),
+                updated_at=datetime(2026, 6, 1, 9, 0, 0, tzinfo=timezone.utc),
+            ),
+        ]
+    )
+    db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        res = client.get("/api/v1/dashboard/picking-order-stats")
+        assert res.status_code == 200
+        daily = res.json()["daily"]
+        assert len(daily) == 7
+        assert daily[0]["date"] == "2026-06-04"
+        assert daily[-1]["date"] == "2026-06-10"
+        assert daily[-1]["count"] == 1
+        assert sum(p["count"] for p in daily) == 1  # 6/1 oynadan tashqarida
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)

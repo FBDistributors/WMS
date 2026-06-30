@@ -116,6 +116,11 @@ export async function getPickingStaffStats(params?: {
   return fetchJSON<PickingStaffStatsResponse>('/api/v1/dashboard/picking-staff-stats', { query })
 }
 
+export type DailyCompletedPoint = {
+  date: string
+  count: number
+}
+
 export type PickingOrderStats = {
   date_from: string
   date_to: string
@@ -123,6 +128,7 @@ export type PickingOrderStats = {
   completed_in_period: number
   days_in_period: number
   avg_completed_per_day: number
+  daily?: DailyCompletedPoint[]
 }
 
 export async function getPickingOrderStats(params?: {

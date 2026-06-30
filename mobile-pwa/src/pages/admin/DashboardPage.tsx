@@ -9,15 +9,14 @@ import {
   LayoutGrid,
   FileSpreadsheet,
   Loader2,
-  CalendarRange,
-  TrendingUp,
+  AlertTriangle,
+  RefreshCw,
+  type LucideIcon,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
-import { KpiCard } from '../../admin/components/KpiCard'
 import { Button } from '../../components/ui/button'
-import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import {
@@ -30,6 +29,7 @@ import {
 import { useAppToast } from '../../feedback/useAppToast'
 import { getReserveStuckSummary } from '../../services/inventoryApi'
 import { writeExcelFile } from '../../utils/exportExcel'
+import { useAuth } from '../../rbac/AuthProvider'
 
 // Yangi = Smartupdan kelgan, admin yig'uvchiga yubormagan
 const STATUS_XOM = ['imported']
@@ -54,7 +54,7 @@ function aggregateByFourGroups(
 }
 
 function formatQty(n: number): string {
-  if (Number.isInteger(n)) return String(n)
+  if (Number.isInteger(n)) return n.toLocaleString('en-US').replace(/,/g, ' ')
   return n.toLocaleString(undefined, { maximumFractionDigits: 3 })
 }
 
@@ -73,70 +73,375 @@ function sheetNameSafe(label: string): string {
   return (cleaned.slice(0, 31) || 'Sheet').trim()
 }
 
-function StaffStatsTable({
-  rows,
+const WEEKDAY_SHORT: Record<string, string[]> = {
+  // 0 = Yakshanba (Sunday)
+  uz: ['Ya', 'Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh'],
+  ru: ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
+  en: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+}
+
+function weekdayShort(isoDate: string, lang: string): string {
+  const [y, m, d] = isoDate.split('-').map(Number)
+  if (!y || !m || !d) return ''
+  const idx = new Date(y, m - 1, d).getDay()
+  const table = WEEKDAY_SHORT[lang] ?? WEEKDAY_SHORT.en
+  return table[idx] ?? ''
+}
+
+function nameInitials(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[1][0]).toUpperCase()
+}
+
+type KpiTone = 'amber' | 'blue' | 'violet' | 'emerald'
+
+const KPI_TONE: Record<KpiTone, string> = {
+  amber: 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400',
+  blue: 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400',
+  violet: 'bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400',
+  emerald: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400',
+}
+
+function KpiTile({
+  label,
+  value,
+  icon: Icon,
+  tone,
+  onClick,
+}: {
+  label: string
+  value: string | number
+  icon: LucideIcon
+  tone: KpiTone
+  onClick?: () => void
+}) {
+  const interactive = typeof onClick === 'function'
+  return (
+    <div
+      role={interactive ? 'button' : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={
+        interactive
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onClick?.()
+              }
+            }
+          : undefined
+      }
+      className={[
+        'rounded-[18px] border border-slate-200 bg-white p-[18px] transition dark:border-slate-800 dark:bg-slate-900',
+        interactive
+          ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-12px_rgba(15,23,42,0.18)]'
+          : '',
+      ].join(' ')}
+    >
+      <div className="flex items-start justify-between">
+        <div
+          className={`flex h-10 w-10 items-center justify-center rounded-[11px] ${KPI_TONE[tone]}`}
+        >
+          <Icon size={20} />
+        </div>
+      </div>
+      <div className="wms-num mt-3.5 text-[30px] font-extrabold leading-none tracking-[-1px] text-slate-900 dark:text-slate-100">
+        {value}
+      </div>
+      <div className="mt-0.5 text-[13px] font-semibold text-slate-500 dark:text-slate-400">
+        {label}
+      </div>
+    </div>
+  )
+}
+
+function AccentKpiTile({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div
+      className="rounded-[18px] p-[18px] text-white shadow-sm"
+      style={{ background: 'linear-gradient(160deg, #2563eb, #1e40af)' }}
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex h-10 w-10 items-center justify-center rounded-[11px] bg-white/20">
+          <LayoutGrid size={20} />
+        </div>
+      </div>
+      <div className="wms-num mt-3.5 text-[30px] font-extrabold leading-none tracking-[-1px]">
+        {value}
+      </div>
+      <div className="mt-0.5 text-[13px] font-semibold text-white/80">{label}</div>
+    </div>
+  )
+}
+
+function WeeklyActivityCard({
+  daily,
+  todayCompleted,
+  periodTotal,
+  avgPerDay,
   isLoading,
+  lang,
+  t,
+}: {
+  daily: PickingOrderStats['daily']
+  todayCompleted: number
+  periodTotal: number
+  avgPerDay: number
+  isLoading: boolean
+  lang: string
+  t: (key: string) => string
+}) {
+  const points = daily ?? []
+  const maxValue = Math.max(1, ...points.map((p) => p.count))
+  const dash = '—'
+  return (
+    <div className="rounded-[20px] border border-slate-200 bg-white p-[22px] dark:border-slate-800 dark:bg-slate-900">
+      <div className="text-base font-extrabold tracking-[-0.3px] text-slate-900 dark:text-slate-100">
+        {t('admin:dashboard.weekly_activity_title')}
+      </div>
+      <div className="text-[13px] font-medium text-slate-400">
+        {t('admin:dashboard.weekly_activity_sub')}
+      </div>
+      <div className="my-[18px] grid grid-cols-3 gap-3">
+        {[
+          { label: t('admin:dashboard.weekly_today'), value: todayCompleted },
+          { label: t('admin:dashboard.weekly_period_total'), value: periodTotal },
+          { label: t('admin:dashboard.weekly_avg'), value: avgPerDay },
+        ].map((s) => (
+          <div
+            key={s.label}
+            className="rounded-[14px] border border-slate-100 px-3.5 py-3 dark:border-slate-800"
+          >
+            <div className="text-xs font-semibold text-slate-400">{s.label}</div>
+            <div className="wms-num mt-1 text-[22px] font-extrabold text-slate-900 dark:text-slate-100">
+              {isLoading ? dash : formatAvgPerDay(s.value)}
+            </div>
+          </div>
+        ))}
+      </div>
+      {isLoading ? (
+        <div className="relative h-[210px]">
+          <LoadingOverlay label="" />
+        </div>
+      ) : points.length === 0 ? (
+        <div className="flex h-[210px] items-center justify-center text-sm text-slate-400">
+          {dash}
+        </div>
+      ) : (
+        <div className="flex h-[210px] items-end justify-between gap-3.5 border-t border-slate-100 pt-2 dark:border-slate-800">
+          {points.map((p, i) => {
+            const isToday = i === points.length - 1
+            const h = Math.max(6, Math.round((p.count / maxValue) * 130))
+            return (
+              <div
+                key={p.date}
+                className="flex h-full flex-1 flex-col items-center justify-end gap-2"
+              >
+                <div
+                  className={`text-xs font-bold ${isToday ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}
+                >
+                  {p.count}
+                </div>
+                <div
+                  className={`w-full max-w-[38px] shrink-0 rounded-t-lg transition ${
+                    isToday
+                      ? 'bg-blue-600 shadow-[0_8px_16px_-6px_rgba(37,99,235,0.5)]'
+                      : 'bg-blue-100 dark:bg-blue-500/25'
+                  }`}
+                  style={{ height: `${h}px` }}
+                />
+                <div
+                  className={`text-xs font-semibold ${isToday ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}
+                >
+                  {weekdayShort(p.date, lang)}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+type PipelineRow = { label: string; count: number; color: string }
+
+function PipelineCard({
+  rows,
+  total,
+  t,
+}: {
+  rows: PipelineRow[]
+  total: number
+  t: (key: string, opts?: Record<string, unknown>) => string
+}) {
+  return (
+    <div className="rounded-[20px] border border-slate-200 bg-white p-[22px] dark:border-slate-800 dark:bg-slate-900">
+      <div className="text-base font-extrabold tracking-[-0.3px] text-slate-900 dark:text-slate-100">
+        {t('admin:dashboard.pipeline_title')}
+      </div>
+      <div className="text-[13px] font-medium text-slate-400">
+        {t('admin:dashboard.pipeline_sub', { count: total })}
+      </div>
+      <div className="mt-5 flex flex-col gap-4">
+        {rows.map((r) => {
+          const pct = total > 0 ? Math.round((r.count / total) * 100) : 0
+          return (
+            <div key={r.label}>
+              <div className="mb-[7px] flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="h-[9px] w-[9px] rounded-[3px]"
+                    style={{ backgroundColor: r.color }}
+                  />
+                  <span className="text-[13px] font-semibold text-slate-600 dark:text-slate-300">
+                    {r.label}
+                  </span>
+                </div>
+                <span className="wms-num text-sm font-extrabold text-slate-900 dark:text-slate-100">
+                  {r.count} · {pct}%
+                </span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${pct}%`, backgroundColor: r.color }}
+                />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+type LeaderTone = 'accent' | 'violet'
+
+function LeaderboardCard({
+  title,
+  rows,
+  tone,
+  isLoading,
+  onExport,
+  exportDisabled,
+  isExporting,
   emptyLabel,
   t,
 }: {
+  title: string
   rows: PickingStaffStatsRow[]
+  tone: LeaderTone
   isLoading: boolean
+  onExport: () => void
+  exportDisabled: boolean
+  isExporting: boolean
   emptyLabel: string
-  t: (key: string) => string
+  t: (key: string, opts?: Record<string, unknown>) => string
 }) {
-  if (isLoading) {
-    return (
-      <div className="relative min-h-[6rem]">
-        <LoadingOverlay label={t('common:messages.loading')} />
-      </div>
-    )
+  const maxQty = Math.max(1, ...rows.map((r) => r.total_picked_qty))
+  const avatarCls =
+    tone === 'accent'
+      ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400'
+      : 'bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400'
+  const barColor = tone === 'accent' ? '#2563eb' : '#7c3aed'
+
+  const rankCls = (rank: number) => {
+    if (rank === 1) return 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
+    if (rank === 2) return 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300'
+    if (rank === 3) return 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300'
+    return 'bg-slate-50 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
   }
-  if (rows.length === 0) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">{emptyLabel}</p>
-  }
+
   return (
-    <table className="min-w-full text-sm">
-      <thead>
-        <tr className="border-b border-slate-200 dark:border-slate-700">
-          <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">
-            {t('admin:dashboard.staff_col_rank')}
-          </th>
-          <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">
-            {t('admin:dashboard.staff_col_name')}
-          </th>
-          <th className="px-3 py-2 text-right font-medium text-slate-600 dark:text-slate-400">
-            {t('admin:dashboard.staff_col_orders')}
-          </th>
-          <th className="px-3 py-2 text-right font-medium text-slate-600 dark:text-slate-400">
-            {t('admin:dashboard.staff_col_lines')}
-          </th>
-          <th className="px-3 py-2 text-right font-medium text-slate-600 dark:text-slate-400">
-            {t('admin:dashboard.staff_col_qty')}
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row, index) => (
-          <tr key={row.user_id} className="border-b border-slate-100 dark:border-slate-800">
-            <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{index + 1}</td>
-            <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{row.full_name}</td>
-            <td className="px-3 py-2 text-right font-medium text-slate-900 dark:text-slate-100">
-              {row.documents_count}
-            </td>
-            <td className="px-3 py-2 text-right text-slate-800 dark:text-slate-200">{row.lines_count}</td>
-            <td className="px-3 py-2 text-right font-medium text-slate-900 dark:text-slate-100">
-              {formatQty(row.total_picked_qty)}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className="rounded-[20px] border border-slate-200 bg-white p-[22px] dark:border-slate-800 dark:bg-slate-900">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-base font-extrabold tracking-[-0.3px] text-slate-900 dark:text-slate-100">
+            {title}
+          </div>
+          <div className="text-[13px] font-medium text-slate-400">
+            {t('admin:dashboard.leaderboard_rating_sub')}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onExport}
+          disabled={exportDisabled}
+          className="flex shrink-0 items-center gap-1.5 rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-[7px] text-xs font-bold text-slate-600 transition hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+        >
+          {isExporting ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+          ) : (
+            <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden />
+          )}
+          Excel
+        </button>
+      </div>
+
+      <div className="relative mt-3 flex flex-col gap-1">
+        {isLoading ? (
+          <div className="relative min-h-[8rem]">
+            <LoadingOverlay label="" />
+          </div>
+        ) : rows.length === 0 ? (
+          <p className="py-6 text-center text-sm text-slate-400">{emptyLabel}</p>
+        ) : (
+          rows.map((row, index) => {
+            const rank = index + 1
+            const pct = Math.round((row.total_picked_qty / maxQty) * 100)
+            return (
+              <div
+                key={row.user_id}
+                className="flex items-center gap-3.5 rounded-xl px-2.5 py-[11px] transition hover:bg-slate-50 dark:hover:bg-slate-800/50"
+              >
+                <div
+                  className={`flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-lg text-xs font-extrabold ${rankCls(rank)}`}
+                >
+                  {rank}
+                </div>
+                <div
+                  className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full text-[13px] font-bold ${avatarCls}`}
+                >
+                  {nameInitials(row.full_name)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">
+                    {row.full_name}
+                  </div>
+                  <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${pct}%`, backgroundColor: barColor }}
+                    />
+                  </div>
+                </div>
+                <div className="shrink-0 text-right">
+                  <div className="wms-num text-[15px] font-extrabold text-slate-900 dark:text-slate-100">
+                    {formatQty(row.total_picked_qty)}
+                  </div>
+                  <div className="text-[11px] font-semibold text-slate-400">
+                    {t('admin:dashboard.staff_row_meta', {
+                      orders: row.documents_count,
+                      lines: row.lines_count,
+                    })}
+                  </div>
+                </div>
+              </div>
+            )
+          })
+        )}
+      </div>
+    </div>
   )
 }
 
 export function DashboardPage() {
-  const { t } = useTranslation(['admin', 'common', 'inventory', 'receiving'])
+  const { t, i18n } = useTranslation(['admin', 'common', 'inventory', 'receiving'])
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [ordersByStatus, setOrdersByStatus] = useState<{ status: string; count: number }[]>([])
   const [pickerRows, setPickerRows] = useState<PickingStaffStatsRow[]>([])
   const [controllerRows, setControllerRows] = useState<PickingStaffStatsRow[]>([])
@@ -265,12 +570,25 @@ export function DashboardPage() {
     }
   }, [t, pickerRows, controllerRows, dateFrom, dateTo, showInfo, showSuccess, showError])
 
-  const statusRows = [
-    { key: 'xom' as const, labelKey: 'admin:dashboard.status_xom', count: counts.xom },
-    { key: 'yigishda' as const, labelKey: 'admin:dashboard.status_yigishda', count: counts.yigishda },
-    { key: 'tekshiruvda' as const, labelKey: 'admin:dashboard.status_tekshiruvda', count: counts.tekshiruvda },
-    { key: 'yakunlangan' as const, labelKey: 'admin:dashboard.status_yakunlangan', count: counts.yakunlangan },
-    { key: 'barcha' as const, labelKey: 'admin:dashboard.status_barcha', count: totalOrders },
+  const greetingName = (user?.name || '').trim().split(/\s+/)[0] || (user?.name ?? '')
+  const greetingDate = useMemo(() => {
+    try {
+      return new Date().toLocaleDateString(i18n.language, {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+        weekday: 'long',
+      })
+    } catch {
+      return todayIsoDate()
+    }
+  }, [i18n.language])
+
+  const pipelineRows: PipelineRow[] = [
+    { label: t('admin:dashboard.status_xom'), count: counts.xom, color: '#d97706' },
+    { label: t('admin:dashboard.status_yigishda'), count: counts.yigishda, color: '#2563eb' },
+    { label: t('admin:dashboard.status_tekshiruvda'), count: counts.tekshiruvda, color: '#7c3aed' },
+    { label: t('admin:dashboard.status_yakunlangan'), count: counts.yakunlangan, color: '#059669' },
   ]
 
   return (
@@ -282,265 +600,160 @@ export function DashboardPage() {
           onAction={load}
         />
       ) : (
-        <>
+        <div className="flex flex-col gap-[22px]">
+          {/* Salomlashuv qatori */}
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h1 className="text-[22px] font-extrabold tracking-[-0.5px] text-slate-900 dark:text-slate-100">
+                {t('admin:dashboard.greeting', { name: greetingName })}
+              </h1>
+              <p className="mt-0.5 text-sm font-medium text-slate-500 dark:text-slate-400">
+                {t('admin:dashboard.greeting_sub', { date: greetingDate })}
+              </p>
+            </div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3.5 py-[7px] dark:border-emerald-500/30 dark:bg-emerald-500/10">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.18)]" />
+              <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                {t('admin:dashboard.system_active')}
+              </span>
+            </div>
+          </div>
+
+          {/* KPI qatori */}
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-            <KpiCard
-              title={t('admin:dashboard.status_xom')}
+            <KpiTile
+              label={t('admin:dashboard.status_xom')}
               value={isLoading ? '—' : counts.xom}
               icon={Package}
-              href="/admin/orders?group=xom"
+              tone="amber"
+              onClick={() => navigate('/admin/orders?group=xom')}
             />
-            <KpiCard
-              title={t('admin:dashboard.status_yigishda')}
+            <KpiTile
+              label={t('admin:dashboard.status_yigishda')}
               value={isLoading ? '—' : counts.yigishda}
               icon={ClipboardList}
-              href="/admin/picking?group=yigishda"
+              tone="blue"
+              onClick={() => navigate('/admin/picking?group=yigishda')}
             />
-            <KpiCard
-              title={t('admin:dashboard.status_tekshiruvda')}
+            <KpiTile
+              label={t('admin:dashboard.status_tekshiruvda')}
               value={isLoading ? '—' : counts.tekshiruvda}
               icon={SearchCheck}
-              href="/admin/picking?group=tekshiruvda"
+              tone="violet"
+              onClick={() => navigate('/admin/picking?group=tekshiruvda')}
             />
-            <KpiCard
-              title={t('admin:dashboard.status_yakunlangan')}
+            <KpiTile
+              label={t('admin:dashboard.status_yakunlangan')}
               value={isLoading ? '—' : counts.yakunlangan}
               icon={PackageCheck}
-              href="/admin/picking/archive?group=yakunlangan"
+              tone="emerald"
+              onClick={() => navigate('/admin/picking/archive?group=yakunlangan')}
             />
-            <KpiCard
-              title={t('admin:dashboard.status_barcha')}
+            <AccentKpiTile
+              label={t('admin:dashboard.status_barcha')}
               value={isLoading ? '—' : totalOrders}
-              icon={LayoutGrid}
             />
           </div>
-          <Card className="mt-6">
-            <div className="text-base font-semibold text-slate-900 dark:text-slate-100">
-              {t('admin:dashboard.picking_stats_title')}
-            </div>
+
+          {/* Sana oralig'i / yangilash toolbar */}
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="flex flex-col gap-1 text-xs text-slate-600 dark:text-slate-400">
+              <span>{t('admin:dashboard.staff_stats_date_from')}</span>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-slate-600 dark:text-slate-400">
+              <span>{t('admin:dashboard.staff_stats_date_to')}</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              />
+            </label>
+            <Button type="button" variant="secondary" className="shrink-0" onClick={resetStatsDatesToToday}>
+              {t('admin:dashboard.staff_stats_clear')}
+            </Button>
+            <Button type="button" variant="secondary" className="shrink-0" onClick={() => void load()}>
+              <RefreshCw className="mr-2 h-4 w-4 shrink-0" aria-hidden />
+              {t('common:buttons.retry')}
+            </Button>
             {pickingStatsUnavailable ? (
-              <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+              <p className="w-full text-xs text-amber-700 dark:text-amber-300">
                 {t('admin:dashboard.picking_stats_unavailable')}
               </p>
             ) : null}
-            <div className="mt-3 flex flex-wrap items-end gap-3">
-              <label className="flex flex-col gap-1 text-xs text-slate-600 dark:text-slate-400">
-                <span>{t('admin:dashboard.staff_stats_date_from')}</span>
-                <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-slate-600 dark:text-slate-400">
-                <span>{t('admin:dashboard.staff_stats_date_to')}</span>
-                <input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                />
-              </label>
-              <Button type="button" variant="secondary" className="shrink-0" onClick={resetStatsDatesToToday}>
-                {t('admin:dashboard.staff_stats_clear')}
-              </Button>
-            </div>
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <KpiCard
-                title={t('admin:dashboard.picking_stats_today')}
-                value={isLoading ? '—' : (pickingOrderStats?.completed_today ?? 0)}
-                icon={PackageCheck}
-                href="/admin/picking/archive?group=yakunlangan"
-              />
-              <KpiCard
-                title={t('admin:dashboard.picking_stats_period')}
-                value={isLoading ? '—' : (pickingOrderStats?.completed_in_period ?? 0)}
-                delta={
-                  pickingOrderStats
-                    ? t('admin:dashboard.picking_stats_period_range', {
-                        from: pickingOrderStats.date_from,
-                        to: pickingOrderStats.date_to,
-                      })
-                    : undefined
-                }
-                icon={CalendarRange}
-              />
-              <KpiCard
-                title={t('admin:dashboard.picking_stats_avg_per_day')}
-                value={
-                  isLoading
-                    ? '—'
-                    : formatAvgPerDay(pickingOrderStats?.avg_completed_per_day ?? 0)
-                }
-                delta={
-                  pickingOrderStats
-                    ? t('admin:dashboard.picking_stats_avg_days', {
-                        days: pickingOrderStats.days_in_period,
-                      })
-                    : undefined
-                }
-                icon={TrendingUp}
-              />
-            </div>
-          </Card>
+          </div>
 
-          {stuckRowsCount > 0 ? (
-            <Card className="mt-4 border-rose-200 bg-rose-50 dark:border-rose-900/60 dark:bg-rose-950/30">
-              <button
-                type="button"
-                className="w-full text-left"
-                onClick={() => navigate('/admin/inventory/reserve-health?warehouse=main')}
-              >
-                <div className="text-sm font-semibold text-rose-900 dark:text-rose-100">
-                  {t('inventory:reserve_health.stuck_alert_title', { hours: 48 })}
-                </div>
-                <div className="mt-1 text-sm text-rose-800 dark:text-rose-200">
-                  {t('inventory:reserve_health.stuck_alert_desc', {
-                    rows: stuckRowsCount,
-                    orders: stuckOrdersCount,
-                    oldest: stuckOldestHours,
-                  })}
-                </div>
-              </button>
-            </Card>
-          ) : null}
-
-          <Card className="mt-6">
-            <div className="text-base font-semibold text-slate-900 dark:text-slate-100">
-              {t('admin:dashboard.orders_by_status')}
-            </div>
-            <div className="mt-3 overflow-x-auto">
-              {isLoading ? (
-                <div className="relative min-h-[6rem]">
-                  <LoadingOverlay label={t('common:messages.loading')} />
-                </div>
-              ) : (
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-700">
-                      <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">
-                        {t('admin:dashboard.status_column')}
-                      </th>
-                      <th className="px-3 py-2 text-right font-medium text-slate-600 dark:text-slate-400">
-                        {t('admin:dashboard.count_column')}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {statusRows.map((row) => {
-                      if (row.key === 'barcha') {
-                        return (
-                          <tr
-                            key={row.key}
-                            className="border-b border-slate-100 dark:border-slate-800"
-                          >
-                            <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
-                              {t(row.labelKey)}
-                            </td>
-                            <td className="px-3 py-2 text-right font-medium text-slate-900 dark:text-slate-100">
-                              {row.count}
-                            </td>
-                          </tr>
-                        )
-                      }
-                      const path =
-                        row.key === 'xom'
-                          ? '/admin/orders?group=xom'
-                          : row.key === 'yakunlangan'
-                            ? '/admin/picking/archive?group=yakunlangan'
-                            : `/admin/picking?group=${row.key}`
-                      return (
-                        <tr
-                          key={row.key}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => navigate(path)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault()
-                              navigate(path)
-                            }
-                          }}
-                          className="cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
-                        >
-                          <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
-                            {t(row.labelKey)}
-                          </td>
-                          <td className="px-3 py-2 text-right font-medium text-slate-900 dark:text-slate-100">
-                            {row.count}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </Card>
-
-          <Card className="mt-6">
-            <div className="text-base font-semibold text-slate-900 dark:text-slate-100">
-              {t('admin:dashboard.staff_stats_title')}
-            </div>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {t('admin:dashboard.staff_stats_uses_period_hint')}
-            </p>
-            <div className="mt-3 flex flex-wrap items-end gap-3">
-              <Button
-                type="button"
-                variant="secondary"
-                className="shrink-0"
-                disabled={staffStatsExportDisabled}
-                onClick={() => void handleExportStaffStatsExcel()}
-              >
-                {isExporting ? (
-                  <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" aria-hidden />
-                ) : (
-                  <FileSpreadsheet className="mr-2 h-4 w-4 shrink-0" aria-hidden />
-                )}
-                {t('admin:dashboard.staff_stats_export_excel')}
-              </Button>
-            </div>
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-              {t('admin:dashboard.staff_stats_sort_hint')}
-            </p>
-
-            <div className="relative mt-6 min-h-[4rem] space-y-6">
-              {isLoading ? (
-                <div className="absolute inset-0 z-10 flex min-h-[8rem] items-center justify-center rounded-xl bg-white/80 dark:bg-slate-950/80">
-                  <LoadingOverlay label={t('common:messages.loading')} />
-                </div>
+          {/* O'rta qator: grafik + pipeline/alert */}
+          <div className="grid grid-cols-1 gap-[22px] lg:grid-cols-[1.55fr_1fr]">
+            <WeeklyActivityCard
+              daily={pickingOrderStats?.daily}
+              todayCompleted={pickingOrderStats?.completed_today ?? 0}
+              periodTotal={pickingOrderStats?.completed_in_period ?? 0}
+              avgPerDay={pickingOrderStats?.avg_completed_per_day ?? 0}
+              isLoading={isLoading}
+              lang={i18n.language}
+              t={t}
+            />
+            <div className="flex flex-col gap-[22px]">
+              <PipelineCard rows={pipelineRows} total={totalOrders} t={t} />
+              {stuckRowsCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => navigate('/admin/inventory/reserve-health?warehouse=main')}
+                  className="flex items-start gap-3.5 rounded-[20px] border border-rose-200 bg-rose-50 px-5 py-[18px] text-left transition hover:brightness-[0.99] dark:border-rose-500/30 dark:bg-rose-500/10"
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400">
+                    <AlertTriangle size={20} />
+                  </div>
+                  <div>
+                    <div className="text-sm font-extrabold text-rose-900 dark:text-rose-200">
+                      {t('inventory:reserve_health.stuck_alert_title', { hours: 48 })}
+                    </div>
+                    <div className="mt-1 text-[13px] font-medium leading-relaxed text-rose-700 dark:text-rose-300">
+                      {t('inventory:reserve_health.stuck_alert_desc', {
+                        rows: stuckRowsCount,
+                        orders: stuckOrdersCount,
+                        oldest: stuckOldestHours,
+                      })}
+                    </div>
+                  </div>
+                </button>
               ) : null}
-              <div>
-                <div className="mb-2 text-sm font-medium text-slate-800 dark:text-slate-200">
-                  {t('admin:dashboard.pickers_table_title')}
-                </div>
-                <div className="overflow-x-auto">
-                  <StaffStatsTable
-                    rows={pickerRows}
-                    isLoading={false}
-                    emptyLabel={t('admin:dashboard.staff_stats_empty')}
-                    t={t}
-                  />
-                </div>
-              </div>
-              <div>
-                <div className="mb-2 text-sm font-medium text-slate-800 dark:text-slate-200">
-                  {t('admin:dashboard.controllers_table_title')}
-                </div>
-                <div className="overflow-x-auto">
-                  <StaffStatsTable
-                    rows={controllerRows}
-                    isLoading={false}
-                    emptyLabel={t('admin:dashboard.staff_stats_empty')}
-                    t={t}
-                  />
-                </div>
-              </div>
             </div>
-          </Card>
-        </>
+          </div>
+
+          {/* Liderbordlar */}
+          <div className="grid grid-cols-1 gap-[22px] lg:grid-cols-2">
+            <LeaderboardCard
+              title={t('admin:dashboard.pickers_table_title')}
+              rows={pickerRows}
+              tone="accent"
+              isLoading={isLoading}
+              onExport={() => void handleExportStaffStatsExcel()}
+              exportDisabled={staffStatsExportDisabled}
+              isExporting={isExporting}
+              emptyLabel={t('admin:dashboard.staff_stats_empty')}
+              t={t}
+            />
+            <LeaderboardCard
+              title={t('admin:dashboard.controllers_table_title')}
+              rows={controllerRows}
+              tone="violet"
+              isLoading={isLoading}
+              onExport={() => void handleExportStaffStatsExcel()}
+              exportDisabled={staffStatsExportDisabled}
+              isExporting={isExporting}
+              emptyLabel={t('admin:dashboard.staff_stats_empty')}
+              t={t}
+            />
+          </div>
+        </div>
       )}
     </AdminLayout>
   )

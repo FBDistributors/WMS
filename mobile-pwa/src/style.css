@@ -25,6 +25,13 @@
   }
 }
 
+/* Tabular figures for dashboard metrics (aligned digits) */
+@layer utilities {
+  .wms-num {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
 /* Safe area for notched devices (iOS, etc.) */
 @layer utilities {
   .pb-safe {
