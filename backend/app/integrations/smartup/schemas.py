@@ -14,6 +14,9 @@ class SmartupOrderLine(BaseModel):
     qty: float = Field(0, alias="quantity")
     uom: Optional[str] = Field(default=None, alias="uom")
     line_source: str = Field(default="product")
+    # Aksiya/chegirma ma'lumoti (SmartUp deal qatoridagi). raw_json'ga saqlanadi;
+    # bo'sh bo'lmasa, mahsulot qatori chegirmali deb hisoblanadi (EXPIRED'dan teriladi).
+    action_margins: Optional[list] = Field(default=None, alias="action_margins")
 
     @root_validator(pre=True)
     def _normalize_qty(cls, values):  # noqa: N805

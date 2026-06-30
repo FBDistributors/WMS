@@ -625,6 +625,20 @@ def _to_order_details(order: OrderModel, db: Session) -> OrderDetails:
     )
 
 
+def _line_has_action_margin(line) -> bool:
+    """Buyurtma qatori chegirmali (action_margins bor) mi — raw_json'dan o'qiladi.
+
+    SmartUp deal qatorida `action_margins` (aksiya/chegirma) bo'sh bo'lmasa, bu
+    mahsulot chegirmali sotilmoqda — uni muddati o'tgan zaxiradan terish maqsadga
+    muvofiq. line_source "product" bo'lsa-da, promo kabi EXPIRED'dan teriladi.
+    """
+    raw = getattr(line, "raw_json", None)
+    if not isinstance(raw, dict):
+        return False
+    margins = raw.get("action_margins")
+    return isinstance(margins, list) and len(margins) > 0
+
+
 def _allocate_order(
     db: Session,
     order: OrderModel,
@@ -661,7 +675,7 @@ def _allocate_order(
         remaining = Decimal(str(line.qty))
         allocated_total = Decimal("0")
         line_source = (getattr(line, "line_source", None) or "product").strip()
-        is_promo = line_source in ("gift", "action")
+        is_promo = line_source in ("gift", "action") or _line_has_action_margin(line)
 
         if is_promo:
             lot_phases = [
