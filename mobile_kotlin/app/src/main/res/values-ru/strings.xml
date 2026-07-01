@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">FB Warehouse</string>
+
+    <string name="login_title">Вход в систему</string>
+    <string name="login_username_label">Имя пользователя</string>
+    <string name="login_password_label">Пароль</string>
+    <string name="login_submit">Войти</string>
+    <string name="login_error_invalid">Неверный логин или пароль</string>
+    <string name="login_error_rate_limited">Слишком много попыток. Повторите позже.</string>
+    <string name="login_error_network">Ошибка сети. Проверьте интернет.</string>
+    <string name="login_error_generic">Произошла ошибка. Попробуйте снова.</string>
+
+    <string name="home_greeting">Здравствуйте, %1$s</string>
+    <string name="home_role_label">Роль: %1$s</string>
+    <string name="home_logout">Выйти</string>
+    <string name="home_open_pick_tasks">Задачи сборки</string>
+    <string name="home_open_inventory">Инвентаризация</string>
+    <string name="home_open_receiving">Приёмка нового товара</string>
+    <string name="home_open_customer_returns">Возвраты клиентов</string>
+    <string name="home_open_account">Аккаунт (сменить пароль)</string>
+    <string name="home_open_feedback">Оставить отзыв о приложении</string>
+
+    <string name="common_retry">Повторить</string>
+    <string name="common_back">Назад</string>
+    <string name="common_select">Выбрать</string>
+    <string name="error_not_found">Не найдено</string>
+
+    <string name="pick_tasks_title">Задачи сборки</string>
+    <string name="pick_tasks_empty">Вам не назначено ни одной задачи сборки</string>
+    <string name="pick_task_progress">%1$d / %2$d строк</string>
+
+    <string name="pick_task_detail_title">Документ %1$s</string>
+    <string name="pick_task_scan_not_found">Этот штрих-код не найден в документе</string>
+    <string name="pick_task_queued_offline">Нет интернета — сохранено локально, будет отправлено позже</string>
+    <string name="pick_line_required_picked">Нужно: %1$s · Собрано: %2$s</string>
+    <string name="pick_line_qty_hint">Количество</string>
+    <string name="pick_line_add_button">Добавить</string>
+    <string name="pick_line_done_label">Готово</string>
+
+    <string name="inventory_title">Инвентаризация</string>
+    <string name="inventory_search_hint">Штрих-код или SKU</string>
+    <string name="inventory_search_button">Искать</string>
+    <string name="inventory_search_empty_hint">Введите штрих-код или SKU для поиска товара</string>
+    <string name="inventory_total_available">Всего доступно: %1$s</string>
+    <string name="inventory_best_locations_title">Лучшие места</string>
+    <string name="inventory_fefo_lots_title">Партии (FEFO)</string>
+    <string name="inventory_expiry_label">Срок: %1$s</string>
+
+    <string name="receiving_title">Приёмка нового товара</string>
+    <string name="receiving_barcode_hint">Штрих-код или SKU</string>
+    <string name="receiving_search_button">Искать</string>
+    <string name="receiving_qty_hint">Количество</string>
+    <string name="receiving_location_label">Место</string>
+    <string name="receiving_box_scan_label">Обнаружена закрытая коробка</string>
+    <string name="receiving_box_count_hint">Количество коробок</string>
+    <string name="receiving_box_computed_qty">Всего: %1$d шт (1 коробка = %2$d шт)</string>
+    <string name="receiving_batch_hint">Партия (необязательно)</string>
+    <string name="receiving_expiry_hint">Срок годности (необязательно)</string>
+    <string name="receiving_expiry_clear">Очистить срок</string>
+    <string name="receiving_add_line_button">Добавить в список</string>
+    <string name="receiving_pending_lines_title">Добавленные строки (%1$d)</string>
+    <string name="receiving_line_qty_location">%1$d шт · %2$s</string>
+    <string name="receiving_line_batch_expiry">Партия: %1$s · Срок: %2$s</string>
+    <string name="receiving_submit_button">Принять всё</string>
+    <string name="receiving_success">Принято: %1$s</string>
+    <string name="receiving_queued_offline">Нет интернета — документ сохранён, будет отправлен позже</string>
+
+    <string name="customer_returns_title">Возвраты клиентов</string>
+    <string name="customer_returns_empty">Нет возвратов, ожидающих проверки</string>
+    <string name="customer_return_detail_title">Возврат %1$s</string>
+    <string name="customer_return_qty_location">%1$s шт · %2$s</string>
+    <string name="customer_return_approve_button">Подтвердить</string>
+    <string name="customer_return_approved_label">Подтверждено ✓</string>
+
+    <string name="customer_return_status_pending_controller">На проверке</string>
+    <string name="customer_return_status_approved">Подтверждено — ожидает сборщика</string>
+    <string name="customer_return_status_assigned_to_picker">Назначено сборщику</string>
+    <string name="customer_return_status_completed">Завершено</string>
+
+    <string name="customer_return_assign_picker_label">Сборщик</string>
+    <string name="customer_return_assign_button">Назначить</string>
+    <string name="customer_return_location_label">Место</string>
+    <string name="customer_return_complete_button">Завершить</string>
+    <string name="customer_return_completed_label">Завершено ✓</string>
+
+    <string name="account_title">Смена пароля</string>
+    <string name="account_current_password">Текущий пароль</string>
+    <string name="account_new_password">Новый пароль</string>
+    <string name="account_confirm_password">Подтвердите новый пароль</string>
+    <string name="account_password_mismatch">Пароли не совпадают</string>
+    <string name="account_password_too_short">Пароль должен содержать не менее 6 символов</string>
+    <string name="account_change_password_button">Изменить</string>
+    <string name="account_password_changed">Пароль успешно изменён ✓</string>
+
+    <string name="feedback_title">Отзыв</string>
+    <string name="feedback_rating_label">Как вы оцениваете приложение?</string>
+    <string name="feedback_comment_hint">Комментарий (необязательно)</string>
+    <string name="feedback_submit_button">Отправить</string>
+    <string name="feedback_thanks">Спасибо! Ваш отзыв отправлен ✓</string>
+
+    <string name="scanner_permission_required">Для сканирования нужен доступ к камере</string>
+    <string name="scanner_hint">Наведите камеру на штрих-код</string>
+
+    <string name="movement_title">Перемещение остатка (без коробок)</string>
+    <string name="movement_from_location">Откуда</string>
+    <string name="movement_to_location">Куда</string>
+    <string name="movement_same_location_error">Место отправления и назначения не могут совпадать</string>
+    <string name="movement_submit_button">Переместить</string>
+    <string name="movement_success">Перемещено: %1$d строк (%2$d движений)</string>
+    <string name="home_open_movement">Переместить остаток</string>
+</resources>

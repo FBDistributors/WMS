@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">FB Warehouse</string>
+
+    <string name="login_title">Sign in</string>
+    <string name="login_username_label">Username</string>
+    <string name="login_password_label">Password</string>
+    <string name="login_submit">Sign in</string>
+    <string name="login_error_invalid">Invalid username or password</string>
+    <string name="login_error_rate_limited">Too many attempts. Try again later.</string>
+    <string name="login_error_network">Network error. Check your connection.</string>
+    <string name="login_error_generic">Something went wrong. Try again.</string>
+
+    <string name="home_greeting">Hello, %1$s</string>
+    <string name="home_role_label">Role: %1$s</string>
+    <string name="home_logout">Log out</string>
+    <string name="home_open_pick_tasks">Pick tasks</string>
+    <string name="home_open_inventory">Inventory</string>
+    <string name="home_open_receiving">Receive new stock</string>
+    <string name="home_open_customer_returns">Customer returns</string>
+    <string name="home_open_account">Account (change password)</string>
+    <string name="home_open_feedback">Send app feedback</string>
+
+    <string name="common_retry">Retry</string>
+    <string name="common_back">Back</string>
+    <string name="common_select">Select</string>
+    <string name="error_not_found">Not found</string>
+
+    <string name="pick_tasks_title">Pick tasks</string>
+    <string name="pick_tasks_empty">No pick tasks assigned to you</string>
+    <string name="pick_task_progress">%1$d / %2$d lines</string>
+
+    <string name="pick_task_detail_title">Document %1$s</string>
+    <string name="pick_task_scan_not_found">This barcode was not found in the document</string>
+    <string name="pick_task_queued_offline">No internet — saved locally, will sync later</string>
+    <string name="pick_line_required_picked">Required: %1$s · Picked: %2$s</string>
+    <string name="pick_line_qty_hint">Quantity</string>
+    <string name="pick_line_add_button">Add</string>
+    <string name="pick_line_done_label">Done</string>
+
+    <string name="inventory_title">Inventory</string>
+    <string name="inventory_search_hint">Barcode or SKU</string>
+    <string name="inventory_search_button">Search</string>
+    <string name="inventory_search_empty_hint">Enter a barcode or SKU to search for a product</string>
+    <string name="inventory_total_available">Total available: %1$s</string>
+    <string name="inventory_best_locations_title">Best locations</string>
+    <string name="inventory_fefo_lots_title">Lots (FEFO)</string>
+    <string name="inventory_expiry_label">Expiry: %1$s</string>
+
+    <string name="receiving_title">Receive new stock</string>
+    <string name="receiving_barcode_hint">Barcode or SKU</string>
+    <string name="receiving_search_button">Search</string>
+    <string name="receiving_qty_hint">Quantity</string>
+    <string name="receiving_location_label">Location</string>
+    <string name="receiving_box_scan_label">Sealed box detected</string>
+    <string name="receiving_box_count_hint">Box count</string>
+    <string name="receiving_box_computed_qty">Total: %1$d pcs (1 box = %2$d pcs)</string>
+    <string name="receiving_batch_hint">Batch (optional)</string>
+    <string name="receiving_expiry_hint">Expiry date (optional)</string>
+    <string name="receiving_expiry_clear">Clear expiry date</string>
+    <string name="receiving_add_line_button">Add to list</string>
+    <string name="receiving_pending_lines_title">Added lines (%1$d)</string>
+    <string name="receiving_line_qty_location">%1$d pcs · %2$s</string>
+    <string name="receiving_line_batch_expiry">Batch: %1$s · Expiry: %2$s</string>
+    <string name="receiving_submit_button">Receive all</string>
+    <string name="receiving_success">Received: %1$s</string>
+    <string name="receiving_queued_offline">No internet — document saved, will sync later</string>
+
+    <string name="customer_returns_title">Customer returns</string>
+    <string name="customer_returns_empty">No returns awaiting review</string>
+    <string name="customer_return_detail_title">Return %1$s</string>
+    <string name="customer_return_qty_location">%1$s pcs · %2$s</string>
+    <string name="customer_return_approve_button">Approve</string>
+    <string name="customer_return_approved_label">Approved ✓</string>
+
+    <string name="customer_return_status_pending_controller">Awaiting review</string>
+    <string name="customer_return_status_approved">Approved — awaiting picker</string>
+    <string name="customer_return_status_assigned_to_picker">Assigned to picker</string>
+    <string name="customer_return_status_completed">Completed</string>
+
+    <string name="customer_return_assign_picker_label">Picker</string>
+    <string name="customer_return_assign_button">Assign</string>
+    <string name="customer_return_location_label">Location</string>
+    <string name="customer_return_complete_button">Complete</string>
+    <string name="customer_return_completed_label">Completed ✓</string>
+
+    <string name="account_title">Change password</string>
+    <string name="account_current_password">Current password</string>
+    <string name="account_new_password">New password</string>
+    <string name="account_confirm_password">Confirm new password</string>
+    <string name="account_password_mismatch">Passwords do not match</string>
+    <string name="account_password_too_short">Password must be at least 6 characters</string>
+    <string name="account_change_password_button">Change</string>
+    <string name="account_password_changed">Password changed successfully ✓</string>
+
+    <string name="feedback_title">Feedback</string>
+    <string name="feedback_rating_label">How do you rate the app?</string>
+    <string name="feedback_comment_hint">Comment (optional)</string>
+    <string name="feedback_submit_button">Submit</string>
+    <string name="feedback_thanks">Thanks! Your feedback was sent ✓</string>
+
+    <string name="scanner_permission_required">Camera permission is required to scan</string>
+    <string name="scanner_hint">Point the camera at a barcode</string>
+
+    <string name="movement_title">Move loose stock</string>
+    <string name="movement_from_location">From location</string>
+    <string name="movement_to_location">To location</string>
+    <string name="movement_same_location_error">Source and destination location cannot be the same</string>
+    <string name="movement_submit_button">Move</string>
+    <string name="movement_success">Moved: %1$d lines (%2$d movements)</string>
+    <string name="home_open_movement">Move stock</string>
+</resources>

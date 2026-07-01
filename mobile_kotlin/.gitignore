@@ -1,0 +1,20 @@
+*.iml
+.gradle/
+/local.properties
+.idea/
+.DS_Store
+/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+local.properties
+
+# Release signing — hech qachon commit qilinmasin
+key.properties
+*.jks
+*.keystore
+
+# Firebase — haqiqiy loyiha ro'yxatdan o'tkazilgach qo'shiladi (Bosqich 5)
+app/google-services.json
+
+app/build/
