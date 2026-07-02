@@ -41,6 +41,11 @@ from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
 from app.models.brand import Brand as BrandModel
 from app.models.location import Location as LocationModel
+from app.models.location_box_placement import (
+    PLACEMENT_SEALED,
+    LocationBoxPlacement as LocationBoxPlacementModel,
+)
+from app.models.product_box import ProductBox as ProductBoxModel
 from app.models.idempotency_key import IdempotencyKey as IdempotencyKeyModel
 from app.models.order import Order as OrderModel
 from app.models.product import Product as ProductModel
@@ -557,6 +562,7 @@ class LocationTransferOut(BaseModel):
     lines_transferred: int
     movements_created: int
     lines_requested: int = 0
+    boxes_transferred: int = 0
 
 
 class BrandZeroStockResponse(BaseModel):
@@ -2365,11 +2371,28 @@ async def transfer_location_stock(
                         }
                     )
 
-        if not transfer_rows:
+        # Q4 (full rejim): "Butun palet" fizik ko'chirilganda undagi yopiq qutilar
+        # ham birga ko'chadi (placement + fizik qoldiq, relocate_sealed_box kabi).
+        sealed_placements: list[tuple[LocationBoxPlacementModel, ProductBoxModel]] = []
+        if payload.mode == "full":
+            sealed_placements = (
+                db.query(LocationBoxPlacementModel, ProductBoxModel)
+                .join(ProductBoxModel, LocationBoxPlacementModel.product_box_id == ProductBoxModel.id)
+                .filter(
+                    LocationBoxPlacementModel.location_id == payload.from_location_id,
+                    LocationBoxPlacementModel.status == PLACEMENT_SEALED,
+                )
+                .order_by(LocationBoxPlacementModel.placed_at.asc())
+                .all()
+            )
+
+        if not transfer_rows and not sealed_placements:
             raise HTTPException(status_code=400, detail="No transfer lines selected")
 
         client_ip = get_client_ip(request)
         movements_created = 0
+        boxes_transferred = 0
+        box_lot_ids: set[UUID] = set()
         try:
             for r in transfer_rows:
                 qty = Decimal(str(r["qty"]))
@@ -2449,17 +2472,82 @@ async def transfer_location_stock(
                 )
                 movements_created += 2
 
-            _verify_non_negative_balances_or_raise(
-                db,
-                [
-                    (r["lot_id"], payload.from_location_id) for r in transfer_rows
-                ] + [
-                    (r["lot_id"], payload.to_location_id) for r in transfer_rows
-                ],
-            )
-            # Faqat loose ko'chgani uchun quti invariant manbada saqlanishi shart.
+            # Yopiq qutilarni ko'chirish (faqat full rejim): har placement uchun
+            # transfer_out/transfer_in juftligi + placement joyi yangilanadi.
+            for placement, box in sealed_placements:
+                lot = db.query(StockLotModel).filter(StockLotModel.id == placement.lot_id).one_or_none()
+                if not lot or lot.product_id != box.product_id:
+                    raise HTTPException(status_code=400, detail="Stock lot not found or mismatch")
+
+                check_location_single_expiry(db, payload.to_location_id, box.product_id, lot.expiry_date)
+                lock_lot_location(db, placement.lot_id, payload.from_location_id)
+                lock_lot_location(db, placement.lot_id, payload.to_location_id)
+
+                upb = Decimal(str(box.units_per_box))
+                mov_out = StockMovementModel(
+                    product_id=box.product_id,
+                    lot_id=placement.lot_id,
+                    location_id=payload.from_location_id,
+                    qty_change=-upb,
+                    movement_type="transfer_out",
+                    created_by_user_id=user.id,
+                )
+                mov_in = StockMovementModel(
+                    product_id=box.product_id,
+                    lot_id=placement.lot_id,
+                    location_id=payload.to_location_id,
+                    qty_change=upb,
+                    movement_type="transfer_in",
+                    created_by_user_id=user.id,
+                )
+                db.add(mov_out)
+                db.add(mov_in)
+                placement.location_id = payload.to_location_id
+                db.flush()
+
+                for mov, loc_id, qty_change in (
+                    (mov_out, payload.from_location_id, -upb),
+                    (mov_in, payload.to_location_id, upb),
+                ):
+                    log_action(
+                        db,
+                        user_id=user.id,
+                        action=ACTION_CREATE,
+                        entity_type="stock_movement",
+                        entity_id=str(mov.id),
+                        new_data={
+                            "product_id": str(box.product_id),
+                            "lot_id": str(placement.lot_id),
+                            "location_id": str(loc_id),
+                            "qty_change": str(qty_change),
+                            "movement_type": mov.movement_type,
+                            "transfer_location_bulk": True,
+                            "transfer_location_box": True,
+                            "box_barcode": box.box_barcode,
+                        },
+                        ip_address=client_ip,
+                    )
+                movements_created += 2
+                boxes_transferred += 1
+                box_lot_ids.add(placement.lot_id)
+
+            affected_pairs = {
+                (r["lot_id"], payload.from_location_id) for r in transfer_rows
+            } | {
+                (r["lot_id"], payload.to_location_id) for r in transfer_rows
+            } | {
+                (lot_id, payload.from_location_id) for lot_id in box_lot_ids
+            } | {
+                (lot_id, payload.to_location_id) for lot_id in box_lot_ids
+            }
+            _verify_non_negative_balances_or_raise(db, list(affected_pairs))
+            # Loose ko'chganda invariant manbada saqlanishi shart; quti ko'chgan
+            # lotlar uchun ikkala tomonda ham tekshiriladi.
             for r in transfer_rows:
                 assert_box_invariant(db, r["lot_id"], payload.from_location_id)
+            for lot_id in box_lot_ids:
+                assert_box_invariant(db, lot_id, payload.from_location_id)
+                assert_box_invariant(db, lot_id, payload.to_location_id)
             db.commit()
         except HTTPException:
             db.rollback()
@@ -2473,6 +2561,7 @@ async def transfer_location_stock(
             lines_transferred=len(transfer_rows),
             movements_created=movements_created,
             lines_requested=lines_requested,
+            boxes_transferred=boxes_transferred,
         )
 
     return _run_with_idempotency(

@@ -352,6 +352,156 @@ def test_transfer_location_loose_only_blocks_boxed_stock(
     assert box_invariant_holds(db_session, lot.id, bin_loc.id)
 
 
+def test_transfer_location_full_moves_sealed_boxes_with_loose(
+    client: TestClient,
+    db_session: Session,
+    admin_user: User,
+    prod: Product,
+    bin_loc: Location,
+) -> None:
+    """Full rejim ("Butun palet"): loose adjust bilan, yopiq qutilar placement+stock bilan ko'chadi."""
+    from app.models.location_box_placement import PLACEMENT_SEALED, LocationBoxPlacement
+    from app.models.product_box import ProductBox
+    from app.services.box_location_service import box_invariant_holds, place_sealed_boxes
+
+    dest = Location(code="FULL-DEST", barcode_value="FULL-DEST", name="Dest", type="bin", is_active=True)
+    db_session.add(dest)
+    lot = _seed_receipt(db_session, prod, bin_loc, qty="30")  # 30 jami
+    box = ProductBox(box_barcode="BOX-FULL-T", product_id=prod.id, units_per_box=12, is_active=True)
+    db_session.add(box)
+    db_session.commit()
+    # 1 yopiq quti (12 dona) -> loose = 18
+    place_sealed_boxes(
+        db_session,
+        box_barcode="BOX-FULL-T",
+        location_id=bin_loc.id,
+        lot_id=lot.id,
+        user=admin_user,
+        box_count=1,
+    )
+    db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: admin_user
+    try:
+        resp = client.post(
+            "/api/v1/inventory/movements/transfer-location",
+            json={
+                "from_location_id": str(bin_loc.id),
+                "to_location_id": str(dest.id),
+                "mode": "full",
+            },
+            headers={"Idempotency-Key": "full-box-1"},
+        )
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    assert resp.status_code == 200, resp.text
+    payload = resp.json()
+    assert payload["lines_transferred"] == 1  # loose qatori
+    assert payload["boxes_transferred"] == 1
+    assert payload["movements_created"] == 4  # loose out/in + quti out/in
+
+    # Placement manzilga ko'chdi
+    placements = (
+        db_session.query(LocationBoxPlacement)
+        .filter(
+            LocationBoxPlacement.product_box_id == box.id,
+            LocationBoxPlacement.status == PLACEMENT_SEALED,
+        )
+        .all()
+    )
+    assert len(placements) == 1
+    assert placements[0].location_id == dest.id
+
+    # Manbada hech narsa qolmadi, manzilda 30 (18 loose + 12 quti)
+    src_total = (
+        db_session.query(StockMovement)
+        .filter(StockMovement.lot_id == lot.id, StockMovement.location_id == bin_loc.id)
+        .all()
+    )
+    assert sum(m.qty_change for m in src_total) == Decimal("0")
+    dest_total = (
+        db_session.query(StockMovement)
+        .filter(StockMovement.lot_id == lot.id, StockMovement.location_id == dest.id)
+        .all()
+    )
+    assert sum(m.qty_change for m in dest_total) == Decimal("30")
+
+    assert box_invariant_holds(db_session, lot.id, bin_loc.id)
+    assert box_invariant_holds(db_session, lot.id, dest.id)
+
+
+def test_transfer_location_full_boxes_only_no_loose(
+    client: TestClient,
+    db_session: Session,
+    admin_user: User,
+    prod: Product,
+    bin_loc: Location,
+) -> None:
+    """Palet to'liq yopiq qutilardan iborat (loose=0): ilgari 400 edi, endi qutilar ko'chadi."""
+    from app.models.location_box_placement import PLACEMENT_SEALED, LocationBoxPlacement
+    from app.models.product_box import ProductBox
+    from app.services.box_location_service import box_invariant_holds, place_sealed_boxes
+
+    dest = Location(code="BOXONLY-DEST", barcode_value="BOXONLY-DEST", name="Dest", type="bin", is_active=True)
+    db_session.add(dest)
+    lot = _seed_receipt(db_session, prod, bin_loc, qty="24")  # 24 jami
+    box = ProductBox(box_barcode="BOX-ONLY-T", product_id=prod.id, units_per_box=12, is_active=True)
+    db_session.add(box)
+    db_session.commit()
+    # 2 yopiq quti (24 dona) -> loose = 0
+    place_sealed_boxes(
+        db_session,
+        box_barcode="BOX-ONLY-T",
+        location_id=bin_loc.id,
+        lot_id=lot.id,
+        user=admin_user,
+        box_count=2,
+    )
+    db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: admin_user
+    try:
+        resp = client.post(
+            "/api/v1/inventory/movements/transfer-location",
+            json={
+                "from_location_id": str(bin_loc.id),
+                "to_location_id": str(dest.id),
+                "mode": "full",
+            },
+            headers={"Idempotency-Key": "full-boxonly-1"},
+        )
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    assert resp.status_code == 200, resp.text
+    payload = resp.json()
+    assert payload["lines_transferred"] == 0
+    assert payload["boxes_transferred"] == 2
+    assert payload["movements_created"] == 4  # 2 quti x (out+in)
+
+    placements = (
+        db_session.query(LocationBoxPlacement)
+        .filter(
+            LocationBoxPlacement.product_box_id == box.id,
+            LocationBoxPlacement.status == PLACEMENT_SEALED,
+        )
+        .all()
+    )
+    assert len(placements) == 2
+    assert all(p.location_id == dest.id for p in placements)
+
+    dest_total = (
+        db_session.query(StockMovement)
+        .filter(StockMovement.lot_id == lot.id, StockMovement.location_id == dest.id)
+        .all()
+    )
+    assert sum(m.qty_change for m in dest_total) == Decimal("24")
+
+    assert box_invariant_holds(db_session, lot.id, bin_loc.id)
+    assert box_invariant_holds(db_session, lot.id, dest.id)
+
+
 def test_zero_brand_stock_resets_only_selected_brand(
     client: TestClient,
     db_session: Session,
