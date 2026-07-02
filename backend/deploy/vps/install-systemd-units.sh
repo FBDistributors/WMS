@@ -10,6 +10,8 @@
 #   WMS_DEPLOY_USER    — linux user (default: www-data)
 #   WMS_PORT           — API port (default: 8000)
 #   WMS_SKIP_WORKER    — 1 bo‘lsa faqat API unit yoziladi
+#   WMS_ENABLE_UZUM_WORKER — 1 bo‘lsa Uzum qoldiq sinxron worker ham o‘rnatiladi
+#                        (api.env da UZUM_API_TOKEN bo‘lishi shart)
 
 set -euo pipefail
 
@@ -21,6 +23,7 @@ WMS_VENV_BIN="${WMS_VENV_BIN:-$WMS_DEPLOY_DIR/.venv/bin}"
 WMS_DEPLOY_USER="${WMS_DEPLOY_USER:-www-data}"
 WMS_PORT="${WMS_PORT:-8000}"
 WMS_SKIP_WORKER="${WMS_SKIP_WORKER:-0}"
+WMS_ENABLE_UZUM_WORKER="${WMS_ENABLE_UZUM_WORKER:-0}"
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Root bilan ishga tushiring: sudo bash $0" >&2
@@ -69,6 +72,10 @@ if [[ "$WMS_SKIP_WORKER" != "1" ]]; then
   substitute "$SCRIPT_DIR/wms-smartup-worker.service.example" /etc/systemd/system/wms-smartup-worker.service
 fi
 
+if [[ "$WMS_ENABLE_UZUM_WORKER" == "1" ]]; then
+  substitute "$SCRIPT_DIR/wms-uzum-worker.service.example" /etc/systemd/system/wms-uzum-worker.service
+fi
+
 mkdir -p /etc/wms
 if [[ ! -f /etc/wms/api.env ]]; then
   echo "# DATABASE_URL=postgresql://..." >/etc/wms/api.env
@@ -83,6 +90,11 @@ systemctl restart wms-api.service
 if [[ "$WMS_SKIP_WORKER" != "1" ]]; then
   systemctl enable wms-smartup-worker.service
   systemctl restart wms-smartup-worker.service
+fi
+
+if [[ "$WMS_ENABLE_UZUM_WORKER" == "1" ]]; then
+  systemctl enable wms-uzum-worker.service
+  systemctl restart wms-uzum-worker.service
 fi
 
 echo ""

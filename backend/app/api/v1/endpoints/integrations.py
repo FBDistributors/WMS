@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import date, datetime
 from typing import Any, Optional
 
@@ -12,6 +13,8 @@ from app.db import get_db
 from app.integrations.smartup.client import SmartupClient
 from app.integrations.smartup.importer import import_orders
 from app.integrations.smartup.sync_lock import smartup_sync_lock
+from app.integrations.uzum.client import UzumSellerClient
+from app.integrations.uzum.stock_sync import run_uzum_stock_sync
 from app.models.smartup_sync import SmartupSyncRun
 
 router = APIRouter()
@@ -126,3 +129,41 @@ async def smartup_order_export_raw(
     response = client.export_orders(filial_code=filial_code)
     orders_json = [o.model_dump(mode="json") for o in response.items]
     return {"order": orders_json, "total": len(orders_json)}
+
+
+@router.get(
+    "/uzum/shops",
+    summary="Uzum token tekshiruvi: do'konlar ro'yxati (GET /v1/shops)",
+    response_model=None,
+)
+async def uzum_shops(
+    _user=Depends(require_permission("integrations:write")),
+) -> dict[str, Any]:
+    """UZUM_API_TOKEN to'g'ri sozlanganini tekshirish uchun — do'konlar ro'yxatini qaytaradi."""
+    try:
+        shops = await asyncio.to_thread(lambda: UzumSellerClient().get_shops())
+        return {"shops": shops, "total": len(shops)}
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.post(
+    "/uzum/stock-sync",
+    summary="Smartup → Uzum qoldiq sinxronizatsiyasi (masking: >= cap → cap, aks holda 0)",
+    response_model=None,
+)
+async def uzum_stock_sync(
+    dry_run: bool = Query(
+        True,
+        description="true = faqat hisobot (Uzumga yuborilmaydi), false = haqiqiy yuborish",
+    ),
+    _user=Depends(require_permission("integrations:write")),
+) -> dict[str, Any]:
+    """
+    Smartup balansini (001 − 002) olib, masking qo'llab Uzum FBS qoldiqlarini yangilaydi.
+    Avval dry_run=true bilan tekshirish tavsiya etiladi.
+    """
+    try:
+        return await asyncio.to_thread(run_uzum_stock_sync, dry_run)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
