@@ -48,6 +48,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
   String _palletDestSearch = '';
   bool _submitting = false;
   String? _productSubmitKey;
+  String? _productSubmitSig;
 
   LocationContentsResponse? _palletContents;
   bool _palletLoading = false;
@@ -56,6 +57,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
   PickerLocationOption? _palletTo;
   bool _palletSubmitting = false;
   String? _palletSubmitKey;
+  String? _palletSubmitSig;
   bool _palletFullTransfer = true;
   final Map<String, bool> _palletSelected = <String, bool>{};
   final Map<String, String> _palletSelectedQty = <String, String>{};
@@ -322,8 +324,14 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
     setState(() => _submitting = true);
     try {
       final repo = ref.read(movementsRepositoryProvider);
-      final String baseKey = _productSubmitKey ?? const Uuid().v4();
-      _productSubmitKey = baseKey;
+      // Payload o'zgarsa yangi Idempotency-Key: eski kalit boshqa payload bilan
+      // yuborilsa backend 409 qaytaradi va retry abadiy bloklanib qoladi.
+      final String sig = '${p.productId}|${from.lotId}|${from.locationId}|${to.id}|$n';
+      if (_productSubmitKey == null || _productSubmitSig != sig) {
+        _productSubmitKey = const Uuid().v4();
+        _productSubmitSig = sig;
+      }
+      final String baseKey = _productSubmitKey!;
       await repo.createStockMovement(
         productId: p.productId,
         lotId: from.lotId,
@@ -358,6 +366,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
           _locationSearch = '';
           _locationSearchCtrl.clear();
           _productSubmitKey = null;
+          _productSubmitSig = null;
           _productError = null;
         });
         _resetRouteScanState();
@@ -425,8 +434,19 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
     }
     setState(() => _palletSubmitting = true);
     try {
-      final String requestKey = _palletSubmitKey ?? const Uuid().v4();
-      _palletSubmitKey = requestKey;
+      // Payload o'zgarsa yangi Idempotency-Key (aks holda backend 409 qaytaradi);
+      // bir xil payload'da retry eski kalit bilan xavfsiz takrorlanadi.
+      final String sig = <String>[
+        c.locationId,
+        to.id,
+        _palletFullTransfer ? 'full' : 'partial',
+        ...lines.map((TransferLocationLineInput l) => '${l.productId}:${l.lotId}:${l.qty}'),
+      ].join('|');
+      if (_palletSubmitKey == null || _palletSubmitSig != sig) {
+        _palletSubmitKey = const Uuid().v4();
+        _palletSubmitSig = sig;
+      }
+      final String requestKey = _palletSubmitKey!;
       await ref.read(movementsRepositoryProvider).transferLocationStock(
             fromLocationId: c.locationId,
             toLocationId: to.id,
@@ -453,6 +473,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
           _palletDestSearch = '';
           _palletDestCtrl.clear();
           _palletSubmitKey = null;
+          _palletSubmitSig = null;
         });
         _resetRouteScanState();
       }

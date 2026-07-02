@@ -12,17 +12,22 @@ class TransferLocationResponse {
     required this.linesTransferred,
     required this.movementsCreated,
     required this.linesRequested,
+    required this.boxesTransferred,
   });
 
   final int linesTransferred;
   final int movementsCreated;
   final int linesRequested;
 
+  /// Full rejimda joy bilan birga ko'chirilgan yopiq qutilar soni.
+  final int boxesTransferred;
+
   factory TransferLocationResponse.fromJson(Map<String, Object?> json) {
     return TransferLocationResponse(
       linesTransferred: _int(json['lines_transferred']),
       movementsCreated: _int(json['movements_created']),
       linesRequested: _int(json['lines_requested']),
+      boxesTransferred: _int(json['boxes_transferred']),
     );
   }
 }

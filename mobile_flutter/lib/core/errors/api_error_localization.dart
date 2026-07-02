@@ -19,6 +19,18 @@ final RegExp _receivingInsufficientStockUz = RegExp(
   r'Qabul qilingan qoldiq yetarli emas \(kerak (\d+), mavjud (\d+)\)',
 );
 
+final RegExp _stockInsufficientAvailable = RegExp(
+  r"Yetarli qoldiq yo'q \(lot\\joy: mavjud ([\d.,]+), so'ralgan ([\d.,]+)\)",
+);
+
+final RegExp _boxInvariantViolated = RegExp(
+  r'Quti invariant buzildi: qutilardagi dona \((\d+)\) fizik qoldiqdan \((\d+)\) oshib ketdi',
+);
+
+final RegExp _movementBoxedLooseOnly = RegExp(
+  r"Qutidagi zaxirani dona qilib ko'chirib bo'lmaydi \(qutisiz mavjud ([\d.,]+)\)",
+);
+
 String _stripExceptionPrefix(String message) {
   const String prefix = 'Exception: ';
   if (message.startsWith(prefix)) {
@@ -133,5 +145,88 @@ String localizeApiErrorMessage(AppLocale loc, Object error) {
     return StringLookup.t(loc, 'receivingLotProductMismatch');
   }
 
+  // --- Ko'chirish (transfer-location) xatolari ---
+  if (raw.contains('No available quantity to transfer')) {
+    return StringLookup.t(loc, 'movementNoAvailableAtSource');
+  }
+
+  if (raw.contains('No transfer lines selected')) {
+    return StringLookup.t(loc, 'movementNothingToTransfer');
+  }
+
+  if (raw.contains('Source and destination locations must differ')) {
+    return StringLookup.t(loc, 'movementSourceDestinationSame');
+  }
+
+  if (raw.contains('Source location not found or inactive')) {
+    return StringLookup.t(loc, 'movementSourceInactive');
+  }
+
+  if (raw.contains('Destination location not found or inactive')) {
+    return StringLookup.t(loc, 'movementDestInactive');
+  }
+
+  if (raw.contains('Lot not available at source location')) {
+    return StringLookup.t(loc, 'movementLotNotAtSource');
+  }
+
+  if (raw.contains('Requested qty exceeds available for lot')) {
+    return StringLookup.t(loc, 'movementQtyExceedsLot');
+  }
+
+  final RegExpMatch? boxedLoose = _movementBoxedLooseOnly.firstMatch(raw);
+  if (boxedLoose != null) {
+    return StringLookup.tParams(
+      loc,
+      'movementBoxedStockLooseOnly',
+      <String, String>{'loose': boxedLoose.group(1)!},
+    );
+  }
+
+  final RegExpMatch? insufficient = _stockInsufficientAvailable.firstMatch(raw);
+  if (insufficient != null) {
+    return StringLookup.tParams(
+      loc,
+      'stockInsufficientAvailable',
+      <String, String>{
+        'available': insufficient.group(1)!,
+        'requested': insufficient.group(2)!,
+      },
+    );
+  }
+
+  final RegExpMatch? invariant = _boxInvariantViolated.firstMatch(raw);
+  if (invariant != null) {
+    return StringLookup.tParams(
+      loc,
+      'boxInvariantViolated',
+      <String, String>{
+        'inBoxes': invariant.group(1)!,
+        'onHand': invariant.group(2)!,
+      },
+    );
+  }
+
+  if (raw.contains('Negative balance detected')) {
+    return StringLookup.t(loc, 'negativeBalanceDetected');
+  }
+
+  if (raw.contains('Idempotency-Key already used with different payload')) {
+    return StringLookup.t(loc, 'idempotencyConflict');
+  }
+
+  if (raw.contains('Duplicate request in progress')) {
+    return StringLookup.t(loc, 'duplicateRequestInProgress');
+  }
+
+  // Tanilmagan xato: sababni yashirmasdan foydalanuvchiga ko'rsatamiz —
+  // aks holda haqiqiy muammo generik xabar ortida ko'rinmay qoladi.
+  if (raw.isNotEmpty) {
+    return StringLookup.tParams(
+      loc,
+      'operationFailedWithReason',
+      <String, String>{'reason': raw},
+    );
+  }
   return StringLookup.t(loc, 'operationFailed');
 }

@@ -192,6 +192,28 @@ abstract final class StringLookup {
     'success': 'Muvaffaqiyat',
     'loadError': 'Yuklash xatosi',
     'operationFailed': 'Amal bajarilmadi. Qayta urinib ko‘ring.',
+    'operationFailedWithReason': 'Amal bajarilmadi: {{reason}}',
+    'movementNoAvailableAtSource':
+        'Manba joyda ko‘chirish uchun mavjud qoldiq yo‘q (rezervda bo‘lishi mumkin).',
+    'movementNothingToTransfer': 'Bu joyda ko‘chiriladigan zaxira topilmadi.',
+    'movementSourceInactive': 'Manba joy topilmadi yoki faol emas.',
+    'movementDestInactive': 'Manzil joy topilmadi yoki faol emas.',
+    'movementLotNotAtSource':
+        'Tanlangan partiya manba joyda mavjud emas. Ro‘yxatni qayta yuklang.',
+    'movementQtyExceedsLot':
+        'So‘ralgan miqdor partiyadagi mavjuddan ko‘p. Ro‘yxatni qayta yuklang.',
+    'movementBoxedStockLooseOnly':
+        'Qutidagi zaxirani dona qilib ko‘chirib bo‘lmaydi (qutisiz mavjud: {{loose}}). Avval qutini ko‘chiring yoki oching.',
+    'stockInsufficientAvailable':
+        'Yetarli qoldiq yo‘q (mavjud {{available}}, so‘ralgan {{requested}}).',
+    'boxInvariantViolated':
+        'Quti hisobida nomuvofiqlik: qutilardagi dona ({{inBoxes}}) fizik qoldiqdan ({{onHand}}) oshiq. Joyni sanoq (count) bilan to‘g‘rilang.',
+    'negativeBalanceDetected':
+        'Amaldan keyin manfiy qoldiq aniqlanib, amal bekor qilindi. Joy qoldig‘ini tekshiring.',
+    'idempotencyConflict':
+        'So‘rov oldingi urinish bilan to‘qnashdi. Ekranni qayta ochib urinib ko‘ring.',
+    'duplicateRequestInProgress':
+        'So‘rov allaqachon bajarilmoqda. Bir oz kutib qayta urinib ko‘ring.',
     'wrongBarcodeTitle': 'Noto‘g‘ri shtrix',
     'wrongBarcodeMessage':
         'Boshqa mahsulotni kiritdingiz yoki noto‘g‘ri shtrix kod. Ushbu qator uchun kutilgan: ',
@@ -617,6 +639,28 @@ abstract final class StringLookup {
     'success': 'Успешно',
     'loadError': 'Ошибка загрузки',
     'operationFailed': 'Не удалось выполнить операцию. Попробуйте снова.',
+    'operationFailedWithReason': 'Не удалось выполнить операцию: {{reason}}',
+    'movementNoAvailableAtSource':
+        'В исходной ячейке нет доступного остатка для перемещения (возможно, зарезервирован).',
+    'movementNothingToTransfer': 'В этой ячейке нет остатка для перемещения.',
+    'movementSourceInactive': 'Исходная ячейка не найдена или неактивна.',
+    'movementDestInactive': 'Целевая ячейка не найдена или неактивна.',
+    'movementLotNotAtSource':
+        'Выбранная партия отсутствует в исходной ячейке. Обновите список.',
+    'movementQtyExceedsLot':
+        'Запрошенное количество больше доступного в партии. Обновите список.',
+    'movementBoxedStockLooseOnly':
+        'Остаток в коробках нельзя переместить поштучно (без коробок доступно: {{loose}}). Сначала переместите или откройте коробку.',
+    'stockInsufficientAvailable':
+        'Недостаточно остатка (доступно {{available}}, запрошено {{requested}}).',
+    'boxInvariantViolated':
+        'Несоответствие учёта коробок: штук в коробках ({{inBoxes}}) больше физического остатка ({{onHand}}). Исправьте ячейку пересчётом (count).',
+    'negativeBalanceDetected':
+        'После операции обнаружен отрицательный остаток — операция отменена. Проверьте остаток ячейки.',
+    'idempotencyConflict':
+        'Запрос конфликтует с предыдущей попыткой. Откройте экран заново и повторите.',
+    'duplicateRequestInProgress':
+        'Запрос уже выполняется. Подождите немного и повторите.',
     'wrongBarcodeTitle': 'Неверный штрихкод',
     'wrongBarcodeMessage':
         'Вы ввели другой товар или неверный штрихкод. Для этой позиции ожидается: ',
@@ -1043,6 +1087,28 @@ abstract final class StringLookup {
     'success': 'Success',
     'loadError': 'Load error',
     'operationFailed': 'Operation failed. Please try again.',
+    'operationFailedWithReason': 'Operation failed: {{reason}}',
+    'movementNoAvailableAtSource':
+        'No available stock to transfer at the source location (it may be reserved).',
+    'movementNothingToTransfer': 'Nothing to transfer at this location.',
+    'movementSourceInactive': 'Source location not found or inactive.',
+    'movementDestInactive': 'Destination location not found or inactive.',
+    'movementLotNotAtSource':
+        'The selected lot is not available at the source location. Reload the list.',
+    'movementQtyExceedsLot':
+        'Requested quantity exceeds the available lot quantity. Reload the list.',
+    'movementBoxedStockLooseOnly':
+        'Boxed stock cannot be moved as loose units (loose available: {{loose}}). Move or open the box first.',
+    'stockInsufficientAvailable':
+        'Not enough available stock (available {{available}}, requested {{requested}}).',
+    'boxInvariantViolated':
+        'Box accounting mismatch: units in boxes ({{inBoxes}}) exceed physical stock ({{onHand}}). Fix the location with a count.',
+    'negativeBalanceDetected':
+        'A negative balance was detected after the operation — it was cancelled. Check the location stock.',
+    'idempotencyConflict':
+        'The request conflicts with a previous attempt. Reopen the screen and try again.',
+    'duplicateRequestInProgress':
+        'The request is already being processed. Wait a moment and try again.',
     'wrongBarcodeTitle': 'Wrong barcode',
     'wrongBarcodeMessage':
         'You entered another product or wrong barcode. Expected for this line: ',

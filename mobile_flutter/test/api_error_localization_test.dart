@@ -25,20 +25,154 @@ void main() {
     expect(ru, contains('коробку'));
   });
 
-  test('localizeApiErrorMessage strips Exception prefix and falls back for unknown', () {
+  test('localizeApiErrorMessage strips Exception prefix and keeps unknown reason visible', () {
     final String msg = localizeApiErrorMessage(
       AppLocale.uz,
       Exception('Some other error'),
     );
-    expect(msg, StringLookup.t(AppLocale.uz, 'operationFailed'));
+    expect(
+      msg,
+      StringLookup.tParams(
+        AppLocale.uz,
+        'operationFailedWithReason',
+        <String, String>{'reason': 'Some other error'},
+      ),
+    );
+    expect(msg, contains('Some other error'));
   });
 
-  test('localizeApiErrorMessage operationFailed in English', () {
+  test('localizeApiErrorMessage unknown reason visible in English', () {
     final String en = localizeApiErrorMessage(
       AppLocale.en,
       Exception('Network timeout'),
     );
-    expect(en, StringLookup.t(AppLocale.en, 'operationFailed'));
+    expect(
+      en,
+      StringLookup.tParams(
+        AppLocale.en,
+        'operationFailedWithReason',
+        <String, String>{'reason': 'Network timeout'},
+      ),
+    );
+  });
+
+  group('transfer-location errors translate to user locale', () {
+    test('no transfer lines selected', () {
+      expect(
+        localizeApiErrorMessage(AppLocale.uz, Exception('No transfer lines selected')),
+        StringLookup.t(AppLocale.uz, 'movementNothingToTransfer'),
+      );
+      expect(
+        localizeApiErrorMessage(AppLocale.ru, Exception('No transfer lines selected')),
+        StringLookup.t(AppLocale.ru, 'movementNothingToTransfer'),
+      );
+    });
+
+    test('no available quantity at source', () {
+      expect(
+        localizeApiErrorMessage(
+          AppLocale.uz,
+          Exception('No available quantity to transfer at the source location'),
+        ),
+        StringLookup.t(AppLocale.uz, 'movementNoAvailableAtSource'),
+      );
+    });
+
+    test('insufficient available with params', () {
+      final String uz = localizeApiErrorMessage(
+        AppLocale.uz,
+        Exception("Yetarli qoldiq yo'q (lot\\joy: mavjud 12, so'ralgan 20)"),
+      );
+      expect(uz, contains('12'));
+      expect(uz, contains('20'));
+      expect(uz, StringLookup.tParams(
+        AppLocale.uz,
+        'stockInsufficientAvailable',
+        <String, String>{'available': '12', 'requested': '20'},
+      ));
+    });
+
+    test('boxed stock loose-only with params', () {
+      final String ru = localizeApiErrorMessage(
+        AppLocale.ru,
+        Exception(
+          "Qutidagi zaxirani dona qilib ko'chirib bo'lmaydi "
+          "(qutisiz mavjud 18). Avval qutini ko'chiring yoki oching.",
+        ),
+      );
+      expect(ru, contains('18'));
+      expect(ru, StringLookup.tParams(
+        AppLocale.ru,
+        'movementBoxedStockLooseOnly',
+        <String, String>{'loose': '18'},
+      ));
+    });
+
+    test('box invariant violated with params', () {
+      final String uz = localizeApiErrorMessage(
+        AppLocale.uz,
+        Exception(
+          'Quti invariant buzildi: qutilardagi dona (24) '
+          'fizik qoldiqdan (12) oshib ketdi',
+        ),
+      );
+      expect(uz, StringLookup.tParams(
+        AppLocale.uz,
+        'boxInvariantViolated',
+        <String, String>{'inBoxes': '24', 'onHand': '12'},
+      ));
+    });
+
+    test('negative balance detected', () {
+      expect(
+        localizeApiErrorMessage(
+          AppLocale.en,
+          Exception('Negative balance detected after operation'),
+        ),
+        StringLookup.t(AppLocale.en, 'negativeBalanceDetected'),
+      );
+    });
+
+    test('idempotency conflict and duplicate in progress', () {
+      expect(
+        localizeApiErrorMessage(
+          AppLocale.uz,
+          Exception('Idempotency-Key already used with different payload'),
+        ),
+        StringLookup.t(AppLocale.uz, 'idempotencyConflict'),
+      );
+      expect(
+        localizeApiErrorMessage(
+          AppLocale.uz,
+          Exception('Duplicate request in progress. Try again.'),
+        ),
+        StringLookup.t(AppLocale.uz, 'duplicateRequestInProgress'),
+      );
+    });
+
+    test('source/destination inactive and same-location', () {
+      expect(
+        localizeApiErrorMessage(
+          AppLocale.uz,
+          Exception('Source location not found or inactive'),
+        ),
+        StringLookup.t(AppLocale.uz, 'movementSourceInactive'),
+      );
+      expect(
+        localizeApiErrorMessage(
+          AppLocale.uz,
+          Exception('Destination location not found or inactive'),
+        ),
+        StringLookup.t(AppLocale.uz, 'movementDestInactive'),
+      );
+      expect(
+        localizeApiErrorMessage(
+          AppLocale.uz,
+          Exception('Source and destination locations must differ'),
+        ),
+        StringLookup.t(AppLocale.uz, 'movementSourceDestinationSame'),
+      );
+    });
   });
 
   test('localizeApiErrorMessage maps box_count required for box scan', () {
