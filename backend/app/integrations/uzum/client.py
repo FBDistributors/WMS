@@ -25,6 +25,10 @@ MAX_DETAIL_LEN = 300
 # POST /v2/fbs/sku/stocks bitta so'rovda yuboriladigan maksimal SKU soni
 STOCK_UPDATE_BATCH_SIZE = 100
 
+# Rate limit (HTTP 429) da kutish va so'rovlar orasidagi pauza
+RATE_LIMIT_SLEEP_SEC = 15
+REQUEST_PACING_SEC = 0.5
+
 
 class UzumApiError(RuntimeError):
     def __init__(self, message: str, status: int | None = None) -> None:
@@ -54,6 +58,7 @@ class UzumSellerClient:
 
         last_error: Exception | None = None
         last_detail: str | None = None
+        rate_limited = False
         for attempt in range(1, MAX_ATTEMPTS + 1):
             request = urllib.request.Request(url, data=data, headers=headers, method=method)
             try:
@@ -62,6 +67,7 @@ class UzumSellerClient:
                 return json.loads(raw) if raw else {}
             except urllib.error.HTTPError as exc:
                 last_error = exc
+                rate_limited = exc.code == 429
                 try:
                     last_detail = exc.read().decode("utf-8")
                 except Exception:
@@ -71,8 +77,9 @@ class UzumSellerClient:
                     method, path, attempt, MAX_ATTEMPTS, exc.code,
                     (last_detail or "")[:MAX_DETAIL_LEN],
                 )
-                # 4xx — takrorlash foydasiz (auth/validatsiya), darhol xato
-                if 400 <= exc.code < 500:
+                # 4xx — takrorlash foydasiz (auth/validatsiya), darhol xato.
+                # 429 (rate limit) bundan mustasno: kutib qayta urinamiz.
+                if 400 <= exc.code < 500 and exc.code != 429:
                     hint = " UZUM_API_TOKEN ni tekshiring." if exc.code in (401, 403) else ""
                     raise UzumApiError(
                         f"Uzum API {method} {path} failed (HTTP {exc.code}): "
@@ -86,7 +93,10 @@ class UzumSellerClient:
                     method, path, attempt, MAX_ATTEMPTS, exc,
                 )
             if attempt < MAX_ATTEMPTS:
-                time.sleep(BACKOFF_BASE_SEC ** attempt)
+                delay = BACKOFF_BASE_SEC ** attempt
+                if rate_limited:
+                    delay = max(delay, RATE_LIMIT_SLEEP_SEC)
+                time.sleep(delay)
 
         detail = f": {(last_detail or str(last_error))[:MAX_DETAIL_LEN]}" if (last_detail or last_error) else ""
         raise UzumApiError(
@@ -134,6 +144,7 @@ class UzumSellerClient:
 
         def send_or_split(items: list[dict[str, Any]]) -> None:
             try:
+                time.sleep(REQUEST_PACING_SEC)  # rate limit'ga urilmaslik uchun pauza
                 resp = self._request("POST", "/v2/fbs/sku/stocks", body={"skuAmountList": items})
             except UzumApiError as exc:
                 if exc.status == 400 and len(items) > 1:
