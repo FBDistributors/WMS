@@ -26,6 +26,12 @@ MAX_DETAIL_LEN = 300
 STOCK_UPDATE_BATCH_SIZE = 100
 
 
+class UzumApiError(RuntimeError):
+    def __init__(self, message: str, status: int | None = None) -> None:
+        super().__init__(message)
+        self.status = status
+
+
 class UzumSellerClient:
     def __init__(self, base_url: str | None = None, token: str | None = None) -> None:
         self.base_url = (base_url or os.getenv("UZUM_API_BASE_URL") or DEFAULT_BASE_URL).strip().rstrip("/")
@@ -68,9 +74,10 @@ class UzumSellerClient:
                 # 4xx — takrorlash foydasiz (auth/validatsiya), darhol xato
                 if 400 <= exc.code < 500:
                     hint = " UZUM_API_TOKEN ni tekshiring." if exc.code in (401, 403) else ""
-                    raise RuntimeError(
+                    raise UzumApiError(
                         f"Uzum API {method} {path} failed (HTTP {exc.code}): "
-                        f"{(last_detail or '')[:MAX_DETAIL_LEN]}{hint}"
+                        f"{(last_detail or '')[:MAX_DETAIL_LEN]}{hint}",
+                        status=exc.code,
                     ) from exc
             except (urllib.error.URLError, OSError, ConnectionError) as exc:
                 last_error = exc
@@ -82,7 +89,9 @@ class UzumSellerClient:
                 time.sleep(BACKOFF_BASE_SEC ** attempt)
 
         detail = f": {(last_detail or str(last_error))[:MAX_DETAIL_LEN]}" if (last_detail or last_error) else ""
-        raise RuntimeError(f"Uzum API {method} {path} failed after {MAX_ATTEMPTS} attempts{detail}") from last_error
+        raise UzumApiError(
+            f"Uzum API {method} {path} failed after {MAX_ATTEMPTS} attempts{detail}"
+        ) from last_error
 
     def get_shops(self) -> list[dict[str, Any]]:
         """GET /v1/shops — do'konlar ro'yxati. Token to'g'riligini tekshirish uchun ham qulay."""
@@ -111,12 +120,34 @@ class UzumSellerClient:
                 raise RuntimeError("Uzum SKU stocks pagination exceeded 1000 pages")
         return items
 
-    def update_fbs_sku_stocks(self, sku_amount_list: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """POST /v2/fbs/sku/stocks — {barcode, amount} ro'yxatini batch'lab yuboradi."""
+    def update_fbs_sku_stocks(
+        self, sku_amount_list: list[dict[str, Any]]
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """POST /v2/fbs/sku/stocks — {barcode, amount} ro'yxatini batch'lab yuboradi.
+
+        Uzum validatsiyasi (HTTP 400) butun paketni rad etadi; bunda paket ikkiga
+        bo'linib qayta yuboriladi — yaroqsiz SKU lar ajratilib, qolganlari o'tadi.
+        Qaytaradi: (muvaffaqiyatli javoblar, yiqilgan elementlar [{barcode, error}]).
+        """
         results: list[dict[str, Any]] = []
-        for i in range(0, len(sku_amount_list), STOCK_UPDATE_BATCH_SIZE):
-            chunk = sku_amount_list[i : i + STOCK_UPDATE_BATCH_SIZE]
-            resp = self._request("POST", "/v2/fbs/sku/stocks", body={"skuAmountList": chunk})
+        failed: list[dict[str, Any]] = []
+
+        def send_or_split(items: list[dict[str, Any]]) -> None:
+            try:
+                resp = self._request("POST", "/v2/fbs/sku/stocks", body={"skuAmountList": items})
+            except UzumApiError as exc:
+                if exc.status == 400 and len(items) > 1:
+                    mid = len(items) // 2
+                    send_or_split(items[:mid])
+                    send_or_split(items[mid:])
+                    return
+                if exc.status == 400:
+                    failed.append({"barcode": items[0].get("barcode"), "error": str(exc)[:MAX_DETAIL_LEN]})
+                    return
+                raise
             payload = resp.get("payload") or {}
             results.extend(payload.get("skuAmountList") or [])
-        return results
+
+        for i in range(0, len(sku_amount_list), STOCK_UPDATE_BATCH_SIZE):
+            send_or_split(sku_amount_list[i : i + STOCK_UPDATE_BATCH_SIZE])
+        return results, failed

@@ -145,7 +145,12 @@ def run_uzum_stock_sync(dry_run: bool = False) -> dict[str, Any]:
 
     updates: list[dict[str, Any]] = []
     unmatched_uzum: list[str] = []
+    skipped_unlinked = 0
     for barcode, sku in uzum_by_barcode.items():
+        # FBS/DBS sxemasiga ulanmagan SKU ni yangilab bo'lmaydi (Uzum 400 qaytaradi)
+        if sku.get("fbsLinked") is False and sku.get("dbsLinked") is False:
+            skipped_unlinked += 1
+            continue
         if barcode in desired_by_barcode:
             desired = desired_by_barcode[barcode]
             current = sku.get("amount")
@@ -167,9 +172,12 @@ def run_uzum_stock_sync(dry_run: bool = False) -> dict[str, Any]:
         "matched": matched,
         "unmatched_uzum_barcodes": unmatched_uzum[:50],
         "unmatched_uzum_count": len(unmatched_uzum),
+        "skipped_unlinked": skipped_unlinked,
         "updates_needed": len(updates),
         "updates": updates[:200],
         "sent": 0,
+        "failed_count": 0,
+        "failed": [],
     }
 
     if dry_run or not updates:
@@ -179,11 +187,18 @@ def run_uzum_stock_sync(dry_run: bool = False) -> dict[str, Any]:
         )
         return summary
 
-    # 6. Yuborish
-    client.update_fbs_sku_stocks(updates)
-    summary["sent"] = len(updates)
+    # 6. Yuborish (validatsiyadan o'tmagan SKU lar ajratiladi, qolganlari yuboriladi)
+    _, failed = client.update_fbs_sku_stocks(updates)
+    summary["sent"] = len(updates) - len(failed)
+    summary["failed_count"] = len(failed)
+    summary["failed"] = failed[:50]
+    if failed:
+        logger.warning(
+            "Uzum stock sync: %d SKU validatsiyadan o'tmadi (birinchisi: %s)",
+            len(failed), failed[0],
+        )
     logger.info(
-        "Uzum stock sync: sent=%d matched=%d unmatched_uzum=%d cap=%d",
-        len(updates), matched, len(unmatched_uzum), cap,
+        "Uzum stock sync: sent=%d failed=%d matched=%d unmatched_uzum=%d skipped_unlinked=%d cap=%d",
+        summary["sent"], len(failed), matched, len(unmatched_uzum), skipped_unlinked, cap,
     )
     return summary

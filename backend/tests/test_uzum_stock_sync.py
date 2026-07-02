@@ -44,7 +44,7 @@ class _FakeUzumClient:
 
     def update_fbs_sku_stocks(self, items):
         type(self).sent.extend(items)
-        return items
+        return items, []
 
 
 class _FakeSession:
@@ -113,3 +113,45 @@ def test_sync_aborts_when_smartup_balance_empty(monkeypatch):
     with pytest.raises(RuntimeError):
         run_uzum_stock_sync(dry_run=False)
     assert _FakeUzumClient.sent == []
+
+
+def test_sync_skips_unlinked_skus(monkeypatch):
+    _setup_sync(
+        monkeypatch,
+        stock=[{"product_code": "A", "quantity": 100}],
+        reserved=[],
+        barcodes={"A": ["111"]},
+        uzum_skus=[
+            # FBS/DBS ga ulanmagan → yuborilmaydi (Uzum 400 qaytarardi)
+            {"barcode": "111", "amount": 5, "fbsLinked": False, "dbsLinked": False},
+        ],
+    )
+    summary = run_uzum_stock_sync(dry_run=False)
+    assert _FakeUzumClient.sent == []
+    assert summary["skipped_unlinked"] == 1
+    assert summary["updates_needed"] == 0
+
+
+def test_client_isolates_invalid_skus_on_400(monkeypatch):
+    """Paket 400 olsa ikkiga bo'linib yuboriladi — yaroqsiz SKU ajratiladi, qolgani o'tadi."""
+    from app.integrations.uzum.client import UzumApiError, UzumSellerClient
+
+    client = UzumSellerClient(token="test-token")
+    bad_barcodes = {"222"}
+
+    def fake_request(method, path, query=None, body=None):
+        items = body["skuAmountList"]
+        if any(i["barcode"] in bad_barcodes for i in items):
+            raise UzumApiError("Validation failed", status=400)
+        return {"payload": {"skuAmountList": items}}
+
+    monkeypatch.setattr(client, "_request", fake_request)
+    ok, failed = client.update_fbs_sku_stocks(
+        [
+            {"barcode": "111", "amount": 30},
+            {"barcode": "222", "amount": 0},
+            {"barcode": "333", "amount": 30},
+        ]
+    )
+    assert {i["barcode"] for i in ok} == {"111", "333"}
+    assert [f["barcode"] for f in failed] == ["222"]
