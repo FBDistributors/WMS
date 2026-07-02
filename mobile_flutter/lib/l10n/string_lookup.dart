@@ -204,6 +204,8 @@ abstract final class StringLookup {
         'So‘ralgan miqdor partiyadagi mavjuddan ko‘p. Ro‘yxatni qayta yuklang.',
     'movementBoxedStockLooseOnly':
         'Qutidagi zaxirani dona qilib ko‘chirib bo‘lmaydi (qutisiz mavjud: {{loose}}). Avval qutini ko‘chiring yoki oching.',
+    'movementReservedAtSource':
+        'Bu joyda {{reserved}} dona rezervda (terish uchun band). Paletni ko‘chirish uchun avval terish yakunlanishi yoki rezerv bekor qilinishi kerak.',
     'stockInsufficientAvailable':
         'Yetarli qoldiq yo‘q (mavjud {{available}}, so‘ralgan {{requested}}).',
     'boxInvariantViolated':
@@ -651,6 +653,8 @@ abstract final class StringLookup {
         'Запрошенное количество больше доступного в партии. Обновите список.',
     'movementBoxedStockLooseOnly':
         'Остаток в коробках нельзя переместить поштучно (без коробок доступно: {{loose}}). Сначала переместите или откройте коробку.',
+    'movementReservedAtSource':
+        'В этой ячейке {{reserved}} шт. в резерве (занято под сборку). Чтобы переместить паллету, дождитесь завершения сборки или снимите резерв.',
     'stockInsufficientAvailable':
         'Недостаточно остатка (доступно {{available}}, запрошено {{requested}}).',
     'boxInvariantViolated':
@@ -1099,6 +1103,8 @@ abstract final class StringLookup {
         'Requested quantity exceeds the available lot quantity. Reload the list.',
     'movementBoxedStockLooseOnly':
         'Boxed stock cannot be moved as loose units (loose available: {{loose}}). Move or open the box first.',
+    'movementReservedAtSource':
+        'This location has {{reserved}} units reserved for picking. Finish or cancel the picking before moving the whole pallet.',
     'stockInsufficientAvailable':
         'Not enough available stock (available {{available}}, requested {{requested}}).',
     'boxInvariantViolated':

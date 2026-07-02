@@ -502,6 +502,81 @@ def test_transfer_location_full_boxes_only_no_loose(
     assert box_invariant_holds(db_session, lot.id, dest.id)
 
 
+def test_transfer_location_full_blocked_when_boxes_and_reserve(
+    client: TestClient,
+    db_session: Session,
+    admin_user: User,
+    prod: Product,
+    bin_loc: Location,
+) -> None:
+    """Lotda rezerv + yopiq quti bo'lsa full ko'chirish aniq sabab bilan bloklanadi."""
+    from app.models.location_box_placement import PLACEMENT_SEALED, LocationBoxPlacement
+    from app.models.product_box import ProductBox
+    from app.services.box_location_service import place_sealed_boxes
+
+    dest = Location(code="RESV-DEST", barcode_value="RESV-DEST", name="Dest", type="bin", is_active=True)
+    db_session.add(dest)
+    lot = _seed_receipt(db_session, prod, bin_loc, qty="30")  # 30 jami
+    box = ProductBox(box_barcode="BOX-RESV-T", product_id=prod.id, units_per_box=12, is_active=True)
+    db_session.add(box)
+    db_session.commit()
+    # 1 yopiq quti (12 dona) -> loose 18
+    place_sealed_boxes(
+        db_session,
+        box_barcode="BOX-RESV-T",
+        location_id=bin_loc.id,
+        lot_id=lot.id,
+        user=admin_user,
+        box_count=1,
+    )
+    # 5 dona rezerv (terish uchun band)
+    db_session.add(
+        StockMovement(
+            product_id=prod.id,
+            lot_id=lot.id,
+            location_id=bin_loc.id,
+            qty_change=Decimal("5"),
+            movement_type="allocate",
+        )
+    )
+    db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: admin_user
+    try:
+        resp = client.post(
+            "/api/v1/inventory/movements/transfer-location",
+            json={
+                "from_location_id": str(bin_loc.id),
+                "to_location_id": str(dest.id),
+                "mode": "full",
+            },
+            headers={"Idempotency-Key": "full-resv-1"},
+        )
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    assert resp.status_code == 409, resp.text
+    assert "rezerv" in resp.json()["detail"]
+    assert "5" in resp.json()["detail"]
+
+    # Hech narsa ko'chmagan: placement manbada, manzilda movement yo'q
+    placement = (
+        db_session.query(LocationBoxPlacement)
+        .filter(
+            LocationBoxPlacement.product_box_id == box.id,
+            LocationBoxPlacement.status == PLACEMENT_SEALED,
+        )
+        .one()
+    )
+    assert placement.location_id == bin_loc.id
+    dest_movs = (
+        db_session.query(StockMovement)
+        .filter(StockMovement.lot_id == lot.id, StockMovement.location_id == dest.id)
+        .count()
+    )
+    assert dest_movs == 0
+
+
 def test_zero_brand_stock_resets_only_selected_brand(
     client: TestClient,
     db_session: Session,

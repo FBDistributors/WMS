@@ -2386,6 +2386,29 @@ async def transfer_location_stock(
                 .all()
             )
 
+        # Oldindan tekshiruv: quti ko'chadigan har bir lot uchun (1) drift bo'lsa
+        # sanoqqa yo'naltiruvchi aniq xabar, (2) rezerv bo'lsa — palet to'liq
+        # ko'chirilsa manbada available manfiy bo'ladi, shuning uchun aniq sabab
+        # bilan bloklanadi (aks holda oxirida umumiy "Negative balance" chiqardi).
+        checked_box_lots: set[UUID] = set()
+        for placement, _box in sealed_placements:
+            if placement.lot_id in checked_box_lots:
+                continue
+            checked_box_lots.add(placement.lot_id)
+            assert_box_invariant(db, placement.lot_id, payload.from_location_id)
+            _oh, reserved_at_src, _av = compute_lot_location_balances(
+                db, placement.lot_id, payload.from_location_id
+            )
+            if reserved_at_src > 0:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"Joyda rezervdagi (terish uchun band) zaxira bor: {int(reserved_at_src)} dona. "
+                        "Palet to'liq ko'chirilishi uchun avval terish yakunlanishi "
+                        "yoki rezerv bekor qilinishi kerak."
+                    ),
+                )
+
         if not transfer_rows and not sealed_placements:
             raise HTTPException(status_code=400, detail="No transfer lines selected")
 

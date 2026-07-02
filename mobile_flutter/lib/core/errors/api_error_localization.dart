@@ -31,6 +31,10 @@ final RegExp _movementBoxedLooseOnly = RegExp(
   r"Qutidagi zaxirani dona qilib ko'chirib bo'lmaydi \(qutisiz mavjud ([\d.,]+)\)",
 );
 
+final RegExp _movementReservedAtSource = RegExp(
+  r'Joyda rezervdagi \(terish uchun band\) zaxira bor: (\d+) dona',
+);
+
 String _stripExceptionPrefix(String message) {
   const String prefix = 'Exception: ';
   if (message.startsWith(prefix)) {
@@ -172,6 +176,15 @@ String localizeApiErrorMessage(AppLocale loc, Object error) {
 
   if (raw.contains('Requested qty exceeds available for lot')) {
     return StringLookup.t(loc, 'movementQtyExceedsLot');
+  }
+
+  final RegExpMatch? reservedAtSource = _movementReservedAtSource.firstMatch(raw);
+  if (reservedAtSource != null) {
+    return StringLookup.tParams(
+      loc,
+      'movementReservedAtSource',
+      <String, String>{'reserved': reservedAtSource.group(1)!},
+    );
   }
 
   final RegExpMatch? boxedLoose = _movementBoxedLooseOnly.firstMatch(raw);
