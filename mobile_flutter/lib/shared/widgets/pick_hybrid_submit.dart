@@ -469,6 +469,23 @@ Future<HybridScanApplyResult> applyHybridBoxScan({
   return (unitsPerBox: newUpb, routedToBox: true);
 }
 
+/// Skanlangan kod mahsulotning o'z dona kodi (barcode/SKU) bilan mos kelsa true.
+/// Quti kodi mahsulot kodi bilan to'qnashganda "Mahsulot skan" kontekstida
+/// dona talqini ustun bo'lishi uchun ishlatiladi (forceProduct bilan birga).
+bool scanMatchesProductUnit(String raw, {String? barcode, String? sku}) {
+  final String q = raw.trim().toLowerCase();
+  if (q.isEmpty) {
+    return false;
+  }
+  if (barcode != null && barcode.trim().toLowerCase() == q) {
+    return true;
+  }
+  if (sku != null && sku.trim().toLowerCase() == q) {
+    return true;
+  }
+  return false;
+}
+
 Future<HybridScanApplyResult> applyHybridProductScan({
   required ScannerRepository scanner,
   required String raw,

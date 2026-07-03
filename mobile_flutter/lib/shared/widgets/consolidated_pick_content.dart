@@ -312,6 +312,12 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
           maxUnits: rem,
           stockBoxCount: locationAltHint.boxCount,
           stockLooseUnits: locationAltHint.looseUnits,
+          // Kod mahsulotning dona kodi bilan to'qnashsa — dona skan.
+          forceProduct: scanMatchesProductUnit(
+            raw,
+            barcode: product.barcode,
+            sku: product.sku,
+          ),
         );
         unitsPerBox = scanRes.unitsPerBox ?? unitsPerBox;
       } on Object {
@@ -510,6 +516,12 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                           maxUnits: rem,
                           stockBoxCount: locationAltHint.boxCount,
                           stockLooseUnits: locationAltHint.looseUnits,
+                          // Kod mahsulotning dona kodi bilan to'qnashsa — dona skan.
+                          forceProduct: scanMatchesProductUnit(
+                            code,
+                            barcode: product.barcode,
+                            sku: product.sku,
+                          ),
                         );
                         setM(() {
                           if (result.unitsPerBox != null) {
@@ -559,6 +571,12 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                             maxUnits: rem,
                             stockBoxCount: locationAltHint.boxCount,
                             stockLooseUnits: locationAltHint.looseUnits,
+                            // Kod mahsulotning dona kodi bilan to'qnashsa — dona skan.
+                            forceProduct: scanMatchesProductUnit(
+                              code,
+                              barcode: product.barcode,
+                              sku: product.sku,
+                            ),
                           );
                           setM(() {
                             if (result.unitsPerBox != null) {

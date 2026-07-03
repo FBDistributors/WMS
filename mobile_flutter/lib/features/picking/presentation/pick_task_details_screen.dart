@@ -1135,6 +1135,11 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                 unitsPerBox: hybridUnitsPerBox,
                                 maxUnits: aggPicked,
                                 bumpCount: false,
+                                // Kod shu qatorning dona kodi bilan to'qnashsa — dona.
+                                forceProduct: barcodeMatchesPickLine(
+                                  code,
+                                  pickTargetHolder[0],
+                                ),
                               );
                               setM(() {
                                 if (result.unitsPerBox != null) {
@@ -1199,6 +1204,11 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                   unitsPerBox: hybridUnitsPerBox,
                                   maxUnits: aggPicked,
                                   bumpCount: false,
+                                  // Kod shu qatorning dona kodi bilan to'qnashsa — dona.
+                                  forceProduct: barcodeMatchesPickLine(
+                                    code,
+                                    pickTargetHolder[0],
+                                  ),
                                 );
                                 setM(() {
                                   if (result.unitsPerBox != null) {
@@ -1378,6 +1388,11 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                 pickTargetHolder[0].qtyPicked,
                             stockBoxCount: activeLocationHint.boxCount,
                             stockLooseUnits: activeLocationHint.looseUnits,
+                            // Kod shu qatorning dona kodi bilan to'qnashsa — dona.
+                            forceProduct: barcodeMatchesPickLine(
+                              code,
+                              pickTargetHolder[0],
+                            ),
                           );
                           setM(() {
                             if (result.unitsPerBox != null) {
@@ -1429,6 +1444,11 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                   pickTargetHolder[0].qtyPicked,
                               stockBoxCount: activeLocationHint.boxCount,
                               stockLooseUnits: activeLocationHint.looseUnits,
+                              // Kod shu qatorning dona kodi bilan to'qnashsa — dona.
+                              forceProduct: barcodeMatchesPickLine(
+                                code,
+                                pickTargetHolder[0],
+                              ),
                             );
                             setM(() {
                               if (result.unitsPerBox != null) {

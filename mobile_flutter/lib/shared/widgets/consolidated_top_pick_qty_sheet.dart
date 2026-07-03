@@ -137,6 +137,12 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
         maxUnits: rem,
         stockBoxCount: locationAltHint.boxCount,
         stockLooseUnits: locationAltHint.looseUnits,
+        // Kod mahsulotning dona kodi bilan to'qnashsa — dona skan.
+        forceProduct: scanMatchesProductUnit(
+          raw,
+          barcode: widget.product.barcode,
+          sku: widget.product.sku,
+        ),
       );
       if (!mounted) {
         return;
@@ -230,6 +236,12 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
       maxUnits: rem,
       stockBoxCount: locationAltHint.boxCount,
       stockLooseUnits: locationAltHint.looseUnits,
+      // Kod mahsulotning dona kodi bilan to'qnashsa — dona skan.
+      forceProduct: scanMatchesProductUnit(
+        code,
+        barcode: widget.product.barcode,
+        sku: widget.product.sku,
+      ),
     );
     if (!mounted) {
       return;
@@ -468,6 +480,12 @@ class _ConsolidatedTopPickQtySheetState extends ConsumerState<_ConsolidatedTopPi
                   maxUnits: rem,
                   stockBoxCount: locationAltHint.boxCount,
                   stockLooseUnits: locationAltHint.looseUnits,
+                  // Kod mahsulotning dona kodi bilan to'qnashsa — dona skan.
+                  forceProduct: scanMatchesProductUnit(
+                    code,
+                    barcode: widget.product.barcode,
+                    sku: widget.product.sku,
+                  ),
                 );
                 if (!mounted) {
                   return;

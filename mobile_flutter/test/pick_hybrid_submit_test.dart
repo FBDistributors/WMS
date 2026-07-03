@@ -8,6 +8,23 @@ import 'package:mobile_flutter/shared/widgets/pick_box_qty_fields.dart';
 import 'package:mobile_flutter/shared/widgets/pick_hybrid_submit.dart';
 
 void main() {
+  test('scanMatchesProductUnit matches barcode or SKU, rejects others', () {
+    expect(
+      scanMatchesProductUnit('4630310730890', barcode: '4630310730890', sku: 'ES0068'),
+      isTrue,
+    );
+    expect(
+      scanMatchesProductUnit(' es0068 ', barcode: '4630310730890', sku: 'ES0068'),
+      isTrue,
+    );
+    expect(
+      scanMatchesProductUnit('14630310730890', barcode: '4630310730890', sku: 'ES0068'),
+      isFalse,
+    );
+    expect(scanMatchesProductUnit('', barcode: '4630310730890', sku: 'ES0068'), isFalse);
+    expect(scanMatchesProductUnit('4630310730890'), isFalse);
+  });
+
   test('submitHybridPick uses combined pick for box and loose', () async {
     final PickHybridQty hybrid = computePickHybridQty(
       boxCount: 2,
