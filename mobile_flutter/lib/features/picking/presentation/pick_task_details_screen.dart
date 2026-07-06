@@ -2197,15 +2197,21 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                     if (isPickerList) {
                       final PickingLine line = orderedPickerLinesList[i];
                       final bool lineComplete = pickingLineEffectivelyDone(line);
-                      final Color cardBg = lineComplete
-                          ? Colors.green.withValues(alpha: isDark ? 0.20 : 0.14)
-                          : cs.surfaceContainerHighest.withValues(alpha: 0.35);
-                      final IconData leadingIcon = lineComplete
-                          ? Icons.check_circle_rounded
-                          : Icons.inventory_2_rounded;
-                      final Color iconColor = lineComplete
-                          ? Colors.green.shade700
-                          : cs.primary;
+                      final Color cardBg = line.isVipExpiryInformational
+                          ? Colors.amber.withValues(alpha: isDark ? 0.22 : 0.30)
+                          : lineComplete
+                              ? Colors.green.withValues(alpha: isDark ? 0.20 : 0.14)
+                              : cs.surfaceContainerHighest.withValues(alpha: 0.35);
+                      final IconData leadingIcon = line.isVipExpiryInformational
+                          ? Icons.info_rounded
+                          : lineComplete
+                              ? Icons.check_circle_rounded
+                              : Icons.inventory_2_rounded;
+                      final Color iconColor = line.isVipExpiryInformational
+                          ? Colors.amber.shade800
+                          : lineComplete
+                              ? Colors.green.shade700
+                              : cs.primary;
                       return Material(
                         color: cardBg,
                         borderRadius: BorderRadius.circular(12),
@@ -2301,16 +2307,24 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                     final bool lineComplete = pickLineGroupEffectivelyDone(g);
                     final bool useGreenCard = groupVerified;
                     final bool controllerIncomplete = !lineComplete;
-                    final Color cardBg = useGreenCard
-                        ? Colors.green.withValues(alpha: isDark ? 0.20 : 0.14)
-                        : controllerIncomplete
-                            ? (isDark
-                                ? Colors.red.withValues(alpha: 0.16)
-                                : const Color(0xFFFFEBEE))
-                            : cs.surfaceContainerHighest.withValues(alpha: 0.35);
+                    // VIP-muddat ma'lumot qatori: yig'ilmaydi — kartaning o'zida
+                    // ajralib tursin (modal ochmasdan ko'rinishi uchun).
+                    final bool vipInfoOnly = g.virtual.isVipExpiryInformational;
+                    final Color cardBg = vipInfoOnly
+                        ? Colors.amber.withValues(alpha: isDark ? 0.22 : 0.30)
+                        : useGreenCard
+                            ? Colors.green.withValues(alpha: isDark ? 0.20 : 0.14)
+                            : controllerIncomplete
+                                ? (isDark
+                                    ? Colors.red.withValues(alpha: 0.16)
+                                    : const Color(0xFFFFEBEE))
+                                : cs.surfaceContainerHighest.withValues(alpha: 0.35);
                     final IconData leadingIcon;
                     final Color iconColor;
-                    if (groupVerified) {
+                    if (vipInfoOnly) {
+                      leadingIcon = Icons.info_rounded;
+                      iconColor = Colors.amber.shade800;
+                    } else if (groupVerified) {
                       leadingIcon = Icons.verified_rounded;
                       iconColor = Colors.green.shade700;
                     } else if (lineComplete) {
@@ -2358,6 +2372,25 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                                 loc,
                                                 _lineSourceBadgeKey(g.virtual)!,
                                               ),
+                                            ),
+                                            visualDensity: VisualDensity.compact,
+                                            padding: EdgeInsets.zero,
+                                            materialTapTargetSize:
+                                                MaterialTapTargetSize.shrinkWrap,
+                                          ),
+                                        if (g.virtual.isVipExpiryInformational)
+                                          Chip(
+                                            label: Text(
+                                              StringLookup.t(loc, 'vipExpiryInfoBadge'),
+                                              style: TextStyle(
+                                                color: Colors.amber.shade900,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            backgroundColor: Colors.amber
+                                                .withValues(alpha: isDark ? 0.35 : 0.45),
+                                            side: BorderSide(
+                                              color: Colors.amber.shade800,
                                             ),
                                             visualDensity: VisualDensity.compact,
                                             padding: EdgeInsets.zero,
