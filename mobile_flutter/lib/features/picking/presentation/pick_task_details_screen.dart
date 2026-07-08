@@ -304,6 +304,47 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     return true;
   }
 
+  /// Terish (picker) varag'ida skan qilingan kod aynan shu qatorga tegishlimi.
+  /// Onlayn resolve orqali mahsulot ID bo'yicha (quti ham, dona ham), oflaynda
+  /// dona/SKU kodi bo'yicha tekshiradi. Tegishli bo'lmasa "noto'g'ri shtrix"
+  /// to'sig'ini ko'rsatadi va false qaytaradi (chaqiruvchi skanni qo'llamaydi).
+  Future<bool> _ensurePickerScanMatchesLine({
+    required BuildContext ctx,
+    required String code,
+    required PickingLine line,
+  }) async {
+    final String normalized = code.trim();
+    if (normalized.isEmpty) {
+      return false;
+    }
+    bool belongs;
+    try {
+      final ScannerResolveOut out =
+          await ref.read(scannerRepositoryProvider).resolveBarcode(normalized);
+      if (out.type == ScannerResolveType.product &&
+          out.productId != null &&
+          out.productId!.trim().isNotEmpty) {
+        belongs = productIdMatchesPickLine(out.productId!, line);
+      } else {
+        belongs = barcodeMatchesPickLine(normalized, line);
+      }
+    } on Object {
+      // Oflayn yoki resolve xatosi — mahalliy dona/SKU tekshiruvi.
+      belongs = barcodeMatchesPickLine(normalized, line);
+    }
+    if (belongs) {
+      return true;
+    }
+    if (ctx.mounted) {
+      _showControllerBarcodeError(
+        ctx,
+        '${StringLookup.t(ref.read(appLocaleProvider), 'wrongBarcodeMessage')}'
+        '${pickLineExpectedBarcodeLabel(line) ?? ''}',
+      );
+    }
+    return false;
+  }
+
   Future<void> _runPickTaskRouteScanWorkflow({
     required String sb,
     required String? lineId,
@@ -1356,6 +1397,14 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                         }),
                         onProductBarcodeChanged: () => setM(() {}),
                         onBoxBarcodeSubmitted: (String code) async {
+                          if (!await _ensurePickerScanMatchesLine(
+                            ctx: ctx,
+                            code: code,
+                            line: pickTargetHolder[0],
+                          )) {
+                            setM(() => hybridBoxBarcode.clear());
+                            return;
+                          }
                           final HybridScanApplyResult result = await applyHybridBoxScan(
                             scanner: ref.read(scannerRepositoryProvider),
                             raw: code,
@@ -1375,6 +1424,14 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                           });
                         },
                         onProductBarcodeSubmitted: (String code) async {
+                          if (!await _ensurePickerScanMatchesLine(
+                            ctx: ctx,
+                            code: code,
+                            line: pickTargetHolder[0],
+                          )) {
+                            setM(() => hybridProductBarcode.clear());
+                            return;
+                          }
                           final HybridScanApplyResult result =
                               await applyHybridProductScan(
                             scanner: ref.read(scannerRepositoryProvider),
@@ -1406,6 +1463,13 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                             if (code == null) {
                               return;
                             }
+                            if (!await _ensurePickerScanMatchesLine(
+                              ctx: ctx,
+                              code: code,
+                              line: pickTargetHolder[0],
+                            )) {
+                              return;
+                            }
                             final HybridScanApplyResult result = await applyHybridBoxScan(
                               scanner: ref.read(scannerRepositoryProvider),
                               raw: code,
@@ -1429,6 +1493,13 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                           unawaited(() async {
                             final String? code = await launchHybridRawBarcodeScan(context);
                             if (code == null) {
+                              return;
+                            }
+                            if (!await _ensurePickerScanMatchesLine(
+                              ctx: ctx,
+                              code: code,
+                              line: pickTargetHolder[0],
+                            )) {
                               return;
                             }
                             final HybridScanApplyResult result =
