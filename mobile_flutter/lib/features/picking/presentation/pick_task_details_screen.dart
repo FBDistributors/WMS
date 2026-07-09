@@ -51,6 +51,30 @@ double _aggregateQtyRequired(Iterable<PickingLine> lines) {
 
 String _barcodeSkuSubtitle(PickingLine l) => '${l.barcode ?? '—'} / ${l.sku ?? '—'}';
 
+/// Skip sabab kodini foydalanuvchi tiliga o'giradi (`reason_<code>`); noma'lum
+/// kod xom holida qaytariladi.
+String localizedSkipReason(AppLocale loc, String? code) {
+  final String c = (code ?? '').trim();
+  if (c.isEmpty) {
+    return '';
+  }
+  if (kIncompleteReasonKeys.contains(c)) {
+    return StringLookup.t(loc, 'reason_$c');
+  }
+  return c;
+}
+
+/// Guruhdagi (controller kartasi) skip qilingan qatorning sababi.
+String? _groupSkipReason(PickLineGroup g) {
+  for (final PickingLine l in g.members) {
+    final String? r = l.skipReason;
+    if (r != null && r.trim().isNotEmpty && l.qtyPicked < l.qtyRequired) {
+      return r;
+    }
+  }
+  return null;
+}
+
 PickLineGroup _pickLineGroupForLine(PickingDocument doc, PickingLine line) {
   for (final PickLineGroup g in groupLinesByProduct(doc.lines)) {
     if (g.members.any((PickingLine l) => l.id == line.id)) {
@@ -2268,21 +2292,32 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                     if (isPickerList) {
                       final PickingLine line = orderedPickerLinesList[i];
                       final bool lineComplete = pickingLineEffectivelyDone(line);
+                      // Sabab bilan skip qilingan (terilmagan/nuqsonli) qator —
+                      // och qizil fon, ko'zга yumshoq.
+                      final bool skipped = !line.isVipExpiryInformational &&
+                          lineHasSkipReason(line) &&
+                          line.qtyPicked < line.qtyRequired;
                       final Color cardBg = line.isVipExpiryInformational
                           ? Colors.amber.withValues(alpha: isDark ? 0.22 : 0.30)
-                          : lineComplete
-                              ? Colors.green.withValues(alpha: isDark ? 0.20 : 0.14)
-                              : cs.surfaceContainerHighest.withValues(alpha: 0.35);
+                          : skipped
+                              ? Colors.red.withValues(alpha: isDark ? 0.16 : 0.09)
+                              : lineComplete
+                                  ? Colors.green.withValues(alpha: isDark ? 0.20 : 0.14)
+                                  : cs.surfaceContainerHighest.withValues(alpha: 0.35);
                       final IconData leadingIcon = line.isVipExpiryInformational
                           ? Icons.info_rounded
-                          : lineComplete
-                              ? Icons.check_circle_rounded
-                              : Icons.inventory_2_rounded;
+                          : skipped
+                              ? Icons.flag_rounded
+                              : lineComplete
+                                  ? Icons.check_circle_rounded
+                                  : Icons.inventory_2_rounded;
                       final Color iconColor = line.isVipExpiryInformational
                           ? Colors.amber.shade800
-                          : lineComplete
-                              ? Colors.green.shade700
-                              : cs.primary;
+                          : skipped
+                              ? Colors.red.shade400
+                              : lineComplete
+                                  ? Colors.green.shade700
+                                  : cs.primary;
                       return Material(
                         color: cardBg,
                         borderRadius: BorderRadius.circular(12),
@@ -2355,11 +2390,26 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                         maxLines: 4,
                                         overflow: TextOverflow.ellipsis,
                                       ),
+                                      if (skipped) ...<Widget>[
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '${StringLookup.t(loc, 'incompleteReasonLabel')} '
+                                          '${localizedSkipReason(loc, line.skipReason)}',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.red.shade600,
+                                          ),
+                                          maxLines: 3,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
                                     ],
                                   ),
                                 ),
                                 if ((ref.watch(networkOnlineProvider).valueOrNull ?? true) &&
-                                    !lineComplete)
+                                    !line.isVipExpiryInformational &&
+                                    line.qtyPicked < line.qtyRequired)
                                   IconButton(
                                     icon: const Icon(Icons.flag_rounded),
                                     tooltip: StringLookup.t(loc, 'lineReasonModalTitle'),
@@ -2381,15 +2431,25 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                     // VIP-muddat ma'lumot qatori: yig'ilmaydi — kartaning o'zida
                     // ajralib tursin (modal ochmasdan ko'rinishi uchun).
                     final bool vipInfoOnly = g.virtual.isVipExpiryInformational;
+                    // Sabab bilan skip qilingan guruh: terilmagan, lekin "hal
+                    // qilingan" (sabab bor) — och qizil, controller ham ko'radi.
+                    final bool groupSkipped = !vipInfoOnly &&
+                        lineComplete &&
+                        g.members.any((PickingLine l) =>
+                            lineHasSkipReason(l) && l.qtyPicked < l.qtyRequired);
                     final Color cardBg = vipInfoOnly
                         ? Colors.amber.withValues(alpha: isDark ? 0.22 : 0.30)
-                        : useGreenCard
+                        : groupVerified
                             ? Colors.green.withValues(alpha: isDark ? 0.20 : 0.14)
-                            : controllerIncomplete
+                            : groupSkipped
                                 ? (isDark
                                     ? Colors.red.withValues(alpha: 0.16)
                                     : const Color(0xFFFFEBEE))
-                                : cs.surfaceContainerHighest.withValues(alpha: 0.35);
+                                : controllerIncomplete
+                                    ? (isDark
+                                        ? Colors.red.withValues(alpha: 0.16)
+                                        : const Color(0xFFFFEBEE))
+                                    : cs.surfaceContainerHighest.withValues(alpha: 0.35);
                     final IconData leadingIcon;
                     final Color iconColor;
                     if (vipInfoOnly) {
@@ -2398,6 +2458,9 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                     } else if (groupVerified) {
                       leadingIcon = Icons.verified_rounded;
                       iconColor = Colors.green.shade700;
+                    } else if (groupSkipped) {
+                      leadingIcon = Icons.flag_rounded;
+                      iconColor = Colors.red.shade400;
                     } else if (lineComplete) {
                       leadingIcon = Icons.check_circle_outline_rounded;
                       iconColor = cs.primary;
@@ -2481,7 +2544,7 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                     ),
-                                    const SizedBox(height: 4),
+                    const SizedBox(height: 4),
                                     Text(
                                       groupLocationQtyLine(g),
                                       style: TextStyle(
@@ -2491,6 +2554,20 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                       maxLines: 4,
                                       overflow: TextOverflow.ellipsis,
                                     ),
+                                    if (groupSkipped) ...<Widget>[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '${StringLookup.t(loc, 'incompleteReasonLabel')} '
+                                        '${localizedSkipReason(loc, _groupSkipReason(g))}',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                          color: Colors.red.shade600,
+                                        ),
+                                        maxLines: 3,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),

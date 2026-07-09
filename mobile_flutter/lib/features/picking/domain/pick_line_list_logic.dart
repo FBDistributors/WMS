@@ -9,8 +9,19 @@ class PickLineGroup {
   final List<PickingLine> members;
 }
 
+/// Qator "hal qilingan" — terilgan yoki VIP-info yoki sabab bilan skip qilingan.
+/// Sabab bilan skip qilingan qator ham bajarilgan hisoblanadi, shuning uchun
+/// controllerga yuborishda qayta sabab so'ralmaydi.
 bool pickingLineEffectivelyDone(PickingLine l) =>
-    l.isVipExpiryInformational || l.qtyPicked >= l.qtyRequired;
+    l.isVipExpiryInformational ||
+    l.qtyPicked >= l.qtyRequired ||
+    lineHasSkipReason(l);
+
+/// Qatorда sabab bilan skip belgisi bormi (terilmagan/nuqsonli deb belgilangan).
+bool lineHasSkipReason(PickingLine l) {
+  final String? r = l.skipReason;
+  return r != null && r.trim().isNotEmpty;
+}
 
 bool pickLineGroupEffectivelyDone(PickLineGroup g) =>
     g.members.every(pickingLineEffectivelyDone);

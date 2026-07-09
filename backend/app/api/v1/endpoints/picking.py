@@ -833,7 +833,9 @@ def _to_picking_list_item(doc: DocumentModel) -> PickingListItem:
     lines_done = sum(
         1
         for line in doc.lines
-        if _line_is_vip_expiry_informational(line) or line.picked_qty >= line.required_qty
+        if _line_is_vip_expiry_informational(line)
+        or line.picked_qty >= line.required_qty
+        or bool(getattr(line, "skip_reason", None))
     )
     picked_any = any(
         (not _line_is_vip_expiry_informational(line)) and line.picked_qty > 0 for line in doc.lines
@@ -880,6 +882,8 @@ def _refresh_document_status(doc: DocumentModel, lines: List[DocumentLineModel])
 
     def _line_satisfied(ln: DocumentLineModel) -> bool:
         if _line_is_vip_expiry_informational(ln):
+            return True
+        if getattr(ln, "skip_reason", None):
             return True
         return ln.picked_qty >= ln.required_qty
 
@@ -2494,30 +2498,34 @@ async def skip_line(
             status_code=409,
             detail="Buyurtma bekor qilinmoqda: avval terilganlarni joyiga qaytaring.",
         )
-    if line.picked_qty <= 0:
-        raise HTTPException(status_code=400, detail="Line has no picked qty to skip")
-
-    if not line.product_id or not line.lot_id or not line.location_id:
+    if _line_is_vip_expiry_informational(line):
         raise HTTPException(
-            status_code=400,
-            detail="Line missing product/lot/location",
+            status_code=409,
+            detail="VIP muddat: bu qator faqat ma'lumot uchun, skip qilinmaydi",
         )
 
-    qty_to_reverse = Decimal(str(line.picked_qty))
-
-    line.picked_qty = 0
-    line.picked_box_barcode = None
+    # Terilmagan qatorga ham sabab qo'yish mumkin (nuqsonli/yo'q mahsulotni
+    # termasdan belgilash). Faqat terilgan bo'lsa stock/rezerv tiklanadi.
+    qty_to_reverse = Decimal(str(line.picked_qty or 0))
     line.skip_reason = reason
-    # Stock+rezerv tiklash + butun-quti pick'larini yopiq qaytarish + invariant.
-    record_pick_rollback(
-        db,
-        product_id=line.product_id,
-        lot_id=line.lot_id,
-        location_id=line.location_id,
-        qty=qty_to_reverse,
-        document_id=document.id,
-        created_by_user_id=user.id,
-    )
+    if qty_to_reverse > 0:
+        if not line.product_id or not line.lot_id or not line.location_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Line missing product/lot/location",
+            )
+        line.picked_qty = 0
+        line.picked_box_barcode = None
+        # Stock+rezerv tiklash + butun-quti pick'larini yopiq qaytarish + invariant.
+        record_pick_rollback(
+            db,
+            product_id=line.product_id,
+            lot_id=line.lot_id,
+            location_id=line.location_id,
+            qty=qty_to_reverse,
+            document_id=document.id,
+            created_by_user_id=user.id,
+        )
 
     lines = (
         db.query(DocumentLineModel)
@@ -2587,20 +2595,31 @@ async def complete_picking_document(
         )
         order_map = {lid: i for i, lid in enumerate(ordered_ids)}
         lines = sorted(lines_locked, key=lambda L: order_map[L.id])
-    incomplete = [
-        line.id
+    # Sababsiz qolgan terilmagan qatorlar (VIP-info va allaqachon skip_reason
+    # qo'yilganlar hisobga olinmaydi — ular "hal qilingan"). Faqat shu qatorlar
+    # uchun bir marta umumiy sabab so'raladi.
+    incomplete_lines = [
+        line
         for line in lines
-        if not _line_is_vip_expiry_informational(line) and line.picked_qty < line.required_qty
+        if not _line_is_vip_expiry_informational(line)
+        and not getattr(line, "skip_reason", None)
+        and line.picked_qty < line.required_qty
     ]
+    incomplete = [line.id for line in incomplete_lines]
     incomplete_reason = (body or CompletePickingRequest()).incomplete_reason if body else None
     # Faqat yig'uvchi to'liq yig'maganda sabab talab qilinadi; controller allaqachon sabab bilan yuborilgan hujjatni yakunlaydi
     if incomplete and user.role != "inventory_controller":
         if not incomplete_reason or incomplete_reason not in INCOMPLETE_REASON_CODES:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail={"message": "Incomplete lines", "lines": incomplete},
+                detail={"message": "Incomplete lines", "lines": [str(x) for x in incomplete]},
             )
         document.incomplete_reason = incomplete_reason
+        # Bir marta berilgan sabab qolgan har bir sababsiz qatorga tarqatiladi —
+        # shunda har qator "sabab bilan" (qizil) bo'ladi va controllerga
+        # yuborishda qayta sabab so'ralmaydi.
+        for line in incomplete_lines:
+            line.skip_reason = incomplete_reason
 
     if user.role == "inventory_controller":
         if document.controlled_by_user_id != user.id:
