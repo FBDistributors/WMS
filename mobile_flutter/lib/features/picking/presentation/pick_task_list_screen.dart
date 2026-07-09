@@ -21,14 +21,29 @@ import '../domain/profile_type_param.dart';
 import '../picking_providers.dart';
 import '../../feedback/presentation/app_feedback_sheet.dart';
 
-bool _pickerEligibleBulkSend(PickingListItem item, PickerProfileParam profile) {
-  return profile == PickerProfileParam.picker &&
-      item.pickedAny &&
-      item.controlledByUserId == null;
-}
-
 bool _isFullyPickedLines(PickingListItem d) =>
     d.linesTotal > 0 && d.linesDone >= d.linesTotal;
+
+/// Yig'uvchi hujjatni controllerga yuborishi mumkinmi.
+///
+/// Oddiy holat: kamida bitta oddiy qator terilgan (`pickedAny`).
+/// VIP-muddat holati: hamma qator faqat ma'lumot (yig'ilmaydi) bo'lsa hech narsa
+/// terilmaydi (`pickedAny == false`), lekin buyurtma to'liq "bajarilgan" va
+/// "picked" holatda — u ham controllerga yuborilishi kerak, aks holda yig'uvchida
+/// qotib qoladi. Yarim terilgan (hali "picked" bo'lmagan) buyurtma yuborilmaydi.
+bool pickerCanSendToController(PickingListItem item, PickerProfileParam profile) {
+  if (profile != PickerProfileParam.picker) {
+    return false;
+  }
+  if (item.controlledByUserId != null) {
+    return false;
+  }
+  return item.pickedAny ||
+      (_isFullyPickedLines(item) && item.status == 'picked');
+}
+
+bool _pickerEligibleBulkSend(PickingListItem item, PickerProfileParam profile) =>
+    pickerCanSendToController(item, profile);
 
 class PickTaskListScreen extends ConsumerStatefulWidget {
   const PickTaskListScreen({super.key});
@@ -1008,9 +1023,7 @@ class _TaskCard extends StatelessWidget {
     final bool fully = item.linesTotal > 0 && item.linesDone >= item.linesTotal;
     final bool useGreenListStyle =
         profile != PickerProfileParam.controller && fully;
-    final bool showSend = profile == PickerProfileParam.picker &&
-        item.pickedAny &&
-        item.controlledByUserId == null;
+    final bool showSend = pickerCanSendToController(item, profile);
     final ColorScheme cs = Theme.of(context).colorScheme;
     final Color greenBg = isDark ? const Color(0xFF14532D) : const Color(0xFFDCFCE7);
     final Color greenBorder = isDark ? const Color(0xFF22C55E) : const Color(0xFF16A34A);
