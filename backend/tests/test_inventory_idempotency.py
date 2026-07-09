@@ -577,6 +577,84 @@ def test_transfer_location_full_blocked_when_boxes_and_reserve(
     assert dest_movs == 0
 
 
+def test_zero_brand_stock_removes_sealed_boxes(
+    client: TestClient,
+    db_session: Session,
+    admin_user: User,
+    bin_loc: Location,
+) -> None:
+    """Brend qoldig'ini nolga tushirganda sealed quti yozuvlari ham tozalanadi (fantom yo'q)."""
+    from app.models.location_box_placement import PLACEMENT_SEALED, LocationBoxPlacement
+    from app.models.product_box import ProductBox
+    from app.services.box_location_service import box_invariant_holds, place_sealed_boxes
+
+    brand = Brand(code="BZBOX", name="Brand box", is_active=True)
+    db_session.add(brand)
+    db_session.commit()
+    db_session.refresh(brand)
+
+    product = Product(
+        external_source="test",
+        external_id="brand-box-1",
+        name="Brand box product",
+        sku="SKU-BRAND-BOX-1",
+        is_active=True,
+        brand_id=brand.id,
+    )
+    db_session.add(product)
+    db_session.commit()
+    db_session.refresh(product)
+
+    lot = StockLot(product_id=product.id, batch="BRAND-BOX-BATCH", expiry_date=None)
+    db_session.add(lot)
+    db_session.flush()
+    db_session.add(
+        StockMovement(
+            product_id=product.id,
+            lot_id=lot.id,
+            location_id=bin_loc.id,
+            qty_change=Decimal("24"),
+            movement_type="receipt",
+        )
+    )
+    box = ProductBox(box_barcode="BOX-BRANDZERO", product_id=product.id, units_per_box=12, is_active=True)
+    db_session.add(box)
+    db_session.commit()
+    # 2 yopiq quti (24 dona) -> loose 0
+    place_sealed_boxes(
+        db_session,
+        box_barcode="BOX-BRANDZERO",
+        location_id=bin_loc.id,
+        lot_id=lot.id,
+        user=admin_user,
+        box_count=2,
+    )
+    db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: admin_user
+    try:
+        resp = client.post(f"/api/v1/inventory/brands/{brand.id}/zero-stock")
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    assert resp.status_code == 200, resp.text
+    payload = resp.json()
+    assert payload["boxes_removed"] == 2
+
+    sealed_remaining = (
+        db_session.query(LocationBoxPlacement)
+        .filter(
+            LocationBoxPlacement.lot_id == lot.id,
+            LocationBoxPlacement.location_id == bin_loc.id,
+            LocationBoxPlacement.status == PLACEMENT_SEALED,
+        )
+        .count()
+    )
+    assert sealed_remaining == 0
+    # Invariant saqlanadi (fantom quti yo'q)
+    assert box_invariant_holds(db_session, lot.id, bin_loc.id)
+
+
 def test_zero_brand_stock_resets_only_selected_brand(
     client: TestClient,
     db_session: Session,

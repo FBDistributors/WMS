@@ -645,6 +645,42 @@ def remove_sealed_box(
     )
 
 
+def remove_all_sealed_at(
+    db: Session,
+    *,
+    lot_id: UUID,
+    location_id: UUID,
+    user: UserModel,
+    reason: str,
+) -> int:
+    """Lot/joydagi barcha SEALED quti joylashuvini 'removed' holatiga o'tkazadi.
+
+    Qaytaradi: o'chirilgan quti soni. Stock (total)ni O'ZGARTIRMAYDI — chaqiruvchi
+    qoldiqni allaqachon to'g'rilagan bo'lishi kerak (masalan zero-stock adjust'i).
+    Qoldiq nolga tushirilganda quti yozuvlari qolib fantom (invariant buzilishi)
+    bo'lmasligi uchun ishlatiladi.
+    """
+    placements = (
+        db.query(LocationBoxPlacement)
+        .filter(
+            LocationBoxPlacement.lot_id == lot_id,
+            LocationBoxPlacement.location_id == location_id,
+            LocationBoxPlacement.status == PLACEMENT_SEALED,
+        )
+        .all()
+    )
+    if not placements:
+        return 0
+    now = datetime.now(timezone.utc)
+    for p in placements:
+        p.status = PLACEMENT_REMOVED
+        p.removed_at = now
+        p.removed_by_user_id = user.id
+        p.remove_reason = reason
+    db.flush()
+    return len(placements)
+
+
 def relocate_sealed_box(
     db: Session,
     *,

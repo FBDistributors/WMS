@@ -25,6 +25,7 @@ from app.services.box_location_service import (
     assert_box_invariant,
     get_breakdown_tolerant,
     product_box_summary_map,
+    remove_all_sealed_at,
     units_in_boxes_at,
 )
 from app.services.stock_availability import (
@@ -574,6 +575,7 @@ class BrandZeroStockResponse(BaseModel):
     reserve_lots_affected: int
     movements_created: int
     skipped: int = 0
+    boxes_removed: int = 0
 
 
 class MainZeroStockResponse(BaseModel):
@@ -586,6 +588,7 @@ class MainZeroStockResponse(BaseModel):
     reserve_lots_affected: int
     movements_created: int
     skipped: int = 0
+    boxes_removed: int = 0
 
 
 class StockBalanceOut(BaseModel):
@@ -2687,6 +2690,7 @@ async def zero_brand_stock(
         stock_movements_created = 0
         reserve_movements_created = 0
         skipped = 0
+        boxes_removed = 0
         touched_rows: list[tuple[UUID, UUID]] = []
         try:
             for row in rows:
@@ -2738,6 +2742,17 @@ async def zero_brand_stock(
                         ip_address=client_ip,
                     )
                     stock_movements_created += 1
+                    # Qoldiq nolga tushirilganda quti yozuvlari ham tozalanadi —
+                    # aks holda units_in_boxes > on_hand bo'lib fantom quti (drift)
+                    # qoladi. Invariant bilan tasdiqlanadi.
+                    boxes_removed += remove_all_sealed_at(
+                        db,
+                        lot_id=row.lot_id,
+                        location_id=row.location_id,
+                        user=user,
+                        reason="bulk_brand_zero",
+                    )
+                    assert_box_invariant(db, row.lot_id, row.location_id)
                 if do_reserve:
                     reserve_lot_ids.add(row.lot_id)
                     movement = StockMovementModel(
@@ -2788,6 +2803,7 @@ async def zero_brand_stock(
             reserve_lots_affected=len(reserve_lot_ids),
             movements_created=movements_created,
             skipped=skipped,
+            boxes_removed=boxes_removed,
         )
 
     return _run_with_idempotency(
@@ -2894,6 +2910,7 @@ async def zero_main_stock(
         stock_movements_created = 0
         reserve_movements_created = 0
         skipped = 0
+        boxes_removed = 0
         touched_rows: list[tuple[UUID, UUID]] = []
         try:
             for row in rows:
@@ -2944,6 +2961,16 @@ async def zero_main_stock(
                         ip_address=client_ip,
                     )
                     stock_movements_created += 1
+                    # Qoldiq nolga tushirilganda quti yozuvlari ham tozalanadi
+                    # (fantom quti/drift oldini olish), invariant bilan tasdiqlanadi.
+                    boxes_removed += remove_all_sealed_at(
+                        db,
+                        lot_id=row.lot_id,
+                        location_id=row.location_id,
+                        user=user,
+                        reason="bulk_main_zero",
+                    )
+                    assert_box_invariant(db, row.lot_id, row.location_id)
                 if do_reserve:
                     reserve_lot_ids.add(row.lot_id)
                     reserve_movement = StockMovementModel(
@@ -2993,6 +3020,7 @@ async def zero_main_stock(
             reserve_lots_affected=len(reserve_lot_ids),
             movements_created=movements_created,
             skipped=skipped,
+            boxes_removed=boxes_removed,
         )
 
     return _run_with_idempotency(
