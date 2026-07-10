@@ -242,6 +242,24 @@ class PickingRepository {
     }
   }
 
+  /// Controller tekshirishда qatorni sabab bilan belgilaydi (stock sababga qarab
+  /// joyiga qaytadi yoki brak/muddat zonasiga ko'chadi).
+  Future<PickLineResponse> controllerFlagLine(String lineId, String reason) async {
+    try {
+      final Response<Object?> res = await _dio.post<Object?>(
+        '$_p/lines/$lineId/controller-flag',
+        data: <String, String>{'reason': reason.trim()},
+      );
+      final Object? data = res.data;
+      if (data is! Map) {
+        throw const FormatException('controller-flag');
+      }
+      return PickLineResponse.fromJson(Map<String, Object?>.from(data));
+    } on DioException catch (e) {
+      throw Exception(mapDioExceptionToMessage(e));
+    }
+  }
+
   Future<PickLineResponse> unpickLine(
     String lineId, {
     required int delta,

@@ -164,6 +164,9 @@ abstract final class StringLookup {
     'consolidatedNoOpenLinesForSwitch':
         'Barcha pozitsiyalar terilgan — manbani almashtirish uchun ochiq qator yo‘q',
     'lineReasonModalTitle': 'Pozitsiyani sabab bilan bekor qilish',
+    'controllerFlagLineTitle': 'Mahsulotni sabab bilan belgilash',
+    'controllerFlagLineHint':
+        'Nuqsonli/muddati o‘tgan — brak yoki muddat zonasiga; boshqa sabab — joyiga qaytadi.',
     'unpickActionTitle': 'Qisman qaytarish',
     'unpickReasonTitle': 'Terilgan miqdorni qaytarish',
     'unpickQtyLabel': 'Qaytariladigan miqdor',
@@ -615,6 +618,9 @@ abstract final class StringLookup {
     'consolidatedNoOpenLinesForSwitch':
         'Все позиции собраны — нечего переназначать',
     'lineReasonModalTitle': 'Отменить позицию с указанием причины',
+    'controllerFlagLineTitle': 'Отметить товар с причиной',
+    'controllerFlagLineHint':
+        'Брак/просрочка — в зону брака или просрочки; иная причина — возврат на место.',
     'unpickActionTitle': 'Частичный возврат',
     'unpickReasonTitle': 'Вернуть собранное количество',
     'unpickQtyLabel': 'Количество к возврату',
@@ -1066,6 +1072,9 @@ abstract final class StringLookup {
     'consolidatedNoOpenLinesForSwitch':
         'All lines are complete — nothing to reassign',
     'lineReasonModalTitle': 'Skip position with reason',
+    'controllerFlagLineTitle': 'Flag item with a reason',
+    'controllerFlagLineHint':
+        'Damaged/expired — to the damaged or expired zone; other reason — returns to its location.',
     'unpickActionTitle': 'Partial rollback',
     'unpickReasonTitle': 'Rollback picked quantity',
     'unpickQtyLabel': 'Rollback quantity',

@@ -1934,6 +1934,78 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
     );
   }
 
+  /// Controller tekshirishда guruhni sabab bilan belgilaydi. Sababga qarab
+  /// stock joyiga qaytadi yoki brak/muddat zonasiga ko'chadi (backend hal qiladi).
+  Future<void> _showControllerFlagSheet(PickLineGroup g) async {
+    final AppLocale loc = ref.read(appLocaleProvider);
+    final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
+    if (!online) {
+      showAppSnackBar(
+        context,
+        SnackBar(content: Text(StringLookup.t(loc, 'reportReasonOffline'))),
+      );
+      return;
+    }
+    final List<PickingLine> picked = g.members
+        .where((PickingLine l) => l.qtyPicked > 0)
+        .toList();
+    if (picked.isEmpty) {
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (BuildContext ctx) {
+        String? sel;
+        return StatefulBuilder(
+          builder: (BuildContext context, void Function(void Function()) setM) {
+            return Padding(
+              padding: EdgeInsets.only(bottom: sheetBottomPadding(context)),
+              child: _ReasonListSheet(
+                loc: loc,
+                title: StringLookup.t(loc, 'controllerFlagLineTitle'),
+                hint: StringLookup.t(loc, 'controllerFlagLineHint'),
+                productName: g.virtual.productName,
+                selected: sel,
+                onSelect: (String? v) => setM(() => sel = v),
+                onConfirm: () async {
+                  final String? r = sel;
+                  if (r == null) {
+                    return;
+                  }
+                  try {
+                    PickLineResponse? last;
+                    for (final PickingLine l in picked) {
+                      last = await ref
+                          .read(pickingRepositoryProvider)
+                          .controllerFlagLine(l.id, r);
+                    }
+                    if (last != null) {
+                      await ref
+                          .read(pickTaskDetailProvider(widget.taskId).notifier)
+                          .applyPickLineResponse(widget.taskId, last);
+                    }
+                    // Guruhning boshqa a'zolari uchun ham holatni yangilash.
+                    ref.invalidate(pickTaskDetailProvider(widget.taskId));
+                    if (ctx.mounted) {
+                      Navigator.of(ctx).pop();
+                    }
+                  } on Exception catch (e) {
+                    if (mounted) {
+                      _rejectScanHaptic();
+                      showAppSnackBar(context, SnackBar(content: Text(localizeApiErrorMessage(ref.read(appLocaleProvider), e))));
+                    }
+                  }
+                },
+                onCancel: () => Navigator.of(ctx).pop(),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _showUnpickSheet(PickingLine line) async {
     final AppLocale loc = ref.read(appLocaleProvider);
     final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
@@ -2571,6 +2643,17 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                   ],
                                 ),
                               ),
+                              if (profile == PickerProfileParam.controller &&
+                                  d.status == 'picked' &&
+                                  (ref.watch(networkOnlineProvider).valueOrNull ?? true) &&
+                                  !vipInfoOnly &&
+                                  !groupSkipped &&
+                                  g.members.any((PickingLine l) => l.qtyPicked > 0))
+                                IconButton(
+                                  icon: const Icon(Icons.flag_rounded),
+                                  tooltip: StringLookup.t(loc, 'controllerFlagLineTitle'),
+                                  onPressed: () => _showControllerFlagSheet(g),
+                                ),
                             ],
                           ),
                         ),

@@ -37,6 +37,7 @@ from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_
 from app.services.box_location_service import (
     apply_hybrid_pick_side_effects,
     apply_scan_pick_side_effects,
+    assert_box_invariant,
     breakdown_kwargs_for_pick,
     compute_consolidated_box_loose_plan,
     consolidated_remainders_by_document,
@@ -44,6 +45,7 @@ from app.services.box_location_service import (
     require_sufficient_loose_for_unit_pick,
     validate_hybrid_pick_qty,
 )
+from app.services.stock_availability import lock_lot_location
 from app.services.stock_box_gateway import record_pick, record_pick_rollback
 from app.services.product_scan_resolve import (
     ProductScanResolve,
@@ -2542,6 +2544,158 @@ async def skip_line(
     )
     db.refresh(document)
 
+    return PickLineResponse(
+        line=_to_picking_line(line),
+        progress=_calculate_progress(lines_after),
+        document_status=document.status,
+    )
+
+
+# Controller tekshirishда qatorni sabab bilan belgilaganда stock qayerga ketadi.
+# Nuqsonli -> brak zonaga, muddati o'tган -> muddat zonasiga; qolgani joyiga qaytadi.
+_CONTROLLER_FLAG_ZONE_BY_REASON = {"damaged": "DAMAGED", "expired": "EXPIRED"}
+
+
+def _resolve_default_zone_location(
+    db: Session, source_location_id, zone_type: str
+) -> Optional[LocationModel]:
+    """Manba joyning ombori (warehouse_id) bo'yicha standart DAMAGED/EXPIRED joy.
+    Bir nechta bo'lsa kod bo'yicha birinchisi. Topilmasa None."""
+    src = db.get(LocationModel, source_location_id)
+    wh_id = getattr(src, "warehouse_id", None) if src else None
+    q = db.query(LocationModel).filter(
+        LocationModel.zone_type == zone_type,
+        LocationModel.is_active.is_(True),
+    )
+    if wh_id is not None:
+        q = q.filter(LocationModel.warehouse_id == wh_id)
+    return q.order_by(LocationModel.code.asc()).first()
+
+
+class ControllerFlagLineRequest(BaseModel):
+    reason: str
+
+
+@router.post(
+    "/lines/{line_id}/controller-flag",
+    response_model=PickLineResponse,
+    summary="Controller flags a picked line with a reason (reason-based stock disposition)",
+)
+async def controller_flag_line(
+    request: Request,
+    line_id: UUID,
+    payload: ControllerFlagLineRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("picking:write")),
+):
+    if user.role != "inventory_controller":
+        raise HTTPException(status_code=403, detail="Faqat controller uchun")
+    reason = (payload.reason or "").strip()
+    if reason not in INCOMPLETE_REASON_CODES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"reason must be one of: {list(INCOMPLETE_REASON_CODES)}",
+        )
+
+    line = (
+        db.query(DocumentLineModel)
+        .options(selectinload(DocumentLineModel.document))
+        .filter(DocumentLineModel.id == line_id)
+        .with_for_update()
+        .one_or_none()
+    )
+    if not line:
+        raise HTTPException(status_code=404, detail="Line not found")
+    document = line.document
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if document.controlled_by_user_id != user.id:
+        raise HTTPException(status_code=403, detail="Document not assigned to you")
+    if document.status != "picked":
+        raise HTTPException(status_code=409, detail="Document must be in picked status")
+    if _line_is_vip_expiry_informational(line):
+        raise HTTPException(
+            status_code=409,
+            detail="VIP muddat: bu qator faqat ma'lumot uchun",
+        )
+    if not line.product_id or not line.lot_id or not line.location_id:
+        raise HTTPException(status_code=400, detail="Line missing product/lot/location")
+    qty = Decimal(str(line.picked_qty or 0))
+    if qty <= 0:
+        raise HTTPException(status_code=400, detail="Line has no picked qty to flag")
+
+    zone_type = _CONTROLLER_FLAG_ZONE_BY_REASON.get(reason)
+    line.skip_reason = reason
+    line.picked_qty = 0
+    line.picked_box_barcode = None
+
+    if zone_type is None:
+        # Joyiga qaytarish: fizik+rezerv+quti tiklanadi (picker skip bilan bir xil).
+        record_pick_rollback(
+            db,
+            product_id=line.product_id,
+            lot_id=line.lot_id,
+            location_id=line.location_id,
+            qty=qty,
+            document_id=document.id,
+            created_by_user_id=user.id,
+        )
+        disposition = "return_to_source"
+        target_code = None
+    else:
+        # Terishда manba on_hand+rezerv allaqachon kamaygan (mol packing'да).
+        # Manbaga tegmaymiz; molni brak/muddat zonasiga qo'shamiz.
+        target = _resolve_default_zone_location(db, line.location_id, zone_type)
+        if not target:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Bu ombor uchun {zone_type} zonasi sozlanmagan",
+            )
+        lock_lot_location(db, line.lot_id, target.id)
+        db.add(
+            StockMovementModel(
+                product_id=line.product_id,
+                lot_id=line.lot_id,
+                location_id=target.id,
+                qty_change=qty,
+                movement_type="transfer_in",
+                source_document_type="document",
+                source_document_id=document.id,
+                created_by_user_id=user.id,
+                reason_code=reason,
+            )
+        )
+        db.flush()
+        assert_box_invariant(db, line.lot_id, target.id)
+        disposition = f"move_to_{zone_type.lower()}_zone"
+        target_code = target.code
+
+    log_action(
+        db,
+        user_id=user.id,
+        action=ACTION_UPDATE,
+        entity_type="document_line",
+        entity_id=str(line.id),
+        new_data={
+            "event": "controller_flag_line",
+            "reason": reason,
+            "qty": str(qty),
+            "disposition": disposition,
+            "target_location": target_code,
+            "document_id": str(document.id),
+        },
+        ip_address=get_client_ip(request),
+    )
+
+    # Hujjat controller tekshiruvida — "picked" holat saqlanadi (status refresh yo'q).
+    db.commit()
+    db.refresh(line)
+    lines_after = (
+        db.query(DocumentLineModel)
+        .filter(DocumentLineModel.document_id == document.id)
+        .all()
+    )
+    db.refresh(document)
     return PickLineResponse(
         line=_to_picking_line(line),
         progress=_calculate_progress(lines_after),

@@ -10,7 +10,10 @@ from sqlalchemy.orm import Session
 from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
 from app.models.stock import StockMovement as StockMovementModel
-from app.services.stock_availability import require_sufficient_reserved
+from app.services.stock_availability import (
+    compute_lot_location_balances,
+    lock_lot_location,
+)
 
 
 def _line_is_vip_expiry_informational(line: DocumentLineModel) -> bool:
@@ -27,6 +30,11 @@ def release_document_reserve_on_cancel(
     Har qator uchun rem = required_qty - picked_qty bo'yicha unallocate (-) yozadi.
     Controller complete dagi terilmagan qism yechish bilan bir xil formula.
     skip_reason qatorlarida picked_qty=0 — to'liq required_qty rezervdan yechiladi.
+
+    Yechiladigan miqdor joydagi HAQIQIY rezervдан oshmaydi (cap): agar rezerv
+    allaqachon boshqa oqimda yechilган bo'lsa (masalan controller qatorni brak
+    zonaga belgilaganда — terishда rezerv ketган), bu yerда qayta yechishга
+    urinib 409 bermaydi, bor rezervni yechadi.
     """
     released_lines = 0
     for line in lines:
@@ -39,20 +47,17 @@ def release_document_reserve_on_cancel(
         rem = req - picked
         if rem <= 0:
             continue
-        require_sufficient_reserved(
-            db,
-            line.product_id,
-            line.lot_id,
-            line.location_id,
-            rem,
-            lock=True,
-        )
+        lock_lot_location(db, line.lot_id, line.location_id)
+        _oh, reserved, _av = compute_lot_location_balances(db, line.lot_id, line.location_id)
+        release = min(rem, Decimal(str(reserved)))
+        if release <= 0:
+            continue
         db.add(
             StockMovementModel(
                 product_id=line.product_id,
                 lot_id=line.lot_id,
                 location_id=line.location_id,
-                qty_change=-rem,
+                qty_change=-release,
                 movement_type="unallocate",
                 source_document_type="document",
                 source_document_id=document.id,
