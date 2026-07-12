@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -31,6 +31,9 @@ import { useAppToast } from '../../feedback/useAppToast'
 import { getReserveStuckSummary } from '../../services/inventoryApi'
 import { writeExcelFile } from '../../utils/exportExcel'
 import { useAuth } from '../../rbac/AuthProvider'
+
+// Haftalik faollik diagrammasi accent rangi (dashboard asosiy ko'k rangi)
+const ACCENT = '#2563eb'
 
 // Yangi = Smartupdan kelgan, admin yig'uvchiga yubormagan
 const STATUS_XOM = ['imported']
@@ -232,30 +235,38 @@ function WeeklyActivityCard({
           <span className="text-sm font-medium">{t('admin:dashboard.weekly_no_data')}</span>
         </div>
       ) : (
-        <div className="flex h-[210px] items-end justify-between gap-3.5 border-t border-slate-100 pt-2 dark:border-slate-800">
+        <div className="flex h-[210px] items-end justify-between gap-2 border-t border-slate-100 pt-2 dark:border-slate-800">
           {points.map((p, i) => {
             const isToday = i === points.length - 1
             const h = Math.max(6, Math.round((p.count / maxValue) * 130))
+            const barStyle: CSSProperties = isToday
+              ? {
+                  height: `${h}px`,
+                  borderRadius: '9px 9px 4px 4px',
+                  background: `linear-gradient(180deg, ${ACCENT}, color-mix(in srgb, ${ACCENT} 78%, #1e1b4b))`,
+                  boxShadow: `0 10px 20px -8px color-mix(in srgb, ${ACCENT} 50%, transparent)`,
+                }
+              : {
+                  height: `${h}px`,
+                  borderRadius: '9px 9px 4px 4px',
+                  background: `linear-gradient(180deg, color-mix(in srgb, ${ACCENT} 55%, #fff), color-mix(in srgb, ${ACCENT} 34%, #fff))`,
+                }
             return (
               <div
                 key={p.date}
                 className="flex h-full flex-1 flex-col items-center justify-end gap-2"
               >
                 <div
-                  className={`text-xs font-bold ${isToday ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}
+                  className={`text-xs tabular-nums ${isToday ? 'font-extrabold text-blue-600 dark:text-blue-400' : 'font-bold text-slate-500 dark:text-slate-400'}`}
                 >
                   {p.count}
                 </div>
                 <div
-                  className={`w-full max-w-[38px] shrink-0 rounded-t-lg transition ${
-                    isToday
-                      ? 'bg-blue-600 shadow-[0_8px_16px_-6px_rgba(37,99,235,0.5)]'
-                      : 'bg-blue-100 dark:bg-blue-500/25'
-                  }`}
-                  style={{ height: `${h}px` }}
+                  className="w-full max-w-[52px] shrink-0 transition-[filter] duration-[180ms] ease-out hover:brightness-[1.08]"
+                  style={barStyle}
                 />
                 <div
-                  className={`text-xs font-semibold ${isToday ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}
+                  className={`text-xs ${isToday ? 'font-extrabold text-blue-600 dark:text-blue-400' : 'font-semibold text-slate-400'}`}
                 >
                   {weekdayShort(p.date, lang)}
                 </div>
