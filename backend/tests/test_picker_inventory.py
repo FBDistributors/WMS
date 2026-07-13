@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 
 from app.models.product import Product, ProductBarcode
 from app.models.location import Location
+from app.models.location_box_placement import PLACEMENT_SEALED, LocationBoxPlacement
+from app.models.product_box import ProductBox
 from app.models.stock import StockLot, StockMovement
 from app.models.user import User
 from app.auth.security import get_password_hash
@@ -159,6 +161,75 @@ def test_picker_inventory_brand_filter(
     )
     assert empty.status_code == 200
     assert empty.json()["items"] == []
+
+
+def test_picker_detail_includes_sealed_only_location(
+    client: TestClient,
+    picker_user: User,
+    test_product_with_barcode: Product,
+    test_location: Location,
+    db_session: Session,
+):
+    """Drift joyi (sealed quti bor, qoldiq 0) detail'da ko'rinishi kerak —
+    aks holda inventarizatsiya sanog'i bilan tuzatib bo'lmaydi."""
+    lot = StockLot(
+        product_id=test_product_with_barcode.id,
+        batch="DRIFT-B1",
+        expiry_date=date.today() + timedelta(days=90),
+    )
+    db_session.add(lot)
+    db_session.flush()
+    box = ProductBox(
+        box_barcode="DRIFTBOX01",
+        product_id=test_product_with_barcode.id,
+        units_per_box=10,
+        is_active=True,
+    )
+    db_session.add(box)
+    db_session.flush()
+    # Sealed placement bor, lekin stock_movements YO'Q — klassik drift (qoldiq 0).
+    db_session.add(
+        LocationBoxPlacement(
+            product_box_id=box.id,
+            location_id=test_location.id,
+            lot_id=lot.id,
+            status=PLACEMENT_SEALED,
+        )
+    )
+    db_session.commit()
+
+    login = client.post("/api/v1/auth/login", json={"username": "picker_test", "password": "testpass123"})
+    token = login.json()["access_token"]
+
+    resp = client.get(
+        f"/api/v1/inventory/picker/{test_product_with_barcode.id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    locations = resp.json()["locations"]
+    row = next(
+        (l for l in locations if l["location_code"] == test_location.code and l["batch_no"] == "DRIFT-B1"),
+        None,
+    )
+    assert row is not None, "sealed-only (drift) joy detail'da chiqishi kerak"
+    # Tolerant clamp: qoldiq 0 bo'lgani uchun ko'rsatkichlar 0, lekin fantom
+    # sealed quti ro'yxati ko'rinadi (sanoq paneli shundan foydalanadi).
+    assert row["box_count"] == 0
+    assert row["units_in_boxes"] == 0
+    assert float(row["on_hand_qty"]) == 0
+    assert row["sealed_boxes"], "fantom sealed quti ro'yxatda ko'rinishi kerak"
+
+    # Joy tarkibi (byLoc rejimi) ham ko'rsatishi kerak.
+    resp2 = client.get(
+        f"/api/v1/inventory/location/{test_location.code}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp2.status_code == 200
+    items = resp2.json()["items"]
+    assert any(
+        i["product_id"] == str(test_product_with_barcode.id) and i["batch_no"] == "DRIFT-B1"
+        for i in items
+    ), "sealed-only (drift) mahsulot joy tarkibida chiqishi kerak"
 
 
 def test_scanner_resolve_product(

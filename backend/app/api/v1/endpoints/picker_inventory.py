@@ -18,13 +18,16 @@ from sqlalchemy.orm import Session
 from app.auth.deps import get_current_user, require_any_permission
 from app.db import get_db
 from app.models.location import Location as LocationModel
+from app.models.location_box_placement import PLACEMENT_SEALED, LocationBoxPlacement
 from app.models.product import Product as ProductModel
 from app.models.product import ProductBarcode
+from app.models.product_box import ProductBox
 from app.models.stock import ON_HAND_MOVEMENT_TYPES
 from app.models.stock import StockLot as StockLotModel
 from app.models.stock import StockMovement as StockMovementModel
 from app.models.user import User as UserModel
 from app.services.box_location_service import SealedBoxInfo, get_breakdown_map_for_product
+from app.services.stock_availability import compute_lot_location_balances
 from app.services.expired_zone_labels import get_labels_row, resolve_expired_display_label
 from app.services.product_scan_resolve import resolve_product_scan
 
@@ -238,6 +241,71 @@ def _get_lot_level_balances(
     return [row._asdict() for row in rows]
 
 
+def _append_sealed_only_pairs(
+    db: Session,
+    product_id: UUID,
+    lot_data: list[dict],
+    *,
+    location_id: Optional[UUID] = None,
+    location_ids: Optional[list[UUID]] = None,
+) -> list[dict]:
+    """Sealed qutisi bor, lekin `available == 0` bo'lgani uchun balans
+    ro'yxatidan tushib qolgan lot/joy juftliklarini qo'shadi.
+
+    Drift holatida (qutidagi dona > fizik qoldiq, qoldiq 0) joy aks holda
+    inventarizatsiya oqimida umuman ko'rinmaydi — sanoq bilan tuzatib
+    bo'lmay qoladi.
+    """
+    seen = {(r["lot_id"], r["location_id"]) for r in lot_data}
+    query = (
+        db.query(
+            StockLotModel.product_id,
+            LocationBoxPlacement.lot_id,
+            StockLotModel.batch,
+            StockLotModel.expiry_date,
+            LocationBoxPlacement.location_id,
+            LocationModel.code.label("location_code"),
+        )
+        .join(StockLotModel, StockLotModel.id == LocationBoxPlacement.lot_id)
+        .join(LocationModel, LocationModel.id == LocationBoxPlacement.location_id)
+        .join(ProductBox, ProductBox.id == LocationBoxPlacement.product_box_id)
+        .filter(
+            StockLotModel.product_id == product_id,
+            LocationBoxPlacement.status == PLACEMENT_SEALED,
+            ProductBox.is_active == True,
+            LocationModel.is_active == True,
+        )
+        .distinct()
+    )
+    if location_id:
+        query = query.filter(LocationBoxPlacement.location_id == location_id)
+    elif location_ids is not None:
+        query = query.filter(LocationBoxPlacement.location_id.in_(location_ids))
+    extra: list[dict] = []
+    for row in query.all():
+        key = (row.lot_id, row.location_id)
+        if key in seen:
+            continue
+        seen.add(key)
+        on_hand, reserved, available = compute_lot_location_balances(
+            db, row.lot_id, row.location_id
+        )
+        extra.append(
+            {
+                "product_id": row.product_id,
+                "lot_id": row.lot_id,
+                "batch": row.batch,
+                "expiry_date": row.expiry_date,
+                "location_id": row.location_id,
+                "location_code": row.location_code,
+                "on_hand": on_hand,
+                "reserved": reserved,
+                "available": available,
+            }
+        )
+    return lot_data + extra
+
+
 def _build_picker_items(
     db: Session,
     products: list[ProductModel],
@@ -413,6 +481,21 @@ async def get_location_contents(
     if not location:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Location not found")
     lot_data = _get_lot_level_balances(db, product_ids=None, location_id=location.id)
+    # Drift mahsulotlari (sealed quti bor, qoldiq 0) joy tarkibida ko'rinsin.
+    sealed_products = (
+        db.query(StockLotModel.product_id)
+        .join(LocationBoxPlacement, LocationBoxPlacement.lot_id == StockLotModel.id)
+        .join(ProductBox, ProductBox.id == LocationBoxPlacement.product_box_id)
+        .filter(
+            LocationBoxPlacement.location_id == location.id,
+            LocationBoxPlacement.status == PLACEMENT_SEALED,
+            ProductBox.is_active == True,
+        )
+        .distinct()
+        .all()
+    )
+    for (pid,) in sealed_products:
+        lot_data = _append_sealed_only_pairs(db, pid, lot_data, location_id=location.id)
     product_ids = list({r["product_id"] for r in lot_data})
     products = {p.id: p for p in db.query(ProductModel).filter(ProductModel.id.in_(product_ids)).all()}
     items = []
@@ -587,6 +670,8 @@ async def get_picker_product_detail(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     loc_ids = _location_ids_for_warehouse(db, warehouse) if warehouse else None
     lot_data = _get_lot_level_balances(db, [product_id], location_ids=loc_ids)
+    # Drift joylari (sealed quti bor, qoldiq 0) sanoq uchun ko'rinsin.
+    lot_data = _append_sealed_only_pairs(db, product_id, lot_data, location_ids=loc_ids)
     main_barcode = _get_product_main_barcode(db, product)
     breakdown_map = get_breakdown_map_for_product(
         db,

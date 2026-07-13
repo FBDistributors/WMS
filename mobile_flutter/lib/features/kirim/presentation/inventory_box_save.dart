@@ -332,6 +332,12 @@ bool inventoryBoxSaveHasChanges({
   required int targetLooseQty,
   List<PickerProductLocation>? looseAdjustLots,
 }) {
+  // Drift (nomuvofiq) holatda ko'rsatkichlar clamp qilingan bo'ladi (0/0) —
+  // operator "0 quti, 0 dona" kiritsa ham fantom sealed yozuvlarni o'chirish
+  // uchun saqlash DOIM ishga tushishi kerak, aks holda drift tuzalmay qoladi.
+  if (breakdown.dataInconsistent) {
+    return true;
+  }
   final int currentBoxes = currentBoxCountTarget(breakdown, boxBarcode?.trim() ?? '');
   final int currentLoose = looseAdjustLots != null && looseAdjustLots.isNotEmpty
       ? looseAdjustLots.fold(0, (int s, PickerProductLocation l) => s + l.looseUnits)
