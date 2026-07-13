@@ -3,7 +3,11 @@ import 'dart:async' show Timer, unawaited;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+
+import '../../../core/config/brand.dart';
 
 import '../../../core/app_state/app_locale.dart';
 import '../../../core/formatting/expiry_display_format.dart';
@@ -19,7 +23,6 @@ import '../../picking/picking_providers.dart';
 import '../../general_customers/data/general_customer_models.dart';
 import '../../general_customers/general_customers_providers.dart';
 import '../../inventory/data/models/picker_inventory_models.dart';
-import '../../inventory/data/picker_location_format.dart';
 import '../../inventory/presentation/inventory_providers.dart';
 import '../../movements/data/movements_repository.dart';
 import '../../movements/movements_providers.dart';
@@ -164,28 +167,49 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   /// Zaxira (FEFO) bo'lmasa — RN'dagi kabi qo'lda lokatsiya / partiya.
   final TextEditingController _returnManualBatch = TextEditingController();
 
-  int _invStep = 0;
-  String? _invSubMode;
+  /// Bir sahifali inventarizatsiya holati: 'idle' | 'location' | 'product'.
+  String _invView = 'idle';
   String _invWarehouse = 'main';
   List<PickerLocationOption> _invAllLocations = const <PickerLocationOption>[];
-  final TextEditingController _invLocSearch = TextEditingController();
+  final TextEditingController _invManualInput = TextEditingController();
   PickerLocationOption? _invLocation;
   LocationContentsResponse? _invContents;
   bool _invLoadingContents = false;
   String? _invContentsError;
   final Map<String, String> _invActualQty = <String, String>{};
+  final Map<String, TextEditingController> _invQtyCtrls = <String, TextEditingController>{};
+  /// Holat 2: karobka paneli ochilgan qator kaliti (`productId-lotId`).
+  String? _invExpandedBoxKey;
   _InvLocGroup? _invScanSelectedGroup;
-  List<ProductBoxSummary> _invProductBoxes = const <ProductBoxSummary>[];
-  String? _invScanExpiry;
   bool _invSubmitting = false;
+  bool _invResolving = false;
   String? _invHandledLocationStr;
-  LocationContentsItem? _invLocPackItem;
+  List<String> _invRecentLocations = <String>[];
+  bool _invRecentsLoaded = false;
+
+  static const Color _invAccent = Color(0xFF1A237E);
+  static const Color _invLink = Color(0xFF1565C0);
+  static const Color _invPageBg = Color(0xFFF0F2F5);
+  static const Color _invTextMain = Color(0xFF0F172A);
+  static const Color _invTextSecondary = Color(0xFF64748B);
+  static const Color _invTextFaded = Color(0xFF94A3B8);
+  static const Color _invTint = Color(0xFFE8EAF6);
+  static const Color _invRedText = Color(0xFFC62828);
+  static const Color _invRedBg = Color(0xFFFDECEA);
+  static const Color _invGreenText = Color(0xFF2E7D32);
+  static const Color _invGreenBg = Color(0xFFE8F5E9);
+  static const Color _invGreenBorder = Color(0xFFA5D6A7);
+  static const Color _invHairline = Color(0xFFE2E8F0);
+  static const String _invRecentsPrefsKey = 'inv_recent_locations';
 
   @override
   void dispose() {
     _customerDebounce?.cancel();
     _customerSearchController.dispose();
-    _invLocSearch.dispose();
+    _invManualInput.dispose();
+    for (final TextEditingController c in _invQtyCtrls.values) {
+      c.dispose();
+    }
     _newReceiveBoxCount.dispose();
     _newReceiveBoxBarcode.dispose();
     _kirimPutawaySearch.dispose();
@@ -281,9 +305,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
               _kirimPutawaySearch.text = savedPutawaySearch;
             }
             _expiry = savedExpiry;
-          }
-          if (_flow == 'inventory') {
-            unawaited(_loadInvProductBoxes(productId));
           }
           if (_flow == 'return' && res.locations.isNotEmpty) {
             final List<PickerProductLocation> sorted = _sortFefo(res.locations);
@@ -1175,62 +1196,208 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       return;
     }
     _invHandledLocationStr = full;
+    // Eski deep-link paramlar (inventoryStep/subMode ham) yangi bir sahifali
+    // holatga map qilinadi: lokatsiya bo'lsa — lokatsiya, aks holda mahsulot.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
       }
-      if (pid != null && pid.isNotEmpty) {
-        if (lid != null && lcode != null && lcode.isNotEmpty) {
-          setState(() {
-            _invSubMode = _invSubMode ?? 'byLocation';
-            _invLocation = PickerLocationOption(
-              id: lid,
-              code: lcode,
-              name: lcode,
-              zoneType: null,
-              expiredSlot: null,
-              expiredDisplayLabel: null,
-            );
-            _invLocSearch.text = lcode;
-            _invStep = 2;
-          });
-          unawaited(_loadProduct(pid));
-        } else {
-          setState(() {
-            _invSubMode = 'byScan';
-            _invStep = 2;
-            _invScanSelectedGroup = null;
-          });
-          unawaited(_loadProduct(pid));
-        }
-        GoRouter.of(context).goNamed(
-          'kirimForm',
-          queryParameters: <String, String>{'flow': 'inventory'},
-        );
-        _invHandledLocationStr = null;
-        return;
-      }
-      if (lid != null && lcode != null && lcode.isNotEmpty) {
-        final int step = int.tryParse(qp['inventoryStep'] ?? '') ?? 2;
-        setState(() {
-          _invSubMode = _invSubMode ?? 'byLocation';
-          _invLocation = PickerLocationOption(
+      if (lid != null && lid.isNotEmpty && lcode != null && lcode.isNotEmpty) {
+        _invOpenLocation(
+          PickerLocationOption(
             id: lid,
             code: lcode,
             name: lcode,
             zoneType: null,
             expiredSlot: null,
             expiredDisplayLabel: null,
-          );
-          _invLocSearch.text = lcode;
-          _invStep = step.clamp(1, 2);
-        });
-        GoRouter.of(context).goNamed(
-          'kirimForm',
-          queryParameters: <String, String>{'flow': 'inventory'},
+          ),
         );
-        _invHandledLocationStr = null;
+      } else if (pid != null && pid.isNotEmpty) {
+        _invOpenProduct(pid);
       }
+      GoRouter.of(context).goNamed(
+        'kirimForm',
+        queryParameters: <String, String>{'flow': 'inventory'},
+      );
+      _invHandledLocationStr = null;
+    });
+  }
+
+  Future<void> _loadInvRecents() async {
+    try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final List<String> list =
+          prefs.getStringList(_invRecentsPrefsKey) ?? const <String>[];
+      if (mounted) {
+        setState(() {
+          _invRecentLocations = list;
+          _invRecentsLoaded = true;
+        });
+      }
+    } on Exception {
+      if (mounted) {
+        setState(() => _invRecentsLoaded = true);
+      }
+    }
+  }
+
+  Future<void> _saveInvRecent(String code) async {
+    final String c = code.trim();
+    if (c.isEmpty) {
+      return;
+    }
+    final List<String> next = <String>[
+      c,
+      ..._invRecentLocations.where((String e) => e != c),
+    ].take(5).toList(growable: false);
+    setState(() => _invRecentLocations = next);
+    try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_invRecentsPrefsKey, next);
+    } on Exception {
+      // Lokal saqlash muvaffaqiyatsiz bo'lsa ham oqim davom etadi.
+    }
+  }
+
+  /// Universal kirish: kod lokatsiyami yoki mahsulot barkodimi — o'zi aniqlaydi.
+  Future<void> _invHandleCode(String raw) async {
+    final String code = raw.trim();
+    if (code.isEmpty || _invResolving) {
+      return;
+    }
+    setState(() => _invResolving = true);
+    try {
+      // 1) Lokatsiya kodi bo'yicha (joriy ombor ro'yxatidan).
+      if (_invAllLocations.isEmpty) {
+        await _loadInvLocations();
+      }
+      final String n = code.toLowerCase();
+      PickerLocationOption? loc;
+      for (final PickerLocationOption l in _invAllLocations) {
+        if (l.code.toLowerCase() == n) {
+          loc = l;
+          break;
+        }
+      }
+      if (loc != null) {
+        _invManualInput.clear();
+        _invOpenLocation(loc);
+        return;
+      }
+      // 2) Mahsulot barkodi/SKU sifatida resolve.
+      final PickerInventoryListResponse res = await ref
+          .read(inventoryRepositoryProvider)
+          .listPickerInventory(q: code, limit: 10);
+      final List<PickerInventoryItem> items = res.items;
+      if (items.isEmpty) {
+        if (mounted) {
+          showAppSnackBar(
+            context,
+            const SnackBar(content: Text('Kod topilmadi')),
+          );
+        }
+        return;
+      }
+      PickerInventoryItem chosen;
+      if (items.length == 1) {
+        chosen = items.first;
+      } else {
+        // Aniq mos (barkod yoki SKU) bo'lsa — o'sha; aks holda tanlov sheet.
+        final PickerInventoryItem? exact = items
+            .where((PickerInventoryItem i) =>
+                (i.mainBarcode ?? '').trim() == code || i.code.trim() == code)
+            .firstOrNull;
+        if (exact != null) {
+          chosen = exact;
+        } else {
+          final PickerInventoryItem? picked = await _invShowProductPickSheet(items);
+          if (picked == null) {
+            return;
+          }
+          chosen = picked;
+        }
+      }
+      _invManualInput.clear();
+      _invOpenProduct(chosen.productId);
+    } on Exception catch (e) {
+      if (mounted) {
+        showAppSnackBar(context, SnackBar(content: Text('$e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _invResolving = false);
+      }
+    }
+  }
+
+  Future<PickerInventoryItem?> _invShowProductPickSheet(
+    List<PickerInventoryItem> items,
+  ) {
+    return showModalBottomSheet<PickerInventoryItem>(
+      context: context,
+      isScrollControlled: true,
+      builder: (BuildContext ctx) {
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(ctx).height * 0.55,
+            ),
+            child: ListView(
+              shrinkWrap: true,
+              children: items.map((PickerInventoryItem i) {
+                return ListTile(
+                  title: Text(i.name, maxLines: 2, overflow: TextOverflow.ellipsis),
+                  subtitle: Text(
+                    <String>[
+                      if ((i.mainBarcode ?? '').trim().isNotEmpty) i.mainBarcode!.trim(),
+                      i.code,
+                    ].join(' · '),
+                  ),
+                  onTap: () => Navigator.of(ctx).pop(i),
+                );
+              }).toList(growable: false),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _invOpenLocation(PickerLocationOption loc) {
+    setState(() {
+      _invView = 'location';
+      _invLocation = loc;
+      _invExpandedBoxKey = null;
+      _product = null;
+      _productError = null;
+      _invScanSelectedGroup = null;
+    });
+    unawaited(_refreshInvLocationContents());
+  }
+
+  void _invOpenProduct(String productId) {
+    setState(() {
+      _invView = 'product';
+      _invScanSelectedGroup = null;
+      _invLocation = null;
+      _invContents = null;
+      _invContentsError = null;
+    });
+    unawaited(_loadProduct(productId));
+  }
+
+  void _invResetToIdle() {
+    setState(() {
+      _invView = 'idle';
+      _invLocation = null;
+      _invContents = null;
+      _invContentsError = null;
+      _invActualQty.clear();
+      _invExpandedBoxKey = null;
+      _product = null;
+      _productError = null;
+      _invScanSelectedGroup = null;
     });
   }
 
@@ -1247,31 +1414,6 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         setState(() => _invAllLocations = const <PickerLocationOption>[]);
       }
     }
-  }
-
-  String _invNorm(String s) => s.trim().toLowerCase();
-
-  List<PickerLocationOption> _filteredInvLocations() {
-    final String q = _invLocSearch.text.trim();
-    if (q.isEmpty) {
-      return const <PickerLocationOption>[];
-    }
-    final String n = _invNorm(q);
-    return _invAllLocations
-        .where(
-          (PickerLocationOption l) =>
-              _invNorm(l.code).contains(n) || _invNorm(l.name).contains(n),
-        )
-        .take(50)
-        .toList(growable: false);
-  }
-
-  bool get _showInvLocDropdown {
-    final String t = _invLocSearch.text.trim();
-    if (t.isEmpty) {
-      return false;
-    }
-    return _invLocation == null || _invLocation!.code != t;
   }
 
   Future<void> _refreshInvLocationContents() async {
@@ -1291,6 +1433,9 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         setState(() {
           _invContents = res;
           _invActualQty.clear();
+          for (final TextEditingController c in _invQtyCtrls.values) {
+            c.clear();
+          }
           _invLoadingContents = false;
         });
       }
@@ -1305,39 +1450,20 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   }
 
   void _onInventoryBack() {
-    if (_invStep == 0) {
+    if (_invView == 'idle') {
       context.goNamed('kirim');
       return;
     }
-    if (_invStep == 1) {
-      setState(() {
-        _invStep = 0;
-        _invSubMode = null;
-      });
+    // Ichki holatlar (lokatsiya/mahsulot ichida) — avval yoyilganini yopish.
+    if (_invView == 'location' && _invExpandedBoxKey != null) {
+      setState(() => _invExpandedBoxKey = null);
       return;
     }
-    if (_invStep == 2) {
-      setState(() {
-        _invStep = 1;
-        if (_invSubMode == 'byScan') {
-          _product = null;
-          _invScanSelectedGroup = null;
-          _productError = null;
-        }
-      });
+    if (_invView == 'product' && _invScanSelectedGroup != null) {
+      setState(() => _invScanSelectedGroup = null);
       return;
     }
-    if (_invStep == 3) {
-      setState(() {
-        _invStep = 2;
-        if (_invSubMode == 'byScan') {
-          _invScanSelectedGroup = null;
-        }
-        if (_invSubMode == 'byLocation') {
-          _invLocPackItem = null;
-        }
-      });
-    }
+    _invResetToIdle();
   }
 
   void _onNewFlowBack() {
@@ -1376,31 +1502,12 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   }
 
   Future<void> _openInventoryScannerAndHandleResult() async {
-    final bool byLoc = _invSubMode == 'byLocation' && _invLocation != null;
-    final String? productId = await context.pushNamed<String>(
-      'scanner',
-      extra: ScannerArgs(
-        returnToKirimForm: true,
-        flow: 'inventory',
-        warehouse: _invWarehouse,
-        inventoryStep: byLoc ? 2 : 1,
-        inventoryLocationId: byLoc ? _invLocation!.id : null,
-        inventoryLocationCode: byLoc ? _invLocation!.code : null,
-      ),
-    );
-    if (!mounted || productId == null || productId.isEmpty) {
+    // Universal skan: xom kod qaytadi, turi (lokatsiya/mahsulot) shu yerda aniqlanadi.
+    final String? raw = await _scanRawBarcode();
+    if (!mounted || raw == null || raw.trim().isEmpty) {
       return;
     }
-    _invSelectProductFromBarcode(productId);
-  }
-
-  void _invSelectProductFromBarcode(String productId) {
-    setState(() {
-      _invSubMode = 'byScan';
-      _invStep = 2;
-      _invScanSelectedGroup = null;
-    });
-    unawaited(_loadProduct(productId));
+    await _invHandleCode(raw);
   }
 
   Future<void> _submitInvByLocationAdjust() async {
@@ -1461,8 +1568,12 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         context,
             SnackBar(content: Text(StringLookup.t(locale, 'inventorySaved'))),
           );
-          setState(() => _invActualQty.clear());
-          await _refreshInvLocationContents();
+          // Muvaffaqiyat: oxirgi lokatsiya chipga qo'shiladi, 1-holatga qaytish.
+          final String? code = _invLocation?.code;
+          if (code != null) {
+            unawaited(_saveInvRecent(code));
+          }
+          _invResetToIdle();
         }
       }
     } finally {
@@ -1472,53 +1583,16 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     }
   }
 
-  Widget _invChoiceCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: <Widget>[
-              Icon(icon, size: 32, color: const Color(0xFF1A237E)),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 4),
-                    Text(subtitle, style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right, color: Colors.grey.shade600),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Inventarizatsiya (lokatsiya tarkibi): shtrix, muddat, tizim — `batch_no` ko‘rsatilmaydi.
+  /// Inventarizatsiya (lokatsiya tarkibi) meta: SKU · muddat.
   String _invContentsItemMetaLine(LocationContentsItem item) {
     final List<String> parts = <String>[];
-    final String? bc = item.barcode?.trim();
-    if (bc != null && bc.isNotEmpty) {
-      parts.add(bc);
+    if (item.productCode.trim().isNotEmpty) {
+      parts.add('SKU: ${item.productCode.trim()}');
     }
     if (item.expiryDate != null && item.expiryDate!.trim().isNotEmpty) {
       parts.add(formatExpiryMonthYear(item.expiryDate));
     }
-    parts.add('Qoldiq: ${item.availableQty.round()}');
-    return parts.join(' • ');
+    return parts.join(' · ');
   }
 
   PickerProductLocation _invScanPackLot(_InvLocGroup group) {
@@ -1528,69 +1602,668 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     );
   }
 
-  Future<void> _loadInvProductBoxes(String productId) async {
-    try {
-      final List<ProductBoxSummary> boxes =
-          await ref.read(productBoxRepositoryProvider).listByProduct(productId);
-      if (!mounted) {
-        return;
-      }
-      setState(() => _invProductBoxes = boxes);
-    } on Exception {
-      if (mounted) {
-        setState(() => _invProductBoxes = const <ProductBoxSummary>[]);
-      }
-    }
-  }
+  // ---------------------------------------------------------------------
+  // Inventarizatsiya — bir sahifali (rejimsiz) UI
+  // ---------------------------------------------------------------------
 
-  bool _invShowBoxBreakdown(_InvLocGroup group) =>
-      _invProductBoxes.isNotEmpty || group.boxCount > 0;
+  String get _invWarehouseLabel =>
+      _invWarehouse == 'showroom' ? 'Showroom' : 'Asosiy ombor';
 
-  List<Widget> _invBoxBreakdownRowsFromLoc(AppLocale appLoc, _InvLocGroup group) {
-    if (!_invShowBoxBreakdown(group)) {
-      return const <Widget>[];
-    }
-    return <Widget>[
-      _invValueRow(
-        StringLookup.t(appLoc, 'inventoryLocationFullBoxes'),
-        '${group.boxCount}',
-      ),
-      _invValueRow(
-        StringLookup.t(appLoc, 'inventoryUnitsInBoxes'),
-        '${group.unitsInBoxes}',
-      ),
-      if (group.looseUnits > 0)
-        _invValueRow(
-          StringLookup.t(appLoc, 'inventoryLooseStock'),
-          '${group.looseUnits}',
-        ),
-      _invValueRow(
-        StringLookup.t(appLoc, 'inventoryLocationTotalUnits'),
-        '${group.totalAvailable.round()}',
-        emphasize: true,
-      ),
-    ];
-  }
-
-  Widget _invValueRow(String label, String value, {bool emphasize = false}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: RichText(
-        text: TextSpan(
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey.shade800,
-          ),
-          children: <InlineSpan>[
-            TextSpan(
-              text: '$label: ',
-              style: const TextStyle(fontWeight: FontWeight.w600),
+  /// Navy header: sarlavha + (idle: ombor segmenti | aks holda: skan tugmasi).
+  Widget _invHeader() {
+    return Container(
+      color: Brand.pickerHeaderNavy,
+      padding: const EdgeInsets.fromLTRB(4, 6, 12, 12),
+      child: SafeArea(
+        bottom: false,
+        child: Row(
+          children: <Widget>[
+            IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: _onInventoryBack,
             ),
-            TextSpan(
-              text: value,
-              style: TextStyle(
-                fontWeight: emphasize ? FontWeight.w700 : FontWeight.w500,
-                color: emphasize ? const Color(0xFF1A237E) : Colors.grey.shade900,
+            const Expanded(
+              child: Text(
+                'Inventarizatsiya',
+                style: TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            if (_invView == 'idle') _invHeaderWarehouseSegment() else _invHeaderScanButton(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _invHeaderWarehouseSegment() {
+    Widget seg(String value, String label) {
+      final bool active = _invWarehouse == value;
+      return InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () {
+          if (_invWarehouse == value) {
+            return;
+          }
+          setState(() {
+            _invWarehouse = value;
+            _invAllLocations = const <PickerLocationOption>[];
+          });
+          unawaited(_loadInvLocations());
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: active ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: active ? _invAccent : Colors.white,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .14),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          seg('main', 'Asosiy'),
+          seg('showroom', 'Showroom'),
+        ],
+      ),
+    );
+  }
+
+  Widget _invHeaderScanButton() {
+    return Material(
+      color: Colors.white.withValues(alpha: .14),
+      borderRadius: BorderRadius.circular(9),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(9),
+        onTap: _openInventoryScanner,
+        child: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Icon(Icons.qr_code_scanner, size: 18, color: Colors.white),
+              SizedBox(width: 6),
+              Text(
+                'Skanerlash',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  BoxDecoration _invCardDecoration({Color? borderColor}) {
+    return BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: borderColor ?? Colors.black.withValues(alpha: .05)),
+      boxShadow: <BoxShadow>[
+        BoxShadow(
+          color: Colors.black.withValues(alpha: .05),
+          blurRadius: 10,
+          offset: const Offset(0, 3),
+        ),
+      ],
+    );
+  }
+
+  // -------------------- Holat 1: kirish (idle) --------------------
+
+  Widget _invIdleView() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      children: <Widget>[
+        Container(
+          decoration: _invCardDecoration(),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Column(
+            children: <Widget>[
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: _invAccent.withValues(alpha: .10),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const Icon(Icons.qr_code_scanner, size: 32, color: _invAccent),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Skanerlashdan boshlang',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: _invTextMain),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                "Bo'lim tanlash shart emas — tizim kodni o'zi aniqlaydi",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: _invTextSecondary),
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _invAccent,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
+                  ),
+                  onPressed: _invResolving ? null : _openInventoryScanner,
+                  icon: const Icon(Icons.qr_code_scanner),
+                  label: const Text(
+                    'Skanerlash',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Row(
+                children: <Widget>[
+                  Expanded(child: Divider(color: _invHairline)),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: Text(
+                      "yoki qo'lda",
+                      style: TextStyle(fontSize: 12, color: _invTextFaded),
+                    ),
+                  ),
+                  Expanded(child: Divider(color: _invHairline)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 48,
+                child: TextField(
+                  controller: _invManualInput,
+                  textCapitalization: TextCapitalization.characters,
+                  style: const TextStyle(fontSize: 15, color: _invTextMain),
+                  decoration: InputDecoration(
+                    hintText: 'Lokatsiya kodi yoki barkod',
+                    hintStyle: const TextStyle(fontSize: 14, color: _invTextFaded),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: _invHairline, width: 1.5),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: _invAccent, width: 1.5),
+                    ),
+                    suffixIcon: _invResolving
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : IconButton(
+                            icon: const Icon(Icons.arrow_forward, color: _invAccent),
+                            onPressed: () => unawaited(_invHandleCode(_invManualInput.text)),
+                          ),
+                  ),
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (String v) => unawaited(_invHandleCode(v)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _invHintRow(
+          chipText: 'A1',
+          chipColor: _invGreenText,
+          chipBg: _invGreenBg,
+          text: 'Lokatsiya kodi → joy tarkibi va sanoq ochiladi',
+        ),
+        const SizedBox(height: 8),
+        _invHintRow(
+          chipText: '▦',
+          chipColor: _invAccent,
+          chipBg: _invTint,
+          text: 'Mahsulot barkodi → uning joylari ochiladi',
+        ),
+        if (_invRecentLocations.isNotEmpty) ...<Widget>[
+          const SizedBox(height: 20),
+          const Text(
+            'Oxirgi lokatsiyalar',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _invTextSecondary),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _invRecentLocations.map((String code) {
+              return Material(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: _invResolving ? null : () => unawaited(_invHandleCode(code)),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: _invHairline),
+                    ),
+                    child: Text(
+                      code,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _invTextMain,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(growable: false),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _invHintRow({
+    required String chipText,
+    required Color chipColor,
+    required Color chipBg,
+    required String text,
+  }) {
+    return Row(
+      children: <Widget>[
+        Container(
+          width: 28,
+          height: 28,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: chipBg,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            chipText,
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: chipColor),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 12.5, color: _invTextSecondary),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // -------------------- Holat 2: lokatsiya (sanoq) --------------------
+
+  TextEditingController _invQtyCtrl(String key) {
+    return _invQtyCtrls.putIfAbsent(
+      key,
+      () => TextEditingController(text: _invActualQty[key] ?? ''),
+    );
+  }
+
+  void _invSetActual(String key, String value) {
+    setState(() => _invActualQty[key] = value);
+  }
+
+  void _invStepQty(LocationContentsItem item, String key, int delta) {
+    final TextEditingController c = _invQtyCtrl(key);
+    final String cur = c.text.trim();
+    int next;
+    if (cur.isEmpty) {
+      // Birinchi tegishda tizim qiymatidan boshlanadi.
+      next = item.availableQty.round() + delta;
+    } else {
+      next = (int.tryParse(cur) ?? 0) + delta;
+    }
+    if (next < 0) {
+      next = 0;
+    }
+    c.text = '$next';
+    _invSetActual(key, '$next');
+  }
+
+  Widget _invLocationView() {
+    final LocationContentsResponse? contents = _invContents;
+    final List<LocationContentsItem> items =
+        contents?.items ?? const <LocationContentsItem>[];
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      children: <Widget>[
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: _invAccent.withValues(alpha: .08),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: _invAccent.withValues(alpha: .22)),
+          ),
+          child: Row(
+            children: <Widget>[
+              const Icon(Icons.location_on_outlined, size: 22, color: _invAccent),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      _invLocation?.code ?? '—',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: _invAccent,
+                      ),
+                    ),
+                    Text(
+                      '$_invWarehouseLabel · ${items.length} mahsulot',
+                      style: const TextStyle(fontSize: 12, color: _invTextSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: _invResetToIdle,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                  child: Text(
+                    'Almashtirish',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _invLink),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        if (_invLoadingContents) const LinearProgressIndicator(),
+        if (_invContentsError != null)
+          Text(_invContentsError!, style: const TextStyle(color: _invRedText)),
+        if (!_invLoadingContents && contents != null && items.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(
+              child: Text(
+                "Bu lokatsiyada mahsulot yo'q",
+                style: TextStyle(color: _invTextSecondary),
+              ),
+            ),
+          ),
+        ...items.map(_invLocationItemCard),
+      ],
+    );
+  }
+
+  Widget _invLocationItemCard(LocationContentsItem item) {
+    final String key = '${item.productId}-${item.lotId}';
+    final int systemQty = item.availableQty.round();
+    final String actualStr = (_invActualQty[key] ?? '').trim();
+    final int? actual = actualStr.isEmpty ? null : int.tryParse(actualStr);
+    final int? diff = actual == null ? null : actual - systemQty;
+    final bool boxOpen = _invExpandedBoxKey == key;
+
+    Color? borderColor;
+    if (diff != null && diff != 0) {
+      borderColor = _invAccent.withValues(alpha: .35);
+    } else if (diff == 0) {
+      borderColor = _invGreenBorder;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: _invCardDecoration(borderColor: borderColor),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text(
+            item.productName,
+            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: _invTextMain),
+          ),
+          const SizedBox(height: 3),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  _invContentsItemMetaLine(item),
+                  style: const TextStyle(fontSize: 12, color: _invTextSecondary),
+                ),
+              ),
+              InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => setState(() => _invExpandedBoxKey = boxOpen ? null : key),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                  child: Text(
+                    boxOpen ? "Karobka sanog'i ▲" : "Karobka sanog'i ▼",
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _invLink),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: RichText(
+                  text: TextSpan(
+                    style: const TextStyle(fontSize: 13, color: _invTextSecondary),
+                    children: <InlineSpan>[
+                      const TextSpan(text: 'Tizimda: '),
+                      TextSpan(
+                        text: '$systemQty',
+                        style: const TextStyle(fontWeight: FontWeight.w800, color: _invTextMain),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              _invQtyStepper(item, key),
+              const SizedBox(width: 8),
+              _invDiffChip(diff),
+            ],
+          ),
+          if (boxOpen) ...<Widget>[
+            const SizedBox(height: 10),
+            const Divider(height: 1, color: _invHairline),
+            const SizedBox(height: 10),
+            InventorySimpleBoxPanel(
+              key: ValueKey<String>('inv-box-$key'),
+              productId: item.productId,
+              locationId: item.locationId,
+              lotId: item.lotId,
+              onSaved: (_) {
+                if (mounted) {
+                  setState(() => _invExpandedBoxKey = null);
+                }
+                unawaited(_refreshInvLocationContents());
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _invQtyStepper(LocationContentsItem item, String key) {
+    final TextEditingController c = _invQtyCtrl(key);
+    Widget btn(IconData icon, int delta) {
+      return InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () => _invStepQty(item, key, delta),
+        // Vizual 38×40, teginish maydoni 44 gacha kengaytirilgan.
+        child: Container(
+          width: 44,
+          height: 44,
+          alignment: Alignment.center,
+          child: Container(
+            width: 38,
+            height: 40,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 18, color: _invTextMain),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: _invHairline),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          btn(Icons.remove, -1),
+          SizedBox(
+            width: 56,
+            child: TextField(
+              controller: c,
+              textAlign: TextAlign.center,
+              keyboardType: kStockQtyKeyboardType,
+              inputFormatters: kStockQtyInputFormatters,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: _invTextMain,
+                fontFeatures: <FontFeature>[FontFeature.tabularFigures()],
+              ),
+              decoration: const InputDecoration(
+                isDense: true,
+                border: InputBorder.none,
+                hintText: '—',
+                hintStyle: TextStyle(color: _invTextFaded, fontWeight: FontWeight.w600),
+                contentPadding: EdgeInsets.symmetric(vertical: 10),
+              ),
+              onChanged: (String v) => _invSetActual(key, v),
+            ),
+          ),
+          btn(Icons.add, 1),
+        ],
+      ),
+    );
+  }
+
+  Widget _invDiffChip(int? diff) {
+    final String text;
+    final Color fg;
+    final Color bg;
+    if (diff == null) {
+      text = '·';
+      fg = _invTextFaded;
+      bg = const Color(0xFFF1F5F9);
+    } else if (diff == 0) {
+      text = '✓';
+      fg = _invGreenText;
+      bg = _invGreenBg;
+    } else {
+      text = diff > 0 ? '+$diff' : '$diff';
+      fg = _invRedText;
+      bg = _invRedBg;
+    }
+    return Container(
+      constraints: const BoxConstraints(minWidth: 40),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(9)),
+      child: Text(
+        text,
+        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: fg),
+      ),
+    );
+  }
+
+  /// Pastki qotirilgan panel: «Sanaldi: X/Y · Farq: Δ» + yuborish tugmasi.
+  Widget _invBottomPanel() {
+    final List<LocationContentsItem> items =
+        _invContents?.items ?? const <LocationContentsItem>[];
+    int entered = 0;
+    int totalDiff = 0;
+    for (final LocationContentsItem item in items) {
+      final String key = '${item.productId}-${item.lotId}';
+      final String s = (_invActualQty[key] ?? '').trim();
+      if (s.isEmpty) {
+        continue;
+      }
+      final int? actual = int.tryParse(s);
+      if (actual == null) {
+        continue;
+      }
+      entered++;
+      totalDiff += actual - item.availableQty.round();
+    }
+    final String diffLabel = totalDiff > 0 ? '+$totalDiff' : '$totalDiff';
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: _invHairline)),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Text(
+              'Sanaldi: $entered/${items.length} · Farq: $diffLabel',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: _invTextSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 50,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: _invAccent,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: entered == 0 || _invSubmitting
+                    ? null
+                    : () => unawaited(_submitInvByLocationAdjust()),
+                child: _invSubmitting
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : Text(
+                        'Tuzatishlarni yuborish ($entered)',
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                      ),
               ),
             ),
           ],
@@ -1599,73 +2272,180 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     );
   }
 
-  Widget _invScanLocationCard(
-    AppLocale appLoc,
-    PickerProductDetailResponse p,
-    _InvLocGroup group,
-  ) {
-    final String ean = (p.mainBarcode ?? '').trim().isEmpty ? '—' : p.mainBarcode!.trim();
-    final String expiry = formatExpiryMonthYear(group.expiryDate);
-    final List<Widget> boxRows = _invBoxBreakdownRowsFromLoc(appLoc, group);
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () {
-          setState(() {
-            _invScanSelectedGroup = group;
-            _invScanExpiry = group.expiryDate;
-            _invStep = 3;
-          });
-        },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      group.locationCode,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF1A237E),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    _invValueRow('Shtrix kod', ean),
-                    _invValueRow('SKU', p.code.trim().isEmpty ? '—' : p.code.trim()),
-                    _invValueRow('Muddat', expiry),
-                    if (boxRows.isEmpty)
-                      _invValueRow('Qoldiq', '${group.totalAvailable.round()}', emphasize: true)
-                    else ...<Widget>[
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Text(
-                          StringLookup.t(appLoc, 'inventoryLocationStockComputed'),
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade700,
-                          ),
+  // -------------------- Holat 3: mahsulot --------------------
+
+  Widget _invProductView() {
+    final PickerProductDetailResponse? p = _product;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      children: <Widget>[
+        if (_loadingProduct) const LinearProgressIndicator(),
+        if (_productError != null)
+          Text(_productError!, style: const TextStyle(color: _invRedText)),
+        if (p != null && !_loadingProduct) ...<Widget>[
+          Container(
+            decoration: _invCardDecoration(),
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: <Widget>[
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: _invTint,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.inventory_2_outlined, color: _invAccent),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        p.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                          color: _invTextMain,
                         ),
                       ),
-                      ...boxRows,
+                      const SizedBox(height: 3),
+                      Text(
+                        <String>[
+                          if ((p.mainBarcode ?? '').trim().isNotEmpty) p.mainBarcode!.trim(),
+                          if (p.code.trim().isNotEmpty) p.code.trim(),
+                        ].join(' · '),
+                        style: GoogleFonts.robotoMono(fontSize: 12, color: _invTextSecondary),
+                      ),
                     ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: <Widget>[
+                    const Text('Jami', style: TextStyle(fontSize: 11, color: _invTextFaded)),
+                    Text(
+                      '${p.locations.fold<double>(0, (double s, PickerProductLocation l) => s + l.availableQty).round()}',
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _invAccent),
+                    ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 6),
-              const Padding(
-                padding: EdgeInsets.only(top: 8),
-                child: Icon(Icons.chevron_right, color: Color(0xFF1A237E)),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+          const SizedBox(height: 14),
+          const Text(
+            'Tuzatish uchun joyni tanlang',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _invTextSecondary),
+          ),
+          const SizedBox(height: 8),
+          if (p.locations.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Text('Qoldiq topilmadi', style: TextStyle(color: _invTextSecondary)),
+            )
+          else
+            ..._groupInvLocations(p.locations).map((_InvLocGroup g) => _invProductLocRow(p, g)),
+          const SizedBox(height: 8),
+          Center(
+            child: TextButton(
+              onPressed: _invResetToIdle,
+              child: const Text(
+                'Boshqa mahsulot skanerlash',
+                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: _invLink),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _invProductLocRow(PickerProductDetailResponse p, _InvLocGroup group) {
+    final bool selected = _invScanSelectedGroup != null &&
+        _invScanSelectedGroup!.locationId == group.locationId &&
+        _invScanSelectedGroup!.expiryDate == group.expiryDate;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: _invCardDecoration(
+        borderColor: selected ? _invAccent.withValues(alpha: .40) : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () => setState(() {
+              _invScanSelectedGroup = selected ? null : group;
+            }),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+              child: Row(
+                children: <Widget>[
+                  const Icon(Icons.location_on_outlined, size: 20, color: _invAccent),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          group.locationCode,
+                          style: const TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w700,
+                            color: _invTextMain,
+                          ),
+                        ),
+                        Text(
+                          <String>[
+                            'Qoldiq: ${group.totalAvailable.round()}',
+                            if (formatExpiryMonthYear(group.expiryDate).isNotEmpty)
+                              formatExpiryMonthYear(group.expiryDate),
+                            if (group.boxCount > 0)
+                              'Karobka: ${group.boxCount} (${group.unitsInBoxes} dona)',
+                          ].join(' · '),
+                          style: const TextStyle(fontSize: 12, color: _invTextSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    selected ? Icons.expand_less : Icons.chevron_right,
+                    color: _invTextFaded,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (selected) ...<Widget>[
+            const Divider(height: 1, color: _invHairline),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+              child: InventorySimpleBoxPanel(
+                key: ValueKey<String>(
+                  '${group.locationId}|${_invScanPackLot(group).lotId}',
+                ),
+                productId: p.productId,
+                locationId: group.locationId,
+                lotId: _invScanPackLot(group).lotId,
+                initialBoxCount: group.boxCount,
+                initialLooseQty: group.looseUnits,
+                looseAdjustLots: group.lots,
+                onSaved: (_) {
+                  if (mounted) {
+                    setState(() => _invScanSelectedGroup = null);
+                  }
+                  unawaited(_loadProduct(p.productId));
+                },
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -1674,349 +2454,17 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     if (_invAllLocations.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadInvLocations());
     }
-    final AppLocale appLoc = ref.watch(appLocaleProvider);
-    final double bottomPad = MediaQuery.viewPaddingOf(context).bottom + 24;
-    return ListView(
-      padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomPad),
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      children: <Widget>[
-        if (_invStep == 0) ...<Widget>[
-          _invChoiceCard(
-            icon: Icons.location_on_outlined,
-            title: 'Lokatsiya bo‘yicha',
-            subtitle: 'Lokatsiyani tanlang, ichidagi qoldiqlarni tekshiring.',
-            onTap: () => setState(() {
-              _invSubMode = 'byLocation';
-              _invStep = 1;
-            }),
-          ),
-          _invChoiceCard(
-            icon: Icons.qr_code_scanner,
-            title: 'Skanerlash orqali',
-            subtitle: 'Mahsulotni skanerlang, keyin lokatsiyani tanlang.',
-            onTap: () => setState(() {
-              _invSubMode = 'byScan';
-              _invStep = 1;
-              _product = null;
-              _invScanSelectedGroup = null;
-            }),
-          ),
-        ],
-        if (_invStep > 0 && _invSubMode == 'byLocation' && _invStep == 1) ...<Widget>[
-          SegmentedButton<String>(
-            segments: const <ButtonSegment<String>>[
-              ButtonSegment<String>(value: 'main', label: Text('Asosiy ombor')),
-              ButtonSegment<String>(value: 'showroom', label: Text('Showroom')),
-            ],
-            selected: <String>{_invWarehouse},
-            onSelectionChanged: (Set<String> v) {
-              setState(() {
-                _invWarehouse = v.first;
-                _invLocation = null;
-                _invLocSearch.clear();
-              });
-              unawaited(_loadInvLocations());
-            },
-          ),
-          const SizedBox(height: 12),
-          const Text('Lokatsiyani tanlang', style: TextStyle(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                Expanded(
-                  child: TextField(
-                    controller: _invLocSearch,
-                    decoration: InputDecoration(
-                      labelText: 'Kod yoki nom bo‘yicha qidiruv',
-                      border: const OutlineInputBorder(),
-                      suffixIcon: buildInputClearButton(
-                        visible: _invLocSearch.text.trim().isNotEmpty,
-                        onPressed: () => setState(() {
-                          _invLocSearch.clear();
-                          _invLocation = null;
-                        }),
-                      ),
-                    ),
-                    onChanged: (_) => setState(() {}),
-                    textCapitalization: TextCapitalization.characters,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ScanActionButton(
-                  onPressed: _openInventoryScanner,
-                  compact: true,
-                ),
-              ],
-            ),
-          ),
-          if (_showInvLocDropdown)
-            Card(
-              margin: const EdgeInsets.only(top: 8),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 220),
-                child: ListView(
-                  shrinkWrap: true,
-                  children: _filteredInvLocations().map((PickerLocationOption loc) {
-                    return ListTile(
-                      title: Text(formatPickerLocationOptionLine(loc)),
-                      subtitle: loc.name.isNotEmpty && loc.name != loc.code ? Text(loc.name) : null,
-                      onTap: () {
-                        setState(() {
-                          _invLocation = loc;
-                          _invLocSearch.text = loc.code;
-                        });
-                      },
-                    );
-                  }).toList(),
-                ),
-              ),
-            ),
-          const SizedBox(height: 12),
-          FilledButton(
-            onPressed: _invLocation == null
-                ? null
-                : () {
-                    setState(() => _invStep = 2);
-                    unawaited(_refreshInvLocationContents());
-                  },
-            child: const Text('Lokatsiya tarkibini ko‘rish'),
-          ),
-        ],
-        if (_invSubMode == 'byLocation' && _invStep == 2 && _invLocation != null) ...<Widget>[
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: Text(
-                  'Tanlangan: ${_invLocation!.code}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1565C0),
-                  ),
-                ),
-              ),
-              TextButton(
-                onPressed: () => setState(() {
-                  _invStep = 1;
-                  _invContents = null;
-                  _invContentsError = null;
-                  _invActualQty.clear();
-                }),
-                child: const Text('Almashtirish'),
-              ),
-            ],
-          ),
-          if (_invLoadingContents) const LinearProgressIndicator(),
-          if (_invContentsError != null)
-            Text(_invContentsError!, style: const TextStyle(color: Colors.red)),
-          if (!_invLoadingContents && _invContents != null) ...<Widget>[
-            if (_invContents!.items.isEmpty)
-              Text('Bu lokatsiyada mahsulot yo‘q', style: TextStyle(color: Colors.grey.shade700))
-            else ...<Widget>[
-              const Text('Qoldiqlar', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              ..._invContents!.items.map((LocationContentsItem item) {
-                final String key = '${item.productId}-${item.lotId}';
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      Text(
-                        item.productName,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      Text(
-                        _invContentsItemMetaLine(item),
-                        style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
-                      ),
-                      const SizedBox(height: 8),
-                      OutlinedButton.icon(
-                        onPressed: () => setState(() {
-                          _invLocPackItem = item;
-                          _invStep = 3;
-                        }),
-                        icon: const Icon(Icons.inventory_2_outlined),
-                        label: Text(StringLookup.t(appLoc, 'inventoryOpenBoxCount')),
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        keyboardType: kStockQtyKeyboardType,
-                        inputFormatters: kStockQtyInputFormatters,
-                        decoration: const InputDecoration(
-                          labelText: 'Haqiqiy miqdor',
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: (String v) => setState(() => _invActualQty[key] = v),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-              const SizedBox(height: 8),
-              FilledButton(
-                onPressed: _invSubmitting ? null : () => unawaited(_submitInvByLocationAdjust()),
-                child: _invSubmitting
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Text('Tuzatishlarni yuborish'),
-              ),
-            ],
-          ],
-        ],
-        if (_invSubMode == 'byLocation' &&
-            _invStep == 3 &&
-            _invLocPackItem != null &&
-            _invLocation != null) ...<Widget>[
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: Text(
-                  StringLookup.t(appLoc, 'inventoryOpenBoxCount'),
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ),
-              TextButton(
-                onPressed: () => setState(() {
-                  _invStep = 2;
-                  _invLocPackItem = null;
-                }),
-                child: Text(StringLookup.t(appLoc, 'back')),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          InventorySimpleBoxPanel(
-            productId: _invLocPackItem!.productId,
-            locationId: _invLocPackItem!.locationId,
-            lotId: _invLocPackItem!.lotId,
-            onSaved: (_) {
-              unawaited(_refreshInvLocationContents());
-              if (mounted) {
-                setState(() {
-                  _invStep = 2;
-                  _invLocPackItem = null;
-                });
-              }
-            },
-          ),
-        ],
-        if (_invSubMode == 'byScan' && _invStep == 1) ...<Widget>[
-          BarcodeSearchInput(
-            onSelectProduct: _invSelectProductFromBarcode,
-            label: 'Mahsulot barcode',
-            onProductScanPressed: _openInventoryScanner,
-          ),
-        ],
-        if (_invSubMode == 'byScan' && _invStep == 2 && _loadingProduct) const LinearProgressIndicator(),
-        if (_invSubMode == 'byScan' && _invStep == 2 && _product != null && !_loadingProduct) ...<Widget>[
-          ProductCard(
-            title: _product!.name,
-            subtitle: _product!.code,
-            barcode: _product!.mainBarcode,
-          ),
-          const SizedBox(height: 12),
-          const Text('Tuzatish uchun lokatsiyani tanlang', style: TextStyle(fontWeight: FontWeight.w600)),
-          if (_product!.locations.isEmpty)
-            Text('Qoldiq topilmadi', style: TextStyle(color: Colors.grey.shade700))
-          else
-            ..._groupInvLocations(_product!.locations).map(
-              (_InvLocGroup group) =>
-                  _invScanLocationCard(appLoc, _product!, group),
-            ),
-          TextButton(
-            onPressed: () => setState(() {
-              _product = null;
-              _invStep = 1;
-              _invProductBoxes = const <ProductBoxSummary>[];
-            }),
-            child: const Text('Boshqa mahsulot skanerlash'),
-          ),
-        ],
-        if (_invSubMode == 'byScan' &&
-            _invStep == 3 &&
-            _product != null &&
-            _invScanSelectedGroup != null) ...<Widget>[
-          const Text(
-            'Tanlangan lokatsiya',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    _invScanSelectedGroup!.locationCode,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF1A237E),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _product!.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    StringLookup.tParams(
-                      appLoc,
-                      'inventoryCompactBreakdown',
-                      <String, String>{
-                        'boxes': '${_invScanSelectedGroup!.boxCount}',
-                        'loose': '${_invScanSelectedGroup!.looseUnits}',
-                        'total': '${_invScanSelectedGroup!.totalAvailable.round()}',
-                      },
-                    ),
-                    style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          ExpiryDatePickerField(
-            value: _invScanExpiry,
-            onChanged: (String? v) => setState(() => _invScanExpiry = v),
-          ),
-          const SizedBox(height: 10),
-          InventorySimpleBoxPanel(
-            key: ValueKey<String>(
-              '${_invScanSelectedGroup!.locationId}|${_invScanPackLot(_invScanSelectedGroup!).lotId}',
-            ),
-            productId: _product!.productId,
-            locationId: _invScanSelectedGroup!.locationId,
-            lotId: _invScanPackLot(_invScanSelectedGroup!).lotId,
-            initialBoxCount: _invScanSelectedGroup!.boxCount,
-            initialLooseQty: _invScanSelectedGroup!.looseUnits,
-            looseAdjustLots: _invScanSelectedGroup!.lots,
-            onSaved: (_) {
-              if (mounted) {
-                setState(() {
-                  _invScanSelectedGroup = null;
-                  _invScanExpiry = null;
-                  _invStep = 2;
-                });
-              }
-              unawaited(_loadProduct(_product!.productId));
-            },
-          ),
-        ],
-        if (_invSubMode == 'byScan' && _invStep == 1 && _loadingProduct) const LinearProgressIndicator(),
-        if (_invSubMode == 'byScan' && _invStep == 1 && _productError != null)
-          Text(_productError!, style: const TextStyle(color: Colors.red)),
-      ],
-    );
+    if (!_invRecentsLoaded) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadInvRecents());
+    }
+    switch (_invView) {
+      case 'location':
+        return _invLocationView();
+      case 'product':
+        return _invProductView();
+      default:
+        return _invIdleView();
+    }
   }
 
   @override
@@ -2038,6 +2486,9 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     }
 
     if (_flow == 'inventory') {
+      final bool showBottomPanel = _invView == 'location' &&
+          !_invLoadingContents &&
+          (_invContents?.items.isNotEmpty ?? false);
       return PopScope(
         canPop: false,
         onPopInvokedWithResult: (bool didPop, Object? result) {
@@ -2045,15 +2496,21 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             _onInventoryBack();
           }
         },
-        child: Scaffold(
-          appBar: AppBar(
-            title: Text(title),
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: _onInventoryBack,
+        child: Theme(
+          data: Theme.of(context).copyWith(
+            textTheme: GoogleFonts.interTextTheme(Theme.of(context).textTheme),
+          ),
+          child: Scaffold(
+            backgroundColor: _invPageBg,
+            body: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                _invHeader(),
+                Expanded(child: _buildInventoryBody()),
+                if (showBottomPanel) _invBottomPanel(),
+              ],
             ),
           ),
-          body: _buildInventoryBody(),
         ),
       );
     }
