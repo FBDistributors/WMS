@@ -633,6 +633,39 @@ async def list_picker_inventory(
                 db.query(ProductBarcode.product_id).filter(ProductBarcode.barcode == exact)
             )
         )
+    # Joy/ombor filtri mahsulotlar ro'yxatining o'zini ham cheklashi kerak —
+    # aks holda joyda yo'q mahsulotlar 0 qoldiq bilan chiqadi.
+    loc_ids = _location_ids_for_warehouse(db, warehouse) if not location_id else None
+    if location_id or loc_ids is not None:
+        on_hand_expr = func.sum(
+            case(
+                (
+                    StockMovementModel.movement_type.in_(PHYSICAL_ON_HAND_MOVEMENT_TYPES),
+                    StockMovementModel.qty_change,
+                ),
+                else_=0,
+            )
+        )
+        reserved_expr = func.sum(
+            case(
+                (
+                    StockMovementModel.movement_type.in_(("allocate", "unallocate")),
+                    StockMovementModel.qty_change,
+                ),
+                else_=0,
+            )
+        )
+        stocked_subq = db.query(StockLotModel.product_id).join(
+            StockMovementModel, StockMovementModel.lot_id == StockLotModel.id
+        )
+        if location_id:
+            stocked_subq = stocked_subq.filter(StockMovementModel.location_id == location_id)
+        else:
+            stocked_subq = stocked_subq.filter(StockMovementModel.location_id.in_(loc_ids))
+        stocked_subq = stocked_subq.group_by(
+            StockLotModel.product_id, StockLotModel.id, StockMovementModel.location_id
+        ).having(on_hand_expr - reserved_expr != 0)
+        query = query.filter(ProductModel.id.in_(stocked_subq))
     query = query.order_by(ProductModel.sku.asc())
     if cursor:
         try:
@@ -647,7 +680,6 @@ async def list_picker_inventory(
     if not products:
         return PickerInventoryListResponse(items=[], next_cursor=None)
     product_ids = [p.id for p in products]
-    loc_ids = _location_ids_for_warehouse(db, warehouse) if not location_id else None
     lot_data = _get_lot_level_balances(db, product_ids, location_id, location_ids=loc_ids)
     items = _build_picker_items(db, products, lot_data, top_n=3)
     return PickerInventoryListResponse(items=items, next_cursor=next_cursor)

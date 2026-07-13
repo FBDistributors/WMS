@@ -163,6 +163,47 @@ def test_picker_inventory_brand_filter(
     assert empty.json()["items"] == []
 
 
+def test_picker_inventory_location_filter_limits_products(
+    client: TestClient,
+    picker_user: User,
+    test_location: Location,
+    db_session: Session,
+):
+    """location_id berilganda faqat shu joyda qoldig'i bor mahsulotlar qaytadi
+    (joyda yo'q mahsulot 0 qoldiq bilan chiqmasligi kerak)."""
+    other_location = Location(
+        code="B-02-02", barcode_value="B-02-02", name="Shelf B", type="bin", is_active=True
+    )
+    p_here = Product(external_source="t", external_id="lf1", name="Bor mahsulot", sku="LF1", is_active=True)
+    p_elsewhere = Product(external_source="t", external_id="lf2", name="Boshqa joyda", sku="LF2", is_active=True)
+    db_session.add_all([other_location, p_here, p_elsewhere])
+    db_session.flush()
+    lot1 = StockLot(product_id=p_here.id, batch="L1")
+    lot2 = StockLot(product_id=p_elsewhere.id, batch="L2")
+    db_session.add_all([lot1, lot2])
+    db_session.flush()
+    db_session.add_all([
+        StockMovement(product_id=p_here.id, lot_id=lot1.id, location_id=test_location.id,
+                      qty_change=Decimal("5"), movement_type="receipt"),
+        StockMovement(product_id=p_elsewhere.id, lot_id=lot2.id, location_id=other_location.id,
+                      qty_change=Decimal("7"), movement_type="receipt"),
+    ])
+    db_session.commit()
+
+    login = client.post("/api/v1/auth/login", json={"username": "picker_test", "password": "testpass123"})
+    token = login.json()["access_token"]
+
+    resp = client.get(
+        "/api/v1/inventory/picker",
+        params={"location_id": str(test_location.id)},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    skus = {i["code"] for i in resp.json()["items"]}
+    assert "LF1" in skus
+    assert "LF2" not in skus, "joyda qoldig'i yo'q mahsulot ro'yxatga tushmasligi kerak"
+
+
 def test_picker_detail_includes_sealed_only_location(
     client: TestClient,
     picker_user: User,
