@@ -150,13 +150,13 @@ def main() -> int:
             w = csv.writer(f, delimiter=";")
             w.writerow([
                 "Joy", "SKU", "Fizik qoldiq", "Qutida yozilgan (dona)",
-                "Quti soni", "Dona/quti", "Muddat", "Mahsulot nomi",
+                "Quti soni", "Dona/quti", "Muddat", "Rezerv", "Mahsulot nomi",
             ])
             for r in drift:
                 w.writerow([
                     r["location_code"], r["sku"], int(r["on_hand"]),
                     int(r["units_in_boxes"]), int(r["box_count"]), upb_label(r),
-                    fmt_expiry(r["expiry_date"]), r["product_name"],
+                    fmt_expiry(r["expiry_date"]), int(r["reserved"]), r["product_name"],
                 ])
         print(f"\nCSV yozildi: {args.csv} ({len(drift)} qator)")
 
