@@ -98,6 +98,69 @@ def test_picker_inventory_list_returns_items(
     assert "top_locations" in item
 
 
+def test_picker_brands_list(
+    client: TestClient,
+    picker_user: User,
+    db_session: Session,
+):
+    """GET /inventory/picker/brands returns distinct non-empty brand names."""
+    db_session.add_all([
+        Product(external_source="t", external_id="b1", name="P1", sku="S1", brand="Nivea", is_active=True),
+        Product(external_source="t", external_id="b2", name="P2", sku="S2", brand="Nivea", is_active=True),
+        Product(external_source="t", external_id="b3", name="P3", sku="S3", brand="Dove", is_active=True),
+        Product(external_source="t", external_id="b4", name="P4", sku="S4", brand=None, is_active=True),
+        Product(external_source="t", external_id="b5", name="P5", sku="S5", brand="", is_active=True),
+    ])
+    db_session.commit()
+
+    login = client.post("/api/v1/auth/login", json={"username": "picker_test", "password": "testpass123"})
+    token = login.json()["access_token"]
+
+    resp = client.get(
+        "/api/v1/inventory/picker/brands",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    brands = resp.json()
+    # Distinct, sorted, no null/empty
+    assert brands == ["Dove", "Nivea"]
+
+
+def test_picker_inventory_brand_filter(
+    client: TestClient,
+    picker_user: User,
+    db_session: Session,
+):
+    """GET /inventory/picker?brand=X returns only products of that exact brand."""
+    db_session.add_all([
+        Product(external_source="t", external_id="f1", name="Nivea A", sku="N1", brand="Nivea", is_active=True),
+        Product(external_source="t", external_id="f2", name="Dove B", sku="D1", brand="Dove", is_active=True),
+    ])
+    db_session.commit()
+
+    login = client.post("/api/v1/auth/login", json={"username": "picker_test", "password": "testpass123"})
+    token = login.json()["access_token"]
+
+    resp = client.get(
+        "/api/v1/inventory/picker",
+        params={"brand": "Nivea"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    skus = {i["code"] for i in resp.json()["items"]}
+    assert "N1" in skus
+    assert "D1" not in skus
+
+    # A brand nobody has yields no items.
+    empty = client.get(
+        "/api/v1/inventory/picker",
+        params={"brand": "DoesNotExist"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert empty.status_code == 200
+    assert empty.json()["items"] == []
+
+
 def test_scanner_resolve_product(
     client: TestClient,
     picker_user: User,

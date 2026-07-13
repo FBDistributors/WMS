@@ -10,7 +10,7 @@ import '../../../shared/input/input_clear_button.dart';
 import '../../../shared/widgets/picker_footer.dart';
 import '../../../shared/widgets/picker_tab_app_header.dart';
 import '../data/models/picker_inventory_models.dart';
-import '../data/picker_location_format.dart';
+import 'inventory_filter_sheet.dart';
 import 'inventory_locale.dart';
 import 'inventory_list_controller.dart';
 import 'inventory_providers.dart';
@@ -58,9 +58,6 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final InventoryLocale locale = ref.watch(inventoryLocaleProvider);
     final InventoryViewState vm = ref.watch(inventoryListControllerProvider);
-    final AsyncValue<List<PickerLocationOption>> locationsAsync =
-        ref.watch(pickerLocationsProvider);
-    final String locationId = ref.watch(inventoryLocationIdProvider);
 
     ref.listen<String>(inventoryQueryProvider, (_, String next) {
       if (_searchController.text != next) {
@@ -93,24 +90,6 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               headerBackgroundColor: isDark ? const Color(0xFF1E293B) : null,
               titleColor: isDark ? const Color(0xFFF1F5F9) : null,
               accentColor: isDark ? const Color(0xFF93C5FD) : null,
-            ),
-            locationsAsync.when(
-              data: (List<PickerLocationOption> locations) {
-                if (locations.isEmpty) {
-                  return const SizedBox.shrink();
-                }
-                return _LocationFilterRow(
-                  locations: locations,
-                  locationId: locationId,
-                  isDark: isDark,
-                  cardBg: cardBg,
-                  secondaryText: secondaryText,
-                  primaryText: primaryText,
-                  locale: locale,
-                );
-              },
-              loading: () => const SizedBox.shrink(),
-              error: (_, __) => const SizedBox.shrink(),
             ),
             Expanded(
               child: _InventoryScrollContent(
@@ -149,6 +128,8 @@ class _StickySearchDelegate extends SliverPersistentHeaderDelegate {
     required this.controller,
     required this.onChanged,
     required this.onClear,
+    required this.hasActiveFilter,
+    required this.onFilterTap,
   });
 
   final bool isDark;
@@ -161,6 +142,8 @@ class _StickySearchDelegate extends SliverPersistentHeaderDelegate {
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
   final VoidCallback onClear;
+  final bool hasActiveFilter;
+  final VoidCallback onFilterTap;
 
   static const double _height = 68;
 
@@ -192,6 +175,8 @@ class _StickySearchDelegate extends SliverPersistentHeaderDelegate {
           locale: locale,
           onChanged: onChanged,
           onClear: onClear,
+          hasActiveFilter: hasActiveFilter,
+          onFilterTap: onFilterTap,
         ),
       ),
     );
@@ -205,7 +190,8 @@ class _StickySearchDelegate extends SliverPersistentHeaderDelegate {
         searchBorder != oldDelegate.searchBorder ||
         primaryText != oldDelegate.primaryText ||
         secondaryText != oldDelegate.secondaryText ||
-        locale != oldDelegate.locale;
+        locale != oldDelegate.locale ||
+        hasActiveFilter != oldDelegate.hasActiveFilter;
   }
 }
 
@@ -220,6 +206,8 @@ class _StickySearchField extends StatefulWidget {
     required this.locale,
     required this.onChanged,
     required this.onClear,
+    required this.hasActiveFilter,
+    required this.onFilterTap,
   });
 
   final TextEditingController controller;
@@ -231,6 +219,8 @@ class _StickySearchField extends StatefulWidget {
   final InventoryLocale locale;
   final ValueChanged<String> onChanged;
   final VoidCallback onClear;
+  final bool hasActiveFilter;
+  final VoidCallback onFilterTap;
 
   @override
   State<_StickySearchField> createState() => _StickySearchFieldState();
@@ -262,45 +252,122 @@ class _StickySearchFieldState extends State<_StickySearchField> {
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: widget.controller,
-      style: GoogleFonts.inter(fontSize: 15, color: widget.primaryText),
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: widget.searchFill,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        prefixIcon: Icon(Icons.search_rounded, color: widget.secondaryText, size: 22),
-        suffixIcon: widget.controller.text.isNotEmpty
-            ? buildInputClearButton(
-                visible: true,
-                tooltip: 'Tozalash',
-                onPressed: () {
-                  widget.onClear();
-                  setState(() {});
-                },
-                icon: Icons.close,
-              )
-            : null,
-        hintText: InventoryStrings.invSearchPlaceholder(widget.locale),
-        hintStyle: GoogleFonts.inter(
-          fontSize: 15,
-          color: widget.isDark ? const Color(0xFF64748B) : const Color(0xFF9CA3AF),
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: TextField(
+            controller: widget.controller,
+            style: GoogleFonts.inter(fontSize: 15, color: widget.primaryText),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: widget.searchFill,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              prefixIcon: Icon(Icons.search_rounded, color: widget.secondaryText, size: 22),
+              suffixIcon: widget.controller.text.isNotEmpty
+                  ? buildInputClearButton(
+                      visible: true,
+                      tooltip: 'Tozalash',
+                      onPressed: () {
+                        widget.onClear();
+                        setState(() {});
+                      },
+                      icon: Icons.close,
+                    )
+                  : null,
+              hintText: InventoryStrings.invSearchPlaceholder(widget.locale),
+              hintStyle: GoogleFonts.inter(
+                fontSize: 15,
+                color: widget.isDark ? const Color(0xFF64748B) : const Color(0xFF9CA3AF),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: widget.searchBorder),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: widget.searchBorder),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFF3B82F6), width: 1.4),
+              ),
+            ),
+            textInputAction: TextInputAction.search,
+            onChanged: widget.onChanged,
+          ),
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: widget.searchBorder),
+        const SizedBox(width: 10),
+        _FilterButton(
+          isDark: widget.isDark,
+          searchFill: widget.searchFill,
+          searchBorder: widget.searchBorder,
+          secondaryText: widget.secondaryText,
+          hasActiveFilter: widget.hasActiveFilter,
+          onTap: widget.onFilterTap,
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: widget.searchBorder),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF3B82F6), width: 1.4),
+      ],
+    );
+  }
+}
+
+class _FilterButton extends StatelessWidget {
+  const _FilterButton({
+    required this.isDark,
+    required this.searchFill,
+    required this.searchBorder,
+    required this.secondaryText,
+    required this.hasActiveFilter,
+    required this.onTap,
+  });
+
+  final bool isDark;
+  final Color searchFill;
+  final Color searchBorder;
+  final Color secondaryText;
+  final bool hasActiveFilter;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color accent = isDark ? const Color(0xFF3B82F6) : const Color(0xFF1A237E);
+    return Material(
+      color: hasActiveFilter ? accent : searchFill,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: hasActiveFilter ? accent : searchBorder),
+          ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: <Widget>[
+              Icon(
+                Icons.tune_rounded,
+                size: 22,
+                color: hasActiveFilter ? Colors.white : secondaryText,
+              ),
+              if (hasActiveFilter)
+                Positioned(
+                  top: 8,
+                  right: 10,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFE53935),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
-      textInputAction: TextInputAction.search,
-      onChanged: widget.onChanged,
     );
   }
 }
@@ -347,6 +414,8 @@ class _InventoryScrollContent extends ConsumerWidget {
       ref.read(inventoryQueryProvider.notifier).state = '';
     }
 
+    final bool hasActiveFilter = ref.watch(inventoryHasActiveFilterProvider);
+
     final Widget searchHeader = SliverPersistentHeader(
       pinned: true,
       delegate: _StickySearchDelegate(
@@ -360,6 +429,8 @@ class _InventoryScrollContent extends ConsumerWidget {
         controller: searchController,
         onChanged: syncQueryFromField,
         onClear: clearSearch,
+        hasActiveFilter: hasActiveFilter,
+        onFilterTap: () => showInventoryFilterSheet(context),
       ),
     );
 
@@ -702,222 +773,5 @@ class _CorporateInventoryCard extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class _LocationFilterRow extends ConsumerWidget {
-  const _LocationFilterRow({
-    required this.locations,
-    required this.locationId,
-    required this.isDark,
-    required this.cardBg,
-    required this.secondaryText,
-    required this.primaryText,
-    required this.locale,
-  });
-
-  final List<PickerLocationOption> locations;
-  final String locationId;
-  final bool isDark;
-  final Color cardBg;
-  final Color secondaryText;
-  final Color primaryText;
-  final InventoryLocale locale;
-
-  String _label() {
-    if (locationId.isEmpty) {
-      return InventoryStrings.invAllLocations(locale);
-    }
-    for (final PickerLocationOption l in locations) {
-      if (l.id == locationId) {
-        return l.code;
-      }
-    }
-    return locationId;
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-      child: Material(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(12),
-        elevation: 0,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () => _openPicker(context, ref),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
-            ),
-            child: Row(
-              children: <Widget>[
-                Text(
-                  '${InventoryStrings.invBestLocation(locale)}:',
-                  style: GoogleFonts.inter(fontSize: 13, color: secondaryText, fontWeight: FontWeight.w500),
-                ),
-                const SizedBox(width: 8),
-                Icon(Icons.location_on_outlined, size: 18, color: secondaryText),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    _label(),
-                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: primaryText),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                Icon(Icons.expand_more_rounded, size: 22, color: secondaryText),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _openPicker(BuildContext context, WidgetRef ref) async {
-    final Color modalBg = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final Color rowText = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF333333);
-    final Color searchFill = isDark ? const Color(0xFF334155) : const Color(0xFFF8FAFC);
-    final Color searchBorder = isDark ? const Color(0xFF475569) : const Color(0xFFE2E8F0);
-    final TextEditingController searchController = TextEditingController();
-
-    try {
-      await showDialog<void>(
-        context: context,
-        barrierDismissible: true,
-        builder: (BuildContext ctx) {
-          return StatefulBuilder(
-            builder: (BuildContext context, void Function(void Function()) setM) {
-              final String q = searchController.text.trim().toLowerCase();
-              final List<PickerLocationOption> filtered = q.isEmpty
-                  ? locations
-                  : locations.where((PickerLocationOption loc) {
-                      final String code = loc.code.toLowerCase();
-                      final String name = loc.name.toLowerCase();
-                      return code.contains(q) || name.contains(q);
-                    }).toList(growable: false);
-              return Material(
-                color: Colors.black54,
-                child: InkWell(
-                  onTap: () => Navigator.of(ctx).pop(),
-                  child: Center(
-                    child: InkWell(
-                      onTap: () {},
-                      child: Container(
-                        margin: const EdgeInsets.all(24),
-                        constraints: const BoxConstraints(maxHeight: 460),
-                        decoration: BoxDecoration(
-                          color: modalBg,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: <Widget>[
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
-                              child: TextField(
-                                controller: searchController,
-                                onChanged: (_) => setM(() {}),
-                                style: GoogleFonts.inter(color: rowText, fontSize: 14),
-                                decoration: InputDecoration(
-                                  hintText:
-                                      '${InventoryStrings.invSearch(locale)} ${InventoryStrings.invBestLocation(locale).toLowerCase()}',
-                                  prefixIcon: Icon(
-                                    Icons.search_rounded,
-                                    color: rowText.withValues(alpha: 0.7),
-                                  ),
-                                  suffixIcon: searchController.text.isNotEmpty
-                                      ? buildInputClearButton(
-                                          visible: true,
-                                          onPressed: () {
-                                            searchController.clear();
-                                            setM(() {});
-                                          },
-                                        )
-                                      : null,
-                                  filled: true,
-                                  fillColor: searchFill,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: searchBorder),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: searchBorder),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: const BorderSide(
-                                      color: Color(0xFF3B82F6),
-                                      width: 1.4,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Flexible(
-                              child: ListView(
-                                shrinkWrap: true,
-                                children: <Widget>[
-                                  if (q.isEmpty)
-                                    ListTile(
-                                      title: Text(
-                                        InventoryStrings.invAllLocations(locale),
-                                        style: GoogleFonts.inter(color: rowText, fontSize: 16),
-                                      ),
-                                      onTap: () {
-                                        ref.read(inventoryLocationIdProvider.notifier).state = '';
-                                        Navigator.of(ctx).pop();
-                                      },
-                                    ),
-                                  if (filtered.isEmpty)
-                                    Padding(
-                                      padding: const EdgeInsets.fromLTRB(16, 18, 16, 20),
-                                      child: Text(
-                                        InventoryStrings.invNoResults(locale),
-                                        textAlign: TextAlign.center,
-                                        style: GoogleFonts.inter(
-                                          color: rowText.withValues(alpha: 0.75),
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ),
-                                  ...filtered.map((PickerLocationOption loc) {
-                                    final String line = formatPickerLocationOptionLine(loc);
-                                    final String suffix = loc.name.isNotEmpty && loc.name != loc.code
-                                        ? ' — ${loc.name}'
-                                        : '';
-                                    return ListTile(
-                                      title: Text(
-                                        '$line$suffix',
-                                        style: GoogleFonts.inter(color: rowText, fontSize: 16),
-                                      ),
-                                      onTap: () {
-                                        ref.read(inventoryLocationIdProvider.notifier).state = loc.id;
-                                        Navigator.of(ctx).pop();
-                                      },
-                                    );
-                                  }),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      );
-    } finally {
-      searchController.dispose();
-    }
   }
 }

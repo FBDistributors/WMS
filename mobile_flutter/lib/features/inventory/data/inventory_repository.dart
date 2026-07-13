@@ -13,6 +13,8 @@ class InventoryRepository {
   Future<PickerInventoryListResponse> listPickerInventory({
     String? q,
     String? locationId,
+    String? brand,
+    String? warehouse,
     int limit = 100,
     String? cursor,
   }) async {
@@ -20,6 +22,8 @@ class InventoryRepository {
       'limit': limit,
       if (q != null && q.trim().isNotEmpty) 'q': q.trim(),
       if (locationId != null && locationId.isNotEmpty) 'location_id': locationId,
+      if (brand != null && brand.trim().isNotEmpty) 'brand': brand.trim(),
+      if (warehouse != null && warehouse.trim().isNotEmpty) 'warehouse': warehouse.trim(),
       if (cursor != null && cursor.isNotEmpty) 'cursor': cursor,
     };
 
@@ -57,6 +61,22 @@ class InventoryRepository {
           .map((Map<dynamic, dynamic> m) => PickerLocationOption.fromJson(
                 Map<String, Object?>.from(m),
               ))
+          .toList(growable: false);
+    } on DioException catch (e) {
+      throw Exception(mapDioExceptionToMessage(e));
+    }
+  }
+
+  Future<List<String>> listPickerBrands() async {
+    try {
+      final Response<Object?> res = await _dio.get<Object?>('$_invPath/picker/brands');
+      final Object? data = res.data;
+      if (data is! List) {
+        return const <String>[];
+      }
+      return data
+          .whereType<String>()
+          .where((String s) => s.trim().isNotEmpty)
           .toList(growable: false);
     } on DioException catch (e) {
       throw Exception(mapDioExceptionToMessage(e));

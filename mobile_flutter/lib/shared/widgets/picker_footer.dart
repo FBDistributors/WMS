@@ -131,7 +131,7 @@ class PickerFooter extends ConsumerWidget {
               if (showKirimTab)
                 Expanded(
                   child: _tab(
-                    icon: Icons.inbox_rounded,
+                    icon: Icons.grid_view_rounded,
                     label: StringLookup.t(loc, 'kirim'),
                     active: current == PickerFooterRoute.kirim,
                     activeC: activeC,

@@ -475,6 +475,33 @@ async def list_picker_locations(
 
 
 @router.get(
+    "/picker/brands",
+    response_model=list[str],
+    summary="Distinct brand names for picker filter",
+)
+async def list_picker_brands(
+    db: Session = Depends(get_db),
+    _user: UserModel = Depends(get_current_user),
+    _guard=Depends(PICKER_INVENTORY_PERMISSION),
+):
+    """Distinct, non-empty brand names across active products (for the inventory filter sheet).
+
+    Kept picker-accessible on purpose: the admin `/brands` endpoint requires
+    `admin:access`, which pickers/controllers do not have.
+    """
+    rows = (
+        db.query(ProductModel.brand)
+        .filter(ProductModel.is_active == True)
+        .filter(ProductModel.brand.isnot(None))
+        .filter(func.trim(ProductModel.brand) != "")
+        .distinct()
+        .order_by(ProductModel.brand.asc())
+        .all()
+    )
+    return [r[0] for r in rows]
+
+
+@router.get(
     "/picker",
     response_model=PickerInventoryListResponse,
     summary="Picker inventory list (read-only)",
@@ -488,6 +515,7 @@ async def list_picker_inventory(
     q: Optional[str] = Query(None, description="Search by product name or SKU"),
     barcode: Optional[str] = Query(None, description="Exact barcode match"),
     location_id: Optional[UUID] = Query(None),
+    brand: Optional[str] = Query(None, description="Filter by exact brand name"),
     warehouse: Optional[str] = Query(None, description="main | showroom — filter by warehouse (qoldiq qayerda)"),
     limit: int = Query(20, ge=1, le=100),
     cursor: Optional[str] = Query(None),
@@ -496,6 +524,8 @@ async def list_picker_inventory(
     _guard=Depends(PICKER_INVENTORY_PERMISSION),
 ):
     query = db.query(ProductModel).filter(ProductModel.is_active == True)
+    if brand and brand.strip():
+        query = query.filter(ProductModel.brand == brand.strip())
     if q:
         term = f"%{q.strip()}%"
 

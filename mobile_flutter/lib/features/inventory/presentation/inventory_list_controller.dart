@@ -45,6 +45,8 @@ class InventoryListController extends StateNotifier<InventoryViewState> {
       : super(const InventoryViewState(loading: true)) {
     _ref.listen<String>(inventoryQueryProvider, _onFilterChanged);
     _ref.listen<String>(inventoryLocationIdProvider, _onFilterChanged);
+    _ref.listen<String>(inventoryBrandProvider, _onFilterChanged);
+    _ref.listen<String>(inventoryWarehouseProvider, _onFilterChanged);
     Future<void>.microtask(() => load(reset: true));
   }
 
@@ -73,9 +75,13 @@ class InventoryListController extends StateNotifier<InventoryViewState> {
     try {
       final String q = _ref.read(inventoryQueryProvider);
       final String loc = _ref.read(inventoryLocationIdProvider);
+      final String brand = _ref.read(inventoryBrandProvider);
+      final String warehouse = _ref.read(inventoryWarehouseProvider);
       final PickerInventoryListResponse res = await _repository.listPickerInventory(
         q: q.trim().isEmpty ? null : q.trim(),
         locationId: loc.trim().isEmpty ? null : loc.trim(),
+        brand: brand.trim().isEmpty ? null : brand.trim(),
+        warehouse: warehouse.trim().isEmpty ? null : warehouse.trim(),
         limit: pageSize,
       );
       state = InventoryViewState(
@@ -116,9 +122,13 @@ class InventoryListController extends StateNotifier<InventoryViewState> {
     try {
       final String q = _ref.read(inventoryQueryProvider);
       final String loc = _ref.read(inventoryLocationIdProvider);
+      final String brand = _ref.read(inventoryBrandProvider);
+      final String warehouse = _ref.read(inventoryWarehouseProvider);
       final PickerInventoryListResponse res = await _repository.listPickerInventory(
         q: q.trim().isEmpty ? null : q.trim(),
         locationId: loc.trim().isEmpty ? null : loc.trim(),
+        brand: brand.trim().isEmpty ? null : brand.trim(),
+        warehouse: warehouse.trim().isEmpty ? null : warehouse.trim(),
         limit: pageSize,
         cursor: cursor,
       );

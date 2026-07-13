@@ -76,4 +76,58 @@ class InventoryStrings {
         InventoryLocale.ru => 'Поиск',
         InventoryLocale.en => 'Search',
       };
+
+  static String invFilters(InventoryLocale l) => switch (l) {
+        InventoryLocale.uz => 'Filtrlar',
+        InventoryLocale.ru => 'Фильтры',
+        InventoryLocale.en => 'Filters',
+      };
+
+  static String invBrand(InventoryLocale l) => switch (l) {
+        InventoryLocale.uz => 'Brend',
+        InventoryLocale.ru => 'Бренд',
+        InventoryLocale.en => 'Brand',
+      };
+
+  static String invAllBrands(InventoryLocale l) => switch (l) {
+        InventoryLocale.uz => 'Barcha brendlar',
+        InventoryLocale.ru => 'Все бренды',
+        InventoryLocale.en => 'All brands',
+      };
+
+  static String invWarehouse(InventoryLocale l) => switch (l) {
+        InventoryLocale.uz => 'Ombor',
+        InventoryLocale.ru => 'Склад',
+        InventoryLocale.en => 'Warehouse',
+      };
+
+  static String invWarehouseAll(InventoryLocale l) => switch (l) {
+        InventoryLocale.uz => 'Barchasi',
+        InventoryLocale.ru => 'Все',
+        InventoryLocale.en => 'All',
+      };
+
+  static String invWarehouseMain(InventoryLocale l) => switch (l) {
+        InventoryLocale.uz => 'Asosiy',
+        InventoryLocale.ru => 'Основной',
+        InventoryLocale.en => 'Main',
+      };
+
+  static String invWarehouseShowroom(InventoryLocale l) => switch (l) {
+        InventoryLocale.uz => 'Showroom',
+        InventoryLocale.ru => 'Шоурум',
+        InventoryLocale.en => 'Showroom',
+      };
+
+  static String invApply(InventoryLocale l) => switch (l) {
+        InventoryLocale.uz => 'Qo\'llash',
+        InventoryLocale.ru => 'Применить',
+        InventoryLocale.en => 'Apply',
+      };
+
+  static String invClearFilters(InventoryLocale l) => switch (l) {
+        InventoryLocale.uz => 'Tozalash',
+        InventoryLocale.ru => 'Сбросить',
+        InventoryLocale.en => 'Clear',
+      };
 }
