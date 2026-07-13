@@ -80,6 +80,33 @@ void main() {
 
       expect(resolved?.id, 'main');
     });
+
+    test('skipped zero-picked promo line does not hijack scan of the picked line', () {
+      // Aksiya qatori ro'yxatda birinchi, 0 terilgan (skip); oddiy qator
+      // 7/7 terilgan va hali tekshirilmagan — skan oddiy qatorga tushishi kerak.
+      final List<PickingLine> lines = <PickingLine>[
+        _line(id: 'promo', productId: 'p1', lineSource: 'action', qtyRequired: 1, qtyPicked: 0),
+        _line(id: 'main', productId: 'p1', lineSource: 'product', qtyRequired: 7, qtyPicked: 7),
+      ];
+
+      final PickingLine? resolved =
+          resolveControllerScanLine(lines, 'BC123', <String>{});
+
+      expect(resolved?.id, 'main');
+    });
+
+    test('falls back to skipped zero-picked line when picked line is verified', () {
+      final List<PickingLine> lines = <PickingLine>[
+        _line(id: 'promo', productId: 'p1', lineSource: 'action', qtyRequired: 1, qtyPicked: 0),
+        _line(id: 'main', productId: 'p1', lineSource: 'product', qtyRequired: 7, qtyPicked: 7),
+      ];
+      final Set<String> verified = <String>{'main'};
+
+      final PickingLine? resolved =
+          resolveControllerScanLine(lines, 'BC123', verified);
+
+      expect(resolved?.id, 'promo');
+    });
   });
 
   group('resolveControllerScanLineByProductId', () {

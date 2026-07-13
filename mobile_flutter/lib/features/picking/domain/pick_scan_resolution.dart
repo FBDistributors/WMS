@@ -101,22 +101,51 @@ PickingLine? resolvePickerScanLineByProductId(List<PickingLine> lines, String pr
   return matches.first;
 }
 
+/// Guruh (kartochka) bo'yicha jami terilgan miqdor.
+double controllerGroupPickedTotal(List<PickingLine> allLines, PickingLine anchor) {
+  return membersOfSamePickCard(allLines, anchor)
+      .fold(0.0, (double s, PickingLine l) => s + l.qtyPicked);
+}
+
+/// Kontroller uchun umumiy tanlov tartibi: (1) tekshirilmagan VA terilgani bor
+/// guruh — haqiqiy skan nishoni; (2) tekshirilmagan, lekin 0 terilgan (skip
+/// qilingan) guruh — flag tasdiqlash uchun; (3) hammasi tekshirilgan bo'lsa
+/// birinchi moslik ("allaqachon tekshirilgan" xabari uchun).
+///
+/// Bu bir xil barcode'li aksiya (0 terilgan, skip) qatori oddiy qatorning
+/// skanini "o'g'irlab" olishining oldini oladi.
+PickingLine? _pickControllerScanTarget(
+  List<PickingLine> allLines,
+  List<PickingLine> matches,
+  Set<String> verifiedLineIds,
+) {
+  if (matches.isEmpty) {
+    return null;
+  }
+  PickingLine? zeroPickedCandidate;
+  for (final PickingLine l in matches) {
+    if (isControllerPickGroupFullyVerified(allLines, l, verifiedLineIds)) {
+      continue;
+    }
+    if (controllerGroupPickedTotal(allLines, l) > 0) {
+      return l;
+    }
+    zeroPickedCandidate ??= l;
+  }
+  return zeroPickedCandidate ?? matches.first;
+}
+
 /// Kontroller: mahsulot ID bo'yicha hali tekshirilmagan guruh.
 PickingLine? resolveControllerScanLineByProductId(
   List<PickingLine> lines,
   String productId,
   Set<String> verifiedLineIds,
 ) {
-  final List<PickingLine> matches = findAllLinesByProductId(lines, productId);
-  if (matches.isEmpty) {
-    return null;
-  }
-  for (final PickingLine l in matches) {
-    if (!isControllerPickGroupFullyVerified(lines, l, verifiedLineIds)) {
-      return l;
-    }
-  }
-  return matches.first;
+  return _pickControllerScanTarget(
+    lines,
+    findAllLinesByProductId(lines, productId),
+    verifiedLineIds,
+  );
 }
 
 PickingLine? resolveScanLineInGroupByProductId(List<PickingLine> members, String productId) {
@@ -148,16 +177,11 @@ PickingLine? resolveControllerScanLine(
   String raw,
   Set<String> verifiedLineIds,
 ) {
-  final List<PickingLine> matches = findAllLinesByScan(lines, raw);
-  if (matches.isEmpty) {
-    return null;
-  }
-  for (final PickingLine l in matches) {
-    if (!isControllerPickGroupFullyVerified(lines, l, verifiedLineIds)) {
-      return l;
-    }
-  }
-  return matches.first;
+  return _pickControllerScanTarget(
+    lines,
+    findAllLinesByScan(lines, raw),
+    verifiedLineIds,
+  );
 }
 
 /// Sheet ichida: faqat joriy kartochka a'zolari orasidan qidirish.

@@ -236,6 +236,17 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
       _showControllerAlreadyVerifiedSnackBar();
       return;
     }
+    // Skip qilingan (0 terilgan) guruh: tekshiriladigan miqdor yo'q — skan
+    // preseti "1 dan 0 gacha" xatosini chiqaradi. Sheet karta bosilgandagi
+    // kabi presetsiz ochiladi (sabab ko'rinadi, flag tasdiqlash mumkin).
+    if (controllerGroupPickedTotal(doc.lines, resolved.line) <= 0) {
+      await _openLineSheet(
+        doc,
+        _pickLineGroupForLine(doc, resolved.line),
+        PickerProfileParam.controller,
+      );
+      return;
+    }
     // Quti kodi mahsulotning dona/SKU kodi bilan to'qnashsa (bir xil qiymat),
     // tekshiruvni dona skan sifatida ochamiz — aks holda skan ko'rsatilmaydigan
     // quti maydoniga ketib, "Mahsulot skan" bo'sh qoladi.
