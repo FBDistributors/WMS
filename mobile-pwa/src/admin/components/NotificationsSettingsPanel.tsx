@@ -187,13 +187,6 @@ export function NotificationsSettingsPanel() {
             {t('admin:settings.notifications.fcm_missing')}
           </Badge>
           <span>{t('admin:settings.notifications.fcm_disabled_short')}</span>
-          {status.fcm_credential_source && status.fcm_credential_source !== 'none' ? (
-            <span className="font-medium">
-              Env: {status.fcm_credential_source}
-            </span>
-          ) : (
-            <span className="font-medium">Env: none</span>
-          )}
         </div>
       ) : null}
 
