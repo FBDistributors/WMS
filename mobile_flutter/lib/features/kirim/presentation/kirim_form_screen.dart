@@ -2636,6 +2636,10 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                         value: 'wrong_shipment',
                         child: Text(StringLookup.t(appLoc, 'returnsReasonWrongShipment')),
                       ),
+                      DropdownMenuItem<String>(
+                        value: 'expired',
+                        child: Text(StringLookup.t(appLoc, 'returnsReasonExpired')),
+                      ),
                     ],
                     onChanged: (String? v) => setState(() => _returnReasonCode = v),
                   ),
@@ -2721,65 +2725,31 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                   ],
                 ],
                 if (_flow == 'return' && _product != null) ...<Widget>[
-                  Text(
-                    StringLookup.t(appLoc, 'kirimBatchFefo'),
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  if (_product!.locations.isNotEmpty) ...<Widget>[
-                    const SizedBox(height: 6),
-                    Text(
-                      StringLookup.t(appLoc, 'returnsFefoSuggestionHint'),
-                      style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
-                    ),
-                    const SizedBox(height: 4),
-                  ],
+                  // Lokatsiya controllerga ko'rsatilmaydi — joy faqat yakunlash
+                  // (complete) bosqichida tanlanadi. Bu yerda: partiya + miqdor +
+                  // muddat. Muddat mahsulot yuklanganda FEFO'dan avtomatik
+                  // to'ldiriladi (ko'rinmas holda), controller o'zgartira oladi.
                   if (_product!.locations.isEmpty) ...<Widget>[
-                    const SizedBox(height: 6),
                     Text(
                       StringLookup.t(appLoc, 'returnsNoStockInWarehouse'),
                       style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      StringLookup.t(appLoc, 'returnsNoStockSelectLocationHint'),
-                      style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _returnManualBatch,
-                      textCapitalization: TextCapitalization.characters,
-                      decoration: InputDecoration(
-                        labelText: StringLookup.t(appLoc, 'kirimBatchLabel'),
-                        border: const OutlineInputBorder(),
-                        suffixIcon: buildInputClearButton(
-                          visible: _returnManualBatch.text.trim().isNotEmpty,
-                          onPressed: () => setState(() => _returnManualBatch.clear()),
-                        ),
-                      ),
-                      onChanged: (_) => setState(() {}),
-                    ),
                     const SizedBox(height: 12),
                   ],
-                  if (_product!.locations.isNotEmpty)
-                    ..._sortFefo(_product!.locations).map((PickerProductLocation loc) {
-                      return ListTile(
-                        title: Text(
-                          '${StringLookup.t(appLoc, 'kirimFefoLocationPrefix')}${loc.locationCode}',
-                        ),
-                        subtitle: Text(
-                          '${StringLookup.t(appLoc, 'kirimFefoQtyPrefix')}${loc.availableQty.toStringAsFixed(0)} · '
-                          '${StringLookup.t(appLoc, 'kirimFefoExpiryPrefix')}${formatExpiryMonthYear(loc.expiryDate)}',
-                        ),
-                        tileColor: null,
-                        onTap: () {
-                          FocusManager.instance.primaryFocus?.unfocus();
-                          setState(() {
-                            _returnPick = loc;
-                            _returnLineExpiry = loc.expiryDate;
-                          });
-                        },
-                      );
-                    }),
+                  TextField(
+                    controller: _returnManualBatch,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: InputDecoration(
+                      labelText: StringLookup.t(appLoc, 'kirimBatchLabel'),
+                      border: const OutlineInputBorder(),
+                      suffixIcon: buildInputClearButton(
+                        visible: _returnManualBatch.text.trim().isNotEmpty,
+                        onPressed: () => setState(() => _returnManualBatch.clear()),
+                      ),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  const SizedBox(height: 12),
                   TextField(
                     controller: _qty,
                     keyboardType: kStockQtyKeyboardType,

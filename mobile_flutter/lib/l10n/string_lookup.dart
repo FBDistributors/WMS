@@ -340,6 +340,7 @@ abstract final class StringLookup {
     'returnsReasonCustomerReturn': 'Mijoz qaytimi',
     'returnsReasonDamaged': 'Brak',
     'returnsReasonWrongShipment': 'Noto‘g‘ri jo‘natilgan',
+    'returnsReasonExpired': 'Muddati o‘tgan',
     'returnsCustomerRequired': 'Mijozni tanlang.',
     'returnsAddAtLeastOne': 'Kamida bitta qator qo‘shing',
     'returnsNoStockInWarehouse':
@@ -793,6 +794,7 @@ abstract final class StringLookup {
     'returnsReasonCustomerReturn': 'Клиентский возврат',
     'returnsReasonDamaged': 'Брак',
     'returnsReasonWrongShipment': 'Ошибочная отгрузка',
+    'returnsReasonExpired': 'Просроченный',
     'returnsCustomerRequired': 'Выберите клиента.',
     'returnsAddAtLeastOne': 'Добавьте хотя бы одну позицию',
     'returnsNoStockInWarehouse':
@@ -1247,6 +1249,7 @@ abstract final class StringLookup {
     'returnsReasonCustomerReturn': 'Customer return',
     'returnsReasonDamaged': 'Damaged',
     'returnsReasonWrongShipment': 'Wrong shipment',
+    'returnsReasonExpired': 'Expired',
     'returnsCustomerRequired': 'Select a customer.',
     'returnsAddAtLeastOne': 'Add at least one line',
     'returnsNoStockInWarehouse':

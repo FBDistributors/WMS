@@ -84,6 +84,32 @@ def test_create_customer_return_accepts_qty_without_available_cap(
     assert float(data["lines"][0]["qty"]) == 999.0
 
 
+def test_create_customer_return_accepts_expired_reason_code(
+    client: TestClient,
+    db_session: Session,
+):
+    _seed_admin_user(db_session)
+    product, location = _seed_product_and_location(db_session)
+    headers = _login_headers(client, "returns_admin", "testpass123")
+
+    payload = {
+        "customer_id": "C0EX",
+        "customer_name": "Customer Expired",
+        "reason_code": "expired",
+        "lines": [
+            {
+                "product_id": str(product.id),
+                "qty": 3,
+                "product_name": product.name,
+            }
+        ],
+    }
+
+    resp = client.post("/api/v1/customer-returns", json=payload, headers=headers)
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["reason_code"] == "expired"
+
+
 def test_create_customer_return_requires_reason_code(
     client: TestClient,
     db_session: Session,

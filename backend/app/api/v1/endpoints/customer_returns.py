@@ -30,7 +30,7 @@ from app.models.stock import StockMovement as StockMovementModel
 from app.models.user import User as UserModel
 
 router = APIRouter()
-RETURN_REASON_CODES = {"customer_return", "damaged", "wrong_shipment"}
+RETURN_REASON_CODES = {"customer_return", "damaged", "wrong_shipment", "expired"}
 
 
 def _is_missing_reason_code_column_error(exc: Exception) -> bool:
