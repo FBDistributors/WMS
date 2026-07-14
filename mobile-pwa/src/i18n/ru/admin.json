@@ -278,6 +278,11 @@
     }
   },
   "smartupReturns": {
+    "detail_title": "Детали возврата",
+    "detail_products": "Товары ({{count}})",
+    "detail_reason": "ID причины",
+    "detail_deal": "Deal ID",
+    "line_warehouse": "Склад",
     "title": "SmartUp возвраты",
     "subtitle": "Возвраты клиентов, синхронизированные из SmartUp (последние 30 дней)",
     "sync_btn": "Обновить из SmartUp",

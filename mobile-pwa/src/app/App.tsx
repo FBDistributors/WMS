@@ -35,6 +35,7 @@ import { AuditLogsPage } from '../pages/admin/AuditLogsPage'
 import { KamomatlarPage } from '../pages/admin/KamomatlarPage'
 import { ReturnsHistoryPage } from '../pages/admin/ReturnsHistoryPage'
 import { SmartupReturnsPage } from '../pages/admin/SmartupReturnsPage'
+import { SmartupReturnDetailPage } from '../pages/admin/SmartupReturnDetailPage'
 import { AppFeedbackPage } from '../pages/admin/AppFeedbackPage'
 import { ReturnDetailsPage } from '../pages/admin/ReturnDetailsPage'
 import { MahsulotYoqQilishPage } from '../pages/admin/MahsulotYoqQilishPage'
@@ -638,6 +639,16 @@ export function App() {
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">
               <RequirePermission permission="orders:read">
                 <SmartupReturnsPage />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/smartup-returns/:id"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="orders:read">
+                <SmartupReturnDetailPage />
               </RequirePermission>
             </RequirePermission>
           }

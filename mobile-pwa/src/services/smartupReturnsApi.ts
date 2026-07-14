@@ -50,6 +50,10 @@ export async function getSmartupReturns(params: {
   return fetchJSON<SmartupReturnsListResponse>(`/api/v1/smartup-returns?${sp.toString()}`)
 }
 
+export async function getSmartupReturn(id: string) {
+  return fetchJSON<SmartupReturn>(`/api/v1/smartup-returns/${id}`)
+}
+
 export async function syncSmartupReturns() {
   return fetchJSON<SmartupReturnsSyncResponse>('/api/v1/smartup-returns/sync?days=30', {
     method: 'POST',

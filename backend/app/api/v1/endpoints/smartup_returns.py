@@ -118,6 +118,23 @@ def list_smartup_returns(
     return SmartupReturnsListResponse(items=[_to_out(r) for r in rows], total=total)
 
 
+@router.get("/{return_id}", response_model=SmartupReturnOut, summary="Bitta qaytarish (mahsulotlari bilan)")
+def get_smartup_return(
+    return_id: UUID,
+    db: Session = Depends(get_db),
+    _user=Depends(require_any_permission(["reports:read", "audit:read", "admin:access"])),
+) -> SmartupReturnOut:
+    row = (
+        db.query(SmartupReturn)
+        .options(selectinload(SmartupReturn.lines))
+        .filter(SmartupReturn.id == return_id)
+        .one_or_none()
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Qaytarish topilmadi")
+    return _to_out(row)
+
+
 @router.post("/sync", response_model=SmartupReturnsSyncResponse, summary="SmartUp'dan oxirgi 30 kunni sinxronlash")
 def sync_smartup_returns(
     days: int = Query(30, ge=1, le=90),

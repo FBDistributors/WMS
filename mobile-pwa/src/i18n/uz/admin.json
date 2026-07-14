@@ -278,6 +278,11 @@
     }
   },
   "smartupReturns": {
+    "detail_title": "Qaytarish tafsiloti",
+    "detail_products": "Mahsulotlar ({{count}})",
+    "detail_reason": "Sabab ID",
+    "detail_deal": "Deal ID",
+    "line_warehouse": "Ombor",
     "title": "SmartUp qaytimlar",
     "subtitle": "SmartUp'dan sinxronlangan mijoz qaytarishlari (oxirgi 30 kun)",
     "sync_btn": "SmartUp'dan yangilash",

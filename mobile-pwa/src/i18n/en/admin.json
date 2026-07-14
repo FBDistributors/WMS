@@ -278,6 +278,11 @@
     }
   },
   "smartupReturns": {
+    "detail_title": "Return detail",
+    "detail_products": "Products ({{count}})",
+    "detail_reason": "Reason ID",
+    "detail_deal": "Deal ID",
+    "line_warehouse": "Warehouse",
     "title": "SmartUp returns",
     "subtitle": "Customer returns synced from SmartUp (last 30 days)",
     "sync_btn": "Sync from SmartUp",

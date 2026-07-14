@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, ChevronRight, RefreshCw, Search } from 'lucide-react'
+import { ChevronRight, RefreshCw, Search } from 'lucide-react'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { Button } from '../../components/ui/button'
@@ -21,6 +22,7 @@ function formatAmount(n: number | null): string {
 
 export function SmartupReturnsPage() {
   const { t } = useTranslation(['admin', 'common'])
+  const navigate = useNavigate()
   const { showSuccess, showError } = useAppToast()
   const [rows, setRows] = useState<SmartupReturn[]>([])
   const [total, setTotal] = useState(0)
@@ -29,7 +31,6 @@ export function SmartupReturnsPage() {
   const [query, setQuery] = useState('')
   const [search, setSearch] = useState('')
   const [offset, setOffset] = useState(0)
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -71,15 +72,6 @@ export function SmartupReturnsPage() {
   const onSearch = () => {
     setOffset(0)
     setSearch(query)
-  }
-
-  const toggle = (id: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
   }
 
   const pageInfo = useMemo(() => {
@@ -149,69 +141,34 @@ export function SmartupReturnsPage() {
                   </td>
                 </tr>
               ) : null}
-              {rows.map((r) => {
-                const open = expanded.has(r.id)
-                return (
-                  <>
-                    <tr
-                      key={r.id}
-                      className="cursor-pointer border-b border-slate-50 hover:bg-slate-50 dark:border-slate-800/60 dark:hover:bg-slate-800/40"
-                      onClick={() => toggle(r.id)}
-                    >
-                      <td className="px-3 py-3 text-slate-400">
-                        {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                      </td>
-                      <td className="px-3 py-3 whitespace-nowrap text-slate-700 dark:text-slate-200">
-                        {r.return_date ?? '—'}
-                      </td>
-                      <td className="px-3 py-3 font-medium text-slate-900 dark:text-slate-100">
-                        {r.person_name ?? '—'}
-                      </td>
-                      <td className="px-3 py-3 text-slate-500">{r.order_deal_id ?? '—'}</td>
-                      <td className="px-3 py-3 text-right tabular-nums">{r.lines_count}</td>
-                      <td className="px-3 py-3 text-right tabular-nums font-semibold text-rose-600 dark:text-rose-400">
-                        {formatAmount(r.total_amount)}
-                      </td>
-                      <td className="px-3 py-3 text-slate-500">{r.sales_manager_name ?? '—'}</td>
-                      <td className="px-3 py-3">
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                          {r.status ?? '—'}
-                        </span>
-                      </td>
-                    </tr>
-                    {open ? (
-                      <tr key={`${r.id}-lines`} className="bg-slate-50/60 dark:bg-slate-800/30">
-                        <td colSpan={8} className="px-6 py-3">
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-xs">
-                              <thead>
-                                <tr className="text-left text-slate-400">
-                                  <th className="py-1 pr-4">{t('admin:smartupReturns.line_product')}</th>
-                                  <th className="py-1 pr-4 text-right">{t('admin:smartupReturns.line_qty')}</th>
-                                  <th className="py-1 pr-4 text-right">{t('admin:smartupReturns.line_price')}</th>
-                                  <th className="py-1 pr-4">{t('admin:smartupReturns.line_expiry')}</th>
-                                  <th className="py-1 pr-4">{t('admin:smartupReturns.line_action')}</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {r.lines.map((l, i) => (
-                                  <tr key={i} className="text-slate-700 dark:text-slate-200">
-                                    <td className="py-1 pr-4">{l.product_name ?? l.product_code ?? '—'}</td>
-                                    <td className="py-1 pr-4 text-right tabular-nums">{l.return_quant ?? '—'}</td>
-                                    <td className="py-1 pr-4 text-right tabular-nums">{formatAmount(l.product_price)}</td>
-                                    <td className="py-1 pr-4">{l.expiry_date ?? '—'}</td>
-                                    <td className="py-1 pr-4">{l.action_name ?? '—'}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : null}
-                  </>
-                )
-              })}
+              {rows.map((r) => (
+                <tr
+                  key={r.id}
+                  className="cursor-pointer border-b border-slate-50 hover:bg-slate-50 dark:border-slate-800/60 dark:hover:bg-slate-800/40"
+                  onClick={() => navigate(`/admin/smartup-returns/${r.id}`)}
+                >
+                  <td className="px-3 py-3 text-slate-400">
+                    <ChevronRight className="h-4 w-4" />
+                  </td>
+                  <td className="px-3 py-3 whitespace-nowrap text-slate-700 dark:text-slate-200">
+                    {r.return_date ?? '—'}
+                  </td>
+                  <td className="px-3 py-3 font-medium text-slate-900 dark:text-slate-100">
+                    {r.person_name ?? '—'}
+                  </td>
+                  <td className="px-3 py-3 text-slate-500">{r.order_deal_id ?? '—'}</td>
+                  <td className="px-3 py-3 text-right tabular-nums">{r.lines_count}</td>
+                  <td className="px-3 py-3 text-right tabular-nums font-semibold text-rose-600 dark:text-rose-400">
+                    {formatAmount(r.total_amount)}
+                  </td>
+                  <td className="px-3 py-3 text-slate-500">{r.sales_manager_name ?? '—'}</td>
+                  <td className="px-3 py-3">
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                      {r.status ?? '—'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
