@@ -74,6 +74,10 @@ final openPickTasksProvider =
 );
 
 class PickTaskDetailNotifier extends AutoDisposeFamilyAsyncNotifier<PickingDocument, String> {
+  /// Har optimistik pick yangilanishida oshadi — eskirgan reconcile fetch
+  /// yangiroq holatni ustiga yozib yubormasligi uchun (poyga himoyasi).
+  int _pickSeq = 0;
+
   Future<void> _silentFetch(String taskId) async {
     try {
       final PickingDocument d =
@@ -119,7 +123,34 @@ class PickTaskDetailNotifier extends AutoDisposeFamilyAsyncNotifier<PickingDocum
     final PickingDocument next = cur.applyPickLineResponse(res);
     final OfflineDatabase? db = await ref.read(offlineDatabaseProvider.future);
     await db?.saveCachedPickTaskDetail(taskId, next.toJson());
+    final int seq = ++_pickSeq;
     state = AsyncData<PickingDocument>(next);
+    // Bitta qatorli javob server tomonidagi kaskadlarni (qo'shni promo qatori,
+    // hujjat holati va h.k.) to'liq aks ettirmasligi mumkin — natijada karta
+    // yashil bo'lmay qolib, faqat chiqib-kirgach yangilanadi. Jimgina qayta
+    // o'qib, holatni server bilan moslashtiramiz (spinner yo'q). Oraliqda
+    // yangiroq pick bo'lsa (seq o'zgargan bo'lsa), natija tashlab yuboriladi.
+    final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
+    if (online) {
+      unawaited(_reconcileAfterPick(taskId, seq));
+    }
+  }
+
+  Future<void> _reconcileAfterPick(String taskId, int seq) async {
+    try {
+      final PickingDocument d =
+          await ref.read(pickingRepositoryProvider).getTaskById(taskId);
+      if (seq != _pickSeq) {
+        return; // Oraliqda yangiroq optimistik yangilanish bo'ldi — ustiga yozmaymiz.
+      }
+      final OfflineDatabase? db = await ref.read(offlineDatabaseProvider.future);
+      await db?.saveCachedPickTaskDetail(taskId, d.toJson());
+      state = AsyncData<PickingDocument>(d);
+    } on Object catch (e) {
+      if (kDebugMode) {
+        debugPrint('PickTaskDetailNotifier reconcile after pick: $e');
+      }
+    }
   }
 }
 
