@@ -183,6 +183,11 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   _InvLocGroup? _invScanSelectedGroup;
   bool _invSubmitting = false;
   bool _invResolving = false;
+  /// Jonli qidiruv (idle input): mahsulot takliflari + debounce.
+  Timer? _invSearchDebounce;
+  List<PickerInventoryItem> _invSearchProducts = const <PickerInventoryItem>[];
+  bool _invSearchLoading = false;
+  int _invSearchSeq = 0;
   String? _invHandledLocationStr;
   List<String> _invRecentLocations = <String>[];
   bool _invRecentsLoaded = false;
@@ -205,6 +210,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   @override
   void dispose() {
     _customerDebounce?.cancel();
+    _invSearchDebounce?.cancel();
     _customerSearchController.dispose();
     _invManualInput.dispose();
     for (final TextEditingController c in _invQtyCtrls.values) {
@@ -1260,6 +1266,77 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     }
   }
 
+  /// Jonli qidiruv: harf kiritilishi bilan joy (lokal) + mahsulot (API, debounce)
+  /// takliflari dropdown'da ko'rsatiladi.
+  void _invOnManualInputChanged(String v) {
+    _invSearchDebounce?.cancel();
+    final String q = v.trim();
+    if (q.isEmpty) {
+      setState(() {
+        _invSearchProducts = const <PickerInventoryItem>[];
+        _invSearchLoading = false;
+      });
+      return;
+    }
+    if (q.length < 2) {
+      // Joy takliflari lokal — darhol; mahsulot qidiruvi 2+ belgidan.
+      setState(() {
+        _invSearchProducts = const <PickerInventoryItem>[];
+        _invSearchLoading = false;
+      });
+      return;
+    }
+    setState(() => _invSearchLoading = true);
+    _invSearchDebounce = Timer(
+      const Duration(milliseconds: 350),
+      () => unawaited(_invLoadProductSuggestions(q)),
+    );
+  }
+
+  Future<void> _invLoadProductSuggestions(String q) async {
+    final int seq = ++_invSearchSeq;
+    try {
+      final PickerInventoryListResponse res = await ref
+          .read(inventoryRepositoryProvider)
+          .listPickerInventory(q: q, limit: 6);
+      if (!mounted || seq != _invSearchSeq) {
+        return;
+      }
+      setState(() {
+        _invSearchProducts = res.items;
+        _invSearchLoading = false;
+      });
+    } on Exception {
+      if (!mounted || seq != _invSearchSeq) {
+        return;
+      }
+      setState(() {
+        _invSearchProducts = const <PickerInventoryItem>[];
+        _invSearchLoading = false;
+      });
+    }
+  }
+
+  List<PickerLocationOption> _invLocationSuggestions() {
+    final String q = _invManualInput.text.trim().toLowerCase();
+    if (q.isEmpty) {
+      return const <PickerLocationOption>[];
+    }
+    return _invAllLocations
+        .where((PickerLocationOption l) =>
+            l.code.toLowerCase().contains(q) || l.name.toLowerCase().contains(q))
+        .take(6)
+        .toList(growable: false);
+  }
+
+  void _invClearSearchState() {
+    _invSearchDebounce?.cancel();
+    _invSearchSeq++;
+    _invManualInput.clear();
+    _invSearchProducts = const <PickerInventoryItem>[];
+    _invSearchLoading = false;
+  }
+
   /// Universal kirish: kod lokatsiyami yoki mahsulot barkodimi — o'zi aniqlaydi.
   Future<void> _invHandleCode(String raw) async {
     final String code = raw.trim();
@@ -1366,6 +1443,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
 
   void _invOpenLocation(PickerLocationOption loc) {
     setState(() {
+      _invClearSearchState();
       _invView = 'location';
       _invLocation = loc;
       _invExpandedBoxKey = null;
@@ -1378,6 +1456,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
 
   void _invOpenProduct(String productId) {
     setState(() {
+      _invClearSearchState();
       _invView = 'product';
       _invScanSelectedGroup = null;
       _invLocation = null;
@@ -1389,6 +1468,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
 
   void _invResetToIdle() {
     setState(() {
+      _invClearSearchState();
       _invView = 'idle';
       _invLocation = null;
       _invContents = null;
@@ -1632,40 +1712,44 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                 ),
               ),
             ),
-            if (_invView == 'idle') _invHeaderWarehouseSegment() else _invHeaderScanButton(),
+            if (_invView != 'idle') _invHeaderScanButton(),
           ],
         ),
       ),
     );
   }
 
-  Widget _invHeaderWarehouseSegment() {
+  /// Ombor segmenti — idle sahifa yuqorisida (headerda emas), to'liq enli.
+  Widget _invWarehouseBodySegment() {
     Widget seg(String value, String label) {
       final bool active = _invWarehouse == value;
-      return InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: () {
-          if (_invWarehouse == value) {
-            return;
-          }
-          setState(() {
-            _invWarehouse = value;
-            _invAllLocations = const <PickerLocationOption>[];
-          });
-          unawaited(_loadInvLocations());
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-          decoration: BoxDecoration(
-            color: active ? Colors.white : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: active ? _invAccent : Colors.white,
+      return Expanded(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(9),
+          onTap: () {
+            if (_invWarehouse == value) {
+              return;
+            }
+            setState(() {
+              _invWarehouse = value;
+              _invAllLocations = const <PickerLocationOption>[];
+            });
+            unawaited(_loadInvLocations());
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: active ? _invAccent : Colors.transparent,
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: active ? Colors.white : _invTextSecondary,
+              ),
             ),
           ),
         ),
@@ -1673,15 +1757,15 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.all(2),
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: .14),
-        borderRadius: BorderRadius.circular(10),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _invHairline),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          seg('main', 'Asosiy'),
+          seg('main', 'Asosiy ombor'),
           seg('showroom', 'Showroom'),
         ],
       ),
@@ -1735,6 +1819,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       children: <Widget>[
+        _invWarehouseBodySegment(),
+        const SizedBox(height: 14),
         Container(
           decoration: _invCardDecoration(),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -1825,9 +1911,11 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                           ),
                   ),
                   textInputAction: TextInputAction.search,
+                  onChanged: _invOnManualInputChanged,
                   onSubmitted: (String v) => unawaited(_invHandleCode(v)),
                 ),
               ),
+              _invSearchDropdown(),
             ],
           ),
         ),
@@ -1883,6 +1971,107 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           ),
         ],
       ],
+    );
+  }
+
+  /// Jonli qidiruv dropdown'i: joylar (lokal) + mahsulotlar (API).
+  Widget _invSearchDropdown() {
+    final String q = _invManualInput.text.trim();
+    if (q.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final List<PickerLocationOption> locs = _invLocationSuggestions();
+    final bool showProducts = _invSearchLoading || _invSearchProducts.isNotEmpty;
+    if (locs.isEmpty && !showProducts) {
+      return const SizedBox.shrink();
+    }
+
+    Widget sectionLabel(String text) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+        child: Text(
+          text,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            color: _invTextFaded,
+            letterSpacing: .4,
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      constraints: const BoxConstraints(maxHeight: 280),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _invHairline),
+      ),
+      child: ListView(
+        shrinkWrap: true,
+        padding: const EdgeInsets.only(bottom: 6),
+        children: <Widget>[
+          if (locs.isNotEmpty) sectionLabel('JOYLAR'),
+          ...locs.map((PickerLocationOption l) {
+            return ListTile(
+              dense: true,
+              visualDensity: VisualDensity.compact,
+              leading: const Icon(Icons.location_on_outlined, size: 20, color: _invAccent),
+              title: Text(
+                l.code,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: _invTextMain,
+                ),
+              ),
+              subtitle: l.name.isNotEmpty && l.name != l.code
+                  ? Text(
+                      l.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12, color: _invTextSecondary),
+                    )
+                  : null,
+              onTap: () => _invOpenLocation(l),
+            );
+          }),
+          if (showProducts) sectionLabel('MAHSULOTLAR'),
+          if (_invSearchLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              child: LinearProgressIndicator(minHeight: 2),
+            ),
+          ..._invSearchProducts.map((PickerInventoryItem i) {
+            final String meta = <String>[
+              if ((i.mainBarcode ?? '').trim().isNotEmpty) i.mainBarcode!.trim(),
+              if (i.code.trim().isNotEmpty) i.code.trim(),
+            ].join(' · ');
+            return ListTile(
+              dense: true,
+              visualDensity: VisualDensity.compact,
+              leading: const Icon(Icons.inventory_2_outlined, size: 20, color: _invAccent),
+              title: Text(
+                i.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: _invTextMain),
+              ),
+              subtitle: meta.isEmpty
+                  ? null
+                  : Text(
+                      meta,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12, color: _invTextSecondary),
+                    ),
+              onTap: () => _invOpenProduct(i.productId),
+            );
+          }),
+        ],
+      ),
     );
   }
 
