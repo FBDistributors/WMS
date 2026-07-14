@@ -22,6 +22,7 @@ from app.models.location import Location as LocationModel
 from app.models.order import Order as OrderModel
 from app.models.order import OrderWmsState as OrderWmsStateModel
 from app.models.picking import PickRequest
+from app.models.settings_organization import SettingsOrganization
 from app.models.stock import StockMovement as StockMovementModel
 from app.models.product import Product as ProductModel
 from app.models.user import User as UserModel
@@ -739,6 +740,7 @@ def _picking_cancel_meta(db: Optional[Session], doc: DocumentModel) -> tuple[Opt
 
 def _to_picking_document(doc: DocumentModel, db: Optional[Session] = None) -> PickingDocument:
     lines = getattr(doc, "lines", None) or []
+    org_names = _load_org_names(db) if db is not None else None
     wms, sid = _picking_cancel_meta(db, doc)
     return PickingDocument(
         id=doc.id,
@@ -754,7 +756,7 @@ def _to_picking_document(doc: DocumentModel, db: Optional[Session] = None) -> Pi
         order_number=_order_number(doc),
         order_wms_status=wms,
         customer_id=_customer_id(doc),
-        customer_name=_customer_name(doc),
+        customer_name=_customer_name(doc, org_names),
         safe_cancel_return_session_id=sid,
         sent_to_controller_at=doc.sent_to_controller_at,
         controller_verification_started_at=doc.controller_verification_started_at,
@@ -772,6 +774,7 @@ def _to_picking_document_with_lines(
         plines = _picking_lines_with_alternates(db, doc, lines)
     else:
         plines = [_to_picking_line(line) for line in lines]
+    org_names = _load_org_names(db) if db is not None else None
     wms, sid = _picking_cancel_meta(db, doc)
     return PickingDocument(
         id=doc.id,
@@ -787,7 +790,7 @@ def _to_picking_document_with_lines(
         order_number=_order_number(doc),
         order_wms_status=wms,
         customer_id=_customer_id(doc),
-        customer_name=_customer_name(doc),
+        customer_name=_customer_name(doc, org_names),
         safe_cancel_return_session_id=sid,
         sent_to_controller_at=doc.sent_to_controller_at,
         controller_verification_started_at=doc.controller_verification_started_at,
@@ -819,18 +822,33 @@ def _customer_id(doc: DocumentModel) -> Optional[str]:
     return s or None
 
 
-def _customer_name(doc: DocumentModel) -> Optional[str]:
+def _load_org_names(db: Session) -> dict[str, str]:
+    """settings_organizations dan {org_id: name} xaritasi (kam yozuv, bir marta yuklanadi)."""
+    rows = db.query(SettingsOrganization.org_id, SettingsOrganization.name).all()
+    return {r[0]: r[1].strip() for r in rows if r[0] and r[1] and r[1].strip()}
+
+
+def _customer_name(
+    doc: DocumentModel, org_names: Optional[dict[str, str]] = None
+) -> Optional[str]:
     order = getattr(doc, "order", None)
     if not order:
         return None
     cn = getattr(order, "customer_name", None)
-    if cn is None:
-        return None
-    s = str(cn).strip()
-    return s or None
+    if cn is not None and str(cn).strip():
+        return str(cn).strip()
+    # Tashkiliy harakat (diller/MFM): mijoz yo'q — manzil filial nomi ko'rsatiladi
+    # (to_filial_code -> settings_organizations.name), aks holda harakat izohi.
+    to_filial = (getattr(order, "to_filial_code", None) or "").strip()
+    if org_names and to_filial and to_filial in org_names:
+        return org_names[to_filial]
+    note = (getattr(order, "movement_note", None) or "").strip()
+    return note or None
 
 
-def _to_picking_list_item(doc: DocumentModel) -> PickingListItem:
+def _to_picking_list_item(
+    doc: DocumentModel, org_names: Optional[dict[str, str]] = None
+) -> PickingListItem:
     lines_total = len(doc.lines)
     lines_done = sum(
         1
@@ -865,7 +883,7 @@ def _to_picking_list_item(doc: DocumentModel) -> PickingListItem:
         order_number=_order_number(doc),
         delivery_number=_delivery_number(doc),
         customer_id=_customer_id(doc),
-        customer_name=_customer_name(doc),
+        customer_name=_customer_name(doc, org_names),
         order_wms_status=wms_status,
         sent_to_controller_at=doc.sent_to_controller_at,
         controller_verification_started_at=doc.controller_verification_started_at,
@@ -1051,7 +1069,8 @@ async def list_picking_documents(
         query = query.filter(OrderWmsStateModel.status.in_(("completed", "packed", "shipped")))
     try:
         docs = query.order_by(DocumentModel.created_at.desc()).offset(offset).limit(limit).all()
-        return [_to_picking_list_item(doc) for doc in docs]
+        org_names = _load_org_names(db)
+        return [_to_picking_list_item(doc, org_names) for doc in docs]
     except Exception as e:
         logger.exception("list_picking_documents error")
         raise HTTPException(status_code=500, detail="Internal error") from e
