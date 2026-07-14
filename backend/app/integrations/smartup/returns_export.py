@@ -22,7 +22,9 @@ from app.models.smartup_return import SmartupReturn, SmartupReturnLine
 
 logger = logging.getLogger(__name__)
 
-RETURN_EXPORT_PATH = "b/anor/mxsx/mdeal/return$export"
+# To'liq URL — env override (`SMARTUP_RETURN_EXPORT_URL`) yoki standart.
+# WMS per-endpoint URL naqshini ishlatadi (SMARTUP_BASE_URL emas).
+DEFAULT_RETURN_EXPORT_URL = "https://smartup.online/b/anor/mxsx/mdeal/return$export"
 
 
 def _none(v: Any) -> Optional[str]:
@@ -72,18 +74,12 @@ def _parse_dt(v: Any) -> Optional[datetime]:
 def fetch_returns_raw(days: int = 30, client: Optional[SmartupClient] = None) -> list[dict]:
     """return$export ni oxirgi `days` kun uchun chaqirib, xom qatorlar ro'yxatini qaytaradi."""
     client = client or SmartupClient()
-    if not client.base_url:
-        raise RuntimeError("SMARTUP_BASE_URL sozlanmagan")
     if not client.username or not client.password:
         raise RuntimeError("SMARTUP_BASIC_USER yoki SMARTUP_BASIC_PASS sozlanmagan")
 
     end = date.today()
     begin = end - timedelta(days=days)
-    raw_base = client.base_url.rstrip("/")
-    if "return$export" in raw_base:
-        url = raw_base
-    else:
-        url = f"{raw_base}/{RETURN_EXPORT_PATH}"
+    url = (os.getenv("SMARTUP_RETURN_EXPORT_URL") or DEFAULT_RETURN_EXPORT_URL).strip()
 
     payload = {
         "filial_codes": [{"filial_code": ""}],
