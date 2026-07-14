@@ -6,6 +6,7 @@
     "brands": "Бренды",
     "orders": "Заказы",
     "returns_history": "Возвраты",
+    "smartup_returns": "SmartUp возвраты",
     "vip_customers": "VIP клиенты",
     "work_zones": "Work zone",
     "settings": "Настройки",
@@ -275,6 +276,28 @@
         "completed": "Завершено"
       }
     }
+  },
+  "smartupReturns": {
+    "title": "SmartUp возвраты",
+    "subtitle": "Возвраты клиентов, синхронизированные из SmartUp (последние 30 дней)",
+    "sync_btn": "Обновить из SmartUp",
+    "sync_result": "Обновлено: получено {{fetched}} · новых {{created}} · обновлено {{updated}}",
+    "sync_error": "Ошибка синхронизации",
+    "load_error": "Не удалось загрузить возвраты",
+    "search_placeholder": "Имя клиента, deal ID или заказ №",
+    "empty": "Возвраты не найдены",
+    "col_date": "Дата",
+    "col_customer": "Клиент",
+    "col_order": "Заказ №",
+    "col_products": "Товары",
+    "col_amount": "Сумма",
+    "col_manager": "Продавец",
+    "col_status": "Статус",
+    "line_product": "Товар",
+    "line_qty": "Кол-во",
+    "line_price": "Цена",
+    "line_expiry": "Срок",
+    "line_action": "Акция"
   },
   "returns_history": {
     "load_error": "Не удалось загрузить историю возвратов",

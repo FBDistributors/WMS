@@ -6,6 +6,7 @@
     "brands": "Brendlar",
     "orders": "Buyurtmalar",
     "returns_history": "Qaytganlar",
+    "smartup_returns": "SmartUp qaytimlar",
     "vip_customers": "VIP mijozlar",
     "work_zones": "Work zone",
     "settings": "Sozlamalar",
@@ -275,6 +276,28 @@
         "completed": "Yakunlangan"
       }
     }
+  },
+  "smartupReturns": {
+    "title": "SmartUp qaytimlar",
+    "subtitle": "SmartUp'dan sinxronlangan mijoz qaytarishlari (oxirgi 30 kun)",
+    "sync_btn": "SmartUp'dan yangilash",
+    "sync_result": "Yangilandi: {{fetched}} ta olindi · {{created}} yangi · {{updated}} yangilandi",
+    "sync_error": "Sinxronlashda xato",
+    "load_error": "Qaytimlarni yuklab bo'lmadi",
+    "search_placeholder": "Mijoz nomi, deal ID yoki buyurtma №",
+    "empty": "Qaytim topilmadi",
+    "col_date": "Sana",
+    "col_customer": "Mijoz",
+    "col_order": "Buyurtma №",
+    "col_products": "Mahsulot",
+    "col_amount": "Summa",
+    "col_manager": "Sotuvchi",
+    "col_status": "Status",
+    "line_product": "Mahsulot",
+    "line_qty": "Miqdor",
+    "line_price": "Narx",
+    "line_expiry": "Muddat",
+    "line_action": "Aksiya"
   },
   "returns_history": {
     "load_error": "Qaytim tarixini yuklab bo'lmadi",

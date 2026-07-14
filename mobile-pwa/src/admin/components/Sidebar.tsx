@@ -14,6 +14,7 @@ import {
   ClipboardCheck,
   ArrowLeftRight,
   Undo2,
+  PackageX,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
@@ -34,6 +35,7 @@ const MENU_ITEMS: Array<MenuItem & { key: string }> = [
   { key: 'brands', label: 'Brands', path: '/admin/brands', icon: Tag, required: 'brands:manage' },
   { key: 'orders', label: 'Orders', path: '/admin/orders', icon: ClipboardList, required: 'orders:read' },
   { key: 'returns_history', label: 'Qaytganlar', path: '/admin/returns-history', icon: Undo2, required: 'orders:read' },
+  { key: 'smartup_returns', label: 'SmartUp qaytimlar', path: '/admin/smartup-returns', icon: PackageX, required: 'orders:read' },
   { key: 'locations', label: 'Locations', path: '/admin/locations', icon: MapPin, required: 'locations:manage' },
   { key: 'inventory', label: 'Qoldiq', path: '/admin/inventory', icon: Boxes, required: 'inventory:read' },
   { key: 'movement', label: 'Movement', path: '/admin/movement', icon: ArrowLeftRight, required: 'movements:read' },

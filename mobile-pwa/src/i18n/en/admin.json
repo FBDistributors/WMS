@@ -6,6 +6,7 @@
     "brands": "Brands",
     "orders": "Orders",
     "returns_history": "Returns",
+    "smartup_returns": "SmartUp returns",
     "vip_customers": "VIP customers",
     "work_zones": "Work zone",
     "settings": "Settings",
@@ -275,6 +276,28 @@
         "completed": "Completed"
       }
     }
+  },
+  "smartupReturns": {
+    "title": "SmartUp returns",
+    "subtitle": "Customer returns synced from SmartUp (last 30 days)",
+    "sync_btn": "Sync from SmartUp",
+    "sync_result": "Synced: {{fetched}} fetched · {{created}} new · {{updated}} updated",
+    "sync_error": "Sync failed",
+    "load_error": "Failed to load returns",
+    "search_placeholder": "Customer name, deal ID or order #",
+    "empty": "No returns found",
+    "col_date": "Date",
+    "col_customer": "Customer",
+    "col_order": "Order #",
+    "col_products": "Items",
+    "col_amount": "Amount",
+    "col_manager": "Seller",
+    "col_status": "Status",
+    "line_product": "Product",
+    "line_qty": "Qty",
+    "line_price": "Price",
+    "line_expiry": "Expiry",
+    "line_action": "Promo"
   },
   "returns_history": {
     "load_error": "Failed to load returns history",

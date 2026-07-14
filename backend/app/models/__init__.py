@@ -15,6 +15,7 @@ from app.models.product_box import ProductBox
 from app.models.receipt import Receipt, ReceiptLine
 from app.models.safe_cancel_return import SafeCancelReturnLine, SafeCancelReturnSession
 from app.models.stock import StockLot, StockMovement
+from app.models.smartup_return import SmartupReturn, SmartupReturnLine
 from app.models.smartup_sync import SmartupSyncRun
 from app.models.user import User
 from app.models.user_app_feedback import UserAppFeedback
@@ -61,6 +62,8 @@ __all__ = [
     "SafeCancelReturnSession",
     "StockLot",
     "StockMovement",
+    "SmartupReturn",
+    "SmartupReturnLine",
     "SmartupSyncRun",
     "User",
     "UserAppFeedback",
