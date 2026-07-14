@@ -320,7 +320,15 @@
       "unmapped_intro": "The following products were not found in WMS. Map them before sending.",
       "reason_not_found": "not found",
       "reason_bad_qty": "invalid quantity",
-      "already_dispatched": "Sent to picker"
+      "already_dispatched": "Sent to picker",
+      "select_all": "Select all",
+      "select_row": "Select row",
+      "selected_count": "{{count}} selected",
+      "bulk_btn": "Send to picker ({{count}})",
+      "title_multi": "Send {{count}} returns",
+      "success_multi": "{{count}} returns sent to picker",
+      "result_partial": "{{ok}} sent, {{fail}} failed",
+      "failures_title": "Not sent (product not mapped)"
     }
   },
   "returns_history": {

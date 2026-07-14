@@ -320,7 +320,15 @@
       "unmapped_intro": "Следующие товары не найдены в базе WMS. Свяжите их перед отправкой.",
       "reason_not_found": "не найден",
       "reason_bad_qty": "неверное количество",
-      "already_dispatched": "Отправлен сборщику"
+      "already_dispatched": "Отправлен сборщику",
+      "select_all": "Выбрать все",
+      "select_row": "Выбрать строку",
+      "selected_count": "Выбрано: {{count}}",
+      "bulk_btn": "Отправить сборщику ({{count}})",
+      "title_multi": "Отправить {{count}} возвратов",
+      "success_multi": "{{count}} возвратов отправлено сборщику",
+      "result_partial": "Отправлено: {{ok}}, ошибок: {{fail}}",
+      "failures_title": "Не отправлено (товар не сопоставлен)"
     }
   },
   "returns_history": {

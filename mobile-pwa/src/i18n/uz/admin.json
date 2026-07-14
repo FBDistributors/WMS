@@ -320,7 +320,15 @@
       "unmapped_intro": "Quyidagi mahsulotlar WMS bazasida topilmadi. Yuborishdan oldin ularni bog'lang.",
       "reason_not_found": "topilmadi",
       "reason_bad_qty": "noto'g'ri miqdor",
-      "already_dispatched": "Yig'uvchiga yuborilgan"
+      "already_dispatched": "Yig'uvchiga yuborilgan",
+      "select_all": "Barchasini tanlash",
+      "select_row": "Qatorni tanlash",
+      "selected_count": "{{count}} ta tanlandi",
+      "bulk_btn": "Yig'uvchiga yuborish ({{count}})",
+      "title_multi": "{{count}} ta qaytimni yuborish",
+      "success_multi": "{{count}} ta qaytim yig'uvchiga yuborildi",
+      "result_partial": "{{ok}} ta yuborildi, {{fail}} ta xato",
+      "failures_title": "Yuborilmadi (mahsulot mos kelmadi)"
     }
   },
   "returns_history": {

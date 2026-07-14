@@ -158,10 +158,9 @@ export function SmartupReturnDetailPage() {
 
       <DispatchReturnDialog
         open={dispatchOpen}
-        returnId={item.id}
+        targets={[{ id: item.id, label: item.person_name ?? item.deal_id }]}
         onOpenChange={setDispatchOpen}
         onDispatched={() => {
-          setDispatchOpen(false)
           void load()
         }}
       />

@@ -7,7 +7,10 @@ import { AdminDataTable, type AdminDataTableColumn } from '../../admin/component
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { AdminTablePagination } from '../../admin/components/AdminTablePagination'
 import { ReturnsHubTabs } from '../../admin/components/returns/ReturnsHubTabs'
-import { DispatchReturnDialog } from '../../admin/components/returns/DispatchReturnDialog'
+import {
+  DispatchReturnDialog,
+  type DispatchTarget,
+} from '../../admin/components/returns/DispatchReturnDialog'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -39,13 +42,15 @@ export function SmartupReturnsPage() {
   const [query, setQuery] = useState('')
   const [search, setSearch] = useState('')
   const [offset, setOffset] = useState(0)
-  const [dispatchId, setDispatchId] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [dispatchTargets, setDispatchTargets] = useState<DispatchTarget[] | null>(null)
   const hasLoadedOnceRef = useRef(false)
 
   const load = useCallback(async () => {
     if (!hasLoadedOnceRef.current) setIsLoading(true)
     else setIsRefreshing(true)
     setHasLoadError(false)
+    setSelectedIds(new Set())
     try {
       const res = await getSmartupReturns({ q: search, onlyNew: true, limit: PAGE_SIZE, offset })
       setRows(res.items)
@@ -91,8 +96,64 @@ export function SmartupReturnsPage() {
 
   const showInitialLoading = isLoading && !hasLoadedOnceRef.current
 
+  const allSelected = rows.length > 0 && rows.every((r) => selectedIds.has(r.id))
+  const someSelected = rows.some((r) => selectedIds.has(r.id))
+
+  const toggleAll = useCallback(() => {
+    setSelectedIds((prev) => {
+      const everySelected = rows.length > 0 && rows.every((r) => prev.has(r.id))
+      const next = new Set(prev)
+      if (everySelected) rows.forEach((r) => next.delete(r.id))
+      else rows.forEach((r) => next.add(r.id))
+      return next
+    })
+  }, [rows])
+
+  const toggleOne = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  const openBulkDispatch = () => {
+    const targets: DispatchTarget[] = rows
+      .filter((r) => selectedIds.has(r.id))
+      .map((r) => ({ id: r.id, label: r.person_name ?? r.deal_id }))
+    if (targets.length > 0) setDispatchTargets(targets)
+  }
+
   const columns = useMemo((): AdminDataTableColumn<SmartupReturn>[] => {
     return [
+      {
+        id: 'select',
+        header: (
+          <input
+            type="checkbox"
+            aria-label={t('admin:smartupReturns.dispatch.select_all')}
+            checked={allSelected}
+            ref={(el) => {
+              if (el) el.indeterminate = !allSelected && someSelected
+            }}
+            onChange={toggleAll}
+            onClick={(e) => e.stopPropagation()}
+            className="h-4 w-4 cursor-pointer accent-sky-600"
+          />
+        ),
+        width: '2.75rem',
+        cell: (row) => (
+          <input
+            type="checkbox"
+            aria-label={t('admin:smartupReturns.dispatch.select_row')}
+            checked={selectedIds.has(row.id)}
+            onChange={() => toggleOne(row.id)}
+            onClick={(e) => e.stopPropagation()}
+            className="h-4 w-4 cursor-pointer accent-sky-600"
+          />
+        ),
+      },
       {
         id: 'date',
         header: t('admin:smartupReturns.col_date'),
@@ -160,27 +221,8 @@ export function SmartupReturnsPage() {
           </span>
         ),
       },
-      {
-        id: 'action',
-        header: t('admin:smartupReturns.dispatch.col_action'),
-        width: '11rem',
-        align: 'right',
-        cell: (row) => (
-          <Button
-            variant="secondary"
-            className="h-8 gap-1.5 px-2.5 text-xs"
-            onClick={(e) => {
-              e.stopPropagation()
-              setDispatchId(row.id)
-            }}
-          >
-            <Send size={14} />
-            {t('admin:smartupReturns.dispatch.dispatch_btn')}
-          </Button>
-        ),
-      },
     ]
-  }, [t])
+  }, [t, selectedIds, allSelected, someSelected, toggleAll, toggleOne])
 
   const tableBody = (): ReactNode => {
     if (showInitialLoading) {
@@ -265,6 +307,23 @@ export function SmartupReturnsPage() {
           </Button>
         </div>
 
+        {selectedIds.size > 0 ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm dark:border-sky-500/30 dark:bg-sky-500/10">
+            <span className="font-medium text-sky-800 dark:text-sky-200">
+              {t('admin:smartupReturns.dispatch.selected_count', { count: selectedIds.size })}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" onClick={() => setSelectedIds(new Set())}>
+                {t('common:buttons.cancel')}
+              </Button>
+              <Button className="gap-1.5" onClick={openBulkDispatch}>
+                <Send size={16} />
+                {t('admin:smartupReturns.dispatch.bulk_btn', { count: selectedIds.size })}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
         {tableBody()}
 
         {!showInitialLoading && total > 0 ? (
@@ -279,13 +338,12 @@ export function SmartupReturnsPage() {
       </Card>
 
       <DispatchReturnDialog
-        open={dispatchId != null}
-        returnId={dispatchId}
+        open={dispatchTargets != null}
+        targets={dispatchTargets ?? []}
         onOpenChange={(o) => {
-          if (!o) setDispatchId(null)
+          if (!o) setDispatchTargets(null)
         }}
         onDispatched={() => {
-          setDispatchId(null)
           void load()
         }}
       />

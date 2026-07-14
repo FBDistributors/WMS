@@ -8,7 +8,11 @@ import { getPickerUsers, type PickerUser } from '../../../services/ordersApi'
 import { dispatchSmartupReturn } from '../../../services/smartupReturnsApi'
 import type { ApiError } from '../../../services/apiClient'
 
+export type DispatchTarget = { id: string; label: string }
+
 type UnmappedItem = { product_code: string | null; product_name: string | null; reason: string }
+
+type DispatchFailure = { label: string; items: UnmappedItem[] | null; message: string | null }
 
 function parseUnmapped(err: unknown): UnmappedItem[] | null {
   if (!err || typeof err !== 'object' || !('details' in err)) return null
@@ -27,14 +31,14 @@ function parseUnmapped(err: unknown): UnmappedItem[] | null {
 
 type DispatchReturnDialogProps = {
   open: boolean
-  returnId: string | null
+  targets: DispatchTarget[]
   onOpenChange: (open: boolean) => void
   onDispatched: () => void
 }
 
 export function DispatchReturnDialog({
   open,
-  returnId,
+  targets,
   onOpenChange,
   onDispatched,
 }: DispatchReturnDialogProps) {
@@ -45,16 +49,16 @@ export function DispatchReturnDialog({
   const [isLoadingPickers, setIsLoadingPickers] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [validationError, setValidationError] = useState<string | null>(null)
-  const [unmapped, setUnmapped] = useState<UnmappedItem[] | null>(null)
+  const [failures, setFailures] = useState<DispatchFailure[] | null>(null)
 
   useEffect(() => {
     if (!open) {
-      setUnmapped(null)
+      setFailures(null)
       return
     }
     setValidationError(null)
     setSelected('')
-    setUnmapped(null)
+    setFailures(null)
     setIsLoadingPickers(true)
     void (async () => {
       try {
@@ -67,7 +71,9 @@ export function DispatchReturnDialog({
     })()
   }, [open, showError, t])
 
-  if (!open || !returnId) return null
+  if (!open || targets.length === 0) return null
+
+  const count = targets.length
 
   const reasonLabel = (reason: string): string =>
     reason === 'bad_qty'
@@ -81,24 +87,37 @@ export function DispatchReturnDialog({
     }
     setIsSubmitting(true)
     setValidationError(null)
-    setUnmapped(null)
-    try {
-      await dispatchSmartupReturn(returnId, selected)
-      showSuccess(t('admin:smartupReturns.dispatch.success'))
-      onDispatched()
-      onOpenChange(false)
-    } catch (err) {
-      const items = parseUnmapped(err)
-      if (items && items.length > 0) {
-        setUnmapped(items)
-      } else {
-        showError(
-          (err as ApiError)?.message || t('admin:smartupReturns.dispatch.failed'),
-        )
+    setFailures(null)
+    let ok = 0
+    const fails: DispatchFailure[] = []
+    for (const tgt of targets) {
+      try {
+        await dispatchSmartupReturn(tgt.id, selected)
+        ok += 1
+      } catch (err) {
+        const items = parseUnmapped(err)
+        fails.push({
+          label: tgt.label,
+          items,
+          message: items ? null : (err as ApiError)?.message || t('admin:smartupReturns.dispatch.failed'),
+        })
       }
-    } finally {
-      setIsSubmitting(false)
     }
+    setIsSubmitting(false)
+    if (ok > 0) onDispatched()
+    if (fails.length === 0) {
+      showSuccess(
+        count > 1
+          ? t('admin:smartupReturns.dispatch.success_multi', { count: ok })
+          : t('admin:smartupReturns.dispatch.success'),
+      )
+      onOpenChange(false)
+      return
+    }
+    if (ok > 0) {
+      showError(t('admin:smartupReturns.dispatch.result_partial', { ok, fail: fails.length }))
+    }
+    setFailures(fails)
   }
 
   return (
@@ -112,32 +131,45 @@ export function DispatchReturnDialog({
       <div className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
           <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            {t('admin:smartupReturns.dispatch.title')}
+            {count > 1
+              ? t('admin:smartupReturns.dispatch.title_multi', { count })
+              : t('admin:smartupReturns.dispatch.title')}
           </div>
           <Button variant="ghost" className="rounded-full px-3 py-3" onClick={() => onOpenChange(false)}>
             <X size={18} />
           </Button>
         </div>
-        <div className="space-y-4 px-6 py-5">
+        <div className="max-h-[70vh] space-y-4 overflow-auto px-6 py-5">
           {validationError ? (
             <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600 dark:border-red-500/30 dark:bg-red-500/10">
               {validationError}
             </div>
           ) : null}
 
-          {unmapped ? (
+          {failures ? (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm dark:border-amber-500/30 dark:bg-amber-500/10">
               <div className="mb-2 font-medium text-amber-800 dark:text-amber-300">
-                {t('admin:smartupReturns.dispatch.unmapped_intro')}
+                {t('admin:smartupReturns.dispatch.failures_title')}
               </div>
-              <ul className="space-y-1 text-amber-800 dark:text-amber-200">
-                {unmapped.map((it, i) => (
-                  <li key={i} className="flex items-start justify-between gap-2">
-                    <span>{it.product_name || it.product_code || '—'}</span>
-                    <span className="shrink-0 text-xs text-amber-600 dark:text-amber-400">
-                      {it.product_code ? `${it.product_code} · ` : ''}
-                      {reasonLabel(it.reason)}
-                    </span>
+              <ul className="space-y-2 text-amber-800 dark:text-amber-200">
+                {failures.map((f, i) => (
+                  <li key={i}>
+                    <div className="font-medium">{f.label}</div>
+                    {f.items ? (
+                      <ul className="ml-3 mt-0.5 space-y-0.5 text-xs">
+                        {f.items.map((it, j) => (
+                          <li key={j} className="flex items-start justify-between gap-2">
+                            <span>{it.product_name || it.product_code || '—'}</span>
+                            <span className="shrink-0 text-amber-600 dark:text-amber-400">
+                              {it.product_code ? `${it.product_code} · ` : ''}
+                              {reasonLabel(it.reason)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="ml-3 text-xs text-amber-600 dark:text-amber-400">{f.message}</div>
+                    )}
                   </li>
                 ))}
               </ul>
