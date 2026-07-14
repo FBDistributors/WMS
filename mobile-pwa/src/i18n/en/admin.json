@@ -7,6 +7,7 @@
     "orders": "Orders",
     "returns_history": "Returns",
     "smartup_returns": "SmartUp returns",
+    "returns_hub": "Returns",
     "vip_customers": "VIP customers",
     "work_zones": "Work zone",
     "settings": "Settings",
@@ -302,7 +303,25 @@
     "line_qty": "Qty",
     "line_price": "Price",
     "line_expiry": "Expiry",
-    "line_action": "Promo"
+    "line_action": "Promo",
+    "dispatch": {
+      "dispatch_btn": "Send",
+      "title": "Send to picker",
+      "col_action": "Action",
+      "picker_label": "Picker",
+      "select_picker": "Select a picker",
+      "picker_required": "Select a picker",
+      "send": "Send",
+      "sending": "Sending...",
+      "success": "Return sent to picker",
+      "failed": "Failed to send",
+      "load_pickers_failed": "Failed to load pickers",
+      "no_pickers": "No active pickers",
+      "unmapped_intro": "The following products were not found in WMS. Map them before sending.",
+      "reason_not_found": "not found",
+      "reason_bad_qty": "invalid quantity",
+      "already_dispatched": "Sent to picker"
+    }
   },
   "returns_history": {
     "load_error": "Failed to load returns history",

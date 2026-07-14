@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, PackageX } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, PackageX, Send } from 'lucide-react'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { DispatchReturnDialog } from '../../admin/components/returns/DispatchReturnDialog'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -24,6 +25,7 @@ export function SmartupReturnDetailPage() {
   const [item, setItem] = useState<SmartupReturn | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [dispatchOpen, setDispatchOpen] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) {
@@ -85,6 +87,17 @@ export function SmartupReturnDetailPage() {
             <ArrowLeft size={16} />
             {t('common:buttons.back')}
           </Button>
+          {item.customer_return_id ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+              <CheckCircle2 size={16} />
+              {t('admin:smartupReturns.dispatch.already_dispatched')}
+            </span>
+          ) : (
+            <Button className="gap-1.5" onClick={() => setDispatchOpen(true)}>
+              <Send size={16} />
+              {t('admin:smartupReturns.dispatch.dispatch_btn')}
+            </Button>
+          )}
         </div>
 
         <div className="grid gap-3 md:grid-cols-3">
@@ -142,6 +155,16 @@ export function SmartupReturnDetailPage() {
           )}
         </div>
       </Card>
+
+      <DispatchReturnDialog
+        open={dispatchOpen}
+        returnId={item.id}
+        onOpenChange={setDispatchOpen}
+        onDispatched={() => {
+          setDispatchOpen(false)
+          void load()
+        }}
+      />
     </AdminLayout>
   )
 }

@@ -56,6 +56,13 @@ class SmartupReturn(Base):
     # WMS ish oqimi holati (kelajakda yig'uvchiga yuborish uchun). Standart: new.
     wms_status: Mapped[str] = mapped_column(String(24), nullable=False, server_default="new")
 
+    # Yig'uvchiga yuborilganda yaratilgan customer_return (materializatsiya).
+    customer_return_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("customer_returns.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
     synced_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -70,6 +77,7 @@ class SmartupReturn(Base):
         Index("ix_smartup_returns_return_date", "return_date"),
         Index("ix_smartup_returns_person_code", "person_code"),
         Index("ix_smartup_returns_wms_status", "wms_status"),
+        Index("ix_smartup_returns_customer_return_id", "customer_return_id"),
     )
 
 

@@ -7,6 +7,7 @@ import { AdminDataTable, type AdminDataTableColumn } from '../../admin/component
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { AdminTablePagination } from '../../admin/components/AdminTablePagination'
 import { ReturnsHistoryTableSettings } from '../../admin/components/returns/ReturnsHistoryTableSettings'
+import { ReturnsHubTabs } from '../../admin/components/returns/ReturnsHubTabs'
 import { ReceiptListExportToolbar } from '../../admin/components/receiving/ReceiptListExportToolbar'
 import type { ExportFormat } from '../../admin/components/receiving/ExportFormatDropdown'
 import {
@@ -353,6 +354,7 @@ export function ReturnsHistoryPage() {
       }
     >
       <Card className="space-y-4">
+        <ReturnsHubTabs />
         <div className="flex flex-wrap items-center justify-end gap-2">
           <div className="relative w-full min-w-[180px] max-w-md sm:w-72 sm:flex-none">
             <Search

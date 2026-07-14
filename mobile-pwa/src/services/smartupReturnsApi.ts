@@ -23,8 +23,15 @@ export type SmartupReturn = {
   status: string | null
   wms_status: string
   note: string | null
+  customer_return_id: string | null
   lines_count: number
   lines: SmartupReturnLine[]
+}
+
+export type DispatchReturnResponse = {
+  customer_return_id: string
+  doc_no: string
+  status: string
 }
 
 export type SmartupReturnsListResponse = {
@@ -40,11 +47,13 @@ export type SmartupReturnsSyncResponse = {
 
 export async function getSmartupReturns(params: {
   q?: string
+  onlyNew?: boolean
   limit?: number
   offset?: number
 }) {
   const sp = new URLSearchParams()
   if (params.q && params.q.trim()) sp.set('q', params.q.trim())
+  if (params.onlyNew === false) sp.set('only_new', 'false')
   sp.set('limit', String(params.limit ?? 50))
   sp.set('offset', String(params.offset ?? 0))
   return fetchJSON<SmartupReturnsListResponse>(`/api/v1/smartup-returns?${sp.toString()}`)
@@ -52,6 +61,13 @@ export async function getSmartupReturns(params: {
 
 export async function getSmartupReturn(id: string) {
   return fetchJSON<SmartupReturn>(`/api/v1/smartup-returns/${id}`)
+}
+
+export async function dispatchSmartupReturn(id: string, pickerUserId: string) {
+  return fetchJSON<DispatchReturnResponse>(`/api/v1/smartup-returns/${id}/dispatch`, {
+    method: 'POST',
+    body: { picker_user_id: pickerUserId },
+  })
 }
 
 export async function syncSmartupReturns() {

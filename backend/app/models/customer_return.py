@@ -28,6 +28,8 @@ class CustomerReturn(Base):
     customer_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     customer_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     reason_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Kelib chiqishi: 'manual' (WMS ichida yaratilgan) yoki 'smartup' (SmartUp qaytimidan yuborilgan).
+    source: Mapped[str] = mapped_column(String(16), nullable=False, server_default="manual")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default=CUSTOMER_RETURN_STATUS_PENDING)
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True

@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { PackageX, RefreshCw, Search } from 'lucide-react'
+import { PackageX, RefreshCw, Search, Send } from 'lucide-react'
 
 import { AdminDataTable, type AdminDataTableColumn } from '../../admin/components/AdminDataTable'
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { AdminTablePagination } from '../../admin/components/AdminTablePagination'
+import { ReturnsHubTabs } from '../../admin/components/returns/ReturnsHubTabs'
+import { DispatchReturnDialog } from '../../admin/components/returns/DispatchReturnDialog'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -37,6 +39,7 @@ export function SmartupReturnsPage() {
   const [query, setQuery] = useState('')
   const [search, setSearch] = useState('')
   const [offset, setOffset] = useState(0)
+  const [dispatchId, setDispatchId] = useState<string | null>(null)
   const hasLoadedOnceRef = useRef(false)
 
   const load = useCallback(async () => {
@@ -44,7 +47,7 @@ export function SmartupReturnsPage() {
     else setIsRefreshing(true)
     setHasLoadError(false)
     try {
-      const res = await getSmartupReturns({ q: search, limit: PAGE_SIZE, offset })
+      const res = await getSmartupReturns({ q: search, onlyNew: true, limit: PAGE_SIZE, offset })
       setRows(res.items)
       setTotal(res.total)
       hasLoadedOnceRef.current = true
@@ -157,6 +160,25 @@ export function SmartupReturnsPage() {
           </span>
         ),
       },
+      {
+        id: 'action',
+        header: t('admin:smartupReturns.dispatch.col_action'),
+        width: '11rem',
+        align: 'right',
+        cell: (row) => (
+          <Button
+            variant="secondary"
+            className="h-8 gap-1.5 px-2.5 text-xs"
+            onClick={(e) => {
+              e.stopPropagation()
+              setDispatchId(row.id)
+            }}
+          >
+            <Send size={14} />
+            {t('admin:smartupReturns.dispatch.dispatch_btn')}
+          </Button>
+        ),
+      },
     ]
   }, [t])
 
@@ -210,6 +232,7 @@ export function SmartupReturnsPage() {
       }
     >
       <Card className="space-y-4">
+        <ReturnsHubTabs />
         <div className="flex flex-wrap items-center justify-end gap-2">
           <div className="relative w-full min-w-[180px] max-w-md sm:w-72 sm:flex-none">
             <Search
@@ -254,6 +277,18 @@ export function SmartupReturnsPage() {
           />
         ) : null}
       </Card>
+
+      <DispatchReturnDialog
+        open={dispatchId != null}
+        returnId={dispatchId}
+        onOpenChange={(o) => {
+          if (!o) setDispatchId(null)
+        }}
+        onDispatched={() => {
+          setDispatchId(null)
+          void load()
+        }}
+      />
     </AdminLayout>
   )
 }

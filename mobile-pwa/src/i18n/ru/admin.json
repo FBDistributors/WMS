@@ -7,6 +7,7 @@
     "orders": "Заказы",
     "returns_history": "Возвраты",
     "smartup_returns": "SmartUp возвраты",
+    "returns_hub": "Возвраты",
     "vip_customers": "VIP клиенты",
     "work_zones": "Work zone",
     "settings": "Настройки",
@@ -302,7 +303,25 @@
     "line_qty": "Кол-во",
     "line_price": "Цена",
     "line_expiry": "Срок",
-    "line_action": "Акция"
+    "line_action": "Акция",
+    "dispatch": {
+      "dispatch_btn": "Отправить",
+      "title": "Отправить сборщику",
+      "col_action": "Действие",
+      "picker_label": "Сборщик",
+      "select_picker": "Выберите сборщика",
+      "picker_required": "Выберите сборщика",
+      "send": "Отправить",
+      "sending": "Отправка...",
+      "success": "Возврат отправлен сборщику",
+      "failed": "Ошибка отправки",
+      "load_pickers_failed": "Не удалось загрузить сборщиков",
+      "no_pickers": "Нет активных сборщиков",
+      "unmapped_intro": "Следующие товары не найдены в базе WMS. Свяжите их перед отправкой.",
+      "reason_not_found": "не найден",
+      "reason_bad_qty": "неверное количество",
+      "already_dispatched": "Отправлен сборщику"
+    }
   },
   "returns_history": {
     "load_error": "Не удалось загрузить историю возвратов",

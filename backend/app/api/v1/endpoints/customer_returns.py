@@ -98,6 +98,7 @@ class CustomerReturnOut(BaseModel):
     customer_id: Optional[str] = None
     customer_name: Optional[str] = None
     reason_code: Optional[str] = None
+    source: str = "manual"
     status: str
     created_by_user_id: Optional[UUID] = None
     created_by_user_name: Optional[str] = None
@@ -165,6 +166,7 @@ def _to_out(
         customer_id=cr.customer_id,
         customer_name=cr.customer_name,
         reason_code=cr.reason_code,
+        source=getattr(cr, "source", None) or "manual",
         status=cr.status,
         created_by_user_id=cr.created_by_user_id,
         created_by_user_name=created_by_user_name,

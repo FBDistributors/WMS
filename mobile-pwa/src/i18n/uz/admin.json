@@ -7,6 +7,7 @@
     "orders": "Buyurtmalar",
     "returns_history": "Qaytganlar",
     "smartup_returns": "SmartUp qaytimlar",
+    "returns_hub": "Qaytimlar",
     "vip_customers": "VIP mijozlar",
     "work_zones": "Work zone",
     "settings": "Sozlamalar",
@@ -302,7 +303,25 @@
     "line_qty": "Miqdor",
     "line_price": "Narx",
     "line_expiry": "Muddat",
-    "line_action": "Aksiya"
+    "line_action": "Aksiya",
+    "dispatch": {
+      "dispatch_btn": "Yuborish",
+      "title": "Yig'uvchiga yuborish",
+      "col_action": "Amal",
+      "picker_label": "Yig'uvchi",
+      "select_picker": "Yig'uvchini tanlang",
+      "picker_required": "Yig'uvchini tanlang",
+      "send": "Yuborish",
+      "sending": "Yuborilmoqda...",
+      "success": "Qaytim yig'uvchiga yuborildi",
+      "failed": "Yuborishda xato",
+      "load_pickers_failed": "Yig'uvchilarni yuklab bo'lmadi",
+      "no_pickers": "Faol yig'uvchi yo'q",
+      "unmapped_intro": "Quyidagi mahsulotlar WMS bazasida topilmadi. Yuborishdan oldin ularni bog'lang.",
+      "reason_not_found": "topilmadi",
+      "reason_bad_qty": "noto'g'ri miqdor",
+      "already_dispatched": "Yig'uvchiga yuborilgan"
+    }
   },
   "returns_history": {
     "load_error": "Qaytim tarixini yuklab bo'lmadi",
