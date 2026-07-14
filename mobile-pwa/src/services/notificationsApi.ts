@@ -33,3 +33,16 @@ export async function postNotificationsBroadcast(payload: { title: string; body:
     body: payload,
   })
 }
+
+// App-update push: bosilganda Play Store sahifasi ochiladi. Maydonlar ixtiyoriy —
+// bo'sh bo'lsa backend standart matn va Play havolasini ishlatadi.
+export async function postNotificationsAppUpdate(payload: {
+  title?: string
+  body?: string
+  url?: string
+}) {
+  return fetchJSON<NotificationsBroadcastResponse>('/api/v1/notifications/app-update', {
+    method: 'POST',
+    body: payload,
+  })
+}

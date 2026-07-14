@@ -7,6 +7,7 @@ import { Card } from '../../components/ui/card'
 import { useAuth } from '../../rbac/AuthProvider'
 import {
   getNotificationsPushStatus,
+  postNotificationsAppUpdate,
   postNotificationsBroadcast,
   postNotificationsTestSelf,
   type NotificationsPushStatus,
@@ -46,6 +47,7 @@ export function NotificationsSettingsPanel() {
   const [broadcastBody, setBroadcastBody] = useState('')
   const [broadcastBusy, setBroadcastBusy] = useState(false)
   const [broadcastFeedback, setBroadcastFeedback] = useState<Feedback | null>(null)
+  const [updateBusy, setUpdateBusy] = useState(false)
 
   const load = useCallback(async () => {
     if (!canUse) return
@@ -111,6 +113,36 @@ export function NotificationsSettingsPanel() {
       setBroadcastFeedback({ text: t('admin:settings.notifications.broadcast_error'), variant: 'error' })
     } finally {
       setBroadcastBusy(false)
+    }
+  }
+
+  const onAppUpdate = async () => {
+    const total = status?.total_fcm_tokens_all_users ?? 0
+    if (total < 1 || !window.confirm(t('admin:settings.notifications.update_confirm', { count: total }))) {
+      return
+    }
+    setUpdateBusy(true)
+    setBroadcastFeedback(null)
+    try {
+      // Composer'dagi matn to'ldirilgan bo'lsa ishlatiladi; bo'sh bo'lsa backend
+      // standart "Ilova yangilandi" matni + Play havolasini yuboradi.
+      const r = await postNotificationsAppUpdate({
+        title: broadcastTitle.trim() || undefined,
+        body: broadcastBody.trim() || undefined,
+      })
+      setBroadcastFeedback({
+        text: t('admin:settings.notifications.broadcast_result', {
+          total: r.total_tokens,
+          success: r.success,
+          failed: r.failed,
+        }),
+        variant: 'info',
+      })
+      await load()
+    } catch {
+      setBroadcastFeedback({ text: t('admin:settings.notifications.broadcast_error'), variant: 'error' })
+    } finally {
+      setUpdateBusy(false)
     }
   }
 
@@ -264,6 +296,16 @@ export function NotificationsSettingsPanel() {
             </Button>
             <Button type="button" variant="outline" className="px-3 py-2 text-xs" onClick={() => void onTest()} disabled={testBusy || loading || !fcmOk}>
               {t('admin:settings.notifications.test_btn')}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="px-3 py-2 text-xs"
+              onClick={() => void onAppUpdate()}
+              disabled={updateBusy || broadcastBusy || loading || !canSend}
+              title={t('admin:settings.notifications.update_hint')}
+            >
+              {t('admin:settings.notifications.update_btn')}
             </Button>
           </div>
         </div>

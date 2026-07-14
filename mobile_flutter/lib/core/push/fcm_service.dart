@@ -6,6 +6,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../features/picking/data/picking_repository.dart';
 import '../../features/picking/domain/profile_type_param.dart';
@@ -127,9 +128,27 @@ class FcmService {
     }
   }
 
+  static Future<void> _openExternalUrl(String url) async {
+    final Uri? uri = Uri.tryParse(url.trim());
+    if (uri == null || url.trim().isEmpty) {
+      return;
+    }
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } on Object catch (_) {
+      /* launch muvaffaqiyatsiz — jim o'tkaziladi */
+    }
+  }
+
   static void _handleOpen(Map<String, dynamic> data) {
     _handlePickTasksData(data);
     final String? type = data['type']?.toString();
+    if (type == 'app_update') {
+      // Play Store sahifasini ochadi ("Update" tugmasi shu yerda).
+      final Object? url = data['url'];
+      unawaited(_openExternalUrl(url is String ? url : url?.toString() ?? ''));
+      return;
+    }
     if (type == 'new_pick_task') {
       _navigateToPickTaskList();
       return;
@@ -213,6 +232,7 @@ class FcmService {
     return t == 'new_pick_task' ||
         t == 'admin_test' ||
         t == 'admin_broadcast' ||
+        t == 'app_update' ||
         t == 'safe_cancel_return_required';
   }
 

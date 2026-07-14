@@ -92,3 +92,39 @@ def post_broadcast_push(
         data={"type": "admin_broadcast"},
     )
     return BroadcastPushResponse(total_tokens=total, success=ok, failed=bad)
+
+
+# Ilova Play Store sahifasi — bosilganda "Update" tugmasi shu yerda.
+_PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=uz.fbwarehouse.wms"
+
+
+class AppUpdatePushRequest(BaseModel):
+    # Ixtiyoriy: admin o'z matnini bersa; bo'sh bo'lsa standart matn ishlatiladi.
+    title: str = Field(default="", max_length=200)
+    body: str = Field(default="", max_length=4000)
+    url: str = Field(default="", max_length=1000)
+
+
+@router.post(
+    "/app-update",
+    response_model=BroadcastPushResponse,
+    summary="Send an app-update notification (opens the Play Store page on tap)",
+)
+def post_app_update_push(
+    payload: AppUpdatePushRequest,
+    db: Session = Depends(get_db),
+    _user: User = Depends(require_permission("admin:access")),
+) -> BroadcastPushResponse:
+    title = payload.title.strip() or "Ilova yangilandi"
+    body = (
+        payload.body.strip()
+        or "Yangi versiya chiqdi. Yangilash uchun bosing."
+    )
+    url = payload.url.strip() or _PLAY_STORE_URL
+    total, ok, bad = send_push_broadcast(
+        db,
+        title,
+        body,
+        data={"type": "app_update", "url": url},
+    )
+    return BroadcastPushResponse(total_tokens=total, success=ok, failed=bad)
