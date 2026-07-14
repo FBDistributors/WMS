@@ -1,7 +1,7 @@
 name: mobile_flutter
 description: WMS mobile app (Flutter).
 publish_to: "none"
-version: 1.0.12+15
+version: 1.0.13+16
 
 environment:
   sdk: ^3.5.0
