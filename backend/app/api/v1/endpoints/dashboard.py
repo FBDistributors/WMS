@@ -117,6 +117,20 @@ def _document_completed_at_expr():
     return func.coalesce(DocumentModel.completed_at, DocumentModel.updated_at)
 
 
+def _picker_activity_at_expr():
+    """Yig'uvchi controllerga yuborgan vaqt; eski yozuvlar uchun completed/updated_at."""
+    return func.coalesce(
+        DocumentModel.sent_to_controller_at,
+        DocumentModel.completed_at,
+        DocumentModel.updated_at,
+    )
+
+
+# Yig'uvchi uchun hujjat "bajarilgan" — controllerga yuborilganidan boshlab
+# (status `picked`), controller yakunlashini kutmasdan.
+PICKER_COUNTED_DOC_STATUSES = ("picked",) + COMPLETED_DOC_STATUSES
+
+
 def _day_bounds_in_tz(day: date) -> tuple[datetime, datetime]:
     """Inclusive calendar day in BUSINESS_TZ as aware UTC datetimes for DB compare."""
     start = datetime.combine(day, time.min, tzinfo=BUSINESS_TZ)
@@ -424,20 +438,19 @@ def _aggregate_staff_by_user_column(
     user_id_column,
     date_from: Optional[date],
     date_to: Optional[date],
+    statuses: tuple = COMPLETED_DOC_STATUSES,
+    ts_col=None,
 ) -> List[PickingStaffStatsRow]:
+    col = ts_col if ts_col is not None else _document_completed_at_expr()
     filters = [
         DocumentModel.doc_type == "SO",
-        DocumentModel.status.in_(COMPLETED_DOC_STATUSES),
+        DocumentModel.status.in_(statuses),
         user_id_column.isnot(None),
     ]
-    if date_from is not None and date_to is not None:
-        filters.extend(_completed_documents_filters(date_from, date_to))
-    elif date_from is not None:
-        col = _document_completed_at_expr()
+    if date_from is not None:
         start, _ = _day_bounds_in_tz(date_from)
         filters.append(col >= start)
-    elif date_to is not None:
-        col = _document_completed_at_expr()
+    if date_to is not None:
         _, end = _day_bounds_in_tz(date_to)
         filters.append(col <= end)
 
@@ -502,8 +515,15 @@ async def get_picking_staff_stats(
 ):
     if date_from is not None and date_to is not None and date_from > date_to:
         raise HTTPException(status_code=400, detail="date_from must be on or before date_to")
+    # Yig'uvchi: controllerga yuborilganidan boshlab (sent_to_controller_at)
+    # sanaladi — controller yakunlashini kutmasdan. Controller: yakunlanganlar.
     pickers = _aggregate_staff_by_user_column(
-        db, DocumentModel.assigned_to_user_id, date_from, date_to
+        db,
+        DocumentModel.assigned_to_user_id,
+        date_from,
+        date_to,
+        statuses=PICKER_COUNTED_DOC_STATUSES,
+        ts_col=_picker_activity_at_expr(),
     )
     controllers = _aggregate_staff_by_user_column(
         db, DocumentModel.controlled_by_user_id, date_from, date_to
