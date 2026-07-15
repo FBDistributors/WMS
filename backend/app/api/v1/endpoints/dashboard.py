@@ -109,6 +109,7 @@ class StaffOrderItem(BaseModel):
     order_id: Optional[UUID] = None
     document_no: str
     order_number: Optional[str] = None
+    customer_name: Optional[str] = None
     status: str
     lines_count: int
     picked_qty: float
@@ -612,6 +613,7 @@ async def get_staff_orders(
                 order_id=doc.order_id,
                 document_no=doc.doc_no,
                 order_number=order.order_number if order else None,
+                customer_name=order.customer_name if order else None,
                 status=doc.status,
                 lines_count=len(doc.lines),
                 picked_qty=picked_qty,

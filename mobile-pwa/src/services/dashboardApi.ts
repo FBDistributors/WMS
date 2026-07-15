@@ -123,6 +123,7 @@ export type StaffOrderRow = {
   order_id: string | null
   document_no: string
   order_number: string | null
+  customer_name: string | null
   status: string
   lines_count: number
   picked_qty: number

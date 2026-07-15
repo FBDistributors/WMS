@@ -84,7 +84,9 @@ export function StaffOrdersDialog({ staff, dateFrom, dateTo, onClose }: StaffOrd
             <div className="text-sm text-slate-500 dark:text-slate-400">
               {t(`admin:dashboard.staff_orders.role_${staff.role}`)}
               {dateFrom || dateTo ? ` · ${dateFrom || '…'} – ${dateTo || '…'}` : ''}
-              {rows.length > 0 ? ` · ${t('admin:dashboard.staff_orders.total_qty', { qty: formatQty(totalQty) })}` : ''}
+              {!isLoading && rows.length > 0
+                ? ` · ${t('admin:dashboard.staff_orders.orders_count', { count: rows.length })} · ${t('admin:dashboard.staff_orders.total_qty', { qty: formatQty(totalQty) })}`
+                : ''}
             </div>
           </div>
           <Button variant="ghost" className="rounded-full px-3 py-3" onClick={onClose}>
@@ -102,10 +104,11 @@ export function StaffOrdersDialog({ staff, dateFrom, dateTo, onClose }: StaffOrd
           ) : rows.length === 0 ? (
             <EmptyState title={t('admin:dashboard.staff_orders.empty')} />
           ) : (
-            <table className="w-full min-w-[640px] text-sm">
+            <table className="w-full min-w-[760px] text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400">
                   <th className="px-3 py-2.5">{t('admin:dashboard.staff_orders.col_order')}</th>
+                  <th className="px-3 py-2.5">{t('admin:dashboard.staff_orders.col_customer')}</th>
                   <th className="px-3 py-2.5">{t('admin:dashboard.staff_orders.col_document')}</th>
                   <th className="px-3 py-2.5">{t('admin:dashboard.staff_orders.col_status')}</th>
                   <th className="px-3 py-2.5 text-right">{t('admin:dashboard.staff_orders.col_qty')}</th>
@@ -129,15 +132,26 @@ export function StaffOrdersDialog({ staff, dateFrom, dateTo, onClose }: StaffOrd
                       <td className="px-3 py-2.5 font-medium text-blue-700 dark:text-blue-300">
                         {r.order_number ?? '—'}
                       </td>
-                      <td className="px-3 py-2.5 text-slate-500">{r.document_no}</td>
+                      <td className="px-3 py-2.5 text-slate-700 dark:text-slate-200">
+                        <span className="block max-w-[16rem] truncate" title={r.customer_name ?? undefined}>
+                          {r.customer_name ?? '—'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 text-slate-500 dark:text-slate-400">{r.document_no}</td>
                       <td className="px-3 py-2.5">
                         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                           {r.status}
                         </span>
                       </td>
-                      <td className="px-3 py-2.5 text-right tabular-nums font-semibold">{formatQty(r.picked_qty)}</td>
-                      <td className="px-3 py-2.5 text-right tabular-nums">{r.lines_count}</td>
-                      <td className="px-3 py-2.5 whitespace-nowrap text-slate-500">{formatDateTime(r.activity_at)}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-slate-900 dark:text-slate-100">
+                        {formatQty(r.picked_qty)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-slate-700 dark:text-slate-200">
+                        {r.lines_count}
+                      </td>
+                      <td className="px-3 py-2.5 whitespace-nowrap text-slate-500 dark:text-slate-400">
+                        {formatDateTime(r.activity_at)}
+                      </td>
                     </tr>
                   )
                 })}
