@@ -607,13 +607,18 @@ async def get_staff_orders(
     for doc in docs:
         picked_qty = float(sum((line.picked_qty or 0) for line in doc.lines))
         order = getattr(doc, "order", None)
+        # Mijoz nomi: SmartUp buyurtmalarida customer_name; diller/tashkiliy
+        # harakatlarda customer_name bo'lmaydi — movement_note yoki agent_name'ga qaytamiz.
+        customer_label = None
+        if order is not None:
+            customer_label = order.customer_name or order.movement_note or order.agent_name
         items.append(
             StaffOrderItem(
                 document_id=doc.id,
                 order_id=doc.order_id,
                 document_no=doc.doc_no,
                 order_number=order.order_number if order else None,
-                customer_name=order.customer_name if order else None,
+                customer_name=customer_label,
                 status=doc.status,
                 lines_count=len(doc.lines),
                 picked_qty=picked_qty,

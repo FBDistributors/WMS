@@ -16,6 +16,7 @@ from app.api.v1.endpoints.dashboard import (
 )
 import app.api.v1.endpoints.dashboard as dashboard_module
 from app.models.document import Document, DocumentLine
+from app.models.order import Order
 from app.models.user import User
 from app.auth.security import get_password_hash
 
@@ -394,6 +395,47 @@ def test_staff_orders_picker_and_controller(client, db_session):
         res_none = client.get("/api/v1/dashboard/staff-orders",
                               params={"user_id": str(c.id), "role": "picker"})
         assert res_none.json()["items"] == []
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_staff_orders_customer_falls_back_to_movement_note(client, db_session):
+    """Diller/tashkiliy harakatda customer_name yo'q — movement_note ko'rsatiladi."""
+    admin = _seed_admin(db_session)
+    p = User(username="so_picker_d", password_hash=get_password_hash("x"), role="picker",
+             full_name="SO Picker D", is_active=True)
+    db_session.add(p)
+    db_session.flush()
+
+    order = Order(
+        source="diller",
+        source_external_id="mov-101430",
+        order_number="101430",
+        customer_name=None,
+        movement_note="ZAKAZ ANDIJON AKMAL COMPLIMENT",
+    )
+    db_session.add(order)
+    db_session.flush()
+
+    d = Document(
+        doc_no="101430", doc_type="SO", status="completed", assigned_to_user_id=p.id,
+        order_id=order.id,
+        completed_at=datetime(2026, 6, 5, 10, 0, 0, tzinfo=timezone.utc),
+        updated_at=datetime(2026, 6, 5, 10, 0, 0, tzinfo=timezone.utc),
+    )
+    db_session.add(d)
+    db_session.flush()
+    db_session.add(DocumentLine(document_id=d.id, product_name="A", location_code="L", required_qty=2, picked_qty=2))
+    db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        res = client.get("/api/v1/dashboard/staff-orders",
+                         params={"user_id": str(p.id), "role": "picker"})
+        assert res.status_code == 200, res.text
+        item = res.json()["items"][0]
+        assert item["order_number"] == "101430"
+        assert item["customer_name"] == "ZAKAZ ANDIJON AKMAL COMPLIMENT"
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 
