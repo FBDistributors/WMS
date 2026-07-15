@@ -180,6 +180,96 @@ def test_reconcile_count_sets_boxes_and_loose_and_fixes_drift(
     assert box_invariant_holds(db_session, lot.id, sample_location.id)
 
 
+def _reserve(db_session: Session, product: ProductModel, lot: StockLot, location: LocationModel, qty: int) -> None:
+    """Rezerv (allocate) simulyatsiyasi — reserved = allocate/unallocate yig'indisi."""
+    db_session.add(
+        StockMovement(
+            product_id=product.id,
+            lot_id=lot.id,
+            location_id=location.id,
+            qty_change=Decimal(str(qty)),
+            movement_type="allocate",
+        )
+    )
+    db_session.flush()
+
+
+def test_reconcile_count_blocks_below_reserved(
+    db_session: Session,
+    inv_user: UserModel,
+    sample_product: ProductModel,
+    sample_location: LocationModel,
+) -> None:
+    """Sanoqni rezervlangan qoldiqdan past tushirib bo'lmaydi (409)."""
+    lot = _seed_stock(db_session, sample_product, sample_location, 30)
+    _reserve(db_session, sample_product, lot, sample_location, 20)
+    db_session.add(
+        ProductBoxModel(box_barcode="BOX-RES-1", product_id=sample_product.id, units_per_box=12, is_active=True)
+    )
+    db_session.flush()
+
+    # Target 10 < reserved 20 -> blok.
+    with pytest.raises(HTTPException) as exc:
+        reconcile_count(
+            db_session,
+            box_barcode="BOX-RES-1",
+            location_id=sample_location.id,
+            lot_id=lot.id,
+            user=inv_user,
+            box_count=0,
+            loose_units=10,
+        )
+    assert exc.value.status_code == 409
+
+    # Qoldiq o'zgarmagan (30) va rezerv (20) saqlanган.
+    on_hand, reserved, _av = compute_lot_location_balances(db_session, lot.id, sample_location.id)
+    assert int(on_hand) == 30
+    assert int(reserved) == 20
+
+
+def test_reconcile_count_allows_at_reserved_and_increase(
+    db_session: Session,
+    inv_user: UserModel,
+    sample_product: ProductModel,
+    sample_location: LocationModel,
+) -> None:
+    """Rezervga teng yoki undan yuqori sanoq, hamda oshirish ruxsat etiladi."""
+    lot = _seed_stock(db_session, sample_product, sample_location, 30)
+    _reserve(db_session, sample_product, lot, sample_location, 20)
+    db_session.add(
+        ProductBoxModel(box_barcode="BOX-RES-2", product_id=sample_product.id, units_per_box=12, is_active=True)
+    )
+    db_session.flush()
+
+    # Target 20 == reserved -> ruxsat (past emas). Breakdown available asosida
+    # bo'lgani uchun on_hand ni to'g'ridan-to'g'ri tekshiramiz.
+    reconcile_count(
+        db_session,
+        box_barcode="BOX-RES-2",
+        location_id=sample_location.id,
+        lot_id=lot.id,
+        user=inv_user,
+        box_count=1,
+        loose_units=8,
+    )
+    on_hand, _res, _av = compute_lot_location_balances(db_session, lot.id, sample_location.id)
+    assert int(on_hand) == 20
+    assert box_invariant_holds(db_session, lot.id, sample_location.id)
+
+    # Oshirish (target 24) — har doim ruxsat.
+    reconcile_count(
+        db_session,
+        box_barcode="BOX-RES-2",
+        location_id=sample_location.id,
+        lot_id=lot.id,
+        user=inv_user,
+        box_count=2,
+        loose_units=0,
+    )
+    on_hand2, _r2, _a2 = compute_lot_location_balances(db_session, lot.id, sample_location.id)
+    assert int(on_hand2) == 24
+
+
 def test_relocate_sealed_box_moves_stock_and_keeps_invariant(
     db_session: Session,
     inv_user: UserModel,

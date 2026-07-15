@@ -781,8 +781,20 @@ def reconcile_count(
 
     # 1) Fizik qoldiqni target jamiga keltirish.
     target_total = Decimal(str(box_count * upb + int(loose_units)))
-    on_hand, _reserved, _available = compute_lot_location_balances(db, lot_id, location_id)
+    on_hand, reserved, _available = compute_lot_location_balances(db, lot_id, location_id)
     delta = target_total - Decimal(str(on_hand))
+    # Rezerv-himoya: sanoqni kamaytirish rezervlangan (buyurtmaga ajratilgan)
+    # qoldiqdan past tushirmasligi kerak — aks holda available manfiy bo'lib,
+    # rezerv hisobi buziladi. Manual adjust yo'li (require_sufficient_available)
+    # bilan izchil.
+    if delta < 0 and target_total < reserved:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Rezervlangan {int(reserved)} dona bor — sanoqni {int(target_total)} donaga "
+                "tushirib bo'lmaydi. Avval buyurtma yig'ishni yakunlang yoki rezervni bo'shating."
+            ),
+        )
     if delta != 0:
         db.add(
             StockMovementModel(
