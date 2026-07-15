@@ -17,6 +17,7 @@ import {
 import * as XLSX from 'xlsx'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { StaffOrdersDialog, type StaffSelection } from '../../admin/components/dashboard/StaffOrdersDialog'
 import { Button } from '../../components/ui/button'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
@@ -26,6 +27,7 @@ import {
   getPickingStaffStats,
   type PickingOrderStats,
   type PickingStaffStatsRow,
+  type StaffRole,
 } from '../../services/dashboardApi'
 import { useAppToast } from '../../feedback/useAppToast'
 import { getReserveStuckSummary } from '../../services/inventoryApi'
@@ -342,6 +344,7 @@ function LeaderboardCard({
   exportDisabled,
   isExporting,
   emptyLabel,
+  onRowClick,
   t,
 }: {
   title: string
@@ -352,6 +355,7 @@ function LeaderboardCard({
   exportDisabled: boolean
   isExporting: boolean
   emptyLabel: string
+  onRowClick?: (row: PickingStaffStatsRow) => void
   t: (key: string, opts?: Record<string, unknown>) => string
 }) {
   const maxQty = Math.max(1, ...rows.map((r) => r.total_picked_qty))
@@ -406,9 +410,11 @@ function LeaderboardCard({
             const rank = index + 1
             const pct = Math.round((row.total_picked_qty / maxQty) * 100)
             return (
-              <div
+              <button
                 key={row.user_id}
-                className="flex items-center gap-3.5 rounded-xl px-2.5 py-[11px] transition hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                type="button"
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                className="flex w-full items-center gap-3.5 rounded-xl px-2.5 py-[11px] text-left transition hover:bg-slate-50 dark:hover:bg-slate-800/50"
               >
                 <div
                   className={`flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-lg text-xs font-extrabold ${rankCls(rank)}`}
@@ -442,7 +448,7 @@ function LeaderboardCard({
                     })}
                   </div>
                 </div>
-              </div>
+              </button>
             )
           })
         )}
@@ -467,6 +473,13 @@ export function DashboardPage() {
   const [pickingStatsUnavailable, setPickingStatsUnavailable] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [stuckRowsCount, setStuckRowsCount] = useState(0)
+  const [selectedStaff, setSelectedStaff] = useState<StaffSelection | null>(null)
+
+  const openStaffOrders = useCallback(
+    (role: StaffRole) => (row: PickingStaffStatsRow) =>
+      setSelectedStaff({ userId: row.user_id, name: row.full_name, role }),
+    []
+  )
   const [stuckOrdersCount, setStuckOrdersCount] = useState(0)
   const [stuckOldestHours, setStuckOldestHours] = useState(0)
 
@@ -752,6 +765,7 @@ export function DashboardPage() {
               exportDisabled={staffStatsExportDisabled}
               isExporting={isExporting}
               emptyLabel={t('admin:dashboard.staff_stats_empty')}
+              onRowClick={openStaffOrders('picker')}
               t={t}
             />
             <LeaderboardCard
@@ -763,11 +777,19 @@ export function DashboardPage() {
               exportDisabled={staffStatsExportDisabled}
               isExporting={isExporting}
               emptyLabel={t('admin:dashboard.staff_stats_empty')}
+              onRowClick={openStaffOrders('controller')}
               t={t}
             />
           </div>
         </div>
       )}
+
+      <StaffOrdersDialog
+        staff={selectedStaff}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onClose={() => setSelectedStaff(null)}
+      />
     </AdminLayout>
   )
 }

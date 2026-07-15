@@ -334,6 +334,107 @@ def test_picking_order_stats_avg_all_time_endpoint(client, db_session, monkeypat
         app.dependency_overrides.pop(get_current_user, None)
 
 
+def _seed_admin(db_session) -> User:
+    admin = User(
+        username="admin_staff_orders",
+        password_hash=get_password_hash("x"),
+        role="warehouse_admin",
+        is_active=True,
+        full_name="Admin SO",
+    )
+    db_session.add(admin)
+    db_session.commit()
+    db_session.refresh(admin)
+    return admin
+
+
+def test_staff_orders_picker_and_controller(client, db_session):
+    admin = _seed_admin(db_session)
+    p = User(username="so_picker", password_hash=get_password_hash("x"), role="picker",
+             full_name="SO Picker", is_active=True)
+    c = User(username="so_ctrl", password_hash=get_password_hash("x"), role="inventory_controller",
+             full_name="SO Ctrl", is_active=True)
+    db_session.add_all([p, c])
+    db_session.flush()
+
+    d = Document(
+        doc_no="SO-ORD-1",
+        doc_type="SO",
+        status="completed",
+        assigned_to_user_id=p.id,
+        controlled_by_user_id=c.id,
+        completed_at=datetime(2026, 6, 5, 10, 0, 0, tzinfo=timezone.utc),
+        updated_at=datetime(2026, 6, 5, 10, 0, 0, tzinfo=timezone.utc),
+    )
+    db_session.add(d)
+    db_session.flush()
+    db_session.add_all([
+        DocumentLine(document_id=d.id, product_name="A", location_code="L1", required_qty=10, picked_qty=10),
+        DocumentLine(document_id=d.id, product_name="B", location_code="L1", required_qty=5, picked_qty=3),
+    ])
+    db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        res = client.get("/api/v1/dashboard/staff-orders",
+                         params={"user_id": str(p.id), "role": "picker"})
+        assert res.status_code == 200, res.text
+        items = res.json()["items"]
+        assert len(items) == 1
+        assert items[0]["document_no"] == "SO-ORD-1"
+        assert items[0]["lines_count"] == 2
+        assert items[0]["picked_qty"] == 13.0
+
+        res_c = client.get("/api/v1/dashboard/staff-orders",
+                           params={"user_id": str(c.id), "role": "controller"})
+        assert res_c.status_code == 200
+        assert len(res_c.json()["items"]) == 1
+
+        # Boshqa foydalanuvchi bo'yicha — bo'sh.
+        res_none = client.get("/api/v1/dashboard/staff-orders",
+                              params={"user_id": str(c.id), "role": "picker"})
+        assert res_none.json()["items"] == []
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_staff_orders_date_filter_and_invalid_role(client, db_session):
+    admin = _seed_admin(db_session)
+    p = User(username="so_picker2", password_hash=get_password_hash("x"), role="picker",
+             full_name="SO Picker2", is_active=True)
+    db_session.add(p)
+    db_session.flush()
+    d = Document(
+        doc_no="SO-ORD-2", doc_type="SO", status="completed", assigned_to_user_id=p.id,
+        completed_at=datetime(2026, 6, 5, 10, 0, 0, tzinfo=timezone.utc),
+        updated_at=datetime(2026, 6, 5, 10, 0, 0, tzinfo=timezone.utc),
+    )
+    db_session.add(d)
+    db_session.flush()
+    db_session.add(DocumentLine(document_id=d.id, product_name="A", location_code="L", required_qty=2, picked_qty=2))
+    db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        # Sana oralig'idan tashqari — bo'sh.
+        out = client.get("/api/v1/dashboard/staff-orders",
+                         params={"user_id": str(p.id), "role": "picker",
+                                 "date_from": "2026-07-01", "date_to": "2026-07-02"})
+        assert out.status_code == 200
+        assert out.json()["items"] == []
+        # Oraliq ichida — 1 ta.
+        inr = client.get("/api/v1/dashboard/staff-orders",
+                         params={"user_id": str(p.id), "role": "picker",
+                                 "date_from": "2026-06-05", "date_to": "2026-06-05"})
+        assert len(inr.json()["items"]) == 1
+        # Noto'g'ri role — 422 (pattern).
+        bad = client.get("/api/v1/dashboard/staff-orders",
+                         params={"user_id": str(p.id), "role": "foo"})
+        assert bad.status_code == 422
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
 def test_picking_order_stats_daily_breakdown(client, db_session, monkeypatch):
     admin = User(
         username="admin_daily",

@@ -104,6 +104,21 @@ class PickingOrderStatsResponse(BaseModel):
     daily: List[DailyCompletedPoint] = []
 
 
+class StaffOrderItem(BaseModel):
+    document_id: UUID
+    order_id: Optional[UUID] = None
+    document_no: str
+    order_number: Optional[str] = None
+    status: str
+    lines_count: int
+    picked_qty: float
+    activity_at: Optional[datetime] = None
+
+
+class StaffOrdersResponse(BaseModel):
+    items: List[StaffOrderItem]
+
+
 def _today_utc() -> date:
     return datetime.now(timezone.utc).date()
 
@@ -433,6 +448,37 @@ async def get_pick_documents(
     return PickDocumentsListResponse(items=items)
 
 
+def _staff_doc_filters(user_id_column, statuses: tuple, ts_col, date_from, date_to) -> list:
+    """SO-hujjatlarni xodim/status/sana bo'yicha filtrlash (reyting va ro'yxat uchun bir xil)."""
+    filters = [
+        DocumentModel.doc_type == "SO",
+        DocumentModel.status.in_(statuses),
+        user_id_column.isnot(None),
+    ]
+    if date_from is not None:
+        start, _ = _day_bounds_in_tz(date_from)
+        filters.append(ts_col >= start)
+    if date_to is not None:
+        _, end = _day_bounds_in_tz(date_to)
+        filters.append(ts_col <= end)
+    return filters
+
+
+def _staff_role_columns(role: str):
+    """(user_id_column, statuses, ts_col) role bo'yicha — reyting bilan bir xil attributsiya."""
+    if role == "picker":
+        return (
+            DocumentModel.assigned_to_user_id,
+            PICKER_COUNTED_DOC_STATUSES,
+            _picker_activity_at_expr(),
+        )
+    return (
+        DocumentModel.controlled_by_user_id,
+        COMPLETED_DOC_STATUSES,
+        _document_completed_at_expr(),
+    )
+
+
 def _aggregate_staff_by_user_column(
     db: Session,
     user_id_column,
@@ -442,17 +488,7 @@ def _aggregate_staff_by_user_column(
     ts_col=None,
 ) -> List[PickingStaffStatsRow]:
     col = ts_col if ts_col is not None else _document_completed_at_expr()
-    filters = [
-        DocumentModel.doc_type == "SO",
-        DocumentModel.status.in_(statuses),
-        user_id_column.isnot(None),
-    ]
-    if date_from is not None:
-        start, _ = _day_bounds_in_tz(date_from)
-        filters.append(col >= start)
-    if date_to is not None:
-        _, end = _day_bounds_in_tz(date_to)
-        filters.append(col <= end)
+    filters = _staff_doc_filters(user_id_column, statuses, col, date_from, date_to)
 
     per_doc = (
         db.query(
@@ -529,6 +565,60 @@ async def get_picking_staff_stats(
         db, DocumentModel.controlled_by_user_id, date_from, date_to
     )
     return PickingStaffStatsResponse(pickers=pickers, controllers=controllers)
+
+
+def _staff_order_activity_at(role: str, doc: DocumentModel) -> Optional[datetime]:
+    if role == "picker":
+        return doc.sent_to_controller_at or doc.completed_at or doc.updated_at
+    return doc.completed_at or doc.updated_at
+
+
+@router.get(
+    "/staff-orders",
+    response_model=StaffOrdersResponse,
+    summary="Bitta yig'uvchi/controller yiqqan (tekshirgan) hujjatlar ro'yxati (reyting bilan bir xil filtr)",
+)
+async def get_staff_orders(
+    user_id: UUID = Query(..., description="Yig'uvchi yoki controller user_id"),
+    role: str = Query(..., pattern="^(picker|controller)$"),
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    limit: int = Query(500, ge=1, le=2000),
+    db: Session = Depends(get_db),
+    _user=Depends(require_any_permission(["reports:read", "audit:read", "admin:access"])),
+):
+    if date_from is not None and date_to is not None and date_from > date_to:
+        raise HTTPException(status_code=400, detail="date_from must be on or before date_to")
+
+    user_col, statuses, ts_col = _staff_role_columns(role)
+    filters = _staff_doc_filters(user_col, statuses, ts_col, date_from, date_to)
+    filters.append(user_col == user_id)
+
+    docs = (
+        db.query(DocumentModel)
+        .options(selectinload(DocumentModel.lines), selectinload(DocumentModel.order))
+        .filter(and_(*filters))
+        .order_by(ts_col.desc())
+        .limit(limit)
+        .all()
+    )
+    items: List[StaffOrderItem] = []
+    for doc in docs:
+        picked_qty = float(sum((line.picked_qty or 0) for line in doc.lines))
+        order = getattr(doc, "order", None)
+        items.append(
+            StaffOrderItem(
+                document_id=doc.id,
+                order_id=doc.order_id,
+                document_no=doc.doc_no,
+                order_number=order.order_number if order else None,
+                status=doc.status,
+                lines_count=len(doc.lines),
+                picked_qty=picked_qty,
+                activity_at=_staff_order_activity_at(role, doc),
+            )
+        )
+    return StaffOrdersResponse(items=items)
 
 
 @router.get(

@@ -116,6 +116,32 @@ export async function getPickingStaffStats(params?: {
   return fetchJSON<PickingStaffStatsResponse>('/api/v1/dashboard/picking-staff-stats', { query })
 }
 
+export type StaffRole = 'picker' | 'controller'
+
+export type StaffOrderRow = {
+  document_id: string
+  order_id: string | null
+  document_no: string
+  order_number: string | null
+  status: string
+  lines_count: number
+  picked_qty: number
+  activity_at: string | null
+}
+
+export async function getStaffOrders(params: {
+  userId: string
+  role: StaffRole
+  dateFrom?: string
+  dateTo?: string
+}): Promise<StaffOrderRow[]> {
+  const query: Record<string, string> = { user_id: params.userId, role: params.role }
+  if (params.dateFrom) query.date_from = params.dateFrom
+  if (params.dateTo) query.date_to = params.dateTo
+  const data = await fetchJSON<{ items: StaffOrderRow[] }>('/api/v1/dashboard/staff-orders', { query })
+  return data.items
+}
+
 export type DailyCompletedPoint = {
   date: string
   count: number
