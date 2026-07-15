@@ -480,6 +480,18 @@ def _staff_role_columns(role: str):
     )
 
 
+def _source_group_conditions(source_group: Optional[str]) -> list:
+    """Buyurtma manbasi bo'yicha filtr: 'shahar' (smartup+orikzor) yoki 'region' (diller).
+
+    None — hamma manba (orqaga moslik). `order_id` yo'q hujjat 'shahar' deb qaraladi.
+    """
+    if source_group == "shahar":
+        return [or_(OrderModel.source.in_(("smartup", "orikzor")), DocumentModel.order_id.is_(None))]
+    if source_group == "region":
+        return [OrderModel.source == "diller"]
+    return []
+
+
 def _aggregate_staff_by_user_column(
     db: Session,
     user_id_column,
@@ -487,9 +499,11 @@ def _aggregate_staff_by_user_column(
     date_to: Optional[date],
     statuses: tuple = COMPLETED_DOC_STATUSES,
     ts_col=None,
+    source_group: Optional[str] = None,
 ) -> List[PickingStaffStatsRow]:
     col = ts_col if ts_col is not None else _document_completed_at_expr()
     filters = _staff_doc_filters(user_id_column, statuses, col, date_from, date_to)
+    filters.extend(_source_group_conditions(source_group))
 
     per_doc = (
         db.query(
@@ -498,6 +512,7 @@ def _aggregate_staff_by_user_column(
             func.count(DocumentLineModel.id).label("lines_cnt"),
             func.coalesce(func.sum(DocumentLineModel.picked_qty), 0).label("picked_sum"),
         )
+        .outerjoin(OrderModel, DocumentModel.order_id == OrderModel.id)
         .outerjoin(DocumentLineModel, DocumentLineModel.document_id == DocumentModel.id)
         .filter(and_(*filters))
         .group_by(user_id_column, DocumentModel.id)
@@ -547,6 +562,11 @@ async def get_picking_staff_stats(
     date_to: Optional[date] = Query(
         None, description="Filter completed_at (or updated_at) UTC date to"
     ),
+    group: Optional[str] = Query(
+        None,
+        pattern="^(shahar|region)$",
+        description="Manba guruhi: 'shahar' (smartup+orikzor) yoki 'region' (diller). Bo'sh — hammasi.",
+    ),
     db: Session = Depends(get_db),
     _user=Depends(require_any_permission(["reports:read", "audit:read", "admin:access"])),
 ):
@@ -561,9 +581,10 @@ async def get_picking_staff_stats(
         date_to,
         statuses=PICKER_COUNTED_DOC_STATUSES,
         ts_col=_picker_activity_at_expr(),
+        source_group=group,
     )
     controllers = _aggregate_staff_by_user_column(
-        db, DocumentModel.controlled_by_user_id, date_from, date_to
+        db, DocumentModel.controlled_by_user_id, date_from, date_to, source_group=group
     )
     return PickingStaffStatsResponse(pickers=pickers, controllers=controllers)
 
@@ -584,6 +605,11 @@ async def get_staff_orders(
     role: str = Query(..., pattern="^(picker|controller)$"),
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
+    group: Optional[str] = Query(
+        None,
+        pattern="^(shahar|region)$",
+        description="Manba guruhi: 'shahar' (smartup+orikzor) yoki 'region' (diller). Bo'sh — hammasi.",
+    ),
     limit: int = Query(500, ge=1, le=2000),
     db: Session = Depends(get_db),
     _user=Depends(require_any_permission(["reports:read", "audit:read", "admin:access"])),
@@ -594,9 +620,11 @@ async def get_staff_orders(
     user_col, statuses, ts_col = _staff_role_columns(role)
     filters = _staff_doc_filters(user_col, statuses, ts_col, date_from, date_to)
     filters.append(user_col == user_id)
+    filters.extend(_source_group_conditions(group))
 
     docs = (
         db.query(DocumentModel)
+        .outerjoin(OrderModel, DocumentModel.order_id == OrderModel.id)
         .options(selectinload(DocumentModel.lines), selectinload(DocumentModel.order))
         .filter(and_(*filters))
         .order_by(ts_col.desc())

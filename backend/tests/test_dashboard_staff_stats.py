@@ -440,6 +440,66 @@ def test_staff_orders_customer_falls_back_to_movement_note(client, db_session):
         app.dependency_overrides.pop(get_current_user, None)
 
 
+def _order(db_session, source: str, ext: str, number: str) -> Order:
+    o = Order(source=source, source_external_id=ext, order_number=number,
+              movement_note=("harakat" if source == "diller" else None))
+    db_session.add(o)
+    db_session.flush()
+    return o
+
+
+def test_staff_stats_group_shahar_vs_region(client, db_session):
+    """group=shahar (smartup+orikzor) va group=region (diller) alohida sanaydi."""
+    admin = _seed_admin(db_session)
+    p = User(username="grp_picker", password_hash=get_password_hash("x"), role="picker",
+             full_name="Grp Picker", is_active=True)
+    db_session.add(p)
+    db_session.flush()
+
+    o_smartup = _order(db_session, "smartup", "s-1", "S1")
+    o_orikzor = _order(db_session, "orikzor", "o-1", "O1")
+    o_diller = _order(db_session, "diller", "d-1", "D1")
+
+    def _doc(no, order, qty):
+        d = Document(doc_no=no, doc_type="SO", status="completed", assigned_to_user_id=p.id,
+                     order_id=order.id,
+                     completed_at=datetime(2026, 6, 5, tzinfo=timezone.utc),
+                     updated_at=datetime(2026, 6, 5, tzinfo=timezone.utc))
+        db_session.add(d)
+        db_session.flush()
+        db_session.add(DocumentLine(document_id=d.id, product_name="A", location_code="L",
+                                    required_qty=qty, picked_qty=qty))
+
+    _doc("D-S1", o_smartup, 10)
+    _doc("D-O1", o_orikzor, 5)
+    _doc("D-D1", o_diller, 100)
+    db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        shahar = client.get("/api/v1/dashboard/picking-staff-stats", params={"group": "shahar"})
+        assert shahar.status_code == 200, shahar.text
+        sp = shahar.json()["pickers"]
+        assert len(sp) == 1
+        assert sp[0]["total_picked_qty"] == 15.0  # 10 + 5, diller yo'q
+        assert sp[0]["documents_count"] == 2
+
+        region = client.get("/api/v1/dashboard/picking-staff-stats", params={"group": "region"})
+        rp = region.json()["pickers"]
+        assert len(rp) == 1
+        assert rp[0]["total_picked_qty"] == 100.0  # faqat diller
+        assert rp[0]["documents_count"] == 1
+
+        # staff-orders?group=region -> faqat diller hujjati
+        so = client.get("/api/v1/dashboard/staff-orders",
+                        params={"user_id": str(p.id), "role": "picker", "group": "region"})
+        items = so.json()["items"]
+        assert len(items) == 1
+        assert items[0]["order_number"] == "D1"
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
 def test_staff_orders_date_filter_and_invalid_role(client, db_session):
     admin = _seed_admin(db_session)
     p = User(username="so_picker2", password_hash=get_password_hash("x"), role="picker",

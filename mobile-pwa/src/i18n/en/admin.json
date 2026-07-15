@@ -222,6 +222,10 @@
     },
     "pickers_table_title": "Pickers",
     "controllers_table_title": "Controllers",
+    "pickers_title_shahar": "Pickers — City",
+    "controllers_title_shahar": "Controllers — City",
+    "pickers_title_region": "Pickers — Region",
+    "controllers_title_region": "Controllers — Region",
     "active_pick_documents_title": "Active pick documents",
     "view_all_picking": "All pick lists"
   },

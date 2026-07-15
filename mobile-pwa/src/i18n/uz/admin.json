@@ -222,6 +222,10 @@
     },
     "pickers_table_title": "Yig‘uvchilar",
     "controllers_table_title": "Controllerlar",
+    "pickers_title_shahar": "Yig‘uvchilar — Shahar",
+    "controllers_title_shahar": "Controllerlar — Shahar",
+    "pickers_title_region": "Yig‘uvchilar — Region",
+    "controllers_title_region": "Controllerlar — Region",
     "active_pick_documents_title": "Faol yig'ish hujjatlari",
     "view_all_picking": "Barcha pick listlar"
   },

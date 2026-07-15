@@ -6,12 +6,18 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '../../../components/ui/button'
 import { EmptyState } from '../../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../../components/ui/LoadingOverlay'
-import { getStaffOrders, type StaffOrderRow, type StaffRole } from '../../../services/dashboardApi'
+import {
+  getStaffOrders,
+  type StaffGroup,
+  type StaffOrderRow,
+  type StaffRole,
+} from '../../../services/dashboardApi'
 
 export type StaffSelection = {
   userId: string
   name: string
   role: StaffRole
+  group: StaffGroup
 }
 
 type StaffOrdersDialogProps = {
@@ -52,7 +58,13 @@ export function StaffOrdersDialog({ staff, dateFrom, dateTo, onClose }: StaffOrd
     setHasError(false)
     void (async () => {
       try {
-        const data = await getStaffOrders({ userId: staff.userId, role: staff.role, dateFrom, dateTo })
+        const data = await getStaffOrders({
+          userId: staff.userId,
+          role: staff.role,
+          group: staff.group,
+          dateFrom,
+          dateTo,
+        })
         if (!cancelled) setRows(data)
       } catch {
         if (!cancelled) setHasError(true)

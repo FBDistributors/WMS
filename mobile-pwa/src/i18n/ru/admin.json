@@ -222,6 +222,10 @@
     },
     "pickers_table_title": "Сборщики",
     "controllers_table_title": "Контролёры",
+    "pickers_title_shahar": "Сборщики — Город",
+    "controllers_title_shahar": "Контролёры — Город",
+    "pickers_title_region": "Сборщики — Регион",
+    "controllers_title_region": "Контролёры — Регион",
     "active_pick_documents_title": "Активные документы подбора",
     "view_all_picking": "Все списки подбора"
   },

@@ -27,6 +27,7 @@ import {
   getPickingStaffStats,
   type PickingOrderStats,
   type PickingStaffStatsRow,
+  type StaffGroup,
   type StaffRole,
 } from '../../services/dashboardApi'
 import { useAppToast } from '../../feedback/useAppToast'
@@ -474,10 +475,12 @@ export function DashboardPage() {
   const [isExporting, setIsExporting] = useState(false)
   const [stuckRowsCount, setStuckRowsCount] = useState(0)
   const [selectedStaff, setSelectedStaff] = useState<StaffSelection | null>(null)
+  const [regionPickerRows, setRegionPickerRows] = useState<PickingStaffStatsRow[]>([])
+  const [regionControllerRows, setRegionControllerRows] = useState<PickingStaffStatsRow[]>([])
 
   const openStaffOrders = useCallback(
-    (role: StaffRole) => (row: PickingStaffStatsRow) =>
-      setSelectedStaff({ userId: row.user_id, name: row.full_name, role }),
+    (role: StaffRole, group: StaffGroup) => (row: PickingStaffStatsRow) =>
+      setSelectedStaff({ userId: row.user_id, name: row.full_name, role, group }),
     []
   )
   const [stuckOrdersCount, setStuckOrdersCount] = useState(0)
@@ -494,11 +497,24 @@ export function DashboardPage() {
       const dateToQ = dateTo.trim() || undefined
       const today = todayIsoDate()
       const shouldAvgAllTime = dateFrom.trim() === today && dateTo.trim() === today
-      const [ordersByStatusData, staffData, pickingStats, stuckMain, stuckShowroom] = await Promise.all([
+      const [
+        ordersByStatusData,
+        staffData,
+        regionStaffData,
+        pickingStats,
+        stuckMain,
+        stuckShowroom,
+      ] = await Promise.all([
         getOrdersByStatus().catch(() => []),
         getPickingStaffStats({
           date_from: dateFromQ,
           date_to: dateToQ,
+          group: 'shahar',
+        }).catch(() => ({ pickers: [], controllers: [] })),
+        getPickingStaffStats({
+          date_from: dateFromQ,
+          date_to: dateToQ,
+          group: 'region',
         }).catch(() => ({ pickers: [], controllers: [] })),
         getPickingOrderStats({
           date_from: dateFromQ,
@@ -515,6 +531,10 @@ export function DashboardPage() {
       setOrdersByStatus(Array.isArray(ordersByStatusData) ? ordersByStatusData : [])
       setPickerRows(Array.isArray(staffData?.pickers) ? staffData.pickers : [])
       setControllerRows(Array.isArray(staffData?.controllers) ? staffData.controllers : [])
+      setRegionPickerRows(Array.isArray(regionStaffData?.pickers) ? regionStaffData.pickers : [])
+      setRegionControllerRows(
+        Array.isArray(regionStaffData?.controllers) ? regionStaffData.controllers : []
+      )
       setPickingOrderStats(pickingStats)
       setPickingStatsUnavailable(pickingStats == null)
       const stuckTotal = (stuckMain?.stuck_rows_count ?? 0) + (stuckShowroom?.stuck_rows_count ?? 0)
@@ -547,11 +567,15 @@ export function DashboardPage() {
     void load()
   }, [load])
 
-  const staffStatsExportDisabled =
-    isLoading || isExporting || (pickerRows.length === 0 && controllerRows.length === 0)
+  const hasAnyStaffRows =
+    pickerRows.length > 0 ||
+    controllerRows.length > 0 ||
+    regionPickerRows.length > 0 ||
+    regionControllerRows.length > 0
+  const staffStatsExportDisabled = isLoading || isExporting || !hasAnyStaffRows
 
   const handleExportStaffStatsExcel = useCallback(async () => {
-    if (pickerRows.length === 0 && controllerRows.length === 0) return
+    if (!hasAnyStaffRows) return
     showInfo(t('receiving:export_fetching'), 4000)
     setIsExporting(true)
     try {
@@ -572,14 +596,15 @@ export function DashboardPage() {
         ])
 
       const wb = XLSX.utils.book_new()
-      if (pickerRows.length > 0) {
-        const ws = XLSX.utils.aoa_to_sheet([headers, ...rowsToAoA(pickerRows)])
-        XLSX.utils.book_append_sheet(wb, ws, sheetNameSafe(t('admin:dashboard.pickers_table_title')))
+      const addSheet = (rows: PickingStaffStatsRow[], title: string) => {
+        if (rows.length === 0) return
+        const ws = XLSX.utils.aoa_to_sheet([headers, ...rowsToAoA(rows)])
+        XLSX.utils.book_append_sheet(wb, ws, sheetNameSafe(title))
       }
-      if (controllerRows.length > 0) {
-        const ws = XLSX.utils.aoa_to_sheet([headers, ...rowsToAoA(controllerRows)])
-        XLSX.utils.book_append_sheet(wb, ws, sheetNameSafe(t('admin:dashboard.controllers_table_title')))
-      }
+      addSheet(pickerRows, t('admin:dashboard.pickers_title_shahar'))
+      addSheet(controllerRows, t('admin:dashboard.controllers_title_shahar'))
+      addSheet(regionPickerRows, t('admin:dashboard.pickers_title_region'))
+      addSheet(regionControllerRows, t('admin:dashboard.controllers_title_region'))
 
       const day = new Date().toISOString().slice(0, 10)
       const fromPart = dateFrom.trim() ? dateFrom.trim() : 'all'
@@ -594,7 +619,19 @@ export function DashboardPage() {
     } finally {
       setIsExporting(false)
     }
-  }, [t, pickerRows, controllerRows, dateFrom, dateTo, showInfo, showSuccess, showError])
+  }, [
+    t,
+    hasAnyStaffRows,
+    pickerRows,
+    controllerRows,
+    regionPickerRows,
+    regionControllerRows,
+    dateFrom,
+    dateTo,
+    showInfo,
+    showSuccess,
+    showError,
+  ])
 
   const greetingName = (user?.name || '').trim().split(/\s+/)[0] || (user?.name ?? '')
   const greetingDate = useMemo(() => {
@@ -754,10 +791,10 @@ export function DashboardPage() {
             </div>
           </div>
 
-          {/* Liderbordlar */}
+          {/* Liderbordlar — Shahar (smartup + orikzor) */}
           <div className="grid grid-cols-1 gap-[22px] lg:grid-cols-2">
             <LeaderboardCard
-              title={t('admin:dashboard.pickers_table_title')}
+              title={t('admin:dashboard.pickers_title_shahar')}
               rows={pickerRows}
               tone="accent"
               isLoading={isLoading}
@@ -765,11 +802,11 @@ export function DashboardPage() {
               exportDisabled={staffStatsExportDisabled}
               isExporting={isExporting}
               emptyLabel={t('admin:dashboard.staff_stats_empty')}
-              onRowClick={openStaffOrders('picker')}
+              onRowClick={openStaffOrders('picker', 'shahar')}
               t={t}
             />
             <LeaderboardCard
-              title={t('admin:dashboard.controllers_table_title')}
+              title={t('admin:dashboard.controllers_title_shahar')}
               rows={controllerRows}
               tone="violet"
               isLoading={isLoading}
@@ -777,7 +814,35 @@ export function DashboardPage() {
               exportDisabled={staffStatsExportDisabled}
               isExporting={isExporting}
               emptyLabel={t('admin:dashboard.staff_stats_empty')}
-              onRowClick={openStaffOrders('controller')}
+              onRowClick={openStaffOrders('controller', 'shahar')}
+              t={t}
+            />
+          </div>
+
+          {/* Liderbordlar — Region (diller) */}
+          <div className="grid grid-cols-1 gap-[22px] lg:grid-cols-2">
+            <LeaderboardCard
+              title={t('admin:dashboard.pickers_title_region')}
+              rows={regionPickerRows}
+              tone="accent"
+              isLoading={isLoading}
+              onExport={() => void handleExportStaffStatsExcel()}
+              exportDisabled={staffStatsExportDisabled}
+              isExporting={isExporting}
+              emptyLabel={t('admin:dashboard.staff_stats_empty')}
+              onRowClick={openStaffOrders('picker', 'region')}
+              t={t}
+            />
+            <LeaderboardCard
+              title={t('admin:dashboard.controllers_title_region')}
+              rows={regionControllerRows}
+              tone="violet"
+              isLoading={isLoading}
+              onExport={() => void handleExportStaffStatsExcel()}
+              exportDisabled={staffStatsExportDisabled}
+              isExporting={isExporting}
+              emptyLabel={t('admin:dashboard.staff_stats_empty')}
+              onRowClick={openStaffOrders('controller', 'region')}
               t={t}
             />
           </div>

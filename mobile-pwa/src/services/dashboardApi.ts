@@ -106,13 +106,17 @@ export type PickingStaffStatsResponse = {
   controllers: PickingStaffStatsRow[]
 }
 
+export type StaffGroup = 'shahar' | 'region'
+
 export async function getPickingStaffStats(params?: {
   date_from?: string
   date_to?: string
+  group?: StaffGroup
 }): Promise<PickingStaffStatsResponse> {
   const query: Record<string, string> = {}
   if (params?.date_from) query.date_from = params.date_from
   if (params?.date_to) query.date_to = params.date_to
+  if (params?.group) query.group = params.group
   return fetchJSON<PickingStaffStatsResponse>('/api/v1/dashboard/picking-staff-stats', { query })
 }
 
@@ -135,10 +139,12 @@ export async function getStaffOrders(params: {
   role: StaffRole
   dateFrom?: string
   dateTo?: string
+  group?: StaffGroup
 }): Promise<StaffOrderRow[]> {
   const query: Record<string, string> = { user_id: params.userId, role: params.role }
   if (params.dateFrom) query.date_from = params.dateFrom
   if (params.dateTo) query.date_to = params.dateTo
+  if (params.group) query.group = params.group
   const data = await fetchJSON<{ items: StaffOrderRow[] }>('/api/v1/dashboard/staff-orders', { query })
   return data.items
 }
