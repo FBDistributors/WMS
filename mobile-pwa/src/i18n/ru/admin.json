@@ -219,6 +219,8 @@
       "col_qty": "Шт",
       "col_lines": "Поз",
       "col_date": "Дата",
+      "col_arrived": "Поступил",
+      "col_finished": "Завершён",
       "col_pick_time": "Время сборки",
       "col_check_time": "Время проверки"
     },

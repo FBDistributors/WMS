@@ -117,7 +117,7 @@ export function StaffOrdersDialog({ staff, dateFrom, dateTo, onClose }: StaffOrd
           ) : rows.length === 0 ? (
             <EmptyState title={t('admin:dashboard.staff_orders.empty')} />
           ) : (
-            <table className="w-full min-w-[860px] text-sm">
+            <table className="w-full min-w-[980px] text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400">
                   <th className="px-3 py-2.5">{t('admin:dashboard.staff_orders.col_order')}</th>
@@ -133,12 +133,19 @@ export function StaffOrdersDialog({ staff, dateFrom, dateTo, onClose }: StaffOrd
                         : 'admin:dashboard.staff_orders.col_check_time'
                     )}
                   </th>
-                  <th className="px-3 py-2.5">{t('admin:dashboard.staff_orders.col_date')}</th>
+                  <th className="px-3 py-2.5">{t('admin:dashboard.staff_orders.col_arrived')}</th>
+                  <th className="px-3 py-2.5">{t('admin:dashboard.staff_orders.col_finished')}</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => {
                   const clickable = Boolean(r.order_id)
+                  const arrivedAt =
+                    staff.role === 'picker' ? r.first_assigned_at : r.sent_to_controller_at
+                  const finishedAt =
+                    staff.role === 'picker'
+                      ? r.sent_to_controller_at ?? r.completed_at
+                      : r.completed_at
                   return (
                     <tr
                       key={r.document_id}
@@ -180,7 +187,10 @@ export function StaffOrdersDialog({ staff, dateFrom, dateTo, onClose }: StaffOrd
                         )}
                       </td>
                       <td className="px-3 py-2.5 whitespace-nowrap text-slate-500 dark:text-slate-400">
-                        {formatDateTime(r.activity_at)}
+                        {formatDateTime(arrivedAt)}
+                      </td>
+                      <td className="px-3 py-2.5 whitespace-nowrap text-slate-500 dark:text-slate-400">
+                        {formatDateTime(finishedAt)}
                       </td>
                     </tr>
                   )

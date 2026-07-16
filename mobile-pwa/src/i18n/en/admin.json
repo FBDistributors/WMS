@@ -219,6 +219,8 @@
       "col_qty": "Units",
       "col_lines": "Pos",
       "col_date": "Date",
+      "col_arrived": "Arrived",
+      "col_finished": "Finished",
       "col_pick_time": "Pick time",
       "col_check_time": "Check time"
     },

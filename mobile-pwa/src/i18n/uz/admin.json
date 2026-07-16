@@ -219,6 +219,8 @@
       "col_qty": "Dona",
       "col_lines": "Poz",
       "col_date": "Sana",
+      "col_arrived": "Kelgan vaqti",
+      "col_finished": "Yakunlagan vaqti",
       "col_pick_time": "Yig'ish vaqti",
       "col_check_time": "Tekshiruv vaqti"
     },
