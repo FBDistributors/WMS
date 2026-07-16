@@ -610,16 +610,31 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
     });
 
     if (_loadingProduct && _phase == _MovementPhase.scanProduct) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text(StringLookup.t(loc, 'movementTitle')),
-          leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: _headerBack),
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (bool didPop, Object? result) {
+          if (!didPop) {
+            _headerBack();
+          }
+        },
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(StringLookup.t(loc, 'movementTitle')),
+            leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: _headerBack),
+          ),
+          body: const Center(child: CircularProgressIndicator()),
         ),
-        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, Object? result) {
+        if (!didPop) {
+          _headerBack();
+        }
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: Text(StringLookup.t(loc, 'movementTitle')),
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: _headerBack),
@@ -964,6 +979,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
             ],
           ],
         ],
+      ),
       ),
     );
   }
