@@ -1,7 +1,7 @@
 """Dashboard picking-staff-stats aggregation (documents SO completed)."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from datetime import date
 
@@ -533,6 +533,85 @@ def test_staff_orders_date_filter_and_invalid_role(client, db_session):
         bad = client.get("/api/v1/dashboard/staff-orders",
                          params={"user_id": str(p.id), "role": "foo"})
         assert bad.status_code == 422
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_staff_timing_picker_and_controller(client, db_session):
+    """Yig'ish va tekshirish davomiyligi (avg + median), belgisiz hujjatlar chiqariladi."""
+    admin = _seed_admin(db_session)
+    p = User(username="tm_picker", password_hash=get_password_hash("x"), role="picker",
+             full_name="TM Picker", is_active=True)
+    c = User(username="tm_ctrl", password_hash=get_password_hash("x"), role="inventory_controller",
+             full_name="TM Ctrl", is_active=True)
+    db_session.add_all([p, c])
+    db_session.flush()
+
+    base = datetime(2026, 6, 5, 9, 0, 0, tzinfo=timezone.utc)
+
+    def _doc(no, *, assigned_min, sent_min, verify_min, done_min):
+        d = Document(
+            doc_no=no, doc_type="SO", status="completed",
+            assigned_to_user_id=p.id, controlled_by_user_id=c.id,
+            first_assigned_at=base + timedelta(minutes=assigned_min),
+            sent_to_controller_at=base + timedelta(minutes=sent_min),
+            controller_verification_started_at=(base + timedelta(minutes=verify_min)) if verify_min is not None else None,
+            completed_at=base + timedelta(minutes=done_min),
+            updated_at=base + timedelta(minutes=done_min),
+        )
+        db_session.add(d)
+        return d
+
+    # Doc1: yig'ish 10 daq (0->10), tekshiruv: keldi 10, boshladi 12, yakun 20 -> total 10 daq, check 8 daq
+    _doc("TM-1", assigned_min=0, sent_min=10, verify_min=12, done_min=20)
+    # Doc2: yig'ish 20 daq (0->20), total 20 daq (20->40), check verify yo'q
+    _doc("TM-2", assigned_min=0, sent_min=20, verify_min=None, done_min=40)
+    db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        res = client.get("/api/v1/dashboard/staff-timing")
+        assert res.status_code == 200, res.text
+        data = res.json()
+
+        assert len(data["pickers"]) == 1
+        pr = data["pickers"][0]
+        assert pr["orders_count"] == 2
+        assert pr["avg_seconds"] == 900.0     # (600+1200)/2 = 900s = 15 daq
+        assert pr["median_seconds"] == 900.0
+
+        assert len(data["controllers"]) == 1
+        cr = data["controllers"][0]
+        assert cr["orders_count"] == 2           # ikkalasida ham total bor
+        assert cr["total_avg_seconds"] == 900.0  # (600+1200)/2
+        assert cr["check_count"] == 1            # faqat Doc1'da verify bor
+        assert cr["check_avg_seconds"] == 480.0  # 8 daq
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_staff_timing_excludes_incomplete_timestamps(client, db_session):
+    """first_assigned yoki sent_to_controller yo'q hujjat yig'ish vaqtiga kirmaydi."""
+    admin = _seed_admin(db_session)
+    p = User(username="tm_picker2", password_hash=get_password_hash("x"), role="picker",
+             full_name="TM P2", is_active=True)
+    db_session.add(p)
+    db_session.flush()
+    base = datetime(2026, 6, 5, 9, 0, 0, tzinfo=timezone.utc)
+    # first_assigned_at yo'q -> davomiylik yo'q
+    db_session.add(Document(
+        doc_no="TM-N", doc_type="SO", status="completed", assigned_to_user_id=p.id,
+        sent_to_controller_at=base + timedelta(minutes=10),
+        completed_at=base + timedelta(minutes=20),
+        updated_at=base + timedelta(minutes=20),
+    ))
+    db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        res = client.get("/api/v1/dashboard/staff-timing")
+        assert res.status_code == 200
+        assert res.json()["pickers"] == []  # hisobga olinmaydi
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 

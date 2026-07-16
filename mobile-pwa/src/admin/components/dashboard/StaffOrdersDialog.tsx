@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '../../../components/ui/button'
 import { EmptyState } from '../../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../../components/ui/LoadingOverlay'
+import { formatDuration } from '../../../lib/formatDuration'
 import {
   getStaffOrders,
   type StaffGroup,
@@ -116,7 +117,7 @@ export function StaffOrdersDialog({ staff, dateFrom, dateTo, onClose }: StaffOrd
           ) : rows.length === 0 ? (
             <EmptyState title={t('admin:dashboard.staff_orders.empty')} />
           ) : (
-            <table className="w-full min-w-[760px] text-sm">
+            <table className="w-full min-w-[860px] text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400">
                   <th className="px-3 py-2.5">{t('admin:dashboard.staff_orders.col_order')}</th>
@@ -125,6 +126,13 @@ export function StaffOrdersDialog({ staff, dateFrom, dateTo, onClose }: StaffOrd
                   <th className="px-3 py-2.5">{t('admin:dashboard.staff_orders.col_status')}</th>
                   <th className="px-3 py-2.5 text-right">{t('admin:dashboard.staff_orders.col_qty')}</th>
                   <th className="px-3 py-2.5 text-right">{t('admin:dashboard.staff_orders.col_lines')}</th>
+                  <th className="px-3 py-2.5 text-right">
+                    {t(
+                      staff.role === 'picker'
+                        ? 'admin:dashboard.staff_orders.col_pick_time'
+                        : 'admin:dashboard.staff_orders.col_check_time'
+                    )}
+                  </th>
                   <th className="px-3 py-2.5">{t('admin:dashboard.staff_orders.col_date')}</th>
                 </tr>
               </thead>
@@ -160,6 +168,16 @@ export function StaffOrdersDialog({ staff, dateFrom, dateTo, onClose }: StaffOrd
                       </td>
                       <td className="px-3 py-2.5 text-right tabular-nums text-slate-700 dark:text-slate-200">
                         {r.lines_count}
+                      </td>
+                      <td className="px-3 py-2.5 text-right whitespace-nowrap tabular-nums text-slate-700 dark:text-slate-200">
+                        {formatDuration(
+                          staff.role === 'picker' ? r.pick_seconds : r.control_total_seconds,
+                          {
+                            h: t('admin:dashboard.timing.h'),
+                            m: t('admin:dashboard.timing.m'),
+                            s: t('admin:dashboard.timing.s'),
+                          }
+                        )}
                       </td>
                       <td className="px-3 py-2.5 whitespace-nowrap text-slate-500 dark:text-slate-400">
                         {formatDateTime(r.activity_at)}

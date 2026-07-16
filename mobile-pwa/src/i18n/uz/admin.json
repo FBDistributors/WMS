@@ -218,7 +218,25 @@
       "col_status": "Status",
       "col_qty": "Dona",
       "col_lines": "Poz",
-      "col_date": "Sana"
+      "col_date": "Sana",
+      "col_pick_time": "Yig'ish vaqti",
+      "col_check_time": "Tekshiruv vaqti"
+    },
+    "timing": {
+      "section_title": "Ish vaqti (unumdorlik)",
+      "pickers_title": "Yig'uvchilar — yig'ish vaqti",
+      "pickers_sub": "Biriktirilgandan controllerga yuborilguncha",
+      "controllers_title": "Controllerlar — tekshirish vaqti",
+      "controllers_sub": "Jami (kelgandan) va sof tekshiruv (boshlagandan)",
+      "col_staff": "Xodim",
+      "col_avg": "O'rtacha",
+      "col_orders": "Buyurtma",
+      "col_total": "Jami",
+      "col_check": "Tekshiruv",
+      "median_short": "med",
+      "h": "soat",
+      "m": "daq",
+      "s": "s"
     },
     "pickers_table_title": "Yig‘uvchilar",
     "controllers_table_title": "Controllerlar",

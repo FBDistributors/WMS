@@ -218,7 +218,25 @@
       "col_status": "Status",
       "col_qty": "Units",
       "col_lines": "Pos",
-      "col_date": "Date"
+      "col_date": "Date",
+      "col_pick_time": "Pick time",
+      "col_check_time": "Check time"
+    },
+    "timing": {
+      "section_title": "Work time (productivity)",
+      "pickers_title": "Pickers — pick time",
+      "pickers_sub": "From assignment to sending to controller",
+      "controllers_title": "Controllers — check time",
+      "controllers_sub": "Total (from arrival) and pure check (from start)",
+      "col_staff": "Staff",
+      "col_avg": "Average",
+      "col_orders": "Orders",
+      "col_total": "Total",
+      "col_check": "Check",
+      "median_short": "med",
+      "h": "h",
+      "m": "m",
+      "s": "s"
     },
     "pickers_table_title": "Pickers",
     "controllers_table_title": "Controllers",

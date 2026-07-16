@@ -132,6 +132,49 @@ export type StaffOrderRow = {
   lines_count: number
   picked_qty: number
   activity_at: string | null
+  first_assigned_at: string | null
+  sent_to_controller_at: string | null
+  controller_verification_started_at: string | null
+  completed_at: string | null
+  pick_seconds: number | null
+  control_total_seconds: number | null
+  control_check_seconds: number | null
+}
+
+export type StaffTimingPickerRow = {
+  user_id: string
+  full_name: string
+  orders_count: number
+  avg_seconds: number
+  median_seconds: number
+}
+
+export type StaffTimingControllerRow = {
+  user_id: string
+  full_name: string
+  orders_count: number
+  total_avg_seconds: number
+  total_median_seconds: number
+  check_count: number
+  check_avg_seconds: number
+  check_median_seconds: number
+}
+
+export type StaffTimingResponse = {
+  pickers: StaffTimingPickerRow[]
+  controllers: StaffTimingControllerRow[]
+}
+
+export async function getStaffTiming(params?: {
+  date_from?: string
+  date_to?: string
+  group?: StaffGroup
+}): Promise<StaffTimingResponse> {
+  const query: Record<string, string> = {}
+  if (params?.date_from) query.date_from = params.date_from
+  if (params?.date_to) query.date_to = params.date_to
+  if (params?.group) query.group = params.group
+  return fetchJSON<StaffTimingResponse>('/api/v1/dashboard/staff-timing', { query })
 }
 
 export async function getStaffOrders(params: {

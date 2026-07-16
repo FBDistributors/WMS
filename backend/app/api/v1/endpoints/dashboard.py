@@ -1,6 +1,8 @@
 """Dashboard summary API - real counts from database."""
 
 import os
+import statistics
+from collections import defaultdict
 from datetime import date, datetime, time, timedelta, timezone
 from typing import List, Optional
 from uuid import UUID
@@ -114,10 +116,50 @@ class StaffOrderItem(BaseModel):
     lines_count: int
     picked_qty: float
     activity_at: Optional[datetime] = None
+    # Vaqt belgilari + hisoblangan davomiyliklar (soniya)
+    first_assigned_at: Optional[datetime] = None
+    sent_to_controller_at: Optional[datetime] = None
+    controller_verification_started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    pick_seconds: Optional[float] = None
+    control_total_seconds: Optional[float] = None
+    control_check_seconds: Optional[float] = None
 
 
 class StaffOrdersResponse(BaseModel):
     items: List[StaffOrderItem]
+
+
+class StaffTimingPickerRow(BaseModel):
+    user_id: UUID
+    full_name: str
+    orders_count: int
+    avg_seconds: float
+    median_seconds: float
+
+
+class StaffTimingControllerRow(BaseModel):
+    user_id: UUID
+    full_name: str
+    orders_count: int
+    total_avg_seconds: float
+    total_median_seconds: float
+    check_count: int
+    check_avg_seconds: float
+    check_median_seconds: float
+
+
+class StaffTimingResponse(BaseModel):
+    pickers: List[StaffTimingPickerRow]
+    controllers: List[StaffTimingControllerRow]
+
+
+def _duration_seconds(start: Optional[datetime], end: Optional[datetime]) -> Optional[float]:
+    """end − start soniyada; ikkalasi bor va musbat bo'lsa, aks holda None."""
+    if start is None or end is None:
+        return None
+    delta = (end - start).total_seconds()
+    return delta if delta > 0 else None
 
 
 def _today_utc() -> date:
@@ -651,9 +693,124 @@ async def get_staff_orders(
                 lines_count=len(doc.lines),
                 picked_qty=picked_qty,
                 activity_at=_staff_order_activity_at(role, doc),
+                first_assigned_at=doc.first_assigned_at,
+                sent_to_controller_at=doc.sent_to_controller_at,
+                controller_verification_started_at=doc.controller_verification_started_at,
+                completed_at=doc.completed_at,
+                pick_seconds=_duration_seconds(doc.first_assigned_at, doc.sent_to_controller_at),
+                control_total_seconds=_duration_seconds(doc.sent_to_controller_at, doc.completed_at),
+                control_check_seconds=_duration_seconds(
+                    doc.controller_verification_started_at, doc.completed_at
+                ),
             )
         )
     return StaffOrdersResponse(items=items)
+
+
+def _timing_name_map(db: Session, user_ids: set) -> dict:
+    ids = [u for u in user_ids if u is not None]
+    if not ids:
+        return {}
+    rows = db.query(UserModel.id, UserModel.full_name, UserModel.username).filter(UserModel.id.in_(ids)).all()
+    return {r.id: ((r.full_name or "").strip() or (r.username or "Unknown")) for r in rows}
+
+
+@router.get(
+    "/staff-timing",
+    response_model=StaffTimingResponse,
+    summary="Yig'uvchi/controller ish vaqti: yig'ish va tekshirish davomiyligi (avg + median)",
+)
+async def get_staff_timing(
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    group: Optional[str] = Query(None, pattern="^(shahar|region)$"),
+    db: Session = Depends(get_db),
+    _user=Depends(require_any_permission(["reports:read", "audit:read", "admin:access"])),
+):
+    if date_from is not None and date_to is not None and date_from > date_to:
+        raise HTTPException(status_code=400, detail="date_from must be on or before date_to")
+
+    # --- Yig'uvchilar: first_assigned_at -> sent_to_controller_at ---
+    p_col, p_statuses, p_ts = _staff_role_columns("picker")
+    p_filters = _staff_doc_filters(p_col, p_statuses, p_ts, date_from, date_to)
+    p_filters.extend(_source_group_conditions(group))
+    p_rows = (
+        db.query(
+            DocumentModel.assigned_to_user_id.label("uid"),
+            DocumentModel.first_assigned_at.label("a"),
+            DocumentModel.sent_to_controller_at.label("b"),
+        )
+        .outerjoin(OrderModel, DocumentModel.order_id == OrderModel.id)
+        .filter(and_(*p_filters))
+        .all()
+    )
+    pick_durs: dict = defaultdict(list)
+    for r in p_rows:
+        d = _duration_seconds(r.a, r.b)
+        if d is not None:
+            pick_durs[r.uid].append(d)
+
+    # --- Controllerlar: jami (sent->completed) va sof tekshiruv (verify->completed) ---
+    c_col, c_statuses, c_ts = _staff_role_columns("controller")
+    c_filters = _staff_doc_filters(c_col, c_statuses, c_ts, date_from, date_to)
+    c_filters.extend(_source_group_conditions(group))
+    c_rows = (
+        db.query(
+            DocumentModel.controlled_by_user_id.label("uid"),
+            DocumentModel.sent_to_controller_at.label("s"),
+            DocumentModel.controller_verification_started_at.label("v"),
+            DocumentModel.completed_at.label("c"),
+        )
+        .outerjoin(OrderModel, DocumentModel.order_id == OrderModel.id)
+        .filter(and_(*c_filters))
+        .all()
+    )
+    ctrl_total: dict = defaultdict(list)
+    ctrl_check: dict = defaultdict(list)
+    for r in c_rows:
+        t = _duration_seconds(r.s, r.c)
+        if t is not None:
+            ctrl_total[r.uid].append(t)
+        ch = _duration_seconds(r.v, r.c)
+        if ch is not None:
+            ctrl_check[r.uid].append(ch)
+
+    names = _timing_name_map(db, set(pick_durs) | set(ctrl_total) | set(ctrl_check))
+
+    pickers = [
+        StaffTimingPickerRow(
+            user_id=uid,
+            full_name=names.get(uid, "Unknown"),
+            orders_count=len(durs),
+            avg_seconds=round(statistics.mean(durs), 1),
+            median_seconds=round(statistics.median(durs), 1),
+        )
+        for uid, durs in pick_durs.items()
+        if durs
+    ]
+    pickers.sort(key=lambda x: (x.median_seconds, x.full_name.lower()))
+
+    controllers = []
+    for uid in set(ctrl_total) | set(ctrl_check):
+        totals = ctrl_total.get(uid, [])
+        checks = ctrl_check.get(uid, [])
+        if not totals and not checks:
+            continue
+        controllers.append(
+            StaffTimingControllerRow(
+                user_id=uid,
+                full_name=names.get(uid, "Unknown"),
+                orders_count=len(totals),
+                total_avg_seconds=round(statistics.mean(totals), 1) if totals else 0.0,
+                total_median_seconds=round(statistics.median(totals), 1) if totals else 0.0,
+                check_count=len(checks),
+                check_avg_seconds=round(statistics.mean(checks), 1) if checks else 0.0,
+                check_median_seconds=round(statistics.median(checks), 1) if checks else 0.0,
+            )
+        )
+    controllers.sort(key=lambda x: (x.total_median_seconds or 1e12, x.full_name.lower()))
+
+    return StaffTimingResponse(pickers=pickers, controllers=controllers)
 
 
 @router.get(

@@ -18,6 +18,7 @@ import * as XLSX from 'xlsx'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { StaffOrdersDialog, type StaffSelection } from '../../admin/components/dashboard/StaffOrdersDialog'
+import { StaffTimingCards } from '../../admin/components/dashboard/StaffTimingCards'
 import { Button } from '../../components/ui/button'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
@@ -25,10 +26,13 @@ import {
   getOrdersByStatus,
   getPickingOrderStats,
   getPickingStaffStats,
+  getStaffTiming,
   type PickingOrderStats,
   type PickingStaffStatsRow,
   type StaffGroup,
   type StaffRole,
+  type StaffTimingControllerRow,
+  type StaffTimingPickerRow,
 } from '../../services/dashboardApi'
 import { useAppToast } from '../../feedback/useAppToast'
 import { getReserveStuckSummary } from '../../services/inventoryApi'
@@ -477,6 +481,8 @@ export function DashboardPage() {
   const [selectedStaff, setSelectedStaff] = useState<StaffSelection | null>(null)
   const [regionPickerRows, setRegionPickerRows] = useState<PickingStaffStatsRow[]>([])
   const [regionControllerRows, setRegionControllerRows] = useState<PickingStaffStatsRow[]>([])
+  const [timingPickers, setTimingPickers] = useState<StaffTimingPickerRow[]>([])
+  const [timingControllers, setTimingControllers] = useState<StaffTimingControllerRow[]>([])
 
   const openStaffOrders = useCallback(
     (role: StaffRole, group: StaffGroup) => (row: PickingStaffStatsRow) =>
@@ -501,6 +507,7 @@ export function DashboardPage() {
         ordersByStatusData,
         staffData,
         regionStaffData,
+        timingData,
         pickingStats,
         stuckMain,
         stuckShowroom,
@@ -516,6 +523,10 @@ export function DashboardPage() {
           date_to: dateToQ,
           group: 'region',
         }).catch(() => ({ pickers: [], controllers: [] })),
+        getStaffTiming({ date_from: dateFromQ, date_to: dateToQ }).catch(() => ({
+          pickers: [],
+          controllers: [],
+        })),
         getPickingOrderStats({
           date_from: dateFromQ,
           date_to: dateToQ,
@@ -535,6 +546,8 @@ export function DashboardPage() {
       setRegionControllerRows(
         Array.isArray(regionStaffData?.controllers) ? regionStaffData.controllers : []
       )
+      setTimingPickers(Array.isArray(timingData?.pickers) ? timingData.pickers : [])
+      setTimingControllers(Array.isArray(timingData?.controllers) ? timingData.controllers : [])
       setPickingOrderStats(pickingStats)
       setPickingStatsUnavailable(pickingStats == null)
       const stuckTotal = (stuckMain?.stuck_rows_count ?? 0) + (stuckShowroom?.stuck_rows_count ?? 0)
@@ -844,6 +857,18 @@ export function DashboardPage() {
               emptyLabel={t('admin:dashboard.staff_stats_empty')}
               onRowClick={openStaffOrders('controller', 'region')}
               t={t}
+            />
+          </div>
+
+          {/* Ish vaqti (unumdorlik) */}
+          <div>
+            <div className="mb-3 text-base font-extrabold tracking-[-0.3px] text-slate-900 dark:text-slate-100">
+              {t('admin:dashboard.timing.section_title')}
+            </div>
+            <StaffTimingCards
+              pickers={timingPickers}
+              controllers={timingControllers}
+              isLoading={isLoading}
             />
           </div>
         </div>
