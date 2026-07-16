@@ -112,7 +112,12 @@ export function LoginPage() {
         <LanguageSwitcher compact />
       </div>
       <div className="mb-8 flex flex-col items-center gap-4">
-        <img src={BRAND.logoIcon} alt="" className="h-20 w-auto object-contain sm:h-24" aria-hidden />
+        <img
+          src={BRAND.logoIcon}
+          alt=""
+          className="h-20 w-auto object-contain sm:h-24 dark:brightness-0 dark:invert"
+          aria-hidden
+        />
         <span className="text-center text-lg font-semibold tracking-tight text-slate-800 dark:text-slate-200 sm:text-xl">{BRAND.name}</span>
       </div>
       <Card className="w-full max-w-sm p-6">
