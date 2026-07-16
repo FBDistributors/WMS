@@ -329,7 +329,7 @@ export default function CameraScanner({
 
   const containerClass = fullscreen
     ? 'fixed inset-0 z-[60] flex flex-col bg-black'
-    : 'rounded-2xl bg-white p-4 shadow-sm'
+    : 'rounded-2xl bg-white p-4 shadow-sm dark:bg-slate-900'
 
   if (isNative && !useWebScanner) {
     return (

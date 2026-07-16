@@ -25,9 +25,9 @@ export function ScanModal({ open, onClose, onScanned, title }: ScanModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="relative w-full max-w-md rounded-2xl bg-white p-4 shadow-xl">
+      <div className="relative w-full max-w-md rounded-2xl bg-white p-4 shadow-xl dark:bg-slate-900">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
             {title ?? t('scan.title')}
           </h2>
           <Button variant="ghost" onClick={onClose} aria-label={t('scan.close')}>

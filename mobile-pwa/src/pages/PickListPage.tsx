@@ -50,7 +50,7 @@ export function PickListPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 px-4">
+      <div className="min-h-screen bg-slate-50 px-4 dark:bg-slate-950">
         <AppHeader title={t('list_title')} onRefresh={load} hideUserMenu />
         <div className="space-y-4">
           <div className="h-12 w-full animate-pulse rounded-2xl bg-slate-200" />
@@ -62,7 +62,7 @@ export function PickListPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 pb-6">
+    <div className="min-h-screen bg-slate-50 px-4 pb-6 dark:bg-slate-950">
       <AppHeader
         title={t('list_title')}
         onRefresh={load}
@@ -77,10 +77,10 @@ export function PickListPage() {
           </Link>
         }
       />
-      <div className="mb-4 flex items-center gap-2 rounded-2xl bg-white px-3 py-2 shadow-sm">
+      <div className="mb-4 flex items-center gap-2 rounded-2xl bg-white px-3 py-2 shadow-sm dark:bg-slate-900">
         <Search size={18} className="text-slate-400" />
         <input
-          className="w-full bg-transparent text-sm text-slate-900 outline-none"
+          className="w-full bg-transparent text-sm text-slate-900 outline-none dark:text-slate-100"
           placeholder={t('search_placeholder')}
           value={query}
           onChange={(event) => setQuery(event.target.value)}

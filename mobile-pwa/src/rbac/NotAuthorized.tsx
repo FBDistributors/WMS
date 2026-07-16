@@ -25,7 +25,7 @@ export function NotAuthorized({ onBack, onHome, onLogin }: NotAuthorizedProps) {
           <button
             type="button"
             onClick={onBack}
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
           >
             {t('buttons.back')}
           </button>
@@ -33,7 +33,7 @@ export function NotAuthorized({ onBack, onHome, onLogin }: NotAuthorizedProps) {
             <button
               type="button"
               onClick={onLogin}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
             >
               {t('buttons.login')}
             </button>

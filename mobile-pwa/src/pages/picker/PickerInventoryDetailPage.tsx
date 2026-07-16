@@ -43,7 +43,7 @@ export function PickerInventoryDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="relative min-h-screen bg-slate-50 px-4">
+      <div className="relative min-h-screen bg-slate-50 px-4 dark:bg-slate-950">
         <AppHeader title={t('inventory.title')} onBack={() => navigate(-1)} hideUserMenu />
         <LoadingOverlay fullScreen label={t('common:messages.loading')} />
       </div>
@@ -52,7 +52,7 @@ export function PickerInventoryDetailPage() {
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-slate-50 px-4">
+      <div className="min-h-screen bg-slate-50 px-4 dark:bg-slate-950">
         <AppHeader title={t('inventory.title')} onBack={() => navigate(-1)} hideUserMenu />
         <EmptyState
           icon={<Boxes size={32} />}

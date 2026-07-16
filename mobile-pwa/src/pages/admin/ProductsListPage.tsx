@@ -91,7 +91,7 @@ export function ProductsListPage() {
             onClick={() => navigate(`/admin/products/${item.id}`)}
           >
             <div>
-              <div className="text-base font-semibold text-slate-900">{item.name}</div>
+              <div className="text-base font-semibold text-slate-900 dark:text-slate-100">{item.name}</div>
               <div className="text-xs text-slate-500">
                 SKU: {item.sku} · {item.barcode ?? `${t('products:fields.barcode')} —`}
               </div>
@@ -114,10 +114,10 @@ export function ProductsListPage() {
         </Button>
       }
     >
-      <div className="mb-4 flex items-center gap-2 rounded-2xl bg-white px-3 py-2 shadow-sm">
+      <div className="mb-4 flex items-center gap-2 rounded-2xl bg-white px-3 py-2 shadow-sm dark:bg-slate-900">
         <Search size={18} className="text-slate-400" />
         <input
-          className="w-full bg-transparent text-sm text-slate-900 outline-none"
+          className="w-full bg-transparent text-sm text-slate-900 outline-none dark:text-slate-100"
           placeholder={t('products:search_placeholder')}
           value={query}
           onChange={(event) => setQuery(event.target.value)}

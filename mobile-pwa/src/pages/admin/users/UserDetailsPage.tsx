@@ -184,17 +184,17 @@ export function UserDetailsPage() {
               {t('users:form.full_name')}
             </label>
             <input
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
               value={fullName}
               onChange={(event) => setFullName(event.target.value)}
             />
           </div>
           <div>
-            <label className="text-sm font-semibold text-slate-700">
+            <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
               {t('users:form.role')}
             </label>
             <select
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
               value={role}
               onChange={(event) => setRole(event.target.value as UserRole)}
             >
@@ -212,7 +212,7 @@ export function UserDetailsPage() {
               ))}
             </select>
           </div>
-          <label className="flex items-center gap-2 text-sm text-slate-700">
+          <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
             <input
               type="checkbox"
               checked={isActive}
@@ -221,8 +221,8 @@ export function UserDetailsPage() {
             {t('users:form.active')}
           </label>
 
-          <div className="border-t border-slate-200 pt-4 mt-4">
-            <div className="text-sm font-semibold text-slate-700">
+          <div className="border-t border-slate-200 pt-4 mt-4 dark:border-slate-700">
+            <div className="text-sm font-semibold text-slate-700 dark:text-slate-300">
               {t('users:granted_permissions_title')}
             </div>
             <p className="mt-1 text-xs text-slate-500">{t('users:granted_permissions_hint')}</p>
@@ -235,7 +235,7 @@ export function UserDetailsPage() {
                   return (
                     <label
                       key={perm}
-                      className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm hover:bg-slate-100"
+                      className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800/40 dark:hover:bg-slate-800"
                     >
                       <input
                         type="checkbox"
@@ -248,7 +248,7 @@ export function UserDetailsPage() {
                           }
                         }}
                       />
-                      <span className="min-w-0 flex-1 text-slate-700">{label || perm}</span>
+                      <span className="min-w-0 flex-1 text-slate-700 dark:text-slate-200">{label || perm}</span>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <span
@@ -286,20 +286,20 @@ export function UserDetailsPage() {
       </Card>
 
       <Card className="mt-6 max-w-xl p-6">
-        <div className="text-sm font-semibold text-slate-700">
+        <div className="text-sm font-semibold text-slate-700 dark:text-slate-300">
           {t('users:actions.reset_password')}
         </div>
         <div className="mt-3 space-y-3">
           <input
             type="password"
-            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
             placeholder={t('users:form.password')}
             value={newPassword}
             onChange={(event) => setNewPassword(event.target.value)}
           />
           <input
             type="password"
-            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
             placeholder={t('users:form.confirm_password')}
             value={confirmPassword}
             onChange={(event) => setConfirmPassword(event.target.value)}

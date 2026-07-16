@@ -118,17 +118,17 @@ export function UserCreatePage() {
               {t('users:form.full_name')}
             </label>
             <input
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
               value={fullName}
               onChange={(event) => setFullName(event.target.value)}
             />
           </div>
           <div>
-            <label className="text-sm font-semibold text-slate-700">
+            <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
               {t('users:form.role')}
             </label>
             <select
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
               value={role}
               onChange={(event) => setRole(event.target.value as UserRole)}
             >
@@ -148,7 +148,7 @@ export function UserCreatePage() {
           </div>
           <div>
             <div className="flex items-center justify-between">
-              <label className="text-sm font-semibold text-slate-700">
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                 {t('users:form.password')}
               </label>
               <button
@@ -162,7 +162,7 @@ export function UserCreatePage() {
             </div>
             <input
               type="password"
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               required
@@ -175,19 +175,19 @@ export function UserCreatePage() {
             </p>
           </div>
           <div>
-            <label className="text-sm font-semibold text-slate-700">
+            <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
               {t('users:form.confirm_password')}
             </label>
             <input
               type="password"
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
               required
               minLength={passwordMinLength}
             />
           </div>
-          <label className="flex items-center gap-2 text-sm text-slate-700">
+          <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
             <input
               type="checkbox"
               checked={isActive}

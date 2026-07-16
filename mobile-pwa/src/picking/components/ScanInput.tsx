@@ -30,10 +30,10 @@ export function ScanInput({ onScan, placeholder = 'Scan or type barcode/SKU' }: 
   }
 
   return (
-    <div className="rounded-2xl bg-white p-4 shadow-sm">
+    <div className="rounded-2xl bg-white p-4 shadow-sm dark:bg-slate-900">
       <input
         ref={inputRef}
-        className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400"
+        className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
         placeholder={placeholder || t('scan_placeholder')}
         value={value}
         onChange={(event) => setValue(event.target.value)}

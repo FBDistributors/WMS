@@ -40,13 +40,13 @@ export function PickLineRow({ line, onClick }: PickLineRowProps) {
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-base font-semibold text-slate-900">{line.product_name}</div>
+          <div className="text-base font-semibold text-slate-900 dark:text-slate-100">{line.product_name}</div>
         </div>
         <Badge variant={statusVariant[line.status]}>{lineStatusBadgeLabel(line, t)}</Badge>
       </div>
-      <div className="flex items-center gap-2 text-sm text-slate-600">
+      <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
         <MapPin size={14} />
-        <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold">
+        <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold dark:bg-slate-800 dark:text-slate-200">
           {line.location_code}
         </span>
       </div>
@@ -60,7 +60,7 @@ export function PickLineRow({ line, onClick }: PickLineRowProps) {
       ) : line.status === 'NOT_PICKED' ? (
         <p className="text-sm text-amber-800 dark:text-amber-200">{t('line_not_picked_hint')}</p>
       ) : null}
-      <div className="flex items-center justify-between text-sm text-slate-700">
+      <div className="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
         <span>{t('qty')}</span>
         <span className="font-semibold">
           {line.qty_picked}/{line.qty_required}

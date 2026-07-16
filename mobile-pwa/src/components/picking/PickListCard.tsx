@@ -33,7 +33,7 @@ export function PickListCard({ item, onClick }: PickListCardProps) {
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-2">
           <div className="text-sm text-slate-500">{t('document_label')}</div>
-          <div className="text-lg font-semibold text-slate-900">
+          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
             {item.order_number
               ? t('order_number_display', { number: item.order_number })
               : item.document_no}

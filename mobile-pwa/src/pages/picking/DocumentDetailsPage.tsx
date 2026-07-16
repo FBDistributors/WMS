@@ -199,7 +199,7 @@ export function DocumentDetailsPage() {
   }, [documentId, formatError, navigate, t])
 
   return (
-    <div style={{ padding: '16px' }}>
+    <div className="p-4 text-slate-900 dark:text-slate-100">
       <Link to={BASE_PATH}>← {t('picking:list_title')}</Link>
       <h1 style={{ marginTop: '12px' }}>
         {document.order_number
@@ -232,17 +232,11 @@ export function DocumentDetailsPage() {
           }}
           onBlur={() => barcodeInputRef.current?.focus()}
           placeholder={t('picking:barcode_placeholder')}
-          style={{
-            width: '100%',
-            padding: '12px',
-            fontSize: '16px',
-            borderRadius: '10px',
-            border: '1px solid #ccc',
-          }}
+          className="w-full rounded-[10px] border border-slate-300 px-3 py-3 text-base outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
         />
       </div>
       {errorMessage ? (
-        <div style={{ marginTop: '10px', color: '#c62828' }}>
+        <div className="mt-2.5 text-red-600 dark:text-red-400">
           {errorMessage}
         </div>
       ) : null}
@@ -254,13 +248,11 @@ export function DocumentDetailsPage() {
           return (
             <li
               key={line.id}
-              style={{
-                padding: '12px',
-                marginBottom: '12px',
-                borderRadius: '12px',
-                border: '1px solid #e0e0e0',
-                background: isDone ? '#e8f5e9' : '#fff',
-              }}
+              className={`mb-3 rounded-xl border p-3 ${
+                isDone
+                  ? 'border-green-200 bg-green-50 dark:border-green-900/50 dark:bg-green-950/40'
+                  : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'
+              }`}
             >
               <div>
                 <strong>{line.product_name}</strong>
@@ -296,30 +288,20 @@ export function DocumentDetailsPage() {
                 <button
                   type="button"
                   onClick={() => handlePick(line.id, -1)}
-                  style={{
-                    flex: 1,
-                    padding: '14px',
-                    fontSize: '16px',
-                    borderRadius: '12px',
-                  }}
+                  className="flex-1 rounded-xl border border-slate-300 py-3.5 text-base dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
                 >
                   -1
                 </button>
                 <button
                   type="button"
                   onClick={() => handlePick(line.id, 1)}
-                  style={{
-                    flex: 1,
-                    padding: '14px',
-                    fontSize: '16px',
-                    borderRadius: '12px',
-                  }}
+                  className="flex-1 rounded-xl border border-slate-300 py-3.5 text-base dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
                 >
                   +1
                 </button>
               </div>
               {isDone ? (
-                <div style={{ marginTop: '8px', color: '#2e7d32' }}>
+                <div className="mt-2 text-green-700 dark:text-green-400">
                   {t('picking:done_label')}
                 </div>
               ) : null}

@@ -115,7 +115,7 @@ export function PickItemPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 px-4">
+      <div className="min-h-screen bg-slate-50 px-4 dark:bg-slate-950">
         <AppHeader title={t('item_title')} onBack={() => navigate(-1)} hideUserMenu />
         <div className="h-40 w-full animate-pulse rounded-2xl bg-slate-200" />
       </div>
@@ -124,7 +124,7 @@ export function PickItemPage() {
 
   if (!line || hasLoadError || notFound) {
     return (
-      <div className="min-h-screen bg-slate-50 px-4">
+      <div className="min-h-screen bg-slate-50 px-4 dark:bg-slate-950">
         <AppHeader title={t('item_title')} onBack={() => navigate(-1)} hideUserMenu />
         <EmptyState
           title={
@@ -138,7 +138,7 @@ export function PickItemPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 pb-10">
+    <div className="min-h-screen bg-slate-50 px-4 pb-10 dark:bg-slate-950">
       <AppHeader title={t('item_title')} onBack={() => navigate(-1)} hideUserMenu />
 
       <div className="mb-4 space-y-3">
@@ -165,7 +165,7 @@ export function PickItemPage() {
         </Button>
         <Suspense
           fallback={
-            <div className="rounded-2xl bg-white p-4 text-sm text-slate-500">
+            <div className="rounded-2xl bg-white p-4 text-sm text-slate-500 dark:bg-slate-900">
               {t('loading_camera')}
             </div>
           }
@@ -190,13 +190,13 @@ export function PickItemPage() {
         status={line.status}
       />
 
-      <div className="mt-6 rounded-2xl bg-white p-4 shadow-sm">
-        <div className="mb-3 text-sm font-semibold text-slate-700">{t('qty')}</div>
+      <div className="mt-6 rounded-2xl bg-white p-4 shadow-sm dark:bg-slate-900">
+        <div className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-200">{t('qty')}</div>
         <div className="flex items-center justify-between gap-2">
           <Button variant="secondary" onClick={() => setQty((prev) => Math.max(1, prev - 1))}>
             <Minus size={18} />
           </Button>
-          <div className="text-2xl font-semibold text-slate-900">{qty}</div>
+          <div className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{qty}</div>
           <Button variant="secondary" onClick={() => setQty((prev) => prev + 1)}>
             <Plus size={18} />
           </Button>

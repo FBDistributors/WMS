@@ -37,21 +37,21 @@ export function PickItemCard({
   return (
     <Card className="p-5">
       <div className="text-xs uppercase text-slate-500">{t('product_label')}</div>
-      <div className="text-2xl font-semibold text-slate-900">{productName}</div>
-      <div className="mt-4 rounded-2xl bg-slate-100 p-6 text-center">
+      <div className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{productName}</div>
+      <div className="mt-4 rounded-2xl bg-slate-100 p-6 text-center dark:bg-slate-800">
         <div className="text-xs uppercase text-slate-500">{t('location_label')}</div>
-        <div className="text-5xl font-bold tracking-widest text-slate-900">
+        <div className="text-5xl font-bold tracking-widest text-slate-900 dark:text-slate-100">
           {locationCode}
         </div>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-slate-600">
         <div>
           <div className="text-xs uppercase text-slate-500">{t('batch_label')}</div>
-          <div className="font-semibold text-slate-900">{batch || '—'}</div>
+          <div className="font-semibold text-slate-900 dark:text-slate-100">{batch || '—'}</div>
         </div>
         <div>
           <div className="text-xs uppercase text-slate-500">{t('expiry_label')}</div>
-          <div className="font-semibold text-slate-900">{formatExpiryDate(expiryDate)}</div>
+          <div className="font-semibold text-slate-900 dark:text-slate-100">{formatExpiryDate(expiryDate)}</div>
         </div>
       </div>
       <div className="mt-4 flex items-center justify-between text-sm text-slate-600">

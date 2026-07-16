@@ -29,7 +29,7 @@ export function ExceptionsList({ items, onView }: ExceptionsListProps) {
       {items.map((item) => (
         <Card key={item.id} className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
-            <div className="text-sm font-semibold text-slate-900">
+            <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
               {item.type} · {item.document_no}
             </div>
             <div className="text-xs text-slate-500">

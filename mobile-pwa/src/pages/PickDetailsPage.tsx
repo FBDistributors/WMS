@@ -78,7 +78,7 @@ export function PickDetailsPage() {
 
   if (isLoading) {
     return (
-      <div className="relative min-h-screen bg-slate-50 px-4">
+      <div className="relative min-h-screen bg-slate-50 px-4 dark:bg-slate-950">
         <AppHeader title={t('details_title')} onBack={() => navigate(-1)} hideUserMenu />
         <LoadingOverlay fullScreen label={t('common:messages.loading')} />
       </div>
@@ -87,7 +87,7 @@ export function PickDetailsPage() {
 
   if (!data || error) {
     return (
-      <div className="min-h-screen bg-slate-50 px-4">
+      <div className="min-h-screen bg-slate-50 px-4 dark:bg-slate-950">
         <AppHeader title={t('details_title')} onBack={() => navigate(-1)} hideUserMenu />
         <EmptyState
           icon={<PackageSearch size={32} />}
@@ -106,7 +106,7 @@ export function PickDetailsPage() {
   const allPicked = progress.total > 0 && progress.picked >= progress.total
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 pb-24">
+    <div className="min-h-screen bg-slate-50 px-4 pb-24 dark:bg-slate-950">
       <AppHeader
         title={data.order_number
           ? t('order_number_display', { number: data.order_number })
@@ -114,8 +114,8 @@ export function PickDetailsPage() {
         onBack={() => navigate(-1)}
         hideUserMenu
       />
-      <div className="rounded-2xl bg-white p-4 shadow-sm">
-        <div className="flex items-center justify-between text-sm text-slate-600">
+      <div className="rounded-2xl bg-white p-4 shadow-sm dark:bg-slate-900">
+        <div className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-300">
           <span>{t('progress_picked', { picked: progress.picked, total: progress.total })}</span>
           <span>{progress.percent}%</span>
         </div>
@@ -141,7 +141,7 @@ export function PickDetailsPage() {
         onSuccess={load}
       />
 
-      <div className="fixed bottom-0 left-0 right-0 border-t bg-white px-4 py-3">
+      <div className="fixed bottom-0 left-0 right-0 border-t bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
         <Button
           fullWidth
           variant={allPicked ? 'default' : 'secondary'}

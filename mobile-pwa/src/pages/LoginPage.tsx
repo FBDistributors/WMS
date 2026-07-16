@@ -129,7 +129,7 @@ export function LoginPage() {
         ) : null}
         <form className="mt-4 space-y-3" onSubmit={handleSubmit}>
           <input
-            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             placeholder={t('username_placeholder')}
             value={username}
             onChange={(event) => setUsername(event.target.value)}
