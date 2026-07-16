@@ -537,8 +537,8 @@ def test_staff_orders_date_filter_and_invalid_role(client, db_session):
         app.dependency_overrides.pop(get_current_user, None)
 
 
-def test_staff_timing_picker_and_controller(client, db_session):
-    """Yig'ish va tekshirish davomiyligi (avg + median), belgisiz hujjatlar chiqariladi."""
+def test_staff_timing_throughput_business_hours(client, db_session):
+    """Biznes-vaqt + dona/soat & poz/soat unumdorlik (2026-06-05 Juma, ish soati ichida)."""
     admin = _seed_admin(db_session)
     p = User(username="tm_picker", password_hash=get_password_hash("x"), role="picker",
              full_name="TM Picker", is_active=True)
@@ -547,25 +547,30 @@ def test_staff_timing_picker_and_controller(client, db_session):
     db_session.add_all([p, c])
     db_session.flush()
 
+    # 09:00 UTC = 14:00 Toshkent (Juma, 09–18 ish oynasi ichida)
     base = datetime(2026, 6, 5, 9, 0, 0, tzinfo=timezone.utc)
 
-    def _doc(no, *, assigned_min, sent_min, verify_min, done_min):
+    def _doc(no, *, assigned, sent, verify, done, line_qtys):
         d = Document(
             doc_no=no, doc_type="SO", status="completed",
             assigned_to_user_id=p.id, controlled_by_user_id=c.id,
-            first_assigned_at=base + timedelta(minutes=assigned_min),
-            sent_to_controller_at=base + timedelta(minutes=sent_min),
-            controller_verification_started_at=(base + timedelta(minutes=verify_min)) if verify_min is not None else None,
-            completed_at=base + timedelta(minutes=done_min),
-            updated_at=base + timedelta(minutes=done_min),
+            first_assigned_at=base + timedelta(minutes=assigned),
+            sent_to_controller_at=base + timedelta(minutes=sent),
+            controller_verification_started_at=(base + timedelta(minutes=verify)) if verify is not None else None,
+            completed_at=base + timedelta(minutes=done),
+            updated_at=base + timedelta(minutes=done),
         )
         db_session.add(d)
+        db_session.flush()
+        for qty in line_qtys:
+            db_session.add(DocumentLine(document_id=d.id, product_name="X", location_code="L",
+                                        required_qty=qty, picked_qty=qty))
         return d
 
-    # Doc1: yig'ish 10 daq (0->10), tekshiruv: keldi 10, boshladi 12, yakun 20 -> total 10 daq, check 8 daq
-    _doc("TM-1", assigned_min=0, sent_min=10, verify_min=12, done_min=20)
-    # Doc2: yig'ish 20 daq (0->20), total 20 daq (20->40), check verify yo'q
-    _doc("TM-2", assigned_min=0, sent_min=20, verify_min=None, done_min=40)
+    # Doc1: yig'ish 10 daq, total 10 daq, check 8 daq; dona 100, poz 2
+    _doc("TM-1", assigned=0, sent=10, verify=12, done=20, line_qtys=[60, 40])
+    # Doc2: yig'ish 20 daq, total 20 daq, verify yo'q; dona 200, poz 1
+    _doc("TM-2", assigned=0, sent=20, verify=None, done=40, line_qtys=[200])
     db_session.commit()
 
     app.dependency_overrides[get_current_user] = lambda: admin
@@ -577,15 +582,24 @@ def test_staff_timing_picker_and_controller(client, db_session):
         assert len(data["pickers"]) == 1
         pr = data["pickers"][0]
         assert pr["orders_count"] == 2
-        assert pr["avg_seconds"] == 900.0     # (600+1200)/2 = 900s = 15 daq
-        assert pr["median_seconds"] == 900.0
+        assert pr["total_units"] == 300.0
+        assert pr["total_positions"] == 3
+        assert pr["median_seconds"] == 900.0     # median([600, 1200])
+        # pick_secs = 1800s = 0.5 soat -> 300/0.5=600 dona/soat, 3/0.5=6 poz/soat
+        assert pr["units_per_hour"] == 600.0
+        assert pr["positions_per_hour"] == 6.0
 
         assert len(data["controllers"]) == 1
         cr = data["controllers"][0]
-        assert cr["orders_count"] == 2           # ikkalasida ham total bor
-        assert cr["total_avg_seconds"] == 900.0  # (600+1200)/2
-        assert cr["check_count"] == 1            # faqat Doc1'da verify bor
-        assert cr["check_avg_seconds"] == 480.0  # 8 daq
+        assert cr["orders_count"] == 2
+        assert cr["median_total_seconds"] == 900.0
+        assert cr["check_count"] == 1
+        assert cr["median_check_seconds"] == 480.0
+        # sof tekshiruv bo'yicha throughput: faqat Doc1 (100 dona, 2 poz, 480s)
+        assert cr["units_per_hour"] == 750.0
+        assert cr["positions_per_hour"] == 15.0
+        assert cr["total_units"] == 100.0
+        assert cr["total_positions"] == 2
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 

@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session, selectinload
 logger = logging.getLogger(__name__)
 
 from app.auth.deps import require_any_permission, require_permission
+from app.core.business_time import business_seconds
 from app.db import get_db
 from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
@@ -134,19 +135,24 @@ class StaffTimingPickerRow(BaseModel):
     user_id: UUID
     full_name: str
     orders_count: int
-    avg_seconds: float
-    median_seconds: float
+    total_units: float
+    total_positions: int
+    units_per_hour: float
+    positions_per_hour: float
+    median_seconds: float  # biznes-vaqt median yig'ish davomiyligi
 
 
 class StaffTimingControllerRow(BaseModel):
     user_id: UUID
     full_name: str
     orders_count: int
-    total_avg_seconds: float
-    total_median_seconds: float
+    total_units: float
+    total_positions: int
+    units_per_hour: float  # sof tekshiruv vaqti bo'yicha
+    positions_per_hour: float
     check_count: int
-    check_avg_seconds: float
-    check_median_seconds: float
+    median_total_seconds: float  # kelgandan yakunlaguncha (biznes-vaqt)
+    median_check_seconds: float  # tekshirishni boshlagandan (biznes-vaqt)
 
 
 class StaffTimingResponse(BaseModel):
@@ -697,9 +703,9 @@ async def get_staff_orders(
                 sent_to_controller_at=doc.sent_to_controller_at,
                 controller_verification_started_at=doc.controller_verification_started_at,
                 completed_at=doc.completed_at,
-                pick_seconds=_duration_seconds(doc.first_assigned_at, doc.sent_to_controller_at),
-                control_total_seconds=_duration_seconds(doc.sent_to_controller_at, doc.completed_at),
-                control_check_seconds=_duration_seconds(
+                pick_seconds=business_seconds(doc.first_assigned_at, doc.sent_to_controller_at),
+                control_total_seconds=business_seconds(doc.sent_to_controller_at, doc.completed_at),
+                control_check_seconds=business_seconds(
                     doc.controller_verification_started_at, doc.completed_at
                 ),
             )
@@ -730,7 +736,21 @@ async def get_staff_timing(
     if date_from is not None and date_to is not None and date_from > date_to:
         raise HTTPException(status_code=400, detail="date_from must be on or before date_to")
 
-    # --- Yig'uvchilar: first_assigned_at -> sent_to_controller_at ---
+    # Har hujjat uchun poz (qator soni) va dona (picked_qty yig'indisi).
+    line_agg = (
+        db.query(
+            DocumentLineModel.document_id.label("doc_id"),
+            func.count(DocumentLineModel.id).label("poz"),
+            func.coalesce(func.sum(DocumentLineModel.picked_qty), 0).label("dona"),
+        )
+        .group_by(DocumentLineModel.document_id)
+        .subquery()
+    )
+
+    def _per_hour(total: float, seconds: float) -> float:
+        return round(total / (seconds / 3600.0), 1) if seconds > 0 else 0.0
+
+    # --- Yig'uvchilar: first_assigned_at -> sent_to_controller_at (biznes-vaqt) ---
     p_col, p_statuses, p_ts = _staff_role_columns("picker")
     p_filters = _staff_doc_filters(p_col, p_statuses, p_ts, date_from, date_to)
     p_filters.extend(_source_group_conditions(group))
@@ -739,16 +759,26 @@ async def get_staff_timing(
             DocumentModel.assigned_to_user_id.label("uid"),
             DocumentModel.first_assigned_at.label("a"),
             DocumentModel.sent_to_controller_at.label("b"),
+            func.coalesce(line_agg.c.poz, 0).label("poz"),
+            func.coalesce(line_agg.c.dona, 0).label("dona"),
         )
         .outerjoin(OrderModel, DocumentModel.order_id == OrderModel.id)
+        .outerjoin(line_agg, line_agg.c.doc_id == DocumentModel.id)
         .filter(and_(*p_filters))
         .all()
     )
     pick_durs: dict = defaultdict(list)
+    pick_units: dict = defaultdict(float)
+    pick_poz: dict = defaultdict(int)
+    pick_secs: dict = defaultdict(float)
     for r in p_rows:
-        d = _duration_seconds(r.a, r.b)
-        if d is not None:
-            pick_durs[r.uid].append(d)
+        sec = business_seconds(r.a, r.b)
+        if sec <= 0:
+            continue
+        pick_durs[r.uid].append(sec)
+        pick_units[r.uid] += float(r.dona or 0)
+        pick_poz[r.uid] += int(r.poz or 0)
+        pick_secs[r.uid] += sec
 
     # --- Controllerlar: jami (sent->completed) va sof tekshiruv (verify->completed) ---
     c_col, c_statuses, c_ts = _staff_role_columns("controller")
@@ -760,20 +790,29 @@ async def get_staff_timing(
             DocumentModel.sent_to_controller_at.label("s"),
             DocumentModel.controller_verification_started_at.label("v"),
             DocumentModel.completed_at.label("c"),
+            func.coalesce(line_agg.c.poz, 0).label("poz"),
+            func.coalesce(line_agg.c.dona, 0).label("dona"),
         )
         .outerjoin(OrderModel, DocumentModel.order_id == OrderModel.id)
+        .outerjoin(line_agg, line_agg.c.doc_id == DocumentModel.id)
         .filter(and_(*c_filters))
         .all()
     )
     ctrl_total: dict = defaultdict(list)
     ctrl_check: dict = defaultdict(list)
+    ctrl_units: dict = defaultdict(float)
+    ctrl_poz: dict = defaultdict(int)
+    ctrl_check_secs: dict = defaultdict(float)
     for r in c_rows:
-        t = _duration_seconds(r.s, r.c)
-        if t is not None:
-            ctrl_total[r.uid].append(t)
-        ch = _duration_seconds(r.v, r.c)
-        if ch is not None:
-            ctrl_check[r.uid].append(ch)
+        tot = business_seconds(r.s, r.c)
+        if tot > 0:
+            ctrl_total[r.uid].append(tot)
+        chk = business_seconds(r.v, r.c)
+        if chk > 0:
+            ctrl_check[r.uid].append(chk)
+            ctrl_units[r.uid] += float(r.dona or 0)
+            ctrl_poz[r.uid] += int(r.poz or 0)
+            ctrl_check_secs[r.uid] += chk
 
     names = _timing_name_map(db, set(pick_durs) | set(ctrl_total) | set(ctrl_check))
 
@@ -782,13 +821,16 @@ async def get_staff_timing(
             user_id=uid,
             full_name=names.get(uid, "Unknown"),
             orders_count=len(durs),
-            avg_seconds=round(statistics.mean(durs), 1),
+            total_units=round(pick_units[uid], 1),
+            total_positions=pick_poz[uid],
+            units_per_hour=_per_hour(pick_units[uid], pick_secs[uid]),
+            positions_per_hour=_per_hour(pick_poz[uid], pick_secs[uid]),
             median_seconds=round(statistics.median(durs), 1),
         )
         for uid, durs in pick_durs.items()
         if durs
     ]
-    pickers.sort(key=lambda x: (x.median_seconds, x.full_name.lower()))
+    pickers.sort(key=lambda x: (-x.units_per_hour, x.full_name.lower()))
 
     controllers = []
     for uid in set(ctrl_total) | set(ctrl_check):
@@ -801,14 +843,16 @@ async def get_staff_timing(
                 user_id=uid,
                 full_name=names.get(uid, "Unknown"),
                 orders_count=len(totals),
-                total_avg_seconds=round(statistics.mean(totals), 1) if totals else 0.0,
-                total_median_seconds=round(statistics.median(totals), 1) if totals else 0.0,
+                total_units=round(ctrl_units[uid], 1),
+                total_positions=ctrl_poz[uid],
+                units_per_hour=_per_hour(ctrl_units[uid], ctrl_check_secs[uid]),
+                positions_per_hour=_per_hour(ctrl_poz[uid], ctrl_check_secs[uid]),
                 check_count=len(checks),
-                check_avg_seconds=round(statistics.mean(checks), 1) if checks else 0.0,
-                check_median_seconds=round(statistics.median(checks), 1) if checks else 0.0,
+                median_total_seconds=round(statistics.median(totals), 1) if totals else 0.0,
+                median_check_seconds=round(statistics.median(checks), 1) if checks else 0.0,
             )
         )
-    controllers.sort(key=lambda x: (x.total_median_seconds or 1e12, x.full_name.lower()))
+    controllers.sort(key=lambda x: (-x.units_per_hour, x.full_name.lower()))
 
     return StaffTimingResponse(pickers=pickers, controllers=controllers)
 

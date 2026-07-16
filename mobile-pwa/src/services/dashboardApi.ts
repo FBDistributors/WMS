@@ -145,7 +145,10 @@ export type StaffTimingPickerRow = {
   user_id: string
   full_name: string
   orders_count: number
-  avg_seconds: number
+  total_units: number
+  total_positions: number
+  units_per_hour: number
+  positions_per_hour: number
   median_seconds: number
 }
 
@@ -153,11 +156,13 @@ export type StaffTimingControllerRow = {
   user_id: string
   full_name: string
   orders_count: number
-  total_avg_seconds: number
-  total_median_seconds: number
+  total_units: number
+  total_positions: number
+  units_per_hour: number
+  positions_per_hour: number
   check_count: number
-  check_avg_seconds: number
-  check_median_seconds: number
+  median_total_seconds: number
+  median_check_seconds: number
 }
 
 export type StaffTimingResponse = {
