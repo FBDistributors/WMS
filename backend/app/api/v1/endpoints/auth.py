@@ -23,8 +23,13 @@ router = APIRouter()
 
 ADMIN_ROLE = "warehouse_admin"
 MAX_ADMIN_SESSIONS = 5
-# Picker/controller: 2 sessiya (mobil + bitta boshqa), shunda buyurtmaga kirganda avtomat chiqmasin
+# Boshqa rollar (masalan supervisor) uchun standart limit.
 MAX_OTHER_SESSIONS = 2
+# Ombor xodimlari (yig'uvchi/controller) — bitta faol sessiya: yangi qurilma
+# kirsa, eski qurilma keyingi so'rovda chiqib ketadi (bitta hisobni ikki telefonda
+# baham ko'rishning oldini olish uchun).
+SINGLE_SESSION_ROLES = {"picker", "controller", "inventory_controller"}
+MAX_SINGLE_SESSION = 1
 
 # Login rate-limiting: oynada N ta noto'g'ri urinishdan keyin vaqtincha bloklash.
 # In-memory (har worker alohida hisoblaydi) — brute-force'ni amalda to'sish uchun yetarli.
@@ -151,8 +156,12 @@ async def login(payload: LoginRequest, request: Request, db: Session = Depends(g
         )
         if user.username and user.username.strip().lower() == "test":
             max_sessions = 999
+        elif user.role == ADMIN_ROLE:
+            max_sessions = MAX_ADMIN_SESSIONS
+        elif user.role in SINGLE_SESSION_ROLES:
+            max_sessions = MAX_SINGLE_SESSION
         else:
-            max_sessions = MAX_ADMIN_SESSIONS if user.role == ADMIN_ROLE else MAX_OTHER_SESSIONS
+            max_sessions = MAX_OTHER_SESSIONS
 
         while len(existing) >= max_sessions and existing:
             db.delete(existing.pop(0))

@@ -30,10 +30,10 @@ def test_login_creates_session(client: TestClient, db_session: Session, test_use
     assert session is not None
 
 
-def test_non_admin_two_sessions_then_third_invalidates_oldest(
+def test_picker_single_session_second_login_kicks_first(
     client: TestClient, db_session: Session, test_user: User
 ):
-    """Non-admin: can have 2 sessions (e.g. mobil + boshqa); 3rd login removes oldest."""
+    """Yig'uvchi/controller: bitta faol sessiya — 2-qurilma kirsa 1-si chiqib ketadi."""
     picker = User(
         username="picker1",
         password_hash=get_password_hash("testpass123"),
@@ -50,33 +50,52 @@ def test_non_admin_two_sessions_then_third_invalidates_oldest(
     )
     assert r1.status_code == 200
     token1 = r1.json()["access_token"]
+    resp1 = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token1}"})
+    assert resp1.status_code == 200
+
+    # 2-qurilmadan kirish: 1-token darhol yaroqsiz bo'ladi.
     r2 = client.post(
         "/api/v1/auth/login",
         json={"username": picker.username, "password": "testpass123"},
-        headers={"User-Agent": "Other Device"},
+        headers={"User-Agent": "Second Device"},
     )
     assert r2.status_code == 200
     token2 = r2.json()["access_token"]
     assert token1 != token2
 
-    # Both tokens valid (2 sessions allowed)
-    resp1 = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token1}"})
-    assert resp1.status_code == 200
-    resp2 = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token2}"})
-    assert resp2.status_code == 200
-
-    # 3rd login: oldest (token1) invalidated
-    r3 = client.post(
-        "/api/v1/auth/login",
-        json={"username": picker.username, "password": "testpass123"},
-        headers={"User-Agent": "Third Device"},
-    )
-    assert r3.status_code == 200
-    token3 = r3.json()["access_token"]
     resp_old = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token1}"})
-    assert resp_old.status_code == 401
-    resp_new = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token3}"})
+    assert resp_old.status_code == 401  # 1-qurilma chiqib ketdi
+    resp_new = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token2}"})
     assert resp_new.status_code == 200
+
+    sessions = db_session.query(UserSession).filter(UserSession.user_id == picker.id).all()
+    assert len(sessions) == 1
+
+
+def test_supervisor_keeps_two_sessions(
+    client: TestClient, db_session: Session, test_user: User
+):
+    """Supervisor (ombor xodimi emas) — avvalgidek 2 sessiya."""
+    sup = User(
+        username="sup1",
+        password_hash=get_password_hash("testpass123"),
+        role="supervisor",
+        is_active=True,
+    )
+    db_session.add(sup)
+    db_session.commit()
+
+    r1 = client.post("/api/v1/auth/login", json={"username": "sup1", "password": "testpass123"})
+    token1 = r1.json()["access_token"]
+    r2 = client.post(
+        "/api/v1/auth/login",
+        json={"username": "sup1", "password": "testpass123"},
+        headers={"User-Agent": "Other"},
+    )
+    token2 = r2.json()["access_token"]
+    # Ikkalasi ham yaroqli (2 sessiya)
+    assert client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token1}"}).status_code == 200
+    assert client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token2}"}).status_code == 200
 
 
 def test_admin_can_have_five_sessions(
