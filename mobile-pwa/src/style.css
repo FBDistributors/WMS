@@ -61,3 +61,13 @@
     display: none;
   }
 }
+
+/* Dark mode'da native date/time input kalendar ikonkasini oq qilish */
+.dark input[type='date']::-webkit-calendar-picker-indicator,
+.dark input[type='time']::-webkit-calendar-picker-indicator,
+.dark input[type='datetime-local']::-webkit-calendar-picker-indicator,
+.dark input[type='month']::-webkit-calendar-picker-indicator,
+.dark input[type='week']::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
