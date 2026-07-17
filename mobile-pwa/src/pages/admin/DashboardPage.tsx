@@ -7,8 +7,6 @@ import {
   SearchCheck,
   PackageCheck,
   LayoutGrid,
-  FileSpreadsheet,
-  Loader2,
   AlertTriangle,
   RefreshCw,
   BarChart3,
@@ -17,8 +15,7 @@ import {
 import * as XLSX from 'xlsx'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
-import { StaffOrdersDialog, type StaffSelection } from '../../admin/components/dashboard/StaffOrdersDialog'
-import { StaffTimingCards } from '../../admin/components/dashboard/StaffTimingCards'
+import { StaffProTable, type StaffProRow } from '../../admin/components/dashboard/StaffProTable'
 import { Button } from '../../components/ui/button'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
@@ -29,13 +26,12 @@ import {
   getStaffTiming,
   type PickingOrderStats,
   type PickingStaffStatsRow,
-  type StaffGroup,
-  type StaffRole,
   type StaffTimingControllerRow,
   type StaffTimingPickerRow,
 } from '../../services/dashboardApi'
 import { useAppToast } from '../../feedback/useAppToast'
 import { getReserveStuckSummary } from '../../services/inventoryApi'
+import { formatDuration } from '../../lib/formatDuration'
 import { writeExcelFile } from '../../utils/exportExcel'
 import { useAuth } from '../../rbac/AuthProvider'
 
@@ -62,11 +58,6 @@ function aggregateByFourGroups(
     tekshiruvda: sum(STATUS_TEKSHIRUVDA),
     yakunlangan: sum(STATUS_YAKUNLANGAN),
   }
-}
-
-function formatQty(n: number): string {
-  if (Number.isInteger(n)) return n.toLocaleString('en-US').replace(/,/g, ' ')
-  return n.toLocaleString(undefined, { maximumFractionDigits: 3 })
 }
 
 function todayIsoDate(): string {
@@ -97,13 +88,6 @@ function weekdayShort(isoDate: string, lang: string): string {
   const idx = new Date(y, m - 1, d).getDay()
   const table = WEEKDAY_SHORT[lang] ?? WEEKDAY_SHORT.en
   return table[idx] ?? ''
-}
-
-function nameInitials(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/).filter(Boolean)
-  if (parts.length === 0) return '?'
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
-  return (parts[0][0] + parts[1][0]).toUpperCase()
 }
 
 type KpiTone = 'amber' | 'blue' | 'violet' | 'emerald'
@@ -338,127 +322,64 @@ function PipelineCard({
   )
 }
 
-type LeaderTone = 'accent' | 'violet'
+type TimingLite = {
+  user_id: string
+  full_name: string
+  units_per_hour: number
+  median_seconds: number
+  total_units: number
+}
 
-function LeaderboardCard({
-  title,
-  rows,
-  tone,
-  isLoading,
-  onExport,
-  exportDisabled,
-  isExporting,
-  emptyLabel,
-  onRowClick,
-  t,
-}: {
-  title: string
-  rows: PickingStaffStatsRow[]
-  tone: LeaderTone
-  isLoading: boolean
-  onExport: () => void
-  exportDisabled: boolean
-  isExporting: boolean
-  emptyLabel: string
-  onRowClick?: (row: PickingStaffStatsRow) => void
-  t: (key: string, opts?: Record<string, unknown>) => string
-}) {
-  const maxQty = Math.max(1, ...rows.map((r) => r.total_picked_qty))
-  const avatarCls =
-    tone === 'accent'
-      ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400'
-      : 'bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400'
-  const barColor = tone === 'accent' ? '#2563eb' : '#7c3aed'
-
-  const rankCls = (rank: number) => {
-    if (rank === 1) return 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
-    if (rank === 2) return 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300'
-    if (rank === 3) return 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300'
-    return 'bg-slate-50 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
+/** Reyting (shahar+region) + unumdorlik/median ni xodim bo'yicha birlashtiradi. */
+function buildProRows(
+  shaharRows: PickingStaffStatsRow[],
+  regionRows: PickingStaffStatsRow[],
+  timing: TimingLite[]
+): StaffProRow[] {
+  const map = new Map<string, StaffProRow>()
+  const ensure = (user_id: string, full_name: string): StaffProRow => {
+    let r = map.get(user_id)
+    if (!r) {
+      r = {
+        user_id,
+        full_name,
+        shahar_qty: 0,
+        region_qty: 0,
+        total_qty: 0,
+        positions: 0,
+        orders_count: 0,
+        units_per_hour: 0,
+        median_seconds: 0,
+        work_hours: 0,
+      }
+      map.set(user_id, r)
+    }
+    if (!r.full_name && full_name) r.full_name = full_name
+    return r
   }
-
-  return (
-    <div className="rounded-[20px] border border-slate-200 bg-white p-[22px] dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-base font-extrabold tracking-[-0.3px] text-slate-900 dark:text-slate-100">
-            {title}
-          </div>
-          <div className="text-[13px] font-medium text-slate-400">
-            {t('admin:dashboard.leaderboard_rating_sub')}
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={onExport}
-          disabled={exportDisabled}
-          className="flex shrink-0 items-center gap-1.5 rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-[7px] text-xs font-bold text-slate-600 transition hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-        >
-          {isExporting ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-          ) : (
-            <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden />
-          )}
-          Excel
-        </button>
-      </div>
-
-      <div className="relative mt-3 flex flex-col gap-1">
-        {isLoading ? (
-          <div className="relative min-h-[8rem]">
-            <LoadingOverlay label="" />
-          </div>
-        ) : rows.length === 0 ? (
-          <p className="py-6 text-center text-sm text-slate-400">{emptyLabel}</p>
-        ) : (
-          rows.map((row, index) => {
-            const rank = index + 1
-            const pct = Math.round((row.total_picked_qty / maxQty) * 100)
-            return (
-              <button
-                key={row.user_id}
-                type="button"
-                onClick={onRowClick ? () => onRowClick(row) : undefined}
-                className="flex w-full items-center gap-3.5 rounded-xl px-2.5 py-[11px] text-left transition hover:bg-slate-50 dark:hover:bg-slate-800/50"
-              >
-                <div
-                  className={`flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-lg text-xs font-extrabold ${rankCls(rank)}`}
-                >
-                  {rank}
-                </div>
-                <div
-                  className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full text-[13px] font-bold ${avatarCls}`}
-                >
-                  {nameInitials(row.full_name)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">
-                    {row.full_name}
-                  </div>
-                  <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                    <div
-                      className="h-full rounded-full"
-                      style={{ width: `${pct}%`, backgroundColor: barColor }}
-                    />
-                  </div>
-                </div>
-                <div className="shrink-0 text-right">
-                  <div className="wms-num text-[15px] font-extrabold text-slate-900 dark:text-slate-100">
-                    {formatQty(row.total_picked_qty)}
-                  </div>
-                  <div className="text-[11px] font-semibold text-slate-400">
-                    {t('admin:dashboard.staff_row_meta', {
-                      orders: row.documents_count,
-                      lines: row.lines_count,
-                    })}
-                  </div>
-                </div>
-              </button>
-            )
-          })
-        )}
-      </div>
-    </div>
+  for (const row of shaharRows) {
+    const r = ensure(row.user_id, row.full_name)
+    r.shahar_qty += row.total_picked_qty
+    r.positions += row.lines_count
+    r.orders_count += row.documents_count
+  }
+  for (const row of regionRows) {
+    const r = ensure(row.user_id, row.full_name)
+    r.region_qty += row.total_picked_qty
+    r.positions += row.lines_count
+    r.orders_count += row.documents_count
+  }
+  for (const tr of timing) {
+    const r = ensure(tr.user_id, tr.full_name)
+    r.units_per_hour = tr.units_per_hour
+    r.median_seconds = tr.median_seconds
+    r.work_hours = tr.units_per_hour > 0 ? tr.total_units / tr.units_per_hour : 0
+  }
+  for (const r of map.values()) {
+    r.total_qty = r.shahar_qty + r.region_qty
+  }
+  return [...map.values()].sort(
+    (a, b) => b.total_qty - a.total_qty || a.full_name.localeCompare(b.full_name)
   )
 }
 
@@ -478,22 +399,46 @@ export function DashboardPage() {
   const [pickingStatsUnavailable, setPickingStatsUnavailable] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [stuckRowsCount, setStuckRowsCount] = useState(0)
-  const [selectedStaff, setSelectedStaff] = useState<StaffSelection | null>(null)
   const [regionPickerRows, setRegionPickerRows] = useState<PickingStaffStatsRow[]>([])
   const [regionControllerRows, setRegionControllerRows] = useState<PickingStaffStatsRow[]>([])
   const [timingPickers, setTimingPickers] = useState<StaffTimingPickerRow[]>([])
   const [timingControllers, setTimingControllers] = useState<StaffTimingControllerRow[]>([])
-
-  const openStaffOrders = useCallback(
-    (role: StaffRole, group: StaffGroup) => (row: PickingStaffStatsRow) =>
-      setSelectedStaff({ userId: row.user_id, name: row.full_name, role, group }),
-    []
-  )
   const [stuckOrdersCount, setStuckOrdersCount] = useState(0)
   const [stuckOldestHours, setStuckOldestHours] = useState(0)
 
   const counts = useMemo(() => aggregateByFourGroups(ordersByStatus), [ordersByStatus])
   const totalOrders = counts.xom + counts.yigishda + counts.tekshiruvda + counts.yakunlangan
+
+  const pickerProRows = useMemo(
+    () =>
+      buildProRows(
+        pickerRows,
+        regionPickerRows,
+        timingPickers.map((tp) => ({
+          user_id: tp.user_id,
+          full_name: tp.full_name,
+          units_per_hour: tp.units_per_hour,
+          median_seconds: tp.median_seconds,
+          total_units: tp.total_units,
+        }))
+      ),
+    [pickerRows, regionPickerRows, timingPickers]
+  )
+  const controllerProRows = useMemo(
+    () =>
+      buildProRows(
+        controllerRows,
+        regionControllerRows,
+        timingControllers.map((tc) => ({
+          user_id: tc.user_id,
+          full_name: tc.full_name,
+          units_per_hour: tc.units_per_hour,
+          median_seconds: tc.median_check_seconds || tc.median_total_seconds,
+          total_units: tc.total_units,
+        }))
+      ),
+    [controllerRows, regionControllerRows, timingControllers]
+  )
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -580,71 +525,57 @@ export function DashboardPage() {
     void load()
   }, [load])
 
-  const hasAnyStaffRows =
-    pickerRows.length > 0 ||
-    controllerRows.length > 0 ||
-    regionPickerRows.length > 0 ||
-    regionControllerRows.length > 0
-  const staffStatsExportDisabled = isLoading || isExporting || !hasAnyStaffRows
-
-  const handleExportStaffStatsExcel = useCallback(async () => {
-    if (!hasAnyStaffRows) return
-    showInfo(t('receiving:export_fetching'), 4000)
-    setIsExporting(true)
-    try {
-      const headers = [
-        t('admin:dashboard.staff_col_rank'),
-        t('admin:dashboard.staff_col_name'),
-        t('admin:dashboard.staff_col_orders'),
-        t('admin:dashboard.staff_col_lines'),
-        t('admin:dashboard.staff_col_qty'),
-      ]
-      const rowsToAoA = (rows: PickingStaffStatsRow[]) =>
-        rows.map((row, index) => [
+  const handleExportProExcel = useCallback(
+    async (rows: StaffProRow[], sheetTitle: string, tag: string) => {
+      if (rows.length === 0) return
+      showInfo(t('receiving:export_fetching'), 4000)
+      setIsExporting(true)
+      try {
+        const durUnits = {
+          h: t('admin:dashboard.timing.h'),
+          m: t('admin:dashboard.timing.m'),
+          s: t('admin:dashboard.timing.s'),
+        }
+        const headers = [
+          '#',
+          t('admin:dashboard.pro.col_staff'),
+          t('admin:dashboard.pro.col_shahar'),
+          t('admin:dashboard.pro.col_region'),
+          t('admin:dashboard.pro.col_qty'),
+          `${t('admin:dashboard.pro.col_productivity')} (${t('admin:dashboard.pro.suffix_speed')})`,
+          t('admin:dashboard.pro.col_median'),
+          t('admin:dashboard.pro.col_orders'),
+        ]
+        const aoa = rows.map((row, index) => [
           index + 1,
           row.full_name,
-          row.documents_count,
-          row.lines_count,
-          row.total_picked_qty,
+          row.shahar_qty,
+          row.region_qty,
+          row.total_qty,
+          Math.round(row.units_per_hour),
+          formatDuration(row.median_seconds, durUnits),
+          row.orders_count,
         ])
+        const wb = XLSX.utils.book_new()
+        const ws = XLSX.utils.aoa_to_sheet([headers, ...aoa])
+        XLSX.utils.book_append_sheet(wb, ws, sheetNameSafe(sheetTitle))
 
-      const wb = XLSX.utils.book_new()
-      const addSheet = (rows: PickingStaffStatsRow[], title: string) => {
-        if (rows.length === 0) return
-        const ws = XLSX.utils.aoa_to_sheet([headers, ...rowsToAoA(rows)])
-        XLSX.utils.book_append_sheet(wb, ws, sheetNameSafe(title))
+        const day = new Date().toISOString().slice(0, 10)
+        const fromPart = dateFrom.trim() ? dateFrom.trim() : 'all'
+        const toPart = dateTo.trim() ? dateTo.trim() : 'all'
+        const fileName = `${tag}_stats_${fromPart}_${toPart}_${day}.xlsx`
+
+        await writeExcelFile(wb, fileName)
+        showSuccess(t('receiving:export_success'))
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        showError(`${t('admin:dashboard.staff_stats_export_failed')}: ${msg}`)
+      } finally {
+        setIsExporting(false)
       }
-      addSheet(pickerRows, t('admin:dashboard.pickers_title_shahar'))
-      addSheet(controllerRows, t('admin:dashboard.controllers_title_shahar'))
-      addSheet(regionPickerRows, t('admin:dashboard.pickers_title_region'))
-      addSheet(regionControllerRows, t('admin:dashboard.controllers_title_region'))
-
-      const day = new Date().toISOString().slice(0, 10)
-      const fromPart = dateFrom.trim() ? dateFrom.trim() : 'all'
-      const toPart = dateTo.trim() ? dateTo.trim() : 'all'
-      const fileName = `picking_staff_stats_${fromPart}_${toPart}_${day}.xlsx`
-
-      await writeExcelFile(wb, fileName)
-      showSuccess(t('receiving:export_success'))
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      showError(`${t('admin:dashboard.staff_stats_export_failed')}: ${msg}`)
-    } finally {
-      setIsExporting(false)
-    }
-  }, [
-    t,
-    hasAnyStaffRows,
-    pickerRows,
-    controllerRows,
-    regionPickerRows,
-    regionControllerRows,
-    dateFrom,
-    dateTo,
-    showInfo,
-    showSuccess,
-    showError,
-  ])
+    },
+    [t, dateFrom, dateTo, showInfo, showSuccess, showError]
+  )
 
   const greetingName = (user?.name || '').trim().split(/\s+/)[0] || (user?.name ?? '')
   const greetingDate = useMemo(() => {
@@ -804,82 +735,47 @@ export function DashboardPage() {
             </div>
           </div>
 
-          {/* Liderbordlar — Shahar (smartup + orikzor) */}
-          <div className="grid grid-cols-1 gap-[22px] lg:grid-cols-2">
-            <LeaderboardCard
-              title={t('admin:dashboard.pickers_title_shahar')}
-              rows={pickerRows}
-              tone="accent"
+          {/* Xodimlar statistikasi — pro-jadval (Yig'uvchilar / Controllerlar) */}
+          <div className="flex flex-col gap-[22px]">
+            <StaffProTable
+              role="picker"
+              title={t('admin:dashboard.pro.pickers_title')}
+              subtitle={t('admin:dashboard.pro.subtitle')}
+              rows={pickerProRows}
               isLoading={isLoading}
-              onExport={() => void handleExportStaffStatsExcel()}
-              exportDisabled={staffStatsExportDisabled}
+              onExport={() =>
+                void handleExportProExcel(
+                  pickerProRows,
+                  t('admin:dashboard.pro.pickers_title'),
+                  'pickers'
+                )
+              }
+              exportDisabled={isLoading || isExporting || pickerProRows.length === 0}
               isExporting={isExporting}
               emptyLabel={t('admin:dashboard.staff_stats_empty')}
-              onRowClick={openStaffOrders('picker', 'shahar')}
               t={t}
             />
-            <LeaderboardCard
-              title={t('admin:dashboard.controllers_title_shahar')}
-              rows={controllerRows}
-              tone="violet"
+            <StaffProTable
+              role="controller"
+              title={t('admin:dashboard.pro.controllers_title')}
+              subtitle={t('admin:dashboard.pro.subtitle')}
+              rows={controllerProRows}
               isLoading={isLoading}
-              onExport={() => void handleExportStaffStatsExcel()}
-              exportDisabled={staffStatsExportDisabled}
+              onExport={() =>
+                void handleExportProExcel(
+                  controllerProRows,
+                  t('admin:dashboard.pro.controllers_title'),
+                  'controllers'
+                )
+              }
+              exportDisabled={isLoading || isExporting || controllerProRows.length === 0}
               isExporting={isExporting}
               emptyLabel={t('admin:dashboard.staff_stats_empty')}
-              onRowClick={openStaffOrders('controller', 'shahar')}
               t={t}
-            />
-          </div>
-
-          {/* Liderbordlar — Region (diller) */}
-          <div className="grid grid-cols-1 gap-[22px] lg:grid-cols-2">
-            <LeaderboardCard
-              title={t('admin:dashboard.pickers_title_region')}
-              rows={regionPickerRows}
-              tone="accent"
-              isLoading={isLoading}
-              onExport={() => void handleExportStaffStatsExcel()}
-              exportDisabled={staffStatsExportDisabled}
-              isExporting={isExporting}
-              emptyLabel={t('admin:dashboard.staff_stats_empty')}
-              onRowClick={openStaffOrders('picker', 'region')}
-              t={t}
-            />
-            <LeaderboardCard
-              title={t('admin:dashboard.controllers_title_region')}
-              rows={regionControllerRows}
-              tone="violet"
-              isLoading={isLoading}
-              onExport={() => void handleExportStaffStatsExcel()}
-              exportDisabled={staffStatsExportDisabled}
-              isExporting={isExporting}
-              emptyLabel={t('admin:dashboard.staff_stats_empty')}
-              onRowClick={openStaffOrders('controller', 'region')}
-              t={t}
-            />
-          </div>
-
-          {/* Ish vaqti (unumdorlik) */}
-          <div>
-            <div className="mb-3 text-base font-extrabold tracking-[-0.3px] text-slate-900 dark:text-slate-100">
-              {t('admin:dashboard.timing.section_title')}
-            </div>
-            <StaffTimingCards
-              pickers={timingPickers}
-              controllers={timingControllers}
-              isLoading={isLoading}
             />
           </div>
         </div>
       )}
-
-      <StaffOrdersDialog
-        staff={selectedStaff}
-        dateFrom={dateFrom}
-        dateTo={dateTo}
-        onClose={() => setSelectedStaff(null)}
-      />
     </AdminLayout>
   )
 }
