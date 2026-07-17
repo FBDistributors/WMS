@@ -112,11 +112,13 @@ export async function getPickingStaffStats(params?: {
   date_from?: string
   date_to?: string
   group?: StaffGroup
+  completed_only?: boolean
 }): Promise<PickingStaffStatsResponse> {
   const query: Record<string, string> = {}
   if (params?.date_from) query.date_from = params.date_from
   if (params?.date_to) query.date_to = params.date_to
   if (params?.group) query.group = params.group
+  if (params?.completed_only) query.completed_only = 'true'
   return fetchJSON<PickingStaffStatsResponse>('/api/v1/dashboard/picking-staff-stats', { query })
 }
 

@@ -260,6 +260,9 @@
       "col_median": "Медиана",
       "col_orders": "Зак",
       "chip_speed": "ш/ч",
+      "hdr_orders": "Зак",
+      "hdr_positions": "Поз",
+      "hdr_units": "Шт",
       "legend": "Цвет производительности: зелёный — выше среднего, серый — средний, красный — ниже"
     },
     "pickers_table_title": "Сборщики",

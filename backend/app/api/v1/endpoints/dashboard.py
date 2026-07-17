@@ -615,20 +615,28 @@ async def get_picking_staff_stats(
         pattern="^(shahar|region)$",
         description="Manba guruhi: 'shahar' (smartup+orikzor) yoki 'region' (diller). Bo'sh — hammasi.",
     ),
+    completed_only: bool = Query(
+        False,
+        description="True — yig'uvchi ham faqat to'liq yakunlangan (completed/packed/shipped) "
+        "hujjatlarni sanaydi; 'picked' hisobga olinmaydi (KPI kartalari uchun).",
+    ),
     db: Session = Depends(get_db),
     _user=Depends(require_any_permission(["reports:read", "audit:read", "admin:access"])),
 ):
     if date_from is not None and date_to is not None and date_from > date_to:
         raise HTTPException(status_code=400, detail="date_from must be on or before date_to")
-    # Yig'uvchi: controllerga yuborilganidan boshlab (sent_to_controller_at)
-    # sanaladi — controller yakunlashini kutmasdan. Controller: yakunlanganlar.
+    # Yig'uvchi: odatda controllerga yuborilganidan boshlab (sent_to_controller_at)
+    # sanaladi — controller yakunlashini kutmasdan. completed_only=True bo'lsa faqat
+    # to'liq yakunlanganlar (completed_at bo'yicha). Controller: doim yakunlanganlar.
+    picker_statuses = COMPLETED_DOC_STATUSES if completed_only else PICKER_COUNTED_DOC_STATUSES
+    picker_ts = _document_completed_at_expr() if completed_only else _picker_activity_at_expr()
     pickers = _aggregate_staff_by_user_column(
         db,
         DocumentModel.assigned_to_user_id,
         date_from,
         date_to,
-        statuses=PICKER_COUNTED_DOC_STATUSES,
-        ts_col=_picker_activity_at_expr(),
+        statuses=picker_statuses,
+        ts_col=picker_ts,
         source_group=group,
     )
     controllers = _aggregate_staff_by_user_column(

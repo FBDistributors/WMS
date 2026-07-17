@@ -343,11 +343,13 @@ function buildProRows(
       r = {
         user_id,
         full_name,
+        shahar_orders: 0,
+        shahar_positions: 0,
         shahar_qty: 0,
+        region_orders: 0,
+        region_positions: 0,
         region_qty: 0,
         total_qty: 0,
-        positions: 0,
-        orders_count: 0,
         units_per_hour: 0,
         median_seconds: 0,
         work_hours: 0,
@@ -359,15 +361,15 @@ function buildProRows(
   }
   for (const row of shaharRows) {
     const r = ensure(row.user_id, row.full_name)
+    r.shahar_orders += row.documents_count
+    r.shahar_positions += row.lines_count
     r.shahar_qty += row.total_picked_qty
-    r.positions += row.lines_count
-    r.orders_count += row.documents_count
   }
   for (const row of regionRows) {
     const r = ensure(row.user_id, row.full_name)
+    r.region_orders += row.documents_count
+    r.region_positions += row.lines_count
     r.region_qty += row.total_picked_qty
-    r.positions += row.lines_count
-    r.orders_count += row.documents_count
   }
   for (const tr of timing) {
     const r = ensure(tr.user_id, tr.full_name)
@@ -381,6 +383,21 @@ function buildProRows(
   return [...map.values()].sort(
     (a, b) => b.total_qty - a.total_qty || a.full_name.localeCompare(b.full_name)
   )
+}
+
+/** KPI kartalari — faqat to'liq yakunlangan hujjatlar jamidan (guruhsiz). */
+function computeStaffKpi(
+  completedRows: PickingStaffStatsRow[],
+  timing: TimingLite[]
+): { orders: number; positions: number; qty: number; speed: number } {
+  const orders = completedRows.reduce((s, r) => s + r.documents_count, 0)
+  const positions = completedRows.reduce((s, r) => s + r.lines_count, 0)
+  const qty = completedRows.reduce((s, r) => s + r.total_picked_qty, 0)
+  const hours = timing.reduce(
+    (s, tr) => s + (tr.units_per_hour > 0 ? tr.total_units / tr.units_per_hour : 0),
+    0
+  )
+  return { orders, positions, qty, speed: hours > 0 ? qty / hours : 0 }
 }
 
 export function DashboardPage() {
@@ -403,6 +420,9 @@ export function DashboardPage() {
   const [regionControllerRows, setRegionControllerRows] = useState<PickingStaffStatsRow[]>([])
   const [timingPickers, setTimingPickers] = useState<StaffTimingPickerRow[]>([])
   const [timingControllers, setTimingControllers] = useState<StaffTimingControllerRow[]>([])
+  // KPI kartalari uchun — faqat to'liq yakunlangan (completed) hujjatlar (guruhsiz jami).
+  const [completedPickers, setCompletedPickers] = useState<PickingStaffStatsRow[]>([])
+  const [completedControllers, setCompletedControllers] = useState<PickingStaffStatsRow[]>([])
   const [stuckOrdersCount, setStuckOrdersCount] = useState(0)
   const [stuckOldestHours, setStuckOldestHours] = useState(0)
 
@@ -440,6 +460,35 @@ export function DashboardPage() {
     [controllerRows, regionControllerRows, timingControllers]
   )
 
+  const pickerKpi = useMemo(
+    () =>
+      computeStaffKpi(
+        completedPickers,
+        timingPickers.map((tp) => ({
+          user_id: tp.user_id,
+          full_name: tp.full_name,
+          units_per_hour: tp.units_per_hour,
+          median_seconds: tp.median_seconds,
+          total_units: tp.total_units,
+        }))
+      ),
+    [completedPickers, timingPickers]
+  )
+  const controllerKpi = useMemo(
+    () =>
+      computeStaffKpi(
+        completedControllers,
+        timingControllers.map((tc) => ({
+          user_id: tc.user_id,
+          full_name: tc.full_name,
+          units_per_hour: tc.units_per_hour,
+          median_seconds: tc.median_check_seconds || tc.median_total_seconds,
+          total_units: tc.total_units,
+        }))
+      ),
+    [completedControllers, timingControllers]
+  )
+
   const load = useCallback(async () => {
     setIsLoading(true)
     setHasLoadError(false)
@@ -453,6 +502,7 @@ export function DashboardPage() {
         staffData,
         regionStaffData,
         timingData,
+        completedStaffData,
         pickingStats,
         stuckMain,
         stuckShowroom,
@@ -472,6 +522,11 @@ export function DashboardPage() {
           pickers: [],
           controllers: [],
         })),
+        getPickingStaffStats({
+          date_from: dateFromQ,
+          date_to: dateToQ,
+          completed_only: true,
+        }).catch(() => ({ pickers: [], controllers: [] })),
         getPickingOrderStats({
           date_from: dateFromQ,
           date_to: dateToQ,
@@ -493,6 +548,10 @@ export function DashboardPage() {
       )
       setTimingPickers(Array.isArray(timingData?.pickers) ? timingData.pickers : [])
       setTimingControllers(Array.isArray(timingData?.controllers) ? timingData.controllers : [])
+      setCompletedPickers(Array.isArray(completedStaffData?.pickers) ? completedStaffData.pickers : [])
+      setCompletedControllers(
+        Array.isArray(completedStaffData?.controllers) ? completedStaffData.controllers : []
+      )
       setPickingOrderStats(pickingStats)
       setPickingStatsUnavailable(pickingStats == null)
       const stuckTotal = (stuckMain?.stuck_rows_count ?? 0) + (stuckShowroom?.stuck_rows_count ?? 0)
@@ -508,6 +567,8 @@ export function DashboardPage() {
       setStuckRowsCount(0)
       setStuckOrdersCount(0)
       setStuckOldestHours(0)
+      setCompletedPickers([])
+      setCompletedControllers([])
       setPickingOrderStats(null)
       setPickingStatsUnavailable(false)
     } finally {
@@ -536,25 +597,36 @@ export function DashboardPage() {
           m: t('admin:dashboard.timing.m'),
           s: t('admin:dashboard.timing.s'),
         }
+        const sh = t('admin:dashboard.pro.col_shahar')
+        const rg = t('admin:dashboard.pro.col_region')
+        const oc = t('admin:dashboard.pro.hdr_orders')
+        const ps = t('admin:dashboard.pro.hdr_positions')
+        const un = t('admin:dashboard.pro.hdr_units')
         const headers = [
           '#',
           t('admin:dashboard.pro.col_staff'),
-          t('admin:dashboard.pro.col_shahar'),
-          t('admin:dashboard.pro.col_region'),
+          `${sh} · ${oc}`,
+          `${sh} · ${ps}`,
+          `${sh} · ${un}`,
+          `${rg} · ${oc}`,
+          `${rg} · ${ps}`,
+          `${rg} · ${un}`,
           t('admin:dashboard.pro.col_qty'),
           `${t('admin:dashboard.pro.col_productivity')} (${t('admin:dashboard.pro.suffix_speed')})`,
           t('admin:dashboard.pro.col_median'),
-          t('admin:dashboard.pro.col_orders'),
         ]
         const aoa = rows.map((row, index) => [
           index + 1,
           row.full_name,
+          row.shahar_orders,
+          row.shahar_positions,
           row.shahar_qty,
+          row.region_orders,
+          row.region_positions,
           row.region_qty,
           row.total_qty,
           Math.round(row.units_per_hour),
           formatDuration(row.median_seconds, durUnits),
-          row.orders_count,
         ])
         const wb = XLSX.utils.book_new()
         const ws = XLSX.utils.aoa_to_sheet([headers, ...aoa])
@@ -742,6 +814,7 @@ export function DashboardPage() {
               title={t('admin:dashboard.pro.pickers_title')}
               subtitle={t('admin:dashboard.pro.subtitle')}
               rows={pickerProRows}
+              kpi={pickerKpi}
               isLoading={isLoading}
               onExport={() =>
                 void handleExportProExcel(
@@ -760,6 +833,7 @@ export function DashboardPage() {
               title={t('admin:dashboard.pro.controllers_title')}
               subtitle={t('admin:dashboard.pro.subtitle')}
               rows={controllerProRows}
+              kpi={controllerKpi}
               isLoading={isLoading}
               onExport={() =>
                 void handleExportProExcel(

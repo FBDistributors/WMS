@@ -260,6 +260,9 @@
       "col_median": "Median",
       "col_orders": "Buy",
       "chip_speed": "d/s",
+      "hdr_orders": "Buy",
+      "hdr_positions": "Poz",
+      "hdr_units": "Dona",
       "legend": "Unumdorlik rangi: yashil — o'rtachadan yuqori, kulrang — o'rtacha, qizil — past"
     },
     "pickers_table_title": "Yig‘uvchilar",

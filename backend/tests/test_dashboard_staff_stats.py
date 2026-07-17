@@ -677,3 +677,53 @@ def test_picking_order_stats_daily_breakdown(client, db_session, monkeypatch):
         assert sum(p["count"] for p in daily) == 1  # 6/1 oynadan tashqarida
     finally:
         app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_completed_only_excludes_picked_for_picker(client, db_session):
+    """completed_only=true bo'lsa yig'uvchi KPI'si 'picked' (yakunlanmagan)ni sanamaydi."""
+    admin = _seed_admin(db_session)
+    p = User(username="co_picker", password_hash=get_password_hash("x"), role="picker",
+             full_name="CO Picker", is_active=True)
+    db_session.add(p)
+    db_session.flush()
+
+    # 1) To'liq yakunlangan hujjat.
+    d_done = Document(doc_no="CO-DONE", doc_type="SO", status="completed",
+                      assigned_to_user_id=p.id,
+                      completed_at=datetime(2026, 7, 1, 9, tzinfo=timezone.utc),
+                      updated_at=datetime(2026, 7, 1, 9, tzinfo=timezone.utc))
+    db_session.add(d_done)
+    db_session.flush()
+    db_session.add(DocumentLine(document_id=d_done.id, product_name="A", location_code="L",
+                                required_qty=10, picked_qty=10))
+    # 2) Faqat 'picked' (controllerga yuborilgan, hali yakunlanmagan).
+    d_picked = Document(doc_no="CO-PICKED", doc_type="SO", status="picked",
+                        assigned_to_user_id=p.id,
+                        sent_to_controller_at=datetime(2026, 7, 1, 10, tzinfo=timezone.utc),
+                        updated_at=datetime(2026, 7, 1, 10, tzinfo=timezone.utc))
+    db_session.add(d_picked)
+    db_session.flush()
+    db_session.add(DocumentLine(document_id=d_picked.id, product_name="B", location_code="L",
+                                required_qty=4, picked_qty=4))
+    db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        # Oddiy (jadval uchun): picked + completed = 2 hujjat, 14 dona.
+        normal = client.get("/api/v1/dashboard/picking-staff-stats")
+        assert normal.status_code == 200, normal.text
+        np = [r for r in normal.json()["pickers"] if r["user_id"] == str(p.id)]
+        assert len(np) == 1
+        assert np[0]["documents_count"] == 2
+        assert np[0]["total_picked_qty"] == 14.0
+
+        # completed_only (KPI uchun): faqat yakunlangan = 1 hujjat, 10 dona.
+        done = client.get("/api/v1/dashboard/picking-staff-stats",
+                          params={"completed_only": "true"})
+        assert done.status_code == 200, done.text
+        dp = [r for r in done.json()["pickers"] if r["user_id"] == str(p.id)]
+        assert len(dp) == 1
+        assert dp[0]["documents_count"] == 1
+        assert dp[0]["total_picked_qty"] == 10.0
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)

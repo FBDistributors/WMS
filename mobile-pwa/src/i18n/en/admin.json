@@ -260,6 +260,9 @@
       "col_median": "Median",
       "col_orders": "Ord",
       "chip_speed": "u/h",
+      "hdr_orders": "Ord",
+      "hdr_positions": "Pos",
+      "hdr_units": "Units",
       "legend": "Productivity color: green — above average, gray — average, red — below"
     },
     "pickers_table_title": "Pickers",

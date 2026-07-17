@@ -3,18 +3,28 @@ import { FileSpreadsheet, Loader2 } from 'lucide-react'
 import { LoadingOverlay } from '../../../components/ui/LoadingOverlay'
 import { formatDuration } from '../../../lib/formatDuration'
 
-/** Reyting (shahar+region) + unumdorlik + median birlashgan bitta xodim qatori. */
+/** Reyting (shahar/region: buyurtma+pozitsiya+dona) + unumdorlik + median birlashgan qator. */
 export type StaffProRow = {
   user_id: string
   full_name: string
+  shahar_orders: number
+  shahar_positions: number
   shahar_qty: number
+  region_orders: number
+  region_positions: number
   region_qty: number
   total_qty: number
-  positions: number
-  orders_count: number
   units_per_hour: number
   median_seconds: number
   work_hours: number
+}
+
+/** KPI kartalari — faqat to'liq yakunlangan buyurtmalar bo'yicha (jadval yig'indisidan farq qilishi mumkin). */
+export type StaffProKpi = {
+  orders: number
+  positions: number
+  qty: number
+  speed: number
 }
 
 type StaffProTableProps = {
@@ -22,6 +32,7 @@ type StaffProTableProps = {
   title: string
   subtitle: string
   rows: StaffProRow[]
+  kpi: StaffProKpi
   isLoading: boolean
   onExport: () => void
   exportDisabled: boolean
@@ -30,10 +41,14 @@ type StaffProTableProps = {
   t: (key: string, opts?: Record<string, unknown>) => string
 }
 
-const GRID_COLS = '222px 72px 72px 1fr 100px 84px 52px'
+const GRID_COLS = '176px 44px 44px 54px 44px 44px 54px 1fr 92px 82px'
 
 function fmtQty(n: number): string {
   return Math.round(n).toLocaleString('en-US').replace(/,/g, ' ')
+}
+
+function cell(n: number): string {
+  return n > 0 ? fmtQty(n) : '—'
 }
 
 function nameInitials(fullName: string): string {
@@ -43,7 +58,6 @@ function nameInitials(fullName: string): string {
   return (parts[0][0] + parts[1][0]).toUpperCase()
 }
 
-/** Rank badge ranglari (medallar + qolganlar). */
 function rankStyle(rank: number): { bg: string; fg: string } {
   if (rank === 1) return { bg: '#fef9c3', fg: '#a16207' }
   if (rank === 2) return { bg: '#f1f5f9', fg: '#64748b' }
@@ -56,6 +70,7 @@ export function StaffProTable({
   title,
   subtitle,
   rows,
+  kpi,
   isLoading,
   onExport,
   exportDisabled,
@@ -71,18 +86,10 @@ export function StaffProTable({
 
   const maxQty = Math.max(1, ...rows.map((r) => r.total_qty))
 
-  // Unumdorlik chipi uchun o'rtacha (faqat uph>0 bo'lganlar).
   const speeds = rows.map((r) => r.units_per_hour).filter((v) => v > 0)
   const avgSpeed = speeds.length ? speeds.reduce((a, b) => a + b, 0) / speeds.length : 0
 
-  // KPI agregatsiya — jadval qatorlaridan.
-  const kpiOrders = rows.reduce((s, r) => s + r.orders_count, 0)
-  const kpiPositions = rows.reduce((s, r) => s + r.positions, 0)
-  const kpiQty = rows.reduce((s, r) => s + r.total_qty, 0)
-  const totalHours = rows.reduce((s, r) => s + r.work_hours, 0)
-  const kpiSpeed = totalHours > 0 ? kpiQty / totalHours : 0
-
-  const avatarLight =
+  const avatar =
     role === 'picker'
       ? { bg: '#eff6ff', fg: '#2563eb' }
       : { bg: '#f5f3ff', fg: '#7c3aed' }
@@ -100,6 +107,9 @@ export function StaffProTable({
 
   const headCls =
     'text-[10.5px] font-extrabold uppercase tracking-[0.05em] text-slate-400 dark:text-slate-500'
+  const subCls =
+    'text-[9px] font-bold uppercase tracking-[0.04em] text-slate-300 dark:text-slate-600 text-right'
+  const numCls = 'wms-num text-right text-[12.5px] font-bold text-slate-600 dark:text-slate-300'
 
   return (
     <div className="rounded-[20px] border border-slate-200 bg-white p-[22px] dark:border-slate-800 dark:bg-slate-900">
@@ -138,40 +148,56 @@ export function StaffProTable({
             {t('admin:dashboard.pro.kpi_orders')}
           </div>
           <div className="wms-num text-[20px] font-extrabold text-white">
-            {isLoading ? '—' : fmtQty(kpiOrders)}
+            {isLoading ? '—' : fmtQty(kpi.orders)}
           </div>
         </div>
         <KpiCell
           label={t('admin:dashboard.pro.kpi_positions')}
-          value={isLoading ? '—' : fmtQty(kpiPositions)}
+          value={isLoading ? '—' : fmtQty(kpi.positions)}
           suffix={t('admin:dashboard.pro.suffix_pos')}
         />
         <KpiCell
           label={t('admin:dashboard.pro.kpi_qty')}
-          value={isLoading ? '—' : fmtQty(kpiQty)}
+          value={isLoading ? '—' : fmtQty(kpi.qty)}
         />
         <KpiCell
           label={t('admin:dashboard.pro.kpi_speed')}
-          value={isLoading ? '—' : fmtQty(kpiSpeed)}
+          value={isLoading ? '—' : fmtQty(kpi.speed)}
           suffix={t('admin:dashboard.pro.suffix_speed')}
         />
       </div>
 
       {/* 3. Jadval */}
       <div className="overflow-x-auto">
-        <div className="min-w-[780px]">
-          {/* Header qatori */}
-          <div
-            className="grid items-center gap-3 border-b border-slate-100 pb-2 dark:border-slate-800"
-            style={{ gridTemplateColumns: GRID_COLS }}
-          >
+        <div className="min-w-[880px]">
+          {/* Header — guruh qatori (SHAHAR / REGION 3 tadan ustun) */}
+          <div className="grid items-end gap-3" style={{ gridTemplateColumns: GRID_COLS }}>
             <div className={headCls}>{t('admin:dashboard.pro.col_staff')}</div>
-            <div className={`${headCls} text-right`}>{t('admin:dashboard.pro.col_shahar')}</div>
-            <div className={`${headCls} text-right`}>{t('admin:dashboard.pro.col_region')}</div>
+            <div className={`${headCls} text-center`} style={{ gridColumn: 'span 3' }}>
+              {t('admin:dashboard.pro.col_shahar')}
+            </div>
+            <div className={`${headCls} text-center`} style={{ gridColumn: 'span 3' }}>
+              {t('admin:dashboard.pro.col_region')}
+            </div>
             <div className={headCls}>{t('admin:dashboard.pro.col_qty')}</div>
             <div className={`${headCls} text-right`}>{t('admin:dashboard.pro.col_productivity')}</div>
             <div className={`${headCls} text-right`}>{t('admin:dashboard.pro.col_median')}</div>
-            <div className={`${headCls} text-right`}>{t('admin:dashboard.pro.col_orders')}</div>
+          </div>
+          {/* Header — kichik qator (Buy / Poz / Dona) */}
+          <div
+            className="mt-1 grid gap-3 border-b border-slate-100 pb-2 dark:border-slate-800"
+            style={{ gridTemplateColumns: GRID_COLS }}
+          >
+            <div />
+            <div className={subCls}>{t('admin:dashboard.pro.hdr_orders')}</div>
+            <div className={subCls}>{t('admin:dashboard.pro.hdr_positions')}</div>
+            <div className={subCls}>{t('admin:dashboard.pro.hdr_units')}</div>
+            <div className={subCls}>{t('admin:dashboard.pro.hdr_orders')}</div>
+            <div className={subCls}>{t('admin:dashboard.pro.hdr_positions')}</div>
+            <div className={subCls}>{t('admin:dashboard.pro.hdr_units')}</div>
+            <div />
+            <div />
+            <div />
           </div>
 
           {isLoading ? (
@@ -189,7 +215,7 @@ export function StaffProTable({
               return (
                 <div
                   key={row.user_id}
-                  className="group grid items-center gap-3 rounded-[10px] px-2 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                  className="grid items-center gap-3 rounded-[10px] px-2 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50"
                   style={{ gridTemplateColumns: GRID_COLS }}
                 >
                   {/* XODIM */}
@@ -202,7 +228,7 @@ export function StaffProTable({
                     </span>
                     <span
                       className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
-                      style={{ backgroundColor: avatarLight.bg, color: avatarLight.fg }}
+                      style={{ backgroundColor: avatar.bg, color: avatar.fg }}
                     >
                       {nameInitials(row.full_name)}
                     </span>
@@ -210,13 +236,17 @@ export function StaffProTable({
                       {row.full_name}
                     </span>
                   </div>
-                  {/* SHAHAR */}
-                  <div className="wms-num text-right text-[12.5px] font-bold text-slate-600 dark:text-slate-300">
-                    {row.shahar_qty > 0 ? fmtQty(row.shahar_qty) : '—'}
+                  {/* SHAHAR: buy / poz / dona */}
+                  <div className={numCls}>{cell(row.shahar_orders)}</div>
+                  <div className={numCls}>{cell(row.shahar_positions)}</div>
+                  <div className={`${numCls} !text-slate-900 dark:!text-slate-100`}>
+                    {cell(row.shahar_qty)}
                   </div>
-                  {/* REGION */}
-                  <div className="wms-num text-right text-[12.5px] font-bold text-slate-600 dark:text-slate-300">
-                    {row.region_qty > 0 ? fmtQty(row.region_qty) : '—'}
+                  {/* REGION: buy / poz / dona */}
+                  <div className={numCls}>{cell(row.region_orders)}</div>
+                  <div className={numCls}>{cell(row.region_positions)}</div>
+                  <div className={`${numCls} !text-slate-900 dark:!text-slate-100`}>
+                    {cell(row.region_qty)}
                   </div>
                   {/* JAMI DONA — progress + qiymat */}
                   <div className="flex items-center gap-2.5">
@@ -246,10 +276,6 @@ export function StaffProTable({
                   {/* MEDIAN */}
                   <div className="whitespace-nowrap text-right text-[12px] font-bold text-slate-500 dark:text-slate-400">
                     {formatDuration(row.median_seconds, durUnits)}
-                  </div>
-                  {/* BUY */}
-                  <div className="wms-num text-right text-[12.5px] font-bold text-slate-600 dark:text-slate-300">
-                    {row.orders_count}
                   </div>
                 </div>
               )
