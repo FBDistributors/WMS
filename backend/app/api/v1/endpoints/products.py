@@ -194,14 +194,19 @@ async def sync_products_from_smartup(
     db: Session = Depends(get_db),
     _user=Depends(require_permission("products:write")),
 ):
-    run, inserted, updated, skipped, errors = sync_smartup_products(
-        db,
-        code=payload.code,
-        begin_created_on=payload.begin_created_on,
-        end_created_on=payload.end_created_on,
-        begin_modified_on=payload.begin_modified_on,
-        end_modified_on=payload.end_modified_on,
-    )
+    try:
+        run, inserted, updated, skipped, errors = sync_smartup_products(
+            db,
+            code=payload.code,
+            begin_created_on=payload.begin_created_on,
+            end_created_on=payload.end_created_on,
+            begin_modified_on=payload.begin_modified_on,
+            end_modified_on=payload.end_modified_on,
+        )
+    except Exception as exc:  # noqa: BLE001
+        # Smartup bilan bog'lanish uzilsa (auth/timeout/tarmoq) — haqiqiy sababni
+        # generic 500 o'rniga ko'rsatamiz, aks holda UI'da faqat "muvaffaqiyatsiz" chiqadi.
+        raise HTTPException(status_code=502, detail=f"Smartup: {exc}") from exc
     return SmartupProductsSyncResponse(
         run_id=str(run.id),
         inserted=inserted,

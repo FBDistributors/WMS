@@ -182,6 +182,7 @@ export type SmartupSyncRun = {
   skipped_count: number
   error_count: number
   status: string
+  errors_json?: Array<{ external_id?: string; reason?: string }> | null
 }
 
 export async function syncProductsFromSmartup(payload: SmartupProductsSyncInput = {}) {

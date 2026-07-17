@@ -10,6 +10,7 @@ import { ImportProductsDialog } from '../../admin/components/products/ImportProd
 import { ProductsTable } from '../../admin/components/products/ProductsTable'
 import { ProductsTableSettings } from '../../admin/components/products/ProductsTableSettings'
 import { useTableConfig } from '../../admin/hooks/useTableConfig'
+import { getApiErrorMessage } from '../../services/apiClient'
 import { Button } from '../../components/ui/button'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
@@ -219,7 +220,10 @@ export function ProductsPage() {
       await loadRuns()
       await load(activeSearch, offset)
     } catch (err) {
-      showError(err instanceof Error ? err.message : t('products:sync_failed'))
+      // Muvaffaqiyatsizlikda ham oxirgi run holatini yangilaymiz va haqiqiy
+      // sababni (Smartup auth/timeout) ko'rsatamiz — generic xabar emas.
+      await loadRuns()
+      showError(getApiErrorMessage(err, t('products:sync_failed')))
     } finally {
       setIsSyncing(false)
     }
@@ -233,6 +237,11 @@ export function ProductsPage() {
         <div className="mb-4 text-sm text-slate-600 dark:text-slate-300">
           {t('products:last_sync')}: {new Date(lastRun.started_at).toLocaleString()} ·{' '}
           {lastRun.status}
+          {lastRun.status !== 'success' && lastRun.errors_json?.[0]?.reason ? (
+            <span className="mt-1 block text-red-600 dark:text-red-400">
+              {lastRun.errors_json[0].reason}
+            </span>
+          ) : null}
         </div>
       ) : (
         <div className="mb-4 text-sm text-slate-500">{t('products:last_sync_none')}</div>

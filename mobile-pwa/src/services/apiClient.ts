@@ -134,4 +134,15 @@ export async function fetchJSON<TResponse, TBody = unknown>(
   }
 }
 
+/**
+ * `fetchJSON` xatosidan (ApiError obyekti yoki Error) o'qiladigan xabar ajratadi.
+ * `err instanceof Error` yetarli emas — fetchJSON oddiy obyekt tashlaydi.
+ */
+export function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (isOurApiError(error) && error.message) return error.message
+  if (error instanceof Error && error.message) return error.message
+  if (typeof error === 'string' && error) return error
+  return fallback
+}
+
 export type { ApiError }
