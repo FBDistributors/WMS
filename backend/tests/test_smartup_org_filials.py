@@ -20,17 +20,14 @@ def test_resolve_org_filial_id_from_note_uses_settings_id() -> None:
     )
 
 
-def test_resolve_org_display_tash_obl_vs_tash_oblast_dot() -> None:
-    """Izoh «Таш обл» — settings «Таш.область» ham mos."""
+def test_resolve_org_display_note_only_returns_none() -> None:
+    """ID-only: faqat izoh bilan (org_id yo'q) — fuzzy-taxmin yo'q, None qaytadi."""
     name = resolve_org_display(
         None,
         SETTINGS_MAP,
         movement_note="Заказ Дилер Таш обл",
     )
-    assert name in (
-        "Дилер Таш обл (Мейрлан) Проф",
-        "Дилер Таш.область (Илхом)",
-    )
+    assert name is None
 
 
 def test_resolve_org_filial_id_from_xayitlik_uses_settings_id() -> None:
@@ -44,15 +41,17 @@ def test_resolve_org_display_by_settings_org_id() -> None:
     )
 
 
-def test_resolve_org_display_from_note_settings_name() -> None:
+def test_resolve_org_display_note_only_no_fuzzy() -> None:
+    # ID-only: izoh org nomiga o'xshasa ham, org_id bo'lmasa None.
     assert (
         resolve_org_display(None, SETTINGS_MAP, movement_note="XAYITLIK JIZZAX MUNAV")
-        == "Дилер Жиззах (Мунаввар) Проф"
+        is None
     )
 
 
 def test_resolve_org_display_ignores_header_filial_id() -> None:
+    # Header filial (3788131) e'tiborga olinmaydi; org_id boshqa yo'q -> None.
     assert (
         resolve_org_display("3788131", SETTINGS_MAP, movement_note="Заказ Дилер Ипподром")
-        == "Дилер Ипподром (Иззат)"
+        is None
     )

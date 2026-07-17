@@ -213,14 +213,15 @@ def reconcile_diller_orders_filial_from_settings(db: Session) -> int:
     updated = 0
     for order in rows:
         before = (order.to_filial_code or order.filial_id or "").strip()
+        # Faqat haqiqiy org_id (to_filial_code/filial_id) normalizatsiya qilinadi.
+        # Izohdan fuzzy-taxmin ATAYLAB ishlatilmaydi — u haqiqiy org_id ni noto'g'ri
+        # tashkilotga almashtirib qo'yardi (masalan Бухара -> Хорезм). Endi hech qachon
+        # almashtirilmaydi; org_id topilmasa order o'z holicha qoladi.
         org_id = normalize_smartup_org_filial_id(order.to_filial_code) or normalize_smartup_org_filial_id(
             order.filial_id
         )
         if org_id in _IGNORE_FILIAL_IDS_FOR_LOOKUP:
             org_id = None
-        if not org_id or org_id not in name_map:
-            inferred, _ = _best_org_match_from_note(order.movement_note, name_map)
-            org_id = inferred
         if org_id and org_id != before:
             order.to_filial_code = org_id
             order.filial_id = org_id
@@ -238,16 +239,15 @@ def resolve_org_display(
     to_warehouse_code: str | None = None,
     movement_note: str | None = None,
 ) -> str | None:
-    """SmartUP org ID yoki izoh → settings_organizations nomi."""
+    """Tashkiliy harakat: settings_organizations dan faqat ID (org_id) orqali nom.
+
+    Izohdan fuzzy-taxmin ATAYLAB ishlatilmaydi — noto'g'ri tashkilotni tanlab
+    qo'yardi. ID topilmasa None (mijoz nomi bo'sh turadi).
+    """
     _ = to_warehouse_code
+    _ = movement_note
     for key in _org_lookup_keys(filial_id, to_filial_code):
         hit = name_map.get(key)
         if hit:
             return hit
-    _, display_name = _best_org_match_from_note(movement_note, name_map)
-    if display_name:
-        return display_name
-    inferred_id = resolve_org_filial_id_from_note(movement_note, name_map)
-    if inferred_id:
-        return name_map.get(inferred_id)
     return None

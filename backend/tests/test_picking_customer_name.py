@@ -18,14 +18,16 @@ def test_customer_name_falls_back_to_org_name_for_transfer():
     assert _customer_name(doc, {"18877428": "Дилер Нукус (Андрей) Проф"}) == "Дилер Нукус (Андрей) Проф"
 
 
-def test_customer_name_falls_back_to_note_when_no_org_match():
+def test_customer_name_none_when_org_id_not_found():
+    # ID-only: org_id settings'da topilmasa bo'sh (izohdan fuzzy-taxmin yo'q).
     doc = _doc(customer_name="", to_filial_code="99999", movement_note="Заказ Дилер Нукус")
-    assert _customer_name(doc, {"18877428": "Дилер Нукус"}) == "Заказ Дилер Нукус"
+    assert _customer_name(doc, {"18877428": "Дилер Нукус"}) is None
 
 
-def test_customer_name_note_when_no_filial():
+def test_customer_name_none_when_no_filial():
+    # ID yo'q — izoh bor bo'lsa ham bo'sh (fuzzy-taxmin ishlatilmaydi).
     doc = _doc(customer_name=None, to_filial_code=None, movement_note="PROMO TERMIZ")
-    assert _customer_name(doc, {}) == "PROMO TERMIZ"
+    assert _customer_name(doc, {}) is None
 
 
 def test_customer_name_none_when_nothing_available():

@@ -33,6 +33,7 @@ from app.models.location_box_placement import PLACEMENT_SEALED, LocationBoxPlace
 from app.models.product_box import ProductBox as ProductBoxModel
 from app.api.v1.endpoints.picker_inventory import _get_lot_level_balances, _location_ids_for_warehouse
 from app.services.order_reserve_release import release_document_reserve_on_cancel
+from app.services.organization_labels import resolve_org_display
 from app.services.stock_availability import require_sufficient_reserved
 from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_ip, log_action
 from app.services.box_location_service import (
@@ -837,13 +838,17 @@ def _customer_name(
     cn = getattr(order, "customer_name", None)
     if cn is not None and str(cn).strip():
         return str(cn).strip()
-    # Tashkiliy harakat (diller/MFM): mijoz yo'q — manzil filial nomi ko'rsatiladi
-    # (to_filial_code -> settings_organizations.name), aks holda harakat izohi.
-    to_filial = (getattr(order, "to_filial_code", None) or "").strip()
-    if org_names and to_filial and to_filial in org_names:
-        return org_names[to_filial]
-    note = (getattr(order, "movement_note", None) or "").strip()
-    return note or None
+    # Tashkiliy harakat (diller/MFM): mijoz yo'q — manzil tashkiloti nomi faqat
+    # settings ID (org_id) orqali (admin ro'yxati bilan bir xil mantiq). ID
+    # topilmasa bo'sh (fuzzy izoh-taxmini ishlatilmaydi).
+    if org_names is None:
+        return None
+    return resolve_org_display(
+        getattr(order, "filial_id", None),
+        org_names,
+        to_filial_code=getattr(order, "to_filial_code", None),
+        movement_note=getattr(order, "movement_note", None),
+    )
 
 
 def _to_picking_list_item(

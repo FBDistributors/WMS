@@ -14,7 +14,7 @@ from app.constants.order_wms_status import (
     smartup_orikzor_status_for_wms_storage,
 )
 from app.constants.smartup_org_filials import normalize_smartup_org_filial_id
-from app.services.organization_labels import load_org_name_map, resolve_org_filial_id_from_note
+from app.services.organization_labels import load_org_name_map
 from app.integrations.smartup.mapper import (
     OrderLinePayload,
     OrderPayload,
@@ -119,12 +119,15 @@ def _apply_order_filial_fields(
     payload: OrderPayload,
     org_name_map: dict[str, str] | None = None,
 ) -> None:
-    """SmartUP to_filial_code → settings org_id; ombor kodi (001) saqlanmasin."""
+    """SmartUP to_filial_code → settings org_id; ombor kodi (001) saqlanmasin.
+
+    Faqat haqiqiy org_id ishlatiladi. Izohdan fuzzy-taxmin ATAYLAB olib tashlandi —
+    u noto'g'ri tashkilotni order'ga yozib qo'yardi. org_id bo'lmasa o'zgartirilmaydi.
+    """
+    _ = org_name_map
     org_id = normalize_smartup_org_filial_id(getattr(payload, "to_filial_code", None)) or normalize_smartup_org_filial_id(
         payload.filial_id
     )
-    if not org_id and org_name_map:
-        org_id = resolve_org_filial_id_from_note(getattr(payload, "movement_note", None), org_name_map)
     if not org_id:
         return
     order.to_filial_code = org_id
@@ -165,16 +168,8 @@ def _process_one_order(
     order_src = (order_source or "").strip().lower()
     if order_src == "diller":
         payload.status = smartup_movement_status_for_wms_storage(order.status)
-        if org_name_map and not normalize_smartup_org_filial_id(
-            getattr(payload, "to_filial_code", None) or payload.filial_id
-        ):
-            inferred = resolve_org_filial_id_from_note(
-                getattr(order, "note", None) or getattr(payload, "movement_note", None),
-                org_name_map,
-            )
-            if inferred:
-                payload.to_filial_code = inferred
-                payload.filial_id = inferred
+        # Izohdan fuzzy org_id taxmini ATAYLAB olib tashlandi — faqat SmartUP dagi
+        # haqiqiy to_filial_code ishlatiladi. Bo'lmasa filial bo'sh qoladi.
     elif order_src == "orikzor":
         payload.status = smartup_orikzor_status_for_wms_storage(order.status)
     else:
