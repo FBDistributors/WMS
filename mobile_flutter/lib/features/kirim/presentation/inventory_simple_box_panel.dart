@@ -1,6 +1,7 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -339,7 +340,7 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
             constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
             padding: EdgeInsets.zero,
             splashRadius: 20,
-            icon: const Icon(Icons.check, color: Color(0xFF1A237E)),
+            icon: Icon(Icons.check, color: context.colors.accentFg),
           ),
         buildInputClearButton(
           visible: true,
@@ -719,7 +720,7 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
         _unitsPerBox?.toString() ?? '—',
         style: TextStyle(
           fontSize: 16,
-          color: _unitsPerBox != null ? null : Colors.grey.shade600,
+          color: _unitsPerBox != null ? null : context.colors.textFaded,
         ),
       ),
     );
@@ -733,7 +734,7 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
       padding: const EdgeInsets.only(top: 6),
       child: Text(
         StringLookup.t(loc, 'inventoryBoxUnitsPerBoxEditHint'),
-        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+        style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
       ),
     );
   }
@@ -788,7 +789,7 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
           padding: const EdgeInsets.only(top: 4),
           child: Text(
             StringLookup.t(loc, 'inventoryZeroStockHint'),
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+            style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
           ),
         ),
       );
@@ -805,7 +806,7 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
       padding: const EdgeInsets.only(top: 6),
       child: Text(
         StringLookup.t(loc, key),
-        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+        style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
       ),
     );
   }

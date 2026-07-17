@@ -1,6 +1,7 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -190,7 +191,7 @@ class _InventoryUnpackBoxPanelState extends ConsumerState<InventoryUnpackBoxPane
             constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
             padding: EdgeInsets.zero,
             splashRadius: 20,
-            icon: const Icon(Icons.check, color: Color(0xFF1A237E)),
+            icon: Icon(Icons.check, color: context.colors.accentFg),
           ),
         buildInputClearButton(
           visible: true,
@@ -320,14 +321,14 @@ class _InventoryUnpackBoxPanelState extends ConsumerState<InventoryUnpackBoxPane
       padding: const EdgeInsets.only(bottom: 4),
       child: RichText(
         text: TextSpan(
-          style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
+          style: TextStyle(fontSize: 14, color: context.colors.textMain),
           children: <InlineSpan>[
             TextSpan(text: '$label: ', style: const TextStyle(fontWeight: FontWeight.w600)),
             TextSpan(
               text: value,
               style: TextStyle(
                 fontWeight: emphasize ? FontWeight.w700 : FontWeight.w500,
-                color: emphasize ? const Color(0xFF1A237E) : Colors.grey.shade900,
+                color: emphasize ? context.colors.accentFg : context.colors.textMain,
               ),
             ),
           ],
@@ -358,9 +359,9 @@ class _InventoryUnpackBoxPanelState extends ConsumerState<InventoryUnpackBoxPane
           const SizedBox(height: 4),
           Text(
             widget.locationCode!,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w600,
-              color: Color(0xFF1565C0),
+              color: context.colors.link,
             ),
           ),
         ],
@@ -368,7 +369,7 @@ class _InventoryUnpackBoxPanelState extends ConsumerState<InventoryUnpackBoxPane
           const SizedBox(height: 4),
           Text(
             formatExpiryMonthYear(widget.expiryDate),
-            style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+            style: TextStyle(fontSize: 13, color: context.colors.textSecondary),
           ),
         ],
         const SizedBox(height: 12),
@@ -388,7 +389,7 @@ class _InventoryUnpackBoxPanelState extends ConsumerState<InventoryUnpackBoxPane
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: Colors.grey.shade700,
+              color: context.colors.textSecondary,
             ),
           ),
           const SizedBox(height: 4),
@@ -439,7 +440,7 @@ class _InventoryUnpackBoxPanelState extends ConsumerState<InventoryUnpackBoxPane
             upb?.toString() ?? '—',
             style: TextStyle(
               fontSize: 16,
-              color: upb != null ? null : Colors.grey.shade600,
+              color: upb != null ? null : context.colors.textFaded,
             ),
           ),
         ),
@@ -496,7 +497,7 @@ class _InventoryUnpackBoxPanelState extends ConsumerState<InventoryUnpackBoxPane
               'inventorySealedAvailableForBarcode',
               <String, String>{'count': '$sealedForBarcode'},
             ),
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+            style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
           ),
         ],
       ],

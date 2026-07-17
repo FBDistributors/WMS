@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/config/brand.dart';
+import '../../../core/theme/app_colors.dart';
 
 import '../../../core/app_state/app_locale.dart';
 import '../../../core/formatting/expiry_display_format.dart';
@@ -192,19 +193,19 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   List<String> _invRecentLocations = <String>[];
   bool _invRecentsLoaded = false;
 
-  static const Color _invAccent = Color(0xFF1A237E);
-  static const Color _invLink = Color(0xFF1565C0);
-  static const Color _invPageBg = Color(0xFFF0F2F5);
-  static const Color _invTextMain = Color(0xFF0F172A);
-  static const Color _invTextSecondary = Color(0xFF64748B);
-  static const Color _invTextFaded = Color(0xFF94A3B8);
-  static const Color _invTint = Color(0xFFE8EAF6);
-  static const Color _invRedText = Color(0xFFC62828);
-  static const Color _invRedBg = Color(0xFFFDECEA);
-  static const Color _invGreenText = Color(0xFF2E7D32);
-  static const Color _invGreenBg = Color(0xFFE8F5E9);
-  static const Color _invGreenBorder = Color(0xFFA5D6A7);
-  static const Color _invHairline = Color(0xFFE2E8F0);
+  Color get _invAccent => context.colors.accentFg;
+  Color get _invLink => context.colors.link;
+  Color get _invPageBg => context.colors.pageBg;
+  Color get _invTextMain => context.colors.textMain;
+  Color get _invTextSecondary => context.colors.textSecondary;
+  Color get _invTextFaded => context.colors.textFaded;
+  Color get _invTint => context.colors.accentTint;
+  Color get _invRedText => context.colors.danger;
+  Color get _invRedBg => context.colors.dangerBg;
+  Color get _invGreenText => context.colors.success;
+  Color get _invGreenBg => context.colors.successBg;
+  Color get _invGreenBorder => context.colors.successBorder;
+  Color get _invHairline => context.colors.hairline;
   static const String _invRecentsPrefsKey = 'inv_recent_locations';
 
   @override
@@ -704,7 +705,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
             padding: EdgeInsets.zero,
             splashRadius: 20,
-            icon: const Icon(Icons.check, color: Color(0xFF1A237E)),
+            icon: Icon(Icons.check, color: context.colors.accentFg),
           ),
         buildInputClearButton(
           visible: true,
@@ -766,7 +767,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           const SizedBox(height: 8),
           Text(
             StringLookup.t(appLoc, 'kirimNewScanBoxFirst'),
-            style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+            style: TextStyle(fontSize: 13, color: context.colors.textSecondary),
           ),
         ],
         const SizedBox(height: 12),
@@ -779,7 +780,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             unitsPerBox?.toString() ?? '—',
             style: TextStyle(
               fontSize: 16,
-              color: unitsPerBox != null ? null : Colors.grey.shade600,
+              color: unitsPerBox != null ? null : context.colors.textFaded,
             ),
           ),
         ),
@@ -1740,7 +1741,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             padding: const EdgeInsets.symmetric(vertical: 10),
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: active ? _invAccent : Colors.transparent,
+              color: active ? context.colors.accent : Colors.transparent,
               borderRadius: BorderRadius.circular(9),
             ),
             child: Text(
@@ -1759,7 +1760,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _invHairline),
       ),
@@ -1799,9 +1800,9 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
 
   BoxDecoration _invCardDecoration({Color? borderColor}) {
     return BoxDecoration(
-      color: Colors.white,
+      color: context.colors.surface,
       borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: borderColor ?? Colors.black.withValues(alpha: .05)),
+      border: Border.all(color: borderColor ?? context.colors.hairline),
       boxShadow: <BoxShadow>[
         BoxShadow(
           color: Colors.black.withValues(alpha: .05),
@@ -1833,15 +1834,15 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                   color: _invAccent.withValues(alpha: .10),
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: const Icon(Icons.qr_code_scanner, size: 32, color: _invAccent),
+                child: Icon(Icons.qr_code_scanner, size: 32, color: _invAccent),
               ),
               const SizedBox(height: 14),
-              const Text(
+              Text(
                 'Skanerlashdan boshlang',
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: _invTextMain),
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 "Bo'lim tanlash shart emas — tizim kodni o'zi aniqlaydi",
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 13, color: _invTextSecondary),
@@ -1852,7 +1853,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                 height: 52,
                 child: FilledButton.icon(
                   style: FilledButton.styleFrom(
-                    backgroundColor: _invAccent,
+                    backgroundColor: context.colors.accent,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
                   ),
                   onPressed: _invResolving ? null : _openInventoryScanner,
@@ -1864,7 +1865,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                 ),
               ),
               const SizedBox(height: 14),
-              const Row(
+              Row(
                 children: <Widget>[
                   Expanded(child: Divider(color: _invHairline)),
                   Padding(
@@ -1883,18 +1884,18 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                 child: TextField(
                   controller: _invManualInput,
                   textCapitalization: TextCapitalization.characters,
-                  style: const TextStyle(fontSize: 15, color: _invTextMain),
+                  style: TextStyle(fontSize: 15, color: _invTextMain),
                   decoration: InputDecoration(
                     hintText: 'Lokatsiya kodi yoki barkod',
-                    hintStyle: const TextStyle(fontSize: 14, color: _invTextFaded),
+                    hintStyle: TextStyle(fontSize: 14, color: _invTextFaded),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: _invHairline, width: 1.5),
+                      borderSide: BorderSide(color: _invHairline, width: 1.5),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: _invAccent, width: 1.5),
+                      borderSide: BorderSide(color: _invAccent, width: 1.5),
                     ),
                     suffixIcon: _invResolving
                         ? const Padding(
@@ -1906,7 +1907,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                             ),
                           )
                         : IconButton(
-                            icon: const Icon(Icons.arrow_forward, color: _invAccent),
+                            icon: Icon(Icons.arrow_forward, color: _invAccent),
                             onPressed: () => unawaited(_invHandleCode(_invManualInput.text)),
                           ),
                   ),
@@ -1935,7 +1936,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         ),
         if (_invRecentLocations.isNotEmpty) ...<Widget>[
           const SizedBox(height: 20),
-          const Text(
+          Text(
             'Oxirgi lokatsiyalar',
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _invTextSecondary),
           ),
@@ -1945,7 +1946,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             runSpacing: 8,
             children: _invRecentLocations.map((String code) {
               return Material(
-                color: Colors.white,
+                color: context.colors.surface,
                 borderRadius: BorderRadius.circular(20),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(20),
@@ -1958,7 +1959,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                     ),
                     child: Text(
                       code,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: _invTextMain,
@@ -1991,7 +1992,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
         child: Text(
           text,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w800,
             color: _invTextFaded,
@@ -2005,7 +2006,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       margin: const EdgeInsets.only(top: 8),
       constraints: const BoxConstraints(maxHeight: 280),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _invHairline),
       ),
@@ -2018,10 +2019,10 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             return ListTile(
               dense: true,
               visualDensity: VisualDensity.compact,
-              leading: const Icon(Icons.location_on_outlined, size: 20, color: _invAccent),
+              leading: Icon(Icons.location_on_outlined, size: 20, color: _invAccent),
               title: Text(
                 l.code,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                   color: _invTextMain,
@@ -2032,7 +2033,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                       l.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12, color: _invTextSecondary),
+                      style: TextStyle(fontSize: 12, color: _invTextSecondary),
                     )
                   : null,
               onTap: () => _invOpenLocation(l),
@@ -2052,12 +2053,12 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             return ListTile(
               dense: true,
               visualDensity: VisualDensity.compact,
-              leading: const Icon(Icons.inventory_2_outlined, size: 20, color: _invAccent),
+              leading: Icon(Icons.inventory_2_outlined, size: 20, color: _invAccent),
               title: Text(
                 i.name,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: _invTextMain),
+                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: _invTextMain),
               ),
               subtitle: meta.isEmpty
                   ? null
@@ -2065,7 +2066,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                       meta,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12, color: _invTextSecondary),
+                      style: TextStyle(fontSize: 12, color: _invTextSecondary),
                     ),
               onTap: () => _invOpenProduct(i.productId),
             );
@@ -2100,7 +2101,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(fontSize: 12.5, color: _invTextSecondary),
+            style: TextStyle(fontSize: 12.5, color: _invTextSecondary),
           ),
         ),
       ],
@@ -2154,7 +2155,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           ),
           child: Row(
             children: <Widget>[
-              const Icon(Icons.location_on_outlined, size: 22, color: _invAccent),
+              Icon(Icons.location_on_outlined, size: 22, color: _invAccent),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -2162,7 +2163,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                   children: <Widget>[
                     Text(
                       _invLocation?.code ?? '—',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
                         color: _invAccent,
@@ -2170,7 +2171,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                     ),
                     Text(
                       '$_invWarehouseLabel · ${items.length} mahsulot',
-                      style: const TextStyle(fontSize: 12, color: _invTextSecondary),
+                      style: TextStyle(fontSize: 12, color: _invTextSecondary),
                     ),
                   ],
                 ),
@@ -2178,7 +2179,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
               InkWell(
                 borderRadius: BorderRadius.circular(8),
                 onTap: _invResetToIdle,
-                child: const Padding(
+                child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                   child: Text(
                     'Almashtirish',
@@ -2192,9 +2193,9 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         const SizedBox(height: 14),
         if (_invLoadingContents) const LinearProgressIndicator(),
         if (_invContentsError != null)
-          Text(_invContentsError!, style: const TextStyle(color: _invRedText)),
+          Text(_invContentsError!, style: TextStyle(color: _invRedText)),
         if (!_invLoadingContents && contents != null && items.isEmpty)
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(vertical: 24),
             child: Center(
               child: Text(
@@ -2232,7 +2233,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         children: <Widget>[
           Text(
             item.productName,
-            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: _invTextMain),
+            style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: _invTextMain),
           ),
           const SizedBox(height: 3),
           Row(
@@ -2240,7 +2241,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
               Expanded(
                 child: Text(
                   _invContentsItemMetaLine(item),
-                  style: const TextStyle(fontSize: 12, color: _invTextSecondary),
+                  style: TextStyle(fontSize: 12, color: _invTextSecondary),
                 ),
               ),
               InkWell(
@@ -2250,7 +2251,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
                   child: Text(
                     boxOpen ? "Karobka sanog'i ▲" : "Karobka sanog'i ▼",
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _invLink),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _invLink),
                   ),
                 ),
               ),
@@ -2262,12 +2263,12 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
               Expanded(
                 child: RichText(
                   text: TextSpan(
-                    style: const TextStyle(fontSize: 13, color: _invTextSecondary),
+                    style: TextStyle(fontSize: 13, color: _invTextSecondary),
                     children: <InlineSpan>[
                       const TextSpan(text: 'Tizimda: '),
                       TextSpan(
                         text: '$systemQty',
-                        style: const TextStyle(fontWeight: FontWeight.w800, color: _invTextMain),
+                        style: TextStyle(fontWeight: FontWeight.w800, color: _invTextMain),
                       ),
                     ],
                   ),
@@ -2280,7 +2281,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           ),
           if (boxOpen) ...<Widget>[
             const SizedBox(height: 10),
-            const Divider(height: 1, color: _invHairline),
+            Divider(height: 1, color: _invHairline),
             const SizedBox(height: 10),
             InventorySimpleBoxPanel(
               key: ValueKey<String>('inv-box-$key'),
@@ -2316,7 +2317,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             height: 40,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: context.colors.surfaceAlt,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, size: 18, color: _invTextMain),
@@ -2341,13 +2342,13 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
               textAlign: TextAlign.center,
               keyboardType: kStockQtyKeyboardType,
               inputFormatters: kStockQtyInputFormatters,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
                 color: _invTextMain,
                 fontFeatures: <FontFeature>[FontFeature.tabularFigures()],
               ),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 isDense: true,
                 border: InputBorder.none,
                 hintText: '—',
@@ -2370,7 +2371,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     if (diff == null) {
       text = '·';
       fg = _invTextFaded;
-      bg = const Color(0xFFF1F5F9);
+      bg = context.colors.surfaceAlt;
     } else if (diff == 0) {
       text = '✓';
       fg = _invGreenText;
@@ -2413,8 +2414,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     }
     final String diffLabel = totalDiff > 0 ? '+$totalDiff' : '$totalDiff';
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(
+        color: context.colors.surface,
         border: Border(top: BorderSide(color: _invHairline)),
       ),
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
@@ -2426,7 +2427,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           children: <Widget>[
             Text(
               'Sanaldi: $entered/${items.length} · Farq: $diffLabel',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 color: _invTextSecondary,
@@ -2437,7 +2438,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
               height: 50,
               child: FilledButton(
                 style: FilledButton.styleFrom(
-                  backgroundColor: _invAccent,
+                  backgroundColor: context.colors.accent,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 onPressed: entered == 0 || _invSubmitting
@@ -2471,7 +2472,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       children: <Widget>[
         if (_loadingProduct) const LinearProgressIndicator(),
         if (_productError != null)
-          Text(_productError!, style: const TextStyle(color: _invRedText)),
+          Text(_productError!, style: TextStyle(color: _invRedText)),
         if (p != null && !_loadingProduct) ...<Widget>[
           Container(
             decoration: _invCardDecoration(),
@@ -2485,7 +2486,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                     color: _invTint,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.inventory_2_outlined, color: _invAccent),
+                  child: Icon(Icons.inventory_2_outlined, color: _invAccent),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -2496,7 +2497,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                         p.name,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w700,
                           color: _invTextMain,
@@ -2517,10 +2518,10 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: <Widget>[
-                    const Text('Jami', style: TextStyle(fontSize: 11, color: _invTextFaded)),
+                    Text('Jami', style: TextStyle(fontSize: 11, color: _invTextFaded)),
                     Text(
                       '${p.locations.fold<double>(0, (double s, PickerProductLocation l) => s + l.availableQty).round()}',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _invAccent),
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _invAccent),
                     ),
                   ],
                 ),
@@ -2528,13 +2529,13 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          const Text(
+          Text(
             'Tuzatish uchun joyni tanlang',
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _invTextSecondary),
           ),
           const SizedBox(height: 8),
           if (p.locations.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(vertical: 16),
               child: Text('Qoldiq topilmadi', style: TextStyle(color: _invTextSecondary)),
             )
@@ -2544,7 +2545,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           Center(
             child: TextButton(
               onPressed: _invResetToIdle,
-              child: const Text(
+              child: Text(
                 'Boshqa mahsulot skanerlash',
                 style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: _invLink),
               ),
@@ -2576,7 +2577,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
               child: Row(
                 children: <Widget>[
-                  const Icon(Icons.location_on_outlined, size: 20, color: _invAccent),
+                  Icon(Icons.location_on_outlined, size: 20, color: _invAccent),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(
@@ -2584,7 +2585,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                       children: <Widget>[
                         Text(
                           group.locationCode,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14.5,
                             fontWeight: FontWeight.w700,
                             color: _invTextMain,
@@ -2598,7 +2599,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                             if (group.boxCount > 0)
                               'Karobka: ${group.boxCount} (${group.unitsInBoxes} dona)',
                           ].join(' · '),
-                          style: const TextStyle(fontSize: 12, color: _invTextSecondary),
+                          style: TextStyle(fontSize: 12, color: _invTextSecondary),
                         ),
                       ],
                     ),
@@ -2612,7 +2613,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             ),
           ),
           if (selected) ...<Widget>[
-            const Divider(height: 1, color: _invHairline),
+            Divider(height: 1, color: _invHairline),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
               child: InventorySimpleBoxPanel(
@@ -2921,7 +2922,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
                   if (_product!.locations.isEmpty) ...<Widget>[
                     Text(
                       StringLookup.t(appLoc, 'returnsNoStockInWarehouse'),
-                      style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                      style: TextStyle(fontSize: 13, color: context.colors.textSecondary),
                     ),
                     const SizedBox(height: 12),
                   ],

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/config/brand.dart';
+import 'core/theme/app_colors.dart';
 import 'core/app_state/locale_controller.dart';
 import 'core/app_state/network_status_provider.dart';
 import 'core/app_state/theme_controller.dart';
@@ -135,11 +136,13 @@ class _MobileFlutterAppState extends ConsumerState<MobileFlutterApp> {
         themeMode: themeMode,
         theme: ThemeData(
           useMaterial3: true,
+          extensions: const <ThemeExtension<dynamic>>[AppColors.light],
           colorScheme: ColorScheme.fromSeed(seedColor: _accent, brightness: Brightness.light),
         ),
         darkTheme: ThemeData(
           useMaterial3: true,
           brightness: Brightness.dark,
+          extensions: const <ThemeExtension<dynamic>>[AppColors.dark],
         ),
         home: Scaffold(
           body: Center(
@@ -174,6 +177,7 @@ class _MobileFlutterAppState extends ConsumerState<MobileFlutterApp> {
       ],
       theme: ThemeData(
         useMaterial3: true,
+        extensions: const <ThemeExtension<dynamic>>[AppColors.light],
         colorScheme: ColorScheme.fromSeed(seedColor: _accent, brightness: Brightness.light),
         scaffoldBackgroundColor: const Color(0xFFF5F5F5),
         appBarTheme: const AppBarTheme(
@@ -199,6 +203,7 @@ class _MobileFlutterAppState extends ConsumerState<MobileFlutterApp> {
       darkTheme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
+        extensions: const <ThemeExtension<dynamic>>[AppColors.dark],
         scaffoldBackgroundColor: const Color(0xFF0F172A),
         colorScheme: ColorScheme.dark(
           primary: const Color(0xFF93C5FD),

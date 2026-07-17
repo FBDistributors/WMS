@@ -1,6 +1,7 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -288,16 +289,16 @@ class _ReturnItemsScreenState extends ConsumerState<ReturnItemsScreen> {
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: Colors.grey.shade700,
+                          color: context.colors.textSecondary,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         nextLine.expectedLocationCode,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF1A237E),
+                          color: context.colors.accentFg,
                         ),
                       ),
                       const SizedBox(height: 4),

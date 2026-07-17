@@ -2,6 +2,7 @@ import 'dart:async' show unawaited;
 import 'dart:math' show max, min;
 
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
 
 import '../../core/app_state/app_locale.dart';
 import '../../features/picking/data/picking_models.dart';
@@ -98,7 +99,7 @@ class PickBoxQtyFields extends StatelessWidget {
               upb?.toString() ?? '—',
               style: TextStyle(
                 fontSize: 16,
-                color: upb != null ? null : Colors.grey.shade600,
+                color: upb != null ? null : context.colors.textFaded,
               ),
             ),
           ),
@@ -935,7 +936,7 @@ class PickHybridQtyFields extends StatelessWidget {
           if (hintKey != null) ...<Widget>[
             Text(
               StringLookup.t(loc, hintKey),
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+              style: TextStyle(fontSize: 12, color: context.colors.textSecondary),
             ),
             const SizedBox(height: 12),
           ],

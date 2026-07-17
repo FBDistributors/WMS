@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -35,7 +36,7 @@ class KirimNewScreen extends ConsumerWidget {
     return Card(
       clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
-        leading: Icon(leadingIcon, color: const Color(0xFF1A237E)),
+        leading: Icon(leadingIcon, color: context.colors.accentFg),
         title: Text(title),
         children: <Widget>[
           Padding(

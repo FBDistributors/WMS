@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -127,7 +128,7 @@ class _KirimHubScreenState extends ConsumerState<KirimHubScreen> {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
-        leading: Icon(icon, color: const Color(0xFF1A237E)),
+        leading: Icon(icon, color: context.colors.accentFg),
         title: Text(title),
         subtitle: Text(subtitle),
         trailing: Row(

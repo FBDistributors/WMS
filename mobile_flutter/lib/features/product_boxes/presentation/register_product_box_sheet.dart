@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -118,7 +119,7 @@ class _RegisterProductBoxSheetState extends ConsumerState<RegisterProductBoxShee
             widget.productName,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: Colors.grey.shade700),
+            style: TextStyle(color: context.colors.textSecondary),
           ),
           const SizedBox(height: 16),
           Row(
