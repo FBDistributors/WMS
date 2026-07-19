@@ -41,7 +41,12 @@ type StaffProTableProps = {
   t: (key: string, opts?: Record<string, unknown>) => string
 }
 
-const GRID_COLS = '176px 44px 44px 54px 44px 44px 54px 1fr 92px 82px'
+// XODIM cho'ziladi (ism to'liq ko'rinsin), JAMI DONA chizig'i qat'iy va qisqa.
+const GRID_COLS =
+  'minmax(210px,1fr) 50px 52px 68px 50px 52px 68px 158px 100px 88px'
+
+/** Guruhlar (Shahar / Region / Jami) orasidagi vertikal ajratuvchi. */
+const SEP = 'border-l border-slate-200 pl-3 dark:border-slate-700'
 
 function fmtQty(n: number): string {
   return Math.round(n).toLocaleString('en-US').replace(/,/g, ' ')
@@ -169,17 +174,23 @@ export function StaffProTable({
 
       {/* 3. Jadval */}
       <div className="overflow-x-auto">
-        <div className="min-w-[880px]">
+        <div className="min-w-[1000px]">
           {/* Header — guruh qatori (SHAHAR / REGION 3 tadan ustun) */}
           <div className="grid items-end gap-3" style={{ gridTemplateColumns: GRID_COLS }}>
             <div className={headCls}>{t('admin:dashboard.pro.col_staff')}</div>
-            <div className={`${headCls} text-center`} style={{ gridColumn: 'span 3' }}>
+            <div
+              className={`${headCls} ${SEP} rounded-t-md bg-slate-50 py-1 text-center dark:bg-slate-800/60`}
+              style={{ gridColumn: 'span 3' }}
+            >
               {t('admin:dashboard.pro.col_shahar')}
             </div>
-            <div className={`${headCls} text-center`} style={{ gridColumn: 'span 3' }}>
+            <div
+              className={`${headCls} ${SEP} rounded-t-md bg-slate-50 py-1 text-center dark:bg-slate-800/60`}
+              style={{ gridColumn: 'span 3' }}
+            >
               {t('admin:dashboard.pro.col_region')}
             </div>
-            <div className={headCls}>{t('admin:dashboard.pro.col_qty')}</div>
+            <div className={`${headCls} ${SEP}`}>{t('admin:dashboard.pro.col_qty')}</div>
             <div className={`${headCls} text-right`}>{t('admin:dashboard.pro.col_productivity')}</div>
             <div className={`${headCls} text-right`}>{t('admin:dashboard.pro.col_median')}</div>
           </div>
@@ -189,13 +200,13 @@ export function StaffProTable({
             style={{ gridTemplateColumns: GRID_COLS }}
           >
             <div />
-            <div className={subCls}>{t('admin:dashboard.pro.hdr_orders')}</div>
+            <div className={`${subCls} ${SEP}`}>{t('admin:dashboard.pro.hdr_orders')}</div>
             <div className={subCls}>{t('admin:dashboard.pro.hdr_positions')}</div>
             <div className={subCls}>{t('admin:dashboard.pro.hdr_units')}</div>
-            <div className={subCls}>{t('admin:dashboard.pro.hdr_orders')}</div>
+            <div className={`${subCls} ${SEP}`}>{t('admin:dashboard.pro.hdr_orders')}</div>
             <div className={subCls}>{t('admin:dashboard.pro.hdr_positions')}</div>
             <div className={subCls}>{t('admin:dashboard.pro.hdr_units')}</div>
-            <div />
+            <div className={SEP} />
             <div />
             <div />
           </div>
@@ -237,19 +248,19 @@ export function StaffProTable({
                     </span>
                   </div>
                   {/* SHAHAR: buy / poz / dona */}
-                  <div className={numCls}>{cell(row.shahar_orders)}</div>
+                  <div className={`${numCls} ${SEP}`}>{cell(row.shahar_orders)}</div>
                   <div className={numCls}>{cell(row.shahar_positions)}</div>
                   <div className={`${numCls} !text-slate-900 dark:!text-slate-100`}>
                     {cell(row.shahar_qty)}
                   </div>
                   {/* REGION: buy / poz / dona */}
-                  <div className={numCls}>{cell(row.region_orders)}</div>
+                  <div className={`${numCls} ${SEP}`}>{cell(row.region_orders)}</div>
                   <div className={numCls}>{cell(row.region_positions)}</div>
                   <div className={`${numCls} !text-slate-900 dark:!text-slate-100`}>
                     {cell(row.region_qty)}
                   </div>
                   {/* JAMI DONA — progress + qiymat */}
-                  <div className="flex items-center gap-2.5">
+                  <div className={`flex items-center gap-2.5 ${SEP}`}>
                     <div className="h-[7px] min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                       <div
                         className="h-full rounded-full"
