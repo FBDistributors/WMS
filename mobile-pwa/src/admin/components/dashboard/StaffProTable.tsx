@@ -111,10 +111,17 @@ export function StaffProTable({
   }
 
   const headCls =
-    'text-[10.5px] font-extrabold uppercase tracking-[0.05em] text-slate-400 dark:text-slate-500'
+    'text-[10.5px] font-extrabold uppercase tracking-[0.05em] text-slate-500 dark:text-slate-400'
   const subCls =
-    'text-[9px] font-bold uppercase tracking-[0.04em] text-slate-300 dark:text-slate-600 text-right'
+    'text-[9.5px] font-bold uppercase tracking-[0.04em] text-slate-400 dark:text-slate-500 text-right'
   const numCls = 'wms-num text-right text-[12.5px] font-bold text-slate-600 dark:text-slate-300'
+  // Guruh sarlavhasi (SHAHAR / REGION) — rol rangida, aniq ko'rinadigan.
+  // headCls bilan qo'shilmaydi: ikkovi ham text-* bersa Tailwind'da ustunlik noaniq.
+  const groupHeadCls =
+    'rounded-md py-[3px] text-center text-[10.5px] font-extrabold uppercase tracking-[0.05em] ' +
+    (role === 'picker'
+      ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300'
+      : 'bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300')
 
   return (
     <div className="rounded-[20px] border border-slate-200 bg-white p-[22px] dark:border-slate-800 dark:bg-slate-900">
@@ -178,16 +185,10 @@ export function StaffProTable({
           {/* Header — guruh qatori (SHAHAR / REGION 3 tadan ustun) */}
           <div className="grid items-end gap-3" style={{ gridTemplateColumns: GRID_COLS }}>
             <div className={headCls}>{t('admin:dashboard.pro.col_staff')}</div>
-            <div
-              className={`${headCls} ${SEP} rounded-t-md bg-slate-50 py-1 text-center dark:bg-slate-800/60`}
-              style={{ gridColumn: 'span 3' }}
-            >
+            <div className={groupHeadCls} style={{ gridColumn: 'span 3' }}>
               {t('admin:dashboard.pro.col_shahar')}
             </div>
-            <div
-              className={`${headCls} ${SEP} rounded-t-md bg-slate-50 py-1 text-center dark:bg-slate-800/60`}
-              style={{ gridColumn: 'span 3' }}
-            >
+            <div className={groupHeadCls} style={{ gridColumn: 'span 3' }}>
               {t('admin:dashboard.pro.col_region')}
             </div>
             <div className={`${headCls} ${SEP}`}>{t('admin:dashboard.pro.col_qty')}</div>
