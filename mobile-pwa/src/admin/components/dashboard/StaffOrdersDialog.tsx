@@ -18,7 +18,8 @@ export type StaffSelection = {
   userId: string
   name: string
   role: StaffRole
-  group: StaffGroup
+  /** Bo'sh — hamma manba (shahar + region). */
+  group?: StaffGroup
 }
 
 type StaffOrdersDialogProps = {

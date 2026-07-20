@@ -496,6 +496,13 @@ def test_staff_stats_group_shahar_vs_region(client, db_session):
         items = so.json()["items"]
         assert len(items) == 1
         assert items[0]["order_number"] == "D1"
+
+        # group'siz (dashboard jadvalida ismga bosilganda) -> hamma manba.
+        so_all = client.get("/api/v1/dashboard/staff-orders",
+                            params={"user_id": str(p.id), "role": "picker"})
+        assert so_all.status_code == 200, so_all.text
+        all_numbers = {i["order_number"] for i in so_all.json()["items"]}
+        assert all_numbers == {"S1", "O1", "D1"}
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 

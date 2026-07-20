@@ -15,6 +15,10 @@ import {
 import * as XLSX from 'xlsx'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import {
+  StaffOrdersDialog,
+  type StaffSelection,
+} from '../../admin/components/dashboard/StaffOrdersDialog'
 import { StaffProTable, type StaffProRow } from '../../admin/components/dashboard/StaffProTable'
 import { Button } from '../../components/ui/button'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -416,6 +420,7 @@ export function DashboardPage() {
   const [pickingStatsUnavailable, setPickingStatsUnavailable] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [stuckRowsCount, setStuckRowsCount] = useState(0)
+  const [selectedStaff, setSelectedStaff] = useState<StaffSelection | null>(null)
   const [regionPickerRows, setRegionPickerRows] = useState<PickingStaffStatsRow[]>([])
   const [regionControllerRows, setRegionControllerRows] = useState<PickingStaffStatsRow[]>([])
   const [timingPickers, setTimingPickers] = useState<StaffTimingPickerRow[]>([])
@@ -830,6 +835,9 @@ export function DashboardPage() {
               exportDisabled={isLoading || isExporting || pickerProRows.length === 0}
               isExporting={isExporting}
               emptyLabel={t('admin:dashboard.staff_stats_empty')}
+              onRowClick={(row) =>
+                setSelectedStaff({ userId: row.user_id, name: row.full_name, role: 'picker' })
+              }
               t={t}
             />
             <StaffProTable
@@ -849,11 +857,21 @@ export function DashboardPage() {
               exportDisabled={isLoading || isExporting || controllerProRows.length === 0}
               isExporting={isExporting}
               emptyLabel={t('admin:dashboard.staff_stats_empty')}
+              onRowClick={(row) =>
+                setSelectedStaff({ userId: row.user_id, name: row.full_name, role: 'controller' })
+              }
               t={t}
             />
           </div>
         </div>
       )}
+
+      <StaffOrdersDialog
+        staff={selectedStaff}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onClose={() => setSelectedStaff(null)}
+      />
     </AdminLayout>
   )
 }

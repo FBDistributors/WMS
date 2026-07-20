@@ -38,6 +38,8 @@ type StaffProTableProps = {
   exportDisabled: boolean
   isExporting: boolean
   emptyLabel: string
+  /** Xodim ismiga bosilganda — uning buyurtmalari ro'yxati. */
+  onRowClick?: (row: StaffProRow) => void
   t: (key: string, opts?: Record<string, unknown>) => string
 }
 
@@ -82,6 +84,7 @@ export function StaffProTable({
   exportDisabled,
   isExporting,
   emptyLabel,
+  onRowClick,
   t,
 }: StaffProTableProps) {
   const durUnits = {
@@ -246,9 +249,20 @@ export function StaffProTable({
                     >
                       {nameInitials(row.full_name)}
                     </span>
-                    <span className="truncate text-[13px] font-bold text-slate-900 dark:text-slate-100">
-                      {row.full_name}
-                    </span>
+                    {onRowClick ? (
+                      <button
+                        type="button"
+                        onClick={() => onRowClick(row)}
+                        title={row.full_name}
+                        className="truncate text-left text-[13px] font-bold text-slate-900 underline-offset-2 hover:text-blue-700 hover:underline dark:text-slate-100 dark:hover:text-blue-300"
+                      >
+                        {row.full_name}
+                      </button>
+                    ) : (
+                      <span className="truncate text-[13px] font-bold text-slate-900 dark:text-slate-100">
+                        {row.full_name}
+                      </span>
+                    )}
                   </div>
                   {/* SHAHAR: buy / poz / dona */}
                   <div className={`${numCls} ${SEP}`}>{cell(row.shahar_orders)}</div>
