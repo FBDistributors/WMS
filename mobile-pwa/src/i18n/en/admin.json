@@ -255,6 +255,7 @@
       "col_staff": "Staff",
       "col_shahar": "City",
       "col_region": "Region",
+      "col_total": "Total",
       "col_qty": "Total units",
       "col_productivity": "Productivity",
       "col_median": "Median",
