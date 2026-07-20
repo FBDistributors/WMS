@@ -150,3 +150,85 @@ def test_plain_line_without_margin_does_not_allocate_from_expired(
     detail = res.json().get("detail")
     assert isinstance(detail, dict)
     assert detail.get("code") == "INSUFFICIENT_STOCK"
+
+
+def _pick(client: TestClient, picker, line_id, delta: int):
+    app.dependency_overrides[get_current_user] = lambda: picker
+    try:
+        return client.post(
+            f"/api/v1/picking/lines/{line_id}/pick",
+            json={"delta": delta, "request_id": str(uuid.uuid4())},
+        )
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def _real_line(db: Session, doc_id: uuid.UUID) -> DocumentLine:
+    return (
+        db.query(DocumentLine)
+        .join(Document, DocumentLine.document_id == Document.id)
+        .filter(Document.id == doc_id, DocumentLine.is_vip_expiry_informational.is_(False))
+        .first()
+    )
+
+
+def test_picker_can_pick_action_margin_line_from_expired_zone(
+    client: TestClient, db_session: Session
+) -> None:
+    """EXPIRED'dan ajratilgan chegirmali qator terilishi ham kerak (uchidan-uchiga)."""
+    admin = _mk_admin(db_session)
+    picker = _mk_picker(db_session)
+    product, exp_loc = _seed_product_with_expired_zone_stock(
+        db_session, sku=f"SKU-EP-{uuid.uuid4().hex[:6]}", qty=Decimal("20")
+    )
+    order = _order_imported(
+        db_session,
+        lines=[
+            OrderLine(
+                sku=product.sku,
+                name="Chegirmali mahsulot",
+                qty=3.0,
+                uom="dona",
+                line_source="product",
+                raw_json={"action_margins": [{"margin_value": "-50"}]},
+            )
+        ],
+    )
+    res = _send_to_picking(client, admin, picker, order)
+    assert res.status_code == 200
+    line = _real_line(db_session, uuid.UUID(res.json()["pick_task_id"]))
+    assert line.location_id == exp_loc.id
+
+    picked = _pick(client, picker, line.id, 3)
+    assert picked.status_code == 200, picked.text
+    assert picked.json()["line"]["qty_picked"] == 3.0
+
+
+def test_pick_still_blocked_for_damaged_zone(client: TestClient, db_session: Session) -> None:
+    """EXPIRED ochilgani DAMAGED/QUARANTINE ni ochib yubormasligi kerak."""
+    admin = _mk_admin(db_session)
+    picker = _mk_picker(db_session)
+    product, exp_loc = _seed_product_with_expired_zone_stock(
+        db_session, sku=f"SKU-DM-{uuid.uuid4().hex[:6]}", qty=Decimal("20")
+    )
+    order = _order_imported(
+        db_session,
+        lines=[
+            OrderLine(
+                sku=product.sku, name="Chegirmali", qty=2.0, uom="dona",
+                line_source="product",
+                raw_json={"action_margins": [{"margin_value": "-50"}]},
+            )
+        ],
+    )
+    res = _send_to_picking(client, admin, picker, order)
+    assert res.status_code == 200
+    line = _real_line(db_session, uuid.UUID(res.json()["pick_task_id"]))
+
+    # Joyni DAMAGED ga o'zgartiramiz — terish rad etilishi shart.
+    exp_loc.zone_type = "DAMAGED"
+    db_session.commit()
+
+    blocked = _pick(client, picker, line.id, 2)
+    assert blocked.status_code == 400
+    assert "NORMAL" in blocked.json()["detail"]

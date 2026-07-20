@@ -362,6 +362,23 @@ class MyPickerStatsResponse(BaseModel):
     by_day: List[MyPickerStatsDay]
 
 
+def _assert_pick_zone_allowed(loc: Optional[LocationModel], *, allow_expired: bool) -> None:
+    """Terish manbasi zonasini tekshiradi.
+
+    NORMAL doim ruxsat. EXPIRED faqat `allow_expired` bo'lganda — chegirmali
+    (action_margins) / promo qatorlar ajratishda ataylab EXPIRED zonadan
+    biriktiriladi (`_allocate_order`), shuning uchun ularni terib bo'lishi kerak.
+    DAMAGED / QUARANTINE hech qachon terilmaydi.
+    """
+    zone = (loc.zone_type if loc else None) or ""
+    allowed = ("NORMAL", "EXPIRED") if allow_expired else ("NORMAL",)
+    if not loc or zone not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail="Pick only from NORMAL zone. Line location is not NORMAL.",
+        )
+
+
 def _line_is_vip_expiry_informational(line: DocumentLineModel) -> bool:
     return bool(getattr(line, "is_vip_expiry_informational", False))
 
@@ -1516,11 +1533,8 @@ async def consolidated_pick(
                     detail="Pick line missing allocation details (product/lot/location). Allocate the order first.",
                 )
             loc = db.query(LocationModel).filter(LocationModel.id == line.location_id).one_or_none()
-            if not loc or loc.zone_type != "NORMAL":
-                raise HTTPException(
-                    status_code=400,
-                    detail="Pick only from NORMAL zone. Line location is not NORMAL.",
-                )
+            # Qator ajratishda biriktirilgan joy — chegirmali qatorda EXPIRED bo'lishi mumkin.
+            _assert_pick_zone_allowed(loc, allow_expired=True)
             assert_location_allowed_for_pick(
                 db,
                 line.location_id,
@@ -1935,8 +1949,17 @@ async def change_pick_source(
         raise HTTPException(status_code=400, detail="Already using this location and lot")
 
     new_loc = db.query(LocationModel).filter(LocationModel.id == payload.location_id).one_or_none()
-    if not new_loc or new_loc.zone_type != "NORMAL":
-        raise HTTPException(status_code=400, detail="Pick only from NORMAL zone")
+    # Chegirmali qator EXPIRED'dan ajratilgan bo'lsa, boshqa EXPIRED joyga ham
+    # o'tishi mumkin; oddiy qator esa faqat NORMAL ichida qoladi.
+    cur_loc = (
+        db.query(LocationModel).filter(LocationModel.id == line.location_id).one_or_none()
+        if line.location_id
+        else None
+    )
+    _assert_pick_zone_allowed(
+        new_loc,
+        allow_expired=bool(cur_loc and cur_loc.zone_type == "EXPIRED"),
+    )
     assert_location_allowed_for_pick(db, payload.location_id, order=document.order)
 
     new_lot = db.query(StockLotModel).filter(StockLotModel.id == payload.lot_id).one_or_none()
@@ -2109,11 +2132,8 @@ def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
             detail="Pick line missing allocation details (product/lot/location). Allocate the order first.",
         )
     loc = db.query(LocationModel).filter(LocationModel.id == line.location_id).one_or_none()
-    if not loc or loc.zone_type != "NORMAL":
-        raise HTTPException(
-            status_code=400,
-            detail="Pick only from NORMAL zone. Line location is not NORMAL.",
-        )
+    # Qator ajratishda biriktirilgan joy — chegirmali qatorda EXPIRED bo'lishi mumkin.
+    _assert_pick_zone_allowed(loc, allow_expired=True)
 
     order_for_pick: Optional[OrderModel] = None
     if document.order_id:
