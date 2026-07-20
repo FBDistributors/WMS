@@ -42,9 +42,9 @@ type StaffProTableProps = {
 }
 
 // XODIM cho'ziladi (ism to'liq ko'rinsin). Uch guruh: Shahar / Region / Jami —
-// har biri Buy · Poz · Dona. Jami dona chizig'i qat'iy kenglikda.
+// har biri Buy · Poz · Dona (faqat sonlar, diagramma yo'q).
 const GRID_COLS =
-  'minmax(190px,1fr) 46px 48px 62px 46px 48px 62px 46px 48px 148px 96px 84px'
+  'minmax(210px,1fr) 46px 48px 62px 46px 48px 62px 46px 50px 72px 96px 84px'
 
 /** Guruhlar (Shahar / Region / Jami) orasidagi vertikal ajratuvchi. */
 const SEP = 'border-l border-slate-200 pl-3 dark:border-slate-700'
@@ -90,8 +90,6 @@ export function StaffProTable({
     s: t('admin:dashboard.timing.s'),
   }
 
-  const maxQty = Math.max(1, ...rows.map((r) => r.total_qty))
-
   const speeds = rows.map((r) => r.units_per_hour).filter((v) => v > 0)
   const avgSpeed = speeds.length ? speeds.reduce((a, b) => a + b, 0) / speeds.length : 0
 
@@ -99,10 +97,6 @@ export function StaffProTable({
     role === 'picker'
       ? { bg: '#eff6ff', fg: '#2563eb' }
       : { bg: '#f5f3ff', fg: '#7c3aed' }
-  const barGradient =
-    role === 'picker'
-      ? 'linear-gradient(90deg, #93c5fd, #2563eb)'
-      : 'linear-gradient(90deg, #c4b5fd, #7c3aed)'
 
   const chipStyle = (uph: number): { bg: string; fg: string } => {
     if (avgSpeed <= 0 || uph <= 0) return { bg: '#f1f5f9', fg: '#64748b' }
@@ -186,7 +180,7 @@ export function StaffProTable({
 
       {/* 3. Jadval */}
       <div className="overflow-x-auto">
-        <div className="min-w-[1100px]">
+        <div className="min-w-[1020px]">
           {/* Header — guruh qatori (SHAHAR / REGION 3 tadan ustun) */}
           <div className="grid items-end gap-3" style={{ gridTemplateColumns: GRID_COLS }}>
             <div className={headCls}>{t('admin:dashboard.pro.col_staff')}</div>
@@ -231,7 +225,6 @@ export function StaffProTable({
             rows.map((row, index) => {
               const rank = index + 1
               const rs = rankStyle(rank)
-              const pct = Math.max(2, Math.round((row.total_qty / maxQty) * 100))
               const chip = chipStyle(row.units_per_hour)
               return (
                 <div
@@ -269,23 +262,15 @@ export function StaffProTable({
                   <div className={`${numCls} !text-slate-900 dark:!text-slate-100`}>
                     {cell(row.region_qty)}
                   </div>
-                  {/* JAMI: buyurtma / pozitsiya / dona (progress + qiymat) */}
+                  {/* JAMI: buyurtma / pozitsiya / dona */}
                   <div className={`${numCls} ${SEP} !text-slate-900 dark:!text-slate-100`}>
                     {cell(row.shahar_orders + row.region_orders)}
                   </div>
                   <div className={`${numCls} !text-slate-900 dark:!text-slate-100`}>
                     {cell(row.shahar_positions + row.region_positions)}
                   </div>
-                  <div className="flex items-center gap-2.5">
-                    <div className="h-[7px] min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                      <div
-                        className="h-full rounded-full"
-                        style={{ width: `${pct}%`, background: barGradient }}
-                      />
-                    </div>
-                    <span className="wms-num shrink-0 text-[13px] font-extrabold text-slate-900 dark:text-slate-100">
-                      {fmtQty(row.total_qty)}
-                    </span>
+                  <div className="wms-num text-right text-[13px] font-extrabold text-slate-900 dark:text-slate-100">
+                    {fmtQty(row.total_qty)}
                   </div>
                   {/* UNUMDORLIK — chip */}
                   <div className="text-right">
