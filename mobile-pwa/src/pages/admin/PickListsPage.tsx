@@ -132,8 +132,12 @@ export function PickListsPage() {
   const canCancelRow = useCallback(
     (item: PickList) => {
       if (archive) {
+        // Backend sharti bilan bir xil: buyurtma ham, hujjat ham `completed`
+        // (packed/shipped da fizik chiqim boshlangan — qaytim yo'q).
         return (
-          Boolean(item.order_id) && (item.order_wms_status ?? '').toLowerCase() === 'completed'
+          Boolean(item.order_id) &&
+          (item.order_wms_status ?? '').toLowerCase() === 'completed' &&
+          (item.document_status ?? '').toLowerCase() === 'completed'
         )
       }
       if (!item.order_id) return true

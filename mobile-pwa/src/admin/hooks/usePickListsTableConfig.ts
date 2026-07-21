@@ -8,7 +8,9 @@ export type PickListsTableConfig = {
 const STORAGE_KEYS: Record<string, string> = {
   active: 'wms_picklists_table_config',
   cancelled: 'wms_picklists_cancelled_table_config_v2',
-  archive: 'wms_picklists_archive_table_config',
+  // _v2: arxivga "Qaytim (bekor)" ustuni qo'shildi. Saqlangan eski konfiguratsiya
+  // ustunni yashirib qo'yardi, shuning uchun kalit yangilandi (default qayta qo'llanadi).
+  archive: 'wms_picklists_archive_table_config_v2',
 }
 
 export const PICKLISTS_COLUMN_IDS = [
@@ -56,6 +58,8 @@ export const DEFAULT_VISIBLE_ARCHIVE: string[] = [
   'controller',
   'last_activity',
   'view',
+  // Arxivda `completed` buyurtmani qaytim bilan bekor qilish uchun.
+  'cancel',
 ]
 
 export const DEFAULT_VISIBLE_CANCELLED: string[] = [
