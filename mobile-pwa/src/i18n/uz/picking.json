@@ -84,6 +84,9 @@
   "cancel_document": "Bekor qilish",
   "cancel_confirm_title": "Hujjatni bekor qilish",
   "cancel_confirm": "{{doc}} hujjatini bekor qilishni xohlaysizmi? Ro'yxatdan o'chiriladi.",
+  "revert_document": "Qaytim (bekor)",
+  "revert_confirm_title": "Buyurtmani qaytim bilan bekor qilish",
+  "revert_confirm": "{{doc}} buyurtmasi bekor qilinadi: yig'uvchiga xabar boradi va u tovarlarni skanerlab joyiga qaytaradi. Qoldiq tiklanadi. Davom etasizmi?",
   "cancel_error": "Bekor qilish amalga oshmadi. Qayta urinib ko'ring.",
   "cancelling": "Bekor qilinmoqda...",
   "status": {

@@ -127,12 +127,21 @@ export function PickListsPage() {
   const nextOffsetRef = useRef(0)
 
   const canCancel = has('documents:edit_status')
-  /** Buyurtmali qator faqat allocated/picking bosqichida bekor qilinadi (backend qoidasi). */
-  const canCancelRow = useCallback((item: PickList) => {
-    if (!item.order_id) return true
-    const wms = (item.order_wms_status ?? '').toLowerCase()
-    return wms === 'allocated' || wms === 'picking'
-  }, [])
+  /** Buyurtmali qator faqat allocated/picking bosqichida bekor qilinadi (backend qoidasi).
+   *  Arxivda esa faqat completed qator qaytim (tovar joyiga qaytariladi) bilan bekor qilinadi. */
+  const canCancelRow = useCallback(
+    (item: PickList) => {
+      if (archive) {
+        return (
+          Boolean(item.order_id) && (item.order_wms_status ?? '').toLowerCase() === 'completed'
+        )
+      }
+      if (!item.order_id) return true
+      const wms = (item.order_wms_status ?? '').toLowerCase()
+      return wms === 'allocated' || wms === 'picking'
+    },
+    [archive]
+  )
   const orderedPickTableColumns = useMemo(() => {
     const rawOrder = tableConfig.columnOrder.filter((id) => PICKLISTS_COLUMN_IDS.includes(id))
     const mergedOrder =
@@ -142,7 +151,7 @@ export function PickListsPage() {
     const visible = new Set(tableConfig.visibleColumns)
     return mergedOrder.filter((id) => {
       if (!visible.has(id)) return false
-      if (id === 'cancel' && (!canCancel || cancelled || archive)) return false
+      if (id === 'cancel' && (!canCancel || cancelled)) return false
       return true
     })
   }, [tableConfig.columnOrder, tableConfig.visibleColumns, cancelled, archive, canCancel])
@@ -659,7 +668,11 @@ export function PickListsPage() {
                 disabled={cancellingId === item.id}
               >
                 <XCircle size={14} className="mr-1" />
-                {cancellingId === item.id ? t('picking:cancelling') : t('picking:cancel_document')}
+                {cancellingId === item.id
+                  ? t('picking:cancelling')
+                  : archive
+                    ? t('picking:revert_document')
+                    : t('picking:cancel_document')}
               </Button>
             </td>
           )
@@ -898,9 +911,13 @@ export function PickListsPage() {
 
         <ConfirmDialog
           open={cancelTarget !== null}
-          title={t('picking:cancel_confirm_title')}
-          message={t('picking:cancel_confirm', { doc: cancelTarget?.document_no ?? '' })}
-          confirmLabel={t('picking:cancel_document')}
+          title={archive ? t('picking:revert_confirm_title') : t('picking:cancel_confirm_title')}
+          message={
+            archive
+              ? t('picking:revert_confirm', { doc: cancelTarget?.document_no ?? '' })
+              : t('picking:cancel_confirm', { doc: cancelTarget?.document_no ?? '' })
+          }
+          confirmLabel={archive ? t('picking:revert_document') : t('picking:cancel_document')}
           cancelLabel={t('common:buttons.cancel')}
           variant="danger"
           loading={cancellingId !== null}

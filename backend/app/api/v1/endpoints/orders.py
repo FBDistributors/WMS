@@ -1357,9 +1357,11 @@ async def update_order_status(
             .filter(DocumentModel.order_id == order.id, DocumentModel.doc_type == "SO")
             .one_or_none()
         )
+        # picking: terish jarayonidagi xavfsiz bekor. completed: arxivdan qaytim —
+        # yig'uvchi tovarni joyiga skanerlab qaytargach buyurtma cancelled bo'ladi.
         if (
             doc_so
-            and old_status == "picking"
+            and old_status in ("picking", "completed")
             and any(float(ln.picked_qty or 0) > 0 for ln in doc_so.lines)
         ):
             _enforce_transition_or_reject(

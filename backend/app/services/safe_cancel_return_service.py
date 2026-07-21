@@ -19,6 +19,7 @@ from app.models.order import Order as OrderModel
 from app.models.order import OrderWmsState as OrderWmsStateModel
 from app.models.product import ProductBarcode
 from app.models.safe_cancel_return import SafeCancelReturnLine, SafeCancelReturnSession
+from app.models.stock import StockMovement as StockMovementModel
 from app.services.order_reserve_release import release_document_reserve_on_cancel
 from app.services.stock_box_gateway import record_pick_rollback
 from app.services.order_transition_policy import require_transition_rule
@@ -130,15 +131,35 @@ def initiate_safe_cancel_return(
         db.refresh(existing, attribute_names=["lines"])
         return existing
 
-    if order.wms_state.status != "picking":
+    order_status = order.wms_state.status
+    if order_status == "picking":
+        # Terish jarayonidagi xavfsiz bekor (asl oqim).
+        if document.status in ("cancelled", "completed", "packed", "shipped", "picked", "cancelling"):
+            raise HTTPException(status_code=409, detail="Hujjat holati bekor qilishga mos emas")
+        if document.controlled_by_user_id is not None:
+            raise HTTPException(status_code=409, detail="Hujjat allaqachon controllerga yuborilgan")
+    elif order_status == "completed":
+        # Arxivdan qaytim: faqat completed (packed/shipped emas — fizik chiqim boshlanadi).
+        if document.status != "completed":
+            raise HTTPException(status_code=409, detail="Hujjat holati bekor qilishga mos emas")
+        shipped = (
+            db.query(StockMovementModel.id)
+            .filter(
+                StockMovementModel.movement_type == "ship",
+                StockMovementModel.source_document_type == "order",
+                StockMovementModel.source_document_id == order.id,
+            )
+            .first()
+        )
+        if shipped:
+            raise HTTPException(
+                status_code=409, detail="Buyurtma jo'natilgan (ship) — qaytim mumkin emas"
+            )
+    else:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Xavfsiz bekor faqat buyurtma `picking` holatida mumkin",
+            detail="Xavfsiz bekor faqat `picking` yoki `completed` holatida mumkin",
         )
-    if document.status in ("cancelled", "completed", "packed", "shipped", "picked", "cancelling"):
-        raise HTTPException(status_code=409, detail="Hujjat holati bekor qilishga mos emas")
-    if document.controlled_by_user_id is not None:
-        raise HTTPException(status_code=409, detail="Hujjat allaqachon controllerga yuborilgan")
     if not document.assigned_to_user_id:
         raise HTTPException(status_code=409, detail="Yig'uvchi tayinlanmagan")
 
