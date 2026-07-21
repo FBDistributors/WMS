@@ -76,20 +76,6 @@ def list_session_lines_ordered(db: Session, session: SafeCancelReturnSession) ->
     return rows
 
 
-def _location_scan_matches(db: Session, expected_location_id: UUID, raw: str) -> bool:
-    scan = _norm_scan(raw)
-    if not scan:
-        return False
-    loc = db.query(LocationModel).filter(LocationModel.id == expected_location_id).one_or_none()
-    if not loc:
-        return False
-    if scan == _norm_scan(loc.code or ""):
-        return True
-    if scan == _norm_scan(loc.barcode_value or ""):
-        return True
-    return False
-
-
 def _product_scan_matches_line(db: Session, line: SafeCancelReturnLine, raw: str) -> bool:
     scan = _norm_scan(raw)
     if not scan:
@@ -206,7 +192,10 @@ def initiate_safe_cancel_return(
                 barcode=(dl.barcode or "").strip() or None,
                 sku=(dl.sku or "").strip() or None,
                 qty_to_return=qty,
-                location_confirmed=False,
+                # Omborda lokatsiya QR kodlari yo'q — joy skanerlanmaydi. Qaytarish
+                # joyi baribir qat'iy: `expected_location_id` (qayerdan terilgan bo'lsa).
+                # Yig'uvchi faqat mahsulotni skanerlaydi.
+                location_confirmed=True,
                 product_confirmed=False,
             )
         )
@@ -235,19 +224,13 @@ def scan_return_location(db: Session, *, session_id: UUID, picker_user_id: UUID,
     if session.status != "returns_pending":
         raise HTTPException(status_code=409, detail="Sessiya allaqachon yopilgan")
 
-    ordered = list_session_lines_ordered(db, session)
-    target: Optional[SafeCancelReturnLine] = next((ln for ln in ordered if not ln.location_confirmed), None)
-    if not target:
-        raise HTTPException(status_code=409, detail="Barcha qatorlar uchun manzil allaqachon tasdiqlangan")
+    """Eski ilova versiyalari uchun no-op.
 
-    if not _location_scan_matches(db, target.expected_location_id, raw):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Manzil mos emas. Avval to'g'ri joyni skanerlang.",
-        )
-
-    target.location_confirmed = True
-    db.flush()
+    Lokatsiya QR kodlari yo'q, shuning uchun joy skanerlanmaydi va qatorlar
+    `location_confirmed=True` bilan yaratiladi. Endpoint saqlanadi (eski build'lar
+    hali chaqiradi), lekin hech narsani o'zgartirmaydi va xato bermaydi.
+    """
+    _ = raw
     return session
 
 
@@ -267,14 +250,15 @@ def scan_return_product(db: Session, *, session_id: UUID, picker_user_id: UUID, 
         raise HTTPException(status_code=409, detail="Sessiya allaqachon yopilgan")
 
     ordered = list_session_lines_ordered(db, session)
+    # Joy skanerlanmaydi (lokatsiya QR kodlari yo'q) — navbatdagi tasdiqlanmagan qator.
     target: Optional[SafeCancelReturnLine] = next(
-        (ln for ln in ordered if ln.location_confirmed and not ln.product_confirmed),
+        (ln for ln in ordered if not ln.product_confirmed),
         None,
     )
     if not target:
         raise HTTPException(
             status_code=409,
-            detail="Avval navbatdagi qator uchun manzilni skanerlang yoki barcha mahsulotlar tasdiqlangan",
+            detail="Barcha mahsulotlar allaqachon tasdiqlangan",
         )
 
     if not _product_scan_matches_line(db, target, raw):
@@ -305,10 +289,10 @@ def finish_safe_cancel_return(db: Session, *, session_id: UUID, picker_user_id: 
 
     ordered = list_session_lines_ordered(db, session)
     for ln in ordered:
-        if not ln.location_confirmed or not ln.product_confirmed:
+        if not ln.product_confirmed:
             raise HTTPException(
                 status_code=409,
-                detail="Barcha qatorlar uchun avval manzil, keyin mahsulot skanerlanishi kerak",
+                detail="Barcha qatorlar uchun mahsulot skanerlanishi kerak",
             )
 
     document = (

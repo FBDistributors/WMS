@@ -106,7 +106,7 @@ class _ReturnItemsScreenState extends ConsumerState<ReturnItemsScreen> {
     }
     SafeCancelReturnLine? next;
     for (final SafeCancelReturnLine l in s.lines) {
-      if (!l.locationConfirmed || !l.productConfirmed) {
+      if (!l.productConfirmed) {
         next = l;
         break;
       }
@@ -116,18 +116,8 @@ class _ReturnItemsScreenState extends ConsumerState<ReturnItemsScreen> {
     }
     setState(() => _busy = true);
     try {
-      // Manzil terimchidan so'ralmaydi: mahsulot qayerdan olingan bo'lsa,
-      // o'sha kutilgan joy avtomatik tasdiqlanadi.
-      if (!next.locationConfirmed) {
-        final SafeCancelReturnSession afterLoc = await ref
-            .read(pickingRepositoryProvider)
-            .scanReturnLocation(s.id, next.expectedLocationCode);
-        if (!mounted) {
-          return;
-        }
-        // Mahsulot skani xato bo'lsa ham manzil tasdig'i lokal holatda saqlanib qolsin.
-        setState(() => _session = afterLoc);
-      }
+      // Manzil skanerlanmaydi (omborda lokatsiya QR kodlari yo'q) — mahsulot
+      // baribir qayerdan olingan bo'lsa o'sha joyga qaytadi. Faqat tovar skani.
       final SafeCancelReturnSession updated =
           await ref.read(pickingRepositoryProvider).scanReturnProduct(s.id, raw);
       if (!mounted) {
@@ -239,7 +229,7 @@ class _ReturnItemsScreenState extends ConsumerState<ReturnItemsScreen> {
     final SafeCancelReturnSession s = _session!;
     final SafeCancelReturnLine? nextLine = () {
       for (final SafeCancelReturnLine l in s.lines) {
-        if (!l.locationConfirmed || !l.productConfirmed) {
+        if (!l.productConfirmed) {
           return l;
         }
       }

@@ -166,3 +166,45 @@ def test_archive_revert_rejected_after_ship(client: TestClient, db_session: Sess
 
     db_session.refresh(order)
     assert order.wms_state.status == "completed"
+
+
+def test_return_finishes_with_product_scan_only(client: TestClient, db_session: Session) -> None:
+    """Omborda lokatsiya QR yo'q: joy skanerlanmaydi, faqat mahsulot skani yetarli."""
+    order, picker = _seed_allocatable_order(db_session)
+    doc_id = _complete_order_via_controller(client, db_session, order, picker)
+    lot_id, loc_id = _lot_loc_from_order_allocate(db_session, order.id)
+
+    admin = _mk_user(db_session, username=f"adm-po-{uuid.uuid4().hex[:8]}", role="warehouse_admin")
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        assert client.patch(
+            f"/api/v1/orders/{order.id}/status", json={"status": "cancelled"}
+        ).status_code == 200
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    app.dependency_overrides[get_current_user] = lambda: picker
+    try:
+        mine = client.get("/api/v1/picking/return-session/mine")
+        session_id = UUID(mine.json()["id"])
+        # Qatorlar joy tasdig'i bilan yaratiladi — skanerlash shart emas.
+        assert all(ln["location_confirmed"] for ln in mine.json()["lines"])
+
+        # FAQAT mahsulot skani (scan-location umuman chaqirilmaydi).
+        for sl in mine.json()["lines"]:
+            r = client.post(
+                f"/api/v1/picking/return-session/{session_id}/scan-product",
+                json={"raw": sl.get("barcode") or sl.get("sku") or ""},
+            )
+            assert r.status_code == 200, r.text
+
+        finish = client.post(f"/api/v1/picking/return-session/{session_id}/finish")
+        assert finish.status_code == 200, finish.text
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    db_session.refresh(order)
+    assert order.wms_state.status == "cancelled"
+    on_hand, reserved, _ = compute_lot_location_balances(db_session, lot_id, loc_id)
+    assert on_hand == Decimal("10")  # qoldiq asl joyiga tiklandi
+    assert reserved == 0
