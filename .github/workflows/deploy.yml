@@ -12,7 +12,12 @@ jobs:
           host: ${{ secrets.VPS_IP }}
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          # Runbookdagi standart deploy skripti: git pull -> pip install ->
+          # alembic upgrade head -> wms-api va wms-smartup-worker restart -> /health.
+          # Avval bu yerda `systemctl restart wms` edi, lekin bunday unit yo'q
+          # (xizmatlar: wms-api, wms-smartup-worker) — shuning uchun kod tortilsa ham
+          # jarayon qayta ishga tushmay, serverda eski kod ishlab turardi.
           script: |
-            cd /var/www/wms
-            git pull origin main
-            sudo systemctl restart wms
+            set -euo pipefail
+            cd /var/www/wms/backend
+            bash deploy/vps/update-wms.sh
