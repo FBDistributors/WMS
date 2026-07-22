@@ -185,3 +185,61 @@ def test_validate_send_to_picking_all_ok(client: TestClient, db_session: Session
     assert res.status_code == 200
     assert res.json()["ok"] is True
     assert res.json()["failures"] == []
+
+
+def test_shortage_includes_product_name(client: TestClient, db_session: Session) -> None:
+    """Yetishmayotgan qatorda mahsulot NOMI ham qaytadi (admin qaysi tovar ekanini ko'rsin)."""
+    admin = _mk_admin(db_session)
+    # 1) Bazada bor, lekin qoldiq yetarli emas.
+    p = _seed_product_with_stock(db_session, sku=f"SKU-N-{uuid.uuid4().hex[:6]}", qty=Decimal("1"))
+    # 2) Bazada umuman yo'q — nom faqat buyurtma qatoridan olinadi.
+    order = _order_imported(
+        db_session,
+        lines=[
+            OrderLine(sku=p.sku, name="Buyurtmadagi nom", qty=9.0, uom="dona"),
+            OrderLine(sku="YO-Q-SKU", name="Bazada yo'q tovar", qty=3.0, uom="dona"),
+        ],
+    )
+
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        res = client.post(
+            "/api/v1/orders/validate-send-to-picking",
+            json={"order_ids": [str(order.id)]},
+        )
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    assert res.status_code == 200, res.text
+    fails = res.json()["failures"]
+    assert len(fails) == 1
+    shorts = fails[0]["shortages"]
+    assert len(shorts) >= 2
+    names = {s.get("product_name") for s in shorts}
+    # Har bir yetishmovchilikda nom bo'lishi shart (bo'sh/None emas).
+    assert all(n for n in names), f"nomsiz shortage bor: {shorts}"
+    # Bazada yo'q tovar uchun nom buyurtma qatoridan olinadi.
+    assert "Bazada yo'q tovar" in names
+    # Bazadagi mahsulot uchun katalog nomi ishlatiladi.
+    assert p.name in names
+
+
+def test_order_not_found_message_is_actionable(client: TestClient, db_session: Session) -> None:
+    """O'chib ketgan buyurtma uchun xabar ro'yxat eskirganini bildiradi."""
+    admin = _mk_admin(db_session)
+    missing_id = str(uuid.uuid4())
+
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        res = client.post(
+            "/api/v1/orders/validate-send-to-picking",
+            json={"order_ids": [missing_id]},
+        )
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    assert res.status_code == 200, res.text
+    fails = res.json()["failures"]
+    assert len(fails) == 1
+    assert fails[0]["code"] == "order_not_found"
+    assert "no longer exists" in (fails[0]["message"] or "")

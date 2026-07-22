@@ -303,6 +303,8 @@ export async function getControllerUsers() {
 
 export type AllocationShortageOut = {
   line_id: string
+  /** Qaysi mahsulot yetishmayapti (SKU/barkod bo'sh bo'lishi mumkin). */
+  product_name?: string | null
   sku?: string | null
   barcode?: string | null
   required_qty: number

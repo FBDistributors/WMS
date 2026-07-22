@@ -422,6 +422,9 @@ class PickerUser(BaseModel):
 
 class AllocationShortage(BaseModel):
     line_id: UUID
+    # Qaysi mahsulot yetishmayotgani ko'rinishi uchun: SKU/barkod bo'sh bo'lishi
+    # mumkin (masalan tashkiliy harakat qatorlarida), nom esa doim bor.
+    product_name: Optional[str] = None
     sku: Optional[str] = None
     barcode: Optional[str] = None
     required_qty: float
@@ -655,9 +658,11 @@ def _allocate_order(
     for line in order.lines:
         product_id = _resolve_product_id(db, line)
         if not product_id:
+            # Mahsulot bazada topilmadi — nom faqat buyurtma qatoridan olinadi.
             shortages.append(
                 AllocationShortage(
                     line_id=line.id,
+                    product_name=(line.name or "").strip() or None,
                     sku=line.sku,
                     barcode=line.barcode,
                     required_qty=line.qty,
@@ -789,6 +794,7 @@ def _allocate_order(
                 shortages.append(
                     AllocationShortage(
                         line_id=line.id,
+                        product_name=(product_name or "").strip() or None,
                         sku=line.sku,
                         barcode=line.barcode,
                         required_qty=line.qty,
@@ -2019,11 +2025,14 @@ def _validate_one_order_send_to_picking(
         .one_or_none()
     )
     if not order:
+        # Odatda ro'yxat eskirgan: SmartUp sinxroni eksportda qolmagan `imported`/`W`
+        # buyurtmalarni o'chiradi (delete_stale_orders), shuning uchun sahifadagi
+        # qator DB da yo'q bo'lishi mumkin.
         return SendToPickingValidationFailure(
             order_id=order_id,
             order_number="",
             code="order_not_found",
-            message="Order not found",
+            message="Order no longer exists (list is out of date) — refresh the list",
         )
     if not order.wms_state:
         return SendToPickingValidationFailure(

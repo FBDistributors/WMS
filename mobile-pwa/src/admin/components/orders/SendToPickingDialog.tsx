@@ -63,6 +63,7 @@ function parseInsufficientStockFailure(err: unknown): SendToPickingValidationFai
     const r = row as Record<string, unknown>
     return {
       line_id: String(r.line_id ?? ''),
+      product_name: r.product_name != null ? String(r.product_name) : null,
       sku: r.sku != null ? String(r.sku) : null,
       barcode: r.barcode != null ? String(r.barcode) : null,
       required_qty:
@@ -303,11 +304,16 @@ export function SendToPickingDialog({
                     {t('orders:send_to_picking.shortage_col_order')}: {fail.order_number || fail.order_id}
                   </div>
                   {fail.message && (!fail.shortages || fail.shortages.length === 0) ? (
-                    <p className="text-sm text-slate-600 dark:text-slate-400">{fail.message}</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                      {fail.code === 'order_not_found'
+                        ? t('orders:send_to_picking.fail_order_not_found')
+                        : fail.message}
+                    </p>
                   ) : (
                     <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
                       <thead>
                         <tr className="border-b border-slate-200 dark:border-slate-700">
+                          <th className="py-1 pr-2 font-medium">{t('orders:send_to_picking.shortage_col_product')}</th>
                           <th className="py-1 pr-2 font-medium">{t('orders:send_to_picking.shortage_col_sku')}</th>
                           <th className="py-1 pr-2 font-medium">{t('orders:send_to_picking.shortage_col_barcode')}</th>
                           <th className="py-1 pr-2 font-medium">{t('orders:send_to_picking.shortage_col_required')}</th>
@@ -317,6 +323,9 @@ export function SendToPickingDialog({
                       <tbody>
                         {(fail.shortages ?? []).map((s) => (
                           <tr key={s.line_id} className="border-b border-slate-100 dark:border-slate-800">
+                            <td className="py-1 pr-2 font-medium text-slate-900 dark:text-slate-100">
+                              {s.product_name ?? '—'}
+                            </td>
                             <td className="py-1 pr-2">{s.sku ?? '—'}</td>
                             <td className="py-1 pr-2">{s.barcode ?? '—'}</td>
                             <td className="py-1 pr-2">{s.required_qty}</td>
