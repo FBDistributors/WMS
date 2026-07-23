@@ -52,7 +52,7 @@
     "sending": "Sending...",
     "failed": "Failed to send to picking.",
     "load_failed": "Failed to load order picker list.",
-  "no_pickers_hint": "No pickers. Create a user with 'Order picker' role via Admin > Users.",
+    "no_pickers_hint": "No pickers. Create a user with 'Order picker' role via Admin > Users.",
     "invalid_selection": "Invalid selection. Please refresh the page and try again.",
     "insufficient_stock": "Insufficient stock in warehouse. Receive products first or check inventory.",
     "picking_task_exists": "A picking task for this movement has already been created.",
@@ -89,8 +89,17 @@
     "one_order_only": "You can only reassign the controller for one order at a time.",
     "error_verification_started": "Controller has already started verification; reassignment is not allowed.",
     "error_terminal_doc": "Verification is finished or the document is in another state.",
-    "error_no_controller": "No controller assigned yet.",
-    "no_controllers_hint": "No controllers found. Create a user with the Controller role in Admin > Users."
+    "no_controllers_hint": "No controllers found. Create a user with the Controller role in Admin > Users.",
+    "assign_button": "Assign controller",
+    "error_not_in_queue": "The order is not in the verification queue yet."
+  },
+  "controller_queue": {
+    "badge": "In queue"
+  },
+  "release_controller": {
+    "button": "Return to queue",
+    "done": "Order returned to the verification queue.",
+    "failed": "Could not return the order to the queue."
   },
   "controller_modal": {
     "title": "Under review — select controller",

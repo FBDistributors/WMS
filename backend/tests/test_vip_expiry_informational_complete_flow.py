@@ -73,11 +73,8 @@ def test_all_vip_info_order_flows_picker_to_controller(
         # 1) Yig'uvchi yakunlaydi — hech narsa terilmagan bo'lsa ham (hammasi VIP-info).
         complete = client.post(f"/api/v1/picking/documents/{doc_id}/complete")
         assert complete.status_code == 200, complete.text
-        # 2) Controllerga yuborish ishlashi kerak (picked_any=false bo'lса ham).
-        send = client.post(
-            f"/api/v1/picking/documents/{doc_id}/send-to-controller",
-            json={"controller_user_id": str(controller.id)},
-        )
+        # 2) Tekshiruv navbatiga yuborish ishlashi kerak (picked_any=false bo'lsa ham).
+        send = client.post(f"/api/v1/picking/documents/{doc_id}/send-to-controller")
         assert send.status_code == 200, send.text
     finally:
         app.dependency_overrides.pop(get_current_user, None)
@@ -85,9 +82,11 @@ def test_all_vip_info_order_flows_picker_to_controller(
     db_session.expire_all()
     doc_after_send = db_session.query(Document).filter(Document.id == doc_id).one()
     assert doc_after_send.status == "picked"
-    assert doc_after_send.controlled_by_user_id == controller.id
+    # Controller tanlanmaydi: hujjat navbatda turadi.
+    assert doc_after_send.sent_to_controller_at is not None
+    assert doc_after_send.controlled_by_user_id is None
 
-    # 3) Controller yakunlaydi.
+    # 3) Controller navbatdan olib yakunlaydi.
     app.dependency_overrides[get_current_user] = lambda: controller
     try:
         ctrl_complete = client.post(f"/api/v1/picking/documents/{doc_id}/complete")
@@ -98,3 +97,5 @@ def test_all_vip_info_order_flows_picker_to_controller(
     db_session.expire_all()
     doc_final = db_session.query(Document).filter(Document.id == doc_id).one()
     assert doc_final.status == "completed"
+    # Yakunlash paytida hujjat controllerga biriktiriladi (attributsiya saqlanadi).
+    assert doc_final.controlled_by_user_id == controller.id

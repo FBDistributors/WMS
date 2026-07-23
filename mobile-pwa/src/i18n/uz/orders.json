@@ -22,9 +22,9 @@
   "packing": "Qadoqlanmoqda...",
   "ship": "Jo'natish",
   "shipping": "Jo'natilmoqda...",
-"pack_failed": "Buyurtmani qadoqlab bo'lmadi.",
-    "status_update_failed": "Holatni o'zgartirib bo'lmadi.",
-    "ship_failed": "Buyurtmani jo'natib bo'lmadi.",
+  "pack_failed": "Buyurtmani qadoqlab bo'lmadi.",
+  "status_update_failed": "Holatni o'zgartirib bo'lmadi.",
+  "ship_failed": "Buyurtmani jo'natib bo'lmadi.",
   "empty": "Buyurtmalar topilmadi",
   "empty_desc": "Buyurtmalarni yuklash uchun Smartupni sinxronlang.",
   "search_no_results": "Qidiruv bo'yicha natija topilmadi",
@@ -89,8 +89,17 @@
     "one_order_only": "Bir vaqtning o'zida faqat bitta buyurtma uchun controllerni almashtirish mumkin.",
     "error_verification_started": "Controller tekshiruvni boshlagan; almashtirib bo'lmaydi.",
     "error_terminal_doc": "Tekshiruv yakunlangan yoki hujjat boshqa holatda.",
-    "error_no_controller": "Controllerga hali biriktirilmagan.",
-    "no_controllers_hint": "Controller yo'q. Admin > Foydalanuvchilar orqali Controller rolida foydalanuvchi yarating."
+    "no_controllers_hint": "Controller yo'q. Admin > Foydalanuvchilar orqali Controller rolida foydalanuvchi yarating.",
+    "assign_button": "Kontrolyor biriktirish",
+    "error_not_in_queue": "Buyurtma hali tekshiruv navbatiga tushmagan."
+  },
+  "controller_queue": {
+    "badge": "Navbatda"
+  },
+  "release_controller": {
+    "button": "Navbatga qaytarish",
+    "done": "Buyurtma tekshiruv navbatiga qaytarildi.",
+    "failed": "Navbatga qaytarib bo'lmadi."
   },
   "controller_modal": {
     "title": "Tekshiruvda — kontrolyor tanlash",

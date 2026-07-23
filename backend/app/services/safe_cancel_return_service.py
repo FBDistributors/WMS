@@ -122,7 +122,7 @@ def initiate_safe_cancel_return(
         # Terish jarayonidagi xavfsiz bekor (asl oqim).
         if document.status in ("cancelled", "completed", "packed", "shipped", "picked", "cancelling"):
             raise HTTPException(status_code=409, detail="Hujjat holati bekor qilishga mos emas")
-        if document.controlled_by_user_id is not None:
+        if document.sent_to_controller_at is not None:
             raise HTTPException(status_code=409, detail="Hujjat allaqachon controllerga yuborilgan")
     elif order_status == "completed":
         # Arxivdan qaytim: faqat completed (packed/shipped emas — fizik chiqim boshlanadi).

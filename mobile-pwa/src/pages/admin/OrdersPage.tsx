@@ -19,6 +19,7 @@ import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import {
   formatSourceExternalIdDisplay,
   getOrders,
+  releaseOrderController,
   syncSmartupOrders,
   type MovementItem,
   type OrderListItem,
@@ -31,6 +32,7 @@ import {
   backendStatusToSimple,
 } from '../../admin/components/orders/OrderWmsStatusCell'
 import { getBrands, type Brand } from '../../services/brandsApi'
+import { useAppToast } from '../../feedback/useAppToast'
 import { formatDillerFilialDisplay } from '../../constants/filialCodes'
 import { useAuth } from '../../rbac/AuthProvider'
 
@@ -146,6 +148,7 @@ type MovementWmsFilter = 'new' | 'picking' | 'review' | 'completed' | 'cancelled
 
 export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
   const { t } = useTranslation(['orders', 'common', 'admin'])
+  const { showSuccess, showError } = useAppToast()
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -278,15 +281,29 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     [canSend]
   )
 
+  /** Navbatda: yig'uvchi yuborgan, lekin hali hech bir kontrolyor band qilmagan. */
+  const isInControllerQueue = useCallback(
+    (order: OrderListItem) =>
+      Boolean(order.sent_to_controller_at) && !order.controller_name,
+    []
+  )
+
   const canReassignController = useCallback(
     (order: OrderListItem) =>
       has('documents:edit_status') &&
       (order.can_reassign_controller ??
         (order.status === 'picked' &&
-          Boolean(order.controller_name) &&
+          Boolean(order.sent_to_controller_at) &&
           order.so_document_status === 'picked' &&
           !order.controller_verification_started_at)),
     [has]
+  )
+
+  /** Band qilinganini navbatga qaytarish — faqat skan boshlanmagan bo'lsa. */
+  const canReleaseController = useCallback(
+    (order: OrderListItem) =>
+      canReassignController(order) && Boolean(order.controller_name),
+    [canReassignController]
   )
 
   const load = useCallback(async (background = false, _forceRefresh?: boolean) => {
@@ -426,6 +443,19 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     movementWmsStatusQuery,
     t,
   ])
+
+  const releaseController = useCallback(
+    async (order: OrderListItem) => {
+      try {
+        await releaseOrderController(order.id)
+        showSuccess(t('orders:release_controller.done'))
+        await load(true)
+      } catch {
+        showError(t('orders:release_controller.failed'))
+      }
+    },
+    [load, showError, showSuccess, t]
+  )
 
   const loadBrands = useCallback(async () => {
     try {
@@ -770,7 +800,6 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
             <OrderWmsStatusCell
               key={`wms-${order.id}`}
               orderId={order.id}
-              orderNumber={order.order_number}
               status={order.status}
               canEdit={canEditStatus}
               onAfterSave={() => load()}
@@ -799,15 +828,34 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
         case 'controller':
           return (
             <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-              <div className="flex flex-col gap-1">
-                <span>{order.controller_name ?? '—'}</span>
+              <div className="flex flex-col items-start gap-1">
+                {order.controller_name ? (
+                  <span>{order.controller_name}</span>
+                ) : isInControllerQueue(order) ? (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
+                    {t('orders:controller_queue.badge')}
+                  </span>
+                ) : (
+                  <span>—</span>
+                )}
                 {canReassignController(order) ? (
                   <button
                     type="button"
                     className="text-left text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
                     onClick={() => setReassignControllerDialogOrderIds([order.id])}
                   >
-                    {t('orders:reassign_controller.button')}
+                    {order.controller_name
+                      ? t('orders:reassign_controller.button')
+                      : t('orders:reassign_controller.assign_button')}
+                  </button>
+                ) : null}
+                {canReleaseController(order) ? (
+                  <button
+                    type="button"
+                    className="text-left text-xs font-medium text-slate-500 hover:underline dark:text-slate-400"
+                    onClick={() => void releaseController(order)}
+                  >
+                    {t('orders:release_controller.button')}
                   </button>
                 ) : null}
               </div>
@@ -938,6 +986,9 @@ export function OrdersPage({ mode = 'default', orderSource }: OrdersPageProps) {
     canEditStatus,
     canReassignPicker,
     canReassignController,
+    canReleaseController,
+    isInControllerQueue,
+    releaseController,
     canSend,
     config.columnOrder,
     config.visibleColumns,

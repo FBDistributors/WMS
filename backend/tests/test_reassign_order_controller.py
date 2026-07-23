@@ -26,8 +26,8 @@ def _pick_and_send_to_controller(
     *,
     doc_id: UUID,
     picker,
-    controller,
 ) -> None:
+    """Yig'uvchi terib, hujjatni umumiy tekshiruv navbatiga yuboradi (controller tanlanmaydi)."""
     app.dependency_overrides[get_current_user] = lambda: picker
     try:
         doc = client.get(f"/api/v1/picking/documents/{doc_id}")
@@ -42,10 +42,7 @@ def _pick_and_send_to_controller(
         assert pick.status_code == 200, pick.text
         complete = client.post(f"/api/v1/picking/documents/{doc_id}/complete")
         assert complete.status_code == 200, complete.text
-        send = client.post(
-            f"/api/v1/picking/documents/{doc_id}/send-to-controller",
-            json={"controller_user_id": str(controller.id)},
-        )
+        send = client.post(f"/api/v1/picking/documents/{doc_id}/send-to-controller")
         assert send.status_code == 200, send.text
     finally:
         app.dependency_overrides.pop(get_current_user, None)
@@ -72,7 +69,7 @@ def test_reassign_controller_success(client: TestClient, db_session: Session) ->
         app.dependency_overrides.pop(get_current_user, None)
 
     _pick_and_send_to_controller(
-        client, db_session, doc_id=doc_id, picker=picker, controller=controller1
+        client, db_session, doc_id=doc_id, picker=picker
     )
 
     app.dependency_overrides[get_current_user] = lambda: admin
@@ -116,7 +113,7 @@ def test_reassign_controller_allowed_after_open_before_scan(
         app.dependency_overrides.pop(get_current_user, None)
 
     _pick_and_send_to_controller(
-        client, db_session, doc_id=doc_id, picker=picker, controller=controller1
+        client, db_session, doc_id=doc_id, picker=picker
     )
 
     app.dependency_overrides[get_current_user] = lambda: controller1
@@ -165,7 +162,7 @@ def test_reassign_controller_rejects_after_verification_started(
         app.dependency_overrides.pop(get_current_user, None)
 
     _pick_and_send_to_controller(
-        client, db_session, doc_id=doc_id, picker=picker, controller=controller1
+        client, db_session, doc_id=doc_id, picker=picker
     )
 
     app.dependency_overrides[get_current_user] = lambda: controller1
@@ -212,7 +209,7 @@ def test_reassign_controller_rejects_invalid_user(
         app.dependency_overrides.pop(get_current_user, None)
 
     _pick_and_send_to_controller(
-        client, db_session, doc_id=doc_id, picker=picker, controller=controller
+        client, db_session, doc_id=doc_id, picker=picker
     )
 
     app.dependency_overrides[get_current_user] = lambda: admin

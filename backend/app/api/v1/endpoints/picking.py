@@ -284,7 +284,9 @@ class PickerUser(BaseModel):
 
 
 class SendToControllerRequest(BaseModel):
-    controller_user_id: UUID
+    # Deprecated: controller endi tanlanmaydi — hujjat umumiy navbatga (pool) tushadi.
+    # Eski mobil ilovalar bu maydonni yuborishda davom etadi; qabul qilinadi, lekin e'tiborsiz.
+    controller_user_id: Optional[UUID] = None
 
 
 class FCMTokenRequest(BaseModel):
@@ -310,6 +312,49 @@ class CompletePickingRequest(BaseModel):
         json_schema_extra = {
             "example": {"incomplete_reason": "out_of_stock"},
         }
+
+
+def _lock_document_row(db: Session, document_id: UUID) -> None:
+    """Hujjat qatorini qulflaydi (identity map tufayli mavjud obyekt o'zgarmaydi)."""
+    db.query(DocumentModel).filter(DocumentModel.id == document_id).with_for_update().one()
+
+
+def _is_in_controller_pool(document: DocumentModel) -> bool:
+    """Hujjat umumiy navbatda: yig'uvchi yuborgan, lekin hali hech kim band qilmagan."""
+    return document.sent_to_controller_at is not None and document.controlled_by_user_id is None
+
+
+def _assert_controller_can_read(document: DocumentModel, user) -> None:
+    """Controller hujjatni ko'ra oladimi: o'zi band qilgan yoki navbatda turgan bo'lsa."""
+    if document.controlled_by_user_id == user.id:
+        return
+    if _is_in_controller_pool(document):
+        return
+    raise HTTPException(status_code=404, detail="Document not found")
+
+
+def _claim_for_controller(document: DocumentModel, user) -> bool:
+    """Controller hujjatni band qiladi (idempotent). True — shu chaqiruvda band qilindi.
+
+    Navbatdagi hujjatni birinchi ochgan/skanlagan controller egalik qiladi, boshqasiga 409.
+    Chaqiruvchi hujjatni `with_for_update()` bilan olgan bo'lishi kerak — shunda ikki
+    controller bir vaqtda bosganda ham faqat bittasi yutadi.
+    """
+    if document.controlled_by_user_id == user.id:
+        return False
+    if document.controlled_by_user_id is not None:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "controller_already_claimed",
+                "message": "Bu hujjatni boshqa controller band qilgan",
+            },
+        )
+    if document.sent_to_controller_at is None:
+        raise HTTPException(status_code=409, detail="Document is not sent to controller yet")
+    document.controlled_by_user_id = user.id
+    document.controller_claimed_at = datetime.now(timezone.utc)
+    return True
 
 
 def _release_unpicked_reserve_on_controller_complete(
@@ -955,8 +1000,8 @@ async def get_picking_document(
         raise HTTPException(status_code=404, detail="Document not found")
     if user.role == "picker" and document.assigned_to_user_id != user.id:
         raise HTTPException(status_code=404, detail="Document not found")
-    if user.role == "inventory_controller" and document.controlled_by_user_id != user.id:
-        raise HTTPException(status_code=404, detail="Document not found")
+    if user.role == "inventory_controller":
+        _assert_controller_can_read(document, user)
     cutoff = _picking_urgency_cutoff_today()
     lines = (
         db.query(DocumentLineModel)
@@ -1065,21 +1110,30 @@ async def list_picking_documents(
                 OrderWmsStateModel.status.notin_(ORDER_HIDDEN_STATUSES),
             )
         )
+    controller_queue = False
     if user.role == "picker":
         query = query.filter(DocumentModel.assigned_to_user_id == user.id)
-        # Controllerga yuborilgan (picked + controlled_by) yig'uvchi ro'yxatida ko'rinmasin
+        # Tekshiruv navbatiga yuborilgan hujjat yig'uvchi ro'yxatida ko'rinmasin
         query = query.filter(
             or_(
                 DocumentModel.status != "picked",
-                DocumentModel.controlled_by_user_id.is_(None),
+                DocumentModel.sent_to_controller_at.is_(None),
             )
         )
         # Controller tekshirib yakunlagan hujjatlar yig'uvchi ro'yxatida ko'rinmasin
         query = query.filter(DocumentModel.status != "completed")
     elif user.role == "inventory_controller":
+        # Navbatdagi (hech kim band qilmagan) + o'zi band qilgan hujjatlar.
+        controller_queue = True
         query = query.filter(
-            DocumentModel.controlled_by_user_id == user.id,
             DocumentModel.status == "picked",
+            or_(
+                DocumentModel.controlled_by_user_id == user.id,
+                and_(
+                    DocumentModel.controlled_by_user_id.is_(None),
+                    DocumentModel.sent_to_controller_at.isnot(None),
+                ),
+            ),
         )
     if not include_cancelled and effective_scope != "cancelled":
         query = query.filter(DocumentModel.status != "cancelled")
@@ -1089,8 +1143,14 @@ async def list_picking_documents(
         query = query.filter(OrderWmsStateModel.status == "picked")
     elif effective_wms_group == "yakunlangan":
         query = query.filter(OrderWmsStateModel.status.in_(("completed", "packed", "shipped")))
+    # Controller navbati FIFO: eng ko'p kutgan hujjat tepada.
+    order_by = (
+        (DocumentModel.sent_to_controller_at.asc(), DocumentModel.created_at.asc())
+        if controller_queue
+        else (DocumentModel.created_at.desc(),)
+    )
     try:
-        docs = query.order_by(DocumentModel.created_at.desc()).offset(offset).limit(limit).all()
+        docs = query.order_by(*order_by).offset(offset).limit(limit).all()
         org_names = _load_org_names(db)
         return [_to_picking_list_item(doc, org_names) for doc in docs]
     except Exception as e:
@@ -1110,7 +1170,7 @@ async def get_consolidated(
     if user.role != "picker":
         raise HTTPException(status_code=403, detail="Only for picker")
     ORDER_HIDDEN_STATUSES = ("completed", "packed", "shipped", "cancelled")
-    # Exclude from consolidated view when picked AND sent to controller (controlled_by set).
+    # Exclude from consolidated view when picked AND sent to the controller queue.
     # Also exclude completed (controller tugatgan); matches Buyurtmalar ro'yxati.
     docs_id_query = (
         db.query(DocumentModel.id)
@@ -1124,7 +1184,7 @@ async def get_consolidated(
             ),
             or_(
                 DocumentModel.status != "picked",
-                DocumentModel.controlled_by_user_id.is_(None),
+                DocumentModel.sent_to_controller_at.is_(None),
             ),
             DocumentModel.status != "cancelled",
             DocumentModel.status != "completed",
@@ -1382,7 +1442,7 @@ async def consolidated_pick(
         return await get_consolidated(db=db, user=user)
 
     ORDER_HIDDEN_STATUSES = ("completed", "packed", "shipped", "cancelled")
-    # Same as get_consolidated: exclude picked+controlled and completed.
+    # Same as get_consolidated: exclude picked+sent-to-controller and completed.
     docs_query = (
         db.query(DocumentModel.id)
         .outerjoin(OrderModel, DocumentModel.order_id == OrderModel.id)
@@ -1395,7 +1455,7 @@ async def consolidated_pick(
             ),
             or_(
                 DocumentModel.status != "picked",
-                DocumentModel.controlled_by_user_id.is_(None),
+                DocumentModel.sent_to_controller_at.is_(None),
             ),
             DocumentModel.status != "cancelled",
             DocumentModel.status != "completed",
@@ -1777,14 +1837,20 @@ async def register_fcm_token(
 @router.post(
     "/documents/{document_id}/send-to-controller",
     response_model=PickingDocument,
-    summary="Send picked document to controller",
+    summary="Send picked document to the controller queue (pool)",
 )
 async def send_to_controller(
     document_id: UUID,
-    payload: SendToControllerRequest,
+    payload: Optional[SendToControllerRequest] = Body(None),
     db: Session = Depends(get_db),
     user=Depends(require_permission("picking:send_to_controller")),
 ):
+    """Yig'uvchi hujjatni umumiy tekshiruv navbatiga yuboradi.
+
+    Controller tanlanmaydi: hujjatni istalgan controller ro'yxatidan olib (claim qilib)
+    tekshiradi. `controller_user_id` eski mobil ilovalar uchun qabul qilinadi, ishlatilmaydi.
+    """
+    _ = payload
     document = (
         db.query(DocumentModel)
         .options(selectinload(DocumentModel.lines))
@@ -1803,36 +1869,68 @@ async def send_to_controller(
         )
     if document.status != "picked":
         raise HTTPException(status_code=409, detail="Document must be in picked status")
-    if document.controlled_by_user_id is not None:
+    if document.sent_to_controller_at is not None:
         raise HTTPException(status_code=409, detail="Already sent to controller")
-    controller = (
-        db.query(UserModel)
-        .filter(
-            UserModel.id == payload.controller_user_id,
-            UserModel.role == "inventory_controller",
-            UserModel.is_active.is_(True),
-        )
-        .one_or_none()
-    )
-    if not controller:
-        raise HTTPException(status_code=400, detail="Invalid controller")
-    document.controlled_by_user_id = payload.controller_user_id
     document.sent_to_controller_at = datetime.now(timezone.utc)
     db.commit()
     return _to_picking_document(document, db)
 
 
 @router.post(
-    "/documents/{document_id}/controller-verification-started",
+    "/documents/{document_id}/claim",
     response_model=PickingDocument,
-    summary="Mark controller verification started (first scan/confirm)",
+    summary="Controller claims a document from the queue",
 )
-async def mark_controller_verification_started(
+async def claim_document_for_controller(
+    request: Request,
     document_id: UUID,
     db: Session = Depends(get_db),
     user=Depends(require_permission("picking:read")),
 ):
-    """Controller birinchi marta skan/tekshiruvni boshlaganda chaqiriladi; ochish (GET) yetarli emas."""
+    """Controller navbatdagi hujjatni o'ziga band qiladi; band bo'lsa 409.
+
+    Takroriy chaqiruv (o'zi band qilgan hujjat) muvaffaqiyatli qaytadi.
+    """
+    if user.role != "inventory_controller":
+        raise HTTPException(status_code=403, detail="Forbidden")
+    document = (
+        db.query(DocumentModel)
+        .filter(DocumentModel.id == document_id)
+        .with_for_update()
+        .one_or_none()
+    )
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if document.status != "picked":
+        raise HTTPException(status_code=409, detail="Document must be in picked status")
+    claimed = _claim_for_controller(document, user)
+    if claimed:
+        log_action(
+            db,
+            user_id=user.id,
+            action=ACTION_UPDATE,
+            entity_type="picking_document",
+            entity_id=str(document.id),
+            new_data={"event": "controller_claim", "controlled_by_user_id": str(user.id)},
+            ip_address=get_client_ip(request),
+        )
+    db.commit()
+    db.refresh(document)
+    return _to_picking_document(document, db)
+
+
+@router.post(
+    "/documents/{document_id}/release",
+    response_model=PickingDocument,
+    summary="Controller releases a claimed document back to the queue",
+)
+async def release_document_to_pool(
+    request: Request,
+    document_id: UUID,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("picking:read")),
+):
+    """Controller o'zi band qilgan hujjatni navbatga qaytaradi (skan boshlanmagan bo'lsa)."""
     if user.role != "inventory_controller":
         raise HTTPException(status_code=403, detail="Forbidden")
     document = (
@@ -1847,10 +1945,59 @@ async def mark_controller_verification_started(
         raise HTTPException(status_code=403, detail="Document not assigned to you")
     if document.status != "picked":
         raise HTTPException(status_code=409, detail="Document must be in picked status")
+    if document.controller_verification_started_at is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="Tekshiruv boshlangan — navbatga qaytarib bo'lmaydi",
+        )
+    document.controlled_by_user_id = None
+    document.controller_claimed_at = None
+    log_action(
+        db,
+        user_id=user.id,
+        action=ACTION_UPDATE,
+        entity_type="picking_document",
+        entity_id=str(document.id),
+        old_data={"controlled_by_user_id": str(user.id)},
+        new_data={"event": "controller_release", "controlled_by_user_id": None},
+        ip_address=get_client_ip(request),
+    )
+    db.commit()
+    db.refresh(document)
+    return _to_picking_document(document, db)
+
+
+@router.post(
+    "/documents/{document_id}/controller-verification-started",
+    response_model=PickingDocument,
+    summary="Mark controller verification started (first scan/confirm)",
+)
+async def mark_controller_verification_started(
+    document_id: UUID,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("picking:read")),
+):
+    """Controller birinchi marta skan/tekshiruvni boshlaganda chaqiriladi; ochish (GET) yetarli emas.
+
+    Hujjat hali navbatda bo'lsa — shu yerda avtomatik band qilinadi (eski ilovalar uchun).
+    """
+    if user.role != "inventory_controller":
+        raise HTTPException(status_code=403, detail="Forbidden")
+    document = (
+        db.query(DocumentModel)
+        .filter(DocumentModel.id == document_id)
+        .with_for_update()
+        .one_or_none()
+    )
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if document.status != "picked":
+        raise HTTPException(status_code=409, detail="Document must be in picked status")
+    _claim_for_controller(document, user)
     if document.controller_verification_started_at is None:
         document.controller_verification_started_at = datetime.now(timezone.utc)
-        db.commit()
-        db.refresh(document)
+    db.commit()
+    db.refresh(document)
     return _to_picking_document(document, db)
 
 
@@ -2352,11 +2499,24 @@ class UnpickLineRequest(BaseModel):
         return v
 
 
-def _assert_pick_line_access(user, document: DocumentModel) -> None:
+def _assert_pick_line_access(
+    db: Session, user, document: DocumentModel, *, claim: bool = True
+) -> None:
+    """Qator ustida ish qilish huquqi.
+
+    Controller uchun: hujjat navbatda bo'lsa (hech kim band qilmagan) shu yerda band
+    qilinadi; boshqa controller band qilgan bo'lsa 409.
+    """
     if user.role == "picker" and document.assigned_to_user_id != user.id:
         raise HTTPException(status_code=403, detail="Forbidden")
-    if user.role == "inventory_controller" and document.controlled_by_user_id != user.id:
+    if user.role != "inventory_controller":
+        return
+    if document.controlled_by_user_id == user.id:
+        return
+    if not claim or document.sent_to_controller_at is None:
         raise HTTPException(status_code=403, detail="Forbidden")
+    _lock_document_row(db, document.id)
+    _claim_for_controller(document, user)
 
 
 @router.post(
@@ -2397,7 +2557,7 @@ async def unpick_line(
         )
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
-        _assert_pick_line_access(user, document)
+        _assert_pick_line_access(db, user, document, claim=False)
         return PickLineResponse(
             line=_to_picking_line(line),
             progress=_calculate_progress(document.lines),
@@ -2416,7 +2576,7 @@ async def unpick_line(
     document = line.document
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
-    _assert_pick_line_access(user, document)
+    _assert_pick_line_access(db, user, document)
     if document.order_id and order_in_cancelling_flow(db, document.order_id):
         raise HTTPException(
             status_code=409,
@@ -2485,7 +2645,7 @@ async def unpick_line(
             )
             if not document:
                 raise HTTPException(status_code=404, detail="Document not found")
-            _assert_pick_line_access(user, document)
+            _assert_pick_line_access(db, user, document, claim=False)
             return PickLineResponse(
                 line=_to_picking_line(line),
                 progress=_calculate_progress(document.lines),
@@ -2653,10 +2813,11 @@ async def controller_flag_line(
     document = line.document
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
-    if document.controlled_by_user_id != user.id:
-        raise HTTPException(status_code=403, detail="Document not assigned to you")
     if document.status != "picked":
         raise HTTPException(status_code=409, detail="Document must be in picked status")
+    if document.controlled_by_user_id != user.id:
+        _lock_document_row(db, document.id)
+        _claim_for_controller(document, user)
     if _line_is_vip_expiry_informational(line):
         raise HTTPException(
             status_code=409,
@@ -2820,7 +2981,10 @@ async def complete_picking_document(
             line.skip_reason = incomplete_reason
 
     if user.role == "inventory_controller":
-        if document.controlled_by_user_id != user.id:
+        if document.status == "picked":
+            # Navbatdagi hujjatni yakunlash — shu yerda band qilinadi (eski ilovalar uchun).
+            _claim_for_controller(document, user)
+        elif document.controlled_by_user_id != user.id:
             raise HTTPException(status_code=403, detail="Document not assigned to you")
         if document.status == "completed":
             response = _to_picking_document_with_lines(document, lines, db)

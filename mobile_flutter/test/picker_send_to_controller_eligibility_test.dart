@@ -9,6 +9,7 @@ PickingListItem _item({
   required int linesDone,
   required bool pickedAny,
   String? controlledByUserId,
+  String? sentToControllerAt,
 }) {
   return PickingListItem(
     id: 'd1',
@@ -22,7 +23,7 @@ PickingListItem _item({
     assignedToUserName: 'Picker',
     orderNumber: '100323',
     deliveryNumber: null,
-    sentToControllerAt: null,
+    sentToControllerAt: sentToControllerAt,
   );
 }
 
@@ -69,15 +70,27 @@ void main() {
       expect(pickerCanSendToController(item, PickerProfileParam.picker), isFalse);
     });
 
-    test('already sent to controller is NOT sendable again', () {
+    test('already sent to the queue is NOT sendable again', () {
       final PickingListItem item = _item(
         status: 'picked',
         linesTotal: 2,
         linesDone: 2,
         pickedAny: false,
-        controlledByUserId: 'c1',
+        sentToControllerAt: '2026-07-23T10:00:00Z',
       );
       expect(pickerCanSendToController(item, PickerProfileParam.picker), isFalse);
+    });
+
+    test('controlledBy alone does not block: the queue flag decides', () {
+      // Navbatga tushmagan (sentToControllerAt=null) hujjat hali yuborilmagan hisoblanadi.
+      final PickingListItem item = _item(
+        status: 'picked',
+        linesTotal: 2,
+        linesDone: 2,
+        pickedAny: true,
+        controlledByUserId: 'c1',
+      );
+      expect(pickerCanSendToController(item, PickerProfileParam.picker), isTrue);
     });
 
     test('controller profile never sends', () {

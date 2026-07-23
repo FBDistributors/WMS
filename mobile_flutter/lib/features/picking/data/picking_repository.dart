@@ -5,6 +5,16 @@ import '../../../core/network/app_dio.dart';
 import '../domain/pick_scan_resolution.dart';
 import 'picking_models.dart';
 
+/// Navbatdagi hujjatni boshqa controller allaqachon band qilgan (backend 409).
+class PickingClaimConflict implements Exception {
+  const PickingClaimConflict(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 class PickingRepository {
   PickingRepository(this._dio);
 
@@ -32,17 +42,6 @@ class PickingRepository {
       final Response<Object?> res = await _dio.get<Object?>('$_p/pickers');
       return _listMap(res.data)
           .map((Map<String, Object?> m) => PickerUser.fromJson(m))
-          .toList(growable: false);
-    } on DioException catch (e) {
-      throw Exception(mapDioExceptionToMessage(e));
-    }
-  }
-
-  Future<List<ControllerUser>> getControllers() async {
-    try {
-      final Response<Object?> res = await _dio.get<Object?>('$_p/controllers');
-      return _listMap(res.data)
-          .map((Map<String, Object?> m) => ControllerUser.fromJson(m))
           .toList(growable: false);
     } on DioException catch (e) {
       throw Exception(mapDioExceptionToMessage(e));
@@ -81,14 +80,48 @@ class PickingRepository {
     }
   }
 
-  Future<PickingDocument> sendToController(
-    String documentId,
-    String controllerUserId,
-  ) async {
+  /// Hujjatni umumiy tekshiruv navbatiga yuboradi (controller tanlanmaydi).
+  Future<PickingDocument> sendToController(String documentId) async {
     try {
       final Response<Object?> res = await _dio.post<Object?>(
         '$_p/documents/$documentId/send-to-controller',
-        data: <String, String>{'controller_user_id': controllerUserId},
+      );
+      final Object? data = res.data;
+      if (data is! Map) {
+        throw const FormatException('document');
+      }
+      return PickingDocument.fromJson(Map<String, Object?>.from(data));
+    } on DioException catch (e) {
+      throw Exception(mapDioExceptionToMessage(e));
+    }
+  }
+
+  /// Controller navbatdagi hujjatni o'ziga band qiladi.
+  ///
+  /// Boshqa controller ulgurgan bo'lsa [PickingClaimConflict] tashlanadi.
+  Future<PickingDocument> claimDocument(String documentId) async {
+    try {
+      final Response<Object?> res = await _dio.post<Object?>(
+        '$_p/documents/$documentId/claim',
+      );
+      final Object? data = res.data;
+      if (data is! Map) {
+        throw const FormatException('document');
+      }
+      return PickingDocument.fromJson(Map<String, Object?>.from(data));
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 409) {
+        throw PickingClaimConflict(mapDioExceptionToMessage(e));
+      }
+      throw Exception(mapDioExceptionToMessage(e));
+    }
+  }
+
+  /// Band qilingan hujjatni umumiy navbatga qaytaradi (skan boshlanmagan bo'lsa).
+  Future<PickingDocument> releaseDocument(String documentId) async {
+    try {
+      final Response<Object?> res = await _dio.post<Object?>(
+        '$_p/documents/$documentId/release',
       );
       final Object? data = res.data;
       if (data is! Map) {

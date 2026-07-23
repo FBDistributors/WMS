@@ -51,8 +51,8 @@ function normalizeReassignErrorMessage(
   if (lower.includes('completed') || lower.includes('verification')) {
     return t('orders:reassign_controller.error_terminal_doc')
   }
-  if (lower.includes('no controller assigned')) {
-    return t('orders:reassign_controller.error_no_controller')
+  if (lower.includes('not in the controller queue')) {
+    return t('orders:reassign_controller.error_not_in_queue')
   }
   return msg
 }

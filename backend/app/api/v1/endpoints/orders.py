@@ -109,6 +109,9 @@ class OrderListItem(BaseModel):
     picker_name: Optional[str] = None
     controller_name: Optional[str] = None
     controller_user_id: Optional[UUID] = None
+    sent_to_controller_at: Optional[datetime] = Field(
+        None, description="Tekshiruv navbatiga tushgan vaqt (bo'sh — hali yuborilmagan)"
+    )
     controller_verification_started_at: Optional[datetime] = None
     can_reassign_controller: bool = False
     is_incomplete: bool = False
@@ -198,6 +201,11 @@ class ReassignControllerResponse(BaseModel):
     controlled_by: UUID
 
 
+class ReleaseControllerResponse(BaseModel):
+    document_id: UUID
+    released_from: Optional[UUID] = None
+
+
 class SendToPickingResponse(BaseModel):
     pick_task_id: UUID
     assigned_to: UUID
@@ -236,7 +244,13 @@ class EnsureMovementOrderRequest(BaseModel):
 
 class OrderStatusUpdateRequest(BaseModel):
     status: str = Field(..., description="picked, packed, shipped yoki boshqa ruxsat etilgan status")
-    controller_user_id: Optional[UUID] = Field(None, description="Tekshiruvda: controllerga yuborish uchun controller user id")
+    controller_user_id: Optional[UUID] = Field(
+        None,
+        description=(
+            "Deprecated: controller tanlanmaydi — 'picked' hujjatni umumiy tekshiruv "
+            "navbatiga qo'yadi. Eski mijozlar uchun qabul qilinadi, ishlatilmaydi."
+        ),
+    )
 
 
 ALLOWED_ADMIN_ORDER_STATUSES = frozenset(
@@ -1020,7 +1034,8 @@ async def list_orders(
         return u.full_name or u.username
 
     def _can_reassign_controller(doc: DocumentModel | None, order_status: str | None) -> bool:
-        if not doc or not doc.controlled_by_user_id:
+        # Navbatda turgan (hali band qilinmagan) hujjatni ham admin biriktira oladi.
+        if not doc or not doc.sent_to_controller_at:
             return False
         if (order_status or "") != "picked":
             return False
@@ -1075,6 +1090,7 @@ async def list_orders(
                 picker_name=_picker_name(doc),
                 controller_name=_controller_name(doc),
                 controller_user_id=doc.controlled_by_user_id if doc else None,
+                sent_to_controller_at=doc.sent_to_controller_at if doc else None,
                 controller_verification_started_at=doc.controller_verification_started_at if doc else None,
                 can_reassign_controller=_can_reassign_controller(doc, wms_status),
                 is_incomplete=is_incomplete,
@@ -1466,25 +1482,14 @@ async def update_order_status(
 
     order.wms_state.status = normalize_order_wms_status_for_storage(normalized_status)
 
-    if normalized_status == "picked" and payload.controller_user_id is not None:
+    if normalized_status == "picked":
+        # Controller tanlanmaydi: hujjat umumiy tekshiruv navbatiga tushadi.
         doc = (
             db.query(DocumentModel)
             .filter(DocumentModel.order_id == order.id, DocumentModel.doc_type == "SO")
             .one_or_none()
         )
-        if doc:
-            controller_user = (
-                db.query(User)
-                .filter(
-                    User.id == payload.controller_user_id,
-                    User.role == "inventory_controller",
-                    User.is_active.is_(True),
-                )
-                .one_or_none()
-            )
-            if not controller_user:
-                raise HTTPException(status_code=400, detail="Invalid controller")
-            doc.controlled_by_user_id = payload.controller_user_id
+        if doc and doc.sent_to_controller_at is None:
             doc.sent_to_controller_at = datetime.now(timezone.utc)
 
     if normalized_status == "completed":
@@ -2290,7 +2295,7 @@ async def reassign_order_picker(
             status_code=409,
             detail="Cannot reassign picker: document already in picked, completed, or terminal state",
         )
-    if document.controlled_by_user_id is not None:
+    if document.sent_to_controller_at is not None:
         raise HTTPException(status_code=409, detail="Cannot reassign after document was sent to controller")
 
     for line in document.lines:
@@ -2387,8 +2392,8 @@ async def reassign_order_controller(
             status_code=409,
             detail="Cannot reassign controller: document already completed or not in verification",
         )
-    if document.controlled_by_user_id is None:
-        raise HTTPException(status_code=409, detail="No controller assigned to this order")
+    if document.sent_to_controller_at is None:
+        raise HTTPException(status_code=409, detail="Order is not in the controller queue yet")
     if document.controller_verification_started_at is not None:
         raise HTTPException(
             status_code=409,
@@ -2417,7 +2422,8 @@ async def reassign_order_controller(
 
     document.controlled_by_user_id = payload.controller_user_id
     document.controller_verification_started_at = None
-    document.sent_to_controller_at = datetime.now(timezone.utc)
+    # `sent_to_controller_at` tegilmaydi — u yig'uvchi navbatga qo'ygan vaqt (metrikalar shunga bog'liq).
+    document.controller_claimed_at = datetime.now(timezone.utc)
     log_action(
         db,
         user_id=user.id,
@@ -2450,6 +2456,81 @@ async def reassign_order_controller(
         document_id=document.id,
         controlled_by=payload.controller_user_id,
     )
+
+
+@router.post(
+    "/{order_id}/release-controller",
+    response_model=ReleaseControllerResponse,
+    summary="Release the document back to the controller queue",
+)
+async def release_order_controller(
+    request: Request,
+    order_id: UUID,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("documents:edit_status")),
+):
+    """Band qilingan hujjatni umumiy tekshiruv navbatiga qaytaradi (skan boshlanmagan bo'lsa)."""
+    order = (
+        db.query(OrderModel)
+        .options(selectinload(OrderModel.wms_state))
+        .filter(OrderModel.id == order_id)
+        .one_or_none()
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if not order.wms_state:
+        raise HTTPException(status_code=409, detail="Order has no WMS state")
+    if order.wms_state.status != "picked":
+        raise HTTPException(
+            status_code=409,
+            detail="Controller can only be released while order is in picked (verification) status",
+        )
+
+    document = (
+        db.query(DocumentModel)
+        .filter(
+            DocumentModel.order_id == order.id,
+            DocumentModel.doc_type == "SO",
+            DocumentModel.status != "cancelled",
+        )
+        .with_for_update()
+        .one_or_none()
+    )
+    if not document:
+        raise HTTPException(status_code=409, detail="No active picking document for this order")
+    if document.status != "picked":
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot release controller: document already completed or not in verification",
+        )
+    if document.controller_verification_started_at is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot release controller: verification already started",
+        )
+
+    old_id = document.controlled_by_user_id
+    if old_id is None:
+        return ReleaseControllerResponse(document_id=document.id, released_from=None)
+
+    document.controlled_by_user_id = None
+    document.controller_claimed_at = None
+    log_action(
+        db,
+        user_id=user.id,
+        action=ACTION_UPDATE,
+        entity_type="order",
+        entity_id=str(order_id),
+        old_data={"controlled_by_user_id": str(old_id)},
+        new_data={
+            "controlled_by_user_id": None,
+            "document_id": str(document.id),
+            "action": "release_controller",
+        },
+        ip_address=get_client_ip(request),
+    )
+    db.commit()
+    return ReleaseControllerResponse(document_id=document.id, released_from=old_id)
 
 
 @router.post("/{order_id}/pack", response_model=OrderDetails, summary="Mark order as packed")

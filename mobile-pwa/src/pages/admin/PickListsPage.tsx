@@ -169,7 +169,8 @@ export function PickListsPage() {
       Boolean(item.order_id) &&
       has('documents:edit_status') &&
       item.document_status === 'picked' &&
-      Boolean(item.controller_name) &&
+      // Navbatga tushgan hujjatni ham admin biriktira oladi (hali band qilinmagan bo'lsa ham).
+      Boolean(item.sent_to_controller_at) &&
       !item.controller_verification_started_at,
     [has]
   )
@@ -586,7 +587,15 @@ export function PickListsPage() {
               title={item.controller_name ?? ''}
             >
               <div className="flex items-center gap-1">
-                <span className="min-w-0 truncate">{item.controller_name ?? '—'}</span>
+                {item.controller_name ? (
+                  <span className="min-w-0 truncate">{item.controller_name}</span>
+                ) : item.sent_to_controller_at ? (
+                  <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
+                    {t('orders:controller_queue.badge')}
+                  </span>
+                ) : (
+                  <span className="min-w-0 truncate">—</span>
+                )}
                 {!archive && canReassignControllerRow(item) ? (
                   <button
                     type="button"

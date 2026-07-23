@@ -348,6 +348,7 @@ class PickingListItem {
     required this.orderNumber,
     required this.deliveryNumber,
     required this.sentToControllerAt,
+    this.controllerVerificationStartedAt,
   });
 
   final String id;
@@ -363,6 +364,9 @@ class PickingListItem {
   final String? deliveryNumber;
   final String? sentToControllerAt;
 
+  /// Controller birinchi skanni qilgan vaqt (null — hali tekshirilmagan).
+  final String? controllerVerificationStartedAt;
+
   factory PickingListItem.fromJson(Map<String, Object?> json) {
     return PickingListItem(
       id: json['id']! as String,
@@ -377,6 +381,8 @@ class PickingListItem {
       orderNumber: json['order_number'] as String?,
       deliveryNumber: json['delivery_number'] as String?,
       sentToControllerAt: json['sent_to_controller_at'] as String?,
+      controllerVerificationStartedAt:
+          json['controller_verification_started_at'] as String?,
     );
   }
 
@@ -393,6 +399,7 @@ class PickingListItem {
         'order_number': orderNumber,
         'delivery_number': deliveryNumber,
         'sent_to_controller_at': sentToControllerAt,
+        'controller_verification_started_at': controllerVerificationStartedAt,
       };
 }
 

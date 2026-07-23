@@ -17,6 +17,7 @@ import '../../../shared/widgets/picker_footer.dart';
 import '../../../shared/widgets/picker_tab_app_header.dart';
 import '../data/picking_constants.dart';
 import '../data/picking_models.dart';
+import '../data/picking_repository.dart';
 import '../domain/profile_type_param.dart';
 import '../picking_providers.dart';
 import '../../feedback/presentation/app_feedback_sheet.dart';
@@ -24,18 +25,18 @@ import '../../feedback/presentation/app_feedback_sheet.dart';
 bool _isFullyPickedLines(PickingListItem d) =>
     d.linesTotal > 0 && d.linesDone >= d.linesTotal;
 
-/// Yig'uvchi hujjatni controllerga yuborishi mumkinmi.
+/// Yig'uvchi hujjatni tekshiruv navbatiga yuborishi mumkinmi.
 ///
 /// Oddiy holat: kamida bitta oddiy qator terilgan (`pickedAny`).
 /// VIP-muddat holati: hamma qator faqat ma'lumot (yig'ilmaydi) bo'lsa hech narsa
 /// terilmaydi (`pickedAny == false`), lekin buyurtma to'liq "bajarilgan" va
-/// "picked" holatda — u ham controllerga yuborilishi kerak, aks holda yig'uvchida
+/// "picked" holatda — u ham navbatga yuborilishi kerak, aks holda yig'uvchida
 /// qotib qoladi. Yarim terilgan (hali "picked" bo'lmagan) buyurtma yuborilmaydi.
 bool pickerCanSendToController(PickingListItem item, PickerProfileParam profile) {
   if (profile != PickerProfileParam.picker) {
     return false;
   }
-  if (item.controlledByUserId != null) {
+  if (item.sentToControllerAt != null) {
     return false;
   }
   return item.pickedAny ||
@@ -44,6 +45,26 @@ bool pickerCanSendToController(PickingListItem item, PickerProfileParam profile)
 
 bool _pickerEligibleBulkSend(PickingListItem item, PickerProfileParam profile) =>
     pickerCanSendToController(item, profile);
+
+/// Hujjat umumiy tekshiruv navbatida — hech kim band qilmagan.
+///
+/// Backend controllerga faqat ikki xil hujjat qaytaradi: navbatdagilar va o'zi
+/// band qilganlari, shuning uchun `controlled_by` bo'sh bo'lishi "navbatda"ni bildiradi.
+bool controllerDocIsInQueue(PickingListItem item) => item.controlledByUserId == null;
+
+/// Controller ro'yxatini bo'limga ajratadi: `mine=false` — navbat, `true` — o'zinikilar.
+List<PickingListItem> controllerDocsForTab(
+  List<PickingListItem> list, {
+  required bool mine,
+}) {
+  return list
+      .where((PickingListItem e) => controllerDocIsInQueue(e) != mine)
+      .toList(growable: false);
+}
+
+/// Band qilingan hujjatni navbatga qaytarish mumkinmi (skan boshlanmagan bo'lsa).
+bool controllerCanReleaseToQueue(PickingListItem item) =>
+    !controllerDocIsInQueue(item) && item.controllerVerificationStartedAt == null;
 
 class PickTaskListScreen extends ConsumerStatefulWidget {
   const PickTaskListScreen({super.key});
@@ -66,6 +87,23 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
   final Set<String> _selectedOrderIds = <String>{};
   bool _headerRefreshing = false;
 
+  /// Controller ro'yxati: false — "Navbatda" (band qilinmagan), true — "Menda".
+  bool _controllerShowMine = false;
+  bool _claiming = false;
+
+  /// Navbat umumiy — boshqa controller olganini ko'rish uchun davriy yangilash.
+  Timer? _queuePollTimer;
+
+  void _ensureQueuePolling() {
+    _queuePollTimer ??= Timer.periodic(const Duration(seconds: 20), (_) {
+      final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
+      if (!mounted || _claiming || !online) {
+        return;
+      }
+      unawaited(ref.read(openPickTasksProvider.notifier).refreshFromNetwork());
+    });
+  }
+
   Future<void> _onAppBarRefresh() async {
     setState(() => _headerRefreshing = true);
     try {
@@ -85,6 +123,7 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
 
   @override
   void dispose() {
+    _queuePollTimer?.cancel();
     _controllerSearch.dispose();
     _consolidatedBarcode.dispose();
     super.dispose();
@@ -96,6 +135,10 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
     final Uri uri = GoRouterState.of(context).uri;
     final String? profileQ = uri.queryParameters['profile'];
     final PickerProfileParam routeProfile = pickerProfileFromQuery(profileQ);
+
+    if (routeProfile == PickerProfileParam.controller) {
+      _ensureQueuePolling();
+    }
 
     if (uri.queryParameters['openConsolidated'] == '1') {
       final String? scanB = uri.queryParameters['scannedBarcode'];
@@ -203,7 +246,7 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
     }
   }
 
-  List<PickingListItem> _filtered(
+  List<PickingListItem> _searched(
     List<PickingListItem> list,
     PickerProfileParam profile,
   ) {
@@ -225,70 +268,146 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
     }).toList(growable: false);
   }
 
-  Future<void> _openControllerModal(PickingListItem doc) async {
+  /// Controller uchun ro'yxat "Navbatda" va "Menda" bo'limlariga bo'linadi.
+  List<PickingListItem> _filtered(
+    List<PickingListItem> list,
+    PickerProfileParam profile,
+  ) {
+    final List<PickingListItem> searched = _searched(list, profile);
+    if (profile != PickerProfileParam.controller) {
+      return searched;
+    }
+    return controllerDocsForTab(searched, mine: _controllerShowMine);
+  }
+
+  /// Navbatdagi hujjatni band qilib ochadi; boshqasi ulgurgan bo'lsa ro'yxat yangilanadi.
+  Future<void> _openQueueDocument(PickingListItem item) async {
+    final AppLocale loc = ref.read(appLocaleProvider);
     final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
-    List<ControllerUser> controllers = const <ControllerUser>[];
-    try {
-      if (online) {
-        controllers = await ref.read(pickingRepositoryProvider).getControllers();
-      }
-    } on Exception catch (e) {
-      if (mounted) {
-        showAppLocalizedError(context, ref.read(appLocaleProvider), e);
-      }
+    if (!online) {
+      showAppSnackBar(
+        context,
+        SnackBar(content: Text(StringLookup.t(loc, 'claimNeedsNetwork'))),
+      );
       return;
     }
+    setState(() => _claiming = true);
+    try {
+      await ref.read(pickingRepositoryProvider).claimDocument(item.id);
+    } on PickingClaimConflict {
+      unawaited(ref.read(openPickTasksProvider.notifier).refreshFromNetwork());
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          SnackBar(content: Text(StringLookup.t(loc, 'claimTakenByOther'))),
+        );
+      }
+      return;
+    } on Exception catch (e) {
+      if (mounted) {
+        showAppLocalizedError(context, loc, e);
+      }
+      return;
+    } finally {
+      if (mounted) {
+        setState(() => _claiming = false);
+      }
+    }
+    unawaited(ref.read(openPickTasksProvider.notifier).refreshFromNetwork());
     if (!mounted) {
       return;
     }
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (BuildContext ctx) {
-        bool sending = false;
-        return StatefulBuilder(
-          builder: (BuildContext context, void Function(void Function()) setModal) {
-            return _ControllerPickerSheet(
-              loc: ref.read(appLocaleProvider),
-              isDark: ref.read(appThemeModeProvider) == ThemeMode.dark,
-              loading: false,
-              sending: sending,
-              controllers: controllers,
-              onPick: (String id) async {
-                setModal(() => sending = true);
-                try {
-                  await _sendToControllerConfirm(doc, id);
-                  if (ctx.mounted) {
-                    Navigator.of(ctx).pop();
-                  }
-                } finally {
-                  if (context.mounted) {
-                    setModal(() => sending = false);
-                  }
-                }
-              },
-              onCancel: () => Navigator.of(ctx).pop(),
-            );
-          },
-        );
+    setState(() => _controllerShowMine = true);
+    await context.pushNamed(
+      'pickTaskDetail',
+      pathParameters: <String, String>{'taskId': item.id},
+      queryParameters: <String, String>{
+        'profile': profileToQuery(PickerProfileParam.controller),
       },
     );
+    if (mounted) {
+      unawaited(ref.read(openPickTasksProvider.notifier).refreshFromNetwork());
+    }
+  }
+
+  /// Bo'lim yorlig'idagi son: qidiruv qo'llangan holda navbat / o'zinikilar soni.
+  int _countForControllerTab(
+    AsyncValue<List<PickingListItem>> tasks, {
+    required bool inQueue,
+  }) {
+    final List<PickingListItem>? list = tasks.valueOrNull;
+    if (list == null) {
+      return 0;
+    }
+    return controllerDocsForTab(
+      _searched(list, PickerProfileParam.controller),
+      mine: !inQueue,
+    ).length;
+  }
+
+  /// Band qilingan, lekin hali tekshirilmagan hujjatni navbatga qaytaradi.
+  Future<void> _releaseToQueue(PickingListItem item) async {
+    final AppLocale loc = ref.read(appLocaleProvider);
+    try {
+      await ref.read(pickingRepositoryProvider).releaseDocument(item.id);
+    } on Exception catch (e) {
+      if (mounted) {
+        showAppLocalizedError(context, loc, e);
+      }
+      return;
+    }
+    unawaited(ref.read(openPickTasksProvider.notifier).refreshFromNetwork());
+    if (!mounted) {
+      return;
+    }
+    showAppSnackBar(
+      context,
+      SnackBar(content: Text(StringLookup.t(loc, 'releaseToQueueDone'))),
+    );
+  }
+
+  /// "Tekshiruvga yuborilsinmi?" — controller tanlanmaydi, hujjat umumiy navbatga tushadi.
+  Future<bool> _askSendConfirmation({String? messageOverride}) async {
+    final AppLocale loc = ref.read(appLocaleProvider);
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext ctx) => AlertDialog(
+        title: Text(StringLookup.t(loc, 'sendToControllerConfirmTitle')),
+        content: Text(
+          messageOverride ?? StringLookup.t(loc, 'sendToControllerConfirmMessage'),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(StringLookup.t(loc, 'cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(StringLookup.t(loc, 'confirmButton')),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
   }
 
   Future<void> _onSendToControllerPress(PickingListItem doc) async {
     final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
-    final bool fully =
-        doc.linesTotal > 0 && doc.linesDone >= doc.linesTotal;
-    if (fully) {
-      await _openControllerModal(doc);
-      return;
-    }
+    // Navbatga yuborish tarmoqsiz ishlamaydi (to'liq ham, sababli ham).
     if (!online) {
       final AppLocale loc = ref.read(appLocaleProvider);
       showAppSnackBar(
         context,
         SnackBar(content: Text(StringLookup.t(loc, 'loadError'))),
       );
+      return;
+    }
+    final bool fully =
+        doc.linesTotal > 0 && doc.linesDone >= doc.linesTotal;
+    if (fully) {
+      if (await _askSendConfirmation()) {
+        await _sendToControllerConfirm(doc);
+      }
       return;
     }
     await showModalBottomSheet<void>(
@@ -320,7 +439,8 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
                     Navigator.of(ctx).pop();
                   }
                   unawaited(ref.read(openPickTasksProvider.notifier).refreshFromNetwork());
-                  await _openControllerModal(doc);
+                  // Sabab tanlangan — bu tasdiq hisoblanadi, hujjat navbatga yuboriladi.
+                  await _sendToControllerConfirm(doc, alreadyCompleted: true);
                 } on Exception catch (e) {
                   if (ctx.mounted) {
                     showAppLocalizedError(ctx, ref.read(appLocaleProvider), e);
@@ -340,8 +460,7 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
   }
 
   Future<void> _sendSingleDocumentToControllerForBulk(
-    PickingListItem doc,
-    String controllerUserId, {
+    PickingListItem doc, {
     String? sharedIncompleteReason,
   }) async {
     final bool fully = _isFullyPickedLines(doc);
@@ -357,10 +476,7 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
     } else if (doc.status != 'picked') {
       await ref.read(pickingRepositoryProvider).completePickDocument(doc.id);
     }
-    await ref.read(pickingRepositoryProvider).sendToController(
-          doc.id,
-          controllerUserId,
-        );
+    await ref.read(pickingRepositoryProvider).sendToController(doc.id);
   }
 
   Future<String?> _showIncompleteReasonPickerForBulk() async {
@@ -390,107 +506,66 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
     );
   }
 
-  Future<void> _openBulkControllerModal(
+  Future<void> _bulkSendToQueue(
     List<PickingListItem> docs, {
     String? sharedIncompleteReason,
   }) async {
-    final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
-    List<ControllerUser> controllers = const <ControllerUser>[];
-    try {
-      if (online) {
-        controllers = await ref.read(pickingRepositoryProvider).getControllers();
-      }
-    } on Exception catch (e) {
-      if (mounted) {
-        showAppLocalizedError(context, ref.read(appLocaleProvider), e);
-      }
+    final AppLocale loc = ref.read(appLocaleProvider);
+    final bool confirmed = await _askSendConfirmation(
+      messageOverride: StringLookup.tParams(
+        loc,
+        'bulkSendConfirmMessage',
+        <String, String>{'count': '${docs.length}'},
+      ),
+    );
+    if (!confirmed || !mounted) {
       return;
+    }
+    int ok = 0;
+    int fail = 0;
+    for (final PickingListItem doc in docs) {
+      try {
+        await _sendSingleDocumentToControllerForBulk(
+          doc,
+          sharedIncompleteReason: sharedIncompleteReason,
+        );
+        ok++;
+      } on Exception catch (e) {
+        fail++;
+        debugPrint('bulk send ${doc.id}: $e');
+      }
     }
     if (!mounted) {
       return;
     }
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (BuildContext ctx) {
-        bool sending = false;
-        return StatefulBuilder(
-          builder: (BuildContext context, void Function(void Function()) setModal) {
-            return _ControllerPickerSheet(
-              loc: ref.read(appLocaleProvider),
-              isDark: ref.read(appThemeModeProvider) == ThemeMode.dark,
-              loading: false,
-              sending: sending,
-              controllers: controllers,
-              onPick: (String controllerId) async {
-                setModal(() => sending = true);
-                try {
-                  int ok = 0;
-                  int fail = 0;
-                  for (final PickingListItem doc in docs) {
-                    try {
-                      await _sendSingleDocumentToControllerForBulk(
-                        doc,
-                        controllerId,
-                        sharedIncompleteReason: sharedIncompleteReason,
-                      );
-                      ok++;
-                    } on Exception catch (e) {
-                      fail++;
-                      debugPrint('bulk send ${doc.id}: $e');
-                    }
-                  }
-                  if (!ctx.mounted) {
-                    return;
-                  }
-                  Navigator.of(ctx).pop();
-                  if (!mounted) {
-                    return;
-                  }
-                  final AppLocale loc = ref.read(appLocaleProvider);
-                  setState(() {
-                    _consolidatedRefreshKey++;
-                    _selectedOrderIds.clear();
-                    _orderSelectionMode = false;
-                  });
-                  unawaited(ref.read(openPickTasksProvider.notifier).refreshFromNetwork());
-                  unawaited(ref.read(consolidatedViewProvider.notifier).refreshFromNetwork());
-                  final String msg;
-                  if (fail == 0) {
-                    msg = StringLookup.tParams(
-                      loc,
-                      'bulkSendResultAllOk',
-                      <String, String>{'count': '$ok'},
-                    );
-                  } else if (ok == 0) {
-                    msg = StringLookup.tParams(
-                      loc,
-                      'bulkSendResultAllFail',
-                      <String, String>{'fail': '$fail'},
-                    );
-                  } else {
-                    msg = StringLookup.tParams(
-                      loc,
-                      'bulkSendResultPartial',
-                      <String, String>{'ok': '$ok', 'fail': '$fail'},
-                    );
-                  }
-                  showAppSnackBar(
-                    context,
-                    SnackBar(content: Text(msg)),
-                  );
-                } finally {
-                  if (context.mounted) {
-                    setModal(() => sending = false);
-                  }
-                }
-              },
-              onCancel: () => Navigator.of(ctx).pop(),
-            );
-          },
-        );
-      },
-    );
+    setState(() {
+      _consolidatedRefreshKey++;
+      _selectedOrderIds.clear();
+      _orderSelectionMode = false;
+    });
+    unawaited(ref.read(openPickTasksProvider.notifier).refreshFromNetwork());
+    unawaited(ref.read(consolidatedViewProvider.notifier).refreshFromNetwork());
+    final String msg;
+    if (fail == 0) {
+      msg = StringLookup.tParams(
+        loc,
+        'bulkSendResultAllOk',
+        <String, String>{'count': '$ok'},
+      );
+    } else if (ok == 0) {
+      msg = StringLookup.tParams(
+        loc,
+        'bulkSendResultAllFail',
+        <String, String>{'fail': '$fail'},
+      );
+    } else {
+      msg = StringLookup.tParams(
+        loc,
+        'bulkSendResultPartial',
+        <String, String>{'ok': '$ok', 'fail': '$fail'},
+      );
+    }
+    showAppSnackBar(context, SnackBar(content: Text(msg)));
   }
 
   Future<void> _onBulkSendPressed(List<PickingListItem> shown) async {
@@ -504,41 +579,36 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
     if (docs.isEmpty) {
       return;
     }
+    final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
+    if (!online) {
+      final AppLocale loc = ref.read(appLocaleProvider);
+      showAppSnackBar(
+        context,
+        SnackBar(content: Text(StringLookup.t(loc, 'loadError'))),
+      );
+      return;
+    }
     final bool anyIncomplete = docs.any((PickingListItem d) => !_isFullyPickedLines(d));
     String? sharedIncompleteReason;
     if (anyIncomplete) {
-      final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
-      if (!online) {
-        final AppLocale loc = ref.read(appLocaleProvider);
-        if (mounted) {
-          showAppSnackBar(
-        context,
-            SnackBar(content: Text(StringLookup.t(loc, 'loadError'))),
-          );
-        }
-        return;
-      }
       sharedIncompleteReason = await _showIncompleteReasonPickerForBulk();
       if (!mounted || sharedIncompleteReason == null || sharedIncompleteReason.isEmpty) {
         return;
       }
     }
-    await _openBulkControllerModal(docs, sharedIncompleteReason: sharedIncompleteReason);
+    await _bulkSendToQueue(docs, sharedIncompleteReason: sharedIncompleteReason);
   }
 
   Future<void> _sendToControllerConfirm(
-    PickingListItem doc,
-    String controllerUserId,
-  ) async {
+    PickingListItem doc, {
+    bool alreadyCompleted = false,
+  }) async {
     final AppLocale loc = ref.read(appLocaleProvider);
     try {
-      if (doc.status != 'picked') {
+      if (!alreadyCompleted && doc.status != 'picked') {
         await ref.read(pickingRepositoryProvider).completePickDocument(doc.id);
       }
-      await ref.read(pickingRepositoryProvider).sendToController(
-            doc.id,
-            controllerUserId,
-          );
+      await ref.read(pickingRepositoryProvider).sendToController(doc.id);
       if (!mounted) {
         return;
       }
@@ -711,7 +781,7 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
             onRefresh: () => unawaited(_onAppBarRefresh()),
             refreshing: _headerRefreshing,
           ),
-          if (!_showConsolidated && profile == PickerProfileParam.controller)
+          if (!_showConsolidated && profile == PickerProfileParam.controller) ...<Widget>[
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: TextField(
@@ -729,6 +799,31 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
                 ),
               ),
             ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: SegmentedButton<bool>(
+                segments: <ButtonSegment<bool>>[
+                  ButtonSegment<bool>(
+                    value: false,
+                    label: Text(
+                      '${StringLookup.t(loc, 'controllerQueueTab')} (${_countForControllerTab(tasks, inQueue: true)})',
+                    ),
+                    icon: const Icon(Icons.inbox_rounded, size: 18),
+                  ),
+                  ButtonSegment<bool>(
+                    value: true,
+                    label: Text(
+                      '${StringLookup.t(loc, 'controllerMineTab')} (${_countForControllerTab(tasks, inQueue: false)})',
+                    ),
+                    icon: const Icon(Icons.assignment_ind_rounded, size: 18),
+                  ),
+                ],
+                selected: <bool>{_controllerShowMine},
+                onSelectionChanged: (Set<bool> next) =>
+                    setState(() => _controllerShowMine = next.single),
+              ),
+            ),
+          ],
           Expanded(
             child: _showConsolidated && profile == PickerProfileParam.picker
                 ? Column(
@@ -810,7 +905,13 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
                     data: (List<PickingListItem> list) {
                       final List<PickingListItem> shown = _filtered(list, profile);
                       if (shown.isEmpty) {
-                        return Center(child: Text(StringLookup.t(loc, 'openTasksEmpty')));
+                        final String emptyKey =
+                            profile == PickerProfileParam.controller
+                                ? (_controllerShowMine
+                                    ? 'controllerMineEmpty'
+                                    : 'controllerQueueEmpty')
+                                : 'openTasksEmpty';
+                        return Center(child: Text(StringLookup.t(loc, emptyKey)));
                       }
                       final Set<String> eligibleIds = shown
                           .where((PickingListItem e) => _pickerEligibleBulkSend(e, profile))
@@ -895,15 +996,31 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
                                           });
                                         }
                                       : null,
-                                  onOpen: () => context.pushNamed(
-                                    'pickTaskDetail',
-                                    pathParameters: <String, String>{'taskId': item.id},
-                                    queryParameters: <String, String>{
-                                      'profile': profileToQuery(profile),
-                                    },
-                                  ),
+                                  onOpen: () {
+                                    if (profile == PickerProfileParam.controller &&
+                                        controllerDocIsInQueue(item)) {
+                                      unawaited(_openQueueDocument(item));
+                                      return;
+                                    }
+                                    unawaited(
+                                      context.pushNamed(
+                                        'pickTaskDetail',
+                                        pathParameters: <String, String>{
+                                          'taskId': item.id,
+                                        },
+                                        queryParameters: <String, String>{
+                                          'profile': profileToQuery(profile),
+                                        },
+                                      ),
+                                    );
+                                  },
                                   onSendToController: profile == PickerProfileParam.picker
                                       ? () => _onSendToControllerPress(item)
+                                      : null,
+                                  onReleaseToQueue: profile ==
+                                              PickerProfileParam.controller &&
+                                          controllerCanReleaseToQueue(item)
+                                      ? () => unawaited(_releaseToQueue(item))
                                       : null,
                                 );
                               },
@@ -1002,6 +1119,7 @@ class _TaskCard extends StatelessWidget {
     this.eligibleForSelection = false,
     this.onToggleSelected,
     this.onSendToController,
+    this.onReleaseToQueue,
   });
 
   final PickingListItem item;
@@ -1017,6 +1135,7 @@ class _TaskCard extends StatelessWidget {
   final bool eligibleForSelection;
   final VoidCallback? onToggleSelected;
   final void Function()? onSendToController;
+  final void Function()? onReleaseToQueue;
 
   @override
   Widget build(BuildContext context) {
@@ -1117,7 +1236,7 @@ class _TaskCard extends StatelessWidget {
                   ),
                   if (profile == PickerProfileParam.picker &&
                       item.status == 'picked' &&
-                      item.controlledByUserId != null) ...<Widget>[
+                      item.sentToControllerAt != null) ...<Widget>[
                     const SizedBox(height: 8),
                     Text(
                       StringLookup.t(loc, 'sendToControllerDone'),
@@ -1142,6 +1261,15 @@ class _TaskCard extends StatelessWidget {
             child: FilledButton.tonal(
               onPressed: onSendToController,
               child: Text(StringLookup.t(loc, 'sendToController')),
+            ),
+          ),
+        if (onReleaseToQueue != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: OutlinedButton.icon(
+              onPressed: onReleaseToQueue,
+              icon: const Icon(Icons.undo_rounded, size: 18),
+              label: Text(StringLookup.t(loc, 'releaseToQueue')),
             ),
           ),
       ],
@@ -1235,74 +1363,3 @@ class _IncompleteReasonSheet extends StatelessWidget {
   }
 }
 
-class _ControllerPickerSheet extends StatelessWidget {
-  const _ControllerPickerSheet({
-    required this.loc,
-    required this.isDark,
-    required this.loading,
-    required this.sending,
-    required this.controllers,
-    required this.onPick,
-    required this.onCancel,
-  });
-
-  final AppLocale loc;
-  final bool isDark;
-  final bool loading;
-  final bool sending;
-  final List<ControllerUser> controllers;
-  final void Function(String id) onPick;
-  final VoidCallback onCancel;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Material(
-          borderRadius: BorderRadius.circular(16),
-          color: isDark ? const Color(0xFF1E293B) : Colors.white,
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: Text(
-                        StringLookup.t(loc, 'selectController'),
-                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
-                      ),
-                    ),
-                    IconButton(onPressed: sending ? null : onCancel, icon: const Icon(Icons.close)),
-                  ],
-                ),
-                if (loading)
-                  const Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else
-                  SizedBox(
-                    height: 320,
-                    child: ListView(
-                      children: controllers.map((ControllerUser c) {
-                        return ListTile(
-                          leading: const CircleAvatar(child: Icon(Icons.verified_user_rounded)),
-                          title: Text(c.fullName ?? c.username),
-                          subtitle: c.fullName != null ? Text(c.username) : null,
-                          onTap: sending ? null : () => onPick(c.id),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}

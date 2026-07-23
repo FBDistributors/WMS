@@ -84,6 +84,8 @@ export type OrderListItem = {
   picker_name?: string | null
   controller_name?: string | null
   controller_user_id?: string | null
+  /** Tekshiruv navbatiga tushgan vaqt; bo'sh bo'lsa hali yuborilmagan. */
+  sent_to_controller_at?: string | null
   controller_verification_started_at?: string | null
   can_reassign_controller?: boolean
   is_incomplete?: boolean
@@ -362,6 +364,14 @@ export async function reassignOrderController(orderId: string, controllerUserId:
   )
 }
 
+/** Band qilingan hujjatni umumiy tekshiruv navbatiga qaytaradi. */
+export async function releaseOrderController(orderId: string) {
+  return fetchJSON<{ document_id: string; released_from: string | null }>(
+    `/api/v1/orders/${orderId}/release-controller`,
+    { method: 'POST' }
+  )
+}
+
 /** Backend `MovementPayload` (from-movement API). */
 export function buildMovementApiPayload(movementId: string, movement: MovementItem) {
   const rawItems = (movement.movement_items as MovementItemLine[] | undefined) ?? []
@@ -535,18 +545,14 @@ export async function getCustomerReturn(returnId: string, init?: { signal?: Abor
   })
 }
 
-/** Admin: buyurtma statusini o'zgartirish (documents:edit_status kerak). Tekshiruvda: controller_user_id ixtiyoriy (controllerga yuborish). */
-export async function updateOrderStatus(
-  orderId: string,
-  status: string,
-  controllerUserId?: string
-) {
-  const body: { status: string; controller_user_id?: string } = { status }
-  if (status === 'picked' && controllerUserId) {
-    body.controller_user_id = controllerUserId
-  }
+/**
+ * Admin: buyurtma statusini o'zgartirish (documents:edit_status kerak).
+ *
+ * `picked` — hujjat umumiy tekshiruv navbatiga tushadi; controller tanlanmaydi.
+ */
+export async function updateOrderStatus(orderId: string, status: string) {
   return fetchJSON<OrderDetails>(`/api/v1/orders/${orderId}/status`, {
     method: 'PATCH',
-    body,
+    body: { status },
   })
 }
