@@ -6,6 +6,7 @@ PickingListItem _doc({
   required String id,
   String? controlledByUserId,
   String? controllerVerificationStartedAt,
+  String sourceGroup = kSourceGroupCity,
 }) {
   return PickingListItem(
     id: id,
@@ -21,6 +22,7 @@ PickingListItem _doc({
     deliveryNumber: null,
     sentToControllerAt: '2026-07-23T10:00:00Z',
     controllerVerificationStartedAt: controllerVerificationStartedAt,
+    sourceGroup: sourceGroup,
   );
 }
 
@@ -117,6 +119,84 @@ void main() {
       });
       expect(item.controllerVerificationStartedAt, isNull);
       expect(controllerDocIsInQueue(item), isTrue);
+    });
+  });
+
+  group('controllerDocsForSourceGroup', () {
+    final List<PickingListItem> list = <PickingListItem>[
+      _doc(id: '1'),
+      _doc(id: '2', sourceGroup: kSourceGroupRegion),
+      _doc(id: '3', controlledByUserId: 'c1', sourceGroup: kSourceGroupRegion),
+      _doc(id: '4', controlledByUserId: 'c1'),
+    ];
+
+    test('city tab keeps only city documents', () {
+      expect(
+        controllerDocsForSourceGroup(list, kSourceGroupCity)
+            .map((PickingListItem e) => e.id),
+        <String>['1', '4'],
+      );
+    });
+
+    test('region tab keeps only region documents', () {
+      expect(
+        controllerDocsForSourceGroup(list, kSourceGroupRegion)
+            .map((PickingListItem e) => e.id),
+        <String>['2', '3'],
+      );
+    });
+
+    test('every document lands in exactly one source tab', () {
+      final int city = controllerDocsForSourceGroup(list, kSourceGroupCity).length;
+      final int region = controllerDocsForSourceGroup(list, kSourceGroupRegion).length;
+      expect(city + region, list.length);
+    });
+
+    test('source and queue tabs combine', () {
+      final List<PickingListItem> regionQueue = controllerDocsForTab(
+        controllerDocsForSourceGroup(list, kSourceGroupRegion),
+        mine: false,
+      );
+      expect(regionQueue.map((PickingListItem e) => e.id), <String>['2']);
+    });
+  });
+
+  group('normalizeSourceGroup', () {
+    test('region stays region', () {
+      expect(normalizeSourceGroup('region'), kSourceGroupRegion);
+    });
+
+    test('missing or unknown value falls back to city so nothing disappears', () {
+      expect(normalizeSourceGroup(null), kSourceGroupCity);
+      expect(normalizeSourceGroup('shahar'), kSourceGroupCity);
+      expect(normalizeSourceGroup('kosmos'), kSourceGroupCity);
+    });
+
+    test('json without source_group parses as city', () {
+      final PickingListItem item = PickingListItem.fromJson(<String, Object?>{
+        'id': 'd9',
+        'reference_number': 'SO-9',
+        'status': 'picked',
+        'lines_total': 1,
+        'lines_done': 1,
+        'picked_any': true,
+        'sent_to_controller_at': '2026-07-23T10:00:00Z',
+      });
+      expect(item.sourceGroup, kSourceGroupCity);
+    });
+
+    test('json with region source_group parses as region', () {
+      final PickingListItem item = PickingListItem.fromJson(<String, Object?>{
+        'id': 'd10',
+        'reference_number': 'SO-10',
+        'status': 'picked',
+        'lines_total': 1,
+        'lines_done': 1,
+        'picked_any': true,
+        'source_group': 'region',
+        'sent_to_controller_at': '2026-07-23T10:00:00Z',
+      });
+      expect(item.sourceGroup, kSourceGroupRegion);
     });
   });
 }

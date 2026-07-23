@@ -14,6 +14,12 @@ import 'picking_repository_provider.dart';
 
 export 'picking_repository_provider.dart';
 
+/// Ochiq vazifalar ro'yxati uchun limit.
+///
+/// Controller navbati shahar/region va navbat/menda bo'yicha mijoz tomonida
+/// ajratiladi — limit past bo'lsa bir bo'lim yolg'ondan bo'sh ko'rinardi.
+const int _openTasksLimit = 200;
+
 class OpenPickTasksNotifier extends AutoDisposeAsyncNotifier<List<PickingListItem>> {
   Future<List<PickingListItem>> _loadCache(OfflineDatabase? db) async {
     if (db == null) {
@@ -37,7 +43,7 @@ class OpenPickTasksNotifier extends AutoDisposeAsyncNotifier<List<PickingListIte
 
     try {
       final List<PickingListItem> list =
-          await ref.read(pickingRepositoryProvider).getOpenTasks();
+          await ref.read(pickingRepositoryProvider).getOpenTasks(limit: _openTasksLimit);
       await db?.saveCachedPickTasks(
         list.map((PickingListItem e) => e.toJson()).toList(growable: false),
       );
@@ -59,7 +65,7 @@ class OpenPickTasksNotifier extends AutoDisposeAsyncNotifier<List<PickingListIte
     }
     state = await AsyncValue.guard(() async {
       final List<PickingListItem> list =
-          await ref.read(pickingRepositoryProvider).getOpenTasks();
+          await ref.read(pickingRepositoryProvider).getOpenTasks(limit: _openTasksLimit);
       await db?.saveCachedPickTasks(
         list.map((PickingListItem e) => e.toJson()).toList(growable: false),
       );

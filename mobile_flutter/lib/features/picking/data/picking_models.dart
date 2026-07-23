@@ -334,6 +334,19 @@ class SafeCancelReturnSession {
   }
 }
 
+/// Buyurtma manbasi guruhi — shahar (smartup/orikzor va manbasizlar).
+const String kSourceGroupCity = 'shahar';
+
+/// Buyurtma manbasi guruhi — region (diller / tashkiliy harakat).
+const String kSourceGroupRegion = 'region';
+
+/// Serverdan kelgan qiymatni guruhga keltiradi.
+///
+/// Eski backend bu maydonni umuman yubormaydi — bunday hujjat shaharga tushadi,
+/// aks holda u hech qaysi tabda ko'rinmay qolardi.
+String normalizeSourceGroup(Object? raw) =>
+    raw == kSourceGroupRegion ? kSourceGroupRegion : kSourceGroupCity;
+
 class PickingListItem {
   const PickingListItem({
     required this.id,
@@ -349,6 +362,7 @@ class PickingListItem {
     required this.deliveryNumber,
     required this.sentToControllerAt,
     this.controllerVerificationStartedAt,
+    this.sourceGroup = kSourceGroupCity,
   });
 
   final String id;
@@ -367,6 +381,9 @@ class PickingListItem {
   /// Controller birinchi skanni qilgan vaqt (null — hali tekshirilmagan).
   final String? controllerVerificationStartedAt;
 
+  /// Buyurtma manbasi guruhi: [kSourceGroupCity] yoki [kSourceGroupRegion].
+  final String sourceGroup;
+
   factory PickingListItem.fromJson(Map<String, Object?> json) {
     return PickingListItem(
       id: json['id']! as String,
@@ -383,6 +400,7 @@ class PickingListItem {
       sentToControllerAt: json['sent_to_controller_at'] as String?,
       controllerVerificationStartedAt:
           json['controller_verification_started_at'] as String?,
+      sourceGroup: normalizeSourceGroup(json['source_group']),
     );
   }
 
@@ -400,6 +418,7 @@ class PickingListItem {
         'delivery_number': deliveryNumber,
         'sent_to_controller_at': sentToControllerAt,
         'controller_verification_started_at': controllerVerificationStartedAt,
+        'source_group': sourceGroup,
       };
 }
 

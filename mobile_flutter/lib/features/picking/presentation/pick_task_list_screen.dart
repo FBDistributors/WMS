@@ -66,6 +66,19 @@ List<PickingListItem> controllerDocsForTab(
 bool controllerCanReleaseToQueue(PickingListItem item) =>
     !controllerDocIsInQueue(item) && item.controllerVerificationStartedAt == null;
 
+/// Ro'yxatni manba guruhi bo'yicha ajratadi (shahar / region).
+///
+/// Guruhlar qoldiqsiz: nomalum yoki yo'q qiymat shaharga tushadi, shuning uchun
+/// hujjat ikkala tabda ham ko'rinmay qolmaydi.
+List<PickingListItem> controllerDocsForSourceGroup(
+  List<PickingListItem> list,
+  String group,
+) {
+  return list
+      .where((PickingListItem e) => e.sourceGroup == group)
+      .toList(growable: false);
+}
+
 class PickTaskListScreen extends ConsumerStatefulWidget {
   const PickTaskListScreen({super.key});
 
@@ -89,6 +102,9 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
 
   /// Controller ro'yxati: false — "Navbatda" (band qilinmagan), true — "Menda".
   bool _controllerShowMine = false;
+
+  /// Controller ro'yxatining yuqori darajasi: manba guruhi (shahar / region).
+  String _controllerSourceGroup = kSourceGroupCity;
   bool _claiming = false;
 
   /// Navbat umumiy — boshqa controller olganini ko'rish uchun davriy yangilash.
@@ -277,7 +293,10 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
     if (profile != PickerProfileParam.controller) {
       return searched;
     }
-    return controllerDocsForTab(searched, mine: _controllerShowMine);
+    return controllerDocsForTab(
+      controllerDocsForSourceGroup(searched, _controllerSourceGroup),
+      mine: _controllerShowMine,
+    );
   }
 
   /// Navbatdagi hujjatni band qilib ochadi; boshqasi ulgurgan bo'lsa ro'yxat yangilanadi.
@@ -330,17 +349,39 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
     }
   }
 
-  /// Bo'lim yorlig'idagi son: qidiruv qo'llangan holda navbat / o'zinikilar soni.
-  int _countForControllerTab(
-    AsyncValue<List<PickingListItem>> tasks, {
-    required bool inQueue,
-  }) {
+  /// Qidiruv qo'llangan, tanlangan manba guruhidagi hujjatlar.
+  List<PickingListItem> _controllerSearchedInGroup(
+    AsyncValue<List<PickingListItem>> tasks,
+  ) {
+    final List<PickingListItem>? list = tasks.valueOrNull;
+    if (list == null) {
+      return const <PickingListItem>[];
+    }
+    return controllerDocsForSourceGroup(
+      _searched(list, PickerProfileParam.controller),
+      _controllerSourceGroup,
+    );
+  }
+
+  /// Manba tabidagi son: qidiruv qo'llangan holda o'sha guruhdagi jami.
+  int _countForSourceGroup(AsyncValue<List<PickingListItem>> tasks, String group) {
     final List<PickingListItem>? list = tasks.valueOrNull;
     if (list == null) {
       return 0;
     }
-    return controllerDocsForTab(
+    return controllerDocsForSourceGroup(
       _searched(list, PickerProfileParam.controller),
+      group,
+    ).length;
+  }
+
+  /// Bo'lim yorlig'idagi son: tanlangan guruh ichida navbat / o'zinikilar soni.
+  int _countForControllerTab(
+    AsyncValue<List<PickingListItem>> tasks, {
+    required bool inQueue,
+  }) {
+    return controllerDocsForTab(
+      _controllerSearchedInGroup(tasks),
       mine: !inQueue,
     ).length;
   }
@@ -782,6 +823,14 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
             refreshing: _headerRefreshing,
           ),
           if (!_showConsolidated && profile == PickerProfileParam.controller) ...<Widget>[
+            _SourceGroupTabs(
+              loc: loc,
+              selected: _controllerSourceGroup,
+              cityCount: _countForSourceGroup(tasks, kSourceGroupCity),
+              regionCount: _countForSourceGroup(tasks, kSourceGroupRegion),
+              onSelected: (String group) =>
+                  setState(() => _controllerSourceGroup = group),
+            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: TextField(
@@ -905,13 +954,33 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
                     data: (List<PickingListItem> list) {
                       final List<PickingListItem> shown = _filtered(list, profile);
                       if (shown.isEmpty) {
-                        final String emptyKey =
-                            profile == PickerProfileParam.controller
-                                ? (_controllerShowMine
-                                    ? 'controllerMineEmpty'
-                                    : 'controllerQueueEmpty')
-                                : 'openTasksEmpty';
-                        return Center(child: Text(StringLookup.t(loc, emptyKey)));
+                        if (profile != PickerProfileParam.controller) {
+                          return Center(
+                            child: Text(StringLookup.t(loc, 'openTasksEmpty')),
+                          );
+                        }
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Text(
+                              StringLookup.tParams(
+                                loc,
+                                _controllerShowMine
+                                    ? 'controllerMineEmptyIn'
+                                    : 'controllerQueueEmptyIn',
+                                <String, String>{
+                                  'group': StringLookup.t(
+                                    loc,
+                                    _controllerSourceGroup == kSourceGroupRegion
+                                        ? 'sourceGroupRegion'
+                                        : 'sourceGroupCity',
+                                  ),
+                                },
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        );
                       }
                       final Set<String> eligibleIds = shown
                           .where((PickingListItem e) => _pickerEligibleBulkSend(e, profile))
@@ -1104,6 +1173,85 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
   }
 }
 
+/// Controller ro'yxatining yuqori darajasi: manba guruhi tablari.
+class _SourceGroupTabs extends StatelessWidget {
+  const _SourceGroupTabs({
+    required this.loc,
+    required this.selected,
+    required this.cityCount,
+    required this.regionCount,
+    required this.onSelected,
+  });
+
+  final AppLocale loc;
+  final String selected;
+  final int cityCount;
+  final int regionCount;
+  final void Function(String group) onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+        ),
+      ),
+      child: Row(
+        children: <Widget>[
+          _tab(
+            context,
+            group: kSourceGroupCity,
+            label: StringLookup.t(loc, 'sourceGroupCity'),
+            count: cityCount,
+          ),
+          _tab(
+            context,
+            group: kSourceGroupRegion,
+            label: StringLookup.t(loc, 'sourceGroupRegion'),
+            count: regionCount,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tab(
+    BuildContext context, {
+    required String group,
+    required String label,
+    required int count,
+  }) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    final bool active = selected == group;
+    return Expanded(
+      child: InkWell(
+        onTap: () => onSelected(group),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: active ? cs.primary : Colors.transparent,
+                width: 2.5,
+              ),
+            ),
+          ),
+          child: Text(
+            '$label ($count)',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+              color: active ? cs.primary : cs.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _TaskCard extends StatelessWidget {
   const _TaskCard({
     required this.item,
@@ -1216,23 +1364,49 @@ class _TaskCard extends StatelessWidget {
                     Text(sentAt!, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
                   ],
                   const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: cs.primaryContainer.withValues(alpha: 0.9),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        statusText,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: cs.onPrimaryContainer,
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: <Widget>[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: cs.primaryContainer.withValues(alpha: 0.9),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          statusText,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: cs.onPrimaryContainer,
+                          ),
                         ),
                       ),
-                    ),
+                      // "Menda" bo'limida ikki guruh aralashadi — manba ko'rinib tursin.
+                      if (profile == PickerProfileParam.controller)
+                        Container(
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: cs.secondaryContainer.withValues(alpha: 0.9),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            StringLookup.t(
+                              loc,
+                              item.sourceGroup == kSourceGroupRegion
+                                  ? 'sourceGroupRegion'
+                                  : 'sourceGroupCity',
+                            ),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: cs.onSecondaryContainer,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                   if (profile == PickerProfileParam.picker &&
                       item.status == 'picked' &&

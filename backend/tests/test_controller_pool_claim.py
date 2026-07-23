@@ -99,6 +99,31 @@ def test_send_to_controller_puts_document_in_pool(
         _clear()
 
 
+def test_queue_exposes_source_group_and_can_filter_by_it(
+    client: TestClient, db_session: Session
+) -> None:
+    doc_id, _ = _seed_sent_document(client, db_session)
+    ctrl = _controller(db_session, "src")
+
+    _as(ctrl)
+    try:
+        listed = client.get("/api/v1/picking/documents")
+        assert listed.status_code == 200, listed.text
+        item = next(i for i in listed.json() if i["id"] == str(doc_id))
+        # Test buyurtmasi 'diller' emas — demak shahar.
+        assert item["source_group"] == "shahar"
+
+        city = client.get("/api/v1/picking/documents", params={"source_group": "shahar"})
+        assert city.status_code == 200, city.text
+        assert str(doc_id) in [i["id"] for i in city.json()]
+
+        region = client.get("/api/v1/picking/documents", params={"source_group": "region"})
+        assert region.status_code == 200, region.text
+        assert str(doc_id) not in [i["id"] for i in region.json()]
+    finally:
+        _clear()
+
+
 def test_send_to_controller_twice_conflicts(client: TestClient, db_session: Session) -> None:
     doc_id, picker = _seed_sent_document(client, db_session)
 

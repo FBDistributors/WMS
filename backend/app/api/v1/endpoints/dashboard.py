@@ -25,6 +25,7 @@ from app.models.document import DocumentLine as DocumentLineModel
 from app.models.order import Order as OrderModel
 from app.models.order import OrderWmsState as OrderWmsStateModel
 from app.models.user import User as UserModel
+from app.services.order_source_group import source_group_conditions
 
 router = APIRouter()
 DEFAULT_FILIAL_ID = os.getenv("WMS_DEFAULT_FILIAL_ID", "3788131").strip()
@@ -531,13 +532,9 @@ def _staff_role_columns(role: str):
 def _source_group_conditions(source_group: Optional[str]) -> list:
     """Buyurtma manbasi bo'yicha filtr: 'shahar' (smartup+orikzor) yoki 'region' (diller).
 
-    None — hamma manba (orqaga moslik). `order_id` yo'q hujjat 'shahar' deb qaraladi.
+    Ta'rif `app.services.order_source_group` da — controller ro'yxati bilan bitta manba.
     """
-    if source_group == "shahar":
-        return [or_(OrderModel.source.in_(("smartup", "orikzor")), DocumentModel.order_id.is_(None))]
-    if source_group == "region":
-        return [OrderModel.source == "diller"]
-    return []
+    return source_group_conditions(source_group)
 
 
 def _aggregate_staff_by_user_column(

@@ -33,6 +33,11 @@ from app.models.location_box_placement import PLACEMENT_SEALED, LocationBoxPlace
 from app.models.product_box import ProductBox as ProductBoxModel
 from app.api.v1.endpoints.picker_inventory import _get_lot_level_balances, _location_ids_for_warehouse
 from app.services.order_reserve_release import release_document_reserve_on_cancel
+from app.services.order_source_group import (
+    SOURCE_GROUP_CITY,
+    order_source_group,
+    source_group_conditions,
+)
 from app.services.organization_labels import resolve_org_display
 from app.services.stock_availability import require_sufficient_reserved
 from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_ip, log_action
@@ -130,6 +135,9 @@ class PickingDocument(BaseModel):
     customer_id: Optional[str] = None
     customer_name: Optional[str] = None
     safe_cancel_return_session_id: Optional[UUID] = None
+    source_group: str = Field(
+        SOURCE_GROUP_CITY, description="Buyurtma manbasi guruhi: 'shahar' yoki 'region'"
+    )
     sent_to_controller_at: Optional[datetime] = None
     controller_verification_started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
@@ -152,6 +160,10 @@ class PickingListItem(BaseModel):
     customer_id: Optional[str] = None
     customer_name: Optional[str] = None
     order_wms_status: Optional[str] = None
+    order_source: Optional[str] = Field(None, description="Buyurtma manbasi (smartup/orikzor/diller)")
+    source_group: str = Field(
+        SOURCE_GROUP_CITY, description="Buyurtma manbasi guruhi: 'shahar' yoki 'region'"
+    )
     sent_to_controller_at: Optional[datetime] = None
     controller_verification_started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
@@ -821,6 +833,7 @@ def _to_picking_document(doc: DocumentModel, db: Optional[Session] = None) -> Pi
         customer_id=_customer_id(doc),
         customer_name=_customer_name(doc, org_names),
         safe_cancel_return_session_id=sid,
+        source_group=order_source_group(getattr(doc, "order", None)),
         sent_to_controller_at=doc.sent_to_controller_at,
         controller_verification_started_at=doc.controller_verification_started_at,
         completed_at=doc.completed_at,
@@ -855,6 +868,7 @@ def _to_picking_document_with_lines(
         customer_id=_customer_id(doc),
         customer_name=_customer_name(doc, org_names),
         safe_cancel_return_session_id=sid,
+        source_group=order_source_group(getattr(doc, "order", None)),
         sent_to_controller_at=doc.sent_to_controller_at,
         controller_verification_started_at=doc.controller_verification_started_at,
         completed_at=doc.completed_at,
@@ -952,6 +966,8 @@ def _to_picking_list_item(
         customer_id=_customer_id(doc),
         customer_name=_customer_name(doc, org_names),
         order_wms_status=wms_status,
+        order_source=getattr(order, "source", None) if order is not None else None,
+        source_group=order_source_group(order),
         sent_to_controller_at=doc.sent_to_controller_at,
         controller_verification_started_at=doc.controller_verification_started_at,
         completed_at=doc.completed_at,
@@ -1054,6 +1070,13 @@ async def list_picking_documents(
             "picker/inventory_controller uchun e'tiborsiz."
         ),
     ),
+    source_group: Optional[Literal["shahar", "region"]] = Query(
+        default=None,
+        description=(
+            "Buyurtma manbasi guruhi bo'yicha filtr: shahar (smartup/orikzor) yoki "
+            "region (diller). Bo'sh — hammasi."
+        ),
+    ),
     db: Session = Depends(get_db),
     user=Depends(require_permission("picking:read")),
 ):
@@ -1135,6 +1158,9 @@ async def list_picking_documents(
                 ),
             ),
         )
+    if source_group is not None:
+        # partition=True — ro'yxat tablari hujjatni yo'qotmasligi uchun.
+        query = query.filter(*source_group_conditions(source_group, partition=True))
     if not include_cancelled and effective_scope != "cancelled":
         query = query.filter(DocumentModel.status != "cancelled")
     if effective_wms_group == "yigishda":
