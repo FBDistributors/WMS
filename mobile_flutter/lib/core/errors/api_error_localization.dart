@@ -79,6 +79,69 @@ String localizeApiErrorMessage(AppLocale loc, Object error) {
     return StringLookup.t(loc, 'pickUseBoxScan');
   }
 
+  // --- Terish / skan oqimi xatolari (picker + controller) ---
+  // Miqdor oshib ketdi — inglizcha va o'zbekcha backend variantlari.
+  if (raw.contains('qty_picked cannot exceed qty_required') ||
+      raw.contains('kerak miqdordan oshib ketdi')) {
+    return StringLookup.t(loc, 'pickQtyExceedsRequired');
+  }
+  if (raw.contains('qty_picked cannot be below 0')) {
+    return StringLookup.t(loc, 'pickQtyBelowZero');
+  }
+  if (raw.contains('delta cannot exceed qty_picked')) {
+    return StringLookup.t(loc, 'pickDeltaExceedsPicked');
+  }
+  if (raw.contains('Line already fully picked')) {
+    return StringLookup.t(loc, 'pickLineAlreadyFull');
+  }
+  if (raw.contains('Line is skipped')) {
+    return StringLookup.t(loc, 'pickLineSkipped');
+  }
+  if (raw.contains('Line has no picked qty')) {
+    return StringLookup.t(loc, 'pickLineNoPickedQty');
+  }
+  if (raw.contains('Line missing product') ||
+      raw.contains('missing allocation details')) {
+    return StringLookup.t(loc, 'pickLineMissingAllocation');
+  }
+  if (raw == 'Mahsulot mos emas') {
+    return StringLookup.t(loc, 'pickProductMismatch');
+  }
+  if (raw.contains('Invalid lot for this product')) {
+    return StringLookup.t(loc, 'pickInvalidLot');
+  }
+  if (raw.contains("Quti topilmadi yoki noto'g'ri")) {
+    return StringLookup.t(loc, 'pickBoxNotFoundOrWrong');
+  }
+  if (raw.contains("buyurtma qatorlarida yetarli joy yo'q")) {
+    return StringLookup.t(loc, 'pickBoxNoRoom');
+  }
+  if (raw.contains('yetarli qoldiq yo‘q') ||
+      raw.contains("yetarli qoldiq yo'q")) {
+    return StringLookup.t(loc, 'pickNotEnoughAtLocation');
+  }
+  if (raw.contains('Pick only from NORMAL zone')) {
+    return StringLookup.t(loc, 'pickOnlyNormalZone');
+  }
+  if (raw.contains('qty must be positive')) {
+    return StringLookup.t(loc, 'pickQtyMustBePositive');
+  }
+  if (raw.contains('Document must be in picked status')) {
+    return StringLookup.t(loc, 'pickDocMustBePicked');
+  }
+  if (raw.contains('Already sent to controller')) {
+    return StringLookup.t(loc, 'pickAlreadySentToController');
+  }
+  if (raw.contains('Document not assigned to you')) {
+    return StringLookup.t(loc, 'pickDocNotYours');
+  }
+  if (raw.contains('VIP muddat')) {
+    return StringLookup.t(loc, 'pickVipInfoOnly');
+  }
+  if (raw.contains('sizning vazifangizda')) {
+    return StringLookup.t(loc, 'pickProductNotInTasks');
+  }
+
   if (raw.contains('box_count required for box scan')) {
     return StringLookup.t(loc, 'pickBoxCountRequired');
   }
@@ -86,6 +149,11 @@ String localizeApiErrorMessage(AppLocale loc, Object error) {
   if (raw.contains('barcode required for hybrid pick') ||
       raw.contains('Gibrid terish uchun mahsulot')) {
     return StringLookup.t(loc, 'pickBarcodeRequiredHybrid');
+  }
+
+  // Oddiy "barcode required" — gibrid variantidan keyin tekshiriladi (soya solmasin).
+  if (raw == 'barcode required') {
+    return StringLookup.t(loc, 'pickBarcodeRequired');
   }
 
   // --- Qabul (receiving) xatolari ---

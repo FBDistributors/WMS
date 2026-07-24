@@ -1,6 +1,7 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
+import '../../../core/errors/api_error_localization.dart';
 import '../../../core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -90,7 +91,7 @@ class _InventoryPackBoxPanelState extends ConsumerState<InventoryPackBoxPanel> {
     } on Exception catch (e) {
       if (mounted) {
         setState(() {
-          _breakdownError = '$e';
+          _breakdownError = localizeApiErrorMessage(ref.read(appLocaleProvider), e);
           _loadingBreakdown = false;
         });
       }

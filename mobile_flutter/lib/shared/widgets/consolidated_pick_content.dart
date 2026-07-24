@@ -950,7 +950,10 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
       error: (Object e, _) => Center(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Text('$e', textAlign: TextAlign.center),
+          child: Text(
+            localizeApiErrorMessage(ref.read(appLocaleProvider), e),
+            textAlign: TextAlign.center,
+          ),
         ),
       ),
     );

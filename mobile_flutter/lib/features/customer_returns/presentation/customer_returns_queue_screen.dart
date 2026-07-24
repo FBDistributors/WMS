@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/errors/api_error_localization.dart';
 import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../l10n/string_lookup.dart';
@@ -77,7 +78,7 @@ class CustomerReturnsQueueScreen extends ConsumerWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              Text('$e'),
+              Text(localizeApiErrorMessage(ref.read(appLocaleProvider), e)),
               FilledButton(
                 onPressed: () => ref.invalidate(customerReturnsQueueProvider),
                 child: Text(StringLookup.t(loc, 'retry')),

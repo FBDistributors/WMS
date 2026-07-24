@@ -11,6 +11,7 @@ import '../../../core/config/brand.dart';
 import '../../../core/theme/app_colors.dart';
 
 import '../../../core/app_state/app_locale.dart';
+import '../../../core/errors/api_error_localization.dart';
 import '../../../core/formatting/expiry_display_format.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../core/router/scanner_args.dart';
@@ -333,7 +334,7 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     } on Exception catch (e) {
       if (mounted) {
         setState(() {
-          _productError = '$e';
+          _productError = localizeApiErrorMessage(ref.read(appLocaleProvider), e);
           _loadingProduct = false;
         });
       }
@@ -1372,7 +1373,11 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         if (mounted) {
           showAppSnackBar(
             context,
-            const SnackBar(content: Text('Kod topilmadi')),
+            SnackBar(
+              content: Text(
+                StringLookup.t(ref.read(appLocaleProvider), 'codeNotFound'),
+              ),
+            ),
           );
         }
         return;
@@ -1400,7 +1405,14 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       _invOpenProduct(chosen.productId);
     } on Exception catch (e) {
       if (mounted) {
-        showAppSnackBar(context, SnackBar(content: Text('$e')));
+        showAppSnackBar(
+          context,
+          SnackBar(
+            content: Text(
+              localizeApiErrorMessage(ref.read(appLocaleProvider), e),
+            ),
+          ),
+        );
       }
     } finally {
       if (mounted) {
@@ -1523,7 +1535,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     } on Exception catch (e) {
       if (mounted) {
         setState(() {
-          _invContentsError = '$e';
+          _invContentsError =
+              localizeApiErrorMessage(ref.read(appLocaleProvider), e);
           _invLoadingContents = false;
         });
       }

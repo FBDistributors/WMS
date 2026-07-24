@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/errors/api_error_localization.dart';
 import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../core/app_state/network_status_provider.dart';
@@ -165,7 +166,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
     } on Exception catch (e) {
       if (mounted) {
         setState(() {
-          _productError = '$e';
+          _productError = localizeApiErrorMessage(ref.read(appLocaleProvider), e);
           _loadingProduct = false;
         });
       }
@@ -214,7 +215,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
     } on Exception catch (e) {
       if (mounted) {
         setState(() {
-          _palletError = '$e';
+          _palletError = localizeApiErrorMessage(ref.read(appLocaleProvider), e);
           _palletLoading = false;
         });
       }

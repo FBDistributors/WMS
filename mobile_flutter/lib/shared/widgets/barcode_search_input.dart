@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/app_state/locale_controller.dart';
+import '../../core/errors/api_error_localization.dart';
+import '../../l10n/string_lookup.dart';
 import '../../features/inventory/data/models/picker_inventory_models.dart';
 import '../../features/inventory/presentation/inventory_providers.dart';
 import '../input/input_clear_button.dart';
@@ -138,7 +141,8 @@ class _BarcodeSearchInputState extends ConsumerState<BarcodeSearchInput> {
       }
       final List<PickerInventoryItem> items = res.items;
       if (items.isEmpty) {
-        setState(() => _error = "Natija yo'q");
+        setState(() => _error =
+            StringLookup.t(ref.read(appLocaleProvider), 'noSearchResults'));
       } else if (items.length == 1) {
         _select(items.first);
       } else {
@@ -149,7 +153,8 @@ class _BarcodeSearchInputState extends ConsumerState<BarcodeSearchInput> {
       }
     } on Exception catch (e) {
       if (mounted) {
-        setState(() => _error = '$e');
+        setState(() =>
+            _error = localizeApiErrorMessage(ref.read(appLocaleProvider), e));
       }
     } finally {
       if (mounted) {

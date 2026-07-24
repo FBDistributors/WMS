@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/errors/api_error_localization.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../core/offline/offline_database.dart';
 import '../../../core/offline/offline_providers.dart';
@@ -60,7 +61,8 @@ class QueueScreen extends ConsumerWidget {
                   .toList(),
             ),
             loading: () => const CircularProgressIndicator(),
-            error: (Object e, _) => Text('$e'),
+            error: (Object e, _) =>
+                Text(localizeApiErrorMessage(ref.read(appLocaleProvider), e)),
           ),
           const SizedBox(height: 24),
           const Text('Xato', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -76,7 +78,8 @@ class QueueScreen extends ConsumerWidget {
                   .toList(),
             ),
             loading: () => const CircularProgressIndicator(),
-            error: (Object e, _) => Text('$e'),
+            error: (Object e, _) =>
+                Text(localizeApiErrorMessage(ref.read(appLocaleProvider), e)),
           ),
         ],
       ),

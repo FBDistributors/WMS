@@ -9,6 +9,7 @@ import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../core/app_state/network_status_provider.dart';
 import '../../../core/app_state/theme_controller.dart';
+import '../../../core/errors/api_error_localization.dart';
 import '../../../l10n/string_lookup.dart';
 import '../../../shared/feedback/app_top_snackbar.dart';
 import '../../../shared/widgets/consolidated_pick_content.dart';
@@ -1123,7 +1124,7 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: <Widget>[
-                          Text('$e'),
+                          Text(localizeApiErrorMessage(loc, e)),
                           FilledButton(
                             onPressed: () => unawaited(
                               ref.read(openPickTasksProvider.notifier).refreshFromNetwork(),

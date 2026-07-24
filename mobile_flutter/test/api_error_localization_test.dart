@@ -301,4 +301,65 @@ void main() {
       );
     });
   });
+
+  group('picking scan-flow errors translate to user locale', () {
+    void expectMapped(String backend, String key) {
+      for (final AppLocale loc in AppLocale.values) {
+        final String got = localizeApiErrorMessage(loc, Exception(backend));
+        expect(got, StringLookup.t(loc, key), reason: '$backend -> $key ($loc)');
+      }
+    }
+
+    test('qty exceeds required (english backend)', () {
+      expectMapped('qty_picked cannot exceed qty_required', 'pickQtyExceedsRequired');
+    });
+
+    test('qty exceeds required (uzbek backend)', () {
+      expectMapped(
+        "Terish miqdori buyurtma bo'yicha kerak miqdordan oshib ketdi. Ehtimol allaqachon terilgan.",
+        'pickQtyExceedsRequired',
+      );
+    });
+
+    test('qty below zero', () {
+      expectMapped('qty_picked cannot be below 0', 'pickQtyBelowZero');
+    });
+
+    test('delta cannot exceed picked', () {
+      expectMapped('delta cannot exceed qty_picked', 'pickDeltaExceedsPicked');
+    });
+
+    test('line already fully picked', () {
+      expectMapped('Line already fully picked', 'pickLineAlreadyFull');
+    });
+
+    test('invalid lot', () {
+      expectMapped('Invalid lot for this product', 'pickInvalidLot');
+    });
+
+    test('only normal zone', () {
+      expectMapped(
+        'Pick only from NORMAL zone. Line location is not NORMAL.',
+        'pickOnlyNormalZone',
+      );
+    });
+
+    test('document must be in picked status', () {
+      expectMapped('Document must be in picked status', 'pickDocMustBePicked');
+    });
+
+    test('qty exceed does not leak english into russian', () {
+      final String ru = localizeApiErrorMessage(
+        AppLocale.ru,
+        Exception('qty_picked cannot exceed qty_required'),
+      );
+      expect(ru, isNot(contains('qty_picked')));
+      expect(ru, isNot(contains('exceed')));
+    });
+
+    test('plain barcode required is not shadowed by hybrid variant', () {
+      expectMapped('barcode required', 'pickBarcodeRequired');
+      expectMapped('barcode required for hybrid pick', 'pickBarcodeRequiredHybrid');
+    });
+  });
 }

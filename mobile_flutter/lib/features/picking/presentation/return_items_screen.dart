@@ -1,11 +1,11 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
+import '../../../core/errors/api_error_localization.dart';
 import '../../../core/theme/app_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
 import '../../../core/app_state/network_status_provider.dart';
 import '../../../core/router/scanner_args.dart';
@@ -77,7 +77,7 @@ class _ReturnItemsScreenState extends ConsumerState<ReturnItemsScreen> {
         return;
       }
       setState(() {
-        _loadError = '$e';
+        _loadError = localizeApiErrorMessage(ref.read(appLocaleProvider), e);
         _loading = false;
       });
     }

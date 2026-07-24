@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/errors/api_error_localization.dart';
 import '../../../core/router/scanner_args.dart';
 import '../../../core/app_state/app_locale.dart';
 import '../../../core/app_state/locale_controller.dart';
@@ -120,7 +121,7 @@ class _CustomerReturnDetailScreenState
       ),
       body: detailAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (Object e, _) => Center(child: Text('$e')),
+        error: (Object e, _) => Center(child: Text(localizeApiErrorMessage(ref.read(appLocaleProvider), e))),
         data: (CustomerReturn ret) {
           final String sentAt =
               formatCustomerReturnApiDateTime(ret.assignedAt ?? ret.updatedAt);

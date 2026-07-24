@@ -92,7 +92,7 @@ class _PickerWorkScreenState extends ConsumerState<PickerWorkScreen> {
     } on Exception catch (e) {
       if (mounted) {
         setState(() {
-          _error = '$e';
+          _error = localizeApiErrorMessage(ref.read(appLocaleProvider), e);
           _loading = false;
         });
       }
