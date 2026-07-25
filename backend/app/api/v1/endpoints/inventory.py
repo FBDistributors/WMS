@@ -23,10 +23,18 @@ from app.core.stock_rules import check_location_single_expiry
 from app.services.audit_service import ACTION_CREATE, get_client_ip, log_action
 from app.services.box_location_service import (
     assert_box_invariant,
-    get_breakdown_tolerant,
     product_box_summary_map,
     remove_all_sealed_at,
     units_in_boxes_at,
+)
+from app.services.location_transfer_service import (
+    LocationTransferResult,
+    assert_invariants,
+    transfer_location_contents,
+)
+from app.services.sector_transfer_service import (
+    SectorTransferPlan,
+    build_sector_transfer_plan,
 )
 from app.services.stock_availability import (
     compute_lot_location_balances,
@@ -36,17 +44,11 @@ from app.services.stock_availability import (
 )
 
 from app.api.v1.endpoints import picker_inventory
-from app.api.v1.endpoints.picker_inventory import _get_lot_level_balances
 from app.db import get_db
 from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
 from app.models.brand import Brand as BrandModel
 from app.models.location import Location as LocationModel
-from app.models.location_box_placement import (
-    PLACEMENT_SEALED,
-    LocationBoxPlacement as LocationBoxPlacementModel,
-)
-from app.models.product_box import ProductBox as ProductBoxModel
 from app.models.idempotency_key import IdempotencyKey as IdempotencyKeyModel
 from app.models.order import Order as OrderModel
 from app.models.product import Product as ProductModel
@@ -564,6 +566,53 @@ class LocationTransferOut(BaseModel):
     movements_created: int
     lines_requested: int = 0
     boxes_transferred: int = 0
+
+
+class SectorTransferRowOut(BaseModel):
+    """Sektor rejasining bitta qatori — bitta manba joyi va uning manzili."""
+
+    from_location_id: UUID
+    from_code: str
+    to_location_id: Optional[UUID] = None
+    to_code: Optional[str] = None
+    lines: int
+    total_qty: Decimal
+    boxes: int
+    status: str = Field(
+        ...,
+        description=(
+            "ok | empty | dest_missing | reserved | expiry_conflict | dest_not_empty"
+        ),
+    )
+    movable: bool
+
+
+class SectorTransferPreviewOut(BaseModel):
+    from_prefix: str
+    to_prefix: str
+    location_type: str
+    #: Bloklovchi holat yo'q va kamida bitta joy ko'chadi.
+    can_submit: bool
+    locations_total: int
+    locations_to_move: int
+    lines_to_move: int
+    boxes_to_move: int
+    total_qty_to_move: Decimal
+    rows: list[SectorTransferRowOut]
+
+
+class SectorTransferIn(BaseModel):
+    from_sector: str = Field(..., description="Manba sektori, masalan P-H")
+    to_sector: str = Field(..., description="Manzil sektori, masalan P-K")
+
+
+class SectorTransferOut(BaseModel):
+    from_prefix: str
+    to_prefix: str
+    locations_transferred: int
+    lines_transferred: int
+    movements_created: int
+    boxes_transferred: int
 
 
 class BrandZeroStockResponse(BaseModel):
@@ -2304,290 +2353,29 @@ async def transfer_location_stock(
         check_controller_adjust_reason(user, "inventory_shortage")
         check_controller_adjust_reason(user, "inventory_overage")
 
-        raw_rows = _get_lot_level_balances(db, product_ids=None, location_id=payload.from_location_id)
-        rows = [r for r in raw_rows if Decimal(str(r["available"])) > 0]
-        if not rows:
-            raise HTTPException(
-                status_code=400,
-                detail="No available quantity to transfer at the source location",
-            )
-        rows_by_lot = {r["lot_id"]: r for r in rows}
-
-        lines_requested = 0
-        transfer_rows: list[dict[str, Any]] = []
-        if payload.mode == "partial":
-            if not payload.lines:
-                raise HTTPException(status_code=400, detail="Transfer lines are required for partial mode")
-            lines_requested = len(payload.lines)
-            for line in payload.lines:
-                r = rows_by_lot.get(line.lot_id)
-                if r is None:
-                    raise HTTPException(status_code=400, detail=f"Lot not available at source location: {line.lot_id}")
-                if r["product_id"] != line.product_id:
-                    raise HTTPException(status_code=400, detail=f"Product/lot mismatch: {line.lot_id}")
-                available_qty = Decimal(str(r["available"]))
-                if line.qty > available_qty:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Requested qty exceeds available for lot {line.lot_id}",
-                    )
-                # Q4: dona ko'chirish faqat qutisiz (loose) zaxiradan. Qutidagi
-                # donalarni dona qilib ko'chirib bo'lmaydi — quti yopiq ko'chiriladi.
-                loose_at_src = get_breakdown_tolerant(
-                    db,
-                    product_id=r["product_id"],
-                    lot_id=r["lot_id"],
-                    location_id=payload.from_location_id,
-                ).loose_units
-                if line.qty > Decimal(loose_at_src):
-                    raise HTTPException(
-                        status_code=400,
-                        detail=(
-                            "Qutidagi zaxirani dona qilib ko'chirib bo'lmaydi "
-                            f"(qutisiz mavjud {loose_at_src}). Avval qutini ko'chiring yoki oching."
-                        ),
-                    )
-                transfer_rows.append(
-                    {
-                        "product_id": r["product_id"],
-                        "lot_id": r["lot_id"],
-                        "qty": line.qty,
-                    }
-                )
-        else:
-            # Q4: ommaviy (full) ko'chirishda ham faqat qutisiz qism ko'chadi;
-            # yopiq qutilar joyida qoladi (ularni quti-ko'chirish orqali ko'chiring).
-            for r in rows:
-                loose_at_src = get_breakdown_tolerant(
-                    db,
-                    product_id=r["product_id"],
-                    lot_id=r["lot_id"],
-                    location_id=payload.from_location_id,
-                ).loose_units
-                qty_loose = min(Decimal(str(r["available"])), Decimal(loose_at_src))
-                if qty_loose > 0:
-                    transfer_rows.append(
-                        {
-                            "product_id": r["product_id"],
-                            "lot_id": r["lot_id"],
-                            "qty": qty_loose,
-                        }
-                    )
-
-        # Q4 (full rejim): "Butun palet" fizik ko'chirilganda undagi yopiq qutilar
-        # ham birga ko'chadi (placement + fizik qoldiq, relocate_sealed_box kabi).
-        sealed_placements: list[tuple[LocationBoxPlacementModel, ProductBoxModel]] = []
-        if payload.mode == "full":
-            sealed_placements = (
-                db.query(LocationBoxPlacementModel, ProductBoxModel)
-                .join(ProductBoxModel, LocationBoxPlacementModel.product_box_id == ProductBoxModel.id)
-                .filter(
-                    LocationBoxPlacementModel.location_id == payload.from_location_id,
-                    LocationBoxPlacementModel.status == PLACEMENT_SEALED,
-                )
-                .order_by(LocationBoxPlacementModel.placed_at.asc())
-                .all()
-            )
-
-        # Oldindan tekshiruv: quti ko'chadigan har bir lot uchun (1) drift bo'lsa
-        # sanoqqa yo'naltiruvchi aniq xabar, (2) rezerv bo'lsa — palet to'liq
-        # ko'chirilsa manbada available manfiy bo'ladi, shuning uchun aniq sabab
-        # bilan bloklanadi (aks holda oxirida umumiy "Negative balance" chiqardi).
-        checked_box_lots: set[UUID] = set()
-        for placement, _box in sealed_placements:
-            if placement.lot_id in checked_box_lots:
-                continue
-            checked_box_lots.add(placement.lot_id)
-            assert_box_invariant(db, placement.lot_id, payload.from_location_id)
-            _oh, reserved_at_src, _av = compute_lot_location_balances(
-                db, placement.lot_id, payload.from_location_id
-            )
-            if reserved_at_src > 0:
-                raise HTTPException(
-                    status_code=409,
-                    detail=(
-                        f"Joyda rezervdagi (terish uchun band) zaxira bor: {int(reserved_at_src)} dona. "
-                        "Palet to'liq ko'chirilishi uchun avval terish yakunlanishi "
-                        "yoki rezerv bekor qilinishi kerak."
-                    ),
-                )
-
-        if not transfer_rows and not sealed_placements:
-            raise HTTPException(status_code=400, detail="No transfer lines selected")
-
-        client_ip = get_client_ip(request)
-        movements_created = 0
-        boxes_transferred = 0
-        box_lot_ids: set[UUID] = set()
         try:
-            for r in transfer_rows:
-                qty = Decimal(str(r["qty"]))
-                if qty <= 0:
-                    continue
-                product_id = r["product_id"]
-                lot_id = r["lot_id"]
-                lot = db.query(StockLotModel).filter(StockLotModel.id == lot_id).one_or_none()
-                if not lot or lot.product_id != product_id:
-                    raise HTTPException(status_code=400, detail="Stock lot not found or mismatch")
-
-                check_location_single_expiry(db, payload.to_location_id, product_id, lot.expiry_date)
-                require_sufficient_available(
-                    db,
-                    product_id,
-                    lot_id,
-                    payload.from_location_id,
-                    qty,
-                    lock=True,
-                )
-
-                mov_out = StockMovementModel(
-                    product_id=product_id,
-                    lot_id=lot_id,
-                    location_id=payload.from_location_id,
-                    qty_change=-qty,
-                    movement_type="adjust",
-                    created_by_user_id=user.id,
-                    reason_code="inventory_shortage",
-                )
-                mov_in = StockMovementModel(
-                    product_id=product_id,
-                    lot_id=lot_id,
-                    location_id=payload.to_location_id,
-                    qty_change=qty,
-                    movement_type="adjust",
-                    created_by_user_id=user.id,
-                    reason_code="inventory_overage",
-                )
-                db.add(mov_out)
-                db.add(mov_in)
-                db.flush()
-
-                log_action(
-                    db,
-                    user_id=user.id,
-                    action=ACTION_CREATE,
-                    entity_type="stock_movement",
-                    entity_id=str(mov_out.id),
-                    new_data={
-                        "product_id": str(product_id),
-                        "lot_id": str(lot_id),
-                        "location_id": str(payload.from_location_id),
-                        "qty_change": str(-qty),
-                        "movement_type": "adjust",
-                        "transfer_location_bulk": payload.mode == "full",
-                        "transfer_location_partial": payload.mode == "partial",
-                    },
-                    ip_address=client_ip,
-                )
-                log_action(
-                    db,
-                    user_id=user.id,
-                    action=ACTION_CREATE,
-                    entity_type="stock_movement",
-                    entity_id=str(mov_in.id),
-                    new_data={
-                        "product_id": str(product_id),
-                        "lot_id": str(lot_id),
-                        "location_id": str(payload.to_location_id),
-                        "qty_change": str(qty),
-                        "movement_type": "adjust",
-                        "transfer_location_bulk": payload.mode == "full",
-                        "transfer_location_partial": payload.mode == "partial",
-                    },
-                    ip_address=client_ip,
-                )
-                movements_created += 2
-
-            # Yopiq qutilarni ko'chirish (faqat full rejim): har placement uchun
-            # transfer_out/transfer_in juftligi + placement joyi yangilanadi.
-            for placement, box in sealed_placements:
-                lot = db.query(StockLotModel).filter(StockLotModel.id == placement.lot_id).one_or_none()
-                if not lot or lot.product_id != box.product_id:
-                    raise HTTPException(status_code=400, detail="Stock lot not found or mismatch")
-
-                check_location_single_expiry(db, payload.to_location_id, box.product_id, lot.expiry_date)
-                lock_lot_location(db, placement.lot_id, payload.from_location_id)
-                lock_lot_location(db, placement.lot_id, payload.to_location_id)
-
-                upb = Decimal(str(box.units_per_box))
-                mov_out = StockMovementModel(
-                    product_id=box.product_id,
-                    lot_id=placement.lot_id,
-                    location_id=payload.from_location_id,
-                    qty_change=-upb,
-                    movement_type="transfer_out",
-                    created_by_user_id=user.id,
-                )
-                mov_in = StockMovementModel(
-                    product_id=box.product_id,
-                    lot_id=placement.lot_id,
-                    location_id=payload.to_location_id,
-                    qty_change=upb,
-                    movement_type="transfer_in",
-                    created_by_user_id=user.id,
-                )
-                db.add(mov_out)
-                db.add(mov_in)
-                placement.location_id = payload.to_location_id
-                db.flush()
-
-                for mov, loc_id, qty_change in (
-                    (mov_out, payload.from_location_id, -upb),
-                    (mov_in, payload.to_location_id, upb),
-                ):
-                    log_action(
-                        db,
-                        user_id=user.id,
-                        action=ACTION_CREATE,
-                        entity_type="stock_movement",
-                        entity_id=str(mov.id),
-                        new_data={
-                            "product_id": str(box.product_id),
-                            "lot_id": str(placement.lot_id),
-                            "location_id": str(loc_id),
-                            "qty_change": str(qty_change),
-                            "movement_type": mov.movement_type,
-                            "transfer_location_bulk": True,
-                            "transfer_location_box": True,
-                            "box_barcode": box.box_barcode,
-                        },
-                        ip_address=client_ip,
-                    )
-                movements_created += 2
-                boxes_transferred += 1
-                box_lot_ids.add(placement.lot_id)
-
-            affected_pairs = {
-                (r["lot_id"], payload.from_location_id) for r in transfer_rows
-            } | {
-                (r["lot_id"], payload.to_location_id) for r in transfer_rows
-            } | {
-                (lot_id, payload.from_location_id) for lot_id in box_lot_ids
-            } | {
-                (lot_id, payload.to_location_id) for lot_id in box_lot_ids
-            }
-            _verify_non_negative_balances_or_raise(db, list(affected_pairs))
-            # Loose ko'chganda invariant manbada saqlanishi shart; quti ko'chgan
-            # lotlar uchun ikkala tomonda ham tekshiriladi.
-            for r in transfer_rows:
-                assert_box_invariant(db, r["lot_id"], payload.from_location_id)
-            for lot_id in box_lot_ids:
-                assert_box_invariant(db, lot_id, payload.from_location_id)
-                assert_box_invariant(db, lot_id, payload.to_location_id)
+            result = transfer_location_contents(
+                db,
+                from_location_id=payload.from_location_id,
+                to_location_id=payload.to_location_id,
+                user_id=user.id,
+                mode=payload.mode,
+                lines=payload.lines,
+                client_ip=get_client_ip(request),
+            )
+            _verify_non_negative_balances_or_raise(db, list(result.balance_pairs))
+            assert_invariants(db, result.invariant_pairs)
             db.commit()
-        except HTTPException:
-            db.rollback()
-            raise
         except Exception:
             db.rollback()
             raise
 
         invalidate_warehouse_transfers_cache()
         return LocationTransferOut(
-            lines_transferred=len(transfer_rows),
-            movements_created=movements_created,
-            lines_requested=lines_requested,
-            boxes_transferred=boxes_transferred,
+            lines_transferred=result.lines_transferred,
+            movements_created=result.movements_created,
+            lines_requested=result.lines_requested,
+            boxes_transferred=result.boxes_transferred,
         )
 
     return _run_with_idempotency(
@@ -2598,6 +2386,156 @@ async def transfer_location_stock(
         payload=payload.model_dump(mode="json"),
         expected_status=status.HTTP_200_OK,
         run=_run_transfer,
+    )
+
+
+def _to_sector_preview(plan: SectorTransferPlan) -> SectorTransferPreviewOut:
+    return SectorTransferPreviewOut(
+        from_prefix=plan.from_prefix,
+        to_prefix=plan.to_prefix,
+        location_type=plan.location_type,
+        can_submit=plan.can_submit,
+        locations_total=len(plan.rows),
+        locations_to_move=plan.locations_to_move,
+        lines_to_move=plan.lines_to_move,
+        boxes_to_move=plan.boxes_to_move,
+        total_qty_to_move=plan.total_qty_to_move,
+        rows=[
+            SectorTransferRowOut(
+                from_location_id=r.from_location_id,
+                from_code=r.from_code,
+                to_location_id=r.to_location_id,
+                to_code=r.to_code,
+                lines=r.lines,
+                total_qty=r.total_qty,
+                boxes=r.boxes,
+                status=r.status,
+                movable=r.movable,
+            )
+            for r in plan.rows
+        ],
+    )
+
+
+@router.get(
+    "/movements/sector-transfer/preview",
+    response_model=SectorTransferPreviewOut,
+    summary="Preview moving a whole sector to another, position by position",
+)
+async def preview_sector_transfer(
+    from_sector: str = Query(..., alias="from", description="Manba sektori, masalan P-H"),
+    to_sector: str = Query(..., alias="to", description="Manzil sektori, masalan P-K"),
+    db: Session = Depends(get_db),
+    _user: UserModel = Depends(get_current_user),
+    _guard=Depends(require_permission("inventory:adjust")),
+):
+    """Sektorni ko'chirishdan oldingi ko'rinish: qaysi joy qayerga, nima to'sqinlik qiladi.
+
+    Hech narsa o'zgartirmaydi. Ko'chirish "hammasi yoki hech narsa" bo'lgani uchun
+    foydalanuvchi 15 ta paletni ko'chirmoqchi bo'lib 14-sida to'xtab qolishini
+    oldindan bilishi kerak.
+
+    To'liq joy kodi ham qabul qilinadi (`P-H-03` → `P-H`) — ombor xodimi sektorning
+    o'zini emas, palet yorlig'ini skanerlaydi.
+    """
+    return _to_sector_preview(build_sector_transfer_plan(db, from_sector, to_sector))
+
+
+@router.post(
+    "/movements/sector-transfer",
+    response_model=SectorTransferOut,
+    status_code=status.HTTP_200_OK,
+    summary="Move a whole sector to another, position by position (all or nothing)",
+)
+async def transfer_sector_stock(
+    request: Request,
+    payload: SectorTransferIn,
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
+    db: Session = Depends(get_db),
+    user: UserModel = Depends(get_current_user),
+    _guard=Depends(require_permission("inventory:adjust")),
+):
+    """Butun sektorni ko'chiradi: `P-H-01 → P-K-01`, `P-H-02 → P-K-02` va h.k.
+
+    Hammasi yoki hech narsa: bitta joy ham bloklangan bo'lsa (rezerv, manzil yo'q,
+    muddat to'qnashuvi) hech narsa ko'chmaydi va 409 qaytadi.
+    """
+
+    def _run_sector_transfer():
+        check_controller_adjust_reason(user, "inventory_shortage")
+        check_controller_adjust_reason(user, "inventory_overage")
+
+        # Reja preview bilan bir xil funksiyadan quriladi va aynan shu yerda,
+        # tranzaksiya ichida qayta tekshiriladi: preview'dan keyin holat o'zgargan
+        # bo'lsa (masalan yangi rezerv paydo bo'lsa) amal bajarilmaydi.
+        plan = build_sector_transfer_plan(db, payload.from_sector, payload.to_sector)
+        if not plan.can_submit:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "sector_transfer_blocked",
+                    "message": (
+                        "Sektorni ko'chirib bo'lmadi: to'siq bor joylar mavjud "
+                        "yoki ko'chadigan qoldiq yo'q"
+                    ),
+                    "rows": [
+                        {
+                            "from_code": r.from_code,
+                            "to_code": r.to_code,
+                            "status": r.status,
+                        }
+                        for r in plan.blocking_rows[:20]
+                    ],
+                },
+            )
+
+        client_ip = get_client_ip(request)
+        total = LocationTransferResult()
+        try:
+            for row in plan.movable_rows:
+                total.merge(
+                    transfer_location_contents(
+                        db,
+                        from_location_id=row.from_location_id,
+                        to_location_id=row.to_location_id,
+                        user_id=user.id,
+                        mode="full",
+                        client_ip=client_ip,
+                        allow_empty=True,
+                        log_extra={
+                            "sector_transfer": True,
+                            "sector_from": plan.from_prefix,
+                            "sector_to": plan.to_prefix,
+                        },
+                    )
+                )
+            # Tekshiruvlar butun sektor bo'yicha bir marta — har joy uchun
+            # takrorlanmaydi va juftliklar takrorlansa ham bir marta sanaladi.
+            _verify_non_negative_balances_or_raise(db, list(total.balance_pairs))
+            assert_invariants(db, total.invariant_pairs)
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+        invalidate_warehouse_transfers_cache()
+        return SectorTransferOut(
+            from_prefix=plan.from_prefix,
+            to_prefix=plan.to_prefix,
+            locations_transferred=plan.locations_to_move,
+            lines_transferred=total.lines_transferred,
+            movements_created=total.movements_created,
+            boxes_transferred=total.boxes_transferred,
+        )
+
+    return _run_with_idempotency(
+        db=db,
+        user_id=user.id,
+        key=idempotency_key,
+        scope="inventory_transfer_sector",
+        payload=payload.model_dump(mode="json"),
+        expected_status=status.HTTP_200_OK,
+        run=_run_sector_transfer,
     )
 
 

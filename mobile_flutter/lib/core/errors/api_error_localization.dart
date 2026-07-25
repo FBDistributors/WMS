@@ -217,6 +217,26 @@ String localizeApiErrorMessage(AppLocale loc, Object error) {
     return StringLookup.t(loc, 'receivingLotProductMismatch');
   }
 
+  // --- Sektor ko'chirish xatolari ---
+  if (raw.contains('Sektor topilmadi')) {
+    return StringLookup.t(loc, 'sectorNotFound');
+  }
+  if (raw.contains('bir nechta joy turiga')) {
+    return StringLookup.t(loc, 'sectorAmbiguous');
+  }
+  if (raw.contains('turlari mos emas')) {
+    return StringLookup.t(loc, 'sectorTypesMismatch');
+  }
+  if (raw.contains("Sektorda juda ko'p joy")) {
+    return StringLookup.t(loc, 'sectorTooManyLocations');
+  }
+  if (raw.contains("Sektorni ko'chirib bo'lmadi")) {
+    return StringLookup.t(loc, 'sectorTransferBlocked');
+  }
+  if (raw.contains('Source and destination sectors must differ')) {
+    return StringLookup.t(loc, 'sectorSameSource');
+  }
+
   // --- Ko'chirish (transfer-location) xatolari ---
   if (raw.contains('No available quantity to transfer')) {
     return StringLookup.t(loc, 'movementNoAvailableAtSource');

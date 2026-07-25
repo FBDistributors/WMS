@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../../core/network/app_dio.dart';
+import '../domain/sector_transfer_status.dart';
 
 /// HTTP 403 on POST /inventory/movements (inventory adjust permission).
 class StockMovementForbiddenException implements Exception {
@@ -42,6 +43,125 @@ class TransferLocationLineInput {
   final String productId;
   final String lotId;
   final int qty;
+}
+
+/// Sektor ko'chirish rejasining bitta qatori: bitta manba joyi va uning manzili.
+class SectorTransferRow {
+  const SectorTransferRow({
+    required this.fromCode,
+    required this.toCode,
+    required this.lines,
+    required this.totalQty,
+    required this.boxes,
+    required this.status,
+    required this.movable,
+  });
+
+  final String fromCode;
+
+  /// Manzil joyi; `null` — mos o'rin topilmadi (`dest_missing`).
+  final String? toCode;
+  final int lines;
+  final int totalQty;
+  final int boxes;
+
+  /// ok | empty | dest_missing | reserved | expiry_conflict | dest_not_empty
+  final String status;
+
+  /// Bu joy haqiqatan ko'chadimi (ogohlantirish bilan bo'lsa ham).
+  final bool movable;
+
+  /// Butun amalni bloklovchi holatmi.
+  bool get blocking => kSectorBlockingStatuses.contains(status);
+
+  factory SectorTransferRow.fromJson(Map<String, Object?> json) {
+    return SectorTransferRow(
+      fromCode: (json['from_code'] as String?) ?? '',
+      toCode: json['to_code'] as String?,
+      lines: _int(json['lines']),
+      totalQty: _int(json['total_qty']),
+      boxes: _int(json['boxes']),
+      status: (json['status'] as String?) ?? kSectorStatusOk,
+      movable: json['movable'] == true,
+    );
+  }
+}
+
+/// Sektor ko'chirishdan oldingi ko'rinish.
+class SectorTransferPreview {
+  const SectorTransferPreview({
+    required this.fromPrefix,
+    required this.toPrefix,
+    required this.canSubmit,
+    required this.locationsTotal,
+    required this.locationsToMove,
+    required this.linesToMove,
+    required this.boxesToMove,
+    required this.totalQtyToMove,
+    required this.rows,
+  });
+
+  final String fromPrefix;
+  final String toPrefix;
+
+  /// Bloklovchi qator yo'q va kamida bitta joy ko'chadi.
+  final bool canSubmit;
+  final int locationsTotal;
+  final int locationsToMove;
+  final int linesToMove;
+  final int boxesToMove;
+  final int totalQtyToMove;
+  final List<SectorTransferRow> rows;
+
+  List<SectorTransferRow> get blockingRows =>
+      rows.where((SectorTransferRow r) => r.blocking).toList(growable: false);
+
+  factory SectorTransferPreview.fromJson(Map<String, Object?> json) {
+    final Object? rawRows = json['rows'];
+    return SectorTransferPreview(
+      fromPrefix: (json['from_prefix'] as String?) ?? '',
+      toPrefix: (json['to_prefix'] as String?) ?? '',
+      canSubmit: json['can_submit'] == true,
+      locationsTotal: _int(json['locations_total']),
+      locationsToMove: _int(json['locations_to_move']),
+      linesToMove: _int(json['lines_to_move']),
+      boxesToMove: _int(json['boxes_to_move']),
+      totalQtyToMove: _int(json['total_qty_to_move']),
+      rows: rawRows is List
+          ? rawRows
+              .whereType<Map<Object?, Object?>>()
+              .map((Map<Object?, Object?> e) =>
+                  SectorTransferRow.fromJson(Map<String, Object?>.from(e)))
+              .toList(growable: false)
+          : const <SectorTransferRow>[],
+    );
+  }
+}
+
+class SectorTransferResponse {
+  const SectorTransferResponse({
+    required this.fromPrefix,
+    required this.toPrefix,
+    required this.locationsTransferred,
+    required this.linesTransferred,
+    required this.boxesTransferred,
+  });
+
+  final String fromPrefix;
+  final String toPrefix;
+  final int locationsTransferred;
+  final int linesTransferred;
+  final int boxesTransferred;
+
+  factory SectorTransferResponse.fromJson(Map<String, Object?> json) {
+    return SectorTransferResponse(
+      fromPrefix: (json['from_prefix'] as String?) ?? '',
+      toPrefix: (json['to_prefix'] as String?) ?? '',
+      locationsTransferred: _int(json['locations_transferred']),
+      linesTransferred: _int(json['lines_transferred']),
+      boxesTransferred: _int(json['boxes_transferred']),
+    );
+  }
 }
 
 class MovementsRepository {
@@ -121,6 +241,52 @@ class MovementsRepository {
         throw const FormatException('transfer');
       }
       return TransferLocationResponse.fromJson(Map<String, Object?>.from(data));
+    } on DioException catch (e) {
+      throw Exception(mapDioExceptionToMessage(e));
+    }
+  }
+  /// Sektorni ko'chirishdan oldingi ko'rinish — hech narsani o'zgartirmaydi.
+  Future<SectorTransferPreview> previewSectorTransfer({
+    required String fromSector,
+    required String toSector,
+  }) async {
+    try {
+      final Response<Object?> res = await _dio.get<Object?>(
+        '/inventory/movements/sector-transfer/preview',
+        queryParameters: <String, Object?>{'from': fromSector, 'to': toSector},
+      );
+      final Object? data = res.data;
+      if (data is! Map) {
+        throw const FormatException('sector-preview');
+      }
+      return SectorTransferPreview.fromJson(Map<String, Object?>.from(data));
+    } on DioException catch (e) {
+      throw Exception(mapDioExceptionToMessage(e));
+    }
+  }
+
+  /// Butun sektorni ko'chiradi (hammasi yoki hech narsa).
+  Future<SectorTransferResponse> transferSector({
+    required String fromSector,
+    required String toSector,
+    String? idempotencyKey,
+  }) async {
+    try {
+      final Response<Object?> res = await _dio.post<Object?>(
+        '/inventory/movements/sector-transfer',
+        options: idempotencyKey != null && idempotencyKey.isNotEmpty
+            ? Options(headers: <String, String>{'Idempotency-Key': idempotencyKey})
+            : null,
+        data: <String, Object>{
+          'from_sector': fromSector,
+          'to_sector': toSector,
+        },
+      );
+      final Object? data = res.data;
+      if (data is! Map) {
+        throw const FormatException('sector-transfer');
+      }
+      return SectorTransferResponse.fromJson(Map<String, Object?>.from(data));
     } on DioException catch (e) {
       throw Exception(mapDioExceptionToMessage(e));
     }

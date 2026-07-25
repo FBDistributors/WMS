@@ -21,10 +21,13 @@ import '../../../shared/widgets/barcode_search_input.dart';
 import '../../../shared/widgets/product_card.dart';
 import '../../../shared/widgets/scan_action_button.dart';
 import '../../product_boxes/product_box_providers.dart';
+import '../../scanner/data/scanner_repository.dart';
+import '../../scanner/scanner_providers.dart';
 import '../data/movements_repository.dart';
+import '../domain/sector_transfer_status.dart';
 import '../movements_providers.dart';
 
-enum _MovementPhase { choose, scanProduct, pallet }
+enum _MovementPhase { choose, scanProduct, pallet, sector }
 
 /// RN `MovementScreen` — mahsulot yoki palet ko‘chirish.
 class MovementScreen extends ConsumerStatefulWidget {
@@ -62,6 +65,15 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
   bool _palletFullTransfer = true;
   final Map<String, bool> _palletSelected = <String, bool>{};
   final Map<String, String> _palletSelectedQty = <String, String>{};
+
+  final TextEditingController _sectorFrom = TextEditingController();
+  final TextEditingController _sectorTo = TextEditingController();
+  SectorTransferPreview? _sectorPreview;
+  bool _sectorChecking = false;
+  bool _sectorSubmitting = false;
+  String? _sectorError;
+  String? _sectorSubmitKey;
+  String? _sectorSubmitSig;
 
   String? _lastHandledProductId;
   String? _lastHandledLocationCode;
@@ -109,6 +121,8 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
     _locationSearchCtrl.dispose();
     _palletDestCtrl.dispose();
     _palletCode.dispose();
+    _sectorFrom.dispose();
+    _sectorTo.dispose();
     super.dispose();
   }
 
@@ -512,6 +526,18 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
       _resetRouteScanState();
       return;
     }
+    if (_phase == _MovementPhase.sector) {
+      setState(() {
+        _phase = _MovementPhase.choose;
+        _sectorPreview = null;
+        _sectorError = null;
+        _sectorFrom.clear();
+        _sectorTo.clear();
+        _sectorSubmitKey = null;
+        _sectorSubmitSig = null;
+      });
+      return;
+    }
     setState(() {
       _phase = _MovementPhase.choose;
       _palletContents = null;
@@ -583,6 +609,197 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
           ..addAll(qtyByKey);
       }
     });
+  }
+
+  /// Kiritilgan matnni sektor prefiksiga keltiradi; yaroqsiz bo'lsa xato ko'rsatadi.
+  String? _readSectorInput(TextEditingController ctrl) {
+    final String? prefix = sectorPrefixFromInput(ctrl.text);
+    if (prefix == null) {
+      return null;
+    }
+    // Skanerlangan palet kodi prefiksga qisqaradi — foydalanuvchi nima
+    // yuborilayotganini ko'rib tursin.
+    if (ctrl.text.trim().toUpperCase() != prefix) {
+      ctrl.text = prefix;
+    }
+    return prefix;
+  }
+
+  /// Joy yorlig'ini skanerlab, uning sektorini maydonga qo'yadi.
+  ///
+  /// Skaner `pushNamed` bilan ochiladi va natija qaytariladi — route orqali
+  /// qaytish ekran holatini (kiritilgan ikkinchi sektorni) yo'qotardi.
+  Future<void> _scanSectorInto(TextEditingController target) async {
+    final AppLocale loc = ref.read(appLocaleProvider);
+    final String? raw = await context.pushNamed<String>(
+      'scanner',
+      extra: const ScannerArgs(returnRawBarcode: true),
+    );
+    if (!mounted || raw == null || raw.trim().isEmpty) {
+      return;
+    }
+    String code = raw.trim();
+    try {
+      final ScannerResolveOut out =
+          await ref.read(scannerRepositoryProvider).resolveBarcode(code);
+      if (out.locationCode != null && out.locationCode!.trim().isNotEmpty) {
+        code = out.locationCode!.trim();
+      }
+    } on Exception {
+      // Resolver ishlamasa yorliqning o'zi kod bo'lishi mumkin — quyida tekshiriladi.
+    }
+    if (!mounted) {
+      return;
+    }
+    final String? prefix = sectorPrefixFromInput(code);
+    if (prefix == null) {
+      setState(() => _sectorError = StringLookup.t(loc, 'sectorInvalidInput'));
+      return;
+    }
+    setState(() {
+      target.text = prefix;
+      _sectorError = null;
+      _sectorPreview = null;
+    });
+  }
+
+  Future<void> _checkSectorPlan() async {
+    final AppLocale loc = ref.read(appLocaleProvider);
+    final String? from = _readSectorInput(_sectorFrom);
+    final String? to = _readSectorInput(_sectorTo);
+    if (from == null || to == null) {
+      setState(() {
+        _sectorPreview = null;
+        _sectorError = StringLookup.t(
+          loc,
+          _sectorFrom.text.trim().isEmpty || _sectorTo.text.trim().isEmpty
+              ? 'sectorEnterBothSectors'
+              : 'sectorInvalidInput',
+        );
+      });
+      return;
+    }
+    if (from == to) {
+      setState(() {
+        _sectorPreview = null;
+        _sectorError = StringLookup.t(loc, 'sectorSameSource');
+      });
+      return;
+    }
+    setState(() {
+      _sectorChecking = true;
+      _sectorError = null;
+      _sectorPreview = null;
+    });
+    try {
+      final SectorTransferPreview preview =
+          await ref.read(movementsRepositoryProvider).previewSectorTransfer(
+                fromSector: from,
+                toSector: to,
+              );
+      if (mounted) {
+        setState(() => _sectorPreview = preview);
+      }
+    } on Exception catch (e) {
+      if (mounted) {
+        setState(() => _sectorError = localizeApiErrorMessage(loc, e));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _sectorChecking = false);
+      }
+    }
+  }
+
+  Future<void> _submitSector() async {
+    final SectorTransferPreview? preview = _sectorPreview;
+    final AppLocale loc = ref.read(appLocaleProvider);
+    if (preview == null || !preview.canSubmit) {
+      return;
+    }
+    final bool confirmed = await _confirmSectorTransfer(preview);
+    if (!confirmed || !mounted) {
+      return;
+    }
+    setState(() => _sectorSubmitting = true);
+    try {
+      // Payload o'zgarsa yangi Idempotency-Key; bir xil payload'da retry eski
+      // kalit bilan xavfsiz takrorlanadi.
+      final String sig = '${preview.fromPrefix}|${preview.toPrefix}';
+      if (_sectorSubmitKey == null || _sectorSubmitSig != sig) {
+        _sectorSubmitKey = const Uuid().v4();
+        _sectorSubmitSig = sig;
+      }
+      final SectorTransferResponse res =
+          await ref.read(movementsRepositoryProvider).transferSector(
+                fromSector: preview.fromPrefix,
+                toSector: preview.toPrefix,
+                idempotencyKey: _sectorSubmitKey,
+              );
+      if (!mounted) {
+        return;
+      }
+      ref.invalidate(pickerLocationsProvider);
+      ref.invalidate(inventoryListControllerProvider);
+      showAppSnackBar(
+        context,
+        SnackBar(
+          content: Text(
+            StringLookup.tParams(loc, 'sectorTransferred', <String, String>{
+              'locations': '${res.locationsTransferred}',
+            }),
+          ),
+        ),
+      );
+      setState(() {
+        _phase = _MovementPhase.choose;
+        _sectorPreview = null;
+        _sectorError = null;
+        _sectorFrom.clear();
+        _sectorTo.clear();
+        _sectorSubmitKey = null;
+        _sectorSubmitSig = null;
+      });
+    } on Exception catch (e) {
+      if (mounted) {
+        // Reja eskirgan bo'lishi mumkin (kimdir rezerv qo'ygan) — qayta tekshiramiz.
+        showAppLocalizedError(context, loc, e);
+        unawaited(_checkSectorPlan());
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _sectorSubmitting = false);
+      }
+    }
+  }
+
+  Future<bool> _confirmSectorTransfer(SectorTransferPreview preview) async {
+    final AppLocale loc = ref.read(appLocaleProvider);
+    final bool? ok = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext ctx) => AlertDialog(
+        title: Text(StringLookup.t(loc, 'sectorConfirmTitle')),
+        content: Text(
+          StringLookup.tParams(loc, 'sectorConfirmMessage', <String, String>{
+            'from': preview.fromPrefix,
+            'to': preview.toPrefix,
+            'locations': '${preview.locationsToMove}',
+            'lines': '${preview.linesToMove}',
+          }),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(StringLookup.t(loc, 'cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(StringLookup.t(loc, 'confirmButton')),
+          ),
+        ],
+      ),
+    );
+    return ok == true;
   }
 
   void _clearPalletSourceInput() {
@@ -673,7 +890,29 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
                 onTap: () => setState(() => _phase = _MovementPhase.pallet),
               ),
             ),
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.dashboard_customize_rounded),
+                title: Text(StringLookup.t(loc, 'movementSectorMode')),
+                subtitle: Text(StringLookup.t(loc, 'movementSubtitleSector')),
+                onTap: () => setState(() => _phase = _MovementPhase.sector),
+              ),
+            ),
           ],
+          if (_phase == _MovementPhase.sector)
+            _SectorTransferPanel(
+              loc: loc,
+              fromCtrl: _sectorFrom,
+              toCtrl: _sectorTo,
+              preview: _sectorPreview,
+              checking: _sectorChecking,
+              submitting: _sectorSubmitting,
+              error: _sectorError,
+              online: online,
+              onCheck: _checkSectorPlan,
+              onSubmit: _submitSector,
+              onScanInto: _scanSectorInto,
+            ),
           if (_phase == _MovementPhase.scanProduct) ...<Widget>[
             if (_product == null) ...<Widget>[
               BarcodeSearchInput(
@@ -982,6 +1221,167 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
         ],
       ),
       ),
+    );
+  }
+}
+
+/// Sektor ko'chirish paneli: ikkita sektor maydoni, reja jadvali va yuborish.
+class _SectorTransferPanel extends StatelessWidget {
+  const _SectorTransferPanel({
+    required this.loc,
+    required this.fromCtrl,
+    required this.toCtrl,
+    required this.preview,
+    required this.checking,
+    required this.submitting,
+    required this.error,
+    required this.online,
+    required this.onCheck,
+    required this.onSubmit,
+    required this.onScanInto,
+  });
+
+  final AppLocale loc;
+  final TextEditingController fromCtrl;
+  final TextEditingController toCtrl;
+  final SectorTransferPreview? preview;
+  final bool checking;
+  final bool submitting;
+  final String? error;
+  final bool online;
+  final Future<void> Function() onCheck;
+  final Future<void> Function() onSubmit;
+  final Future<void> Function(TextEditingController target) onScanInto;
+
+  @override
+  Widget build(BuildContext context) {
+    final SectorTransferPreview? p = preview;
+    final bool busy = checking || submitting;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        _sectorField(context, fromCtrl, 'sectorFromLabel', busy: busy),
+        const SizedBox(height: 12),
+        _sectorField(context, toCtrl, 'sectorToLabel', busy: busy),
+        const SizedBox(height: 12),
+        FilledButton.tonal(
+          onPressed: busy || !online ? null : () => unawaited(onCheck()),
+          child: checking
+              ? const SizedBox(
+                  height: 18,
+                  width: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(StringLookup.t(loc, 'sectorCheck')),
+        ),
+        if (error != null) ...<Widget>[
+          const SizedBox(height: 12),
+          Text(error!, style: const TextStyle(color: Colors.red)),
+        ],
+        if (p != null) ...<Widget>[
+          const SizedBox(height: 16),
+          _planHeader(context, p),
+          const SizedBox(height: 8),
+          ...p.rows.map((SectorTransferRow r) => _planRow(context, r)),
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: p.canSubmit && !busy && online ? () => unawaited(onSubmit()) : null,
+            child: submitting
+                ? const SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Text(StringLookup.t(loc, 'movementTitle')),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _sectorField(
+    BuildContext context,
+    TextEditingController ctrl,
+    String labelKey, {
+    required bool busy,
+  }) {
+    return TextField(
+      controller: ctrl,
+      enabled: !busy,
+      textCapitalization: TextCapitalization.characters,
+      decoration: InputDecoration(
+        labelText: StringLookup.t(loc, labelKey),
+        border: const OutlineInputBorder(),
+        suffixIcon: IconButton(
+          icon: const Icon(Icons.qr_code_scanner),
+          tooltip: StringLookup.t(loc, 'scanButton'),
+          onPressed: busy ? null : () => unawaited(onScanInto(ctrl)),
+        ),
+      ),
+    );
+  }
+
+  Widget _planHeader(BuildContext context, SectorTransferPreview p) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    final int blocked = p.blockingRows.length;
+    final String summary = blocked > 0
+        ? StringLookup.tParams(
+            loc,
+            'sectorPlanBlocked',
+            <String, String>{'count': '$blocked'},
+          )
+        : p.locationsToMove == 0
+            ? StringLookup.t(loc, 'sectorPlanNothingToMove')
+            : StringLookup.tParams(loc, 'sectorPlanSummary', <String, String>{
+                'locations': '${p.locationsToMove}',
+                'lines': '${p.linesToMove}',
+                'qty': '${p.totalQtyToMove}',
+              });
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          '${StringLookup.t(loc, 'sectorPlanTitle')}: ${p.fromPrefix} → ${p.toPrefix}',
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          summary,
+          style: TextStyle(
+            color: p.canSubmit ? cs.onSurfaceVariant : cs.error,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _planRow(BuildContext context, SectorTransferRow r) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    final (IconData icon, Color color) = switch (r.status) {
+      kSectorStatusOk => (Icons.check_circle, Colors.green.shade600),
+      kSectorStatusDestNotEmpty => (Icons.warning_amber_rounded, Colors.orange.shade700),
+      kSectorStatusEmpty => (Icons.remove_circle_outline, cs.onSurfaceVariant),
+      _ => (Icons.cancel, cs.error),
+    };
+    final List<String> meta = <String>[
+      if (r.lines > 0)
+        StringLookup.tParams(loc, 'sectorRowLines', <String, String>{
+          'lines': '${r.lines}',
+          'qty': '${r.totalQty}',
+        }),
+      if (r.boxes > 0)
+        StringLookup.tParams(loc, 'sectorRowBoxes', <String, String>{
+          'boxes': '${r.boxes}',
+        }),
+      StringLookup.t(loc, sectorStatusLabelKey(r.status)),
+    ];
+    return ListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon, color: color),
+      title: Text('${r.fromCode} → ${r.toCode ?? '—'}'),
+      subtitle: Text(meta.join(' · ')),
     );
   }
 }
