@@ -12,26 +12,19 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { getLocations, type Location } from '../../services/locationsApi'
 import { getInventoryDetails, type InventoryDetailRow } from '../../services/inventoryApi'
+import { HistoryTable } from '../../admin/components/history/HistoryTable'
+import { useProductHistoryColumns } from '../../admin/components/history/productHistoryColumns'
 import { getProductHistory, type ProductHistoryResponse } from '../../services/productsApi'
 import { useAppToast } from '../../feedback/useAppToast'
 import { formatExpiryDate } from '../../utils/expiry'
 
 type TabId = 'receiving' | 'picks' | 'adjustments' | 'stock'
 
-function formatDate(iso: string): string {
-  if (!iso) return '—'
-  try {
-    const d = new Date(iso)
-    return Number.isNaN(d.getTime()) ? iso : d.toLocaleString()
-  } catch {
-    return iso
-  }
-}
-
 export function InventoryDetailsPage() {
   const { productId } = useParams()
   const navigate = useNavigate()
   const { t } = useTranslation(['inventory', 'common', 'products'])
+  const historyColumns = useProductHistoryColumns()
   const [items, setItems] = useState<InventoryDetailRow[]>([])
   const [locations, setLocations] = useState<Location[]>([])
   const [locationId, setLocationId] = useState('')
@@ -196,62 +189,13 @@ export function InventoryDetailsPage() {
               <h3 className="mb-4 text-base font-semibold text-slate-900 dark:text-slate-100">
                 {t('products:history.receiving_history')}
               </h3>
-              {historyLoading ? (
-                <div className="h-24 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
-              ) : !history || history.receiving.length === 0 ? (
-                <p className="text-sm text-slate-500">{t('products:history.no_receiving')}</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-200 dark:border-slate-700">
-                        <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">
-                          {t('products:history.date')}
-                        </th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">
-                          {t('products:history.received_by')}
-                        </th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">
-                          {t('products:history.doc_no')}
-                        </th>
-                        <th className="px-3 py-2 text-right font-medium text-slate-600 dark:text-slate-400">
-                          {t('products:history.qty')}
-                        </th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">
-                          {t('products:history.batch')}
-                        </th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">
-                          {t('products:history.location')}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {history.receiving.map((row, idx) => (
-                        <tr key={idx} className="border-b border-slate-100 dark:border-slate-800">
-                          <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
-                            {formatDate(row.date)}
-                          </td>
-                          <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
-                            {row.received_by ?? '—'}
-                          </td>
-                          <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
-                            {row.doc_no}
-                          </td>
-                          <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">
-                            {row.qty}
-                          </td>
-                          <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
-                            {row.batch}
-                          </td>
-                          <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
-                            {row.location_name ?? '—'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              <HistoryTable
+                columns={historyColumns.receiving}
+                rows={history?.receiving}
+                loading={historyLoading}
+                emptyText={t('products:history.no_receiving')}
+                minWidth="min-w-[57rem]"
+              />
             </section>
           )}
 
@@ -260,62 +204,13 @@ export function InventoryDetailsPage() {
               <h3 className="mb-4 text-base font-semibold text-slate-900 dark:text-slate-100">
                 {t('products:history.pick_history')}
               </h3>
-              {historyLoading ? (
-                <div className="h-24 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
-              ) : !history || history.picks.length === 0 ? (
-                <p className="text-sm text-slate-500">{t('products:history.no_picks')}</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-200 dark:border-slate-700">
-                        <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">
-                          {t('products:history.date')}
-                        </th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">
-                          {t('products:history.picked_by')}
-                        </th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">
-                          {t('products:history.location')}
-                        </th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">
-                          {t('products:history.order_number')}
-                        </th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">
-                          {t('products:history.customer')}
-                        </th>
-                        <th className="px-3 py-2 text-right font-medium text-slate-600 dark:text-slate-400">
-                          {t('products:history.qty')}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {history.picks.map((row, idx) => (
-                        <tr key={idx} className="border-b border-slate-100 dark:border-slate-800">
-                          <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
-                            {formatDate(row.date)}
-                          </td>
-                          <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
-                            {row.picked_by ?? '—'}
-                          </td>
-                          <td className="px-3 py-2 font-mono text-xs text-slate-700 dark:text-slate-300">
-                            {row.location_code ?? '—'}
-                          </td>
-                          <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
-                            {row.order_number ?? row.document_doc_no ?? '—'}
-                          </td>
-                          <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
-                            {row.customer_name ?? '—'}
-                          </td>
-                          <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">
-                            {row.qty}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              <HistoryTable
+                columns={historyColumns.picks}
+                rows={history?.picks}
+                loading={historyLoading}
+                emptyText={t('products:history.no_picks')}
+                minWidth="min-w-[60rem]"
+              />
             </section>
           )}
 
@@ -324,56 +219,13 @@ export function InventoryDetailsPage() {
               <h3 className="mb-4 text-base font-semibold text-slate-900 dark:text-slate-100">
                 {t('products:history.adjustment_history')}
               </h3>
-              {historyLoading ? (
-                <div className="h-24 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
-              ) : !history || !history.adjustments?.length ? (
-                <p className="text-sm text-slate-500">{t('products:history.no_adjustments')}</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-200 dark:border-slate-700">
-                        <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">
-                          {t('products:history.date')}
-                        </th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">
-                          {t('products:history.adjusted_by')}
-                        </th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">
-                          {t('products:history.location_code')}
-                        </th>
-                        <th className="px-3 py-2 text-right font-medium text-slate-600 dark:text-slate-400">
-                          {t('products:history.qty_change')}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {history.adjustments.map((row, idx) => (
-                        <tr key={idx} className="border-b border-slate-100 dark:border-slate-800">
-                          <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
-                            {formatDate(row.date)}
-                          </td>
-                          <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
-                            {row.adjusted_by ?? '—'}
-                          </td>
-                          <td className="px-3 py-2 font-mono text-slate-700 dark:text-slate-300">
-                            {row.location_code ?? '—'}
-                          </td>
-                          <td
-                            className={`px-3 py-2 text-right font-medium ${
-                              row.qty_change < 0
-                                ? 'text-amber-600 dark:text-amber-400'
-                                : 'text-slate-700 dark:text-slate-300'
-                            }`}
-                          >
-                            {row.qty_change > 0 ? '+' : ''}{row.qty_change}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              <HistoryTable
+                columns={historyColumns.adjustments}
+                rows={history?.adjustments}
+                loading={historyLoading}
+                emptyText={t('products:history.no_adjustments')}
+                minWidth="min-w-[43rem]"
+              />
             </section>
           )}
 

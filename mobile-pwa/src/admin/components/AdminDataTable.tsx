@@ -31,6 +31,18 @@ export type AdminDataTableProps<T> = {
   /** Ma'lumot yangilanganda jadval yashirilmaydi, ustiga overlay */
   refreshing?: boolean
   refreshingLabel?: string
+  /**
+   * Masalan `max-h-[65vh]` — shundan uzun ro'yxat jadval ichida aylantiriladi.
+   *
+   * Yopishqoq sarlavha shu bilan birga ishlaydi: `TableScrollArea` da
+   * `overflow-y-hidden` bor, ya'ni sticky element unga bog'lanib qoladi va
+   * sahifa aylanganda qimirlamaydi. Balandlik berilganda o'z scroll qutisi
+   * yaratiladi. Qatorlar kam bo'lsa quti kontent bo'yicha qisqaradi — hech narsa
+   * o'zgarmaydi.
+   */
+  maxHeight?: string
+  /** Sarlavha aylantirishda tepada qolsin (`maxHeight` bilan birga). */
+  stickyHeader?: boolean
 }
 
 /**
@@ -46,16 +58,14 @@ export function AdminDataTable<T>({
   zebra = true,
   refreshing = false,
   refreshingLabel,
+  maxHeight,
+  stickyHeader = false,
 }: AdminDataTableProps<T>) {
-  return (
-    <div className="relative">
-      {refreshing ? (
-        <div className="pointer-events-none absolute inset-0 z-20 flex items-start justify-center bg-white/40 pt-8 dark:bg-slate-950/40">
-          <LoadingOverlay label={refreshingLabel} />
-        </div>
-      ) : null}
-      <TableScrollArea>
-        <table className={adminDataTableClass(minWidth)}>
+  const thExtra = stickyHeader
+    ? ' sticky top-0 z-10 bg-slate-50 dark:bg-slate-800'
+    : ''
+  const table = (
+    <table className={adminDataTableClass(minWidth)}>
           {columns.some((c) => c.width) ? (
             <colgroup>
               {columns.map((col) => (
@@ -66,7 +76,7 @@ export function AdminDataTable<T>({
           <thead className={ADMIN_TABLE_HEAD_CLASS}>
             <tr className={ADMIN_TABLE_HEAD_ROW_CLASS}>
               {columns.map((col) => (
-                <th key={col.id} className={adminTableThClass(col.align ?? 'left')}>
+                <th key={col.id} className={adminTableThClass(col.align ?? 'left') + thExtra}>
                   {col.header}
                 </th>
               ))}
@@ -90,8 +100,25 @@ export function AdminDataTable<T>({
               </tr>
             ))}
           </tbody>
-        </table>
-      </TableScrollArea>
+    </table>
+  )
+
+  return (
+    <div className="relative">
+      {refreshing ? (
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-start justify-center bg-white/40 pt-8 dark:bg-slate-950/40">
+          <LoadingOverlay label={refreshingLabel} />
+        </div>
+      ) : null}
+      {maxHeight ? (
+        <div
+          className={`min-w-0 overflow-auto overscroll-contain [scrollbar-gutter:stable] ${maxHeight}`}
+        >
+          {table}
+        </div>
+      ) : (
+        <TableScrollArea>{table}</TableScrollArea>
+      )}
     </div>
   )
 }
