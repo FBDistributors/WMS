@@ -362,4 +362,91 @@ void main() {
       expectMapped('barcode required for hybrid pick', 'pickBarcodeRequiredHybrid');
     });
   });
+
+  group('no backend message leaks untranslated into another language', () {
+    // Backenddagi haqiqiy foydalanuvchi xabarlari. Ro'yxatga yangi xabar
+    // qo'shilsa va tarjimasi bo'lmasa — test yiqiladi, chunki fallback xom
+    // matnni javobga qo'shib yuboradi.
+    const List<String> backendMessages = <String>[
+      // Quti / inventarizatsiya
+      "Qoldiqni quti ichidagi donadan past tushirib bo'lmaydi (qutida 80 dona). "
+          "Avval qutini oching (unpack) yoki quti sanog'ini (count) ishlating.",
+      'Sealed quti yetarli emas (kerak 3, mavjud 1)',
+      'Quti bu lokatsiyada joylashmagan',
+      'Quti joylashmagan',
+      "Quti ichidagi dona soni noto'g'ri",
+      'Quti topilmadi',
+      'Quti mahsulotga mos emas',
+      "Quti topilmadi yoki noto'g'ri",
+      "Bu kod mahsulot (dona) shtrix-kodi sifatida band — quti kodi qilib bo'lmaydi",
+      "box_count manfiy bo'lmasligi kerak",
+      "loose_units manfiy bo'lmasligi kerak",
+      "Quti terish: ajratishlarda yetarli joy yo'q",
+      "Quti terish: buyurtma qatorlarida yetarli joy yo'q",
+      "Qutilardagi dona jami qoldiqdan oshib ketgan (ma'lumot nomuvofiqligi)",
+      // Terish / sessiya
+      'Barcha qatorlar uchun mahsulot skanerlanishi kerak',
+      'Bu sessiya sizga tegishli emas',
+      "Terilgan miqdor sessiya bilan mos kelmaydi — yig'uvchi to'xtatilgan bo'lishi kerak",
+      'Tovar (shtrix-kod/SKU) mos emas. Kutilgan qator uchun skanerlang.',
+      "Terish miqdori buyurtma bo'yicha kerak miqdordan oshib ketdi. Ehtimol allaqachon terilgan.",
+      "Mahsulot topilmadi yoki sizning vazifangizda yo'q",
+      'Faqat controller uchun',
+      "VIP muddat: bu qator faqat ma'lumot uchun",
+      "Tanlangan joyda qolgan terish uchun yetarli qoldiq yo‘q",
+      // Bekor qilish / qaytim
+      'Buyurtma bekor qilinmoqda: avval terilganlarni joyiga qaytaring.',
+      'Buyurtma xavfsiz bekor rejimida: avval qaytarish tugallansin',
+      'Xavfsiz bekor faqat `picking` yoki `completed` holatida mumkin',
+      'Hujjat holati bekor qilishga mos emas',
+      "Terilgan qator yo'q — oddiy bekor ishlating",
+      "Qator 42 uchun product/lot/joy to'liq emas — xavfsiz bekor mumkin emas",
+      "Ortiqcha pick topilmadi yoki allaqachon to'g'ri.",
+      'Qaytarish topilmadi',
+      "Qaytimda mahsulot yo'q",
+      "Buyurtma jo'natilgan (ship) — qaytim mumkin emas",
+      'Ba\'zi mahsulotlar WMS bazasida topilmadi',
+      // Ko'chirish / sektor
+      "Qutidagi zaxirani dona qilib ko'chirib bo'lmaydi (qutisiz mavjud 4). "
+          "Avval qutini ko'chiring yoki oching.",
+      'Joyda rezervdagi (terish uchun band) zaxira bor: 5 dona',
+      'Sektor topilmadi: P-ZZ',
+      'Sektor S-88 bir nechta joy turiga mos keladi (RACK, SHOWROOM_RACK)',
+      "Sektorni ko'chirib bo'lmadi: to'siq bor joylar mavjud yoki ko'chadigan qoldiq yo'q",
+      // Qabul
+      'Qabul qilingan qoldiq yetarli emas (kerak 10, mavjud 4)',
+      "Qutisiz qoldiq yetarli emas (kerak 3, mavjud 0). Quti skan qiling.",
+      'Bitta lokatsiyaga ikki xil muddati bor mahsulotni kirg\'azish taqiqlanadi.',
+    ];
+
+    test('russian output never contains the raw backend text', () {
+      for (final String backend in backendMessages) {
+        final String ru = localizeApiErrorMessage(AppLocale.ru, Exception(backend));
+        expect(
+          ru,
+          isNot(contains(backend)),
+          reason: 'Tarjima yo\'q, xom matn sizib chiqdi: $backend',
+        );
+      }
+    });
+
+    test('english output never contains the raw backend text', () {
+      for (final String backend in backendMessages) {
+        final String en = localizeApiErrorMessage(AppLocale.en, Exception(backend));
+        expect(
+          en,
+          isNot(contains(backend)),
+          reason: 'Tarjima yo\'q, xom matn sizib chiqdi: $backend',
+        );
+      }
+    });
+
+    test('the leak detector itself works on an unmapped message', () {
+      const String unmapped = 'Bunday xabar xaritalanmagan albatta';
+      expect(
+        localizeApiErrorMessage(AppLocale.ru, Exception(unmapped)),
+        contains(unmapped),
+      );
+    });
+  });
 }

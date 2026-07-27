@@ -35,6 +35,14 @@ final RegExp _movementReservedAtSource = RegExp(
   r'Joyda rezervdagi \(terish uchun band\) zaxira bor: (\d+) dona',
 );
 
+final RegExp _belowBoxedUnits = RegExp(
+  r'Qoldiqni quti ichidagi donadan past tushirib bo.lmaydi \(qutida (\d+) dona\)',
+);
+
+final RegExp _notEnoughSealedBoxes = RegExp(
+  r'Sealed quti yetarli emas \(kerak (\d+), mavjud (\d+)\)',
+);
+
 String _stripExceptionPrefix(String message) {
   const String prefix = 'Exception: ';
   if (message.startsWith(prefix)) {
@@ -215,6 +223,99 @@ String localizeApiErrorMessage(AppLocale loc, Object error) {
 
   if (raw == 'Partiya mahsulotga mos emas') {
     return StringLookup.t(loc, 'receivingLotProductMismatch');
+  }
+
+  // --- Quti / inventarizatsiya xatolari ---
+  final RegExpMatch? belowBoxed = _belowBoxedUnits.firstMatch(raw);
+  if (belowBoxed != null) {
+    return StringLookup.tParams(
+      loc,
+      'errBelowBoxedUnits',
+      <String, String>{'units': belowBoxed.group(1)!},
+    );
+  }
+
+  final RegExpMatch? sealedShort = _notEnoughSealedBoxes.firstMatch(raw);
+  if (sealedShort != null) {
+    return StringLookup.tParams(
+      loc,
+      'errNotEnoughSealedBoxes',
+      <String, String>{
+        'needed': sealedShort.group(1)!,
+        'available': sealedShort.group(2)!,
+      },
+    );
+  }
+
+  if (raw.contains('Quti bu lokatsiyada joylashmagan')) {
+    return StringLookup.t(loc, 'errBoxNotAtLocation');
+  }
+  if (raw == 'Quti joylashmagan') {
+    return StringLookup.t(loc, 'errBoxNotPlaced');
+  }
+  if (raw.contains("Quti ichidagi dona soni noto'g'ri")) {
+    return StringLookup.t(loc, 'errBoxUnitsInvalid');
+  }
+  if (raw.contains('shtrix-kodi sifatida band')) {
+    return StringLookup.t(loc, 'errBarcodeTakenByProduct');
+  }
+  if (raw.contains("manfiy bo'lmasligi kerak")) {
+    return StringLookup.t(loc, 'errNegativeCount');
+  }
+  if (raw.contains('ajratishlarda yetarli joy')) {
+    return StringLookup.t(loc, 'errBoxPickNoRoomAllocations');
+  }
+
+  // --- Terish sessiyasi / bekor qilish xatolari ---
+  if (raw.contains('Barcha qatorlar uchun mahsulot skanerlanishi kerak')) {
+    return StringLookup.t(loc, 'errScanAllLines');
+  }
+  if (raw.contains('Bu sessiya sizga tegishli emas')) {
+    return StringLookup.t(loc, 'errSessionNotYours');
+  }
+  if (raw.contains('Terilgan miqdor sessiya bilan mos kelmaydi')) {
+    return StringLookup.t(loc, 'errPickedQtyMismatch');
+  }
+  if (raw.contains('Kutilgan qator uchun skanerlang')) {
+    return StringLookup.t(loc, 'errWrongProductScanned');
+  }
+  if (raw.contains('xavfsiz bekor rejimida')) {
+    return StringLookup.t(loc, 'errSafeCancelInProgress');
+  }
+  if (raw.contains('Buyurtma bekor qilinmoqda')) {
+    return StringLookup.t(loc, 'errOrderCancelling');
+  }
+  if (raw.contains('Xavfsiz bekor faqat')) {
+    return StringLookup.t(loc, 'errSafeCancelOnly');
+  }
+  if (raw.contains('Hujjat holati bekor qilishga mos emas')) {
+    return StringLookup.t(loc, 'errDocStateNotCancellable');
+  }
+  if (raw.contains('oddiy bekor ishlating')) {
+    return StringLookup.t(loc, 'errNothingPicked');
+  }
+  if (raw.contains('xavfsiz bekor mumkin emas')) {
+    return StringLookup.t(loc, 'errLineIncompleteForCancel');
+  }
+  if (raw.contains('Ortiqcha pick topilmadi')) {
+    return StringLookup.t(loc, 'errOverPickNotFound');
+  }
+  if (raw.contains('Faqat controller uchun')) {
+    return StringLookup.t(loc, 'errControllerOnly');
+  }
+
+  // --- Qaytim (customer returns) xatolari ---
+  if (raw.contains('Qaytarish topilmadi')) {
+    return StringLookup.t(loc, 'errReturnNotFound');
+  }
+  if (raw.contains("Qaytimda mahsulot yo'q")) {
+    return StringLookup.t(loc, 'errReturnNoProducts');
+  }
+  if (raw.contains('qaytim mumkin emas')) {
+    return StringLookup.t(loc, 'errOrderShipped');
+  }
+  if (raw.contains('WMS bazasida topilmadi')) {
+    return StringLookup.t(loc, 'errProductsNotInWms');
   }
 
   // --- Sektor ko'chirish xatolari ---
