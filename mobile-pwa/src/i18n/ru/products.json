@@ -117,6 +117,7 @@
     "date": "Дата",
     "received_by": "Кто принял",
     "order_number": "Заказ",
+    "customer": "Клиент",
     "picked_by": "Кто собрал",
     "adjusted_by": "Кто изменил",
     "qty": "Кол-во",

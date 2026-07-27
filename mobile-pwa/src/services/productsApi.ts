@@ -86,6 +86,8 @@ export type ProductHistoryPick = {
   location_code: string | null
   order_number: string | null
   document_doc_no: string | null
+  /** Mijoz nomi; tashkiliy harakatda (MFM) — manzil tashkiloti nomi. */
+  customer_name: string | null
   qty: number
 }
 

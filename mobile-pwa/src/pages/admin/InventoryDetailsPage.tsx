@@ -281,6 +281,9 @@ export function InventoryDetailsPage() {
                         <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">
                           {t('products:history.order_number')}
                         </th>
+                        <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-400">
+                          {t('products:history.customer')}
+                        </th>
                         <th className="px-3 py-2 text-right font-medium text-slate-600 dark:text-slate-400">
                           {t('products:history.qty')}
                         </th>
@@ -300,6 +303,9 @@ export function InventoryDetailsPage() {
                           </td>
                           <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
                             {row.order_number ?? row.document_doc_no ?? '—'}
+                          </td>
+                          <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
+                            {row.customer_name ?? '—'}
                           </td>
                           <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">
                             {row.qty}

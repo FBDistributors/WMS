@@ -21,6 +21,7 @@ from app.models.receipt import ReceiptLine as ReceiptLineModel
 from app.models.document import Document as DocumentModel
 from app.models.order import Order as OrderModel
 from app.models.location import Location as LocationModel
+from app.services.organization_labels import load_org_name_map, resolve_org_display
 from app.models.user import User as UserModel
 from app.models.stock import ON_HAND_MOVEMENT_TYPES
 from app.models.stock import StockLot as StockLotModel
@@ -89,6 +90,8 @@ class ProductHistoryPick(BaseModel):
     location_code: Optional[str] = None
     order_number: Optional[str] = None
     document_doc_no: Optional[str] = None
+    #: Mijoz nomi; tashkiliy harakatda (MFM) — manzil tashkiloti nomi.
+    customer_name: Optional[str] = None
     qty: float
 
 
@@ -349,6 +352,23 @@ async def get_product_by_barcode(
     return _to_product(product, summary)
 
 
+def _order_customer_name(order: OrderModel, org_names: dict[str, str]) -> Optional[str]:
+    """Buyurtma mijozi; tashkiliy harakatda (MFM) — manzil tashkiloti nomi.
+
+    Terish ro'yxatidagi bilan bir xil qoida: izohdan fuzzy-taxmin ishlatilmaydi,
+    ID topilmasa bo'sh qoladi.
+    """
+    name = getattr(order, "customer_name", None)
+    if name is not None and str(name).strip():
+        return str(name).strip()
+    return resolve_org_display(
+        getattr(order, "filial_id", None),
+        org_names,
+        to_filial_code=getattr(order, "to_filial_code", None),
+        movement_note=getattr(order, "movement_note", None),
+    )
+
+
 @router.get(
     "/{product_id}/history",
     response_model=ProductHistoryResponse,
@@ -484,14 +504,19 @@ async def get_product_history(
     if pick_location_ids:
         for loc in db.query(LocationModel).filter(LocationModel.id.in_(pick_location_ids)).all():
             pick_locations_by_id[loc.id] = loc
+    # Tashkiliy harakat (diller/MFM) buyurtmalarida mijoz yo'q — terish ro'yxatidagi
+    # kabi manzil tashkiloti nomi ko'rsatiladi (faqat org_id bo'yicha, taxminsiz).
+    org_names = load_org_name_map(db) if orders_by_id else {}
     for mov in movements:
         doc = docs_by_id.get(mov.source_document_id) if mov.source_document_id else None
         order_number = None
+        customer_name = None
         document_doc_no = doc.doc_no if doc else None
         if doc and doc.order_id:
             order = orders_by_id.get(doc.order_id)
             if order:
                 order_number = order.order_number
+                customer_name = _order_customer_name(order, org_names)
         creator = pickers_by_id.get(mov.created_by_user_id) if mov.created_by_user_id else None
         picked_by = (creator.full_name or creator.username) if creator else None
         pick_loc = pick_locations_by_id.get(mov.location_id) if mov.location_id else None
@@ -504,6 +529,7 @@ async def get_product_history(
                 location_code=location_code,
                 order_number=order_number,
                 document_doc_no=document_doc_no,
+                customer_name=customer_name,
                 qty=qty,
             )
         )

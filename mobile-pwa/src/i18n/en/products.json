@@ -117,6 +117,7 @@
     "date": "Date",
     "received_by": "Received by",
     "order_number": "Order",
+    "customer": "Customer",
     "picked_by": "Picked by",
     "adjusted_by": "Adjusted by",
     "qty": "Qty",
