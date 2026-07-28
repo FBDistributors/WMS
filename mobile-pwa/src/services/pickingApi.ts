@@ -51,6 +51,8 @@ export type PickLine = {
   qty_picked: number
   status: PickLineStatus
   skip_reason?: string | null
+  /** Yig'uvchi skanerlab miqdorni tasdiqlagan oxirgi vaqt (ISO, UTC). */
+  picked_at?: string | null
   /** VIP muddat: faqat ma'lumot, terilmaydi */
   is_vip_expiry_informational?: boolean
   vip_expiry_information_key?: string | null
@@ -96,6 +98,7 @@ type BackendDocumentLine = {
   qty_required: number
   qty_picked: number
   skip_reason?: string | null
+  picked_at?: string | null
   is_vip_expiry_informational?: boolean
   vip_expiry_information_key?: string | null
 }
@@ -117,6 +120,8 @@ type BackendPickingDetails = {
   controlled_by_user_name?: string | null
   sent_to_controller_at?: string | null
   completed_at?: string | null
+  first_assigned_at?: string | null
+  last_assigned_at?: string | null
 }
 
 const STATUS_MAP: Record<string, PickListStatus> = {
@@ -171,6 +176,7 @@ function mapPickingLineToPickerViewModel(line: BackendDocumentLine): PickLine {
     qty_picked: line.qty_picked,
     status: mapLineStatus(line),
     skip_reason: line.skip_reason?.trim() || null,
+    picked_at: line.picked_at ?? null,
     is_vip_expiry_informational: line.is_vip_expiry_informational === true,
     vip_expiry_information_key: line.vip_expiry_information_key ?? null,
   }
@@ -225,6 +231,8 @@ function mapDetails(doc: BackendPickingDetails): PickListDetails {
     controller_name: doc.controlled_by_user_name?.trim() || undefined,
     sent_to_controller_at: doc.sent_to_controller_at ?? undefined,
     completed_at: doc.completed_at ?? undefined,
+    first_assigned_at: doc.first_assigned_at ?? undefined,
+    last_assigned_at: doc.last_assigned_at ?? undefined,
     lines: doc.lines.map(mapPickingLineToPickerViewModel),
     customer_id: doc.customer_id?.trim() || undefined,
     customer_name: doc.customer_name?.trim() || undefined,

@@ -134,6 +134,7 @@
   "readonly_back": "Orqaga",
   "readonly_page_title": "Pick list (ko'rish)",
   "column_sku": "SKU",
+  "column_picked_at": "Terilgan vaqti",
   "column_customer_id": "Mijoz ID",
   "column_customer_name": "Mijoz nomi",
   "sent_to_controller_at": "Controllerga yuborilgan",

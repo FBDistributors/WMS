@@ -134,6 +134,7 @@
   "readonly_back": "Back",
   "readonly_page_title": "Pick list (view)",
   "column_sku": "SKU",
+  "column_picked_at": "Picked at",
   "column_customer_id": "Customer ID",
   "column_customer_name": "Customer name",
   "sent_to_controller_at": "Sent to controller",

@@ -123,6 +123,8 @@ class DocumentLine(Base):
     )
     line_source: Mapped[str | None] = mapped_column(String(16), nullable=True, default="product")
     picked_box_barcode: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Yig'uvchi skanerlab miqdorni tasdiqlagan oxirgi vaqt; qaytarilsa tozalanadi.
+    picked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     document: Mapped[Document] = relationship("Document", back_populates="lines")
 

@@ -120,7 +120,8 @@ export function PickListReadOnlyDetail({ documentId }: PickListReadOnlyDetailPro
     Boolean(data.picker_name?.trim()) ||
     Boolean(data.controller_name?.trim()) ||
     Boolean(data.sent_to_controller_at?.trim()) ||
-    Boolean(data.completed_at?.trim())
+    Boolean(data.completed_at?.trim()) ||
+    Boolean(data.first_assigned_at?.trim())
 
   return (
     <div className="space-y-4">
@@ -145,6 +146,24 @@ export function PickListReadOnlyDetail({ documentId }: PickListReadOnlyDetailPro
                 <span className="text-slate-500 dark:text-slate-400">{t('picking:column_picker')}: </span>
                 <span className="text-slate-900 dark:text-slate-100">{data.picker_name?.trim() || '—'}</span>
               </div>
+              <div className="min-w-0">
+                <span className="text-slate-500 dark:text-slate-400">
+                  {t('picking:column_sent_to_picker')}:{' '}
+                </span>
+                <span className="text-slate-900 dark:text-slate-100">
+                  {formatDateTime(data.first_assigned_at)}
+                </span>
+              </div>
+              {data.last_assigned_at?.trim() ? (
+                <div className="min-w-0">
+                  <span className="text-slate-500 dark:text-slate-400">
+                    {t('picking:column_picker_reassigned')}:{' '}
+                  </span>
+                  <span className="text-slate-900 dark:text-slate-100">
+                    {formatDateTime(data.last_assigned_at)}
+                  </span>
+                </div>
+              ) : null}
               <div className="min-w-0">
                 <span className="text-slate-500 dark:text-slate-400">{t('picking:column_controller')}: </span>
                 <span className="text-slate-900 dark:text-slate-100">{data.controller_name?.trim() || '—'}</span>
@@ -182,6 +201,9 @@ export function PickListReadOnlyDetail({ documentId }: PickListReadOnlyDetailPro
                 <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('picking:column_sku')}</th>
                 <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('picking:expiry_label')}</th>
                 <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('picking:qty')}</th>
+                <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">
+                  {t('picking:column_picked_at')}
+                </th>
                 <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('picking:status_label')}</th>
               </tr>
             </thead>
@@ -213,6 +235,9 @@ export function PickListReadOnlyDetail({ documentId }: PickListReadOnlyDetailPro
                   </td>
                   <td className="whitespace-nowrap px-3 py-3 text-slate-800 dark:text-slate-200 sm:px-4">
                     {line.qty_picked}/{line.qty_required}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-3 text-slate-700 dark:text-slate-300 sm:px-4">
+                    {formatDateTime(line.picked_at)}
                   </td>
                   <td className="whitespace-nowrap px-3 py-3 sm:px-4">
                     <Badge variant={lineStatusVariant[line.status]}>

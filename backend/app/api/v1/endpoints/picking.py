@@ -112,6 +112,10 @@ class PickingLine(BaseModel):
         description="product | action | gift — SmartUP buyurtma qatori manbasi",
     )
     picked_box_barcode: Optional[str] = None
+    picked_at: Optional[datetime] = Field(
+        default=None,
+        description="Yig'uvchi skanerlab miqdorni tasdiqlagan oxirgi vaqt (UTC)",
+    )
 
 
 class PickingProgress(BaseModel):
@@ -141,6 +145,8 @@ class PickingDocument(BaseModel):
     sent_to_controller_at: Optional[datetime] = None
     controller_verification_started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+    first_assigned_at: Optional[datetime] = None
+    last_assigned_at: Optional[datetime] = None
 
 
 class PickingListItem(BaseModel):
@@ -436,6 +442,16 @@ def _assert_pick_zone_allowed(loc: Optional[LocationModel], *, allow_expired: bo
         )
 
 
+def _mark_line_picked(line: DocumentLineModel) -> None:
+    """Skan + miqdor tasdig'i muvaffaqiyatli — tasdiqlash vaqtini yozamiz."""
+    line.picked_at = datetime.now(timezone.utc)
+
+
+def _clear_line_picked(line: DocumentLineModel) -> None:
+    """Terilgan miqdor to'liq qaytarildi — tasdiqlash vaqti ham o'chadi."""
+    line.picked_at = None
+
+
 def _line_is_vip_expiry_informational(line: DocumentLineModel) -> bool:
     return bool(getattr(line, "is_vip_expiry_informational", False))
 
@@ -670,6 +686,7 @@ def _to_picking_line(
         vip_expiry_information_key="vip_expiry_not_picked" if is_vip_info else None,
         line_source=(getattr(line, "line_source", None) or "product").strip(),
         picked_box_barcode=getattr(line, "picked_box_barcode", None),
+        picked_at=getattr(line, "picked_at", None),
     )
 
 
@@ -824,6 +841,8 @@ def _to_picking_document(doc: DocumentModel, db: Optional[Session] = None) -> Pi
         lines=[_to_picking_line(line) for line in lines],
         progress=_calculate_progress(lines),
         incomplete_reason=getattr(doc, "incomplete_reason", None),
+        first_assigned_at=doc.first_assigned_at,
+        last_assigned_at=doc.last_assigned_at,
         assigned_to_user_id=doc.assigned_to_user_id,
         assigned_to_user_name=_picker_name(doc),
         controlled_by_user_id=doc.controlled_by_user_id,
@@ -859,6 +878,8 @@ def _to_picking_document_with_lines(
         lines=plines,
         progress=_calculate_progress(lines),
         incomplete_reason=getattr(doc, "incomplete_reason", None),
+        first_assigned_at=doc.first_assigned_at,
+        last_assigned_at=doc.last_assigned_at,
         assigned_to_user_id=doc.assigned_to_user_id,
         assigned_to_user_name=_picker_name(doc),
         controlled_by_user_id=doc.controlled_by_user_id,
@@ -1687,6 +1708,7 @@ async def consolidated_pick(
             if picked_box:
                 line.picked_box_barcode = picked_box
             line.picked_qty = float(Decimal(str(line.picked_qty or 0)) + need)
+            _mark_line_picked(line)
             docs_to_refresh.add(line.document_id)
             record_pick(
                 db,
@@ -2315,6 +2337,10 @@ def _pick_line_impl(line_id: UUID, payload: PickLineRequest, db: Session, user):
         )
 
     line.picked_qty = next_qty
+    if payload.delta > 0:
+        _mark_line_picked(line)
+    elif next_qty <= 0:
+        _clear_line_picked(line)
     qty_delta = Decimal(str(payload.delta))
 
     # Ortiqcha terishni oldini olish: hujjat bo'yicha (product+lot+location) jami terilgan
@@ -2624,6 +2650,7 @@ async def unpick_line(
     line.picked_qty = float(Decimal(str(line.picked_qty)) - qty_to_rollback)
     if line.picked_qty <= 0:
         line.picked_box_barcode = None
+        _clear_line_picked(line)
     line.skip_reason = reason
 
     # Stock+rezerv tiklash + butun-quti pick'larini yopiq qaytarish + invariant.
@@ -2748,6 +2775,7 @@ async def skip_line(
             )
         line.picked_qty = 0
         line.picked_box_barcode = None
+        _clear_line_picked(line)
         # Stock+rezerv tiklash + butun-quti pick'larini yopiq qaytarish + invariant.
         record_pick_rollback(
             db,
@@ -2859,6 +2887,7 @@ async def controller_flag_line(
     line.skip_reason = reason
     line.picked_qty = 0
     line.picked_box_barcode = None
+    _clear_line_picked(line)
 
     if zone_type is None:
         # Joyiga qaytarish: fizik+rezerv+quti tiklanadi (picker skip bilan bir xil).
