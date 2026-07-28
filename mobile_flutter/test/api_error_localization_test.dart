@@ -372,6 +372,7 @@ void main() {
       "Qoldiqni quti ichidagi donadan past tushirib bo'lmaydi (qutida 80 dona). "
           "Avval qutini oching (unpack) yoki quti sanog'ini (count) ishlating.",
       'Sealed quti yetarli emas (kerak 3, mavjud 1)',
+      'Bu joydagi qutilar boshqa shtrix-kod ostida yozilgan: 4640204563999',
       'Quti bu lokatsiyada joylashmagan',
       'Quti joylashmagan',
       "Quti ichidagi dona soni noto'g'ri",
@@ -451,6 +452,34 @@ void main() {
         localizeApiErrorMessage(AppLocale.ru, Exception(unmapped)),
         contains(unmapped),
       );
+    });
+  });
+
+  group('a mixed-barcode location explains itself during picking', () {
+    const String backend =
+        'Bu joydagi qutilar boshqa shtrix-kod ostida yozilgan: 4640204563999, 4640204563888';
+
+    test('the other barcodes reach the message', () {
+      for (final AppLocale loc in AppLocale.values) {
+        final String out = localizeApiErrorMessage(loc, Exception(backend));
+        expect(out, contains('4640204563999'));
+        expect(out, contains('4640204563888'));
+      }
+    });
+
+    test('it wins over the plain shortage message', () {
+      // "mavjud 0" ekranda qutilar ko'rinib turganda chalkash — sabab aytilsin.
+      final String uz = localizeApiErrorMessage(AppLocale.uz, Exception(backend));
+      expect(uz, isNot(contains('yetarli emas')));
+    });
+
+    test('a real shortage still reports counts', () {
+      final String uz = localizeApiErrorMessage(
+        AppLocale.uz,
+        Exception('Sealed quti yetarli emas (kerak 3, mavjud 1)'),
+      );
+      expect(uz, contains('3'));
+      expect(uz, contains('1'));
     });
   });
 }

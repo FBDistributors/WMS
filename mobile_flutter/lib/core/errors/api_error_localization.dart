@@ -43,6 +43,10 @@ final RegExp _notEnoughSealedBoxes = RegExp(
   r'Sealed quti yetarli emas \(kerak (\d+), mavjud (\d+)\)',
 );
 
+final RegExp _boxesUnderOtherBarcode = RegExp(
+  r'Bu joydagi qutilar boshqa shtrix-kod ostida yozilgan: (.+)$',
+);
+
 String _stripExceptionPrefix(String message) {
   const String prefix = 'Exception: ';
   if (message.startsWith(prefix)) {
@@ -232,6 +236,17 @@ String localizeApiErrorMessage(AppLocale loc, Object error) {
       loc,
       'errBelowBoxedUnits',
       <String, String>{'units': belowBoxed.group(1)!},
+    );
+  }
+
+  // Bu tekshiruv "yetarli emas" dan oldin: joyda qutilar bor, lekin boshqa kod
+  // ostida — "mavjud 0" xabari ekranda qutilar ko'rinib turganda chalkash.
+  final RegExpMatch? otherBarcode = _boxesUnderOtherBarcode.firstMatch(raw);
+  if (otherBarcode != null) {
+    return StringLookup.tParams(
+      loc,
+      'errBoxesUnderOtherBarcode',
+      <String, String>{'barcodes': otherBarcode.group(1)!.trim()},
     );
   }
 

@@ -848,6 +848,56 @@ def reconcile_count(
     )
 
 
+def _assert_enough_sealed_for_pick(
+    db: Session,
+    *,
+    box: ProductBoxModel,
+    lot_id: UUID,
+    location_id: UUID,
+    box_count: int,
+) -> None:
+    """Skanerlangan kod bo'yicha yetarli yopiq quti bormi.
+
+    Sanoq shtrix-kodga bog'liq, ekrandagi quti soni esa emas — u joydagi hamma
+    qutini ko'rsatadi. Shu sababli "kerak 2, mavjud 0" xabari operatorni
+    chalkashtiradi: ekranda qutilar ko'rinib turadi. Agar joyda boshqa kod
+    ostida yozilgan qutilar bo'lsa, aynan shu aytiladi.
+    """
+    sealed_count = (
+        db.query(LocationBoxPlacement)
+        .filter(
+            LocationBoxPlacement.product_box_id == box.id,
+            LocationBoxPlacement.lot_id == lot_id,
+            LocationBoxPlacement.location_id == location_id,
+            LocationBoxPlacement.status == PLACEMENT_SEALED,
+        )
+        .count()
+    )
+    if sealed_count >= box_count:
+        return
+
+    _total, _units, sealed = _units_in_boxes_for_lot_location(db, lot_id, location_id)
+    other_codes = sorted(
+        {
+            info.box_barcode
+            for info in sealed
+            if info.product_box_id != box.id and info.box_barcode
+        }
+    )
+    if other_codes:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Bu joydagi qutilar boshqa shtrix-kod ostida yozilgan: "
+                + ", ".join(other_codes)
+            ),
+        )
+    raise HTTPException(
+        status_code=409,
+        detail=f"Sealed quti yetarli emas (kerak {box_count}, mavjud {sealed_count})",
+    )
+
+
 def remove_sealed_boxes_for_pick(
     db: Session,
     *,
@@ -876,23 +926,9 @@ def remove_sealed_boxes_for_pick(
             detail=f"qty {int(qty_dec)} != box_count * units_per_box ({int(expected)})",
         )
     lock_lot_location(db, lot_id, location_id)
-    sealed_count = (
-        db.query(LocationBoxPlacement)
-        .filter(
-            LocationBoxPlacement.product_box_id == box.id,
-            LocationBoxPlacement.lot_id == lot_id,
-            LocationBoxPlacement.location_id == location_id,
-            LocationBoxPlacement.status == PLACEMENT_SEALED,
-        )
-        .count()
+    _assert_enough_sealed_for_pick(
+        db, box=box, lot_id=lot_id, location_id=location_id, box_count=box_count
     )
-    if sealed_count < box_count:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                f"Sealed quti yetarli emas (kerak {box_count}, mavjud {sealed_count})"
-            ),
-        )
     for _ in range(box_count):
         placement = _find_sealed_at(
             db,
@@ -930,23 +966,9 @@ def open_sealed_boxes_for_pick(
     if not lot or lot.product_id != box.product_id:
         raise HTTPException(status_code=400, detail="Partiya mahsulotga mos emas")
     lock_lot_location(db, lot_id, location_id)
-    sealed_count = (
-        db.query(LocationBoxPlacement)
-        .filter(
-            LocationBoxPlacement.product_box_id == box.id,
-            LocationBoxPlacement.lot_id == lot_id,
-            LocationBoxPlacement.location_id == location_id,
-            LocationBoxPlacement.status == PLACEMENT_SEALED,
-        )
-        .count()
+    _assert_enough_sealed_for_pick(
+        db, box=box, lot_id=lot_id, location_id=location_id, box_count=box_count
     )
-    if sealed_count < box_count:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                f"Sealed quti yetarli emas (kerak {box_count}, mavjud {sealed_count})"
-            ),
-        )
     for _ in range(box_count):
         placement = _find_sealed_at(
             db,

@@ -25,7 +25,9 @@ from app.models.user import User as UserModel
 from app.services.box_location_service import (
     get_breakdown_tolerant,
     merge_box_type_at_location,
+    open_sealed_boxes_for_pick,
     place_sealed_boxes,
+    remove_sealed_boxes_for_pick,
 )
 from app.services.stock_availability import compute_lot_location_balances
 
@@ -495,3 +497,152 @@ class TestMergeEndpoint:
 
         assert resp.status_code == 400, resp.text
         assert "dona soni farq qiladi" in resp.json()["detail"]
+
+
+class TestPickErrorNamesTheOtherBarcode:
+    """Terishda "mavjud 0" xabari chalkash: ekranda qutilar ko'rinib turadi."""
+
+    def test_whole_box_pick_names_the_other_barcode(
+        self,
+        db_session: Session,
+        inv_user: UserModel,
+        product: ProductModel,
+        location: LocationModel,
+    ) -> None:
+        _box(db_session, product, "SCANNED-1", 6)
+        _box(db_session, product, "RECORDED-1", 6)
+        lot = _stock(db_session, product, location, 74)
+        place_sealed_boxes(
+            db_session,
+            box_barcode="RECORDED-1",
+            location_id=location.id,
+            lot_id=lot.id,
+            user=inv_user,
+            box_count=7,
+        )
+        db_session.flush()
+
+        with pytest.raises(HTTPException) as err:
+            remove_sealed_boxes_for_pick(
+                db_session,
+                box_barcode="SCANNED-1",
+                location_id=location.id,
+                lot_id=lot.id,
+                user=inv_user,
+                box_count=2,
+                pick_qty=Decimal("12"),
+            )
+
+        assert err.value.status_code == 409
+        detail = str(err.value.detail)
+        assert "boshqa shtrix-kod ostida yozilgan" in detail
+        assert "RECORDED-1" in detail
+
+    def test_opening_a_box_reports_the_same_way(
+        self,
+        db_session: Session,
+        inv_user: UserModel,
+        product: ProductModel,
+        location: LocationModel,
+    ) -> None:
+        _box(db_session, product, "SCANNED-2", 6)
+        _box(db_session, product, "RECORDED-2", 6)
+        lot = _stock(db_session, product, location, 30)
+        place_sealed_boxes(
+            db_session,
+            box_barcode="RECORDED-2",
+            location_id=location.id,
+            lot_id=lot.id,
+            user=inv_user,
+            box_count=3,
+        )
+        db_session.flush()
+
+        with pytest.raises(HTTPException) as err:
+            open_sealed_boxes_for_pick(
+                db_session,
+                box_barcode="SCANNED-2",
+                location_id=location.id,
+                lot_id=lot.id,
+                user=inv_user,
+                box_count=1,
+            )
+
+        assert "RECORDED-2" in str(err.value.detail)
+
+    def test_an_empty_location_keeps_the_plain_shortage_message(
+        self,
+        db_session: Session,
+        inv_user: UserModel,
+        product: ProductModel,
+        location: LocationModel,
+    ) -> None:
+        """Boshqa kod yo'q bo'lsa sabab boshqacha — xabar ham eskicha qolsin."""
+        _box(db_session, product, "SCANNED-3", 6)
+        lot = _stock(db_session, product, location, 12)
+        db_session.flush()
+
+        with pytest.raises(HTTPException) as err:
+            remove_sealed_boxes_for_pick(
+                db_session,
+                box_barcode="SCANNED-3",
+                location_id=location.id,
+                lot_id=lot.id,
+                user=inv_user,
+                box_count=2,
+                pick_qty=Decimal("12"),
+            )
+
+        detail = str(err.value.detail)
+        assert "Sealed quti yetarli emas" in detail
+        assert "boshqa shtrix-kod" not in detail
+
+    def test_enough_boxes_of_the_scanned_code_still_pick(
+        self,
+        db_session: Session,
+        inv_user: UserModel,
+        product: ProductModel,
+        location: LocationModel,
+    ) -> None:
+        """Aralash joyda ham skanerlangan kodda yetarli quti bo'lsa terish o'tadi."""
+        _box(db_session, product, "SCANNED-4", 6)
+        _box(db_session, product, "OTHER-4", 6)
+        lot = _stock(db_session, product, location, 60)
+        place_sealed_boxes(
+            db_session,
+            box_barcode="SCANNED-4",
+            location_id=location.id,
+            lot_id=lot.id,
+            user=inv_user,
+            box_count=3,
+        )
+        place_sealed_boxes(
+            db_session,
+            box_barcode="OTHER-4",
+            location_id=location.id,
+            lot_id=lot.id,
+            user=inv_user,
+            box_count=2,
+        )
+        db_session.flush()
+
+        remove_sealed_boxes_for_pick(
+            db_session,
+            box_barcode="SCANNED-4",
+            location_id=location.id,
+            lot_id=lot.id,
+            user=inv_user,
+            box_count=2,
+            pick_qty=Decimal("12"),
+        )
+
+        assert _sealed_count(db_session, _box_by_code(db_session, "SCANNED-4")) == 1
+        assert _sealed_count(db_session, _box_by_code(db_session, "OTHER-4")) == 2
+
+
+def _box_by_code(db: Session, barcode: str) -> ProductBoxModel:
+    return (
+        db.query(ProductBoxModel)
+        .filter(ProductBoxModel.box_barcode == barcode)
+        .one()
+    )
