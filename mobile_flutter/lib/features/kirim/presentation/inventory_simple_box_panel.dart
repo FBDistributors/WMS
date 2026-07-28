@@ -536,6 +536,28 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
     }
 
     final BoxLocationBreakdown breakdownForSave = _breakdown ?? b;
+
+    // Joyda kiritilgan koddan boshqa quti turi bo'lsa, maqsad jami ularning
+    // donasini hisobga olmaydi — saqlash qoldiqni yopiq qutilardan past
+    // tushirishga urinadi va server rad etadi. Chalkash 409 o'rniga aniq xabar.
+    final List<SealedBoxGroup> foreign = blockingForeignBoxGroups(
+      breakdown: breakdownForSave,
+      boxBarcode: barcode.isEmpty ? null : barcode,
+    );
+    if (foreign.isNotEmpty) {
+      showAppSnackBar(
+        context,
+        SnackBar(
+          content: Text(
+            StringLookup.tParams(loc, 'inventoryForeignBoxBlocked', <String, String>{
+              'barcodes': foreign.map((SealedBoxGroup g) => g.boxBarcode).join(', '),
+            }),
+          ),
+        ),
+      );
+      return;
+    }
+
     final int currentBoxes = currentBoxCountTarget(breakdownForSave, barcode);
     final int boxDelta = targetBoxCount - currentBoxes;
     if (boxDelta != 0) {
@@ -811,6 +833,50 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
     );
   }
 
+  /// Joyda bir nechta quti turi bo'lsa, qaysi koddan nechta ekanini ko'rsatadi.
+  ///
+  /// Sarlavhadagi "Karobka: 13" jami son — ikki xil shtrix-kod aralashganini
+  /// yashiradi va operator nima noto'g'ri ketayotganini ko'ra olmaydi.
+  Widget _buildBoxTypesList(AppLocale loc, BoxLocationBreakdown breakdown) {
+    final List<SealedBoxGroup> groups = groupSealedBoxesByBarcode(breakdown);
+    if (groups.length < 2) {
+      return const SizedBox.shrink();
+    }
+    final String entered = (_resolvedBarcode ?? _boxBarcode.text).trim();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            StringLookup.t(loc, 'inventoryBoxTypesTitle'),
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          ...groups.map((SealedBoxGroup g) {
+            final bool isEntered = entered.isNotEmpty && g.boxBarcode == entered;
+            return Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                StringLookup.tParams(loc, 'inventoryBoxTypeLine', <String, String>{
+                  'barcode': g.boxBarcode,
+                  'count': '${g.count}',
+                  'upb': '${g.unitsPerBox}',
+                  'units': '${g.units}',
+                }),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: isEntered ? FontWeight.w600 : FontWeight.w400,
+                  color: isEntered ? null : Colors.orange.shade800,
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
   Widget _buildInconsistentBanner(AppLocale loc) {
     return MaterialBanner(
       content: Text(StringLookup.t(loc, 'inventoryDataInconsistent')),
@@ -840,6 +906,7 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         if (breakdown.dataInconsistent) _buildInconsistentBanner(loc),
+        _buildBoxTypesList(loc, breakdown),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[

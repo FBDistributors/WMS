@@ -818,6 +818,122 @@ void main() {
     expect(result.boxCount, 108);
     expect(result.totalUnits, 1080);
   });
+
+  group('groupSealedBoxesByBarcode', () {
+    test('same barcode is counted together', () {
+      final List<SealedBoxGroup> groups = groupSealedBoxesByBarcode(
+        _breakdown(sealedBoxes: _sealedBoxes(3, 'BOX-A', 6)),
+      );
+
+      expect(groups, hasLength(1));
+      expect(groups.single.boxBarcode, 'BOX-A');
+      expect(groups.single.count, 3);
+      expect(groups.single.units, 18);
+    });
+
+    test('a mixed location is split, biggest group first', () {
+      // Ekrandagi holat: 12 quti to'g'ri kodda, 1 tasi boshqa kodda.
+      final List<SealedBoxGroup> groups = groupSealedBoxesByBarcode(
+        _breakdown(
+          sealedBoxes: <SealedBoxInfo>[
+            ..._sealedBoxes(1, 'WRONG', 6),
+            ..._sealedBoxes(12, 'RIGHT', 6),
+          ],
+        ),
+      );
+
+      expect(
+        groups.map((SealedBoxGroup g) => g.boxBarcode),
+        <String>['RIGHT', 'WRONG'],
+      );
+      expect(groups.first.count, 12);
+      expect(groups.last.count, 1);
+    });
+
+    test('same barcode with a different box size stays separate', () {
+      final List<SealedBoxGroup> groups = groupSealedBoxesByBarcode(
+        _breakdown(
+          sealedBoxes: <SealedBoxInfo>[
+            ..._sealedBoxes(1, 'BOX-A', 6),
+            ..._sealedBoxes(1, 'BOX-A', 12),
+          ],
+        ),
+      );
+
+      expect(groups, hasLength(2));
+    });
+
+    test('blank barcodes are skipped', () {
+      expect(
+        groupSealedBoxesByBarcode(_breakdown(sealedBoxes: _sealedBoxes(1, '  ', 6))),
+        isEmpty,
+      );
+    });
+  });
+
+  group('blockingForeignBoxGroups', () {
+    test('a foreign box type blocks the save', () {
+      // Aks holda maqsad jami begona qutining donasini hisobga olmaydi va
+      // saqlash qoldiqni yopiq qutilardan past tushirishga urinadi.
+      final List<SealedBoxGroup> blocking = blockingForeignBoxGroups(
+        breakdown: _breakdown(
+          sealedBoxes: <SealedBoxInfo>[
+            ..._sealedBoxes(12, 'RIGHT', 6),
+            ..._sealedBoxes(1, 'WRONG', 6),
+          ],
+        ),
+        boxBarcode: 'RIGHT',
+      );
+
+      expect(blocking, hasLength(1));
+      expect(blocking.single.boxBarcode, 'WRONG');
+    });
+
+    test('a single matching box type does not block', () {
+      expect(
+        blockingForeignBoxGroups(
+          breakdown: _breakdown(sealedBoxes: _sealedBoxes(2, 'RIGHT', 6)),
+          boxBarcode: 'RIGHT',
+        ),
+        isEmpty,
+      );
+    });
+
+    test('every box being foreign also blocks', () {
+      expect(
+        blockingForeignBoxGroups(
+          breakdown: _breakdown(sealedBoxes: _sealedBoxes(1, 'OTHER', 6)),
+          boxBarcode: 'RIGHT',
+        ),
+        hasLength(1),
+      );
+    });
+
+    test('inconsistent data is not blocked so drift stays fixable', () {
+      // Drift oqimi baribir hamma qutini tozalab qayta quradi; bloklansa
+      // nomuvofiqlikni umuman tuzatib bo'lmay qolardi.
+      expect(
+        blockingForeignBoxGroups(
+          breakdown: _breakdown(
+            sealedBoxes: _sealedBoxes(1, 'OTHER', 6),
+            dataInconsistent: true,
+          ),
+          boxBarcode: 'RIGHT',
+        ),
+        isEmpty,
+      );
+    });
+
+    test('an empty barcode does not block', () {
+      expect(
+        blockingForeignBoxGroups(
+          breakdown: _breakdown(sealedBoxes: _sealedBoxes(1, 'OTHER', 6)),
+          boxBarcode: null,
+        ),
+        isEmpty,
+      );
+    });
+  });
 }
 
 List<SealedBoxInfo> _sealedBoxes(int count, String barcode, int upb) {
