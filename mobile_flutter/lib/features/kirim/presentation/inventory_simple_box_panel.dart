@@ -60,6 +60,7 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
   int? _originalUnitsPerBox;
   bool _pendingBoxRegistration = false;
   bool _boxPrefilledFromBreakdown = false;
+  bool _merging = false;
   BoxLocationBreakdown? _breakdown;
   bool _loadingBreakdown = true;
   bool _saving = false;
@@ -833,6 +834,88 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
     );
   }
 
+  /// Begona kodli qutilarni kiritilgan (to'g'ri) kodga o'tkazadi.
+  ///
+  /// Qoldiq tegilmaydi — faqat joylashuvning quti turi almashadi. Server
+  /// qutidagi dona soni bir xil bo'lishini talab qiladi, aks holda rad etadi.
+  Future<void> _mergeBoxType(SealedBoxGroup group) async {
+    final AppLocale loc = ref.read(appLocaleProvider);
+    final String target = (_resolvedBarcode ?? _boxBarcode.text).trim();
+    if (target.isEmpty) {
+      showAppSnackBar(
+        context,
+        SnackBar(content: Text(StringLookup.t(loc, 'inventoryBoxMergeNeedsTarget'))),
+      );
+      return;
+    }
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext ctx) => AlertDialog(
+        title: Text(StringLookup.t(loc, 'inventoryBoxMergeConfirmTitle')),
+        content: Text(
+          StringLookup.tParams(loc, 'inventoryBoxMergeConfirmMessage', <String, String>{
+            'count': '${group.count}',
+            'from': group.boxBarcode,
+            'to': target,
+          }),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(StringLookup.t(loc, 'cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(StringLookup.t(loc, 'confirmButton')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) {
+      return;
+    }
+    setState(() => _merging = true);
+    try {
+      final BoxTypeMergeResult result =
+          await ref.read(boxLocationRepositoryProvider).mergeBoxType(
+                fromBoxBarcode: group.boxBarcode,
+                toBoxBarcode: target,
+                locationId: widget.locationId,
+                lotId: widget.lotId,
+              );
+      if (!mounted) {
+        return;
+      }
+      setState(() => _breakdown = result.breakdown);
+      showAppTopSuccess(
+        context,
+        StringLookup.tParams(loc, 'inventoryBoxMergeDone', <String, String>{
+          'count': '${result.moved}',
+        }),
+      );
+      if (result.remainingElsewhere > 0) {
+        showAppSnackBar(
+          context,
+          SnackBar(
+            content: Text(
+              StringLookup.tParams(loc, 'inventoryBoxMergeRemaining', <String, String>{
+                'count': '${result.remainingElsewhere}',
+              }),
+            ),
+          ),
+        );
+      }
+    } on Exception catch (e) {
+      if (mounted) {
+        showAppLocalizedError(context, loc, e);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _merging = false);
+      }
+    }
+  }
+
   /// Joyda bir nechta quti turi bo'lsa, qaysi koddan nechta ekanini ko'rsatadi.
   ///
   /// Sarlavhadagi "Karobka: 13" jami son — ikki xil shtrix-kod aralashganini
@@ -857,18 +940,40 @@ class _InventorySimpleBoxPanelState extends ConsumerState<InventorySimpleBoxPane
             final bool isEntered = entered.isNotEmpty && g.boxBarcode == entered;
             return Padding(
               padding: const EdgeInsets.only(top: 2),
-              child: Text(
-                StringLookup.tParams(loc, 'inventoryBoxTypeLine', <String, String>{
-                  'barcode': g.boxBarcode,
-                  'count': '${g.count}',
-                  'upb': '${g.unitsPerBox}',
-                  'units': '${g.units}',
-                }),
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: isEntered ? FontWeight.w600 : FontWeight.w400,
-                  color: isEntered ? null : Colors.orange.shade800,
-                ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      StringLookup.tParams(loc, 'inventoryBoxTypeLine', <String, String>{
+                        'barcode': g.boxBarcode,
+                        'count': '${g.count}',
+                        'upb': '${g.unitsPerBox}',
+                        'units': '${g.units}',
+                      }),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: isEntered ? FontWeight.w600 : FontWeight.w400,
+                        color: isEntered ? null : Colors.orange.shade800,
+                      ),
+                    ),
+                  ),
+                  if (!isEntered)
+                    TextButton(
+                      onPressed: _saving || _merging
+                          ? null
+                          : () => unawaited(_mergeBoxType(g)),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text(
+                        StringLookup.t(loc, 'inventoryBoxMergeAction'),
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ),
+                ],
               ),
             );
           }),

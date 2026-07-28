@@ -934,6 +934,40 @@ void main() {
       );
     });
   });
+
+  group('BoxTypeMergeResult parsing', () {
+    test('the full server response is read', () {
+      final BoxTypeMergeResult r = BoxTypeMergeResult.fromJson(<String, Object?>{
+        'moved': 1,
+        'remaining_elsewhere': 3,
+        'breakdown': <String, Object?>{
+          'product_id': 'p1',
+          'lot_id': 'lot1',
+          'location_id': 'loc1',
+          'box_count': 13,
+          'units_in_boxes': 78,
+          'loose_units': 1,
+          'total_units': 79,
+          'sealed_boxes': <Object?>[],
+        },
+      });
+
+      expect(r.moved, 1);
+      expect(r.remainingElsewhere, 3);
+      expect(r.breakdown.boxCount, 13);
+      expect(r.breakdown.unitsInBoxes, 78);
+    });
+
+    test('a missing breakdown does not throw', () {
+      final BoxTypeMergeResult r = BoxTypeMergeResult.fromJson(<String, Object?>{
+        'moved': 2,
+        'remaining_elsewhere': 0,
+      });
+
+      expect(r.moved, 2);
+      expect(r.breakdown.boxCount, 0);
+    });
+  });
 }
 
 List<SealedBoxInfo> _sealedBoxes(int count, String barcode, int upb) {

@@ -406,6 +406,10 @@ void main() {
       "Qaytimda mahsulot yo'q",
       "Buyurtma jo'natilgan (ship) — qaytim mumkin emas",
       'Ba\'zi mahsulotlar WMS bazasida topilmadi',
+      // Quti turini birlashtirish
+      "Qutidagi dona soni farq qiladi (12 va 6) — birlashtirib bo'lmaydi, avval sanoq qiling",
+      'Qutilar har xil mahsulotga tegishli',
+      "Bu joyda shu shtrix-kodli yopiq quti yo'q",
       // Ko'chirish / sektor
       "Qutidagi zaxirani dona qilib ko'chirib bo'lmaydi (qutisiz mavjud 4). "
           "Avval qutini ko'chiring yoki oching.",

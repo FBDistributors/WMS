@@ -137,4 +137,34 @@ class BoxLocationRepository {
       throw Exception(mapDioExceptionToMessage(e));
     }
   }
+
+  /// Noto'g'ri shtrix-kod bilan qayd etilgan qutilarni to'g'ri turga o'tkazadi.
+  ///
+  /// Qayta yorliqlash: qoldiq tegilmaydi, faqat joylashuvning quti turi
+  /// almashadi. Qutidagi dona soni ikkala kodda bir xil bo'lishi shart.
+  Future<BoxTypeMergeResult> mergeBoxType({
+    required String fromBoxBarcode,
+    required String toBoxBarcode,
+    required String locationId,
+    required String lotId,
+  }) async {
+    try {
+      final Response<Object?> res = await _dio.post<Object?>(
+        '/box-locations/merge-box-type',
+        data: <String, Object?>{
+          'from_box_barcode': fromBoxBarcode.trim(),
+          'to_box_barcode': toBoxBarcode.trim(),
+          'location_id': locationId,
+          'lot_id': lotId,
+        },
+      );
+      final Object? data = res.data;
+      if (data is! Map) {
+        throw const FormatException('box merge');
+      }
+      return BoxTypeMergeResult.fromJson(Map<String, Object?>.from(data));
+    } on DioException catch (e) {
+      throw Exception(mapDioExceptionToMessage(e));
+    }
+  }
 }

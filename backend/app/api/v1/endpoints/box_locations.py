@@ -3,16 +3,18 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.auth.deps import require_any_permission, require_permission
 from app.db import get_db
 from app.models.user import User as UserModel
+from app.services.audit_service import ACTION_UPDATE, get_client_ip, log_action
 from app.services.box_location_service import (
     LocationBoxBreakdown,
     get_breakdown_tolerant,
+    merge_box_type_at_location,
     place_sealed_boxes,
     reconcile_count,
     relocate_sealed_box,
@@ -60,6 +62,23 @@ class BoxTransferIn(BaseModel):
     box_barcode: str = Field(..., min_length=1, max_length=64)
     from_location_id: UUID
     to_location_id: UUID
+
+
+class BoxMergeTypeIn(BaseModel):
+    """Noto'g'ri shtrix-kod bilan qayd etilgan qutilarni to'g'ri turga o'tkazish."""
+
+    from_box_barcode: str = Field(..., min_length=1, max_length=64)
+    to_box_barcode: str = Field(..., min_length=1, max_length=64)
+    location_id: UUID
+    lot_id: UUID
+
+
+class BoxMergeTypeOut(BaseModel):
+    breakdown: BoxBreakdownOut
+    #: Shu joyda ko'chirilgan quti soni.
+    moved: int
+    #: Manba turida boshqa joylarda qolgan qutilar — ish tugadimi yoki yo'q.
+    remaining_elsewhere: int
 
 
 class BoxCountIn(BaseModel):
@@ -186,3 +205,51 @@ async def box_transfer(
     )
     db.commit()
     return _to_out(result)
+
+
+@router.post(
+    "/merge-box-type",
+    response_model=BoxMergeTypeOut,
+    summary="Move sealed boxes from a wrong box barcode to the correct one",
+)
+async def box_merge_type(
+    request: Request,
+    payload: BoxMergeTypeIn,
+    db: Session = Depends(get_db),
+    user: UserModel = Depends(require_permission("inventory:adjust")),
+):
+    """Joydagi qutilarni noto'g'ri shtrix-koddan to'g'risiga o'tkazadi.
+
+    Qayta yorliqlash: joylashuv yozuvining quti turi almashadi, fizik qoldiq
+    tegilmaydi. Qutidagi dona soni ikkala turda bir xil bo'lishi shart.
+    """
+    result = merge_box_type_at_location(
+        db,
+        from_box_barcode=payload.from_box_barcode,
+        to_box_barcode=payload.to_box_barcode,
+        location_id=payload.location_id,
+        lot_id=payload.lot_id,
+    )
+    log_action(
+        db,
+        user_id=user.id,
+        action=ACTION_UPDATE,
+        entity_type="location_box_placement",
+        entity_id=str(payload.location_id),
+        ip_address=get_client_ip(request),
+        old_data={"box_barcode": payload.from_box_barcode},
+        new_data={
+            "box_barcode": payload.to_box_barcode,
+            "location_id": str(payload.location_id),
+            "lot_id": str(payload.lot_id),
+            "moved": result.moved,
+            "remaining_elsewhere": result.remaining_elsewhere,
+            "action": "merge_box_type",
+        },
+    )
+    db.commit()
+    return BoxMergeTypeOut(
+        breakdown=_to_out(result.breakdown),
+        moved=result.moved,
+        remaining_elsewhere=result.remaining_elsewhere,
+    )

@@ -86,3 +86,31 @@ int _int(Object? v) {
   }
   return int.tryParse('$v') ?? 0;
 }
+
+/// Quti turini birlashtirish natijasi.
+class BoxTypeMergeResult {
+  const BoxTypeMergeResult({
+    required this.breakdown,
+    required this.moved,
+    required this.remainingElsewhere,
+  });
+
+  final BoxLocationBreakdown breakdown;
+
+  /// Shu joyda to'g'ri turga o'tkazilgan quti soni.
+  final int moved;
+
+  /// Manba kodida boshqa joylarda qolgan qutilar — ish tugadimi yoki yo'q.
+  final int remainingElsewhere;
+
+  factory BoxTypeMergeResult.fromJson(Map<String, Object?> json) {
+    final Object? raw = json['breakdown'];
+    return BoxTypeMergeResult(
+      breakdown: BoxLocationBreakdown.fromJson(
+        raw is Map ? Map<String, Object?>.from(raw) : <String, Object?>{},
+      ),
+      moved: _int(json['moved']),
+      remainingElsewhere: _int(json['remaining_elsewhere']),
+    );
+  }
+}

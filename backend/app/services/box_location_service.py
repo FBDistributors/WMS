@@ -1295,3 +1295,104 @@ def require_sufficient_loose_for_unit_pick(
                 "Quti skan qiling."
             ),
         )
+
+
+@dataclass(frozen=True)
+class BoxTypeMergeResult:
+    """Noto'g'ri shtrix-kodli qutilarni to'g'ri turga o'tkazish natijasi."""
+
+    breakdown: LocationBoxBreakdown
+    moved: int
+    #: Manba turida boshqa joy/partiyalarda qolgan yopiq qutilar.
+    remaining_elsewhere: int
+
+
+def merge_box_type_at_location(
+    db: Session,
+    *,
+    from_box_barcode: str,
+    to_box_barcode: str,
+    location_id: UUID,
+    lot_id: UUID,
+) -> BoxTypeMergeResult:
+    """Joydagi qutilarni bir quti turidan boshqasiga o'tkazadi.
+
+    Noto'g'ri shtrix-kod bilan qayd etilgan qutilarni tuzatish uchun. Faqat
+    joylashuv yozuvining quti turi almashadi — fizik qoldiq (stock_movements)
+    va joylashuv soni tegilmaydi, ya'ni bu qayta yorliqlash, sanoq emas.
+
+    Shu sababli qutidagi dona soni ikkala turda bir xil bo'lishi **shart**:
+    aks holda `units_in_boxes` jimgina o'zgarib, quti invariantini buzardi.
+
+    Amal faqat berilgan joy va partiya bilan cheklanadi — bir xil xato boshqa
+    joyda ham bo'lsa, u yerda alohida tuzatiladi. Natijadagi
+    `remaining_elsewhere` shuni bildiradi.
+    """
+    from_box = _get_product_box_by_barcode(db, from_box_barcode)
+    to_box = _get_product_box_by_barcode(db, to_box_barcode)
+
+    if from_box.id == to_box.id:
+        raise HTTPException(
+            status_code=400, detail="Manba va manzil quti turi bir xil"
+        )
+    if from_box.product_id != to_box.product_id:
+        raise HTTPException(
+            status_code=400, detail="Qutilar har xil mahsulotga tegishli"
+        )
+    if from_box.units_per_box != to_box.units_per_box:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Qutidagi dona soni farq qiladi "
+                f"({from_box.units_per_box} va {to_box.units_per_box}) — "
+                "birlashtirib bo'lmaydi, avval sanoq qiling"
+            ),
+        )
+
+    lock_lot_location(db, lot_id, location_id)
+    placements = (
+        db.query(LocationBoxPlacement)
+        .filter(
+            LocationBoxPlacement.product_box_id == from_box.id,
+            LocationBoxPlacement.location_id == location_id,
+            LocationBoxPlacement.lot_id == lot_id,
+            LocationBoxPlacement.status == PLACEMENT_SEALED,
+        )
+        .all()
+    )
+    if not placements:
+        raise HTTPException(
+            status_code=404, detail="Bu joyda shu shtrix-kodli yopiq quti yo'q"
+        )
+
+    for placement in placements:
+        # FK emas, bog'lanishning o'zi beriladi: aks holda `product_box`
+        # obyekti keshda eski turib qoladi va qaytgan breakdown hamon noto'g'ri
+        # shtrix-kodni ko'rsatadi.
+        placement.product_box = to_box
+    db.flush()
+
+    remaining_elsewhere = (
+        db.query(func.count(LocationBoxPlacement.id))
+        .filter(
+            LocationBoxPlacement.product_box_id == from_box.id,
+            LocationBoxPlacement.status == PLACEMENT_SEALED,
+        )
+        .scalar()
+        or 0
+    )
+
+    # Dona soni o'zgarmagani uchun invariant buzilmasligi kerak; baribir
+    # tekshiramiz — bu tuzatish amali, jimgina buzilish qolib ketmasin.
+    assert_box_invariant(db, lot_id, location_id)
+
+    return BoxTypeMergeResult(
+        breakdown=get_breakdown_tolerant(
+            db,
+            product_id=to_box.product_id,
+            lot_id=lot_id,
+            location_id=location_id,
+        ),
+        moved=len(placements),
+        remaining_elsewhere=int(remaining_elsewhere),
+    )

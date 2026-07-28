@@ -265,6 +265,15 @@ String localizeApiErrorMessage(AppLocale loc, Object error) {
   if (raw.contains('ajratishlarda yetarli joy')) {
     return StringLookup.t(loc, 'errBoxPickNoRoomAllocations');
   }
+  if (raw.contains('dona soni farq qiladi')) {
+    return StringLookup.t(loc, 'errBoxMergeSizeMismatch');
+  }
+  if (raw.contains('har xil mahsulotga tegishli')) {
+    return StringLookup.t(loc, 'errBoxMergeOtherProduct');
+  }
+  if (raw.contains("shu shtrix-kodli yopiq quti yo'q")) {
+    return StringLookup.t(loc, 'errBoxMergeNothingHere');
+  }
 
   // --- Terish sessiyasi / bekor qilish xatolari ---
   if (raw.contains('Barcha qatorlar uchun mahsulot skanerlanishi kerak')) {
