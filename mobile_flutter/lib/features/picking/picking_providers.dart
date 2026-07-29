@@ -260,6 +260,17 @@ final pickerStatsProvider = FutureProvider.autoDispose<MyPickerStats>(
   (Ref ref) => ref.watch(pickingRepositoryProvider).getMyPickerStats(),
 );
 
+/// Kutayotgan qaytim: bosh ekrandagi banner uchun. Qaytim endi ishni bloklamaydi —
+/// yig'uvchi uni navbatdagi ustuvor vazifa sifatida ko'radi va o'zi kirib bajaradi.
+final myReturnSessionProvider = FutureProvider.autoDispose<SafeCancelReturnSession?>((Ref ref) async {
+  try {
+    return await ref.watch(pickingRepositoryProvider).getMyReturnSession();
+  } on Object {
+    // Tarmoq yo'q yoki 401 — banner ko'rsatilmaydi, boshqa ish to'xtamaydi.
+    return null;
+  }
+});
+
 /// Skaner `router.go` o‘rniga `pop` qilganda vazifa detaliga skan natijasini yetkazish.
 class PickTaskScanFromScanner {
   const PickTaskScanFromScanner({

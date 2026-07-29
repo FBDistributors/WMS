@@ -31,39 +31,16 @@ class PickerHomeScreen extends ConsumerStatefulWidget {
 class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
   bool _refreshing = false;
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(_maybeNavigateToPendingReturn());
-    });
-  }
-
-  Future<void> _maybeNavigateToPendingReturn() async {
-    final ProfileType pt = ref.read(profileTypeProvider);
-    final GoRouterState rs = GoRouterState.of(context);
-    final String? qp = rs.uri.queryParameters['profile'];
-    if (qp == 'controller' || pt == ProfileType.controller) {
-      return;
-    }
+  /// Kutayotgan qaytimni keshga yozamiz (tarmoq uzilganda ham banner ko'rinsin),
+  /// lekin ekranni majburan almashtirmaymiz — yig'uvchi o'zi kirib bajaradi.
+  Future<void> _rememberPendingReturn(String? sessionId) async {
     final SharedPreferences sp = await SharedPreferences.getInstance();
-    final String? cached = ReturnSessionStorage.read(sp);
-    if (cached != null && cached.isNotEmpty && mounted) {
-      context.go('/return-items/$cached');
+    if (sessionId == null || sessionId.isEmpty) {
+      await ReturnSessionStorage.clear(sp);
       return;
     }
-    try {
-      final SafeCancelReturnSession? s =
-          await ref.read(pickingRepositoryProvider).getMyReturnSession();
-      if (s != null && mounted) {
-        await ReturnSessionStorage.save(sp, s.id);
-        if (!mounted) {
-          return;
-        }
-        context.go('/return-items/${s.id}');
-      }
-    } on Object {
-      /* tarmoq yo'q yoki 401 — e'tiborsiz */
+    if (ReturnSessionStorage.read(sp) != sessionId) {
+      await ReturnSessionStorage.save(sp, sessionId);
     }
   }
 
@@ -89,6 +66,16 @@ class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
         : StringLookup.t(loc, 'pickerTitle');
 
     final AsyncValue<MyPickerStats> stats = ref.watch(pickerStatsProvider);
+
+    final SafeCancelReturnSession? pendingReturn = profile == PickerProfileParam.picker
+        ? ref.watch(myReturnSessionProvider).valueOrNull
+        : null;
+    ref.listen<AsyncValue<SafeCancelReturnSession?>>(
+      myReturnSessionProvider,
+      (AsyncValue<SafeCancelReturnSession?>? prev, AsyncValue<SafeCancelReturnSession?> next) {
+        next.whenData((SafeCancelReturnSession? s) => unawaited(_rememberPendingReturn(s?.id)));
+      },
+    );
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
@@ -141,6 +128,12 @@ class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
                   sliver: SliverList(
                     delegate: SliverChildListDelegate(
                       <Widget>[
+                        if (pendingReturn != null)
+                          _PendingReturnBanner(
+                            session: pendingReturn,
+                            isDark: isDark,
+                            onTap: () => context.push('/return-items/${pendingReturn.id}'),
+                          ),
                         stats.when(
                           data: (MyPickerStats s) =>
                               _StatsBlock(stats: s, loc: loc, isDark: isDark),
@@ -195,6 +188,7 @@ class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
   Future<void> _onRefresh() async {
     setState(() => _refreshing = true);
     ref.invalidate(pickerStatsProvider);
+    ref.invalidate(myReturnSessionProvider);
     await ref.read(openPickTasksProvider.notifier).refreshFromNetwork();
     ref.invalidate(pendingQueueCountProvider);
     await Future<void>.delayed(const Duration(milliseconds: 400));
@@ -245,6 +239,54 @@ class _StatsBlock extends StatelessWidget {
           textAlign: TextAlign.center,
         ),
       ],
+    );
+  }
+}
+
+/// Kutayotgan qaytim — bloklovchi ekran emas, navbatdagi ustuvor vazifa.
+class _PendingReturnBanner extends StatelessWidget {
+  const _PendingReturnBanner({
+    required this.session,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  final SafeCancelReturnSession session;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final int remaining = session.lines.where((SafeCancelReturnLine l) => !l.productConfirmed).length;
+    final String order = (session.orderNumber ?? '').trim().isNotEmpty
+        ? '№ ${session.orderNumber}'
+        : session.referenceNumber;
+    final Color accent = isDark ? const Color(0xFFFDBA74) : Colors.orange.shade900;
+
+    return Card(
+      color: isDark ? const Color(0xFF4A2C0B) : Colors.orange.shade50,
+      margin: const EdgeInsets.only(bottom: 10),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: isDark ? const Color(0xFF9A5B12) : Colors.orange.shade200),
+      ),
+      child: ListTile(
+        visualDensity: VisualDensity.compact,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        minLeadingWidth: 32,
+        leading: Icon(Icons.assignment_return_outlined, size: 28, color: accent),
+        title: Text(
+          'Qaytim kutilmoqda',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: accent),
+        ),
+        subtitle: Text(
+          '$order — qaytariladigan pozitsiya: $remaining',
+          style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54),
+        ),
+        trailing: Icon(Icons.chevron_right, color: accent),
+        onTap: onTap,
+      ),
     );
   }
 }

@@ -239,123 +239,121 @@ class _ReturnItemsScreenState extends ConsumerState<ReturnItemsScreen> {
         ? 'Barcha qatorlar tasdiqlandi.'
         : 'Navbat: MAHSULOT — ${nextLine.barcode ?? nextLine.sku ?? nextLine.productName}';
 
-    return PopScope(
-      canPop: false,
-      child: Scaffold(
-        appBar: AppBar(
-          automaticallyImplyLeading: false,
-          title: const Text('Tovar qaytarish'),
-        ),
-        body: ListView(
-          padding: const EdgeInsets.all(16),
-          children: <Widget>[
-            Text(
-              'Buyurtma: ${s.referenceNumber}',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+    // Qaytim ishni bloklamaydi: yig'uvchi chiqib, keyin davom ettira oladi —
+    // skanerlangan qatorlar serverda saqlanadi.
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Tovar qaytarish'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: <Widget>[
+          Text(
+            'Buyurtma: ${s.referenceNumber}',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+          if (s.orderNumber != null && s.orderNumber!.isNotEmpty)
+            Text('№ ${s.orderNumber}', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 12),
+          Card(
+            color: Colors.orange.shade50,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                'DIQQAT: buyurtma bekor qilindi. Iloji boricha birinchi navbatda bajaring — chiqib ketsangiz ham skanerlanganlar saqlanadi.',
+                style: TextStyle(color: Colors.orange.shade900, fontWeight: FontWeight.w600),
+              ),
             ),
-            if (s.orderNumber != null && s.orderNumber!.isNotEmpty)
-              Text('№ ${s.orderNumber}', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-            const SizedBox(height: 12),
+          ),
+          const SizedBox(height: 12),
+          if (nextLine != null) ...<Widget>[
             Card(
-              color: Colors.orange.shade50,
               child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(
-                  'DIQQAT: buyurtma bekor qilindi. Boshqa vazifa ololmaysiz — qaytarish tugaguncha faqat bu ekran.',
-                  style: TextStyle(color: Colors.orange.shade900, fontWeight: FontWeight.w600),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'Qaytarish joyi',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: context.colors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      nextLine.expectedLocationCode,
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        color: context.colors.accentFg,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      nextLine.productName,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ],
                 ),
               ),
             ),
             const SizedBox(height: 12),
-            if (nextLine != null) ...<Widget>[
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        'Qaytarish joyi',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: context.colors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        nextLine.expectedLocationCode,
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w700,
-                          color: context.colors.accentFg,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        nextLine.productName,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-            Text(hint, style: const TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  Expanded(
-                    child: TextField(
-                      controller: _scan,
-                      decoration: const InputDecoration(
-                        labelText: 'Mahsulot shtrix kodi / SKU',
-                        border: OutlineInputBorder(),
-                      ),
-                      textInputAction: TextInputAction.done,
-                      onSubmitted: (_) => unawaited(_submitScan()),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  ScanActionButton(
-                    compact: true,
-                    onPressed: _busy ? null : () => unawaited(_openCameraScan()),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            FilledButton(
-              onPressed: _busy ? null : () => unawaited(_submitScan()),
-              child: Text(_busy ? 'Kutilmoqda…' : 'Tasdiqlash'),
-            ),
-            const SizedBox(height: 20),
-            const Text('Qatorlar', style: TextStyle(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
-            ...s.lines.map(
-              (SafeCancelReturnLine l) => ListTile(
-                dense: true,
-                title: Text(l.productName),
-                subtitle: Text(
-                  '${l.expectedLocationCode} · ${l.qtyToReturn} · '
-                  '${l.productConfirmed ? "✓ mahsulot" : "… mahsulot"}',
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: (!s.allLinesComplete || _busy) ? null : () => unawaited(_finish()),
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.green.shade700,
-                disabledBackgroundColor: Colors.grey.shade400,
-              ),
-              child: const Text('Finish Return — yakunlash'),
-            ),
           ],
-        ),
+          Text(hint, style: const TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Expanded(
+                  child: TextField(
+                    controller: _scan,
+                    decoration: const InputDecoration(
+                      labelText: 'Mahsulot shtrix kodi / SKU',
+                      border: OutlineInputBorder(),
+                    ),
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => unawaited(_submitScan()),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ScanActionButton(
+                  compact: true,
+                  onPressed: _busy ? null : () => unawaited(_openCameraScan()),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          FilledButton(
+            onPressed: _busy ? null : () => unawaited(_submitScan()),
+            child: Text(_busy ? 'Kutilmoqda…' : 'Tasdiqlash'),
+          ),
+          const SizedBox(height: 20),
+          const Text('Qatorlar', style: TextStyle(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          ...s.lines.map(
+            (SafeCancelReturnLine l) => ListTile(
+              dense: true,
+              title: Text(l.productName),
+              subtitle: Text(
+                '${l.expectedLocationCode} · ${l.qtyToReturn} · '
+                '${l.productConfirmed ? "✓ mahsulot" : "… mahsulot"}',
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: (!s.allLinesComplete || _busy) ? null : () => unawaited(_finish()),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.green.shade700,
+              disabledBackgroundColor: Colors.grey.shade400,
+            ),
+            child: const Text('Finish Return — yakunlash'),
+          ),
+        ],
       ),
     );
   }

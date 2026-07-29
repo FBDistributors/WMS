@@ -2722,6 +2722,13 @@ class _PickTaskDetailsScreenState extends ConsumerState<PickTaskDetailsScreen> {
                                 },
                                 child: const Text('Qaytarish ekraniga o\'tish'),
                               ),
+                              const SizedBox(height: 8),
+                              // Qaytim boshqa ishni bloklamaydi — yig'uvchi ro'yxatga
+                              // qaytib boshqa buyurtmani terishi mumkin.
+                              TextButton(
+                                onPressed: () => context.go('/pick-tasks'),
+                                child: const Text('Vazifalar ro\'yxatiga qaytish'),
+                              ),
                             ],
                           ),
                         ),
