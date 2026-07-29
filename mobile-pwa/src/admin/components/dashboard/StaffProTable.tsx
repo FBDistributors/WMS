@@ -14,7 +14,8 @@ export type StaffProRow = {
   region_positions: number
   region_qty: number
   total_qty: number
-  units_per_hour: number
+  /** Unumdorlik — pozitsiya/soat (dona emas: qator soni mehnatni to'g'riroq o'lchaydi). */
+  positions_per_hour: number
   median_seconds: number
   work_hours: number
 }
@@ -93,7 +94,7 @@ export function StaffProTable({
     s: t('admin:dashboard.timing.s'),
   }
 
-  const speeds = rows.map((r) => r.units_per_hour).filter((v) => v > 0)
+  const speeds = rows.map((r) => r.positions_per_hour).filter((v) => v > 0)
   const avgSpeed = speeds.length ? speeds.reduce((a, b) => a + b, 0) / speeds.length : 0
 
   const avatar =
@@ -101,10 +102,10 @@ export function StaffProTable({
       ? { bg: '#eff6ff', fg: '#2563eb' }
       : { bg: '#f5f3ff', fg: '#7c3aed' }
 
-  const chipStyle = (uph: number): { bg: string; fg: string } => {
-    if (avgSpeed <= 0 || uph <= 0) return { bg: '#f1f5f9', fg: '#64748b' }
-    if (uph > avgSpeed * 1.15) return { bg: '#dcfce7', fg: '#15803d' }
-    if (uph < avgSpeed * 0.55) return { bg: '#fee2e2', fg: '#b91c1c' }
+  const chipStyle = (pph: number): { bg: string; fg: string } => {
+    if (avgSpeed <= 0 || pph <= 0) return { bg: '#f1f5f9', fg: '#64748b' }
+    if (pph > avgSpeed * 1.15) return { bg: '#dcfce7', fg: '#15803d' }
+    if (pph < avgSpeed * 0.55) return { bg: '#fee2e2', fg: '#b91c1c' }
     return { bg: '#f1f5f9', fg: '#64748b' }
   }
 
@@ -228,7 +229,7 @@ export function StaffProTable({
             rows.map((row, index) => {
               const rank = index + 1
               const rs = rankStyle(rank)
-              const chip = chipStyle(row.units_per_hour)
+              const chip = chipStyle(row.positions_per_hour)
               return (
                 <div
                   key={row.user_id}
@@ -288,12 +289,12 @@ export function StaffProTable({
                   </div>
                   {/* UNUMDORLIK — chip */}
                   <div className="text-right">
-                    {row.units_per_hour > 0 ? (
+                    {row.positions_per_hour > 0 ? (
                       <span
                         className="wms-num inline-block rounded-[7px] px-2 py-[3px] text-[11.5px] font-extrabold"
                         style={{ backgroundColor: chip.bg, color: chip.fg }}
                       >
-                        {fmtQty(row.units_per_hour)} {t('admin:dashboard.pro.chip_speed')}
+                        {fmtQty(row.positions_per_hour)} {t('admin:dashboard.pro.chip_speed')}
                       </span>
                     ) : (
                       <span className="text-[12px] text-slate-400">—</span>

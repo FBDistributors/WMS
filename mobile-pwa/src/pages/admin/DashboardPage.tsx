@@ -329,9 +329,10 @@ function PipelineCard({
 type TimingLite = {
   user_id: string
   full_name: string
-  units_per_hour: number
+  /** Unumdorlik pozitsiya bo'yicha o'lchanadi — dona xodim mehnatini aks ettirmaydi. */
+  positions_per_hour: number
   median_seconds: number
-  total_units: number
+  total_positions: number
 }
 
 /** Reyting (shahar+region) + unumdorlik/median ni xodim bo'yicha birlashtiradi. */
@@ -354,7 +355,7 @@ function buildProRows(
         region_positions: 0,
         region_qty: 0,
         total_qty: 0,
-        units_per_hour: 0,
+        positions_per_hour: 0,
         median_seconds: 0,
         work_hours: 0,
       }
@@ -377,9 +378,9 @@ function buildProRows(
   }
   for (const tr of timing) {
     const r = ensure(tr.user_id, tr.full_name)
-    r.units_per_hour = tr.units_per_hour
+    r.positions_per_hour = tr.positions_per_hour
     r.median_seconds = tr.median_seconds
-    r.work_hours = tr.units_per_hour > 0 ? tr.total_units / tr.units_per_hour : 0
+    r.work_hours = tr.positions_per_hour > 0 ? tr.total_positions / tr.positions_per_hour : 0
   }
   for (const r of map.values()) {
     r.total_qty = r.shahar_qty + r.region_qty
@@ -398,10 +399,10 @@ function computeStaffKpi(
   const positions = completedRows.reduce((s, r) => s + r.lines_count, 0)
   const qty = completedRows.reduce((s, r) => s + r.total_picked_qty, 0)
   const hours = timing.reduce(
-    (s, tr) => s + (tr.units_per_hour > 0 ? tr.total_units / tr.units_per_hour : 0),
+    (s, tr) => s + (tr.positions_per_hour > 0 ? tr.total_positions / tr.positions_per_hour : 0),
     0
   )
-  return { orders, positions, qty, speed: hours > 0 ? qty / hours : 0 }
+  return { orders, positions, qty, speed: hours > 0 ? positions / hours : 0 }
 }
 
 export function DashboardPage() {
@@ -442,9 +443,9 @@ export function DashboardPage() {
         timingPickers.map((tp) => ({
           user_id: tp.user_id,
           full_name: tp.full_name,
-          units_per_hour: tp.units_per_hour,
+          positions_per_hour: tp.positions_per_hour,
           median_seconds: tp.median_seconds,
-          total_units: tp.total_units,
+          total_positions: tp.total_positions,
         }))
       ),
     [pickerRows, regionPickerRows, timingPickers]
@@ -457,9 +458,9 @@ export function DashboardPage() {
         timingControllers.map((tc) => ({
           user_id: tc.user_id,
           full_name: tc.full_name,
-          units_per_hour: tc.units_per_hour,
+          positions_per_hour: tc.positions_per_hour,
           median_seconds: tc.median_check_seconds || tc.median_total_seconds,
-          total_units: tc.total_units,
+          total_positions: tc.total_positions,
         }))
       ),
     [controllerRows, regionControllerRows, timingControllers]
@@ -472,9 +473,9 @@ export function DashboardPage() {
         timingPickers.map((tp) => ({
           user_id: tp.user_id,
           full_name: tp.full_name,
-          units_per_hour: tp.units_per_hour,
+          positions_per_hour: tp.positions_per_hour,
           median_seconds: tp.median_seconds,
-          total_units: tp.total_units,
+          total_positions: tp.total_positions,
         }))
       ),
     [completedPickers, timingPickers]
@@ -486,9 +487,9 @@ export function DashboardPage() {
         timingControllers.map((tc) => ({
           user_id: tc.user_id,
           full_name: tc.full_name,
-          units_per_hour: tc.units_per_hour,
+          positions_per_hour: tc.positions_per_hour,
           median_seconds: tc.median_check_seconds || tc.median_total_seconds,
-          total_units: tc.total_units,
+          total_positions: tc.total_positions,
         }))
       ),
     [completedControllers, timingControllers]
@@ -634,7 +635,7 @@ export function DashboardPage() {
           row.shahar_orders + row.region_orders,
           row.shahar_positions + row.region_positions,
           row.total_qty,
-          Math.round(row.units_per_hour),
+          Math.round(row.positions_per_hour),
           formatDuration(row.median_seconds, durUnits),
         ])
         const wb = XLSX.utils.book_new()
