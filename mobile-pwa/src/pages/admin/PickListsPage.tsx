@@ -9,6 +9,7 @@ import { OrdersHubTabs } from '../../admin/components/orders/OrdersHubTabs'
 import { OrdersTableSettings } from '../../admin/components/orders/OrdersTableSettings'
 import { SendToPickingDialog } from '../../admin/components/orders/SendToPickingDialog'
 import { ReassignControllerDialog } from '../../admin/components/orders/ReassignControllerDialog'
+import { ReturnPickerDialog } from '../../admin/components/picking/ReturnPickerDialog'
 import { usePickListsTableConfig, PICKLISTS_COLUMN_IDS } from '../../admin/hooks/usePickListsTableConfig'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
@@ -928,21 +929,37 @@ export function PickListsPage() {
           onReset={resetTableConfig}
         />
 
-        <ConfirmDialog
-          open={cancelTarget !== null}
-          title={archive ? t('picking:revert_confirm_title') : t('picking:cancel_confirm_title')}
-          message={
-            archive
-              ? t('picking:revert_confirm', { doc: cancelTarget?.document_no ?? '' })
-              : t('picking:cancel_confirm', { doc: cancelTarget?.document_no ?? '' })
-          }
-          confirmLabel={archive ? t('picking:revert_document') : t('picking:cancel_document')}
-          cancelLabel={t('common:buttons.cancel')}
-          variant="danger"
-          loading={cancellingId !== null}
-          onConfirm={confirmCancel}
-          onCancel={() => setCancelTarget(null)}
-        />
+        {/* Arxivdan qaytim — yig'uvchi tanlanadi; oddiy bekor esa tasdiq so'raydi. */}
+        {archive && cancelTarget?.order_id ? (
+          <ReturnPickerDialog
+            open
+            orderId={cancelTarget.order_id}
+            documentNo={cancelTarget.document_no}
+            currentPickerId={cancelTarget.picker_id}
+            onOpenChange={(open) => !open && setCancelTarget(null)}
+            onDone={() => {
+              setCancelTarget(null)
+              nextOffsetRef.current = 0
+              void load({ background: true })
+            }}
+          />
+        ) : (
+          <ConfirmDialog
+            open={cancelTarget !== null}
+            title={archive ? t('picking:revert_confirm_title') : t('picking:cancel_confirm_title')}
+            message={
+              archive
+                ? t('picking:revert_confirm', { doc: cancelTarget?.document_no ?? '' })
+                : t('picking:cancel_confirm', { doc: cancelTarget?.document_no ?? '' })
+            }
+            confirmLabel={archive ? t('picking:revert_document') : t('picking:cancel_document')}
+            cancelLabel={t('common:buttons.cancel')}
+            variant="danger"
+            loading={cancellingId !== null}
+            onConfirm={confirmCancel}
+            onCancel={() => setCancelTarget(null)}
+          />
+        )}
 
         {reassignDialogOrderIds !== null ? (
           <SendToPickingDialog

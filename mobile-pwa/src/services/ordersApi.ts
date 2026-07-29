@@ -550,9 +550,21 @@ export async function getCustomerReturn(returnId: string, init?: { signal?: Abor
  *
  * `picked` — hujjat umumiy tekshiruv navbatiga tushadi; controller tanlanmaydi.
  */
-export async function updateOrderStatus(orderId: string, status: string) {
+export type UpdateOrderStatusOptions = {
+  /** Faqat `cancelled` uchun: qaytimni kim skanerlab qaytaradi (bo'sh — hujjat yig'uvchisi). */
+  returnPickerUserId?: string | null
+}
+
+export async function updateOrderStatus(
+  orderId: string,
+  status: string,
+  options: UpdateOrderStatusOptions = {}
+) {
   return fetchJSON<OrderDetails>(`/api/v1/orders/${orderId}/status`, {
     method: 'PATCH',
-    body: { status },
+    body: {
+      status,
+      ...(options.returnPickerUserId ? { return_picker_user_id: options.returnPickerUserId } : {}),
+    },
   })
 }

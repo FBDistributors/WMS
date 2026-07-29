@@ -251,6 +251,13 @@ class OrderStatusUpdateRequest(BaseModel):
             "navbatiga qo'yadi. Eski mijozlar uchun qabul qilinadi, ishlatilmaydi."
         ),
     )
+    return_picker_user_id: Optional[UUID] = Field(
+        None,
+        description=(
+            "Faqat 'cancelled' uchun: qaytimni kim skanerlab qaytarishi. "
+            "Berilmasa — hujjatga biriktirilgan yig'uvchi."
+        ),
+    )
 
 
 ALLOWED_ADMIN_ORDER_STATUSES = frozenset(
@@ -1386,6 +1393,14 @@ async def update_order_status(
             and old_status in ("picking", "completed")
             and any(float(ln.picked_qty or 0) > 0 for ln in doc_so.lines)
         ):
+            # Yig'uvchi tanlovi noto'g'ri bo'lsa — o'tishni yozib qo'yishdan oldin to'xtaymiz.
+            return_picker_id: Optional[UUID] = payload.return_picker_user_id
+            if return_picker_id is not None:
+                return_picker = (
+                    db.query(User).filter(User.id == return_picker_id).one_or_none()
+                )
+                if not return_picker or return_picker.role != "picker":
+                    raise HTTPException(status_code=400, detail="Invalid picker selection")
             _enforce_transition_or_reject(
                 request=request,
                 db=db,
@@ -1394,11 +1409,17 @@ async def update_order_status(
                 from_status=old_status,
                 to_status="cancelling_in_progress",
             )
-            session = initiate_safe_cancel_return(db, order=order, document=doc_so, admin_user_id=user.id)
-            if doc_so.assigned_to_user_id:
+            session = initiate_safe_cancel_return(
+                db,
+                order=order,
+                document=doc_so,
+                admin_user_id=user.id,
+                picker_user_id=return_picker_id,
+            )
+            if session.picker_user_id:
                 send_push_to_user(
                     db,
-                    doc_so.assigned_to_user_id,
+                    session.picker_user_id,
                     title="DIQQAT: Buyurtma bekor qilindi",
                     body="Terishni to'xtating va mahsulotlarni joyiga qaytaring.",
                     data={
@@ -1418,6 +1439,9 @@ async def update_order_status(
                 new_data={
                     "status": "cancelling_in_progress",
                     "note": "safe_cancel_return_initiated",
+                    "return_picker_user_id": (
+                        str(session.picker_user_id) if session.picker_user_id else None
+                    ),
                 },
                 ip_address=get_client_ip(request),
             )

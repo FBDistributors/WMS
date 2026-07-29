@@ -87,6 +87,8 @@
   "revert_document": "Return & cancel",
   "revert_confirm_title": "Cancel order with return",
   "revert_confirm": "Order {{doc}} will be cancelled: the picker is notified and scans the goods back to their locations. Stock is restored. Continue?",
+  "revert_picker_label": "Who performs the return",
+  "revert_picker_keep_current": "The document's picker",
   "cancel_error": "Failed to cancel. Try again.",
   "cancelling": "Cancelling...",
   "status": {

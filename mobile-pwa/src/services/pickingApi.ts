@@ -32,6 +32,7 @@ export type PickList = {
   status: PickListStatus
   total_lines: number
   picked_lines: number
+  picker_id?: string | null
   picker_name?: string | null
   controller_name?: string | null
   controller_verification_started_at?: string | null
@@ -82,6 +83,7 @@ type BackendPickingListItem = {
   completed_at?: string | null
   sent_to_controller_at?: string | null
   controller_verification_started_at?: string | null
+  assigned_to_user_id?: string | null
   assigned_to_user_name?: string | null
   controlled_by_user_name?: string | null
   updated_at?: string
@@ -208,6 +210,7 @@ function mapList(item: BackendPickingListItem): PickList {
     completed_at: item.completed_at ?? undefined,
     sent_to_controller_at: item.sent_to_controller_at ?? undefined,
     controller_verification_started_at: item.controller_verification_started_at ?? undefined,
+    picker_id: item.assigned_to_user_id ?? undefined,
     picker_name: item.assigned_to_user_name ?? undefined,
     controller_name: item.controlled_by_user_name ?? undefined,
     updated_at: item.updated_at,

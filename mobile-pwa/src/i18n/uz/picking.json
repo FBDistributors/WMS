@@ -87,6 +87,8 @@
   "revert_document": "Qaytim (bekor)",
   "revert_confirm_title": "Buyurtmani qaytim bilan bekor qilish",
   "revert_confirm": "{{doc}} buyurtmasi bekor qilinadi: yig'uvchiga xabar boradi va u tovarlarni skanerlab joyiga qaytaradi. Qoldiq tiklanadi. Davom etasizmi?",
+  "revert_picker_label": "Qaytimni kim bajaradi",
+  "revert_picker_keep_current": "Hujjatning yig'uvchisi",
   "cancel_error": "Bekor qilish amalga oshmadi. Qayta urinib ko'ring.",
   "cancelling": "Bekor qilinmoqda...",
   "status": {

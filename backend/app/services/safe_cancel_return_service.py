@@ -101,7 +101,9 @@ def initiate_safe_cancel_return(
     order: OrderModel,
     document: DocumentModel,
     admin_user_id: UUID,
+    picker_user_id: Optional[UUID] = None,
 ) -> SafeCancelReturnSession:
+    """`picker_user_id` — admin tanlagan yig'uvchi; berilmasa hujjatnikiga tushadi."""
     if not order.wms_state:
         raise HTTPException(status_code=409, detail="Order has no WMS state")
     existing = (
@@ -146,7 +148,8 @@ def initiate_safe_cancel_return(
             status_code=status.HTTP_409_CONFLICT,
             detail="Xavfsiz bekor faqat `picking` yoki `completed` holatida mumkin",
         )
-    if not document.assigned_to_user_id:
+    return_picker_id = picker_user_id or document.assigned_to_user_id
+    if not return_picker_id:
         raise HTTPException(status_code=409, detail="Yig'uvchi tayinlanmagan")
 
     lines = (
@@ -163,7 +166,7 @@ def initiate_safe_cancel_return(
         id=uuid.uuid4(),
         order_id=order.id,
         document_id=document.id,
-        picker_user_id=document.assigned_to_user_id,
+        picker_user_id=return_picker_id,
         initiated_by_user_id=admin_user_id,
         status="returns_pending",
     )
