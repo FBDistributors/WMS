@@ -44,6 +44,7 @@ export function ControllerDocumentsPage() {
       REVIEW: 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200',
       DONE: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200',
       ERROR: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200',
+      RETURNING: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200',
       UNKNOWN: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
     }
     return map[status] ?? map.UNKNOWN

@@ -33,6 +33,8 @@ function statusBadgeClass(status: PickListStatus): string {
       return 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200'
     case 'ERROR':
       return 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
+    case 'RETURNING':
+      return 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200'
     case 'UNKNOWN':
     case 'NEW':
     default:
@@ -300,6 +302,10 @@ export function PickListsPage() {
   /** Jarayon: ustuvor buyurtma WMS bosqichi; buyurtmasiz hujjatda hujjat holati. */
   const pipelineStatusLabel = useCallback(
     (item: PickList) => {
+      // Qaytim jarayoni har qaysi tabda bir xil o'qilsin.
+      if (item.status === 'RETURNING') {
+        return t('picking:status.returning')
+      }
       if (archive) {
         return docStatusLabel(item.document_status)
       }

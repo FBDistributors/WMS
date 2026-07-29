@@ -10,6 +10,7 @@ const statusVariant: Record<PickList['status'], 'neutral' | 'primary' | 'success
   REVIEW: 'primary',
   DONE: 'success',
   ERROR: 'danger',
+  RETURNING: 'danger',
   UNKNOWN: 'neutral',
 }
 
@@ -21,7 +22,14 @@ type PickListCardProps = {
 export function PickListCard({ item, onClick }: PickListCardProps) {
   const { t } = useTranslation('picking')
   const progressText = `${item.picked_lines}/${item.total_lines}`
-  const statusKey = item.status.toLowerCase() as 'new' | 'in_progress' | 'review' | 'done' | 'error' | 'unknown'
+  const statusKey = item.status.toLowerCase() as
+    | 'new'
+    | 'in_progress'
+    | 'review'
+    | 'done'
+    | 'error'
+    | 'returning'
+    | 'unknown'
 
   return (
     <Card

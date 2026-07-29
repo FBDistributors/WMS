@@ -1,11 +1,18 @@
 import type { TFunction } from 'i18next'
 import { fetchJSON } from './apiClient'
 
-export type PickListStatus = 'NEW' | 'IN_PROGRESS' | 'REVIEW' | 'DONE' | 'ERROR' | 'UNKNOWN'
+export type PickListStatus =
+  | 'NEW'
+  | 'IN_PROGRESS'
+  | 'REVIEW'
+  | 'DONE'
+  | 'ERROR'
+  | 'RETURNING'
+  | 'UNKNOWN'
 
-/** Yakunlangan yoki bekor — mobil terish oqimi o‘rniga faqat ko‘rish. */
+/** Yakunlangan, bekor yoki qaytim jarayonida — mobil terish oqimi o‘rniga faqat ko‘rish. */
 export function isTerminalPickListStatus(status: PickListStatus): boolean {
-  return status === 'DONE' || status === 'ERROR'
+  return status === 'DONE' || status === 'ERROR' || status === 'RETURNING'
 }
 
 export type PickList = {
@@ -134,6 +141,7 @@ const STATUS_MAP: Record<string, PickListStatus> = {
   completed: 'DONE',
   packed: 'DONE',
   shipped: 'DONE',
+  cancelling: 'RETURNING',
   cancelled: 'ERROR',
 }
 
@@ -149,7 +157,8 @@ function mapWmsStatusToPickListBadge(wms: string | null | undefined): PickListSt
   if (k === 'allocated' || k === 'picking') return 'IN_PROGRESS'
   if (k === 'picked') return 'REVIEW'
   if (k === 'completed' || k === 'packed' || k === 'shipped') return 'DONE'
-  if (k === 'cancelled' || k === 'cancelling_in_progress') return 'ERROR'
+  if (k === 'cancelling_in_progress') return 'RETURNING'
+  if (k === 'cancelled') return 'ERROR'
   return 'UNKNOWN'
 }
 

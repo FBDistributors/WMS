@@ -76,6 +76,8 @@ export function PickListReadOnlyDetail({ documentId }: PickListReadOnlyDetailPro
         return 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200'
       case 'ERROR':
         return 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
+      case 'RETURNING':
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200'
       default:
         return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
     }

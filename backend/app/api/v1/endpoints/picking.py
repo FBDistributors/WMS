@@ -1146,7 +1146,11 @@ async def list_picking_documents(
     elif effective_scope == "archived":
         query = query.filter(DocumentModel.status.in_(("completed", "packed", "shipped")))
     elif effective_scope == "cancelled":
-        query = query.filter(OrderWmsStateModel.status == "cancelled")
+        # Qaytim jarayonidagi buyurtma ham shu tabda — aks holda mollar joyiga
+        # qaytarilgunicha u hech qaysi ro'yxatda ko'rinmay qoladi.
+        query = query.filter(
+            OrderWmsStateModel.status.in_(("cancelled", "cancelling_in_progress"))
+        )
     else:
         query = query.filter(
             or_(
