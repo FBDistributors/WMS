@@ -43,6 +43,25 @@ function statusBadgeClass(status: PickListStatus): string {
   }
 }
 
+/** Ombor kuni brauzer vaqtida — `toISOString()` UTC ga surib, kunni adashtiradi. */
+function localIsoDate(d: Date): string {
+  const tzOffsetMs = d.getTimezoneOffset() * 60_000
+  return new Date(d.getTime() - tzOffsetMs).toISOString().slice(0, 10)
+}
+
+function daysAgoRange(days: number): [string, string] {
+  const to = new Date()
+  const from = new Date()
+  from.setDate(from.getDate() - days)
+  return [localIsoDate(from), localIsoDate(to)]
+}
+
+const DATE_PRESETS: { id: string; labelKey: string; range: () => [string, string] }[] = [
+  { id: 'today', labelKey: 'picking:filter_date_today', range: () => daysAgoRange(0) },
+  { id: 'week', labelKey: 'picking:filter_date_7d', range: () => daysAgoRange(6) },
+  { id: 'month', labelKey: 'picking:filter_date_30d', range: () => daysAgoRange(29) },
+]
+
 function formatActivity(iso: string | undefined, locale: string): string {
   if (!iso) return '—'
   try {
@@ -125,6 +144,12 @@ export function PickListsPage() {
   const [filterDocStatus, setFilterDocStatus] = useState('')
   const [filterPicker, setFilterPicker] = useState('')
   const [filterController, setFilterController] = useState('')
+  // Sana serverda filtrlanadi: mijoz tomonida qilinsa faqat joriy sahifa kesilib,
+  // "o'sha kuni shuncha buyurtma bo'lgan" degan noto'g'ri xulosa chiqadi.
+  const [filterDateFrom, setFilterDateFrom] = useState('')
+  const [filterDateTo, setFilterDateTo] = useState('')
+  /** Sana filtri Arxiv (yakunlangan kun) va Bekor qilingan (bekor kuni) uchun. */
+  const dateFilterEnabled = archive || cancelled
 
   /** Keyingi sahifa uchun offset (yuklangan qatorlar soni) */
   const nextOffsetRef = useRef(0)
@@ -198,7 +223,12 @@ export function PickListsPage() {
       }
       try {
         const offset = append ? nextOffsetRef.current : archive ? pageOffset : 0
-        const listOpts: ListPickListsOptions = { processScope, ...(wmsGroupForApi ? { wmsGroup: wmsGroupForApi } : {}) }
+        const listOpts: ListPickListsOptions = {
+          processScope,
+          ...(wmsGroupForApi ? { wmsGroup: wmsGroupForApi } : {}),
+          ...(dateFilterEnabled && filterDateFrom ? { dateFrom: filterDateFrom } : {}),
+          ...(dateFilterEnabled && filterDateTo ? { dateTo: filterDateTo } : {}),
+        }
         const data = await listPickLists(PAGE_SIZE, offset, listOpts)
         if (append) {
           setItems((prev) => [...prev, ...data])
@@ -230,12 +260,22 @@ export function PickListsPage() {
         }
       }
     },
-    [archive, pageOffset, processScope, showError, t, wmsGroupForApi]
+    [
+      archive,
+      dateFilterEnabled,
+      filterDateFrom,
+      filterDateTo,
+      pageOffset,
+      processScope,
+      showError,
+      t,
+      wmsGroupForApi,
+    ]
   )
 
   useEffect(() => {
     setPageOffset(0)
-  }, [processScope, wmsGroupForApi])
+  }, [processScope, wmsGroupForApi, filterDateFrom, filterDateTo])
 
   useEffect(() => {
     nextOffsetRef.current = 0
@@ -259,8 +299,24 @@ export function PickListsPage() {
     [items]
   )
   const activeFilterCount = useMemo(
-    () => [filterStatus, filterDocStatus, filterPicker, filterController].filter(Boolean).length,
-    [filterStatus, filterDocStatus, filterPicker, filterController]
+    () =>
+      [
+        filterStatus,
+        filterDocStatus,
+        filterPicker,
+        filterController,
+        dateFilterEnabled ? filterDateFrom : '',
+        dateFilterEnabled ? filterDateTo : '',
+      ].filter(Boolean).length,
+    [
+      filterStatus,
+      filterDocStatus,
+      filterPicker,
+      filterController,
+      dateFilterEnabled,
+      filterDateFrom,
+      filterDateTo,
+    ]
   )
 
   const filtered = useMemo(() => {
@@ -846,6 +902,53 @@ export function PickListsPage() {
                           ))}
                         </select>
                       </label>
+                      {dateFilterEnabled ? (
+                        <div className="border-t border-slate-200 pt-3 dark:border-slate-700">
+                          <div className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                            {archive
+                              ? t('picking:filter_date_completed')
+                              : t('picking:filter_date_cancelled')}
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {DATE_PRESETS.map((preset) => (
+                              <button
+                                key={preset.id}
+                                type="button"
+                                onClick={() => {
+                                  const [from, to] = preset.range()
+                                  setFilterDateFrom(from)
+                                  setFilterDateTo(to)
+                                }}
+                                className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                              >
+                                {t(preset.labelKey)}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="mt-2 grid grid-cols-2 gap-2">
+                            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
+                              {t('picking:filter_date_from')}
+                              <input
+                                type="date"
+                                value={filterDateFrom}
+                                max={filterDateTo || undefined}
+                                onChange={(e) => setFilterDateFrom(e.target.value)}
+                                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                              />
+                            </label>
+                            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
+                              {t('picking:filter_date_to')}
+                              <input
+                                type="date"
+                                value={filterDateTo}
+                                min={filterDateFrom || undefined}
+                                onChange={(e) => setFilterDateTo(e.target.value)}
+                                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                     <div className="mt-4 flex items-center justify-end gap-2">
                       <Button
@@ -855,6 +958,8 @@ export function PickListsPage() {
                           setFilterDocStatus('')
                           setFilterPicker('')
                           setFilterController('')
+                          setFilterDateFrom('')
+                          setFilterDateTo('')
                           setFilterPanelOpen(false)
                         }}
                       >

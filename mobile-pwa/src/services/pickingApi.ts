@@ -256,6 +256,9 @@ export type ListPickListsOptions = {
   processScope?: 'active' | 'archived' | 'cancelled'
   /** Dashboard guruhi: backend `wms_group`; picker/controller uchun server e'tiborsiz. */
   wmsGroup?: 'yigishda' | 'tekshiruvda' | 'yakunlangan'
+  /** Sana oralig'i (YYYY-MM-DD, ombor vaqti). Arxivda — yakunlangan kun. */
+  dateFrom?: string
+  dateTo?: string
 }
 
 export async function listPickLists(
@@ -270,6 +273,8 @@ export async function listPickLists(
       offset,
       ...(options.processScope ? { process_scope: options.processScope } : {}),
       ...(options.wmsGroup ? { wms_group: options.wmsGroup } : {}),
+      ...(options.dateFrom ? { date_from: options.dateFrom } : {}),
+      ...(options.dateTo ? { date_to: options.dateTo } : {}),
     },
     signal,
   })

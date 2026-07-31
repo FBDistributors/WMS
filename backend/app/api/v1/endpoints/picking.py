@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session, selectinload
 logger = logging.getLogger(__name__)
 
 from app.auth.deps import get_current_user, require_permission
+from app.core.business_time import day_bounds_in_tz
 from app.db import get_db
 from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
@@ -1098,9 +1099,20 @@ async def list_picking_documents(
             "region (diller). Bo'sh — hammasi."
         ),
     ),
+    date_from: Optional[date] = Query(
+        default=None,
+        description=(
+            "Sana filtri (ombor vaqti bo'yicha, shu kun kiritiladi). Qaysi ustun: "
+            "archived — yakunlangan vaqt, cancelled — bekor qilingan vaqt, "
+            "qolganlari — yaratilgan vaqt."
+        ),
+    ),
+    date_to: Optional[date] = Query(default=None, description="Sana filtri oxiri (shu kun kiritiladi)."),
     db: Session = Depends(get_db),
     user=Depends(require_permission("picking:read")),
 ):
+    if date_from is not None and date_to is not None and date_from > date_to:
+        raise HTTPException(status_code=400, detail="date_from must be on or before date_to")
     # Admin buyurtmani packed/shipped/cancelled qilsa — yig'uvchi va controller ro'yxatida ko'rinmasin
     ORDER_HIDDEN_STATUSES = ("completed", "packed", "shipped", "cancelled")
     ACTIVE_PIPELINE_ORDER_STATUSES = ("allocated", "picking", "picked")
@@ -1194,6 +1206,19 @@ async def list_picking_documents(
         query = query.filter(OrderWmsStateModel.status == "picked")
     elif effective_wms_group == "yakunlangan":
         query = query.filter(OrderWmsStateModel.status.in_(("completed", "packed", "shipped")))
+    if date_from is not None or date_to is not None:
+        # Har tabda "sana" boshqa voqeani anglatadi; eski yozuvlarda maydon bo'sh
+        # bo'lishi mumkin — coalesce filtrdan tushib qolmasligi uchun.
+        if effective_scope == "archived":
+            date_col = func.coalesce(DocumentModel.completed_at, DocumentModel.updated_at)
+        elif effective_scope == "cancelled":
+            date_col = func.coalesce(OrderWmsStateModel.cancelled_at, DocumentModel.updated_at)
+        else:
+            date_col = DocumentModel.created_at
+        if date_from is not None:
+            query = query.filter(date_col >= day_bounds_in_tz(date_from)[0])
+        if date_to is not None:
+            query = query.filter(date_col <= day_bounds_in_tz(date_to)[1])
     # Controller navbati FIFO: eng ko'p kutgan hujjat tepada.
     order_by = (
         (DocumentModel.sent_to_controller_at.asc(), DocumentModel.created_at.asc())

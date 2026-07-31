@@ -13,7 +13,7 @@ Vaqt zonasi `WMS_BUSINESS_TIMEZONE` (standart Asia/Tashkent, UTC+5).
 from __future__ import annotations
 
 import os
-from datetime import datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 # weekday(): 0=Dushanba ... 6=Yakshanba. (start_hour, end_hour) yoki None (dam).
@@ -40,6 +40,17 @@ def _business_tz():
 
 
 BUSINESS_TZ = _business_tz()
+
+
+def day_bounds_in_tz(day: date) -> tuple[datetime, datetime]:
+    """Kalendar kunning biznes-tz dagi boshi va oxiri (DB solishtirish uchun aware).
+
+    Sana filtri UTC bo'yicha kesilsa, kechqurun yakunlangan hujjat ertangi kunga
+    tushib qoladi — shuning uchun chegara ombor vaqtida olinadi.
+    """
+    start = datetime.combine(day, time.min, tzinfo=BUSINESS_TZ)
+    end = datetime.combine(day, time.max, tzinfo=BUSINESS_TZ)
+    return start, end
 
 
 def business_seconds(start: datetime | None, end: datetime | None) -> float:

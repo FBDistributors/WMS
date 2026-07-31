@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session, selectinload
 logger = logging.getLogger(__name__)
 
 from app.auth.deps import require_any_permission, require_permission
-from app.core.business_time import business_seconds
+from app.core.business_time import business_seconds, day_bounds_in_tz
 from app.db import get_db
 from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
@@ -198,9 +198,7 @@ PICKER_COUNTED_DOC_STATUSES = ("picked",) + COMPLETED_DOC_STATUSES
 
 def _day_bounds_in_tz(day: date) -> tuple[datetime, datetime]:
     """Inclusive calendar day in BUSINESS_TZ as aware UTC datetimes for DB compare."""
-    start = datetime.combine(day, time.min, tzinfo=BUSINESS_TZ)
-    end = datetime.combine(day, time.max, tzinfo=BUSINESS_TZ)
-    return start, end
+    return day_bounds_in_tz(day)
 
 
 def _completed_documents_filters(
