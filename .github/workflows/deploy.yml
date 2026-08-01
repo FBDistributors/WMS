@@ -21,3 +21,54 @@ jobs:
             set -euo pipefail
             cd /var/www/wms/backend
             bash deploy/vps/update-wms.sh
+
+  # Admin PWA (fbwarehouse.uz) — Vercel o'rniga shu VPS'dan beriladi.
+  # Build GitHub Actions'da: VPS'da Node kerak emas va API build paytida
+  # xotira/CPU uchun kurashmaydi.
+  pwa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mobile-pwa/package-lock.json
+      - name: Build
+        working-directory: mobile-pwa
+        # VITE_API_BASE_URL .env.production dan olinadi (api.fbwarehouse.uz).
+        run: |
+          npm ci
+          npm run build
+      - name: Upload to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_IP }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: mobile-pwa/dist/*
+          strip_components: 2
+          target: /var/www/wms-pwa/incoming
+          rm: true
+      - name: Publish
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_IP }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          # Yangi reliz alohida papkaga tushadi va symlink bir harakatda
+          # almashadi — foydalanuvchi yarim yangilangan saytni ko'rmaydi.
+          script: |
+            set -euo pipefail
+            test -f /var/www/wms-pwa/incoming/index.html
+            rel="/var/www/wms-pwa/releases/$(date +%Y%m%d%H%M%S)"
+            mkdir -p "$rel"
+            cp -a /var/www/wms-pwa/incoming/. "$rel/"
+            chown -R www-data:www-data "$rel"
+            ln -sfn "$rel" /var/www/wms-pwa/current.tmp
+            mv -Tf /var/www/wms-pwa/current.tmp /var/www/wms-pwa/current
+            rm -rf /var/www/wms-pwa/incoming
+            # Oxirgi 5 relizni saqlaymiz (orqaga qaytish uchun yetarli).
+            ls -1dt /var/www/wms-pwa/releases/* | tail -n +6 | xargs -r rm -rf
+            curl -sf -o /dev/null -H 'Host: www.fbwarehouse.uz' http://127.0.0.1/
+            echo "PWA joylandi: $rel"
