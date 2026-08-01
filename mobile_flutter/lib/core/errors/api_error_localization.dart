@@ -10,6 +10,60 @@ final RegExp _pickInsufficientLooseEn = RegExp(
   caseSensitive: false,
 );
 
+/// `app_dio` yasagan belgi: `validation:<maydon>:<tur>:<chegara>`.
+final RegExp _validationToken = RegExp(r'^validation:([^:]*):([^:]*):(.*)$');
+
+/// Server maydon nomlari — foydalanuvchi ko'radigan yorliqqa mos kalitlar.
+const Map<String, String> _validationFieldKeys = <String, String>{
+  'box_count': 'fieldBoxCount',
+  'box_barcode': 'fieldBoxBarcode',
+  'qty': 'fieldQty',
+  'batch': 'fieldBatch',
+  'expiry_date': 'fieldExpiryDate',
+  'doc_no': 'fieldDocNo',
+  'delta': 'fieldQty',
+};
+
+/// Serverning 422 javobini o'qiladigan jumlaga aylantiradi; belgi bo'lmasa null.
+String? _localizeValidationTokens(AppLocale loc, String raw) {
+  final List<String> out = <String>[];
+  for (final String part in raw.split('; ')) {
+    final RegExpMatch? m = _validationToken.firstMatch(part.trim());
+    if (m == null) {
+      // Aralash javob: bittasi ham belgi bo'lmasa, boshqa qoidalarga qoldiramiz.
+      continue;
+    }
+    final String field = m.group(1) ?? '';
+    final String type = m.group(2) ?? '';
+    final String limit = m.group(3) ?? '';
+    final String fieldKey = _validationFieldKeys[field] ?? '';
+    final String fieldLabel =
+        fieldKey.isNotEmpty ? StringLookup.t(loc, fieldKey) : field;
+    final Map<String, String> params = <String, String>{
+      'field': fieldLabel,
+      'limit': limit,
+    };
+    final String key = switch (type) {
+      'less_than_equal' => 'validationMax',
+      'less_than' => 'validationMax',
+      'greater_than_equal' => 'validationMin',
+      'greater_than' => 'validationMin',
+      'string_too_long' => 'validationTooLong',
+      'missing' => 'validationRequired',
+      _ => 'validationInvalid',
+    };
+    out.add(
+      key == 'validationRequired' || key == 'validationInvalid'
+          ? StringLookup.tParams(loc, key, <String, String>{'field': fieldLabel})
+          : StringLookup.tParams(loc, key, params),
+    );
+  }
+  if (out.isEmpty) {
+    return null;
+  }
+  return out.join('\n');
+}
+
 final RegExp _receivingQtyBelowBoxUnits = RegExp(
   r'qty (\d+) < box_count \* units_per_box \((\d+)\)',
   caseSensitive: false,
@@ -431,6 +485,11 @@ String localizeApiErrorMessage(AppLocale loc, Object error) {
         'onHand': invariant.group(2)!,
       },
     );
+  }
+
+  final String? validation = _localizeValidationTokens(loc, raw);
+  if (validation != null) {
+    return validation;
   }
 
   if (raw.contains('Negative balance detected')) {

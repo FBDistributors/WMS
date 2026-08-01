@@ -54,6 +54,49 @@ final appDioProvider = Provider<Dio>((Ref ref) {
   return dio;
 });
 
+/// FastAPI 422 qatori (`{type, loc, msg, ctx}`) -> tarjima qilinadigan belgi.
+///
+/// Xom `Map.toString()` ekranga `{type: less_than_equal, loc: [...]}` bo'lib
+/// chiqib ketardi. Bu yerda til yo'q, shuning uchun tarjimaga emas — barqaror
+/// `validation:<maydon>:<tur>:<chegara>` belgisiga aylantiramiz.
+String _validationItemToToken(Object? item) {
+  if (item is! Map) {
+    return item == null ? '' : item.toString().trim();
+  }
+  final Object? typeRaw = item['type'];
+  final Object? msgRaw = item['msg'];
+  final String type = typeRaw is String ? typeRaw : '';
+  final String msg = msgRaw is String ? msgRaw.trim() : '';
+  if (type.isEmpty) {
+    return msg.isNotEmpty ? msg : item.toString().trim();
+  }
+
+  // `loc` oxiridagi matn — maydon nomi (`[body, lines, 0, box_count]`).
+  String field = '';
+  final Object? loc = item['loc'];
+  if (loc is List) {
+    for (final Object? part in loc.reversed) {
+      if (part is String && part != 'body' && part != 'query') {
+        field = part;
+        break;
+      }
+    }
+  }
+
+  String limit = '';
+  final Object? ctx = item['ctx'];
+  if (ctx is Map) {
+    for (final String key in <String>['le', 'ge', 'lt', 'gt', 'max_length', 'min_length']) {
+      final Object? v = ctx[key];
+      if (v != null) {
+        limit = v.toString();
+        break;
+      }
+    }
+  }
+  return 'validation:$field:$type:$limit';
+}
+
 String mapDioExceptionToMessage(DioException err) {
   final int? status = err.response?.statusCode;
 
@@ -75,7 +118,7 @@ String mapDioExceptionToMessage(DioException err) {
     }
     if (detail is List) {
       final Iterable<String> parts = detail
-          .map((Object? e) => e == null ? '' : e.toString().trim())
+          .map(_validationItemToToken)
           .where((String s) => s.isNotEmpty);
       if (parts.isNotEmpty) {
         return parts.join('; ');

@@ -19,18 +19,28 @@ String _monthPickerTitle(String languageCode) {
   };
 }
 
+String _defaultFieldLabel(String languageCode) {
+  return switch (languageCode) {
+    'ru' => 'Срок годности',
+    'en' => 'Expiry date',
+    _ => 'Yaroqlilik muddati',
+  };
+}
+
 /// RN `ExpiryDatePicker` — yil + oy (kun doim 01), `YYYY-MM-DD` qaytarish.
 class ExpiryDatePickerField extends StatelessWidget {
   const ExpiryDatePickerField({
     super.key,
     required this.value,
     required this.onChanged,
-    this.label = 'Yaroqlilik muddati',
+    this.label,
   });
 
   final String? value;
   final void Function(String? isoDate) onChanged;
-  final String label;
+
+  /// Berilmasa — ilova tiliga qarab ("Yaroqlilik muddati" qotib qolmasin).
+  final String? label;
 
   static const int _firstYear = 2020;
 
@@ -173,7 +183,7 @@ class ExpiryDatePickerField extends StatelessWidget {
       },
       child: InputDecorator(
         decoration: InputDecoration(
-          labelText: label,
+          labelText: label ?? _defaultFieldLabel(Localizations.localeOf(context).languageCode),
           border: const OutlineInputBorder(),
         ),
         child: Text(formatExpiryMonthYear(value)),
