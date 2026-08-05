@@ -24,6 +24,8 @@ from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
 from app.models.order import Order as OrderModel
 from app.models.order import OrderWmsState as OrderWmsStateModel
+from app.models.safe_cancel_return import SafeCancelReturnLine as SafeCancelReturnLineModel
+from app.models.safe_cancel_return import SafeCancelReturnSession as SafeCancelReturnSessionModel
 from app.models.user import User as UserModel
 from app.services.order_source_group import source_group_conditions
 
@@ -159,6 +161,22 @@ class StaffTimingControllerRow(BaseModel):
 class StaffTimingResponse(BaseModel):
     pickers: List[StaffTimingPickerRow]
     controllers: List[StaffTimingControllerRow]
+
+
+class CancelledPickerRow(BaseModel):
+    """Terilgan, keyin bekor qilingan ish — ish haqi uchun (unumdorlikka kirmaydi)."""
+
+    user_id: UUID
+    full_name: str
+    documents_count: int
+    positions: int
+    qty: float
+    # Shu yig'uvchiga tushgan, hali bajarilmagan qaytarish topshiriqlari (operativ).
+    pending_returns: int
+
+
+class CancelledStatsResponse(BaseModel):
+    pickers: List[CancelledPickerRow]
 
 
 def _duration_seconds(start: Optional[datetime], end: Optional[datetime]) -> Optional[float]:
@@ -858,6 +876,115 @@ async def get_staff_timing(
     controllers.sort(key=lambda x: (-x.units_per_hour, x.full_name.lower()))
 
     return StaffTimingResponse(pickers=pickers, controllers=controllers)
+
+
+@router.get(
+    "/staff-cancelled-stats",
+    response_model=CancelledStatsResponse,
+    summary="Bekor qilingan buyurtmalardagi terish ishi (ish haqi uchun)",
+)
+async def get_staff_cancelled_stats(
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    db: Session = Depends(get_db),
+    _user=Depends(require_any_permission(["reports:read", "audit:read", "admin:access"])),
+):
+    """Bekor qilingan buyurtmada yig'uvchi bajargan ish.
+
+    Bekor qilinganda `document_lines.picked_qty` nolga tushadi, shuning uchun
+    asosiy statistika bu ishni ko'rmaydi. Ammo qaytarish sessiyasi o'sha paytdagi
+    terilgan miqdorni saqlab qoladi (`qty_to_return`) — hisob shundan olinadi.
+
+    Ish yig'uvchiga (`documents.assigned_to_user_id`) yoziladi: qaytarishni boshqa
+    odam bajarishi mumkin, lekin tergani baribir shu kishi.
+    """
+    if date_from is not None and date_to is not None and date_from > date_to:
+        raise HTTPException(status_code=400, detail="date_from must be on or before date_to")
+
+    filters = [DocumentModel.assigned_to_user_id.isnot(None)]
+    if date_from is not None:
+        filters.append(SafeCancelReturnSessionModel.created_at >= _day_bounds_in_tz(date_from)[0])
+    if date_to is not None:
+        filters.append(SafeCancelReturnSessionModel.created_at <= _day_bounds_in_tz(date_to)[1])
+
+    per_session = (
+        db.query(
+            DocumentModel.assigned_to_user_id.label("uid"),
+            SafeCancelReturnSessionModel.id.label("sid"),
+            func.count(SafeCancelReturnLineModel.id).label("poz"),
+            func.coalesce(func.sum(SafeCancelReturnLineModel.qty_to_return), 0).label("dona"),
+        )
+        .join(DocumentModel, DocumentModel.id == SafeCancelReturnSessionModel.document_id)
+        .outerjoin(
+            SafeCancelReturnLineModel,
+            SafeCancelReturnLineModel.session_id == SafeCancelReturnSessionModel.id,
+        )
+        .filter(and_(*filters))
+        .group_by(DocumentModel.assigned_to_user_id, SafeCancelReturnSessionModel.id)
+        .subquery()
+    )
+
+    rows = (
+        db.query(
+            per_session.c.uid,
+            UserModel.full_name,
+            UserModel.username,
+            func.count().label("documents_count"),
+            func.sum(per_session.c.poz).label("positions"),
+            func.sum(per_session.c.dona).label("qty"),
+        )
+        .join(UserModel, UserModel.id == per_session.c.uid)
+        .group_by(per_session.c.uid, UserModel.full_name, UserModel.username)
+        .all()
+    )
+
+    # Bajarilmagan qaytarishlar — sana filtriga bog'liq emas: hozir kimda osilib
+    # turgani muhim (qaytim endi ishni bloklamaydi, shuning uchun kuzatib turiladi).
+    pending = dict(
+        db.query(
+            SafeCancelReturnSessionModel.picker_user_id,
+            func.count(SafeCancelReturnSessionModel.id),
+        )
+        .filter(SafeCancelReturnSessionModel.status == "returns_pending")
+        .group_by(SafeCancelReturnSessionModel.picker_user_id)
+        .all()
+    )
+
+    out: List[CancelledPickerRow] = []
+    for r in rows:
+        name = (r.full_name or "").strip() or (r.username or "Unknown")
+        out.append(
+            CancelledPickerRow(
+                user_id=r.uid,
+                full_name=name,
+                documents_count=int(r.documents_count or 0),
+                positions=int(r.positions or 0),
+                qty=float(r.qty or 0),
+                pending_returns=int(pending.get(r.uid, 0)),
+            )
+        )
+    # Hali qaytarilmagan sessiyasi bor, lekin oraliqda bekor qilingan ishi yo'q
+    # yig'uvchilar ham ko'rinsin — aks holda osilib qolgan qaytim yashirinadi.
+    seen = {row.user_id for row in out}
+    for uid, cnt in pending.items():
+        if uid in seen:
+            continue
+        user = db.query(UserModel).filter(UserModel.id == uid).one_or_none()
+        if user is None:
+            continue
+        out.append(
+            CancelledPickerRow(
+                user_id=uid,
+                full_name=(user.full_name or "").strip() or user.username or "Unknown",
+                documents_count=0,
+                positions=0,
+                qty=0.0,
+                pending_returns=int(cnt),
+            )
+        )
+
+    out.sort(key=lambda x: (-x.positions, -x.pending_returns, x.full_name.lower()))
+    return CancelledStatsResponse(pickers=out)
 
 
 @router.get(

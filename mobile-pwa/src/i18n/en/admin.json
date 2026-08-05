@@ -266,6 +266,14 @@
       "hdr_units": "Units",
       "legend": "Productivity color: green — above average, gray — average, red — below"
     },
+    "cancelled": {
+      "title": "Cancelled orders — picking work",
+      "subtitle": "Picked, then cancelled · for payroll",
+      "col_pending": "Returns pending",
+      "total": "Total",
+      "empty": "No cancelled picking work in the selected period.",
+      "note": "This work is excluded from productivity (pos/hr) — the cancellation removes it from the main table, but the work was done. \"Returns pending\" counts unfinished returns; unpaid, shown for follow-up."
+    },
     "pickers_table_title": "Pickers",
     "controllers_table_title": "Controllers",
     "pickers_title_shahar": "Pickers — City",

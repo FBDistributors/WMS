@@ -19,6 +19,7 @@ import {
   StaffOrdersDialog,
   type StaffSelection,
 } from '../../admin/components/dashboard/StaffOrdersDialog'
+import { CancelledWorkTable } from '../../admin/components/dashboard/CancelledWorkTable'
 import { StaffProTable, type StaffProRow } from '../../admin/components/dashboard/StaffProTable'
 import { Button } from '../../components/ui/button'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -27,11 +28,13 @@ import {
   getOrdersByStatus,
   getPickingOrderStats,
   getPickingStaffStats,
+  getStaffCancelledStats,
   getStaffTiming,
   type PickingOrderStats,
   type PickingStaffStatsRow,
   type StaffTimingControllerRow,
   type StaffTimingPickerRow,
+  type CancelledPickerRow,
 } from '../../services/dashboardApi'
 import { useAppToast } from '../../feedback/useAppToast'
 import { getReserveStuckSummary } from '../../services/inventoryApi'
@@ -425,6 +428,7 @@ export function DashboardPage() {
   const [regionPickerRows, setRegionPickerRows] = useState<PickingStaffStatsRow[]>([])
   const [regionControllerRows, setRegionControllerRows] = useState<PickingStaffStatsRow[]>([])
   const [timingPickers, setTimingPickers] = useState<StaffTimingPickerRow[]>([])
+  const [cancelledRows, setCancelledRows] = useState<CancelledPickerRow[]>([])
   const [timingControllers, setTimingControllers] = useState<StaffTimingControllerRow[]>([])
   // KPI kartalari uchun — faqat to'liq yakunlangan (completed) hujjatlar (guruhsiz jami).
   const [completedPickers, setCompletedPickers] = useState<PickingStaffStatsRow[]>([])
@@ -512,6 +516,7 @@ export function DashboardPage() {
         pickingStats,
         stuckMain,
         stuckShowroom,
+        cancelledData,
       ] = await Promise.all([
         getOrdersByStatus().catch(() => []),
         getPickingStaffStats({
@@ -544,6 +549,7 @@ export function DashboardPage() {
         getReserveStuckSummary({ warehouse: 'showroom', age_hours: 48, sample_limit: 3 }).catch(
           () => null,
         ),
+        getStaffCancelledStats({ date_from: dateFromQ, date_to: dateToQ }).catch(() => []),
       ])
       setOrdersByStatus(Array.isArray(ordersByStatusData) ? ordersByStatusData : [])
       setPickerRows(Array.isArray(staffData?.pickers) ? staffData.pickers : [])
@@ -558,6 +564,7 @@ export function DashboardPage() {
       setCompletedControllers(
         Array.isArray(completedStaffData?.controllers) ? completedStaffData.controllers : []
       )
+      setCancelledRows(Array.isArray(cancelledData) ? cancelledData : [])
       setPickingOrderStats(pickingStats)
       setPickingStatsUnavailable(pickingStats == null)
       const stuckTotal = (stuckMain?.stuck_rows_count ?? 0) + (stuckShowroom?.stuck_rows_count ?? 0)
@@ -658,6 +665,44 @@ export function DashboardPage() {
     },
     [t, dateFrom, dateTo, showInfo, showSuccess, showError]
   )
+
+  const handleExportCancelledExcel = useCallback(async () => {
+    if (cancelledRows.length === 0) return
+    showInfo(t('receiving:export_fetching'), 4000)
+    setIsExporting(true)
+    try {
+      const headers = [
+        '#',
+        t('admin:dashboard.pro.col_staff'),
+        t('admin:dashboard.pro.kpi_orders'),
+        t('admin:dashboard.pro.suffix_pos'),
+        t('admin:dashboard.pro.kpi_qty'),
+        t('admin:dashboard.cancelled.col_pending'),
+      ]
+      const aoa = cancelledRows.map((row, index) => [
+        index + 1,
+        row.full_name,
+        row.documents_count,
+        row.positions,
+        Math.round(row.qty),
+        row.pending_returns,
+      ])
+      const wb = XLSX.utils.book_new()
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...aoa])
+      XLSX.utils.book_append_sheet(wb, ws, sheetNameSafe(t('admin:dashboard.cancelled.title')))
+
+      const day = new Date().toISOString().slice(0, 10)
+      const fromPart = dateFrom.trim() ? dateFrom.trim() : 'all'
+      const toPart = dateTo.trim() ? dateTo.trim() : 'all'
+      await writeExcelFile(wb, `cancelled_stats_${fromPart}_${toPart}_${day}.xlsx`)
+      showSuccess(t('receiving:export_success'))
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      showError(`${t('admin:dashboard.staff_stats_export_failed')}: ${msg}`)
+    } finally {
+      setIsExporting(false)
+    }
+  }, [cancelledRows, t, dateFrom, dateTo, showInfo, showSuccess, showError])
 
   const greetingName = (user?.name || '').trim().split(/\s+/)[0] || (user?.name ?? '')
   const greetingDate = useMemo(() => {
@@ -861,6 +906,14 @@ export function DashboardPage() {
               onRowClick={(row) =>
                 setSelectedStaff({ userId: row.user_id, name: row.full_name, role: 'controller' })
               }
+              t={t}
+            />
+            <CancelledWorkTable
+              rows={cancelledRows}
+              isLoading={isLoading}
+              onExport={() => void handleExportCancelledExcel()}
+              exportDisabled={isLoading || isExporting || cancelledRows.length === 0}
+              isExporting={isExporting}
               t={t}
             />
           </div>

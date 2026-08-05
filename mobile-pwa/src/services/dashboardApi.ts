@@ -184,6 +184,31 @@ export async function getStaffTiming(params?: {
   return fetchJSON<StaffTimingResponse>('/api/v1/dashboard/staff-timing', { query })
 }
 
+/** Bekor qilingan buyurtmadagi terish ishi — ish haqi uchun, unumdorlikka kirmaydi. */
+export type CancelledPickerRow = {
+  user_id: string
+  full_name: string
+  documents_count: number
+  positions: number
+  qty: number
+  /** Hali bajarilmagan qaytarish topshiriqlari (to'lanmaydi, kuzatuv uchun). */
+  pending_returns: number
+}
+
+export async function getStaffCancelledStats(params?: {
+  date_from?: string
+  date_to?: string
+}): Promise<CancelledPickerRow[]> {
+  const query: Record<string, string> = {}
+  if (params?.date_from) query.date_from = params.date_from
+  if (params?.date_to) query.date_to = params.date_to
+  const data = await fetchJSON<{ pickers: CancelledPickerRow[] }>(
+    '/api/v1/dashboard/staff-cancelled-stats',
+    { query }
+  )
+  return data.pickers
+}
+
 export async function getStaffOrders(params: {
   userId: string
   role: StaffRole
