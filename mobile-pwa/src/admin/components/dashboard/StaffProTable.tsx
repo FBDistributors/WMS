@@ -51,9 +51,9 @@ type StaffProTableProps = {
 
 // XODIM cho'ziladi (ism to'liq ko'rinsin). Uch guruh: Shahar / Region / Jami —
 // har biri Buy · Poz · Dona (faqat sonlar, diagramma yo'q).
-// XODIM · SHAHAR(3) · REGION(3) · BEKOR(2) · JAMI(3) · UNUMDORLIK · MEDIAN
+// XODIM · SHAHAR(3) · REGION(3) · BEKOR(3) · JAMI(3) · UNUMDORLIK · MEDIAN
 const GRID_COLS =
-  'minmax(168px,1fr) 42px 44px 58px 42px 44px 58px 42px 44px 42px 46px 66px 88px 78px'
+  'minmax(160px,1fr) 42px 44px 56px 42px 44px 56px 42px 44px 56px 42px 46px 64px 86px 76px'
 
 /** Guruhlar (Shahar / Region / Jami) orasidagi vertikal ajratuvchi. */
 const SEP = 'border-l border-slate-200 pl-3 dark:border-slate-700'
@@ -195,7 +195,7 @@ export function StaffProTable({
 
       {/* 3. Jadval */}
       <div className="overflow-x-auto">
-        <div className="min-w-[1100px]">
+        <div className="min-w-[1160px]">
           {/* Header — guruh qatori (SHAHAR / REGION 3 tadan ustun) */}
           <div className="grid items-end gap-3" style={{ gridTemplateColumns: GRID_COLS }}>
             <div className={headCls}>{t('admin:dashboard.pro.col_staff')}</div>
@@ -205,7 +205,7 @@ export function StaffProTable({
             <div className={groupHeadCls} style={{ gridColumn: 'span 3' }}>
               {t('admin:dashboard.pro.col_region')}
             </div>
-            <div className={cancelledHeadCls} style={{ gridColumn: 'span 2' }}>
+            <div className={cancelledHeadCls} style={{ gridColumn: 'span 3' }}>
               {t('admin:dashboard.pro.col_cancelled')}
             </div>
             <div className={totalHeadCls} style={{ gridColumn: 'span 3' }}>
@@ -228,6 +228,7 @@ export function StaffProTable({
             <div className={subCls}>{t('admin:dashboard.pro.hdr_units')}</div>
             <div className={`${subCls} ${SEP}`}>{t('admin:dashboard.pro.hdr_orders')}</div>
             <div className={subCls}>{t('admin:dashboard.pro.hdr_positions')}</div>
+            <div className={subCls}>{t('admin:dashboard.pro.hdr_units')}</div>
             <div className={`${subCls} ${SEP}`}>{t('admin:dashboard.pro.hdr_orders')}</div>
             <div className={subCls}>{t('admin:dashboard.pro.hdr_positions')}</div>
             <div className={subCls}>{t('admin:dashboard.pro.hdr_units')}</div>
@@ -304,6 +305,7 @@ export function StaffProTable({
                   {/* BEKOR: buy / poz — terilgan, keyin bekor qilingan ish */}
                   <div className={`${cancelledNumCls} ${SEP}`}>{cell(row.cancelled_orders)}</div>
                   <div className={cancelledNumCls}>{cell(row.cancelled_positions)}</div>
+                  <div className={cancelledNumCls}>{cell(row.cancelled_qty)}</div>
                   {/* JAMI: uchala guruh yig'indisi */}
                   <div className={`${numCls} ${SEP} !text-slate-900 dark:!text-slate-100`}>
                     {cell(row.shahar_orders + row.region_orders + row.cancelled_orders)}
