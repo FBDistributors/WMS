@@ -70,5 +70,10 @@ jobs:
             rm -rf /var/www/wms-pwa/incoming
             # Oxirgi 5 relizni saqlaymiz (orqaga qaytish uchun yetarli).
             ls -1dt /var/www/wms-pwa/releases/* | tail -n +6 | xargs -r rm -rf
-            curl -sf -o /dev/null -H 'Host: www.fbwarehouse.uz' http://127.0.0.1/
+            # HTTPS orqali tekshiramiz: :80 endi faqat redirect qaytaradi, ya'ni
+            # u yerdagi 301 sayt ochilishini isbotlamaydi.
+            curl -sf -o /dev/null --resolve www.fbwarehouse.uz:443:127.0.0.1 \
+              https://www.fbwarehouse.uz/
+            curl -sf -o /dev/null --resolve www.fbwarehouse.uz:443:127.0.0.1 \
+              https://www.fbwarehouse.uz/index.html
             echo "PWA joylandi: $rel"
