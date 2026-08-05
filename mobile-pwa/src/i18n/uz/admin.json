@@ -268,12 +268,7 @@
       "legend": "Unumdorlik rangi: yashil — o'rtachadan yuqori, kulrang — o'rtacha, qizil — past"
     },
     "cancelled": {
-      "title": "Bekor qilingan buyurtmalar — terish ishi",
-      "subtitle": "Terilgan, keyin bekor qilingan · ish haqi uchun",
-      "col_pending": "Kutayotgan qaytim",
-      "total": "Jami",
-      "empty": "Tanlangan davrda bekor qilingan terish ishi yo'q.",
-      "note": "Bu ish unumdorlik (poz/soat) hisobiga kirmaydi — buyurtma bekor qilingani uchun asosiy jadvalda ko'rinmaydi, lekin ish bajarilgan. \"Kutayotgan qaytim\" — hali joyiga qaytarilmagan topshiriqlar soni; bu to'lanmaydi, kuzatuv uchun."
+      "col_pending": "Kutayotgan qaytim"
     },
     "pickers_table_title": "Yig‘uvchilar",
     "controllers_table_title": "Controllerlar",
