@@ -13,6 +13,11 @@ export type StaffProRow = {
   region_orders: number
   region_positions: number
   region_qty: number
+  cancelled_orders: number
+  cancelled_positions: number
+  cancelled_qty: number
+  /** Bajarilmagan qaytarish topshiriqlari — to'lov emas, kuzatuv uchun. */
+  pending_returns: number
   total_qty: number
   /** Unumdorlik — pozitsiya/soat (dona emas: qator soni mehnatni to'g'riroq o'lchaydi). */
   positions_per_hour: number
@@ -46,8 +51,9 @@ type StaffProTableProps = {
 
 // XODIM cho'ziladi (ism to'liq ko'rinsin). Uch guruh: Shahar / Region / Jami —
 // har biri Buy · Poz · Dona (faqat sonlar, diagramma yo'q).
+// XODIM · SHAHAR(3) · REGION(3) · BEKOR(2) · JAMI(3) · UNUMDORLIK · MEDIAN
 const GRID_COLS =
-  'minmax(210px,1fr) 46px 48px 62px 46px 48px 62px 46px 50px 72px 96px 84px'
+  'minmax(168px,1fr) 42px 44px 58px 42px 44px 58px 42px 44px 42px 46px 66px 88px 78px'
 
 /** Guruhlar (Shahar / Region / Jami) orasidagi vertikal ajratuvchi. */
 const SEP = 'border-l border-slate-200 pl-3 dark:border-slate-700'
@@ -123,6 +129,11 @@ export function StaffProTable({
     (role === 'picker'
       ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300'
       : 'bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300')
+  // BEKOR — JAMI ga kiradi, lekin terilgani bekor bo'lgani ko'rinib tursin.
+  const cancelledHeadCls =
+    groupBase + 'bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300'
+  const cancelledNumCls =
+    'wms-num text-right text-[12.5px] font-bold text-rose-700 dark:text-rose-300'
   // JAMI — yig'indi bo'lgani uchun neytral, quyuqroq urg'u.
   const totalHeadCls = groupBase + 'bg-slate-200/70 text-slate-700 dark:bg-slate-700 dark:text-slate-200'
 
@@ -184,7 +195,7 @@ export function StaffProTable({
 
       {/* 3. Jadval */}
       <div className="overflow-x-auto">
-        <div className="min-w-[1020px]">
+        <div className="min-w-[1100px]">
           {/* Header — guruh qatori (SHAHAR / REGION 3 tadan ustun) */}
           <div className="grid items-end gap-3" style={{ gridTemplateColumns: GRID_COLS }}>
             <div className={headCls}>{t('admin:dashboard.pro.col_staff')}</div>
@@ -193,6 +204,9 @@ export function StaffProTable({
             </div>
             <div className={groupHeadCls} style={{ gridColumn: 'span 3' }}>
               {t('admin:dashboard.pro.col_region')}
+            </div>
+            <div className={cancelledHeadCls} style={{ gridColumn: 'span 2' }}>
+              {t('admin:dashboard.pro.col_cancelled')}
             </div>
             <div className={totalHeadCls} style={{ gridColumn: 'span 3' }}>
               {t('admin:dashboard.pro.col_total')}
@@ -212,6 +226,8 @@ export function StaffProTable({
             <div className={`${subCls} ${SEP}`}>{t('admin:dashboard.pro.hdr_orders')}</div>
             <div className={subCls}>{t('admin:dashboard.pro.hdr_positions')}</div>
             <div className={subCls}>{t('admin:dashboard.pro.hdr_units')}</div>
+            <div className={`${subCls} ${SEP}`}>{t('admin:dashboard.pro.hdr_orders')}</div>
+            <div className={subCls}>{t('admin:dashboard.pro.hdr_positions')}</div>
             <div className={`${subCls} ${SEP}`}>{t('admin:dashboard.pro.hdr_orders')}</div>
             <div className={subCls}>{t('admin:dashboard.pro.hdr_positions')}</div>
             <div className={subCls}>{t('admin:dashboard.pro.hdr_units')}</div>
@@ -264,6 +280,14 @@ export function StaffProTable({
                         {row.full_name}
                       </span>
                     )}
+                    {row.pending_returns > 0 ? (
+                      <span
+                        className="wms-num ml-1 shrink-0 rounded-[6px] bg-orange-100 px-1.5 py-[1px] text-[10.5px] font-extrabold text-orange-800 dark:bg-orange-900/40 dark:text-orange-200"
+                        title={t('admin:dashboard.cancelled.col_pending')}
+                      >
+                        {row.pending_returns}
+                      </span>
+                    ) : null}
                   </div>
                   {/* SHAHAR: buy / poz / dona */}
                   <div className={`${numCls} ${SEP}`}>{cell(row.shahar_orders)}</div>
@@ -277,12 +301,15 @@ export function StaffProTable({
                   <div className={`${numCls} !text-slate-900 dark:!text-slate-100`}>
                     {cell(row.region_qty)}
                   </div>
-                  {/* JAMI: buyurtma / pozitsiya / dona */}
+                  {/* BEKOR: buy / poz — terilgan, keyin bekor qilingan ish */}
+                  <div className={`${cancelledNumCls} ${SEP}`}>{cell(row.cancelled_orders)}</div>
+                  <div className={cancelledNumCls}>{cell(row.cancelled_positions)}</div>
+                  {/* JAMI: uchala guruh yig'indisi */}
                   <div className={`${numCls} ${SEP} !text-slate-900 dark:!text-slate-100`}>
-                    {cell(row.shahar_orders + row.region_orders)}
+                    {cell(row.shahar_orders + row.region_orders + row.cancelled_orders)}
                   </div>
                   <div className={`${numCls} !text-slate-900 dark:!text-slate-100`}>
-                    {cell(row.shahar_positions + row.region_positions)}
+                    {cell(row.shahar_positions + row.region_positions + row.cancelled_positions)}
                   </div>
                   <div className="wms-num text-right text-[13px] font-extrabold text-slate-900 dark:text-slate-100">
                     {fmtQty(row.total_qty)}

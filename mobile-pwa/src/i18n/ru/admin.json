@@ -255,6 +255,7 @@
       "col_staff": "Сотрудник",
       "col_shahar": "Город",
       "col_region": "Регион",
+      "col_cancelled": "Отменён",
       "col_total": "Всего",
       "col_qty": "Всего штук",
       "col_productivity": "Производительность",

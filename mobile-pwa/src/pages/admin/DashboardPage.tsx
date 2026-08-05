@@ -19,7 +19,6 @@ import {
   StaffOrdersDialog,
   type StaffSelection,
 } from '../../admin/components/dashboard/StaffOrdersDialog'
-import { CancelledWorkTable } from '../../admin/components/dashboard/CancelledWorkTable'
 import { StaffProTable, type StaffProRow } from '../../admin/components/dashboard/StaffProTable'
 import { Button } from '../../components/ui/button'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -342,7 +341,8 @@ type TimingLite = {
 function buildProRows(
   shaharRows: PickingStaffStatsRow[],
   regionRows: PickingStaffStatsRow[],
-  timing: TimingLite[]
+  timing: TimingLite[],
+  cancelled: CancelledPickerRow[] = []
 ): StaffProRow[] {
   const map = new Map<string, StaffProRow>()
   const ensure = (user_id: string, full_name: string): StaffProRow => {
@@ -357,6 +357,10 @@ function buildProRows(
         region_orders: 0,
         region_positions: 0,
         region_qty: 0,
+        cancelled_orders: 0,
+        cancelled_positions: 0,
+        cancelled_qty: 0,
+        pending_returns: 0,
         total_qty: 0,
         positions_per_hour: 0,
         median_seconds: 0,
@@ -379,6 +383,13 @@ function buildProRows(
     r.region_positions += row.lines_count
     r.region_qty += row.total_picked_qty
   }
+  for (const row of cancelled) {
+    const r = ensure(row.user_id, row.full_name)
+    r.cancelled_orders += row.documents_count
+    r.cancelled_positions += row.positions
+    r.cancelled_qty += row.qty
+    r.pending_returns = row.pending_returns
+  }
   for (const tr of timing) {
     const r = ensure(tr.user_id, tr.full_name)
     r.positions_per_hour = tr.positions_per_hour
@@ -386,7 +397,7 @@ function buildProRows(
     r.work_hours = tr.positions_per_hour > 0 ? tr.total_positions / tr.positions_per_hour : 0
   }
   for (const r of map.values()) {
-    r.total_qty = r.shahar_qty + r.region_qty
+    r.total_qty = r.shahar_qty + r.region_qty + r.cancelled_qty
   }
   return [...map.values()].sort(
     (a, b) => b.total_qty - a.total_qty || a.full_name.localeCompare(b.full_name)
@@ -396,11 +407,18 @@ function buildProRows(
 /** KPI kartalari — faqat to'liq yakunlangan hujjatlar jamidan (guruhsiz). */
 function computeStaffKpi(
   completedRows: PickingStaffStatsRow[],
-  timing: TimingLite[]
+  timing: TimingLite[],
+  cancelled: CancelledPickerRow[] = []
 ): { orders: number; positions: number; qty: number; speed: number } {
-  const orders = completedRows.reduce((s, r) => s + r.documents_count, 0)
-  const positions = completedRows.reduce((s, r) => s + r.lines_count, 0)
-  const qty = completedRows.reduce((s, r) => s + r.total_picked_qty, 0)
+  const orders =
+    completedRows.reduce((s, r) => s + r.documents_count, 0) +
+    cancelled.reduce((s, r) => s + r.documents_count, 0)
+  const positions =
+    completedRows.reduce((s, r) => s + r.lines_count, 0) +
+    cancelled.reduce((s, r) => s + r.positions, 0)
+  const qty =
+    completedRows.reduce((s, r) => s + r.total_picked_qty, 0) +
+    cancelled.reduce((s, r) => s + r.qty, 0)
   const hours = timing.reduce(
     (s, tr) => s + (tr.positions_per_hour > 0 ? tr.total_positions / tr.positions_per_hour : 0),
     0
@@ -450,9 +468,10 @@ export function DashboardPage() {
           positions_per_hour: tp.positions_per_hour,
           median_seconds: tp.median_seconds,
           total_positions: tp.total_positions,
-        }))
+        })),
+        cancelledRows
       ),
-    [pickerRows, regionPickerRows, timingPickers]
+    [pickerRows, regionPickerRows, timingPickers, cancelledRows]
   )
   const controllerProRows = useMemo(
     () =>
@@ -480,9 +499,10 @@ export function DashboardPage() {
           positions_per_hour: tp.positions_per_hour,
           median_seconds: tp.median_seconds,
           total_positions: tp.total_positions,
-        }))
+        })),
+        cancelledRows
       ),
-    [completedPickers, timingPickers]
+    [completedPickers, timingPickers, cancelledRows]
   )
   const controllerKpi = useMemo(
     () =>
@@ -624,6 +644,9 @@ export function DashboardPage() {
           `${rg} · ${oc}`,
           `${rg} · ${ps}`,
           `${rg} · ${un}`,
+          `${t('admin:dashboard.pro.col_cancelled')} · ${oc}`,
+          `${t('admin:dashboard.pro.col_cancelled')} · ${ps}`,
+          `${t('admin:dashboard.pro.col_cancelled')} · ${un}`,
           `${t('admin:dashboard.pro.col_total')} · ${oc}`,
           `${t('admin:dashboard.pro.col_total')} · ${ps}`,
           t('admin:dashboard.pro.col_qty'),
@@ -639,8 +662,11 @@ export function DashboardPage() {
           row.region_orders,
           row.region_positions,
           row.region_qty,
-          row.shahar_orders + row.region_orders,
-          row.shahar_positions + row.region_positions,
+          row.cancelled_orders,
+          row.cancelled_positions,
+          Math.round(row.cancelled_qty),
+          row.shahar_orders + row.region_orders + row.cancelled_orders,
+          row.shahar_positions + row.region_positions + row.cancelled_positions,
           row.total_qty,
           Math.round(row.positions_per_hour),
           formatDuration(row.median_seconds, durUnits),
@@ -665,44 +691,6 @@ export function DashboardPage() {
     },
     [t, dateFrom, dateTo, showInfo, showSuccess, showError]
   )
-
-  const handleExportCancelledExcel = useCallback(async () => {
-    if (cancelledRows.length === 0) return
-    showInfo(t('receiving:export_fetching'), 4000)
-    setIsExporting(true)
-    try {
-      const headers = [
-        '#',
-        t('admin:dashboard.pro.col_staff'),
-        t('admin:dashboard.pro.kpi_orders'),
-        t('admin:dashboard.pro.suffix_pos'),
-        t('admin:dashboard.pro.kpi_qty'),
-        t('admin:dashboard.cancelled.col_pending'),
-      ]
-      const aoa = cancelledRows.map((row, index) => [
-        index + 1,
-        row.full_name,
-        row.documents_count,
-        row.positions,
-        Math.round(row.qty),
-        row.pending_returns,
-      ])
-      const wb = XLSX.utils.book_new()
-      const ws = XLSX.utils.aoa_to_sheet([headers, ...aoa])
-      XLSX.utils.book_append_sheet(wb, ws, sheetNameSafe(t('admin:dashboard.cancelled.title')))
-
-      const day = new Date().toISOString().slice(0, 10)
-      const fromPart = dateFrom.trim() ? dateFrom.trim() : 'all'
-      const toPart = dateTo.trim() ? dateTo.trim() : 'all'
-      await writeExcelFile(wb, `cancelled_stats_${fromPart}_${toPart}_${day}.xlsx`)
-      showSuccess(t('receiving:export_success'))
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      showError(`${t('admin:dashboard.staff_stats_export_failed')}: ${msg}`)
-    } finally {
-      setIsExporting(false)
-    }
-  }, [cancelledRows, t, dateFrom, dateTo, showInfo, showSuccess, showError])
 
   const greetingName = (user?.name || '').trim().split(/\s+/)[0] || (user?.name ?? '')
   const greetingDate = useMemo(() => {
@@ -906,14 +894,6 @@ export function DashboardPage() {
               onRowClick={(row) =>
                 setSelectedStaff({ userId: row.user_id, name: row.full_name, role: 'controller' })
               }
-              t={t}
-            />
-            <CancelledWorkTable
-              rows={cancelledRows}
-              isLoading={isLoading}
-              onExport={() => void handleExportCancelledExcel()}
-              exportDisabled={isLoading || isExporting || cancelledRows.length === 0}
-              isExporting={isExporting}
               t={t}
             />
           </div>

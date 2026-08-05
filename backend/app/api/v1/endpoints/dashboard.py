@@ -24,6 +24,7 @@ from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
 from app.models.order import Order as OrderModel
 from app.models.order import OrderWmsState as OrderWmsStateModel
+from app.models.stock import StockMovement as StockMovementModel
 from app.models.safe_cancel_return import SafeCancelReturnLine as SafeCancelReturnLineModel
 from app.models.safe_cancel_return import SafeCancelReturnSession as SafeCancelReturnSessionModel
 from app.models.user import User as UserModel
@@ -801,6 +802,18 @@ async def get_staff_timing(
         pick_poz[r.uid] += int(r.poz or 0)
         pick_secs[r.uid] += sec
 
+    # --- Bekor qilingan buyurtmalardagi terish ---
+    # Ish bajarilgan, shuning uchun unumdorlikka kiradi. Miqdor ham, vaqt ham
+    # birga qo'shiladi — faqat biri qo'shilsa poz/soat yolg'on chiqadi.
+    for r in _cancelled_picker_work_rows(db, date_from, date_to, group):
+        sec = business_seconds(r["start"], r["end"])
+        if sec <= 0:
+            continue
+        pick_durs[r["uid"]].append(sec)
+        pick_units[r["uid"]] += r["dona"]
+        pick_poz[r["uid"]] += r["poz"]
+        pick_secs[r["uid"]] += sec
+
     # --- Controllerlar: jami (sent->completed) va sof tekshiruv (verify->completed) ---
     c_col, c_statuses, c_ts = _staff_role_columns("controller")
     c_filters = _staff_doc_filters(c_col, c_statuses, c_ts, date_from, date_to)
@@ -876,6 +889,92 @@ async def get_staff_timing(
     controllers.sort(key=lambda x: (-x.units_per_hour, x.full_name.lower()))
 
     return StaffTimingResponse(pickers=pickers, controllers=controllers)
+
+
+def _cancelled_picker_work_rows(
+    db: Session,
+    date_from: Optional[date],
+    date_to: Optional[date],
+    group: Optional[str] = None,
+) -> List[dict]:
+    """Bekor qilingan hujjatlardagi terish ishi: kim, qancha va qancha vaqtda.
+
+    Miqdor qaytarish sessiyasidan olinadi — bekor qilinganda qator `picked_qty`
+    nolga tushadi, sessiya esa o'sha paytdagi miqdorni saqlab qoladi.
+
+    Ish tugagan payt: oxirgi skan (`picked_at`). Bekor qilingan vaqtni olib
+    bo'lmaydi — admin yig'uvchi to'xtaganidan bir necha soat keyin bosishi
+    mumkin, bu esa unumdorlikni asossiz tushirib yuboradi. Eski yozuvlarda
+    `picked_at` bo'sh (migratsiyagacha bekor qilingan) — ular uchun `pick`
+    harakatining vaqti, u ham bo'lmasa sessiya boshlangan payt.
+    """
+    line_totals = (
+        db.query(
+            SafeCancelReturnLineModel.session_id.label("sid"),
+            func.count(SafeCancelReturnLineModel.id).label("poz"),
+            func.coalesce(func.sum(SafeCancelReturnLineModel.qty_to_return), 0).label("dona"),
+        )
+        .group_by(SafeCancelReturnLineModel.session_id)
+        .subquery()
+    )
+    last_scan = (
+        db.query(
+            DocumentLineModel.document_id.label("doc_id"),
+            func.max(DocumentLineModel.picked_at).label("last_picked_at"),
+        )
+        .group_by(DocumentLineModel.document_id)
+        .subquery()
+    )
+    last_movement = (
+        db.query(
+            StockMovementModel.source_document_id.label("doc_id"),
+            func.max(StockMovementModel.created_at).label("last_pick_at"),
+        )
+        .filter(
+            StockMovementModel.movement_type == "pick",
+            StockMovementModel.source_document_type == "document",
+        )
+        .group_by(StockMovementModel.source_document_id)
+        .subquery()
+    )
+
+    filters = [DocumentModel.assigned_to_user_id.isnot(None)]
+    if date_from is not None:
+        filters.append(SafeCancelReturnSessionModel.created_at >= _day_bounds_in_tz(date_from)[0])
+    if date_to is not None:
+        filters.append(SafeCancelReturnSessionModel.created_at <= _day_bounds_in_tz(date_to)[1])
+    filters.extend(_source_group_conditions(group))
+
+    rows = (
+        db.query(
+            DocumentModel.assigned_to_user_id.label("uid"),
+            DocumentModel.first_assigned_at.label("start"),
+            func.coalesce(
+                last_scan.c.last_picked_at,
+                last_movement.c.last_pick_at,
+                SafeCancelReturnSessionModel.created_at,
+            ).label("end"),
+            func.coalesce(line_totals.c.poz, 0).label("poz"),
+            func.coalesce(line_totals.c.dona, 0).label("dona"),
+        )
+        .join(DocumentModel, DocumentModel.id == SafeCancelReturnSessionModel.document_id)
+        .outerjoin(OrderModel, DocumentModel.order_id == OrderModel.id)
+        .outerjoin(line_totals, line_totals.c.sid == SafeCancelReturnSessionModel.id)
+        .outerjoin(last_scan, last_scan.c.doc_id == DocumentModel.id)
+        .outerjoin(last_movement, last_movement.c.doc_id == DocumentModel.id)
+        .filter(and_(*filters))
+        .all()
+    )
+    return [
+        {
+            "uid": r.uid,
+            "start": r.start,
+            "end": r.end,
+            "poz": int(r.poz or 0),
+            "dona": float(r.dona or 0),
+        }
+        for r in rows
+    ]
 
 
 @router.get(

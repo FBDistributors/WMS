@@ -100,23 +100,26 @@ def test_work_survives_after_the_return_is_finished(
         app.dependency_overrides.pop(get_current_user, None)
 
 
-def test_cancelled_work_stays_out_of_productivity(
+def test_cancelling_does_not_erase_the_work_from_productivity(
     client: TestClient, db_session: Session
 ) -> None:
-    """Asosiy statistika bekor qilingan ishni sanamasligi kerak (unumdorlik buzilmasin)."""
+    """Bekor qilish ish hajmini o'chirmasin: pozitsiya ham, vaqt ham sanalishda qolsin."""
     order, picker = _seed_allocatable_order(db_session)
     _complete_order_via_controller(client, db_session, order, picker)
     admin = _mk_user(db_session, username=f"adm-cp-{uuid.uuid4().hex[:8]}", role="warehouse_admin")
 
+    def _picker_timing() -> dict | None:
+        res = client.get("/api/v1/dashboard/staff-timing")
+        assert res.status_code == 200, res.text
+        return next(
+            (p for p in res.json()["pickers"] if p["user_id"] == str(picker.id)), None
+        )
+
     app.dependency_overrides[get_current_user] = lambda: admin
     try:
-        timing_before = client.get("/api/v1/dashboard/staff-timing")
-        assert timing_before.status_code == 200
-        picked_before = next(
-            (p for p in timing_before.json()["pickers"] if p["user_id"] == str(picker.id)),
-            None,
-        )
-        assert picked_before is not None, "yakunlangan ish statistikada bo'lishi kerak"
+        before = _picker_timing()
+        assert before is not None, "yakunlangan ish statistikada bo'lishi kerak"
+        assert before["total_positions"] > 0
 
         assert (
             client.patch(
@@ -125,13 +128,13 @@ def test_cancelled_work_stays_out_of_productivity(
             == 200
         )
 
-        timing_after = client.get("/api/v1/dashboard/staff-timing")
-        picked_after = next(
-            (p for p in timing_after.json()["pickers"] if p["user_id"] == str(picker.id)),
-            None,
-        )
-        if picked_after is not None:
-            assert picked_after["total_positions"] < picked_before["total_positions"]
+        after = _picker_timing()
+        assert after is not None, "bekor qilingach yig'uvchi statistikadan yo'qoldi"
+        # Ish bir chelakdan ikkinchisiga ko'chdi, lekin hajmi o'zgarmaydi.
+        assert after["total_positions"] == before["total_positions"]
+        assert after["total_units"] == before["total_units"]
+        # Vaqt ham hisoblanadi — aks holda poz/soat sun'iy ko'tarilib ketardi.
+        assert after["positions_per_hour"] > 0
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 
