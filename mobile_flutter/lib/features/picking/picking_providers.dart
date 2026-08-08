@@ -260,6 +260,12 @@ final pickerStatsProvider = FutureProvider.autoDispose<MyPickerStats>(
   (Ref ref) => ref.watch(pickingRepositoryProvider).getMyPickerStats(),
 );
 
+/// Ish haqi davri bo'yicha kunma-kun jadval; `offset` 0 — joriy davr, -1 — oldingi.
+final myPeriodStatsProvider =
+    FutureProvider.autoDispose.family<MyPeriodStats, int>((Ref ref, int offset) {
+  return ref.watch(pickingRepositoryProvider).getMyPeriodStats(offset: offset);
+});
+
 /// Kutayotgan qaytim: bosh ekrandagi banner uchun. Qaytim endi ishni bloklamaydi —
 /// yig'uvchi uni navbatdagi ustuvor vazifa sifatida ko'radi va o'zi kirib bajaradi.
 final myReturnSessionProvider = FutureProvider.autoDispose<SafeCancelReturnSession?>((Ref ref) async {

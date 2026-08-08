@@ -28,6 +28,7 @@ from app.models.settings_organization import SettingsOrganization
 from app.models.stock import StockMovement as StockMovementModel
 from app.models.product import Product as ProductModel
 from app.models.user import User as UserModel
+from app.models.safe_cancel_return import SafeCancelReturnLine as SafeCancelReturnLineModel
 from app.models.safe_cancel_return import SafeCancelReturnSession as SafeCancelReturnSessionModel
 from app.models.user_fcm_token import UserFCMToken
 from app.models.stock import StockLot as StockLotModel
@@ -419,6 +420,26 @@ class SafeCancelReturnSessionOut(BaseModel):
 class MyPickerStatsDay(BaseModel):
     date: str  # YYYY-MM-DD
     count: int
+
+
+class MyPeriodStatsDay(BaseModel):
+    date: str  # YYYY-MM-DD
+    orders: int
+    positions: int
+    qty: float
+
+
+class MyPeriodStatsTotals(BaseModel):
+    orders: int
+    positions: int
+    qty: float
+
+
+class MyPeriodStatsResponse(BaseModel):
+    period_from: str
+    period_to: str
+    days: List[MyPeriodStatsDay]
+    totals: MyPeriodStatsTotals
 
 
 class MyPickerStatsResponse(BaseModel):
@@ -1927,6 +1948,159 @@ async def get_my_picker_stats(
         total_completed=total_completed,
         completed_today=per_day.get(today, 0),
         by_day=by_day,
+    )
+
+
+# Ish haqi davri kalendar oyi emas: 26-sanadan keyingi oyning 25-sanasigacha.
+PAYROLL_PERIOD_START_DAY = 26
+
+
+def _payroll_period_bounds(today: date, offset: int = 0) -> tuple[date, date]:
+    """`offset` 0 — joriy davr, -1 — oldingi va h.k."""
+    year, month = today.year, today.month
+    if today.day < PAYROLL_PERIOD_START_DAY:
+        month -= 1
+    month += offset
+    while month <= 0:
+        month += 12
+        year -= 1
+    while month > 12:
+        month -= 12
+        year += 1
+    start = date(year, month, PAYROLL_PERIOD_START_DAY)
+    next_year, next_month = (year + 1, 1) if month == 12 else (year, month + 1)
+    end = date(next_year, next_month, PAYROLL_PERIOD_START_DAY - 1)
+    return start, end
+
+
+@router.get(
+    "/my-period-stats",
+    response_model=MyPeriodStatsResponse,
+    summary="Ish haqi davri bo'yicha kunma-kun ko'rsatkich (26 -> keyingi oy 25)",
+)
+async def get_my_period_stats(
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("picking:read")),
+):
+    """Davr ichida kunma-kun: buyurtma, pozitsiya, dona.
+
+    Faqat ish bo'lgan kunlar qaytariladi — bo'sh kunlar telefon ekranida
+    ro'yxatni cho'zib, kerakli raqamni ko'mib yuboradi.
+    """
+    offset = max(-24, min(0, offset))
+    period_from, period_to = _payroll_period_bounds(datetime.now(BUSINESS_TZ).date(), offset)
+    window_start, _ = day_bounds_in_tz(period_from)
+    _, window_end = day_bounds_in_tz(period_to)
+
+    is_controller = user.role == "inventory_controller"
+    if is_controller:
+        user_col = DocumentModel.controlled_by_user_id
+        statuses = ("completed", "packed", "shipped")
+        ts_col = func.coalesce(DocumentModel.completed_at, DocumentModel.updated_at)
+    else:
+        user_col = DocumentModel.assigned_to_user_id
+        statuses = ("picked", "completed", "packed", "shipped")
+        ts_col = func.coalesce(
+            DocumentModel.sent_to_controller_at,
+            DocumentModel.completed_at,
+            DocumentModel.updated_at,
+        )
+
+    line_agg = (
+        db.query(
+            DocumentLineModel.document_id.label("doc_id"),
+            func.count(DocumentLineModel.id).label("poz"),
+            func.coalesce(func.sum(DocumentLineModel.picked_qty), 0).label("dona"),
+        )
+        .group_by(DocumentLineModel.document_id)
+        .subquery()
+    )
+    rows = (
+        db.query(
+            ts_col.label("ts"),
+            func.coalesce(line_agg.c.poz, 0).label("poz"),
+            func.coalesce(line_agg.c.dona, 0).label("dona"),
+        )
+        .outerjoin(line_agg, line_agg.c.doc_id == DocumentModel.id)
+        .filter(
+            DocumentModel.doc_type == "SO",
+            DocumentModel.status.in_(statuses),
+            user_col == user.id,
+            ts_col >= window_start,
+            ts_col <= window_end,
+        )
+        .all()
+    )
+
+    per_day: dict = defaultdict(lambda: {"orders": 0, "positions": 0, "qty": 0.0})
+
+    def _add(ts, poz, dona) -> None:
+        if ts is None:
+            return
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        bucket = per_day[ts.astimezone(BUSINESS_TZ).date()]
+        bucket["orders"] += 1
+        bucket["positions"] += int(poz or 0)
+        bucket["qty"] += float(dona or 0)
+
+    for r in rows:
+        _add(r.ts, r.poz, r.dona)
+
+    # Bekor qilingan terish ham xodimning ishi (admin paneli ham shunday sanaydi).
+    if not is_controller:
+        cancel_lines = (
+            db.query(
+                SafeCancelReturnLineModel.session_id.label("sid"),
+                func.count(SafeCancelReturnLineModel.id).label("poz"),
+                func.coalesce(func.sum(SafeCancelReturnLineModel.qty_to_return), 0).label("dona"),
+            )
+            .group_by(SafeCancelReturnLineModel.session_id)
+            .subquery()
+        )
+        cancel_ts = func.coalesce(
+            db.query(func.max(DocumentLineModel.picked_at))
+            .filter(DocumentLineModel.document_id == DocumentModel.id)
+            .scalar_subquery(),
+            SafeCancelReturnSessionModel.created_at,
+        )
+        cancel_rows = (
+            db.query(
+                cancel_ts.label("ts"),
+                func.coalesce(cancel_lines.c.poz, 0).label("poz"),
+                func.coalesce(cancel_lines.c.dona, 0).label("dona"),
+            )
+            .join(DocumentModel, DocumentModel.id == SafeCancelReturnSessionModel.document_id)
+            .outerjoin(cancel_lines, cancel_lines.c.sid == SafeCancelReturnSessionModel.id)
+            .filter(
+                DocumentModel.assigned_to_user_id == user.id,
+                cancel_ts >= window_start,
+                cancel_ts <= window_end,
+            )
+            .all()
+        )
+        for r in cancel_rows:
+            _add(r.ts, r.poz, r.dona)
+
+    days = [
+        MyPeriodStatsDay(
+            date=d.isoformat(),
+            orders=v["orders"],
+            positions=v["positions"],
+            qty=round(v["qty"], 3),
+        )
+        for d, v in sorted(per_day.items())
+    ]
+    return MyPeriodStatsResponse(
+        period_from=period_from.isoformat(),
+        period_to=period_to.isoformat(),
+        days=days,
+        totals=MyPeriodStatsTotals(
+            orders=sum(d.orders for d in days),
+            positions=sum(d.positions for d in days),
+            qty=round(sum(d.qty for d in days), 3),
+        ),
     )
 
 

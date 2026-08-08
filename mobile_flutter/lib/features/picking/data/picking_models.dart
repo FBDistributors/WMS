@@ -720,6 +720,70 @@ class MyPickerStatsDay {
   }
 }
 
+class MyPeriodStatsDay {
+  const MyPeriodStatsDay({
+    required this.date,
+    required this.orders,
+    required this.positions,
+    required this.qty,
+  });
+
+  final String date;
+  final int orders;
+  final int positions;
+  final double qty;
+
+  factory MyPeriodStatsDay.fromJson(Map<String, Object?> json) {
+    return MyPeriodStatsDay(
+      date: json['date']! as String,
+      orders: _int(json['orders']),
+      positions: _int(json['positions']),
+      qty: _num(json['qty']),
+    );
+  }
+}
+
+/// Ish haqi davri (26 -> keyingi oy 25) bo'yicha kunma-kun hisob.
+class MyPeriodStats {
+  const MyPeriodStats({
+    required this.periodFrom,
+    required this.periodTo,
+    required this.days,
+    required this.totalOrders,
+    required this.totalPositions,
+    required this.totalQty,
+  });
+
+  final String periodFrom;
+  final String periodTo;
+  final List<MyPeriodStatsDay> days;
+  final int totalOrders;
+  final int totalPositions;
+  final double totalQty;
+
+  factory MyPeriodStats.fromJson(Map<String, Object?> json) {
+    final Object? raw = json['days'];
+    final Object? totals = json['totals'];
+    final Map<String, Object?> t = totals is Map
+        ? Map<String, Object?>.from(totals)
+        : <String, Object?>{};
+    return MyPeriodStats(
+      periodFrom: (json['period_from'] as String?) ?? '',
+      periodTo: (json['period_to'] as String?) ?? '',
+      days: raw is List
+          ? raw
+              .whereType<Map<dynamic, dynamic>>()
+              .map((Map<dynamic, dynamic> m) =>
+                  MyPeriodStatsDay.fromJson(Map<String, Object?>.from(m)))
+              .toList(growable: false)
+          : const <MyPeriodStatsDay>[],
+      totalOrders: _int(t['orders']),
+      totalPositions: _int(t['positions']),
+      totalQty: _num(t['qty']),
+    );
+  }
+}
+
 class MyPickerStats {
   const MyPickerStats({
     required this.totalCompleted,

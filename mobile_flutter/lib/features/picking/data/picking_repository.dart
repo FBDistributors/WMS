@@ -381,6 +381,22 @@ class PickingRepository {
     );
   }
 
+  Future<MyPeriodStats> getMyPeriodStats({int offset = 0}) async {
+    try {
+      final Response<Object?> res = await _dio.get<Object?>(
+        '$_p/my-period-stats',
+        queryParameters: <String, Object?>{'offset': offset},
+      );
+      final Object? data = res.data;
+      if (data is! Map) {
+        throw const FormatException('my_period_stats');
+      }
+      return MyPeriodStats.fromJson(Map<String, Object?>.from(data));
+    } on DioException catch (e) {
+      throw Exception(mapDioExceptionToMessage(e));
+    }
+  }
+
   Future<SafeCancelReturnSession?> getMyReturnSession() async {
     try {
       final Response<Object?> res = await _dio.get<Object?>('$_p/return-session/mine');

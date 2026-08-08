@@ -147,6 +147,7 @@ class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
                           ),
                           error: (_, __) => const SizedBox.shrink(),
                         ),
+                        _PeriodTable(loc: loc, isDark: isDark),
                         if (profile == PickerProfileParam.picker)
                           _HomeCard(
                             icon: Icons.layers_outlined,
@@ -163,14 +164,17 @@ class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
                             isDark: isDark,
                             onTap: () => context.pushNamed('customerReturnsQueue'),
                           ),
-                        _HomeCard(
-                          icon: Icons.cloud_off_outlined,
-                          title:
-                              '${StringLookup.t(loc, 'queue')} (${pendingQ.valueOrNull ?? 0})',
-                          subtitle: StringLookup.t(loc, 'syncPending'),
-                          isDark: isDark,
-                          onTap: () => context.pushNamed('queue'),
-                        ),
+                        // Navbat "Boshqalar" bo'limiga ko'chdi — bu yerda faqat
+                        // kutayotgan yozuv bo'lsa ko'rinadi.
+                        if ((pendingQ.valueOrNull ?? 0) > 0)
+                          _HomeCard(
+                            icon: Icons.cloud_off_outlined,
+                            title:
+                                '${StringLookup.t(loc, 'queue')} (${pendingQ.valueOrNull ?? 0})',
+                            subtitle: StringLookup.t(loc, 'syncPending'),
+                            isDark: isDark,
+                            onTap: () => context.pushNamed('queue'),
+                          ),
                       ],
                     ),
                   ),
@@ -356,6 +360,158 @@ class _WeekChart extends StatelessWidget {
           ),
         );
       }).toList(growable: false),
+    );
+  }
+}
+
+/// Ish haqi davri (26 -> keyingi oy 25) bo'yicha kunma-kun jadval.
+/// Faqat ish bo'lgan kunlar — bo'sh qatorlar telefonda kerakli raqamni ko'madi.
+class _PeriodTable extends ConsumerStatefulWidget {
+  const _PeriodTable({required this.loc, required this.isDark});
+
+  final AppLocale loc;
+  final bool isDark;
+
+  @override
+  ConsumerState<_PeriodTable> createState() => _PeriodTableState();
+}
+
+class _PeriodTableState extends ConsumerState<_PeriodTable> {
+  int _offset = 0;
+
+  static String _dm(String iso) {
+    final List<String> p = iso.split('-');
+    return p.length == 3 ? '${p[2]}.${p[1]}' : iso;
+  }
+
+  static String _dmy(String iso) {
+    final List<String> p = iso.split('-');
+    return p.length == 3 ? '${p[2]}.${p[1]}.${p[0]}' : iso;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final AsyncValue<MyPeriodStats> async = ref.watch(myPeriodStatsProvider(_offset));
+    final bool isDark = widget.isDark;
+    final Color accent = isDark ? const Color(0xFF93C5FD) : const Color(0xFF1A237E);
+    final Color faded = isDark ? Colors.white60 : Colors.black54;
+    final MyPeriodStats? data = async.valueOrNull;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF334155) : const Color(0xFFF0F0F0),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                onPressed: () => setState(() => _offset -= 1),
+                icon: Icon(Icons.chevron_left, color: accent),
+                tooltip: StringLookup.t(widget.loc, 'periodPrev'),
+              ),
+              Expanded(
+                child: Text(
+                  data == null
+                      ? StringLookup.t(widget.loc, 'periodTitle')
+                      : '${_dmy(data.periodFrom)} – ${_dmy(data.periodTo)}',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                onPressed: _offset >= 0 ? null : () => setState(() => _offset += 1),
+                icon: Icon(
+                  Icons.chevron_right,
+                  color: _offset >= 0 ? faded.withValues(alpha: 0.4) : accent,
+                ),
+                tooltip: StringLookup.t(widget.loc, 'periodNext'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          if (async.isLoading && data == null)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (data == null || data.days.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Text(
+                StringLookup.t(widget.loc, 'periodEmpty'),
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: faded),
+              ),
+            )
+          else ...<Widget>[
+            _row(
+              StringLookup.t(widget.loc, 'periodColDate'),
+              StringLookup.t(widget.loc, 'periodColOrders'),
+              StringLookup.t(widget.loc, 'periodColPositions'),
+              StringLookup.t(widget.loc, 'periodColQty'),
+              isHeader: true,
+              color: faded,
+            ),
+            const SizedBox(height: 2),
+            ...data.days.map(
+              (MyPeriodStatsDay d) => _row(
+                _dm(d.date),
+                '${d.orders}',
+                '${d.positions}',
+                d.qty.round().toString(),
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+            Divider(height: 14, color: isDark ? Colors.white24 : Colors.black26),
+            _row(
+              StringLookup.t(widget.loc, 'periodTotal'),
+              '${data.totalOrders}',
+              '${data.totalPositions}',
+              data.totalQty.round().toString(),
+              isTotal: true,
+              color: accent,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _row(
+    String date,
+    String orders,
+    String positions,
+    String qty, {
+    bool isHeader = false,
+    bool isTotal = false,
+    required Color color,
+  }) {
+    final TextStyle style = TextStyle(
+      fontSize: isHeader ? 11 : 12.5,
+      fontWeight: (isHeader || isTotal) ? FontWeight.w700 : FontWeight.w400,
+      color: color,
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: <Widget>[
+          Expanded(flex: 3, child: Text(date, style: style)),
+          Expanded(flex: 2, child: Text(orders, textAlign: TextAlign.right, style: style)),
+          Expanded(flex: 3, child: Text(positions, textAlign: TextAlign.right, style: style)),
+          Expanded(flex: 3, child: Text(qty, textAlign: TextAlign.right, style: style)),
+        ],
+      ),
     );
   }
 }

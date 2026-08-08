@@ -9,6 +9,7 @@ import '../../../core/app_state/profile_type.dart';
 import '../../../core/app_state/profile_type_controller.dart';
 import '../../../core/app_state/theme_controller.dart';
 import '../../auth/presentation/auth_providers.dart';
+import '../../../core/offline/offline_providers.dart';
 import '../../customer_returns/customer_returns_providers.dart';
 import '../../../l10n/string_lookup.dart';
 import '../../../shared/widgets/picker_footer.dart';
@@ -47,6 +48,7 @@ class _KirimHubScreenState extends ConsumerState<KirimHubScreen> {
     final bool canPickerReturns = perms.contains('picking:write');
     final bool canInventoryAdjust = perms.contains('inventory:adjust');
     final int returnsBadge = ref.watch(customerReturnsAssignedCountProvider);
+    final AsyncValue<int> pendingQueue = ref.watch(pendingQueueCountProvider);
 
     return Scaffold(
       body: Column(
@@ -108,6 +110,14 @@ class _KirimHubScreenState extends ConsumerState<KirimHubScreen> {
                     subtitle: StringLookup.t(loc, 'kirimCardMovementSubtitle'),
                     onTap: () => context.pushNamed('movement'),
                   ),
+                // Oflayn navbat — odatda bo'sh; bosh ekranda joy egallamasin.
+                _card(
+                  context,
+                  icon: Icons.cloud_off_outlined,
+                  title: '${StringLookup.t(loc, 'queue')} (${pendingQueue.valueOrNull ?? 0})',
+                  subtitle: StringLookup.t(loc, 'syncPending'),
+                  onTap: () => context.pushNamed('queue'),
+                ),
               ],
             ),
           ),
