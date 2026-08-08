@@ -7,12 +7,16 @@ qoladi, lekin unumdorlikka aralashmaydi.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, time, timedelta, timezone
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
+from app.core.business_time import BUSINESS_TZ
 from app.main import app
+from app.models.document import Document
+from app.models.document import DocumentLine
 from tests.test_archive_revert_return import _complete_order_via_controller
 from tests.test_order_transition_policy import _mk_user, _seed_allocatable_order
 
@@ -105,8 +109,26 @@ def test_cancelling_does_not_erase_the_work_from_productivity(
 ) -> None:
     """Bekor qilish ish hajmini o'chirmasin: pozitsiya ham, vaqt ham sanalishda qolsin."""
     order, picker = _seed_allocatable_order(db_session)
-    _complete_order_via_controller(client, db_session, order, picker)
+    doc_id = _complete_order_via_controller(client, db_session, order, picker)
     admin = _mk_user(db_session, username=f"adm-cp-{uuid.uuid4().hex[:8]}", role="warehouse_admin")
+
+    # Biznes-vaqt faqat ish oynasida sanaladi (Du-Ju 09-18). Test qachon
+    # ishga tushishiga bog'liq bo'lmasligi uchun vaqtlarni dushanba ertalabiga
+    # qo'yamiz — aks holda kechqurun yoki dam kunida davomiylik 0 chiqadi.
+    today = datetime.now(BUSINESS_TZ).date()
+    monday = today - timedelta(days=today.weekday())
+
+    def _at(hour: int, minute: int) -> datetime:
+        return datetime.combine(monday, time(hour, minute), tzinfo=BUSINESS_TZ).astimezone(
+            timezone.utc
+        )
+
+    doc = db_session.query(Document).filter(Document.id == doc_id).one()
+    doc.first_assigned_at = _at(10, 0)
+    doc.sent_to_controller_at = _at(10, 30)
+    for line in db_session.query(DocumentLine).filter(DocumentLine.document_id == doc_id).all():
+        line.picked_at = _at(10, 20)
+    db_session.commit()
 
     def _picker_timing() -> dict | None:
         res = client.get("/api/v1/dashboard/staff-timing")

@@ -135,8 +135,12 @@ class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
                             onTap: () => context.push('/return-items/${pendingReturn.id}'),
                           ),
                         stats.when(
-                          data: (MyPickerStats s) =>
-                              _StatsBlock(stats: s, loc: loc, isDark: isDark),
+                          data: (MyPickerStats s) => _StatsBlock(
+                            stats: s,
+                            loc: loc,
+                            isDark: isDark,
+                            isController: profile == PickerProfileParam.controller,
+                          ),
                           loading: () => const Padding(
                             padding: EdgeInsets.symmetric(vertical: 24),
                             child: Center(child: CircularProgressIndicator()),
@@ -198,16 +202,30 @@ class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
   }
 }
 
+/// Hafta kunlarining qisqartmasi — sana yorlig'i sifatida (0 = Dushanba).
+const Map<String, List<String>> _weekdayShort = <String, List<String>>{
+  'uz': <String>['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya'],
+  'ru': <String>['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
+  'en': <String>['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+};
+
 class _StatsBlock extends StatelessWidget {
-  const _StatsBlock({required this.stats, required this.loc, required this.isDark});
+  const _StatsBlock({
+    required this.stats,
+    required this.loc,
+    required this.isDark,
+    required this.isController,
+  });
 
   final MyPickerStats stats;
   final AppLocale loc;
   final bool isDark;
+  final bool isController;
 
   @override
   Widget build(BuildContext context) {
     final Color accent = isDark ? const Color(0xFF93C5FD) : const Color(0xFF1A237E);
+    final int week = stats.byDay.fold<int>(0, (int a, MyPickerStatsDay d) => a + d.count);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -220,10 +238,37 @@ class _StatsBlock extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: <Widget>[
-              _statBox('${stats.totalCompleted}', StringLookup.t(loc, 'statsTotalCompleted'), accent, isDark),
-              _statBox('${stats.completedToday}', StringLookup.t(loc, 'statsCompletedToday'), accent, isDark),
+              _statBox(
+                '${stats.completedToday}',
+                StringLookup.t(loc, isController ? 'statsCheckedToday' : 'statsCompletedToday'),
+                accent,
+                isDark,
+              ),
+              _statBox('$week', StringLookup.t(loc, 'statsThisWeek'), accent, isDark),
+              _statBox(
+                '${stats.totalCompleted}',
+                StringLookup.t(loc, isController ? 'statsCheckedTotal' : 'statsTotalCompleted'),
+                accent,
+                isDark,
+              ),
             ],
           ),
+          if (stats.byDay.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 14),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                StringLookup.t(loc, 'statsWeekChartTitle'),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white70 : Colors.black54,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            _WeekChart(days: stats.byDay, loc: loc, isDark: isDark, accent: accent),
+          ],
         ],
       ),
     );
@@ -239,6 +284,78 @@ class _StatsBlock extends StatelessWidget {
           textAlign: TextAlign.center,
         ),
       ],
+    );
+  }
+}
+
+/// Kunlik ustunlar. Tashqi kutubxonasiz — 7 ta ustun uchun paket ortiqcha.
+class _WeekChart extends StatelessWidget {
+  const _WeekChart({
+    required this.days,
+    required this.loc,
+    required this.isDark,
+    required this.accent,
+  });
+
+  final List<MyPickerStatsDay> days;
+  final AppLocale loc;
+  final bool isDark;
+  final Color accent;
+
+  static const double _maxBarHeight = 64;
+
+  @override
+  Widget build(BuildContext context) {
+    final int peak = days.fold<int>(0, (int m, MyPickerStatsDay d) => d.count > m ? d.count : m);
+    final List<String> names = _weekdayShort[loc.code] ?? _weekdayShort['en']!;
+    final String todayIso = DateTime.now().toIso8601String().substring(0, 10);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: days.map((MyPickerStatsDay d) {
+        final bool isToday = d.date == todayIso;
+        // Nol bo'lmagan kun ko'rinib tursin: eng past ustun ham 4px.
+        final double h = peak <= 0 ? 0 : (d.count / peak) * _maxBarHeight;
+        final DateTime parsed = DateTime.tryParse(d.date) ?? DateTime.now();
+        final Color barColor = isToday
+            ? accent
+            : (isDark ? const Color(0xFF64748B) : const Color(0xFFB0BEC5));
+        return Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(
+                d.count > 0 ? '${d.count}' : '',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white70 : Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Container(
+                height: d.count > 0 ? (h < 4 ? 4 : h) : 2,
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                decoration: BoxDecoration(
+                  color: d.count > 0
+                      ? barColor
+                      : (isDark ? const Color(0xFF475569) : const Color(0xFFD7DDE2)),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                names[(parsed.weekday - 1) % 7],
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: isToday ? FontWeight.w700 : FontWeight.w400,
+                  color: isToday ? accent : (isDark ? Colors.white60 : Colors.black45),
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(growable: false),
     );
   }
 }

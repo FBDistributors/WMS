@@ -1,4 +1,5 @@
 import os
+from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import List, Literal, Optional
@@ -15,7 +16,7 @@ from sqlalchemy.orm import Session, selectinload
 logger = logging.getLogger(__name__)
 
 from app.auth.deps import get_current_user, require_permission
-from app.core.business_time import day_bounds_in_tz
+from app.core.business_time import BUSINESS_TZ, day_bounds_in_tz
 from app.db import get_db
 from app.models.document import Document as DocumentModel
 from app.models.document import DocumentLine as DocumentLineModel
@@ -1843,51 +1844,88 @@ async def get_my_picker_stats(
     db: Session = Depends(get_db),
     user=Depends(require_permission("picking:read")),
 ):
-    today = datetime.now(timezone.utc).date()
-    total_completed = (
-        db.query(func.count(DocumentModel.id))
-        .filter(
-            DocumentModel.doc_type == "SO",
-            DocumentModel.status == "completed",
-            (DocumentModel.assigned_to_user_id == user.id) | (DocumentModel.controlled_by_user_id == user.id),
-        )
-        .scalar()
-        or 0
-    )
-    completed_today = (
-        db.query(func.count(DocumentModel.id))
-        .filter(
-            DocumentModel.doc_type == "SO",
-            DocumentModel.status == "completed",
-            (DocumentModel.assigned_to_user_id == user.id) | (DocumentModel.controlled_by_user_id == user.id),
-            func.date(DocumentModel.updated_at) == today,
-        )
-        .scalar()
-        or 0
-    )
+    """Xodimning o'z ko'rsatkichi — admin paneldagi hisob bilan bir xil qoidada.
+
+    Rolga qarab ajratiladi: yig'uvchi controllerga yuborgan paytdan sanaladi
+    (controller yakunlashini kutmaydi, aks holda o'z ishini kun bo'yi 0 ko'rardi),
+    controller esa yakunlagan paytdan. Kun chegarasi ombor vaqtida olinadi —
+    kechqurungi ish ertangi kunga o'tib ketmasin.
+    """
     days = max(1, min(31, days))
-    start_date = today - timedelta(days=days - 1)
-    rows = (
-        db.query(func.date(DocumentModel.updated_at).label("d"), func.count(DocumentModel.id).label("c"))
-        .filter(
-            DocumentModel.doc_type == "SO",
-            DocumentModel.status == "completed",
-            (DocumentModel.assigned_to_user_id == user.id) | (DocumentModel.controlled_by_user_id == user.id),
-            func.date(DocumentModel.updated_at) >= start_date,
-            func.date(DocumentModel.updated_at) <= today,
+    is_controller = user.role == "inventory_controller"
+
+    if is_controller:
+        user_col = DocumentModel.controlled_by_user_id
+        statuses = ("completed", "packed", "shipped")
+        ts_col = func.coalesce(DocumentModel.completed_at, DocumentModel.updated_at)
+    else:
+        user_col = DocumentModel.assigned_to_user_id
+        statuses = ("picked", "completed", "packed", "shipped")
+        ts_col = func.coalesce(
+            DocumentModel.sent_to_controller_at,
+            DocumentModel.completed_at,
+            DocumentModel.updated_at,
         )
-        .group_by(func.date(DocumentModel.updated_at))
-        .order_by(func.date(DocumentModel.updated_at))
-        .all()
+
+    base_filters = [
+        DocumentModel.doc_type == "SO",
+        DocumentModel.status.in_(statuses),
+        user_col == user.id,
+    ]
+
+    today = datetime.now(BUSINESS_TZ).date()
+    start_date = today - timedelta(days=days - 1)
+    window_start, _ = day_bounds_in_tz(start_date)
+    _, window_end = day_bounds_in_tz(today)
+
+    total_completed = (
+        db.query(func.count(DocumentModel.id)).filter(and_(*base_filters)).scalar() or 0
     )
-    by_date = {str(r.d): r.c for r in rows}
+    window_rows = [
+        r[0]
+        for r in db.query(ts_col)
+        .filter(and_(*base_filters, ts_col >= window_start, ts_col <= window_end))
+        .all()
+    ]
+
+    # Bekor qilingan buyurtmadagi terish ham xodimning ishi (admin paneli ham
+    # shunday sanaydi) — mobil raqam menejernikidan kam ko'rinmasligi kerak.
+    if not is_controller:
+        cancel_ts = func.coalesce(
+            db.query(func.max(DocumentLineModel.picked_at))
+            .filter(DocumentLineModel.document_id == DocumentModel.id)
+            .scalar_subquery(),
+            SafeCancelReturnSessionModel.created_at,
+        )
+        cancel_q = (
+            db.query(cancel_ts)
+            .join(DocumentModel, DocumentModel.id == SafeCancelReturnSessionModel.document_id)
+            .filter(DocumentModel.assigned_to_user_id == user.id)
+        )
+        total_completed += cancel_q.count()
+        window_rows.extend(
+            r[0]
+            for r in cancel_q.filter(cancel_ts >= window_start, cancel_ts <= window_end).all()
+        )
+
+    per_day: dict = defaultdict(int)
+    for ts in window_rows:
+        if ts is None:
+            continue
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        per_day[ts.astimezone(BUSINESS_TZ).date()] += 1
+
     by_day = [
-        MyPickerStatsDay(date=(start_date + timedelta(days=i)).isoformat(), count=by_date.get((start_date + timedelta(days=i)).isoformat(), 0))
+        MyPickerStatsDay(
+            date=(start_date + timedelta(days=i)).isoformat(),
+            count=per_day.get(start_date + timedelta(days=i), 0),
+        )
         for i in range(days)
     ]
     return MyPickerStatsResponse(
         total_completed=total_completed,
-        completed_today=completed_today,
+        completed_today=per_day.get(today, 0),
         by_day=by_day,
     )
 
