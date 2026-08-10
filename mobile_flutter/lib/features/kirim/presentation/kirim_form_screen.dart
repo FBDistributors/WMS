@@ -2562,42 +2562,140 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     _invOpenLocation(opt, fromSector: true);
   }
 
+  /// `P-H-01` -> `P-H`. Sektor — kodning `{tip}-{sektor}` prefiksi.
+  static String? _sectorOfCode(String code) {
+    final List<String> parts = code.trim().toUpperCase().split('-');
+    if (parts.length < 3) {
+      return null;
+    }
+    return '${parts[0]}-${parts[1]}';
+  }
+
+  /// Mavjud sektorlar — yuklangan joylar ro'yxatidan hosil qilinadi.
+  List<MapEntry<String, int>> _invSectorOptions() {
+    final Map<String, int> counts = <String, int>{};
+    for (final PickerLocationOption loc in _invAllLocations) {
+      final String? sector = _sectorOfCode(loc.code);
+      if (sector != null) {
+        counts[sector] = (counts[sector] ?? 0) + 1;
+      }
+    }
+    final List<MapEntry<String, int>> out = counts.entries.toList()
+      ..sort((MapEntry<String, int> a, MapEntry<String, int> b) => a.key.compareTo(b.key));
+    return out;
+  }
+
+  Future<void> _scanSectorFromLocation() async {
+    final String? raw = await _scanRawBarcode();
+    if (!mounted || raw == null || raw.trim().isEmpty) {
+      return;
+    }
+    final String code = raw.trim();
+    // Skanerlangan joyning kodidan sektor ajratiladi; ro'yxatdan ham tekshiramiz,
+    // chunki shtrix-kod kod bilan bir xil bo'lmasligi mumkin.
+    String? sector = _sectorOfCode(code);
+    if (sector == null) {
+      for (final PickerLocationOption loc in _invAllLocations) {
+        if (loc.code.toUpperCase() == code.toUpperCase()) {
+          sector = _sectorOfCode(loc.code);
+          break;
+        }
+      }
+    }
+    if (sector == null) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          SnackBar(content: Text('$code: sektor aniqlanmadi')),
+        );
+      }
+      return;
+    }
+    await _openInvSector(sector);
+  }
+
   Future<void> _promptInvSector() async {
+    final List<MapEntry<String, int>> options = _invSectorOptions();
     final TextEditingController ctrl = TextEditingController();
-    final String? sector = await showDialog<String>(
+    final String? sector = await showModalBottomSheet<String>(
       context: context,
+      isScrollControlled: true,
       builder: (BuildContext ctx) {
-        return AlertDialog(
-          title: const Text('Sektor'),
-          content: TextField(
-            controller: ctrl,
-            autofocus: true,
-            textCapitalization: TextCapitalization.characters,
-            decoration: const InputDecoration(
-              hintText: 'P-H',
-              border: OutlineInputBorder(),
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 16,
+              bottom: MediaQuery.viewInsetsOf(ctx).bottom + 16,
             ),
-            onSubmitted: (String v) => Navigator.of(ctx).pop(v),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Text(
+                  'Sektor tanlang',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _invTextMain),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 46,
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.of(ctx).pop('__scan__'),
+                    icon: const Icon(Icons.qr_code_scanner),
+                    label: const Text('Joyni skanerlash'),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: ctrl,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: const InputDecoration(
+                    labelText: 'Yoki qo‘lda kiriting',
+                    hintText: 'P-H',
+                    border: OutlineInputBorder(),
+                  ),
+                  onSubmitted: (String v) => Navigator.of(ctx).pop(v),
+                ),
+                const SizedBox(height: 12),
+                if (options.isNotEmpty)
+                  Flexible(
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: options
+                          .map(
+                            (MapEntry<String, int> e) => ListTile(
+                              dense: true,
+                              leading: Icon(Icons.grid_view_rounded, color: _invAccent),
+                              title: Text(
+                                e.key,
+                                style: const TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                              subtitle: Text('${e.value} joy'),
+                              onTap: () => Navigator.of(ctx).pop(e.key),
+                            ),
+                          )
+                          .toList(growable: false),
+                    ),
+                  ),
+              ],
+            ),
           ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(ctrl.text),
-              child: const Text('Ochish'),
-            ),
-          ],
         );
       },
     );
     ctrl.dispose();
-    final String value = (sector ?? '').trim();
-    if (value.isEmpty) {
+    if (!mounted) {
       return;
     }
-    await _openInvSector(value);
+    if (sector == '__scan__') {
+      await _scanSectorFromLocation();
+      return;
+    }
+    final String value = (sector ?? '').trim();
+    if (value.isNotEmpty) {
+      await _openInvSector(value);
+    }
   }
 
   Future<void> _openInvSector(String sector) async {
