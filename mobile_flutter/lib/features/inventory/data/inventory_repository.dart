@@ -125,6 +125,18 @@ class InventoryRepository {
     }
   }
 
+  /// Sektor ichidagi joylar (inventarizatsiya): band bo'lganlari belgilanadi.
+  Future<SectorContents> getSectorContents(String sector) async {
+    final Response<Object?> res = await _dio.get<Object?>(
+      '$_invPath/sector/${Uri.encodeComponent(sector.trim())}',
+    );
+    final Object? data = res.data;
+    if (data is! Map) {
+      throw const FormatException('sector_contents');
+    }
+    return SectorContents.fromJson(Map<String, Object?>.from(data));
+  }
+
   Future<LocationContentsResponse> getLocationContents(String locationCode) async {
     final String code = locationCode.trim();
     if (code.isEmpty) {

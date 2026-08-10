@@ -12,12 +12,14 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import case, func, or_
-from sqlalchemy.orm import Session
+from sqlalchemy import and_, case, func, or_
+from sqlalchemy.orm import Session, aliased
 
 from app.auth.deps import get_current_user, require_any_permission
 from app.db import get_db
+from app.models.document import Document as DocumentModel
 from app.models.location import Location as LocationModel
+from app.models.order import Order as OrderModel
 from app.models.location_box_placement import PLACEMENT_SEALED, LocationBoxPlacement
 from app.models.product import Product as ProductModel
 from app.models.product import ProductBarcode
@@ -25,6 +27,8 @@ from app.models.product_box import ProductBox
 from app.models.stock import ON_HAND_MOVEMENT_TYPES
 from app.models.stock import StockLot as StockLotModel
 from app.models.stock import StockMovement as StockMovementModel
+from app.services.location_sector import load_sector, normalize_sector_input
+from app.services.stock_availability import PHYSICAL_ON_HAND_MOVEMENT_TYPES
 from app.models.user import User as UserModel
 from app.services.box_location_service import SealedBoxInfo, get_breakdown_map_for_product
 from app.services.stock_availability import compute_lot_location_balances
@@ -454,10 +458,138 @@ class LocationContentsItem(BaseModel):
     available_qty: Decimal
 
 
+class SectorLocationOut(BaseModel):
+    id: str
+    code: str
+    items_count: int
+    #: Rezervdagi tovar bor — sanab bo'lmaydi (terish paytida javondan ketishi mumkin).
+    blocked: bool = False
+    blocking_orders: list[str] = []
+
+
+class SectorContentsResponse(BaseModel):
+    sector: str
+    locations: list[SectorLocationOut]
+    blocked_count: int
+
+
 class LocationContentsResponse(BaseModel):
     location_id: str
     location_code: str
     items: list[LocationContentsItem]
+
+
+def _reserved_location_ids(db: Session, location_ids: list[UUID]) -> dict[UUID, Decimal]:
+    """Joy bo'yicha sof rezerv (allocate - unallocate); faqat > 0 bo'lganlari."""
+    if not location_ids:
+        return {}
+    rows = (
+        db.query(
+            StockMovementModel.location_id,
+            func.coalesce(func.sum(StockMovementModel.qty_change), 0).label("reserved"),
+        )
+        .filter(
+            StockMovementModel.location_id.in_(location_ids),
+            StockMovementModel.movement_type.in_(("allocate", "unallocate")),
+        )
+        .group_by(StockMovementModel.location_id)
+        .all()
+    )
+    return {r.location_id: Decimal(str(r.reserved)) for r in rows if Decimal(str(r.reserved)) > 0}
+
+
+def _blocking_order_numbers(db: Session, location_id: UUID) -> list[str]:
+    """Joyni band qilib turgan buyurtma raqamlari — sanoqchiga sabab ko'rsatish uchun."""
+    doc = aliased(DocumentModel)
+    order_id_expr = case(
+        (
+            and_(
+                StockMovementModel.source_document_type == "order",
+                StockMovementModel.source_document_id.isnot(None),
+            ),
+            StockMovementModel.source_document_id,
+        ),
+        (
+            and_(
+                StockMovementModel.source_document_type == "document",
+                doc.order_id.isnot(None),
+            ),
+            doc.order_id,
+        ),
+        else_=None,
+    )
+    rows = (
+        db.query(OrderModel.order_number)
+        .select_from(StockMovementModel)
+        .outerjoin(
+            doc,
+            and_(
+                StockMovementModel.source_document_type == "document",
+                StockMovementModel.source_document_id == doc.id,
+            ),
+        )
+        .join(OrderModel, OrderModel.id == order_id_expr)
+        .filter(
+            StockMovementModel.location_id == location_id,
+            StockMovementModel.movement_type == "allocate",
+        )
+        .distinct()
+        .limit(5)
+        .all()
+    )
+    return [r[0] for r in rows if r[0]]
+
+
+@router.get(
+    "/sector/{sector}",
+    response_model=SectorContentsResponse,
+    summary="Sektor ichidagi joylar (inventarizatsiya uchun)",
+)
+async def get_sector_contents(
+    sector: str,
+    db: Session = Depends(get_db),
+    _user: UserModel = Depends(get_current_user),
+    _guard=Depends(PICKER_INVENTORY_PERMISSION),
+):
+    """Sektorning barcha joylari, har birida nechta qator borligi va band-bandligi.
+
+    Rezervdagi joy sanalmaydi: tovar terish uchun band qilingan, ya'ni sanoq
+    paytida javondan ketishi mumkin — sanoq natijasi yolg'on chiqadi.
+    """
+    info = load_sector(db, normalize_sector_input(sector))
+    location_ids = [loc.id for loc in info.locations]
+    reserved = _reserved_location_ids(db, location_ids)
+
+    counts = dict(
+        db.query(
+            StockMovementModel.location_id,
+            func.count(func.distinct(StockMovementModel.lot_id)),
+        )
+        .filter(
+            StockMovementModel.location_id.in_(location_ids),
+            StockMovementModel.movement_type.in_(PHYSICAL_ON_HAND_MOVEMENT_TYPES),
+        )
+        .group_by(StockMovementModel.location_id)
+        .all()
+    )
+
+    out: list[SectorLocationOut] = []
+    for loc in info.locations:
+        is_blocked = loc.id in reserved
+        out.append(
+            SectorLocationOut(
+                id=str(loc.id),
+                code=loc.code,
+                items_count=int(counts.get(loc.id, 0)),
+                blocked=is_blocked,
+                blocking_orders=_blocking_order_numbers(db, loc.id) if is_blocked else [],
+            )
+        )
+    return SectorContentsResponse(
+        sector=info.prefix,
+        locations=out,
+        blocked_count=sum(1 for o in out if o.blocked),
+    )
 
 
 @router.get(

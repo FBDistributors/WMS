@@ -404,6 +404,65 @@ int? _optionalInt(Object? v) {
   return null;
 }
 
+/// Sektor ichidagi bitta joy — inventarizatsiya ro'yxati uchun.
+class SectorLocationInfo {
+  const SectorLocationInfo({
+    required this.id,
+    required this.code,
+    required this.itemsCount,
+    required this.blocked,
+    required this.blockingOrders,
+  });
+
+  final String id;
+  final String code;
+  final int itemsCount;
+
+  /// Rezervdagi tovar bor — sanab bo'lmaydi.
+  final bool blocked;
+  final List<String> blockingOrders;
+
+  factory SectorLocationInfo.fromJson(Map<String, Object?> json) {
+    final Object? orders = json['blocking_orders'];
+    return SectorLocationInfo(
+      id: (json['id'] ?? '').toString(),
+      code: (json['code'] ?? '').toString(),
+      itemsCount: (json['items_count'] as num?)?.toInt() ?? 0,
+      blocked: json['blocked'] == true,
+      blockingOrders: orders is List
+          ? orders.map((Object? e) => '$e').toList(growable: false)
+          : const <String>[],
+    );
+  }
+}
+
+class SectorContents {
+  const SectorContents({
+    required this.sector,
+    required this.locations,
+    required this.blockedCount,
+  });
+
+  final String sector;
+  final List<SectorLocationInfo> locations;
+  final int blockedCount;
+
+  factory SectorContents.fromJson(Map<String, Object?> json) {
+    final Object? locs = json['locations'];
+    return SectorContents(
+      sector: (json['sector'] ?? '').toString(),
+      locations: locs is List
+          ? locs
+              .whereType<Map<dynamic, dynamic>>()
+              .map((Map<dynamic, dynamic> m) =>
+                  SectorLocationInfo.fromJson(Map<String, Object?>.from(m)))
+              .toList(growable: false)
+          : const <SectorLocationInfo>[],
+      blockedCount: (json['blocked_count'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
 class LocationContentsItem {
   const LocationContentsItem({
     required this.productId,

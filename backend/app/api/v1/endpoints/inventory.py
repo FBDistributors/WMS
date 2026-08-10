@@ -2174,6 +2174,34 @@ async def reserve_stuck_summary(
     )
 
 
+INVENTORY_ADJUST_REASONS = ("inventory_shortage", "inventory_overage")
+
+
+def _reject_inventory_on_reserved_location(db: Session, payload) -> None:
+    """Rezervdagi joyni inventarizatsiya qilishga yo'l qo'ymaymiz.
+
+    Tovar terish uchun band — sanoq paytida javondan ketishi mumkin, ya'ni
+    natija yolg'on chiqadi. Tekshiruv shu yerda: faqat ilovada bloklash yetarli
+    emas, eski versiya yoki ochiq qolgan ekran baribir yozib yuborardi.
+    """
+    if (payload.reason_code or "") not in INVENTORY_ADJUST_REASONS:
+        return
+    reserved = (
+        db.query(func.coalesce(func.sum(StockMovementModel.qty_change), 0))
+        .filter(
+            StockMovementModel.location_id == payload.location_id,
+            StockMovementModel.movement_type.in_(("allocate", "unallocate")),
+        )
+        .scalar()
+        or 0
+    )
+    if Decimal(str(reserved)) > 0:
+        raise HTTPException(
+            status_code=409,
+            detail="Joyda buyurtma uchun band tovar bor — inventarizatsiya qilib bo'lmaydi",
+        )
+
+
 @router.post("/movements", response_model=StockMovementOut, status_code=status.HTTP_201_CREATED)
 @router.post("/movements/", response_model=StockMovementOut, status_code=status.HTTP_201_CREATED)
 async def create_stock_movement(
@@ -2214,6 +2242,7 @@ async def create_stock_movement(
 
         if payload.movement_type == "adjust":
             check_controller_adjust_reason(user, payload.reason_code)
+            _reject_inventory_on_reserved_location(db, payload)
 
         qty_abs = abs(Decimal(str(payload.qty_change)))
         if payload.movement_type == "allocate" and payload.qty_change > 0:

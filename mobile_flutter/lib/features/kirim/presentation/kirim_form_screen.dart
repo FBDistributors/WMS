@@ -169,8 +169,15 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
   /// Zaxira (FEFO) bo'lmasa — RN'dagi kabi qo'lda lokatsiya / partiya.
   final TextEditingController _returnManualBatch = TextEditingController();
 
-  /// Bir sahifali inventarizatsiya holati: 'idle' | 'location' | 'product'.
+  /// Bir sahifali inventarizatsiya holati: 'idle' | 'sector' | 'location' | 'product'.
   String _invView = 'idle';
+  /// Sektor rejimi: joylar ro'yxati, sanalganlari va yuklash holati.
+  SectorContents? _invSector;
+  bool _invSectorLoading = false;
+  String? _invSectorError;
+  final Set<String> _invSectorDone = <String>{};
+  /// Lokatsiya sektor ro'yxatidan ochilganmi — "orqaga" o'sha ro'yxatga qaytadi.
+  bool _invFromSector = false;
   String _invWarehouse = 'main';
   List<PickerLocationOption> _invAllLocations = const <PickerLocationOption>[];
   final TextEditingController _invManualInput = TextEditingController();
@@ -1454,9 +1461,10 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     );
   }
 
-  void _invOpenLocation(PickerLocationOption loc) {
+  void _invOpenLocation(PickerLocationOption loc, {bool fromSector = false}) {
     setState(() {
       _invClearSearchState();
+      _invFromSector = fromSector;
       _invView = 'location';
       _invLocation = loc;
       _invExpandedBoxKey = null;
@@ -1487,6 +1495,10 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       _invContents = null;
       _invContentsError = null;
       _invActualQty.clear();
+      _invSector = null;
+      _invSectorError = null;
+      _invSectorDone.clear();
+      _invFromSector = false;
       _invExpandedBoxKey = null;
       _product = null;
       _productError = null;
@@ -1551,6 +1563,20 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     // Ichki holatlar (lokatsiya/mahsulot ichida) — avval yoyilganini yopish.
     if (_invView == 'location' && _invExpandedBoxKey != null) {
       setState(() => _invExpandedBoxKey = null);
+      return;
+    }
+    if (_invView == 'location' && _invFromSector) {
+      setState(() {
+        _invView = 'sector';
+        _invLocation = null;
+        _invContents = null;
+        _invContentsError = null;
+        _invActualQty.clear();
+      });
+      return;
+    }
+    if (_invView == 'sector') {
+      _invResetToIdle();
       return;
     }
     if (_invView == 'product' && _invScanSelectedGroup != null) {
@@ -1662,12 +1688,28 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
         context,
             SnackBar(content: Text(StringLookup.t(locale, 'inventorySaved'))),
           );
-          // Muvaffaqiyat: oxirgi lokatsiya chipga qo'shiladi, 1-holatga qaytish.
+          // Muvaffaqiyat: oxirgi lokatsiya chipga qo'shiladi.
           final String? code = _invLocation?.code;
           if (code != null) {
             unawaited(_saveInvRecent(code));
           }
-          _invResetToIdle();
+          if (_invFromSector) {
+            // Sektor rejimida ro'yxatga qaytamiz — joy "sanaldi" bo'lib belgilanadi.
+            final String? doneId = _invLocation?.id;
+            setState(() {
+              if (doneId != null) {
+                _invSectorDone.add(doneId);
+              }
+              _invView = 'sector';
+              _invLocation = null;
+              _invContents = null;
+              _invContentsError = null;
+              _invActualQty.clear();
+              _invExpandedBoxKey = null;
+            });
+          } else {
+            _invResetToIdle();
+          }
         }
       }
     } finally {
@@ -1835,6 +1877,28 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       children: <Widget>[
         _invWarehouseBodySegment(),
         const SizedBox(height: 14),
+        // Sektor bo'yicha: butun rakni/qatorni ketma-ket sanash uchun.
+        Container(
+          margin: const EdgeInsets.only(bottom: 14),
+          decoration: _invCardDecoration(),
+          child: ListTile(
+            leading: Icon(Icons.grid_view_rounded, color: _invAccent),
+            title: Text(
+              'Sektor bo‘yicha sanash',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: _invTextMain,
+              ),
+            ),
+            subtitle: Text(
+              'Masalan P-H — ichidagi barcha joylar ro‘yxati',
+              style: TextStyle(fontSize: 12.5, color: _invTextSecondary),
+            ),
+            trailing: Icon(Icons.chevron_right, color: _invTextFaded),
+            onTap: _promptInvSector,
+          ),
+        ),
         Container(
           decoration: _invCardDecoration(),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -2477,6 +2541,216 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
 
   // -------------------- Holat 3: mahsulot --------------------
 
+  /// Sektordagi joyni ochish: to'liq variant lokal ro'yxatdan olinadi
+  /// (`PickerLocationOption` zona/muddat maydonlarini ham talab qiladi).
+  void _invOpenSectorLocation(SectorLocationInfo loc) {
+    PickerLocationOption? opt;
+    for (final PickerLocationOption o in _invAllLocations) {
+      if (o.id == loc.id || o.code == loc.code) {
+        opt = o;
+        break;
+      }
+    }
+    if (opt == null) {
+      showAppSnackBar(
+        context,
+        SnackBar(content: Text('${loc.code}: joy topilmadi, ro‘yxatni yangilang')),
+      );
+      unawaited(_loadInvLocations());
+      return;
+    }
+    _invOpenLocation(opt, fromSector: true);
+  }
+
+  Future<void> _promptInvSector() async {
+    final TextEditingController ctrl = TextEditingController();
+    final String? sector = await showDialog<String>(
+      context: context,
+      builder: (BuildContext ctx) {
+        return AlertDialog(
+          title: const Text('Sektor'),
+          content: TextField(
+            controller: ctrl,
+            autofocus: true,
+            textCapitalization: TextCapitalization.characters,
+            decoration: const InputDecoration(
+              hintText: 'P-H',
+              border: OutlineInputBorder(),
+            ),
+            onSubmitted: (String v) => Navigator.of(ctx).pop(v),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(ctrl.text),
+              child: const Text('Ochish'),
+            ),
+          ],
+        );
+      },
+    );
+    ctrl.dispose();
+    final String value = (sector ?? '').trim();
+    if (value.isEmpty) {
+      return;
+    }
+    await _openInvSector(value);
+  }
+
+  Future<void> _openInvSector(String sector) async {
+    setState(() {
+      _invClearSearchState();
+      _invView = 'sector';
+      _invSectorLoading = true;
+      _invSectorError = null;
+      _invSector = null;
+      _invSectorDone.clear();
+      _invLocation = null;
+      _invContents = null;
+      _product = null;
+    });
+    try {
+      final SectorContents data =
+          await ref.read(inventoryRepositoryProvider).getSectorContents(sector);
+      if (!mounted) return;
+      setState(() {
+        _invSector = data;
+        _invSectorLoading = false;
+      });
+    } on Exception catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _invSectorLoading = false;
+        _invSectorError = localizeApiErrorMessage(ref.read(appLocaleProvider), e);
+      });
+    }
+  }
+
+  /// Sektor ichidagi joylar. Band joy ochilmaydi: tovar terish uchun ajratilgan,
+  /// sanoq paytida javondan ketishi mumkin.
+  Widget _invSectorView() {
+    final SectorContents? data = _invSector;
+    if (_invSectorLoading && data == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_invSectorError != null && data == null) {
+      return Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(_invSectorError!, style: TextStyle(color: _invRedText)),
+      );
+    }
+    if (data == null) {
+      return const SizedBox.shrink();
+    }
+    final int total = data.locations.where((SectorLocationInfo l) => !l.blocked).length;
+    final int done = _invSectorDone.length;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      children: <Widget>[
+        Container(
+          decoration: _invCardDecoration(),
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: <Widget>[
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: _invTint,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.grid_view_rounded, color: _invAccent),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      data.sector,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: _invTextMain,
+                      ),
+                    ),
+                    Text(
+                      '$done / $total sanaldi',
+                      style: TextStyle(fontSize: 12.5, color: _invTextSecondary),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (data.blockedCount > 0) ...<Widget>[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: context.colors.dangerBg,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              '${data.blockedCount} joy buyurtma uchun band — inventarizatsiya qilib bo‘lmaydi.',
+              style: TextStyle(fontSize: 12.5, color: _invRedText, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
+        ...data.locations.map(_invSectorRow),
+      ],
+    );
+  }
+
+  Widget _invSectorRow(SectorLocationInfo loc) {
+    final bool counted = _invSectorDone.contains(loc.id);
+    final Widget trailing = loc.blocked
+        ? Icon(Icons.lock_outline, color: _invRedText, size: 20)
+        : counted
+            ? const Icon(Icons.check_circle, color: Color(0xFF2E7D32), size: 20)
+            : Icon(Icons.chevron_right, color: _invTextFaded);
+    final String subtitle = loc.blocked
+        ? (loc.blockingOrders.isEmpty
+            ? 'Band — buyurtma uchun ajratilgan'
+            : 'Band — buyurtma ${loc.blockingOrders.join(", ")}')
+        : '${loc.itemsCount} qator';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: _invCardDecoration(),
+      child: ListTile(
+        enabled: !loc.blocked,
+        leading: Icon(
+          Icons.inventory_2_outlined,
+          color: loc.blocked ? _invTextFaded : _invAccent,
+        ),
+        title: Text(
+          loc.code,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: loc.blocked ? _invTextFaded : _invTextMain,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: TextStyle(
+            fontSize: 12.5,
+            color: loc.blocked ? _invRedText : _invTextSecondary,
+          ),
+        ),
+        trailing: trailing,
+        onTap: loc.blocked ? null : () => _invOpenSectorLocation(loc),
+      ),
+    );
+  }
+
   Widget _invProductView() {
     final PickerProductDetailResponse? p = _product;
     return ListView(
@@ -2661,6 +2935,8 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadInvRecents());
     }
     switch (_invView) {
+      case 'sector':
+        return _invSectorView();
       case 'location':
         return _invLocationView();
       case 'product':
