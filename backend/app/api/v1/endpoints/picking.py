@@ -2124,7 +2124,9 @@ async def get_my_period_stats(
             orders=raw["orders"],
             positions=raw["positions"],
             qty=round(raw["qty"], 3),
-            amount=float(Decimal(raw["orders"]) * rates[group]),
+            # Ball pozitsiyaga hisoblanadi: mehnat buyurtma soniga emas, ichidagi
+            # qatorlar soniga bog'liq.
+            amount=float(Decimal(raw["positions"]) * rates[group]),
         )
 
     days: List[MyPeriodStatsDay] = []

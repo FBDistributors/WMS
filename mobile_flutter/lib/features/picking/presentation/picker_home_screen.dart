@@ -439,8 +439,8 @@ class _PeriodTableState extends ConsumerState<_PeriodTable> {
             ...data.days.map(
               (MyPeriodStatsDay d) => _row(
                 _dm(d.date),
-                '${d.shahar.orders}',
-                '${d.region.orders}',
+                '${d.shahar.positions}',
+                '${d.region.positions}',
                 _money(d.amount),
                 color: isDark ? Colors.white : Colors.black87,
               ),
@@ -448,8 +448,8 @@ class _PeriodTableState extends ConsumerState<_PeriodTable> {
             Divider(height: 14, color: isDark ? Colors.white24 : Colors.black26),
             _row(
               StringLookup.t(widget.loc, 'periodTotal'),
-              '${data.totalShahar.orders}',
-              '${data.totalRegion.orders}',
+              '${data.totalShahar.positions}',
+              '${data.totalRegion.positions}',
               _money(data.totalAmount),
               isTotal: true,
               color: accent,

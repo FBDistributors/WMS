@@ -538,7 +538,7 @@
   },
   "payroll": {
     "title": "Point rates",
-    "subtitle": "Points per order",
+    "subtitle": "Points per position",
     "role_picker": "Picker",
     "role_controller": "Controller",
     "group_shahar": "City",

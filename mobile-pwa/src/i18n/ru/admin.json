@@ -538,7 +538,7 @@
   },
   "payroll": {
     "title": "Тарифы баллов",
-    "subtitle": "Баллы за один заказ",
+    "subtitle": "Баллы за одну позицию",
     "role_picker": "Сборщик",
     "role_controller": "Контролёр",
     "group_shahar": "Город",

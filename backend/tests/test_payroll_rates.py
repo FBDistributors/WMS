@@ -68,8 +68,8 @@ def test_period_splits_by_group_and_prices_the_work(
         assert totals["region"]["orders"] == 0
         assert totals["orders"] == totals["shahar"]["orders"] + totals["region"]["orders"]
 
-        # Summa = buyurtma soni x tarif.
-        assert totals["shahar"]["amount"] == totals["shahar"]["orders"] * body["rate_shahar"]
+        # Ball = pozitsiya soni x tarif (buyurtma soni emas).
+        assert totals["shahar"]["amount"] == totals["shahar"]["positions"] * body["rate_shahar"]
         assert totals["amount"] == totals["shahar"]["amount"] + totals["region"]["amount"]
 
         day = body["days"][0]
@@ -118,5 +118,41 @@ def test_a_rate_change_leaves_past_periods_alone(
 
         # Oldingi davr tegilmagan — eski tarif o'z joyida.
         assert prev_after["rate_shahar"] == prev_before["rate_shahar"] == 463
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_points_follow_positions_not_orders(client: TestClient, db_session: Session) -> None:
+    """Ikki qatorli bitta buyurtma: ball qator soniga qarab ikki barobar bo'lsin."""
+    from app.models.document import Document, DocumentLine
+
+    order, picker = _seed_allocatable_order(db_session)
+    doc_id = _send_and_pick(client, db_session, order, picker)
+
+    doc = db_session.query(Document).filter(Document.id == uuid.UUID(doc_id)).one()
+    first = db_session.query(DocumentLine).filter(DocumentLine.document_id == doc.id).first()
+    db_session.add(
+        DocumentLine(
+            document_id=doc.id,
+            product_id=first.product_id,
+            lot_id=first.lot_id,
+            location_id=first.location_id,
+            sku=first.sku,
+            product_name=first.product_name,
+            location_code=first.location_code,
+            required_qty=first.required_qty,
+            picked_qty=first.picked_qty,
+        )
+    )
+    db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: picker
+    try:
+        body = client.get("/api/v1/picking/my-period-stats").json()
+        totals = body["totals"]["shahar"]
+        assert totals["orders"] == 1
+        assert totals["positions"] == 2, "ikkinchi qator hisobga tushmadi"
+        assert totals["amount"] == 2 * body["rate_shahar"]
+        assert totals["amount"] != totals["orders"] * body["rate_shahar"]
     finally:
         app.dependency_overrides.pop(get_current_user, None)

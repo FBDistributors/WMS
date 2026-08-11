@@ -538,7 +538,7 @@
   },
   "payroll": {
     "title": "Ball tariflari",
-    "subtitle": "Bitta buyurtma uchun ball",
+    "subtitle": "Bitta pozitsiya uchun ball",
     "role_picker": "Yig'uvchi",
     "role_controller": "Kontrolyor",
     "group_shahar": "Shahar",
