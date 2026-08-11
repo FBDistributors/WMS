@@ -106,7 +106,8 @@
     "tabs": {
       "vip_customers": "VIP customers",
       "work_zones": "Work zone",
-      "organizations": "Organization"
+      "organizations": "Organization",
+      "payroll": "Payroll"
     }
   },
   "settings": {
@@ -534,5 +535,19 @@
       "receiving": "Receiving",
       "general": "General"
     }
+  },
+  "payroll": {
+    "title": "Payroll rates",
+    "subtitle": "Pay per order",
+    "role_picker": "Picker",
+    "role_controller": "Controller",
+    "group_shahar": "City",
+    "group_region": "Region",
+    "currency": "UZS",
+    "saved": "Rates saved",
+    "save_failed": "Not saved. Try again.",
+    "load_failed": "Failed to load rates.",
+    "invalid_amount": "Invalid amount.",
+    "note": "Takes effect immediately and shows in the mobile app. Past periods are recalculated at the new rate."
   }
 }

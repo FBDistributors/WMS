@@ -106,7 +106,8 @@
     "tabs": {
       "vip_customers": "VIP клиенты",
       "work_zones": "Work zone",
-      "organizations": "Организация"
+      "organizations": "Организация",
+      "payroll": "Оплата"
     }
   },
   "settings": {
@@ -534,5 +535,19 @@
       "receiving": "Приёмка",
       "general": "Общее"
     }
+  },
+  "payroll": {
+    "title": "Тарифы оплаты",
+    "subtitle": "Оплата за один заказ",
+    "role_picker": "Сборщик",
+    "role_controller": "Контролёр",
+    "group_shahar": "Город",
+    "group_region": "Область",
+    "currency": "сум",
+    "saved": "Тарифы сохранены",
+    "save_failed": "Не сохранено. Попробуйте снова.",
+    "load_failed": "Не удалось загрузить тарифы.",
+    "invalid_amount": "Неверная сумма.",
+    "note": "Изменение действует сразу и видно в мобильном приложении. Прошлые периоды пересчитываются по новому тарифу."
   }
 }

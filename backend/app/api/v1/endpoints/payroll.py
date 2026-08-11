@@ -1,0 +1,96 @@
+"""Ish haqi tariflari — admin o'zi o'zgartiradi.
+
+Tarif kodda emas bazada: o'zgartirish uchun deploy ham, ilova relizi ham kerak
+emas, va hamma xodim ayni bir raqamni ko'radi.
+"""
+from __future__ import annotations
+
+from decimal import Decimal
+from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+
+from app.auth.deps import require_any_permission, require_permission
+from app.db import get_db
+from app.models.payroll_rate import PAYROLL_GROUPS, PAYROLL_ROLES, PayrollRate
+from app.services.audit_service import ACTION_UPDATE, log_action
+from app.services.payroll_rates import DEFAULT_RATES
+
+router = APIRouter()
+
+
+class PayrollRateOut(BaseModel):
+    role: str
+    source_group: str
+    amount: float
+
+
+class PayrollRatesResponse(BaseModel):
+    rates: List[PayrollRateOut]
+
+
+class PayrollRateUpdate(BaseModel):
+    role: str
+    source_group: str
+    amount: Decimal = Field(..., ge=0)
+
+
+class PayrollRatesUpdateRequest(BaseModel):
+    rates: List[PayrollRateUpdate]
+
+
+@router.get("", response_model=PayrollRatesResponse, summary="Ish haqi tariflari")
+@router.get("/", response_model=PayrollRatesResponse, summary="Ish haqi tariflari")
+async def list_payroll_rates(
+    db: Session = Depends(get_db),
+    _user=Depends(require_any_permission(["reports:read", "audit:read", "admin:access"])),
+):
+    stored = {(r.role, r.source_group): Decimal(str(r.amount)) for r in db.query(PayrollRate).all()}
+    out: List[PayrollRateOut] = []
+    for role in PAYROLL_ROLES:
+        for group in PAYROLL_GROUPS:
+            amount = stored.get((role, group), DEFAULT_RATES.get((role, group), Decimal("0")))
+            out.append(PayrollRateOut(role=role, source_group=group, amount=float(amount)))
+    return PayrollRatesResponse(rates=out)
+
+
+@router.put("", response_model=PayrollRatesResponse, summary="Tariflarni saqlash")
+@router.put("/", response_model=PayrollRatesResponse, summary="Tariflarni saqlash")
+async def update_payroll_rates(
+    payload: PayrollRatesUpdateRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission("admin:access")),
+):
+    for item in payload.rates:
+        if item.role not in PAYROLL_ROLES:
+            raise HTTPException(status_code=400, detail=f"Unknown role: {item.role}")
+        if item.source_group not in PAYROLL_GROUPS:
+            raise HTTPException(status_code=400, detail=f"Unknown group: {item.source_group}")
+
+    for item in payload.rates:
+        row = (
+            db.query(PayrollRate)
+            .filter(PayrollRate.role == item.role, PayrollRate.source_group == item.source_group)
+            .one_or_none()
+        )
+        old = float(row.amount) if row else None
+        if row is None:
+            row = PayrollRate(role=item.role, source_group=item.source_group, amount=item.amount)
+            db.add(row)
+        else:
+            row.amount = item.amount
+        row.updated_by_user_id = user.id
+        # Ish haqiga ta'sir qiladi — kim, qachon, qanaqadan qanaqaga o'zgartirgani qolsin.
+        log_action(
+            db,
+            user_id=user.id,
+            action=ACTION_UPDATE,
+            entity_type="payroll_rate",
+            entity_id=f"{item.role}:{item.source_group}",
+            old_data={"amount": old},
+            new_data={"amount": float(item.amount)},
+        )
+    db.commit()
+    return await list_payroll_rates(db=db, _user=user)

@@ -36,8 +36,11 @@ from app.models.location_box_placement import PLACEMENT_SEALED, LocationBoxPlace
 from app.models.product_box import ProductBox as ProductBoxModel
 from app.api.v1.endpoints.picker_inventory import _get_lot_level_balances, _location_ids_for_warehouse
 from app.services.order_reserve_release import release_document_reserve_on_cancel
+from app.services.payroll_rates import load_rates, payroll_role_for
 from app.services.order_source_group import (
+    REGION_SOURCE,
     SOURCE_GROUP_CITY,
+    SOURCE_GROUP_REGION,
     order_source_group,
     source_group_conditions,
 )
@@ -422,22 +425,37 @@ class MyPickerStatsDay(BaseModel):
     count: int
 
 
+class MyPeriodStatsGroup(BaseModel):
+    orders: int = 0
+    positions: int = 0
+    qty: float = 0.0
+    amount: float = 0.0
+
+
 class MyPeriodStatsDay(BaseModel):
     date: str  # YYYY-MM-DD
     orders: int
     positions: int
     qty: float
+    amount: float = 0.0
+    shahar: MyPeriodStatsGroup = MyPeriodStatsGroup()
+    region: MyPeriodStatsGroup = MyPeriodStatsGroup()
 
 
 class MyPeriodStatsTotals(BaseModel):
     orders: int
     positions: int
     qty: float
+    amount: float = 0.0
+    shahar: MyPeriodStatsGroup = MyPeriodStatsGroup()
+    region: MyPeriodStatsGroup = MyPeriodStatsGroup()
 
 
 class MyPeriodStatsResponse(BaseModel):
     period_from: str
     period_to: str
+    rate_shahar: float = 0.0
+    rate_region: float = 0.0
     days: List[MyPeriodStatsDay]
     totals: MyPeriodStatsTotals
 
@@ -1983,10 +2001,10 @@ async def get_my_period_stats(
     db: Session = Depends(get_db),
     user=Depends(require_permission("picking:read")),
 ):
-    """Davr ichida kunma-kun: buyurtma, pozitsiya, dona.
+    """Davr ichida kunma-kun: buyurtma, pozitsiya, dona — shahar/viloyat bo'yicha.
 
-    Faqat ish bo'lgan kunlar qaytariladi — bo'sh kunlar telefon ekranida
-    ro'yxatni cho'zib, kerakli raqamni ko'mib yuboradi.
+    Summa serverda hisoblanadi: tarif bazada turadi, o'zgarsa hamma darrov bir
+    xil raqamni ko'radi. Faqat ish bo'lgan kunlar qaytariladi.
     """
     offset = max(-24, min(0, offset))
     period_from, period_to = _payroll_period_bounds(datetime.now(BUSINESS_TZ).date(), offset)
@@ -2007,6 +2025,8 @@ async def get_my_period_stats(
             DocumentModel.updated_at,
         )
 
+    rates = load_rates(db, payroll_role_for(user.role))
+
     line_agg = (
         db.query(
             DocumentLineModel.document_id.label("doc_id"),
@@ -2021,8 +2041,10 @@ async def get_my_period_stats(
             ts_col.label("ts"),
             func.coalesce(line_agg.c.poz, 0).label("poz"),
             func.coalesce(line_agg.c.dona, 0).label("dona"),
+            OrderModel.source.label("source"),
         )
         .outerjoin(line_agg, line_agg.c.doc_id == DocumentModel.id)
+        .outerjoin(OrderModel, OrderModel.id == DocumentModel.order_id)
         .filter(
             DocumentModel.doc_type == "SO",
             DocumentModel.status.in_(statuses),
@@ -2033,20 +2055,31 @@ async def get_my_period_stats(
         .all()
     )
 
-    per_day: dict = defaultdict(lambda: {"orders": 0, "positions": 0, "qty": 0.0})
+    def _empty_group() -> dict:
+        return {"orders": 0, "positions": 0, "qty": 0.0}
 
-    def _add(ts, poz, dona) -> None:
+    per_day: dict = defaultdict(
+        lambda: {SOURCE_GROUP_CITY: _empty_group(), SOURCE_GROUP_REGION: _empty_group()}
+    )
+
+    def _add(ts, poz, dona, source) -> None:
         if ts is None:
             return
         if ts.tzinfo is None:
             ts = ts.replace(tzinfo=timezone.utc)
-        bucket = per_day[ts.astimezone(BUSINESS_TZ).date()]
+        # Guruh ta'rifi admin paneldagi bilan bir xil: `diller` -> viloyat, qolgani shahar.
+        group = (
+            SOURCE_GROUP_REGION
+            if (source or "").strip().lower() == REGION_SOURCE
+            else SOURCE_GROUP_CITY
+        )
+        bucket = per_day[ts.astimezone(BUSINESS_TZ).date()][group]
         bucket["orders"] += 1
         bucket["positions"] += int(poz or 0)
         bucket["qty"] += float(dona or 0)
 
     for r in rows:
-        _add(r.ts, r.poz, r.dona)
+        _add(r.ts, r.poz, r.dona, r.source)
 
     # Bekor qilingan terish ham xodimning ishi (admin paneli ham shunday sanaydi).
     if not is_controller:
@@ -2070,9 +2103,11 @@ async def get_my_period_stats(
                 cancel_ts.label("ts"),
                 func.coalesce(cancel_lines.c.poz, 0).label("poz"),
                 func.coalesce(cancel_lines.c.dona, 0).label("dona"),
+                OrderModel.source.label("source"),
             )
             .join(DocumentModel, DocumentModel.id == SafeCancelReturnSessionModel.document_id)
             .outerjoin(cancel_lines, cancel_lines.c.sid == SafeCancelReturnSessionModel.id)
+            .outerjoin(OrderModel, OrderModel.id == DocumentModel.order_id)
             .filter(
                 DocumentModel.assigned_to_user_id == user.id,
                 cancel_ts >= window_start,
@@ -2081,25 +2116,60 @@ async def get_my_period_stats(
             .all()
         )
         for r in cancel_rows:
-            _add(r.ts, r.poz, r.dona)
+            _add(r.ts, r.poz, r.dona, r.source)
 
-    days = [
-        MyPeriodStatsDay(
-            date=d.isoformat(),
-            orders=v["orders"],
-            positions=v["positions"],
-            qty=round(v["qty"], 3),
+    def _group_out(raw: dict, group: str) -> MyPeriodStatsGroup:
+        return MyPeriodStatsGroup(
+            orders=raw["orders"],
+            positions=raw["positions"],
+            qty=round(raw["qty"], 3),
+            amount=float(Decimal(raw["orders"]) * rates[group]),
         )
-        for d, v in sorted(per_day.items())
-    ]
+
+    days: List[MyPeriodStatsDay] = []
+    for day, groups in sorted(per_day.items()):
+        city = _group_out(groups[SOURCE_GROUP_CITY], SOURCE_GROUP_CITY)
+        region = _group_out(groups[SOURCE_GROUP_REGION], SOURCE_GROUP_REGION)
+        days.append(
+            MyPeriodStatsDay(
+                date=day.isoformat(),
+                orders=city.orders + region.orders,
+                positions=city.positions + region.positions,
+                qty=round(city.qty + region.qty, 3),
+                amount=round(city.amount + region.amount, 2),
+                shahar=city,
+                region=region,
+            )
+        )
+
+    def _sum(attr: str, group: str) -> float:
+        return sum(getattr(getattr(d, group), attr) for d in days)
+
+    totals_city = MyPeriodStatsGroup(
+        orders=int(_sum("orders", "shahar")),
+        positions=int(_sum("positions", "shahar")),
+        qty=round(_sum("qty", "shahar"), 3),
+        amount=round(_sum("amount", "shahar"), 2),
+    )
+    totals_region = MyPeriodStatsGroup(
+        orders=int(_sum("orders", "region")),
+        positions=int(_sum("positions", "region")),
+        qty=round(_sum("qty", "region"), 3),
+        amount=round(_sum("amount", "region"), 2),
+    )
     return MyPeriodStatsResponse(
         period_from=period_from.isoformat(),
         period_to=period_to.isoformat(),
+        rate_shahar=float(rates[SOURCE_GROUP_CITY]),
+        rate_region=float(rates[SOURCE_GROUP_REGION]),
         days=days,
         totals=MyPeriodStatsTotals(
-            orders=sum(d.orders for d in days),
-            positions=sum(d.positions for d in days),
-            qty=round(sum(d.qty for d in days), 3),
+            orders=totals_city.orders + totals_region.orders,
+            positions=totals_city.positions + totals_region.positions,
+            qty=round(totals_city.qty + totals_region.qty, 3),
+            amount=round(totals_city.amount + totals_region.amount, 2),
+            shahar=totals_city,
+            region=totals_region,
         ),
     )
 

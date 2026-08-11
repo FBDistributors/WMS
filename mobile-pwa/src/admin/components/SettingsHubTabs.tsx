@@ -1,11 +1,12 @@
 import { useTranslation } from 'react-i18next'
 
-export type SettingsHubTabId = 'vip-customers' | 'work-zones' | 'organizations'
+export type SettingsHubTabId = 'vip-customers' | 'work-zones' | 'organizations' | 'payroll'
 
 const TABS: { id: SettingsHubTabId; labelKey: string }[] = [
   { id: 'vip-customers', labelKey: 'admin:settings_hub.tabs.vip_customers' },
   { id: 'work-zones', labelKey: 'admin:settings_hub.tabs.work_zones' },
   { id: 'organizations', labelKey: 'admin:settings_hub.tabs.organizations' },
+  { id: 'payroll', labelKey: 'admin:settings_hub.tabs.payroll' },
 ]
 
 type SettingsHubTabsProps = {

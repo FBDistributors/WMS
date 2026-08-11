@@ -720,18 +720,58 @@ class MyPickerStatsDay {
   }
 }
 
+/// Bitta guruh (shahar yoki viloyat) bo'yicha ko'rsatkich va uning summasi.
+class PeriodGroupStats {
+  const PeriodGroupStats({
+    required this.orders,
+    required this.positions,
+    required this.qty,
+    required this.amount,
+  });
+
+  final int orders;
+  final int positions;
+  final double qty;
+  final double amount;
+
+  static const PeriodGroupStats empty =
+      PeriodGroupStats(orders: 0, positions: 0, qty: 0, amount: 0);
+
+  factory PeriodGroupStats.fromJson(Map<String, Object?>? json) {
+    if (json == null) {
+      return empty;
+    }
+    return PeriodGroupStats(
+      orders: _int(json['orders']),
+      positions: _int(json['positions']),
+      qty: _num(json['qty']),
+      amount: _num(json['amount']),
+    );
+  }
+}
+
+PeriodGroupStats _group(Object? raw) => PeriodGroupStats.fromJson(
+      raw is Map ? Map<String, Object?>.from(raw) : null,
+    );
+
 class MyPeriodStatsDay {
   const MyPeriodStatsDay({
     required this.date,
     required this.orders,
     required this.positions,
     required this.qty,
+    required this.amount,
+    required this.shahar,
+    required this.region,
   });
 
   final String date;
   final int orders;
   final int positions;
   final double qty;
+  final double amount;
+  final PeriodGroupStats shahar;
+  final PeriodGroupStats region;
 
   factory MyPeriodStatsDay.fromJson(Map<String, Object?> json) {
     return MyPeriodStatsDay(
@@ -739,6 +779,9 @@ class MyPeriodStatsDay {
       orders: _int(json['orders']),
       positions: _int(json['positions']),
       qty: _num(json['qty']),
+      amount: _num(json['amount']),
+      shahar: _group(json['shahar']),
+      region: _group(json['region']),
     );
   }
 }
@@ -748,18 +791,28 @@ class MyPeriodStats {
   const MyPeriodStats({
     required this.periodFrom,
     required this.periodTo,
+    required this.rateShahar,
+    required this.rateRegion,
     required this.days,
     required this.totalOrders,
     required this.totalPositions,
     required this.totalQty,
+    required this.totalAmount,
+    required this.totalShahar,
+    required this.totalRegion,
   });
 
   final String periodFrom;
   final String periodTo;
+  final double rateShahar;
+  final double rateRegion;
   final List<MyPeriodStatsDay> days;
   final int totalOrders;
   final int totalPositions;
   final double totalQty;
+  final double totalAmount;
+  final PeriodGroupStats totalShahar;
+  final PeriodGroupStats totalRegion;
 
   factory MyPeriodStats.fromJson(Map<String, Object?> json) {
     final Object? raw = json['days'];
@@ -770,6 +823,8 @@ class MyPeriodStats {
     return MyPeriodStats(
       periodFrom: (json['period_from'] as String?) ?? '',
       periodTo: (json['period_to'] as String?) ?? '',
+      rateShahar: _num(json['rate_shahar']),
+      rateRegion: _num(json['rate_region']),
       days: raw is List
           ? raw
               .whereType<Map<dynamic, dynamic>>()
@@ -780,6 +835,9 @@ class MyPeriodStats {
       totalOrders: _int(t['orders']),
       totalPositions: _int(t['positions']),
       totalQty: _num(t['qty']),
+      totalAmount: _num(t['amount']),
+      totalShahar: _group(t['shahar']),
+      totalRegion: _group(t['region']),
     );
   }
 }

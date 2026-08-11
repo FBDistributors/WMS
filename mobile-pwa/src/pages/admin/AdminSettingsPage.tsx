@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
+import { PayrollRatesSection } from '../../admin/components/PayrollRatesSection'
 import { SettingsHubTabs, type SettingsHubTabId } from '../../admin/components/SettingsHubTabs'
 import { VipCustomersSection } from './VipCustomersPage'
 import { OrganizationsSection } from './OrganizationsPage'
@@ -12,7 +13,13 @@ const TAB_PARAM = 'tab'
 const DEFAULT_TAB: SettingsHubTabId = 'vip-customers'
 
 function parseTab(raw: string | null): SettingsHubTabId {
-  if (raw === 'work-zones' || raw === 'vip-customers' || raw === 'organizations') return raw
+  if (
+    raw === 'work-zones' ||
+    raw === 'vip-customers' ||
+    raw === 'organizations' ||
+    raw === 'payroll'
+  )
+    return raw
   return DEFAULT_TAB
 }
 
@@ -36,6 +43,9 @@ export function AdminSettingsPage() {
   const content = useMemo(() => {
     if (tab === 'work-zones') {
       return <WorkZonesSection embedded setHeaderAction={setHeaderActionStable} />
+    }
+    if (tab === 'payroll') {
+      return <PayrollRatesSection />
     }
     if (tab === 'organizations') {
       return <OrganizationsSection embedded setHeaderAction={setHeaderActionStable} />

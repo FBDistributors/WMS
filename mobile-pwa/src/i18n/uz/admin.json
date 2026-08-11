@@ -106,7 +106,8 @@
     "tabs": {
       "vip_customers": "VIP mijozlar",
       "work_zones": "Work zone",
-      "organizations": "Organizatsiya"
+      "organizations": "Organizatsiya",
+      "payroll": "Ish haqi"
     }
   },
   "settings": {
@@ -534,5 +535,19 @@
       "receiving": "Qabul",
       "general": "Umumiy"
     }
+  },
+  "payroll": {
+    "title": "Ish haqi tariflari",
+    "subtitle": "Bitta buyurtma uchun to'lov",
+    "role_picker": "Yig'uvchi",
+    "role_controller": "Kontrolyor",
+    "group_shahar": "Shahar",
+    "group_region": "Viloyat",
+    "currency": "so'm",
+    "saved": "Tariflar saqlandi",
+    "save_failed": "Saqlanmadi. Qayta urinib ko'ring.",
+    "load_failed": "Tariflar yuklanmadi.",
+    "invalid_amount": "Summa noto'g'ri.",
+    "note": "O'zgarish darrov kuchga kiradi va mobil ilovada ham ko'rinadi. Eski davrlar yangi tarif bo'yicha qayta hisoblanadi."
   }
 }

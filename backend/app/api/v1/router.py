@@ -26,6 +26,7 @@ from app.api.v1.endpoints import (
     smartup_returns,
     users,
     vip_customers,
+    payroll,
     settings_organizations,
     work_zones,
 )
@@ -60,6 +61,7 @@ router.include_router(
     prefix="/settings-organizations",
     tags=["settings-organizations"],
 )
+router.include_router(payroll.router, prefix="/payroll-rates", tags=["payroll"])
 router.include_router(scanner.router, prefix="/scanner", tags=["scanner"])
 router.include_router(smartup_returns.router, prefix="/smartup-returns", tags=["smartup-returns"])
 router.include_router(waves.router, prefix="/waves", tags=["waves"])

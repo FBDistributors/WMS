@@ -135,12 +135,8 @@ class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
                             onTap: () => context.push('/return-items/${pendingReturn.id}'),
                           ),
                         stats.when(
-                          data: (MyPickerStats s) => _StatsBlock(
-                            stats: s,
-                            loc: loc,
-                            isDark: isDark,
-                            isController: profile == PickerProfileParam.controller,
-                          ),
+                          data: (MyPickerStats s) =>
+                              _StatsBlock(stats: s, loc: loc, isDark: isDark),
                           loading: () => const Padding(
                             padding: EdgeInsets.symmetric(vertical: 24),
                             child: Center(child: CircularProgressIndicator()),
@@ -218,18 +214,18 @@ class _StatsBlock extends StatelessWidget {
     required this.stats,
     required this.loc,
     required this.isDark,
-    required this.isController,
   });
 
   final MyPickerStats stats;
   final AppLocale loc;
   final bool isDark;
-  final bool isController;
 
   @override
   Widget build(BuildContext context) {
+    if (stats.byDay.isEmpty) {
+      return const SizedBox.shrink();
+    }
     final Color accent = isDark ? const Color(0xFF93C5FD) : const Color(0xFF1A237E);
-    final int week = stats.byDay.fold<int>(0, (int a, MyPickerStatsDay d) => a + d.count);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -238,56 +234,20 @@ class _StatsBlock extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: <Widget>[
-              _statBox(
-                '${stats.completedToday}',
-                StringLookup.t(loc, isController ? 'statsCheckedToday' : 'statsCompletedToday'),
-                accent,
-                isDark,
-              ),
-              _statBox('$week', StringLookup.t(loc, 'statsThisWeek'), accent, isDark),
-              _statBox(
-                '${stats.totalCompleted}',
-                StringLookup.t(loc, isController ? 'statsCheckedTotal' : 'statsTotalCompleted'),
-                accent,
-                isDark,
-              ),
-            ],
-          ),
-          if (stats.byDay.isNotEmpty) ...<Widget>[
-            const SizedBox(height: 14),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                StringLookup.t(loc, 'statsWeekChartTitle'),
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white70 : Colors.black54,
-                ),
-              ),
+          Text(
+            StringLookup.t(loc, 'statsWeekChartTitle'),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white70 : Colors.black54,
             ),
-            const SizedBox(height: 8),
-            _WeekChart(days: stats.byDay, loc: loc, isDark: isDark, accent: accent),
-          ],
+          ),
+          const SizedBox(height: 8),
+          _WeekChart(days: stats.byDay, loc: loc, isDark: isDark, accent: accent),
         ],
       ),
-    );
-  }
-
-  Widget _statBox(String value, String label, Color accent, bool dark) {
-    return Column(
-      children: <Widget>[
-        Text(value, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: accent)),
-        Text(
-          label,
-          style: TextStyle(fontSize: 12, color: dark ? Colors.white70 : Colors.black54),
-          textAlign: TextAlign.center,
-        ),
-      ],
     );
   }
 }
@@ -384,6 +344,18 @@ class _PeriodTableState extends ConsumerState<_PeriodTable> {
     return p.length == 3 ? '${p[2]}.${p[1]}' : iso;
   }
 
+  static String _money(double v) {
+    final String digits = v.round().abs().toString();
+    final StringBuffer out = StringBuffer();
+    for (int i = 0; i < digits.length; i++) {
+      if (i > 0 && (digits.length - i) % 3 == 0) {
+        out.write(' ');
+      }
+      out.write(digits[i]);
+    }
+    return (v < 0 ? '-' : '') + out.toString();
+  }
+
   static String _dmy(String iso) {
     final List<String> p = iso.split('-');
     return p.length == 3 ? '${p[2]}.${p[1]}.${p[0]}' : iso;
@@ -457,9 +429,9 @@ class _PeriodTableState extends ConsumerState<_PeriodTable> {
           else ...<Widget>[
             _row(
               StringLookup.t(widget.loc, 'periodColDate'),
-              StringLookup.t(widget.loc, 'periodColOrders'),
-              StringLookup.t(widget.loc, 'periodColPositions'),
-              StringLookup.t(widget.loc, 'periodColQty'),
+              StringLookup.t(widget.loc, 'periodColCity'),
+              StringLookup.t(widget.loc, 'periodColRegion'),
+              StringLookup.t(widget.loc, 'periodColAmount'),
               isHeader: true,
               color: faded,
             ),
@@ -467,20 +439,28 @@ class _PeriodTableState extends ConsumerState<_PeriodTable> {
             ...data.days.map(
               (MyPeriodStatsDay d) => _row(
                 _dm(d.date),
-                '${d.orders}',
-                '${d.positions}',
-                d.qty.round().toString(),
+                '${d.shahar.orders}',
+                '${d.region.orders}',
+                _money(d.amount),
                 color: isDark ? Colors.white : Colors.black87,
               ),
             ),
             Divider(height: 14, color: isDark ? Colors.white24 : Colors.black26),
             _row(
               StringLookup.t(widget.loc, 'periodTotal'),
-              '${data.totalOrders}',
-              '${data.totalPositions}',
-              data.totalQty.round().toString(),
+              '${data.totalShahar.orders}',
+              '${data.totalRegion.orders}',
+              _money(data.totalAmount),
               isTotal: true,
               color: accent,
+            ),
+            const SizedBox(height: 8),
+            // Tarif serverdan keladi — o'zgarsa ilovani yangilash shart emas.
+            Text(
+              '${StringLookup.t(widget.loc, 'periodColCity')}: ${_money(data.rateShahar)} · '
+              '${StringLookup.t(widget.loc, 'periodColRegion')}: ${_money(data.rateRegion)}',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 11, color: faded),
             ),
           ],
         ],
