@@ -79,9 +79,10 @@ def test_period_splits_by_group_and_prices_the_work(
         app.dependency_overrides.pop(get_current_user, None)
 
 
-def test_changing_the_rate_changes_what_staff_see(
+def test_a_rate_change_leaves_past_periods_alone(
     client: TestClient, db_session: Session
 ) -> None:
+    """Yangi tarif joriy davrdan boshlanadi: to'langan oy o'z tarifida qoladi."""
     order, picker = _seed_allocatable_order(db_session)
     _send_and_pick(client, db_session, order, picker)
     admin = _mk_user(db_session, username=f"adm-rc-{uuid.uuid4().hex[:8]}", role="warehouse_admin")
@@ -89,25 +90,33 @@ def test_changing_the_rate_changes_what_staff_see(
     app.dependency_overrides[get_current_user] = lambda: picker
     try:
         before = client.get("/api/v1/picking/my-period-stats").json()
+        prev_before = client.get(
+            "/api/v1/picking/my-period-stats", params={"offset": -1}
+        ).json()
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 
     app.dependency_overrides[get_current_user] = lambda: admin
     try:
-        assert (
-            client.put(
-                "/api/v1/payroll-rates",
-                json={"rates": [{"role": "picker", "source_group": "shahar", "amount": 1000}]},
-            ).status_code
-            == 200
+        res = client.put(
+            "/api/v1/payroll-rates",
+            json={"rates": [{"role": "picker", "source_group": "shahar", "amount": 1000}]},
         )
+        assert res.status_code == 200, res.text
+        assert res.json()["effective_from"] == before["period_from"]
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 
     app.dependency_overrides[get_current_user] = lambda: picker
     try:
         after = client.get("/api/v1/picking/my-period-stats").json()
+        prev_after = client.get("/api/v1/picking/my-period-stats", params={"offset": -1}).json()
+
+        # Joriy davr yangi tarifda.
         assert after["rate_shahar"] == 1000
         assert after["totals"]["amount"] > before["totals"]["amount"]
+
+        # Oldingi davr tegilmagan — eski tarif o'z joyida.
+        assert prev_after["rate_shahar"] == prev_before["rate_shahar"] == 463
     finally:
         app.dependency_overrides.pop(get_current_user, None)

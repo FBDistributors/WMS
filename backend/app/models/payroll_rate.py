@@ -2,13 +2,16 @@
 
 Tarif kodda emas, bazada — admin uni o'zi o'zgartiradi va o'zgarish hamma
 qurilmada darrov ko'rinadi (ilovani qayta chiqarish shart emas).
+
+Har o'zgarish **yangi qator** bo'lib yoziladi (`effective_from`), eskisi joyida
+qoladi: to'langan oy keyingi tarif bilan qayta hisoblanib ketmasligi kerak.
 """
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, UniqueConstraint, func
+from sqlalchemy import Date, DateTime, ForeignKey, Numeric, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -28,6 +31,8 @@ class PayrollRate(Base):
     source_group: Mapped[str] = mapped_column(String(16), nullable=False)
     #: Bitta buyurtma uchun so'mda.
     amount: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
+    #: Shu sanadan boshlangan davrlarga qo'llanadi (davr boshi bilan solishtiriladi).
+    effective_from: Mapped[date] = mapped_column(Date, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
@@ -36,5 +41,7 @@ class PayrollRate(Base):
     )
 
     __table_args__ = (
-        UniqueConstraint("role", "source_group", name="uq_payroll_rates_role_group"),
+        UniqueConstraint(
+            "role", "source_group", "effective_from", name="uq_payroll_rates_role_group_from"
+        ),
     )

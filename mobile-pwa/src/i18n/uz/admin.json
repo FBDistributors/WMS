@@ -548,6 +548,6 @@
     "save_failed": "Saqlanmadi. Qayta urinib ko'ring.",
     "load_failed": "Tariflar yuklanmadi.",
     "invalid_amount": "Summa noto'g'ri.",
-    "note": "O'zgarish darrov kuchga kiradi va mobil ilovada ham ko'rinadi. Eski davrlar yangi tarif bo'yicha qayta hisoblanadi."
+    "note": "Yangi tarif {{date}} dan boshlangan davrga qo'llanadi. O'tgan davrlar o'z tarifida qoladi — to'langan oy qayta hisoblanmaydi."
   }
 }

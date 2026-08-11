@@ -2025,7 +2025,8 @@ async def get_my_period_stats(
             DocumentModel.updated_at,
         )
 
-    rates = load_rates(db, payroll_role_for(user.role))
+    # Tarif davr boshiga qarab: to'langan oy keyingi tarifda qayta hisoblanmasin.
+    rates = load_rates(db, payroll_role_for(user.role), period_from)
 
     line_agg = (
         db.query(

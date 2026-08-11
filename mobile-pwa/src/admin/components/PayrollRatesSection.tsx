@@ -19,16 +19,18 @@ export function PayrollRatesSection() {
   const [values, setValues] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [effectiveFrom, setEffectiveFrom] = useState('')
 
   const keyOf = (role: string, group: string) => `${role}:${group}`
 
   const load = useCallback(async () => {
     setIsLoading(true)
     try {
-      const rates = await getPayrollRates()
+      const data = await getPayrollRates()
       const next: Record<string, string> = {}
-      for (const r of rates) next[keyOf(r.role, r.source_group)] = String(Math.round(r.amount))
+      for (const r of data.rates) next[keyOf(r.role, r.source_group)] = String(Math.round(r.amount))
       setValues(next)
+      setEffectiveFrom(data.effective_from)
     } catch {
       showError(t('admin:payroll.load_failed'))
     } finally {
@@ -55,7 +57,8 @@ export function PayrollRatesSection() {
     }
     setIsSaving(true)
     try {
-      await savePayrollRates(payload)
+      const data = await savePayrollRates(payload)
+      setEffectiveFrom(data.effective_from)
       showSuccess(t('admin:payroll.saved'))
     } catch {
       showError(t('admin:payroll.save_failed'))
@@ -114,7 +117,7 @@ export function PayrollRatesSection() {
 
           <div className="flex items-center justify-between gap-3 pt-1">
             <p className="text-[11.5px] leading-relaxed text-slate-400 dark:text-slate-500">
-              {t('admin:payroll.note')}
+              {t('admin:payroll.note', { date: effectiveFrom })}
             </p>
             <Button onClick={handleSave} disabled={isSaving}>
               {isSaving ? t('common:messages.loading') : t('common:buttons.save')}

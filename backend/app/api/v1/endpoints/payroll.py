@@ -5,6 +5,7 @@ emas, va hamma xodim ayni bir raqamni ko'radi.
 """
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 from typing import List
 
@@ -15,8 +16,10 @@ from sqlalchemy.orm import Session
 from app.auth.deps import require_any_permission, require_permission
 from app.db import get_db
 from app.models.payroll_rate import PAYROLL_GROUPS, PAYROLL_ROLES, PayrollRate
+from app.api.v1.endpoints.picking import _payroll_period_bounds
+from app.core.business_time import BUSINESS_TZ
 from app.services.audit_service import ACTION_UPDATE, log_action
-from app.services.payroll_rates import DEFAULT_RATES
+from app.services.payroll_rates import DEFAULT_RATES, load_rates
 
 router = APIRouter()
 
@@ -29,6 +32,8 @@ class PayrollRateOut(BaseModel):
 
 class PayrollRatesResponse(BaseModel):
     rates: List[PayrollRateOut]
+    #: Tahrir shu davrdan boshlab kuchga kiradi (oldingi davrlar tegilmaydi).
+    effective_from: str
 
 
 class PayrollRateUpdate(BaseModel):
@@ -47,13 +52,15 @@ async def list_payroll_rates(
     db: Session = Depends(get_db),
     _user=Depends(require_any_permission(["reports:read", "audit:read", "admin:access"])),
 ):
-    stored = {(r.role, r.source_group): Decimal(str(r.amount)) for r in db.query(PayrollRate).all()}
+    """Joriy davrda amal qilayotgan tariflar."""
+    period_from, _ = _payroll_period_bounds(datetime.now(BUSINESS_TZ).date())
     out: List[PayrollRateOut] = []
     for role in PAYROLL_ROLES:
+        current = load_rates(db, role, period_from)
         for group in PAYROLL_GROUPS:
-            amount = stored.get((role, group), DEFAULT_RATES.get((role, group), Decimal("0")))
+            amount = current.get(group, DEFAULT_RATES.get((role, group), Decimal("0")))
             out.append(PayrollRateOut(role=role, source_group=group, amount=float(amount)))
-    return PayrollRatesResponse(rates=out)
+    return PayrollRatesResponse(rates=out, effective_from=period_from.isoformat())
 
 
 @router.put("", response_model=PayrollRatesResponse, summary="Tariflarni saqlash")
@@ -69,15 +76,27 @@ async def update_payroll_rates(
         if item.source_group not in PAYROLL_GROUPS:
             raise HTTPException(status_code=400, detail=f"Unknown group: {item.source_group}")
 
+    # Yangi tarif joriy davr boshidan kuchga kiradi: o'tgan davrlar o'z qatorida
+    # qoladi, ya'ni to'langan oy qayta hisoblanmaydi.
+    period_from, _ = _payroll_period_bounds(datetime.now(BUSINESS_TZ).date())
     for item in payload.rates:
         row = (
             db.query(PayrollRate)
-            .filter(PayrollRate.role == item.role, PayrollRate.source_group == item.source_group)
+            .filter(
+                PayrollRate.role == item.role,
+                PayrollRate.source_group == item.source_group,
+                PayrollRate.effective_from == period_from,
+            )
             .one_or_none()
         )
-        old = float(row.amount) if row else None
+        old = float(load_rates(db, item.role, period_from).get(item.source_group, 0))
         if row is None:
-            row = PayrollRate(role=item.role, source_group=item.source_group, amount=item.amount)
+            row = PayrollRate(
+                role=item.role,
+                source_group=item.source_group,
+                amount=item.amount,
+                effective_from=period_from,
+            )
             db.add(row)
         else:
             row.amount = item.amount
@@ -90,7 +109,7 @@ async def update_payroll_rates(
             entity_type="payroll_rate",
             entity_id=f"{item.role}:{item.source_group}",
             old_data={"amount": old},
-            new_data={"amount": float(item.amount)},
+            new_data={"amount": float(item.amount), "effective_from": period_from.isoformat()},
         )
     db.commit()
     return await list_payroll_rates(db=db, _user=user)

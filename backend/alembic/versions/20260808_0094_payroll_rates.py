@@ -1,7 +1,8 @@
 """payroll_rates: bitta buyurtma uchun to'lov (rol + manba guruhi).
 
-Boshlang'ich qiymatlar amaldagi tariflardan olindi; keyin admin panelidan
-o'zgartiriladi.
+Boshlang'ich qiymatlar amaldagi tariflardan olindi va uzoq o'tmish sanasi bilan
+yoziladi — eski davrlar ham tarifsiz qolmasin. Keyingi o'zgarishlar yangi qator
+bo'lib qo'shiladi, ya'ni to'langan oy o'z tarifida qoladi.
 
 Revision ID: 20260808_0094
 Revises: 20260728_0093
@@ -24,6 +25,7 @@ def upgrade() -> None:
         sa.Column("role", sa.String(length=32), nullable=False),
         sa.Column("source_group", sa.String(length=16), nullable=False),
         sa.Column("amount", sa.Numeric(14, 2), nullable=False),
+        sa.Column("effective_from", sa.Date(), nullable=False),
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),
@@ -36,16 +38,18 @@ def upgrade() -> None:
             sa.ForeignKey("users.id", ondelete="SET NULL"),
             nullable=True,
         ),
-        sa.UniqueConstraint("role", "source_group", name="uq_payroll_rates_role_group"),
+        sa.UniqueConstraint(
+            "role", "source_group", "effective_from", name="uq_payroll_rates_role_group_from"
+        ),
     )
     op.execute(
         """
-        INSERT INTO payroll_rates (id, role, source_group, amount)
+        INSERT INTO payroll_rates (id, role, source_group, amount, effective_from)
         VALUES
-            (gen_random_uuid(), 'picker', 'shahar', 463),
-            (gen_random_uuid(), 'picker', 'region', 1389),
-            (gen_random_uuid(), 'controller', 'shahar', 278),
-            (gen_random_uuid(), 'controller', 'region', 834)
+            (gen_random_uuid(), 'picker', 'shahar', 463, DATE '2020-01-01'),
+            (gen_random_uuid(), 'picker', 'region', 1389, DATE '2020-01-01'),
+            (gen_random_uuid(), 'controller', 'shahar', 278, DATE '2020-01-01'),
+            (gen_random_uuid(), 'controller', 'region', 834, DATE '2020-01-01')
         """
     )
 

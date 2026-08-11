@@ -7,15 +7,19 @@ export type PayrollRate = {
   amount: number
 }
 
-export async function getPayrollRates(): Promise<PayrollRate[]> {
-  const data = await fetchJSON<{ rates: PayrollRate[] }>('/api/v1/payroll-rates')
-  return data.rates
+export type PayrollRatesResponse = {
+  rates: PayrollRate[]
+  /** Tahrir shu davrdan boshlab kuchga kiradi; oldingi davrlar tegilmaydi. */
+  effective_from: string
 }
 
-export async function savePayrollRates(rates: PayrollRate[]): Promise<PayrollRate[]> {
-  const data = await fetchJSON<{ rates: PayrollRate[] }>('/api/v1/payroll-rates', {
+export async function getPayrollRates(): Promise<PayrollRatesResponse> {
+  return fetchJSON<PayrollRatesResponse>('/api/v1/payroll-rates')
+}
+
+export async function savePayrollRates(rates: PayrollRate[]): Promise<PayrollRatesResponse> {
+  return fetchJSON<PayrollRatesResponse>('/api/v1/payroll-rates', {
     method: 'PUT',
     body: { rates },
   })
-  return data.rates
 }

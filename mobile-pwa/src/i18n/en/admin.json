@@ -548,6 +548,6 @@
     "save_failed": "Not saved. Try again.",
     "load_failed": "Failed to load rates.",
     "invalid_amount": "Invalid amount.",
-    "note": "Takes effect immediately and shows in the mobile app. Past periods are recalculated at the new rate."
+    "note": "The new rate applies to the period starting {{date}}. Past periods keep their own rate — a paid month is not recalculated."
   }
 }
