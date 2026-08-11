@@ -107,7 +107,7 @@
       "vip_customers": "VIP customers",
       "work_zones": "Work zone",
       "organizations": "Organization",
-      "payroll": "Payroll"
+      "payroll": "Points"
     }
   },
   "settings": {
@@ -537,17 +537,17 @@
     }
   },
   "payroll": {
-    "title": "Payroll rates",
-    "subtitle": "Pay per order",
+    "title": "Point rates",
+    "subtitle": "Points per order",
     "role_picker": "Picker",
     "role_controller": "Controller",
     "group_shahar": "City",
     "group_region": "Region",
-    "currency": "UZS",
+    "currency": "points",
     "saved": "Rates saved",
     "save_failed": "Not saved. Try again.",
     "load_failed": "Failed to load rates.",
     "invalid_amount": "Invalid amount.",
-    "note": "The new rate applies to the period starting {{date}}. Past periods keep their own rate — a paid month is not recalculated."
+    "note": "The new rate applies to the period starting {{date}}. Past periods keep their own rate — a calculated month is not recalculated."
   }
 }

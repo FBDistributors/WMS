@@ -107,7 +107,7 @@
       "vip_customers": "VIP mijozlar",
       "work_zones": "Work zone",
       "organizations": "Organizatsiya",
-      "payroll": "Ish haqi"
+      "payroll": "Ball"
     }
   },
   "settings": {
@@ -537,17 +537,17 @@
     }
   },
   "payroll": {
-    "title": "Ish haqi tariflari",
-    "subtitle": "Bitta buyurtma uchun to'lov",
+    "title": "Ball tariflari",
+    "subtitle": "Bitta buyurtma uchun ball",
     "role_picker": "Yig'uvchi",
     "role_controller": "Kontrolyor",
     "group_shahar": "Shahar",
     "group_region": "Viloyat",
-    "currency": "so'm",
+    "currency": "ball",
     "saved": "Tariflar saqlandi",
     "save_failed": "Saqlanmadi. Qayta urinib ko'ring.",
     "load_failed": "Tariflar yuklanmadi.",
     "invalid_amount": "Summa noto'g'ri.",
-    "note": "Yangi tarif {{date}} dan boshlangan davrga qo'llanadi. O'tgan davrlar o'z tarifida qoladi — to'langan oy qayta hisoblanmaydi."
+    "note": "Yangi tarif {{date}} dan boshlangan davrga qo'llanadi. O'tgan davrlar o'z tarifida qoladi — hisoblangan oy qayta hisoblanmaydi."
   }
 }
