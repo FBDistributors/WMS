@@ -18,7 +18,8 @@
     "full_name": "Ism",
     "role": "Rol",
     "status": "Holat",
-    "actions": "Amallar"
+    "actions": "Amallar",
+    "person_code": "Xodim kodi"
   },
   "form": {
     "create_title": "Foydalanuvchi yaratish",
@@ -38,7 +39,10 @@
     "save": "Saqlash",
     "create": "Yaratish",
     "cancel": "Bekor qilish",
-    "back": "Orqaga"
+    "back": "Orqaga",
+    "person_code": "Xodim kodi (shaxs)",
+    "person_code_placeholder": "masalan X-012",
+    "person_code_hint": "Bitta odamning barcha profillari bir xil kod oladi. Yig'uvchi o'z hujjatini o'zi tekshira olmasligi shu kodga tayanadi."
   },
   "roles": {
     "all": "Barcha rollar",

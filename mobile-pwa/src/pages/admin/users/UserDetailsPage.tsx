@@ -45,6 +45,7 @@ export function UserDetailsPage() {
   const [validationError, setValidationError] = useState<string | null>(null)
   const [username, setUsername] = useState('')
   const [fullName, setFullName] = useState('')
+  const [personCode, setPersonCode] = useState('')
   const [role, setRole] = useState<UserRole>('picker')
   const [isActive, setIsActive] = useState(true)
   const [grantedPermissions, setGrantedPermissions] = useState<string[]>([])
@@ -62,6 +63,7 @@ export function UserDetailsPage() {
       setUser(data)
       setUsername(data.username)
       setFullName(data.full_name ?? '')
+      setPersonCode(data.person_code ?? '')
       setRole(data.role)
       setIsActive(data.is_active)
       setGrantedPermissions(data.granted_permissions ?? [])
@@ -96,6 +98,7 @@ export function UserDetailsPage() {
         username: trimmedUsername,
         full_name: fullName.trim() || null,
         role,
+        person_code: personCode.trim() || null,
         is_active: isActive,
         granted_permissions: grantedPermissions,
       })
@@ -188,6 +191,19 @@ export function UserDetailsPage() {
               value={fullName}
               onChange={(event) => setFullName(event.target.value)}
             />
+          </div>
+          <div>
+            <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              {t('users:form.person_code')}
+            </label>
+            <input
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              value={personCode}
+              onChange={(event) => setPersonCode(event.target.value)}
+              maxLength={64}
+              placeholder={t('users:form.person_code_placeholder')}
+            />
+            <p className="mt-1 text-xs text-slate-500">{t('users:form.person_code_hint')}</p>
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">

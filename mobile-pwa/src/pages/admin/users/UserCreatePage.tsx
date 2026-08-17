@@ -45,6 +45,7 @@ export function UserCreatePage() {
   const { t } = useTranslation(['users', 'common'])
   const [username, setUsername] = useState('')
   const [fullName, setFullName] = useState('')
+  const [personCode, setPersonCode] = useState('')
   const [role, setRole] = useState<UserRole>('picker')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -74,6 +75,7 @@ export function UserCreatePage() {
         full_name: fullName.trim() || null,
         password,
         role,
+        person_code: personCode.trim() || null,
         is_active: isActive,
       })
       navigate(`/admin/users/${created.id}`, { replace: true })
@@ -122,6 +124,19 @@ export function UserCreatePage() {
               value={fullName}
               onChange={(event) => setFullName(event.target.value)}
             />
+          </div>
+          <div>
+            <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              {t('users:form.person_code')}
+            </label>
+            <input
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              value={personCode}
+              onChange={(event) => setPersonCode(event.target.value)}
+              maxLength={64}
+              placeholder={t('users:form.person_code_placeholder')}
+            />
+            <p className="mt-1 text-xs text-slate-500">{t('users:form.person_code_hint')}</p>
           </div>
           <div>
             <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">

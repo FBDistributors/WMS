@@ -76,6 +76,7 @@ from app.constants.order_wms_status import (
 )
 from app.services.order_reserve_release import release_document_reserve_on_cancel
 from app.services.order_transition_policy import get_transition_rule
+from app.services.person_identity import same_person
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -194,6 +195,14 @@ class SendToPickingRequest(BaseModel):
 
 class ReassignControllerRequest(BaseModel):
     controller_user_id: UUID
+    allow_self_check: bool = Field(
+        False,
+        description=(
+            "To'rt ko'z istisnosiga ochiq rozilik: controller hujjatni yig'gan "
+            "xodimning o'zi (yoki person_code bilan bog'langan profili) bo'lsa ham "
+            "biriktirilsin. Faqat admin, audit yoziladi."
+        ),
+    )
 
 
 class ReassignControllerResponse(BaseModel):
@@ -2436,6 +2445,24 @@ async def reassign_order_controller(
     if not new_controller:
         raise HTTPException(status_code=400, detail="Invalid controller selection")
 
+    # To'rt ko'z: o'zi yig'gan hujjatga o'zini (bog'langan profilini) biriktirish
+    # faqat ochiq admin override bilan — smenada boshqa controller yo'q holat uchun.
+    self_check = bool(
+        document.assigned_to_user_id
+        and same_person(db, payload.controller_user_id, document.assigned_to_user_id)
+    )
+    if self_check and not payload.allow_self_check:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "self_check_forbidden",
+                "message": (
+                    "Bu controller hujjatni yig'gan xodimning o'zi — biriktirish "
+                    "uchun ochiq tasdiq (allow_self_check) kerak"
+                ),
+            },
+        )
+
     old_id = document.controlled_by_user_id
     if old_id == payload.controller_user_id:
         db.commit()
@@ -2459,6 +2486,14 @@ async def reassign_order_controller(
             "controlled_by_user_id": str(payload.controller_user_id),
             "document_id": str(document.id),
             "action": "reassign_controller",
+            **(
+                {
+                    "self_check_admin_override": True,
+                    "picker_user_id": str(document.assigned_to_user_id),
+                }
+                if self_check
+                else {}
+            ),
         },
         ip_address=get_client_ip(request),
     )

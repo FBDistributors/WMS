@@ -136,6 +136,9 @@ export function UsersPage() {
                   {t('users:columns.full_name')}
                 </th>
                 <th className="px-4 py-3 text-left font-medium">
+                  {t('users:columns.person_code')}
+                </th>
+                <th className="px-4 py-3 text-left font-medium">
                   {t('users:columns.role')}
                 </th>
                 <th className="px-4 py-3 text-left font-medium">
@@ -160,6 +163,9 @@ export function UsersPage() {
                   </td>
                   <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
                     {user.full_name || '—'}
+                  </td>
+                  <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
+                    {user.person_code || '—'}
                   </td>
                   <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
                     {t(`users:roles.${user.role}`)}

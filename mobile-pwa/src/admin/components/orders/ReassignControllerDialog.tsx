@@ -40,6 +40,18 @@ function formatApiError(err: unknown, t: (key: string) => string): string {
   return err instanceof Error ? err.message : 'Error'
 }
 
+function isSelfCheckForbidden(err: unknown): boolean {
+  if (!err || typeof err !== 'object' || !('details' in err)) return false
+  const d = (err as ApiError).details
+  if (!d || typeof d !== 'object' || !('detail' in d)) return false
+  const detail = (d as { detail?: unknown }).detail
+  return (
+    !!detail &&
+    typeof detail === 'object' &&
+    (detail as { code?: string }).code === 'self_check_forbidden'
+  )
+}
+
 function normalizeReassignErrorMessage(
   msg: string,
   t: (key: string, options?: Record<string, unknown>) => string
@@ -77,11 +89,14 @@ export function ReassignControllerDialog({
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [validationError, setValidationError] = useState<string | null>(null)
+  // To'rt ko'z: tanlangan controller hujjatni yig'gan xodimning o'zi — override taklifi.
+  const [selfCheckPrompt, setSelfCheckPrompt] = useState(false)
 
   useEffect(() => {
     if (!open) return
     setValidationError(null)
     setSelected('')
+    setSelfCheckPrompt(false)
     setIsLoading(true)
     void (async () => {
       try {
@@ -98,7 +113,7 @@ export function ReassignControllerDialog({
   if (!open) return null
   if (orderIds.length === 0) return null
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (allowSelfCheck = false) => {
     if (!selected) {
       setValidationError(t('orders:controller_modal.controller_placeholder'))
       return
@@ -121,10 +136,15 @@ export function ReassignControllerDialog({
     setIsSubmitting(true)
     setValidationError(null)
     try {
-      await reassignOrderController(validIds[0], selectedStr)
+      await reassignOrderController(validIds[0], selectedStr, allowSelfCheck)
       onReassigned()
       onOpenChange(false)
     } catch (err) {
+      if (isSelfCheckForbidden(err)) {
+        // Blokni xato deb emas, ochiq override taklifi sifatida ko'rsatamiz.
+        setSelfCheckPrompt(true)
+        return
+      }
       const msg = formatApiError(err, t) || t('orders:reassign_controller.failed')
       showError(normalizeReassignErrorMessage(msg, t))
     } finally {
@@ -160,7 +180,10 @@ export function ReassignControllerDialog({
             <select
               className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
               value={selected}
-              onChange={(event) => setSelected(event.target.value)}
+              onChange={(event) => {
+                setSelected(event.target.value)
+                setSelfCheckPrompt(false)
+              }}
               disabled={isLoading}
             >
               <option value="">
@@ -180,11 +203,26 @@ export function ReassignControllerDialog({
               </p>
             ) : null}
           </label>
+          {selfCheckPrompt ? (
+            <div className="space-y-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-900/30">
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                {t('orders:reassign_controller.self_check_warning')}
+              </p>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => void handleSubmit(true)}
+                disabled={isSubmitting}
+              >
+                {t('orders:reassign_controller.self_check_override_submit')}
+              </Button>
+            </div>
+          ) : null}
           <div className="flex items-center justify-end gap-2">
             <Button variant="ghost" onClick={() => onOpenChange(false)}>
               {t('common:buttons.cancel')}
             </Button>
-            <Button onClick={handleSubmit} disabled={isSubmitting}>
+            <Button onClick={() => void handleSubmit()} disabled={isSubmitting}>
               {isSubmitting ? t('orders:reassign_controller.submitting') : t('orders:reassign_controller.submit')}
             </Button>
           </div>

@@ -91,7 +91,9 @@
     "error_terminal_doc": "Tekshiruv yakunlangan yoki hujjat boshqa holatda.",
     "no_controllers_hint": "Controller yo'q. Admin > Foydalanuvchilar orqali Controller rolida foydalanuvchi yarating.",
     "assign_button": "Kontrolyor biriktirish",
-    "error_not_in_queue": "Buyurtma hali tekshiruv navbatiga tushmagan."
+    "error_not_in_queue": "Buyurtma hali tekshiruv navbatiga tushmagan.",
+    "self_check_warning": "Diqqat: bu controller hujjatni yig'gan xodimning o'zi. To'rt ko'z qoidasi buni taqiqlaydi. Boshqa controller yo'q bo'lsa, quyidagi tugma bilan ochiq tasdiqlab biriktirishingiz mumkin (audit yoziladi).",
+    "self_check_override_submit": "Baribir biriktirish (admin tasdig'i bilan)"
   },
   "controller_queue": {
     "badge": "Navbatda"

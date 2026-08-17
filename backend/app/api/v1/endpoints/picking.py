@@ -50,6 +50,7 @@ from app.services.order_source_group import (
     source_group_conditions,
 )
 from app.services.organization_labels import resolve_org_display
+from app.services.person_identity import linked_user_ids, same_person
 from app.services.stock_availability import require_sufficient_reserved
 from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_ip, log_action
 from app.services.box_location_service import (
@@ -167,6 +168,9 @@ class PickingListItem(BaseModel):
     lines_total: int
     lines_done: int
     picked_any: bool = False
+    # To'rt ko'z: joriy foydalanuvchi (yoki person_code bilan bog'langan profili)
+    # yig'gan hujjat — controller UI kulrang qilib, claim ni o'chiradi.
+    is_own_pick: bool = False
     controlled_by_user_id: Optional[UUID] = None
     controlled_by_user_name: Optional[str] = None
     assigned_to_user_id: Optional[UUID] = None
@@ -362,15 +366,33 @@ def _assert_controller_can_read(document: DocumentModel, user) -> None:
     raise HTTPException(status_code=404, detail="Document not found")
 
 
-def _claim_for_controller(document: DocumentModel, user) -> bool:
+def _claim_for_controller(db: Session, document: DocumentModel, user) -> bool:
     """Controller hujjatni band qiladi (idempotent). True — shu chaqiruvda band qilindi.
 
     Navbatdagi hujjatni birinchi ochgan/skanlagan controller egalik qiladi, boshqasiga 409.
     Chaqiruvchi hujjatni `with_for_update()` bilan olgan bo'lishi kerak — shunda ikki
     controller bir vaqtda bosganda ham faqat bittasi yutadi.
+
+    To'rt ko'z qoidasi: o'zi yig'gan hujjatni (shu jumladan person_code bilan
+    bog'langan boshqa profili yig'ganini) o'zi band qila olmaydi. Yagona istisno —
+    admin reassign-controller dagi ochiq override; bu yerda istisno YO'Q.
     """
     if document.controlled_by_user_id == user.id:
         return False
+    if document.assigned_to_user_id and same_person(db, user.id, document.assigned_to_user_id):
+        logger.warning(
+            "self_check_blocked: user=%s document=%s picker=%s",
+            user.id,
+            document.id,
+            document.assigned_to_user_id,
+        )
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "self_check_forbidden",
+                "message": "O'zingiz yig'gan hujjatni o'zingiz tekshira olmaysiz",
+            },
+        )
     if document.controlled_by_user_id is not None:
         raise HTTPException(
             status_code=409,
@@ -1268,7 +1290,11 @@ async def list_picking_documents(
     try:
         docs = query.order_by(*order_by).offset(offset).limit(limit).all()
         org_names = _load_org_names(db)
-        return [_to_picking_list_item(doc, org_names) for doc in docs]
+        items = [_to_picking_list_item(doc, org_names) for doc in docs]
+        own_ids = linked_user_ids(db, user.id, getattr(user, "person_code", None))
+        for item in items:
+            item.is_own_pick = item.assigned_to_user_id in own_ids
+        return items
     except Exception as e:
         logger.exception("list_picking_documents error")
         raise HTTPException(status_code=500, detail="Internal error") from e
@@ -2263,7 +2289,7 @@ async def claim_document_for_controller(
         raise HTTPException(status_code=404, detail="Document not found")
     if document.status != "picked":
         raise HTTPException(status_code=409, detail="Document must be in picked status")
-    claimed = _claim_for_controller(document, user)
+    claimed = _claim_for_controller(db, document, user)
     if claimed:
         log_action(
             db,
@@ -2353,7 +2379,7 @@ async def mark_controller_verification_started(
         raise HTTPException(status_code=404, detail="Document not found")
     if document.status != "picked":
         raise HTTPException(status_code=409, detail="Document must be in picked status")
-    _claim_for_controller(document, user)
+    _claim_for_controller(db, document, user)
     if document.controller_verification_started_at is None:
         document.controller_verification_started_at = datetime.now(timezone.utc)
     db.commit()
@@ -2880,7 +2906,7 @@ def _assert_pick_line_access(
     if not claim or document.sent_to_controller_at is None:
         raise HTTPException(status_code=403, detail="Forbidden")
     _lock_document_row(db, document.id)
-    _claim_for_controller(document, user)
+    _claim_for_controller(db, document, user)
 
 
 @router.post(
@@ -3183,7 +3209,7 @@ async def controller_flag_line(
         raise HTTPException(status_code=409, detail="Document must be in picked status")
     if document.controlled_by_user_id != user.id:
         _lock_document_row(db, document.id)
-        _claim_for_controller(document, user)
+        _claim_for_controller(db, document, user)
     if _line_is_vip_expiry_informational(line):
         raise HTTPException(
             status_code=409,
@@ -3350,7 +3376,7 @@ async def complete_picking_document(
     if user.role == "inventory_controller":
         if document.status == "picked":
             # Navbatdagi hujjatni yakunlash — shu yerda band qilinadi (eski ilovalar uchun).
-            _claim_for_controller(document, user)
+            _claim_for_controller(db, document, user)
         elif document.controlled_by_user_id != user.id:
             raise HTTPException(status_code=403, detail="Document not assigned to you")
         if document.status == "completed":

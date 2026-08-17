@@ -354,12 +354,17 @@ export async function reassignOrderPicker(orderId: string, assignedToUserId: str
   )
 }
 
-export async function reassignOrderController(orderId: string, controllerUserId: string) {
+export async function reassignOrderController(
+  orderId: string,
+  controllerUserId: string,
+  allowSelfCheck = false,
+) {
   return fetchJSON<{ document_id: string; controlled_by: string }>(
     `/api/v1/orders/${orderId}/reassign-controller`,
     {
       method: 'POST',
-      body: { controller_user_id: controllerUserId },
+      // allow_self_check — to'rt ko'z istisnosiga ochiq admin roziligi (audit yoziladi).
+      body: { controller_user_id: controllerUserId, allow_self_check: allowSelfCheck },
     }
   )
 }

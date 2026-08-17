@@ -303,6 +303,14 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
   /// Navbatdagi hujjatni band qilib ochadi; boshqasi ulgurgan bo'lsa ro'yxat yangilanadi.
   Future<void> _openQueueDocument(PickingListItem item) async {
     final AppLocale loc = ref.read(appLocaleProvider);
+    // To'rt ko'z: o'zi yig'gan hujjat — band qilishga urinmaymiz (backend baribir 409 beradi).
+    if (item.isOwnPick) {
+      showAppSnackBar(
+        context,
+        SnackBar(content: Text(StringLookup.t(loc, 'selfCheckForbidden'))),
+      );
+      return;
+    }
     final bool online = ref.read(networkOnlineProvider).valueOrNull ?? true;
     if (!online) {
       showAppSnackBar(
@@ -314,6 +322,16 @@ class _PickTaskListScreenState extends ConsumerState<PickTaskListScreen> {
     setState(() => _claiming = true);
     try {
       await ref.read(pickingRepositoryProvider).claimDocument(item.id);
+    } on PickingSelfCheckForbidden {
+      // Ro'yxat eskirgan bo'lishi mumkin (masalan admin endi bog'lagan) — yangilaymiz.
+      unawaited(ref.read(openPickTasksProvider.notifier).refreshFromNetwork());
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          SnackBar(content: Text(StringLookup.t(loc, 'selfCheckForbidden'))),
+        );
+      }
+      return;
     } on PickingClaimConflict {
       unawaited(ref.read(openPickTasksProvider.notifier).refreshFromNetwork());
       if (mounted) {
@@ -1384,6 +1402,24 @@ class _TaskCard extends StatelessWidget {
                           ),
                         ),
                       ),
+                      // To'rt ko'z: o'zi yig'gan hujjat — band qilib bo'lmaydi.
+                      if (profile == PickerProfileParam.controller && item.isOwnPick)
+                        Container(
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: cs.errorContainer.withValues(alpha: 0.9),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            StringLookup.t(loc, 'ownPickBadge'),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: cs.onErrorContainer,
+                            ),
+                          ),
+                        ),
                       // "Menda" bo'limida ikki guruh aralashadi — manba ko'rinib tursin.
                       if (profile == PickerProfileParam.controller)
                         Container(

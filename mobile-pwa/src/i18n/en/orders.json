@@ -91,7 +91,9 @@
     "error_terminal_doc": "Verification is finished or the document is in another state.",
     "no_controllers_hint": "No controllers found. Create a user with the Controller role in Admin > Users.",
     "assign_button": "Assign controller",
-    "error_not_in_queue": "The order is not in the verification queue yet."
+    "error_not_in_queue": "The order is not in the verification queue yet.",
+    "self_check_warning": "Warning: this controller is the same employee who picked the order. The four-eyes rule forbids this. If no other controller is available, you can assign with explicit confirmation (audited).",
+    "self_check_override_submit": "Assign anyway (admin override)"
   },
   "controller_queue": {
     "badge": "In queue"

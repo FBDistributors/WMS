@@ -19,6 +19,11 @@ class User(Base):
     full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(32), nullable=False, default="picker")
+    # Bitta jismoniy xodimning barcha profillari bir xil kod oladi (tabel raqami
+    # uslubida, admin kiritadi). "To'rt ko'z" qoidasi shu bog'lanishga tayanadi:
+    # o'zi yig'gan hujjatni o'zi tekshira olmaydi. Unique EMAS — bir odamda bir
+    # nechta profil bo'ladi.
+    person_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -37,6 +42,7 @@ class User(Base):
         Index("ix_users_code", "code"),
         Index("ix_users_username", "username"),
         Index("ix_users_full_name", "full_name"),
+        Index("ix_users_person_code", "person_code"),
         Index("ix_users_active_session", "active_session_token", 
               postgresql_where="active_session_token IS NOT NULL"),
     )

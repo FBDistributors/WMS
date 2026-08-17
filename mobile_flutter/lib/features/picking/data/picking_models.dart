@@ -363,6 +363,7 @@ class PickingListItem {
     required this.sentToControllerAt,
     this.controllerVerificationStartedAt,
     this.sourceGroup = kSourceGroupCity,
+    this.isOwnPick = false,
   });
 
   final String id;
@@ -384,6 +385,10 @@ class PickingListItem {
   /// Buyurtma manbasi guruhi: [kSourceGroupCity] yoki [kSourceGroupRegion].
   final String sourceGroup;
 
+  /// To'rt ko'z: joriy foydalanuvchi (yoki bog'langan profili) yig'gan hujjat —
+  /// controller uni band qila olmaydi, UI kulrang ko'rsatadi.
+  final bool isOwnPick;
+
   factory PickingListItem.fromJson(Map<String, Object?> json) {
     return PickingListItem(
       id: json['id']! as String,
@@ -401,6 +406,7 @@ class PickingListItem {
       controllerVerificationStartedAt:
           json['controller_verification_started_at'] as String?,
       sourceGroup: normalizeSourceGroup(json['source_group']),
+      isOwnPick: json['is_own_pick'] == true,
     );
   }
 
@@ -419,6 +425,7 @@ class PickingListItem {
         'sent_to_controller_at': sentToControllerAt,
         'controller_verification_started_at': controllerVerificationStartedAt,
         'source_group': sourceGroup,
+        'is_own_pick': isOwnPick,
       };
 }
 

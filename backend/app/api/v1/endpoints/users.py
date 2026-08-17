@@ -98,6 +98,7 @@ class UserOut(BaseModel):
     username: str
     full_name: Optional[str] = None
     role: str
+    person_code: Optional[str] = None
     is_active: bool
     created_at: datetime
     last_login_at: Optional[datetime] = None
@@ -116,6 +117,11 @@ class UserCreateIn(BaseModel):
     full_name: Optional[str] = Field(default=None, max_length=255)
     password: str = Field(..., min_length=6)
     role: str
+    person_code: Optional[str] = Field(
+        default=None,
+        max_length=64,
+        description="Xodim (shaxs) kodi — bitta odamning barcha profillari bir xil kod oladi",
+    )
     is_active: bool = True
 
 
@@ -123,8 +129,15 @@ class UserUpdateIn(BaseModel):
     username: Optional[str] = Field(default=None, min_length=3, max_length=128)
     full_name: Optional[str] = Field(default=None, max_length=255)
     role: Optional[str] = None
+    person_code: Optional[str] = Field(default=None, max_length=64)
     is_active: Optional[bool] = None
     granted_permissions: Optional[list[str]] = None
+
+
+def _normalize_person_code(value: Optional[str]) -> Optional[str]:
+    """Bo'sh string ham NULL sifatida saqlanadi — same_person tekshiruvi chalg'imasin."""
+    v = (value or "").strip()
+    return v or None
 
 
 class ResetPasswordIn(BaseModel):
@@ -138,6 +151,7 @@ def _to_user_out(user: User) -> UserOut:
         username=user.username,
         full_name=user.full_name,
         role=user.role,
+        person_code=user.person_code,
         is_active=user.is_active,
         created_at=user.created_at,
         last_login_at=user.last_login_at,
@@ -208,6 +222,7 @@ async def create_user(
         full_name=payload.full_name,
         password_hash=get_password_hash(payload.password),
         role=payload.role,
+        person_code=_normalize_person_code(payload.person_code),
         is_active=payload.is_active,
     )
     db.add(new_user)
@@ -217,7 +232,12 @@ async def create_user(
         action=ACTION_CREATE,
         entity_type="user",
         entity_id=str(new_user.id),
-        new_data={"username": payload.username, "role": payload.role, "is_active": payload.is_active},
+        new_data={
+            "username": payload.username,
+            "role": payload.role,
+            "person_code": new_user.person_code,
+            "is_active": payload.is_active,
+        },
         ip_address=get_client_ip(request),
     )
     db.commit()
@@ -237,7 +257,12 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    old_data = {"username": user.username, "role": user.role, "is_active": user.is_active}
+    old_data = {
+        "username": user.username,
+        "role": user.role,
+        "person_code": user.person_code,
+        "is_active": user.is_active,
+    }
     updates = payload.model_dump(exclude_unset=True)
     if "role" in updates and updates["role"] not in VALID_ROLES:
         raise HTTPException(status_code=400, detail="Invalid role")
@@ -254,6 +279,8 @@ async def update_user(
         user.full_name = updates["full_name"]
     if "role" in updates:
         user.role = updates["role"]
+    if "person_code" in updates:
+        user.person_code = _normalize_person_code(updates["person_code"])
     if "is_active" in updates:
         user.is_active = updates["is_active"]
     if "granted_permissions" in updates:
@@ -269,7 +296,12 @@ async def update_user(
         else:
             user.granted_permissions = []
 
-    new_data = {"username": user.username, "role": user.role, "is_active": user.is_active}
+    new_data = {
+        "username": user.username,
+        "role": user.role,
+        "person_code": user.person_code,
+        "is_active": user.is_active,
+    }
     log_action(
         db,
         user_id=current_user.id,

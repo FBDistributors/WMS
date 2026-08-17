@@ -18,7 +18,8 @@
     "full_name": "Name",
     "role": "Role",
     "status": "Status",
-    "actions": "Actions"
+    "actions": "Actions",
+    "person_code": "Person code"
   },
   "form": {
     "create_title": "Create user",
@@ -38,7 +39,10 @@
     "save": "Save changes",
     "create": "Create user",
     "cancel": "Cancel",
-    "back": "Back"
+    "back": "Back",
+    "person_code": "Employee (person) code",
+    "person_code_placeholder": "e.g. X-012",
+    "person_code_hint": "All profiles of the same person share one code. The rule that a picker cannot verify their own order relies on it."
   },
   "roles": {
     "all": "All roles",

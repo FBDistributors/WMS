@@ -15,6 +15,28 @@ class PickingClaimConflict implements Exception {
   String toString() => message;
 }
 
+/// To'rt ko'z: o'zi yig'gan hujjatni o'zi band qila olmaydi (backend 409,
+/// code=self_check_forbidden).
+class PickingSelfCheckForbidden implements Exception {
+  const PickingSelfCheckForbidden(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+bool _isSelfCheckForbidden(DioException e) {
+  final Object? data = e.response?.data;
+  if (data is Map) {
+    final Object? detail = data['detail'];
+    if (detail is Map && detail['code'] == 'self_check_forbidden') {
+      return true;
+    }
+  }
+  return false;
+}
+
 class PickingRepository {
   PickingRepository(this._dio);
 
@@ -111,6 +133,9 @@ class PickingRepository {
       return PickingDocument.fromJson(Map<String, Object?>.from(data));
     } on DioException catch (e) {
       if (e.response?.statusCode == 409) {
+        if (_isSelfCheckForbidden(e)) {
+          throw PickingSelfCheckForbidden(mapDioExceptionToMessage(e));
+        }
         throw PickingClaimConflict(mapDioExceptionToMessage(e));
       }
       throw Exception(mapDioExceptionToMessage(e));
