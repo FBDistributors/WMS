@@ -550,6 +550,9 @@ export type BrandZeroStockResponse = {
   reserve_lots_affected: number
   movements_created: number
   skipped: number
+  // Faol yig'ish rezervi bor juftliklar — nollash ularga tegmagan.
+  active_skipped: number
+  active_orders: string[]
 }
 
 export type BrandZeroMode = 'brand_only' | 'reserve_only' | 'brand_and_reserve'
@@ -564,6 +567,22 @@ export type MainZeroStockResponse = {
   reserve_lots_affected: number
   movements_created: number
   skipped: number
+  // Faol yig'ish rezervi bor juftliklar — nollash ularga tegmagan.
+  active_skipped: number
+  active_orders: string[]
+}
+
+export type ZeroStockActiveReserves = {
+  scope: 'brand' | 'main'
+  brand_id: string | null
+  active_pairs: number
+  orders: string[]
+}
+
+export async function getZeroStockActiveReserves(scope: 'brand' | 'main', brandId?: string) {
+  return fetchJSON<ZeroStockActiveReserves>('/api/v1/inventory/zero-stock/active-reserves', {
+    query: { scope, ...(brandId ? { brand_id: brandId } : {}) },
+  })
 }
 
 export async function zeroBrandStock(

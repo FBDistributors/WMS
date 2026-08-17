@@ -14,10 +14,12 @@ import {
   type BrandZeroMode,
   getInventoryByLocation,
   getInventoryDetails,
+  getZeroStockActiveReserves,
   type InventoryByLocationRow,
   zeroMainStock,
   zeroBrandStock,
   type InventoryDetailRow,
+  type ZeroStockActiveReserves,
 } from '../../services/inventoryApi'
 import { getBrands, type Brand } from '../../services/brandsApi'
 import { getLocations, type Location } from '../../services/locationsApi'
@@ -57,6 +59,8 @@ export function MahsulotYoqQilishPage() {
   const [brandZeroMode, setBrandZeroMode] = useState<BrandZeroMode>('brand_only')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [confirmMainOpen, setConfirmMainOpen] = useState(false)
+  // Pre-flight: nollash doirasidagi faol yig'ish rezervlari (dialogda ogohlantirish uchun).
+  const [activeReserves, setActiveReserves] = useState<ZeroStockActiveReserves | null>(null)
   const getErrorMessage = useCallback(
     (err: unknown) => {
       if (typeof err === 'string' && err.trim()) return err
@@ -296,6 +300,13 @@ export function MahsulotYoqQilishPage() {
       try {
         // Keep this call compatible even when idempotency migration is pending.
         const res = await zeroBrandStock(selectedBrand.id, brandZeroMode)
+        const activeNote =
+          (res.active_skipped ?? 0) > 0
+            ? ` ${t('kamomat:write_off.active_skipped_note', {
+                count: res.active_skipped,
+                orders: res.active_orders.join(', '),
+              })}`
+            : ''
         showSuccess(
           t('kamomat:write_off.brand_zero_success', {
             products: res.products_affected,
@@ -303,9 +314,10 @@ export function MahsulotYoqQilishPage() {
             stock_movements: res.stock_movements_created,
             reserve_movements: res.reserve_movements_created,
             mode: t(`kamomat:write_off.reset_mode_${brandZeroMode}`),
-          }),
+          }) + activeNote,
         )
         setConfirmOpen(false)
+        setActiveReserves(null)
       } catch (err) {
         showError(getErrorMessage(err))
       } finally {
@@ -336,6 +348,13 @@ export function MahsulotYoqQilishPage() {
     setSubmitLoading(true)
     try {
       const res = await zeroMainStock('brand_and_reserve')
+      const activeNote =
+        (res.active_skipped ?? 0) > 0
+          ? ` ${t('kamomat:write_off.active_skipped_note', {
+              count: res.active_skipped,
+              orders: res.active_orders.join(', '),
+            })}`
+          : ''
       showSuccess(
         t('kamomat:write_off.brand_zero_success', {
           products: res.products_affected,
@@ -343,15 +362,48 @@ export function MahsulotYoqQilishPage() {
           stock_movements: res.stock_movements_created,
           reserve_movements: res.reserve_movements_created,
           mode: t('kamomat:write_off.reset_mode_brand_and_reserve'),
-        }),
+        }) + activeNote,
       )
       setConfirmMainOpen(false)
+      setActiveReserves(null)
     } catch (err) {
       showError(getErrorMessage(err))
     } finally {
       setSubmitLoading(false)
     }
   }, [submitLoading, t, getErrorMessage])
+
+  // Nollashdan oldin pre-flight: faol rezervlar bo'lsa dialogda ogohlantiramiz.
+  // So'rov muvaffaqiyatsiz bo'lsa ham dialog ochiladi — ogohlantirish majburiy emas,
+  // server tomonidagi himoya (active skip) baribir ishlaydi.
+  const openBrandConfirm = useCallback(async () => {
+    if (!selectedBrand) return
+    setActiveReserves(null)
+    try {
+      setActiveReserves(await getZeroStockActiveReserves('brand', selectedBrand.id))
+    } catch {
+      // ogohlantirishsiz davom etamiz
+    }
+    setConfirmOpen(true)
+  }, [selectedBrand])
+
+  const openMainConfirm = useCallback(async () => {
+    setActiveReserves(null)
+    try {
+      setActiveReserves(await getZeroStockActiveReserves('main'))
+    } catch {
+      // ogohlantirishsiz davom etamiz
+    }
+    setConfirmMainOpen(true)
+  }, [])
+
+  const activeReserveWarning =
+    activeReserves && activeReserves.active_pairs > 0
+      ? t('kamomat:write_off.active_reserve_warning', {
+          count: activeReserves.active_pairs,
+          orders: activeReserves.orders.join(', '),
+        })
+      : ''
 
   return (
     <AdminLayout title={t('kamomat:write_off.title')}>
@@ -443,7 +495,7 @@ export function MahsulotYoqQilishPage() {
               <Button
                 variant="danger"
                 className="shrink-0"
-                onClick={() => setConfirmMainOpen(true)}
+                onClick={openMainConfirm}
                 disabled={submitLoading}
               >
                 {submitLoading ? t('common:messages.loading') : "Main omborni to'liq 0 qilish"}
@@ -909,7 +961,7 @@ export function MahsulotYoqQilishPage() {
                 })}
               </div>
               <div className="flex items-center gap-3">
-                <Button onClick={() => setConfirmOpen(true)} disabled={!selectedBrand || submitLoading}>
+                <Button onClick={openBrandConfirm} disabled={!selectedBrand || submitLoading}>
                   {submitLoading ? t('common:messages.loading') : t('kamomat:write_off.zero_brand_submit')}
                 </Button>
                 <Link to="/admin/kamomat" className="text-sm text-slate-600 dark:text-slate-400">
@@ -923,10 +975,12 @@ export function MahsulotYoqQilishPage() {
       <ConfirmDialog
         open={confirmOpen}
         title={t('kamomat:write_off.zero_brand_confirm_title')}
-        message={t('kamomat:write_off.zero_brand_confirm_message', {
-          brand: selectedBrand ? `${selectedBrand.code} — ${selectedBrand.name}` : '',
-          mode: t(`kamomat:write_off.reset_mode_${brandZeroMode}`),
-        })}
+        message={
+          t('kamomat:write_off.zero_brand_confirm_message', {
+            brand: selectedBrand ? `${selectedBrand.code} — ${selectedBrand.name}` : '',
+            mode: t(`kamomat:write_off.reset_mode_${brandZeroMode}`),
+          }) + (activeReserveWarning ? ` ${activeReserveWarning}` : '')
+        }
         confirmLabel={t('kamomat:write_off.zero_brand_confirm_button')}
         cancelLabel={t('common:buttons.cancel')}
         variant="danger"
@@ -937,7 +991,10 @@ export function MahsulotYoqQilishPage() {
       <ConfirmDialog
         open={confirmMainOpen}
         title="Main omborni to‘liq 0 qilish"
-        message="Main ombordagi barcha mahsulot uchun qoldiq va rezerv 0 qilinadi. Tasdiqlaysizmi?"
+        message={
+          'Main ombordagi barcha mahsulot uchun qoldiq va rezerv 0 qilinadi. Tasdiqlaysizmi?' +
+          (activeReserveWarning ? ` ${activeReserveWarning}` : '')
+        }
         confirmLabel="Ha, 0 qilinsin"
         cancelLabel={t('common:buttons.cancel')}
         variant="danger"

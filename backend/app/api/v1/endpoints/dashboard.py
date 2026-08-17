@@ -18,6 +18,11 @@ from sqlalchemy.orm import Session, selectinload
 logger = logging.getLogger(__name__)
 
 from app.auth.deps import require_any_permission, require_permission
+from app.constants.document_status import (
+    ACTIVE_DOCUMENT_STATUSES,
+    ACTIVE_PIPELINE_ORDER_STATUSES,
+    ORDER_HIDDEN_STATUSES,
+)
 from app.core.business_time import business_seconds, day_bounds_in_tz
 from app.db import get_db
 from app.models.document import Document as DocumentModel
@@ -413,10 +418,6 @@ async def get_orders_by_status(
         # Admin Jarayon (GET /picking/documents?process_scope=active) bilan moslik:
         # allocated / picking / picked sonlari faqat shu ro'yxatga tushadigan hujjatlardan.
         # Aks holda buyurtma WMS kechiksa, hujjat allaqachon completed bo'lsa KPI > 0, jadval bo'sh bo'lardi.
-        ORDER_HIDDEN_STATUSES = ("completed", "packed", "shipped", "cancelled")
-        ACTIVE_PIPELINE_ORDER_STATUSES = ("allocated", "picking", "picked")
-        ACTIVE_DOCUMENT_STATUSES = ("draft", "confirmed", "new", "partial", "in_progress", "picked")
-
         for _pipeline_status in ACTIVE_PIPELINE_ORDER_STATUSES:
             by_status[_pipeline_status] = 0
 

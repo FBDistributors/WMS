@@ -20,7 +20,8 @@ from sqlalchemy.exc import IntegrityError
 from app.auth.deps import get_current_user, require_permission
 from app.auth.guards import check_controller_adjust_reason
 from app.core.stock_rules import check_location_single_expiry
-from app.services.audit_service import ACTION_CREATE, get_client_ip, log_action
+from app.services.active_reserve_guard import active_reserved_pairs
+from app.services.audit_service import ACTION_CREATE, ACTION_UPDATE, get_client_ip, log_action
 from app.services.box_location_service import (
     assert_box_invariant,
     product_box_summary_map,
@@ -625,6 +626,9 @@ class BrandZeroStockResponse(BaseModel):
     movements_created: int
     skipped: int = 0
     boxes_removed: int = 0
+    # Faol yig'ish rezervi bor (lot, joy) juftliklar — butunlay tegilmaydi.
+    active_skipped: int = 0
+    active_orders: list[str] = []
 
 
 class MainZeroStockResponse(BaseModel):
@@ -638,6 +642,18 @@ class MainZeroStockResponse(BaseModel):
     movements_created: int
     skipped: int = 0
     boxes_removed: int = 0
+    # Faol yig'ish rezervi bor (lot, joy) juftliklar — butunlay tegilmaydi.
+    active_skipped: int = 0
+    active_orders: list[str] = []
+
+
+class ZeroStockActiveReservesResponse(BaseModel):
+    """Nollashdan oldin ogohlantirish: faol yig'ish rezervidagi juftliklar."""
+
+    scope: Literal["brand", "main"]
+    brand_id: Optional[UUID] = None
+    active_pairs: int
+    orders: list[str]
 
 
 class StockBalanceOut(BaseModel):
@@ -2568,6 +2584,59 @@ async def transfer_sector_stock(
     )
 
 
+@router.get(
+    "/zero-stock/active-reserves",
+    response_model=ZeroStockActiveReservesResponse,
+    summary="Pre-flight: nollash doirasidagi faol yig'ish rezervlari (hech narsa yozmaydi)",
+)
+@router.get(
+    "/zero-stock/active-reserves/",
+    response_model=ZeroStockActiveReservesResponse,
+    summary="Pre-flight: nollash doirasidagi faol yig'ish rezervlari (hech narsa yozmaydi)",
+)
+async def zero_stock_active_reserves(
+    scope: Literal["brand", "main"] = Query(..., description="brand yoki main"),
+    brand_id: Optional[UUID] = Query(None, description="scope=brand uchun majburiy"),
+    db: Session = Depends(get_db),
+    _user: UserModel = Depends(get_current_user),
+    _guard=Depends(require_permission("inventory:adjust")),
+):
+    """Tasdiqlash dialogi uchun: nollash qaysi faol buyurtmalarni chetlab o'tishini ko'rsatadi.
+
+    Faol juftliklar hujjat qatorlaridan olinadi; qoldiq harakati bo'lmagan juftlik
+    ozgina ortiqcha sanalishi mumkin — ogohlantirish uchun bu maqbul.
+    """
+    if scope == "brand" and brand_id is None:
+        raise HTTPException(status_code=400, detail="brand_id is required for scope=brand")
+
+    pairs = active_reserved_pairs(db)
+    if scope == "brand":
+        lot_ids = {lot for (lot, _loc) in pairs}
+        brand_lot_ids: set[UUID] = set()
+        if lot_ids:
+            rows = (
+                db.query(StockLotModel.id)
+                .join(ProductModel, ProductModel.id == StockLotModel.product_id)
+                .filter(StockLotModel.id.in_(lot_ids), ProductModel.brand_id == brand_id)
+                .all()
+            )
+            brand_lot_ids = {r[0] for r in rows}
+        pairs = {key: orders for key, orders in pairs.items() if key[0] in brand_lot_ids}
+    else:
+        main_ids = set(_location_ids_for_warehouse(db, "main") or [])
+        pairs = {key: orders for key, orders in pairs.items() if key[1] in main_ids}
+
+    orders: set[str] = set()
+    for order_numbers in pairs.values():
+        orders.update(order_numbers)
+    return ZeroStockActiveReservesResponse(
+        scope=scope,
+        brand_id=brand_id,
+        active_pairs=len(pairs),
+        orders=sorted(orders)[:10],
+    )
+
+
 @router.post(
     "/brands/{brand_id}/zero-stock",
     response_model=BrandZeroStockResponse,
@@ -2659,8 +2728,36 @@ async def zero_brand_stock(
         skipped = 0
         boxes_removed = 0
         touched_rows: list[tuple[UUID, UUID]] = []
+        # Faol yig'ish rezervi bor juftliklar butunlay chetlab o'tiladi —
+        # aks holda yig'uvchi hujjati ostidan rezerv o'chib ketadi (17.08.2026 hodisasi).
+        active_pairs = active_reserved_pairs(
+            db, [(row.lot_id, row.location_id) for row in rows]
+        )
+        active_skipped = 0
+        active_orders: set[str] = set()
         try:
             for row in rows:
+                pair_key = (row.lot_id, row.location_id)
+                if pair_key in active_pairs:
+                    active_skipped += 1
+                    active_orders.update(active_pairs[pair_key])
+                    log_action(
+                        db,
+                        user_id=user.id,
+                        action=ACTION_UPDATE,
+                        entity_type="stock_lot",
+                        entity_id=str(row.lot_id),
+                        new_data={
+                            "active_reserve_skipped": True,
+                            "location_id": str(row.location_id),
+                            "orders": active_pairs[pair_key],
+                            "bulk_brand_zero": True,
+                            "brand_id": str(brand_id),
+                            "mode": mode,
+                        },
+                        ip_address=client_ip,
+                    )
+                    continue
                 lock_lot_location(db, row.lot_id, row.location_id)
                 on_hand_qty, reserved_qty, available_qty = compute_lot_location_balances(
                     db,
@@ -2771,6 +2868,8 @@ async def zero_brand_stock(
             movements_created=movements_created,
             skipped=skipped,
             boxes_removed=boxes_removed,
+            active_skipped=active_skipped,
+            active_orders=sorted(active_orders)[:10],
         )
 
     return _run_with_idempotency(
@@ -2879,8 +2978,35 @@ async def zero_main_stock(
         skipped = 0
         boxes_removed = 0
         touched_rows: list[tuple[UUID, UUID]] = []
+        # Faol yig'ish rezervi bor juftliklar butunlay chetlab o'tiladi —
+        # aks holda yig'uvchi hujjati ostidan rezerv o'chib ketadi (17.08.2026 hodisasi).
+        active_pairs = active_reserved_pairs(
+            db, [(row.lot_id, row.location_id) for row in rows]
+        )
+        active_skipped = 0
+        active_orders: set[str] = set()
         try:
             for row in rows:
+                pair_key = (row.lot_id, row.location_id)
+                if pair_key in active_pairs:
+                    active_skipped += 1
+                    active_orders.update(active_pairs[pair_key])
+                    log_action(
+                        db,
+                        user_id=user.id,
+                        action=ACTION_UPDATE,
+                        entity_type="stock_lot",
+                        entity_id=str(row.lot_id),
+                        new_data={
+                            "active_reserve_skipped": True,
+                            "location_id": str(row.location_id),
+                            "orders": active_pairs[pair_key],
+                            "bulk_main_zero": True,
+                            "mode": mode,
+                        },
+                        ip_address=client_ip,
+                    )
+                    continue
                 lock_lot_location(db, row.lot_id, row.location_id)
                 on_hand_qty, reserved_qty, _available_qty = compute_lot_location_balances(
                     db,
@@ -2988,6 +3114,8 @@ async def zero_main_stock(
             movements_created=movements_created,
             skipped=skipped,
             boxes_removed=boxes_removed,
+            active_skipped=active_skipped,
+            active_orders=sorted(active_orders)[:10],
         )
 
     return _run_with_idempotency(

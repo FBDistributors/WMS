@@ -35,6 +35,11 @@ from app.models.stock import StockLot as StockLotModel
 from app.models.location_box_placement import PLACEMENT_SEALED, LocationBoxPlacement
 from app.models.product_box import ProductBox as ProductBoxModel
 from app.api.v1.endpoints.picker_inventory import _get_lot_level_balances, _location_ids_for_warehouse
+from app.constants.document_status import (
+    ACTIVE_DOCUMENT_STATUSES,
+    ACTIVE_PIPELINE_ORDER_STATUSES,
+    ORDER_HIDDEN_STATUSES,
+)
 from app.services.order_reserve_release import release_document_reserve_on_cancel
 from app.services.payroll_rates import load_rates, payroll_role_for
 from app.services.order_source_group import (
@@ -1153,11 +1158,6 @@ async def list_picking_documents(
 ):
     if date_from is not None and date_to is not None and date_from > date_to:
         raise HTTPException(status_code=400, detail="date_from must be on or before date_to")
-    # Admin buyurtmani packed/shipped/cancelled qilsa — yig'uvchi va controller ro'yxatida ko'rinmasin
-    ORDER_HIDDEN_STATUSES = ("completed", "packed", "shipped", "cancelled")
-    ACTIVE_PIPELINE_ORDER_STATUSES = ("allocated", "picking", "picked")
-    ACTIVE_DOCUMENT_STATUSES = ("draft", "confirmed", "new", "partial", "in_progress", "picked")
-
     effective_scope: Optional[str] = process_scope
     if user.role in ("picker", "inventory_controller"):
         effective_scope = None
@@ -1285,7 +1285,6 @@ async def get_consolidated(
 ):
     if user.role != "picker":
         raise HTTPException(status_code=403, detail="Only for picker")
-    ORDER_HIDDEN_STATUSES = ("completed", "packed", "shipped", "cancelled")
     # Exclude from consolidated view when picked AND sent to the controller queue.
     # Also exclude completed (controller tugatgan); matches Buyurtmalar ro'yxati.
     docs_id_query = (
@@ -1557,7 +1556,6 @@ async def consolidated_pick(
     if existing:
         return await get_consolidated(db=db, user=user)
 
-    ORDER_HIDDEN_STATUSES = ("completed", "packed", "shipped", "cancelled")
     # Same as get_consolidated: exclude picked+sent-to-controller and completed.
     docs_query = (
         db.query(DocumentModel.id)
