@@ -33,7 +33,10 @@ from app.models.stock import StockMovement as StockMovementModel
 from app.models.safe_cancel_return import SafeCancelReturnLine as SafeCancelReturnLineModel
 from app.models.safe_cancel_return import SafeCancelReturnSession as SafeCancelReturnSessionModel
 from app.models.user import User as UserModel
-from app.services.order_source_group import source_group_conditions
+from app.services.order_source_group import (
+    payroll_source_group_conditions,
+    source_group_conditions,
+)
 
 router = APIRouter()
 DEFAULT_FILIAL_ID = os.getenv("WMS_DEFAULT_FILIAL_ID", "3788131").strip()
@@ -547,6 +550,16 @@ def _staff_role_columns(role: str):
     )
 
 
+def _payroll_group_conditions(source_group: Optional[str], ts_col) -> list:
+    """Reyting/ish haqi endpointlari uchun tarif-guruhlash.
+
+    26.07.2026 dan o'rikzor region tarifida — xodim ilovasidagi hisob bilan bir
+    xil bo'lishi shart, aks holda maosh paytida ikki xil raqam chiqadi. Shart
+    hujjatning o'z ish vaqtiga (`ts_col`) bog'lanadi — eski hujjatlar eskicha.
+    """
+    return payroll_source_group_conditions(source_group, ts_col)
+
+
 def _source_group_conditions(source_group: Optional[str]) -> list:
     """Buyurtma manbasi bo'yicha filtr: 'shahar' (smartup+orikzor) yoki 'region' (diller).
 
@@ -566,7 +579,8 @@ def _aggregate_staff_by_user_column(
 ) -> List[PickingStaffStatsRow]:
     col = ts_col if ts_col is not None else _document_completed_at_expr()
     filters = _staff_doc_filters(user_id_column, statuses, col, date_from, date_to)
-    filters.extend(_source_group_conditions(source_group))
+    # Reyting jadvali maosh asosi — tarif-guruhlash (o'rikzor -> region, 26.07.2026 dan).
+    filters.extend(_payroll_group_conditions(source_group, col))
 
     per_doc = (
         db.query(
@@ -691,7 +705,8 @@ async def get_staff_orders(
     user_col, statuses, ts_col = _staff_role_columns(role)
     filters = _staff_doc_filters(user_col, statuses, ts_col, date_from, date_to)
     filters.append(user_col == user_id)
-    filters.extend(_source_group_conditions(group))
+    # Reyting bilan bir xil filtr — tarif-guruhlash (o'rikzor -> region, 26.07.2026 dan).
+    filters.extend(_payroll_group_conditions(group, ts_col))
 
     docs = (
         db.query(DocumentModel)

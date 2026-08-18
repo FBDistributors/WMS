@@ -47,6 +47,7 @@ from app.services.order_source_group import (
     SOURCE_GROUP_CITY,
     SOURCE_GROUP_REGION,
     order_source_group,
+    payroll_source_group,
     source_group_conditions,
 )
 from app.services.organization_labels import resolve_org_display
@@ -2092,12 +2093,9 @@ async def get_my_period_stats(
             return
         if ts.tzinfo is None:
             ts = ts.replace(tzinfo=timezone.utc)
-        # Guruh ta'rifi admin paneldagi bilan bir xil: `diller` -> viloyat, qolgani shahar.
-        group = (
-            SOURCE_GROUP_REGION
-            if (source or "").strip().lower() == REGION_SOURCE
-            else SOURCE_GROUP_CITY
-        )
+        # Tarif guruhi: diller -> viloyat; o'rikzor ham 26.07.2026 davridan viloyat
+        # (davr boshi bo'yicha — eski davrlar eskicha). Navbat tablari o'zgarmagan.
+        group = payroll_source_group(source, period_from)
         bucket = per_day[ts.astimezone(BUSINESS_TZ).date()][group]
         bucket["orders"] += 1
         bucket["positions"] += int(poz or 0)
