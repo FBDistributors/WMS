@@ -568,6 +568,7 @@
     "prev_period": "Предыдущий период",
     "next_period": "Следующий период",
     "rate_picker": "Сборщик: город {{shahar}} · регион {{region}}",
-    "rate_controller": "Контролёр: город {{shahar}} · регион {{region}}"
+    "rate_controller": "Контролёр: город {{shahar}} · регион {{region}}",
+    "export_failed": "Не удалось экспортировать в Excel"
   }
 }

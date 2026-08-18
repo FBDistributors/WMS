@@ -568,6 +568,7 @@
     "prev_period": "Oldingi davr",
     "next_period": "Keyingi davr",
     "rate_picker": "Yig'uvchi: shahar {{shahar}} · region {{region}}",
-    "rate_controller": "Controller: shahar {{shahar}} · region {{region}}"
+    "rate_controller": "Controller: shahar {{shahar}} · region {{region}}",
+    "export_failed": "Excel eksport muvaffaqiyatsiz"
   }
 }

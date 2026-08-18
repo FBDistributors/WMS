@@ -568,6 +568,7 @@
     "prev_period": "Previous period",
     "next_period": "Next period",
     "rate_picker": "Picker: city {{shahar}} · region {{region}}",
-    "rate_controller": "Controller: city {{shahar}} · region {{region}}"
+    "rate_controller": "Controller: city {{shahar}} · region {{region}}",
+    "export_failed": "Excel export failed"
   }
 }

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, Loader2, Wallet } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FileSpreadsheet, Loader2, Wallet } from 'lucide-react'
+import * as XLSX from 'xlsx'
 
 import { getStaffPayroll, type StaffPayrollResponse, type StaffPayrollRow } from '../../../services/dashboardApi'
+import { writeExcelFile } from '../../../utils/exportExcel'
 
 /** Ish haqi davri (26→25) bo'yicha ball jadvali — xodim ilovasidagi hisob bilan
  * bitta manba (backend: /dashboard/staff-payroll → payroll_stats servisi). */
@@ -12,7 +14,8 @@ type Props = {
 }
 
 function fmtMoney(n: number): string {
-  return Math.round(n).toLocaleString('en-US').replace(/,/g, ' ')
+  // 1,000,000 ko'rinishida — mijoz talabi.
+  return Math.round(n).toLocaleString('en-US')
 }
 
 function fmtPeriodDate(iso: string): string {
@@ -77,9 +80,9 @@ function PayrollTable({
                   <td className="py-2 pr-3 font-semibold text-slate-800 dark:text-slate-100">
                     {row.full_name}
                   </td>
-                  <td className={`py-2 ${numCls}`}>{row.orders}</td>
-                  <td className={`py-2 ${numCls}`}>{row.positions_shahar || '—'}</td>
-                  <td className={`py-2 ${numCls}`}>{row.positions_region || '—'}</td>
+                  <td className={`py-2 ${numCls}`}>{fmtMoney(row.orders)}</td>
+                  <td className={`py-2 ${numCls}`}>{row.positions_shahar ? fmtMoney(row.positions_shahar) : '—'}</td>
+                  <td className={`py-2 ${numCls}`}>{row.positions_region ? fmtMoney(row.positions_region) : '—'}</td>
                   <td className={`py-2 ${numCls}`}>
                     {row.amount_shahar ? fmtMoney(row.amount_shahar) : '—'}
                   </td>
@@ -114,6 +117,7 @@ export function StaffPayrollSection({ t, showError }: Props) {
   const [offset, setOffset] = useState(0)
   const [data, setData] = useState<StaffPayrollResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isExporting, setIsExporting] = useState(false)
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -131,6 +135,57 @@ export function StaffPayrollSection({ t, showError }: Props) {
     void load()
   }, [load])
 
+  const handleExport = useCallback(async () => {
+    if (!data) return
+    setIsExporting(true)
+    try {
+      const header = [
+        t('admin:payroll_table.employee'),
+        t('admin:payroll_table.orders'),
+        t('admin:payroll_table.pos_shahar'),
+        t('admin:payroll_table.pos_region'),
+        t('admin:payroll_table.amount_shahar'),
+        t('admin:payroll_table.amount_region'),
+        t('admin:payroll_table.total'),
+      ]
+      const buildSheet = (rows: StaffPayrollRow[], total: number) => {
+        const aoa: (string | number)[][] = [
+          [`${t('admin:payroll_table.title')}: ${fmtPeriodDate(data.period_from)} — ${fmtPeriodDate(data.period_to)}`],
+          header,
+          ...rows.map((r) => [
+            r.full_name,
+            r.orders,
+            r.positions_shahar,
+            r.positions_region,
+            r.amount_shahar,
+            r.amount_region,
+            r.total_amount,
+          ]),
+          [t('admin:payroll_table.footer_total'), '', '', '', '', '', total],
+        ]
+        const ws = XLSX.utils.aoa_to_sheet(aoa)
+        ws['!cols'] = [{ wch: 28 }, { wch: 10 }, { wch: 11 }, { wch: 11 }, { wch: 14 }, { wch: 14 }, { wch: 14 }]
+        // Raqam kataklariga 1,000,000 formati — Excel'da ham jadvaldagidek ko'rinsin.
+        const range = XLSX.utils.decode_range(ws['!ref'] ?? 'A1')
+        for (let r = 2; r <= range.e.r; r++) {
+          for (let c = 1; c <= 6; c++) {
+            const cell = ws[XLSX.utils.encode_cell({ r, c })]
+            if (cell && typeof cell.v === 'number') cell.z = '#,##0'
+          }
+        }
+        return ws
+      }
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, buildSheet(data.pickers, data.totals.pickers_total), t('admin:payroll_table.pickers').slice(0, 31))
+      XLSX.utils.book_append_sheet(wb, buildSheet(data.controllers, data.totals.controllers_total), t('admin:payroll_table.controllers').slice(0, 31))
+      await writeExcelFile(wb, `ball_${data.period_from}_${data.period_to}.xlsx`)
+    } catch {
+      showError(t('admin:payroll_table.export_failed'))
+    } finally {
+      setIsExporting(false)
+    }
+  }, [data, showError, t])
+
   return (
     <div className="rounded-[20px] border border-slate-200 bg-white p-[22px] dark:border-slate-800 dark:bg-slate-900">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -144,6 +199,19 @@ export function StaffPayrollSection({ t, showError }: Props) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleExport()}
+            disabled={isLoading || isExporting || !data}
+            className="flex shrink-0 items-center gap-1.5 rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-[7px] text-xs font-bold text-slate-600 transition hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+          >
+            {isExporting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+            ) : (
+              <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden />
+            )}
+            Excel
+          </button>
           <button
             type="button"
             aria-label={t('admin:payroll_table.prev_period')}
