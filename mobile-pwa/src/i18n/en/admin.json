@@ -549,5 +549,25 @@
     "load_failed": "Failed to load rates.",
     "invalid_amount": "Invalid amount.",
     "note": "The new rate applies to the period starting {{date}}. Past periods keep their own rate — a calculated month is not recalculated."
+  },
+  "payroll_table": {
+    "title": "Points (payroll period)",
+    "subtitle": "Period: 26 → 25. Same math as the worker app — positions x rate.",
+    "employee": "Employee",
+    "orders": "Orders",
+    "pos_shahar": "Pos. city",
+    "pos_region": "Pos. region",
+    "amount_shahar": "Amount city",
+    "amount_region": "Amount region",
+    "total": "Total",
+    "footer_total": "Grand total",
+    "pickers": "Pickers",
+    "controllers": "Controllers",
+    "empty": "No work recorded in this period",
+    "load_failed": "Failed to load the points table",
+    "prev_period": "Previous period",
+    "next_period": "Next period",
+    "rate_picker": "Picker: city {{shahar}} · region {{region}}",
+    "rate_controller": "Controller: city {{shahar}} · region {{region}}"
   }
 }

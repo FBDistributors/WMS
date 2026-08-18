@@ -34,8 +34,16 @@ from app.models.safe_cancel_return import SafeCancelReturnLine as SafeCancelRetu
 from app.models.safe_cancel_return import SafeCancelReturnSession as SafeCancelReturnSessionModel
 from app.models.user import User as UserModel
 from app.services.order_source_group import (
+    SOURCE_GROUP_CITY,
+    SOURCE_GROUP_REGION,
     payroll_source_group_conditions,
     source_group_conditions,
+)
+from app.services.payroll_stats import (
+    collect_period_buckets,
+    group_amount,
+    load_period_rates,
+    payroll_period_bounds,
 )
 
 router = APIRouter()
@@ -102,6 +110,40 @@ class PickingStaffStatsRow(BaseModel):
 class PickingStaffStatsResponse(BaseModel):
     pickers: List[PickingStaffStatsRow]
     controllers: List[PickingStaffStatsRow]
+
+
+class StaffPayrollRow(BaseModel):
+    user_id: UUID
+    full_name: str
+    orders: int
+    positions: int
+    positions_shahar: int
+    positions_region: int
+    qty: float
+    amount_shahar: float
+    amount_region: float
+    total_amount: float
+
+
+class StaffPayrollRates(BaseModel):
+    picker_shahar: float
+    picker_region: float
+    controller_shahar: float
+    controller_region: float
+
+
+class StaffPayrollTotals(BaseModel):
+    pickers_total: float
+    controllers_total: float
+
+
+class StaffPayrollResponse(BaseModel):
+    period_from: str
+    period_to: str
+    rates: StaffPayrollRates
+    pickers: List[StaffPayrollRow]
+    controllers: List[StaffPayrollRow]
+    totals: StaffPayrollTotals
 
 
 class DailyCompletedPoint(BaseModel):
@@ -672,6 +714,90 @@ async def get_picking_staff_stats(
         db, DocumentModel.controlled_by_user_id, date_from, date_to, source_group=group
     )
     return PickingStaffStatsResponse(pickers=pickers, controllers=controllers)
+
+
+@router.get(
+    "/staff-payroll",
+    response_model=StaffPayrollResponse,
+    summary="Ish haqi davri bo'yicha xodimlar balli (xodim ilovasidagi hisob bilan bitta manba)",
+)
+async def get_staff_payroll(
+    offset: int = Query(0, ge=-24, le=0, description="0 — joriy davr (26→25), -1 — oldingi va h.k."),
+    db: Session = Depends(get_db),
+    _user=Depends(require_any_permission(["reports:read", "audit:read", "admin:access"])),
+):
+    """Har yig'uvchi/controller davrda qancha ball (pul) ishlagani.
+
+    Hisob `payroll_stats` servisida — xodim ilovasidagi `/picking/my-period-stats`
+    bilan aynan bitta kod: maosh kuni ikki xil raqam chiqmaydi.
+    """
+    period_from, period_to = payroll_period_bounds(_today_business(), offset)
+
+    role_rows: dict[str, List[StaffPayrollRow]] = {}
+    role_rates: dict[str, dict] = {}
+    all_user_ids: set[UUID] = set()
+    role_buckets: dict[str, dict] = {}
+    for role in ("picker", "controller"):
+        role_rates[role] = load_period_rates(db, role, period_from)
+        buckets = collect_period_buckets(db, period_from, period_to, role=role)
+        role_buckets[role] = buckets
+        all_user_ids.update(buckets.keys())
+
+    name_map: dict[UUID, str] = {}
+    if all_user_ids:
+        for u in db.query(UserModel).filter(UserModel.id.in_(all_user_ids)).all():
+            name_map[u.id] = (u.full_name or "").strip() or (u.username or str(u.id))
+
+    for role in ("picker", "controller"):
+        rates = role_rates[role]
+        rows: List[StaffPayrollRow] = []
+        for uid, days in role_buckets[role].items():
+            orders = positions = 0
+            pos_sh = pos_rg = 0
+            qty = 0.0
+            for groups in days.values():
+                city = groups[SOURCE_GROUP_CITY]
+                region = groups[SOURCE_GROUP_REGION]
+                orders += city["orders"] + region["orders"]
+                pos_sh += city["positions"]
+                pos_rg += region["positions"]
+                qty += city["qty"] + region["qty"]
+            positions = pos_sh + pos_rg
+            amount_sh = group_amount(pos_sh, SOURCE_GROUP_CITY, rates)
+            amount_rg = group_amount(pos_rg, SOURCE_GROUP_REGION, rates)
+            rows.append(
+                StaffPayrollRow(
+                    user_id=uid,
+                    full_name=name_map.get(uid, str(uid)),
+                    orders=orders,
+                    positions=positions,
+                    positions_shahar=pos_sh,
+                    positions_region=pos_rg,
+                    qty=round(qty, 3),
+                    amount_shahar=round(amount_sh, 2),
+                    amount_region=round(amount_rg, 2),
+                    total_amount=round(amount_sh + amount_rg, 2),
+                )
+            )
+        rows.sort(key=lambda r: (-r.total_amount, r.full_name.lower()))
+        role_rows[role] = rows
+
+    return StaffPayrollResponse(
+        period_from=period_from.isoformat(),
+        period_to=period_to.isoformat(),
+        rates=StaffPayrollRates(
+            picker_shahar=float(role_rates["picker"][SOURCE_GROUP_CITY]),
+            picker_region=float(role_rates["picker"][SOURCE_GROUP_REGION]),
+            controller_shahar=float(role_rates["controller"][SOURCE_GROUP_CITY]),
+            controller_region=float(role_rates["controller"][SOURCE_GROUP_REGION]),
+        ),
+        pickers=role_rows["picker"],
+        controllers=role_rows["controller"],
+        totals=StaffPayrollTotals(
+            pickers_total=round(sum(r.total_amount for r in role_rows["picker"]), 2),
+            controllers_total=round(sum(r.total_amount for r in role_rows["controller"]), 2),
+        ),
+    )
 
 
 def _staff_order_activity_at(role: str, doc: DocumentModel) -> Optional[datetime]:

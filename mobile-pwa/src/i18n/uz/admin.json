@@ -549,5 +549,25 @@
     "load_failed": "Tariflar yuklanmadi.",
     "invalid_amount": "Summa noto'g'ri.",
     "note": "Yangi tarif {{date}} dan boshlangan davrga qo'llanadi. O'tgan davrlar o'z tarifida qoladi — hisoblangan oy qayta hisoblanmaydi."
+  },
+  "payroll_table": {
+    "title": "Ball (ish haqi davri)",
+    "subtitle": "Davr: 26 → 25. Hisob xodim ilovasi bilan bir xil — pozitsiya x tarif.",
+    "employee": "Xodim",
+    "orders": "Buyurtma",
+    "pos_shahar": "Poz. shahar",
+    "pos_region": "Poz. region",
+    "amount_shahar": "Summa shahar",
+    "amount_region": "Summa region",
+    "total": "Jami",
+    "footer_total": "Umumiy",
+    "pickers": "Yig'uvchilar",
+    "controllers": "Controllerlar",
+    "empty": "Bu davrda ish qayd etilmagan",
+    "load_failed": "Ball jadvali yuklanmadi",
+    "prev_period": "Oldingi davr",
+    "next_period": "Keyingi davr",
+    "rate_picker": "Yig'uvchi: shahar {{shahar}} · region {{region}}",
+    "rate_controller": "Controller: shahar {{shahar}} · region {{region}}"
   }
 }

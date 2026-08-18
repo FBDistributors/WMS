@@ -41,13 +41,17 @@ from app.constants.document_status import (
     ORDER_HIDDEN_STATUSES,
 )
 from app.services.order_reserve_release import release_document_reserve_on_cancel
-from app.services.payroll_rates import load_rates, payroll_role_for
+from app.services.payroll_rates import payroll_role_for
+from app.services.payroll_stats import (
+    collect_period_buckets,
+    load_period_rates,
+    payroll_period_bounds as _payroll_period_bounds,
+)
 from app.services.order_source_group import (
     REGION_SOURCE,
     SOURCE_GROUP_CITY,
     SOURCE_GROUP_REGION,
     order_source_group,
-    payroll_source_group,
     source_group_conditions,
 )
 from app.services.organization_labels import resolve_org_display
@@ -1994,26 +1998,7 @@ async def get_my_picker_stats(
     )
 
 
-# Ish haqi davri kalendar oyi emas: 26-sanadan keyingi oyning 25-sanasigacha.
-PAYROLL_PERIOD_START_DAY = 26
-
-
-def _payroll_period_bounds(today: date, offset: int = 0) -> tuple[date, date]:
-    """`offset` 0 — joriy davr, -1 — oldingi va h.k."""
-    year, month = today.year, today.month
-    if today.day < PAYROLL_PERIOD_START_DAY:
-        month -= 1
-    month += offset
-    while month <= 0:
-        month += 12
-        year -= 1
-    while month > 12:
-        month -= 12
-        year += 1
-    start = date(year, month, PAYROLL_PERIOD_START_DAY)
-    next_year, next_month = (year + 1, 1) if month == 12 else (year, month + 1)
-    end = date(next_year, next_month, PAYROLL_PERIOD_START_DAY - 1)
-    return start, end
+# Davr chegaralari payroll_stats servisida — dashboard bilan bitta manba.
 
 
 @router.get(
@@ -2033,113 +2018,14 @@ async def get_my_period_stats(
     """
     offset = max(-24, min(0, offset))
     period_from, period_to = _payroll_period_bounds(datetime.now(BUSINESS_TZ).date(), offset)
-    window_start, _ = day_bounds_in_tz(period_from)
-    _, window_end = day_bounds_in_tz(period_to)
 
-    is_controller = user.role == "inventory_controller"
-    if is_controller:
-        user_col = DocumentModel.controlled_by_user_id
-        statuses = ("completed", "packed", "shipped")
-        ts_col = func.coalesce(DocumentModel.completed_at, DocumentModel.updated_at)
-    else:
-        user_col = DocumentModel.assigned_to_user_id
-        statuses = ("picked", "completed", "packed", "shipped")
-        ts_col = func.coalesce(
-            DocumentModel.sent_to_controller_at,
-            DocumentModel.completed_at,
-            DocumentModel.updated_at,
-        )
-
-    # Tarif davr boshiga qarab: to'langan oy keyingi tarifda qayta hisoblanmasin.
-    rates = load_rates(db, payroll_role_for(user.role), period_from)
-
-    line_agg = (
-        db.query(
-            DocumentLineModel.document_id.label("doc_id"),
-            func.count(DocumentLineModel.id).label("poz"),
-            func.coalesce(func.sum(DocumentLineModel.picked_qty), 0).label("dona"),
-        )
-        .group_by(DocumentLineModel.document_id)
-        .subquery()
-    )
-    rows = (
-        db.query(
-            ts_col.label("ts"),
-            func.coalesce(line_agg.c.poz, 0).label("poz"),
-            func.coalesce(line_agg.c.dona, 0).label("dona"),
-            OrderModel.source.label("source"),
-        )
-        .outerjoin(line_agg, line_agg.c.doc_id == DocumentModel.id)
-        .outerjoin(OrderModel, OrderModel.id == DocumentModel.order_id)
-        .filter(
-            DocumentModel.doc_type == "SO",
-            DocumentModel.status.in_(statuses),
-            user_col == user.id,
-            ts_col >= window_start,
-            ts_col <= window_end,
-        )
-        .all()
-    )
-
-    def _empty_group() -> dict:
-        return {"orders": 0, "positions": 0, "qty": 0.0}
-
-    per_day: dict = defaultdict(
-        lambda: {SOURCE_GROUP_CITY: _empty_group(), SOURCE_GROUP_REGION: _empty_group()}
-    )
-
-    def _add(ts, poz, dona, source) -> None:
-        if ts is None:
-            return
-        if ts.tzinfo is None:
-            ts = ts.replace(tzinfo=timezone.utc)
-        # Tarif guruhi: diller -> viloyat; o'rikzor ham 26.07.2026 davridan viloyat
-        # (davr boshi bo'yicha — eski davrlar eskicha). Navbat tablari o'zgarmagan.
-        group = payroll_source_group(source, period_from)
-        bucket = per_day[ts.astimezone(BUSINESS_TZ).date()][group]
-        bucket["orders"] += 1
-        bucket["positions"] += int(poz or 0)
-        bucket["qty"] += float(dona or 0)
-
-    for r in rows:
-        _add(r.ts, r.poz, r.dona, r.source)
-
-    # Bekor qilingan terish ham xodimning ishi (admin paneli ham shunday sanaydi).
-    if not is_controller:
-        cancel_lines = (
-            db.query(
-                SafeCancelReturnLineModel.session_id.label("sid"),
-                func.count(SafeCancelReturnLineModel.id).label("poz"),
-                func.coalesce(func.sum(SafeCancelReturnLineModel.qty_to_return), 0).label("dona"),
-            )
-            .group_by(SafeCancelReturnLineModel.session_id)
-            .subquery()
-        )
-        cancel_ts = func.coalesce(
-            db.query(func.max(DocumentLineModel.picked_at))
-            .filter(DocumentLineModel.document_id == DocumentModel.id)
-            .scalar_subquery(),
-            SafeCancelReturnSessionModel.created_at,
-        )
-        cancel_rows = (
-            db.query(
-                cancel_ts.label("ts"),
-                func.coalesce(cancel_lines.c.poz, 0).label("poz"),
-                func.coalesce(cancel_lines.c.dona, 0).label("dona"),
-                OrderModel.source.label("source"),
-            )
-            .join(DocumentModel, DocumentModel.id == SafeCancelReturnSessionModel.document_id)
-            .outerjoin(cancel_lines, cancel_lines.c.sid == SafeCancelReturnSessionModel.id)
-            .outerjoin(OrderModel, OrderModel.id == DocumentModel.order_id)
-            .filter(
-                DocumentModel.assigned_to_user_id == user.id,
-                cancel_ts >= window_start,
-                cancel_ts <= window_end,
-            )
-            .all()
-        )
-        for r in cancel_rows:
-            _add(r.ts, r.poz, r.dona, r.source)
+    # Hisob umumiy servisda — admin dashboard jadvali bilan bitta manba
+    # (maosh kuni ikki xil raqam chiqmasin).
+    payroll_role = payroll_role_for(user.role)
+    rates = load_period_rates(db, payroll_role, period_from)
+    per_day = collect_period_buckets(
+        db, period_from, period_to, role=payroll_role, user_ids=[user.id]
+    ).get(user.id, {})
 
     def _group_out(raw: dict, group: str) -> MyPeriodStatsGroup:
         return MyPeriodStatsGroup(

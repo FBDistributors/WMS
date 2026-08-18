@@ -19,6 +19,7 @@ import {
   StaffOrdersDialog,
   type StaffSelection,
 } from '../../admin/components/dashboard/StaffOrdersDialog'
+import { StaffPayrollSection } from '../../admin/components/dashboard/StaffPayrollSection'
 import { StaffProTable, type StaffProRow } from '../../admin/components/dashboard/StaffProTable'
 import { Button } from '../../components/ui/button'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -896,6 +897,9 @@ export function DashboardPage() {
               }
               t={t}
             />
+
+            {/* Ball (ish haqi davri) — xodim ilovasidagi hisob bilan bitta manba */}
+            <StaffPayrollSection t={t} showError={showError} />
           </div>
         </div>
       )}

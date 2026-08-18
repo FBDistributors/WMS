@@ -122,6 +122,40 @@ export async function getPickingStaffStats(params?: {
   return fetchJSON<PickingStaffStatsResponse>('/api/v1/dashboard/picking-staff-stats', { query })
 }
 
+export type StaffPayrollRow = {
+  user_id: string
+  full_name: string
+  orders: number
+  positions: number
+  positions_shahar: number
+  positions_region: number
+  qty: number
+  amount_shahar: number
+  amount_region: number
+  total_amount: number
+}
+
+export type StaffPayrollResponse = {
+  period_from: string
+  period_to: string
+  rates: {
+    picker_shahar: number
+    picker_region: number
+    controller_shahar: number
+    controller_region: number
+  }
+  pickers: StaffPayrollRow[]
+  controllers: StaffPayrollRow[]
+  totals: { pickers_total: number; controllers_total: number }
+}
+
+/** Ish haqi davri (26→25) bo'yicha xodimlar balli — xodim ilovasi bilan bitta hisob. */
+export async function getStaffPayroll(offset = 0): Promise<StaffPayrollResponse> {
+  return fetchJSON<StaffPayrollResponse>('/api/v1/dashboard/staff-payroll', {
+    query: { offset: String(offset) },
+  })
+}
+
 export type StaffRole = 'picker' | 'controller'
 
 export type StaffOrderRow = {
