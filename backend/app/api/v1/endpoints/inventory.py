@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import time
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
@@ -64,6 +65,8 @@ from app.integrations.smartup.balance_disk_cache import (
     write_balance_cache as write_smartup_balance_disk_cache,
 )
 from app.integrations.smartup.filial_list import FILIAL_LIST, get_filial_ids
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -4149,7 +4152,12 @@ async def get_smartup_balance(
 
     if isinstance(result, dict):
         _smartup_balance_cache[cache_key] = result
-        write_smartup_balance_disk_cache(today_str, wh, fid_param, result)
+        # Disk keshi — qulaylik: yozib bo'lmasa (masalan papka egaligi buzilgan)
+        # foydalanuvchi baribir kelgan ma'lumotni olishi kerak, 500 emas.
+        try:
+            write_smartup_balance_disk_cache(today_str, wh, fid_param, result)
+        except OSError as exc:
+            logger.warning("Smartup balance disk keshi yozilmadi: %s", exc)
     return result
 
 

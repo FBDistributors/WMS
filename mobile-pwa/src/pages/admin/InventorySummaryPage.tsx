@@ -196,6 +196,21 @@ export function InventorySummaryPage() {
     }
   }, [])
 
+  // fetchJSON xatoni Error emas, ApiError obyekt sifatida tashlaydi —
+  // String() "[object Object]" bermasligi uchun message ni qo'lda ajratamiz.
+  const smartupErrText = useCallback(
+    (reason: unknown): string => {
+      if (reason instanceof Error && reason.message) return reason.message
+      if (reason && typeof reason === 'object') {
+        const apiErr = reason as { message?: unknown; status?: unknown }
+        if (typeof apiErr.message === 'string' && apiErr.message.trim()) return apiErr.message
+        if (typeof apiErr.status === 'number') return `HTTP ${apiErr.status}`
+      }
+      return t('inventory:smartup_sync_failed')
+    },
+    [t],
+  )
+
   const syncSmartupFromSource = useCallback(async () => {
     setIsSmartupSyncing(true)
     const prev = readSmartupSummaryCache()
@@ -215,18 +230,14 @@ export function InventorySummaryPage() {
       q001Map = built.byCode
       q001Bc = built.byBarcode
     } else {
-      errs.push(
-        q001.reason instanceof Error ? q001.reason.message : String(q001.reason ?? '')
-      )
+      errs.push(smartupErrText(q001.reason))
     }
     if (q002.status === 'fulfilled') {
       const built = buildSmartupSummaryMaps(q002.value)
       q002Map = built.byCode
       q002Bc = built.byBarcode
     } else {
-      errs.push(
-        q002.reason instanceof Error ? q002.reason.message : String(q002.reason ?? '')
-      )
+      errs.push(smartupErrText(q002.reason))
     }
     const hasData =
       hasSmartupMapData(q001Map) ||
@@ -241,7 +252,7 @@ export function InventorySummaryPage() {
       showError(errs.filter(Boolean).join(' · ') || t('inventory:smartup_sync_failed'))
     }
     setIsSmartupSyncing(false)
-  }, [applySmartupMaps, showError, t])
+  }, [applySmartupMaps, showError, smartupErrText, t])
 
   useEffect(() => {
     if (
