@@ -211,7 +211,15 @@ export function AdminLayout({ title, titleSlot, backTo, actionSlot, children }: 
         </header>
         <main className="min-w-0 flex-1 overflow-x-auto overflow-y-auto px-4 py-4 pb-14 sm:px-6 sm:py-6">{children}</main>
         <footer className="shrink-0 border-t border-slate-200 bg-white/80 px-4 py-2 text-left text-[10px] text-slate-500 backdrop-blur sm:px-6 sm:text-xs dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
-          © 2026 FB Warehouse Management System · Developed by Jaloliddin
+          © 2026 FB Warehouse Management System · Developed by{' '}
+          <a
+            href="https://jaloliddin7.uz"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-slate-600 underline-offset-2 hover:text-sky-600 hover:underline dark:text-slate-300 dark:hover:text-sky-400"
+          >
+            Jaloliddin
+          </a>
         </footer>
       </div>
       <ConfirmDialog
