@@ -548,7 +548,10 @@
     "save_failed": "Not saved. Try again.",
     "load_failed": "Failed to load rates.",
     "invalid_amount": "Invalid amount.",
-    "note": "The new rate applies to the period starting {{date}}. Past periods keep their own rate — a calculated month is not recalculated."
+    "note": "The new rate applies to the period starting {{date}}. Past periods keep their own rate — a calculated month is not recalculated.",
+    "big_order_title": "Big order rule (UZUM MARKET)",
+    "big_order_label": "Threshold amount",
+    "big_order_hint": "If an UZUM MARKET MCHJ XK order EXCEEDS this amount, the picker and controller are paid at the region rate. Takes effect from the current period."
   },
   "payroll_table": {
     "title": "Points (payroll period)",

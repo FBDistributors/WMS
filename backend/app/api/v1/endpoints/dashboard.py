@@ -39,6 +39,7 @@ from app.services.order_source_group import (
     payroll_source_group_conditions,
     source_group_conditions,
 )
+from app.services.payroll_rates import load_big_order_threshold
 from app.services.payroll_stats import (
     collect_period_buckets,
     group_amount,
@@ -592,14 +593,17 @@ def _staff_role_columns(role: str):
     )
 
 
-def _payroll_group_conditions(source_group: Optional[str], ts_col) -> list:
+def _payroll_group_conditions(db: Session, source_group: Optional[str], ts_col) -> list:
     """Reyting/ish haqi endpointlari uchun tarif-guruhlash.
 
-    26.07.2026 dan o'rikzor region tarifida — xodim ilovasidagi hisob bilan bir
-    xil bo'lishi shart, aks holda maosh paytida ikki xil raqam chiqadi. Shart
+    O'rikzor (26.07.2026 dan) va yirik-buyurtma (UZUM, chegaradan ortiq) region
+    tarifida — xodim ilovasidagi hisob bilan bir xil bo'lishi shart. Shart
     hujjatning o'z ish vaqtiga (`ts_col`) bog'lanadi — eski hujjatlar eskicha.
+    Chegara joriy davr boshidagi qiymat bilan olinadi.
     """
-    return payroll_source_group_conditions(source_group, ts_col)
+    period_from, _ = payroll_period_bounds(_today_business())
+    big_min = load_big_order_threshold(db, period_from)
+    return payroll_source_group_conditions(source_group, ts_col, big_min)
 
 
 def _source_group_conditions(source_group: Optional[str]) -> list:
@@ -622,7 +626,7 @@ def _aggregate_staff_by_user_column(
     col = ts_col if ts_col is not None else _document_completed_at_expr()
     filters = _staff_doc_filters(user_id_column, statuses, col, date_from, date_to)
     # Reyting jadvali maosh asosi — tarif-guruhlash (o'rikzor -> region, 26.07.2026 dan).
-    filters.extend(_payroll_group_conditions(source_group, col))
+    filters.extend(_payroll_group_conditions(db, source_group, col))
 
     per_doc = (
         db.query(
@@ -832,7 +836,7 @@ async def get_staff_orders(
     filters = _staff_doc_filters(user_col, statuses, ts_col, date_from, date_to)
     filters.append(user_col == user_id)
     # Reyting bilan bir xil filtr — tarif-guruhlash (o'rikzor -> region, 26.07.2026 dan).
-    filters.extend(_payroll_group_conditions(group, ts_col))
+    filters.extend(_payroll_group_conditions(db, group, ts_col))
 
     docs = (
         db.query(DocumentModel)

@@ -33,9 +33,9 @@ from app.models.safe_cancel_return import (
 from app.services.order_source_group import (
     SOURCE_GROUP_CITY,
     SOURCE_GROUP_REGION,
-    payroll_source_group,
+    payroll_group_for_order,
 )
-from app.services.payroll_rates import load_rates
+from app.services.payroll_rates import load_big_order_threshold, load_rates
 
 PayrollRole = Literal["picker", "controller"]
 
@@ -117,6 +117,9 @@ def collect_period_buckets(
         .group_by(DocumentLine.document_id)
         .subquery()
     )
+    # Yirik-buyurtma chegarasi davr boshiga qarab (tariflar bilan bir printsip).
+    big_order_min = load_big_order_threshold(db, period_from)
+
     query = (
         db.query(
             user_col.label("uid"),
@@ -124,6 +127,8 @@ def collect_period_buckets(
             func.coalesce(line_agg.c.poz, 0).label("poz"),
             func.coalesce(line_agg.c.dona, 0).label("dona"),
             Order.source.label("source"),
+            Order.customer_id.label("customer_id"),
+            Order.total_amount.label("total_amount"),
         )
         .outerjoin(line_agg, line_agg.c.doc_id == Document.id)
         .outerjoin(Order, Order.id == Document.order_id)
@@ -139,19 +144,21 @@ def collect_period_buckets(
 
     out: dict[UUID, UserBuckets] = defaultdict(_new_user_buckets)
 
-    def _add(uid, ts, poz, dona, source) -> None:
+    def _add(uid, ts, poz, dona, source, customer_id=None, total_amount=None) -> None:
         if uid is None or ts is None:
             return
         if ts.tzinfo is None:
             ts = ts.replace(tzinfo=timezone.utc)
-        group = payroll_source_group(source, period_from)
+        group = payroll_group_for_order(
+            source, customer_id, total_amount, period_from, big_order_min=big_order_min
+        )
         bucket = out[uid][ts.astimezone(BUSINESS_TZ).date()][group]
         bucket["orders"] += 1
         bucket["positions"] += int(poz or 0)
         bucket["qty"] += float(dona or 0)
 
     for r in rows:
-        _add(r.uid, r.ts, r.poz, r.dona, r.source)
+        _add(r.uid, r.ts, r.poz, r.dona, r.source, r.customer_id, r.total_amount)
 
     # Bekor qilingan terish ham yig'uvchining ishi (admin paneli ham shunday sanaydi).
     if not is_controller:
@@ -177,6 +184,8 @@ def collect_period_buckets(
                 func.coalesce(cancel_lines.c.poz, 0).label("poz"),
                 func.coalesce(cancel_lines.c.dona, 0).label("dona"),
                 Order.source.label("source"),
+                Order.customer_id.label("customer_id"),
+                Order.total_amount.label("total_amount"),
             )
             .join(Document, Document.id == SafeCancelReturnSession.document_id)
             .outerjoin(cancel_lines, cancel_lines.c.sid == SafeCancelReturnSession.id)
@@ -192,7 +201,7 @@ def collect_period_buckets(
             else cancel_query.filter(Document.assigned_to_user_id.isnot(None))
         )
         for r in cancel_query.all():
-            _add(r.uid, r.ts, r.poz, r.dona, r.source)
+            _add(r.uid, r.ts, r.poz, r.dona, r.source, r.customer_id, r.total_amount)
 
     return dict(out)
 

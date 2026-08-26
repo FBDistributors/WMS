@@ -548,7 +548,10 @@
     "save_failed": "Saqlanmadi. Qayta urinib ko'ring.",
     "load_failed": "Tariflar yuklanmadi.",
     "invalid_amount": "Summa noto'g'ri.",
-    "note": "Yangi tarif {{date}} dan boshlangan davrga qo'llanadi. O'tgan davrlar o'z tarifida qoladi — hisoblangan oy qayta hisoblanmaydi."
+    "note": "Yangi tarif {{date}} dan boshlangan davrga qo'llanadi. O'tgan davrlar o'z tarifida qoladi — hisoblangan oy qayta hisoblanmaydi.",
+    "big_order_title": "Yirik buyurtma qoidasi (UZUM MARKET)",
+    "big_order_label": "Chegara summasi",
+    "big_order_hint": "UZUM MARKET MCHJ XK buyurtmasi shu summadan ORTIQ bo'lsa, yig'uvchi va controller region tarifida oladi. O'zgarish joriy davrdan kuchga kiradi."
   },
   "payroll_table": {
     "title": "Ball (ish haqi davri)",

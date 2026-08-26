@@ -88,11 +88,15 @@ def _mk_sent_doc(
     source: str,
     sent_at: datetime,
     lines: int = 2,
+    customer_id: str | None = None,
+    total_amount=None,
 ) -> Document:
     order = Order(
         source=source,
         source_external_id=f"orz-{uuid.uuid4().hex[:10]}",
         order_number=f"N{uuid.uuid4().hex[:6]}",
+        customer_id=customer_id,
+        total_amount=total_amount,
     )
     order.wms_state = OrderWmsState(status="picked")
     db.add(order)

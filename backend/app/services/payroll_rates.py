@@ -14,8 +14,12 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from app.models.payroll_rate import PayrollRate
-from app.services.order_source_group import SOURCE_GROUP_CITY, SOURCE_GROUP_REGION
+from app.models.payroll_rate import PayrollBigOrderThreshold, PayrollRate
+from app.services.order_source_group import (
+    DEFAULT_BIG_ORDER_MIN_TOTAL,
+    SOURCE_GROUP_CITY,
+    SOURCE_GROUP_REGION,
+)
 
 #: Jadval bo'sh bo'lsa (migratsiyagacha yoki qator o'chirilgan) ishlatiladi.
 DEFAULT_RATES: dict[tuple[str, str], Decimal] = {
@@ -52,3 +56,18 @@ def load_rates(db: Session, role: str, as_of: date) -> dict[str, Decimal]:
         if row.source_group in out:
             out[row.source_group] = Decimal(str(row.amount))
     return out
+
+
+def load_big_order_threshold(db: Session, as_of: date) -> Decimal:
+    """Yirik buyurtma chegarasi — `as_of` (davr boshi) sanasida amaldagi qiymat.
+
+    Tariflar bilan bir printsip: o'zgarish yangi sanali qator, o'tgan davr o'z
+    chegarasida qoladi. Jadval bo'sh — default (20 mln).
+    """
+    row = (
+        db.query(PayrollBigOrderThreshold)
+        .filter(PayrollBigOrderThreshold.effective_from <= as_of)
+        .order_by(PayrollBigOrderThreshold.effective_from.desc())
+        .first()
+    )
+    return Decimal(str(row.amount)) if row else DEFAULT_BIG_ORDER_MIN_TOTAL

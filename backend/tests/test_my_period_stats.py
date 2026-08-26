@@ -42,8 +42,10 @@ def test_work_lands_on_its_day_with_all_three_numbers(
     doc_id = _send_and_pick(client, db_session, order, picker)
 
     # Davr ichidagi aniq kunga qo'yamiz (bugundan bir kun oldin — chegaraga tegmasin).
+    # Davr boshida (26-sana) "kecha" OLDINGI davrga tushadi — davr ichida qolamiz.
     today = datetime.now(BUSINESS_TZ).date()
-    day = today - timedelta(days=1)
+    period_start, _ = _payroll_period_bounds(today)
+    day = max(today - timedelta(days=1), period_start)
     doc = db_session.query(Document).filter(Document.id == uuid.UUID(doc_id)).one()
     doc.sent_to_controller_at = datetime.combine(
         day, time(11, 0), tzinfo=BUSINESS_TZ

@@ -20,6 +20,7 @@ export function PayrollRatesSection() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [effectiveFrom, setEffectiveFrom] = useState('')
+  const [bigOrderThreshold, setBigOrderThreshold] = useState('')
 
   const keyOf = (role: string, group: string) => `${role}:${group}`
 
@@ -31,6 +32,7 @@ export function PayrollRatesSection() {
       for (const r of data.rates) next[keyOf(r.role, r.source_group)] = String(Math.round(r.amount))
       setValues(next)
       setEffectiveFrom(data.effective_from)
+      setBigOrderThreshold(String(Math.round(data.big_order_threshold ?? 0)))
     } catch {
       showError(t('admin:payroll.load_failed'))
     } finally {
@@ -55,10 +57,17 @@ export function PayrollRatesSection() {
         payload.push({ role, source_group: group, amount })
       }
     }
+    const thresholdRaw = bigOrderThreshold.trim()
+    const threshold = Number(thresholdRaw)
+    if (!thresholdRaw || Number.isNaN(threshold) || threshold < 0) {
+      showError(t('admin:payroll.invalid_amount'))
+      return
+    }
     setIsSaving(true)
     try {
-      const data = await savePayrollRates(payload)
+      const data = await savePayrollRates(payload, threshold)
       setEffectiveFrom(data.effective_from)
+      setBigOrderThreshold(String(Math.round(data.big_order_threshold ?? threshold)))
       showSuccess(t('admin:payroll.saved'))
     } catch {
       showError(t('admin:payroll.save_failed'))
@@ -114,6 +123,31 @@ export function PayrollRatesSection() {
               </div>
             </div>
           ))}
+
+          <div>
+            <div className="mb-2 text-[13px] font-bold text-slate-700 dark:text-slate-300">
+              {t('admin:payroll.big_order_title')}
+            </div>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400">
+              {t('admin:payroll.big_order_label')}
+              <div className="mt-1 flex items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  inputMode="numeric"
+                  value={bigOrderThreshold}
+                  onChange={(e) => setBigOrderThreshold(e.target.value)}
+                  className="w-full max-w-[240px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                />
+                <span className="shrink-0 text-xs text-slate-400">
+                  {t('admin:payroll.currency')}
+                </span>
+              </div>
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-400 dark:text-slate-500">
+                {t('admin:payroll.big_order_hint')}
+              </p>
+            </label>
+          </div>
 
           <div className="flex items-center justify-between gap-3 pt-1">
             <p className="text-[11.5px] leading-relaxed text-slate-400 dark:text-slate-500">
