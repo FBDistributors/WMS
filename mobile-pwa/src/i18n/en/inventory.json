@@ -166,5 +166,6 @@
     "adjust": "Adjust",
     "transfer_in": "Transfer in",
     "transfer_out": "Transfer out"
-  }
+  },
+  "sale_blocked_badge": "Sale blocked"
 }

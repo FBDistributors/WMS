@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { PayrollRatesSection } from '../../admin/components/PayrollRatesSection'
+import { SaleExpiryCutoffSection } from '../../admin/components/SaleExpiryCutoffSection'
 import { SettingsHubTabs, type SettingsHubTabId } from '../../admin/components/SettingsHubTabs'
 import { VipCustomersSection } from './VipCustomersPage'
 import { OrganizationsSection } from './OrganizationsPage'
@@ -50,7 +51,13 @@ export function AdminSettingsPage() {
     if (tab === 'organizations') {
       return <OrganizationsSection embedded setHeaderAction={setHeaderActionStable} />
     }
-    return <VipCustomersSection embedded setHeaderAction={setHeaderActionStable} />
+    // VIP tabi — muddat qoidalari oilasi: global sotuv chegarasi ham shu yerda.
+    return (
+      <div className="space-y-4">
+        <SaleExpiryCutoffSection />
+        <VipCustomersSection embedded setHeaderAction={setHeaderActionStable} />
+      </div>
+    )
   }, [tab, setHeaderActionStable])
 
   return (

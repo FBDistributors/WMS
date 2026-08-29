@@ -573,5 +573,15 @@
     "rate_picker": "Picker: city {{shahar}} · region {{region}}",
     "rate_controller": "Controller: city {{shahar}} · region {{region}}",
     "export_failed": "Excel export failed"
+  },
+  "sale_expiry": {
+    "title": "Sale expiry cutoff",
+    "subtitle": "Lots expiring BEFORE this date do not go into regular sale.",
+    "label": "Cutoff date",
+    "clear": "Clear (disable rule)",
+    "hint": "With a cutoff set: allocation skips such lots and pickers are not offered them as alternate locations. Promo/action lines are exempt. Stock pages mark such lots as \"Sale blocked\".",
+    "saved": "Saved",
+    "save_failed": "Save failed",
+    "load_failed": "Failed to load the cutoff"
   }
 }

@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from app.api.v1.endpoints import (
     app_feedback,
+    app_settings,
     audit,
     auth,
     box_locations,
@@ -33,6 +34,7 @@ from app.api.v1.endpoints import (
 
 router = APIRouter()
 router.include_router(app_feedback.router, prefix="/app-feedback", tags=["app-feedback"])
+router.include_router(app_settings.router, prefix="/app-settings", tags=["app-settings"])
 router.include_router(audit.router, prefix="/audit", tags=["audit"])
 router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
 router.include_router(auth.router, prefix="/auth", tags=["auth"])

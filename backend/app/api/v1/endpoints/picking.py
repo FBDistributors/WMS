@@ -54,6 +54,7 @@ from app.services.order_source_group import (
     order_source_group,
     source_group_conditions,
 )
+from app.services.app_settings import get_sale_expiry_cutoff
 from app.services.organization_labels import resolve_org_display
 from app.services.person_identity import linked_user_ids, same_person
 from app.services.stock_availability import require_sufficient_reserved
@@ -668,15 +669,24 @@ def _line_alternate_locations(
     bd_map: dict[tuple[UUID, UUID], dict],
     primary_rows: list[dict],
     max_rows: int = 24,
+    sale_cutoff=None,
 ) -> List[PickingAlternateLocation]:
     """
     Muqobil joylar — DB so'rovsiz, oldindan batch yuklangan xaritalardan:
     `bd_map` — (lot_id, location_id) -> quti breakdown kwargs;
     `primary_rows` — qatorning asosiy (product, location) balans qatorlari.
+
+    `sale_cutoff`: muddati shu sanadan oldin tugaydigan lotlar taklif qilinmaydi —
+    faqat qatorning O'Z loti chegaradan yuqorida bo'lsa (promo/EXPIRED'dan
+    ajratilgan qator o'z sinfida qoladi, allow_expired naqshiga o'xshash).
     """
     if not line.product_id:
         return []
     lid, lot_line = line.location_id, line.lot_id
+    line_exp = getattr(line, "expiry_date", None)
+    enforce_cutoff = (
+        sale_cutoff is not None and not (line_exp is not None and line_exp < sale_cutoff)
+    )
     out: List[PickingAlternateLocation] = []
     for r in rows:
         if len(out) >= max_rows:
@@ -684,6 +694,11 @@ def _line_alternate_locations(
         is_pri = lid is not None and lot_line is not None and r["location_id"] == lid and r["lot_id"] == lot_line
         av = float(r["available"] or 0)
         if av <= 0 and not is_pri:
+            continue
+        # Taqqoslash uchun date kerak (_safe_expiry_date str qaytaradi — u API uchun).
+        raw_exp = r.get("expiry_date")
+        r_exp = date.fromisoformat(raw_exp) if isinstance(raw_exp, str) else raw_exp
+        if enforce_cutoff and not is_pri and r_exp is not None and r_exp < sale_cutoff:
             continue
         bd_kw = bd_map.get((r["lot_id"], r["location_id"]), {})
         out.append(
@@ -843,6 +858,7 @@ def _picking_lines_with_alternates(
             pairs.add((ln.lot_id, ln.location_id))
     _fill_pick_balances_for_pairs(db, pairs, balances)
     bd_map = _breakdown_kwargs_map_for_pairs(db, pairs, balances)
+    sale_cutoff = get_sale_expiry_cutoff(db)
 
     out: List[PickingLine] = []
     for ln in lines:
@@ -857,6 +873,7 @@ def _picking_lines_with_alternates(
                         by_pid.get(ln.product_id, []),
                         bd_map=bd_map,
                         primary_rows=primary_by_key.get((ln.product_id, ln.location_id), []),
+                        sale_cutoff=sale_cutoff,
                     ),
                 )
             )
@@ -2382,6 +2399,20 @@ async def change_pick_source(
     new_lot = db.query(StockLotModel).filter(StockLotModel.id == payload.lot_id).one_or_none()
     if not new_lot or new_lot.product_id != line.product_id:
         raise HTTPException(status_code=400, detail="Invalid lot for this product")
+
+    # Sotuv muddat chegarasi: chegaradan qisqa muddatli lotga o'tib bo'lmaydi —
+    # qatorning o'z loti allaqachon chegara ostida bo'lsa (promo/EXPIRED) ruxsat.
+    sale_cutoff = get_sale_expiry_cutoff(db)
+    if sale_cutoff is not None and new_lot.expiry_date is not None and new_lot.expiry_date < sale_cutoff:
+        line_exp = getattr(line, "expiry_date", None)
+        if not (line_exp is not None and line_exp < sale_cutoff):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Bu lot muddati ({new_lot.expiry_date:%Y-%m}) sotuv chegarasidan "
+                    f"({sale_cutoff:%Y-%m-%d}) qisqa — oddiy sotuvga tanlab bo'lmaydi."
+                ),
+            )
 
     bals = _get_lot_level_balances(db, [line.product_id], location_id=payload.location_id)
     match = next((r for r in bals if r["lot_id"] == payload.lot_id), None)

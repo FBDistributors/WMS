@@ -573,5 +573,15 @@
     "rate_picker": "Yig'uvchi: shahar {{shahar}} · region {{region}}",
     "rate_controller": "Controller: shahar {{shahar}} · region {{region}}",
     "export_failed": "Excel eksport muvaffaqiyatsiz"
+  },
+  "sale_expiry": {
+    "title": "Sotuv muddat chegarasi",
+    "subtitle": "Muddati shu sanadan OLDIN tugaydigan lotlar oddiy sotuvga chiqmaydi.",
+    "label": "Chegara sanasi",
+    "clear": "Tozalash (qoidani o'chirish)",
+    "hint": "Chegara qo'yilsa: ajratish bunday lotlarni tanlamaydi, yig'uvchiga muqobil joy sifatida taklif qilinmaydi. Promo/aksiya qatorlari bundan mustasno — ular qisqa muddatlilardan teraveradi. Qoldiq sahifasida bunday lotlar 'Sotuvga yopiq' belgisi bilan ko'rinadi.",
+    "saved": "Saqlandi",
+    "save_failed": "Saqlanmadi",
+    "load_failed": "Chegara yuklanmadi"
   }
 }

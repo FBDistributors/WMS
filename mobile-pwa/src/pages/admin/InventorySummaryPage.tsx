@@ -34,6 +34,7 @@ import {
 import { getBrands, type Brand } from '../../services/brandsApi'
 import { useAuth } from '../../rbac/AuthProvider'
 import { useAppToast } from '../../feedback/useAppToast'
+import { getSaleExpiryCutoff } from '../../services/appSettingsApi'
 import { writeExcelFile } from '../../utils/exportExcel'
 import {
   formatSmartupCacheTime,
@@ -129,6 +130,8 @@ export function InventorySummaryPage() {
   const [brandOptions, setBrandOptions] = useState<Brand[]>([])
   const [brandFilterLoading, setBrandFilterLoading] = useState(false)
   const [selectedBrandIds, setSelectedBrandIds] = useState<string[]>([])
+  // Sotuv muddat chegarasi: shu sanadan oldin tugaydigan lotlar "sotuvga yopiq".
+  const [saleCutoff, setSaleCutoff] = useState<string | null>(null)
   const excelMenuRef = useRef<HTMLDivElement>(null)
   const initialSmartup = useMemo(() => readInitialSmartupState(), [])
   const [smartupQoldiqByCode, setSmartupQoldiqByCode] = useState(initialSmartup.q001)
@@ -328,6 +331,19 @@ export function InventorySummaryPage() {
     if (!brandFilterOpen || brandOptions.length > 0 || brandFilterLoading) return
     void loadBrands()
   }, [brandFilterOpen, brandFilterLoading, brandOptions.length, loadBrands])
+
+  useEffect(() => {
+    // Belgi uchun bir marta; xato bo'lsa belgi shunchaki chiqmaydi (bloklamaydi).
+    void getSaleExpiryCutoff()
+      .then((d) => setSaleCutoff(d.cutoff))
+      .catch(() => setSaleCutoff(null))
+  }, [])
+
+  const isSaleBlocked = useCallback(
+    (expiry: string | null | undefined): boolean =>
+      !!saleCutoff && !!expiry && expiry < saleCutoff,
+    [saleCutoff],
+  )
 
   useEffect(() => {
     void load()
@@ -633,13 +649,25 @@ export function InventorySummaryPage() {
                             {t('inventory:enter_stock')}
                           </Link>
                         ) : locs.length === 1 ? (
-                          locs[0].location_code
+                          <span className="font-mono">
+                            {locs[0].location_code}
+                            {isSaleBlocked(locs[0].expiry_date) ? (
+                              <span className="ml-1 rounded bg-rose-100 px-1 text-[10px] font-bold text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                                {t('inventory:sale_blocked_badge')}
+                              </span>
+                            ) : null}
+                          </span>
                         ) : (
                           <span className="block space-y-1">
                             {locs.map((loc, idx) => (
                               <span key={idx} className="block font-mono">
                                 {loc.location_code}
                                 {loc.expiry_date ? ` · ${loc.expiry_date}` : ''}
+                                {isSaleBlocked(loc.expiry_date) ? (
+                                  <span className="ml-1 rounded bg-rose-100 px-1 text-[10px] font-bold text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                                    {t('inventory:sale_blocked_badge')}
+                                  </span>
+                                ) : null}
                               </span>
                             ))}
                           </span>
@@ -668,6 +696,7 @@ export function InventorySummaryPage() {
     smartupQoldiqByBarcode,
     smartupBronByCode,
     smartupBronByBarcode,
+    isSaleBlocked,
     t,
   ])
 

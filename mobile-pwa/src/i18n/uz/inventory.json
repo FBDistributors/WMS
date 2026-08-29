@@ -164,5 +164,6 @@
     "adjust": "Tuzatish",
     "transfer_in": "Ko'chirish kirim",
     "transfer_out": "Ko'chirish chiqim"
-  }
+  },
+  "sale_blocked_badge": "Sotuvga yopiq"
 }
