@@ -35,6 +35,9 @@ router = APIRouter()
 
 LOCATION_TYPE_ENUM = {"RACK", "FLOOR", "SHOWROOM_RACK"}
 
+#: Zona turlari — yaratish va tahrirlashda bir xil ro'yxat.
+ZONE_TYPES = ("NORMAL", "EXPIRED", "DAMAGED", "QUARANTINE")
+
 
 def _get_showroom_root_id(db: Session) -> Optional[UUID]:
     """Return the id of the Showroom warehouse root location, or None if not found."""
@@ -88,6 +91,10 @@ class LocationCreate(BaseModel):
     pallet_no: Optional[int] = Field(default=None, ge=0, le=99)
     is_active: bool = True
     warehouse_id: Optional[UUID] = Field(default=None, description="Set for showroom locations (showroom root id)")
+    zone_type: str = Field(default="NORMAL", description="NORMAL, EXPIRED, DAMAGED, QUARANTINE")
+    expired_slot: Optional[str] = Field(
+        default=None, description="A or B when zone_type is EXPIRED"
+    )
 
 
 class LocationUpdate(BaseModel):
@@ -245,6 +252,12 @@ async def create_location(
 ):
     if payload.location_type not in LOCATION_TYPE_ENUM:
         raise HTTPException(status_code=400, detail="location_type must be RACK, FLOOR or SHOWROOM_RACK")
+    if payload.zone_type not in ZONE_TYPES:
+        raise HTTPException(status_code=400, detail=f"zone_type must be one of {ZONE_TYPES}")
+    # Slot faqat EXPIRED zonada ma'noga ega — boshqasida tashlanadi.
+    expired_slot = payload.expired_slot if payload.zone_type == "EXPIRED" else None
+    if expired_slot is not None and expired_slot not in ("A", "B"):
+        raise HTTPException(status_code=400, detail="expired_slot must be A, B or null")
     warehouse_id = payload.warehouse_id
     if payload.location_type == "SHOWROOM_RACK":
         showroom_id = _get_showroom_root_id(db)
@@ -286,15 +299,34 @@ async def create_location(
         parent_id=None,
         warehouse_id=warehouse_id,
         is_active=payload.is_active,
+        zone_type=payload.zone_type,
+        expired_slot=expired_slot,
     )
     db.add(location)
+    db.flush()
+    # Tahrirlashdagi bilan bir xil qoida: bitta omborda A (va B) slotini faqat
+    # bitta faol EXPIRED joy egallashi mumkin.
+    assert_expired_slot_unique_for_warehouse(
+        db,
+        location_id=location.id,
+        warehouse_id=location.warehouse_id,
+        expired_slot=location.expired_slot,
+        zone_type=location.zone_type or "NORMAL",
+        is_active=location.is_active,
+    )
     log_action(
         db,
         user_id=user.id,
         action=ACTION_CREATE,
         entity_type="location",
         entity_id=str(location.id),
-        new_data={"code": location.code, "type": location.type, "sector": location.sector},
+        new_data={
+            "code": location.code,
+            "type": location.type,
+            "sector": location.sector,
+            "zone_type": location.zone_type,
+            "expired_slot": location.expired_slot,
+        },
         ip_address=get_client_ip(request),
     )
     db.commit()
@@ -314,7 +346,6 @@ async def update_location(
     location = db.query(LocationModel).filter(LocationModel.id == location_id).one_or_none()
     if not location:
         raise HTTPException(status_code=404, detail="Location not found")
-    ZONE_TYPES = ("NORMAL", "EXPIRED", "DAMAGED", "QUARANTINE")
     old_data = {"code": location.code, "is_active": location.is_active}
     if payload.zone_type is not None:
         old_data["zone_type"] = location.zone_type

@@ -471,6 +471,15 @@ export function LocationsPage() {
           mode={dialog.mode}
           target={dialog.target}
           isShowroom={dialog.isShowroom}
+          defaultZoneType={
+            warehouse === 'main'
+              ? mainZone === 'expired'
+                ? 'EXPIRED'
+                : mainZone === 'damaged'
+                  ? 'DAMAGED'
+                  : 'NORMAL'
+              : 'NORMAL'
+          }
           onClose={() => setDialog({ open: false, mode: 'create' })}
           onSaved={load}
           onCreated={(loc) => {
@@ -500,19 +509,29 @@ type DialogProps = {
   mode: 'create' | 'edit'
   target?: Location
   isShowroom?: boolean
+  /** Yaratishda boshlang'ich zona — joriy tabga mos (Muddati o'tkan -> EXPIRED). */
+  defaultZoneType?: string
   onClose: () => void
   onSaved: () => void
   onCreated?: (location: Location) => void
 }
 
-function LocationDialog({ mode, target, isShowroom = false, onClose, onSaved, onCreated }: DialogProps) {
+function LocationDialog({
+  mode,
+  target,
+  isShowroom = false,
+  defaultZoneType = 'NORMAL',
+  onClose,
+  onSaved,
+  onCreated,
+}: DialogProps) {
   const { t } = useTranslation(['locations', 'common'])
   const { showError } = useAppToast()
   const isShowroomForm = isShowroom || (target?.location_type as string) === 'SHOWROOM_RACK'
   const [locationType, setLocationType] = useState<LocationTypeEnum>(
     (target?.location_type as LocationTypeEnum) ?? (isShowroom ? 'SHOWROOM_RACK' : 'RACK')
   )
-  const [zoneType, setZoneType] = useState<string>(target?.zone_type ?? 'NORMAL')
+  const [zoneType, setZoneType] = useState<string>(target?.zone_type ?? defaultZoneType)
   const [sector, setSector] = useState(target?.sector ?? '')
   const [levelNo, setLevelNo] = useState<number | ''>(target?.level_no ?? '')
   const [rowNo, setRowNo] = useState<number | ''>(target?.row_no ?? '')
@@ -591,6 +610,7 @@ function LocationDialog({ mode, target, isShowroom = false, onClose, onSaved, on
               ? { level_no: Number(levelNo), row_no: Number(rowNo) }
               : { pallet_no: Number(palletNo) }),
           is_active: true,
+          ...(effectiveType === 'SHOWROOM_RACK' ? {} : { zone_type: zoneType }),
         })
         onCreated?.(created)
       } else if (target) {
@@ -655,7 +675,9 @@ function LocationDialog({ mode, target, isShowroom = false, onClose, onSaved, on
             </label>
           )}
 
-          {mode === 'edit' && (
+          {/* Tahrirlashda — avvalgidek doim; yaratishda — asosiy omborda (u yerda
+              zona tablari bor, showroomda zona tushunchasi ishlatilmaydi). */}
+          {(mode === 'edit' || !isShowroomForm) && (
             <label className="text-sm text-slate-600 dark:text-slate-300">
               {t('locations:zone_type')}
               <select

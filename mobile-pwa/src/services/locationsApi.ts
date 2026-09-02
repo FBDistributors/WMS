@@ -47,6 +47,9 @@ export type LocationCreateInput = {
   pallet_no?: number
   is_active?: boolean
   warehouse_id?: string | null
+  /** Berilmasa NORMAL. EXPIRED bo'lsa expired_slot (A/B) ham berilishi mumkin. */
+  zone_type?: ZoneType | string
+  expired_slot?: string | null
 }
 
 export type LocationUpdateInput = {
