@@ -19,7 +19,11 @@ from app.services.stock_availability import (
     lock_lot_location,
     require_sufficient_available,
 )
-from app.services.app_settings import effective_min_expiry, get_sale_expiry_cutoff
+from app.services.app_settings import (
+    effective_min_expiry,
+    get_expired_zone_in_regular_orders,
+    get_sale_expiry_cutoff,
+)
 from app.services.vip_service import resolve_vip_min_expiry_months
 from app.services.warehouse_scope import location_ids_for_warehouse_scope, warehouse_scope_for_order
 from pydantic import BaseModel, Field
@@ -689,6 +693,8 @@ def _allocate_order(
     # chiqmaydi. Promo/aksiya qatorlariga taalluqli emas (qisqa muddatlilarni
     # sotish kanali ochiq qoladi).
     sale_cutoff = get_sale_expiry_cutoff(db)
+    # Sozlama yoqilgan bo'lsa oddiy qatorlar EXPIRED zonadan ham ajratiladi.
+    expired_zone_enabled = get_expired_zone_in_regular_orders(db)
 
     for line in order.lines:
         product_id = _resolve_product_id(db, line)
@@ -736,14 +742,29 @@ def _allocate_order(
             ]
         else:
             # Oddiy qator: samarali pol = eng qattig'i (VIP talabi, sotuv chegarasi).
-            lot_phases = [
+            regular_floor = effective_min_expiry(min_expiry_date, sale_cutoff)
+            lot_phases = []
+            if expired_zone_enabled:
+                # EXPIRED oldin — zonaning maqsadi qisqa muddatlini tezroq chiqarish.
+                # Promo'dan farqli `skip_expiry_floor` YO'Q: muddati o'tgan tovar
+                # oddiy mijozga ketmaydi, faqat zonada turgan amaldagi lotlar.
+                lot_phases.append(
+                    _fefo_available_lots(
+                        db,
+                        product_id,
+                        min_expiry_date=regular_floor,
+                        zone_types=["EXPIRED"],
+                        location_ids=scope_location_ids,
+                    )
+                )
+            lot_phases.append(
                 _fefo_available_lots(
                     db,
                     product_id,
-                    min_expiry_date=effective_min_expiry(min_expiry_date, sale_cutoff),
+                    min_expiry_date=regular_floor,
                     location_ids=scope_location_ids,
-                ),
-            ]
+                )
+            )
 
         for available_lots in lot_phases:
             if remaining <= 0:

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { PayrollRatesSection } from '../../admin/components/PayrollRatesSection'
+import { ExpiredZoneRuleSection } from '../../admin/components/ExpiredZoneRuleSection'
 import { SaleExpiryCutoffSection } from '../../admin/components/SaleExpiryCutoffSection'
 import { SettingsHubTabs, type SettingsHubTabId } from '../../admin/components/SettingsHubTabs'
 import { VipCustomersSection } from './VipCustomersPage'
@@ -55,6 +56,7 @@ export function AdminSettingsPage() {
     return (
       <div className="space-y-4">
         <SaleExpiryCutoffSection />
+        <ExpiredZoneRuleSection />
         <VipCustomersSection embedded setHeaderAction={setHeaderActionStable} />
       </div>
     )

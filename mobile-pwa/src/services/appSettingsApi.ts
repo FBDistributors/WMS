@@ -17,3 +17,19 @@ export async function saveSaleExpiryCutoff(cutoff: string | null): Promise<SaleE
     body: { cutoff },
   })
 }
+
+export type ExpiredZoneRule = {
+  /** true — oddiy buyurtmalar EXPIRED zonadan ham ajratiladi. */
+  enabled: boolean
+}
+
+export async function getExpiredZoneRule(): Promise<ExpiredZoneRule> {
+  return fetchJSON<ExpiredZoneRule>('/api/v1/app-settings/expired-zone-in-regular-orders')
+}
+
+export async function saveExpiredZoneRule(enabled: boolean): Promise<ExpiredZoneRule> {
+  return fetchJSON<ExpiredZoneRule>('/api/v1/app-settings/expired-zone-in-regular-orders', {
+    method: 'PUT',
+    body: { enabled },
+  })
+}

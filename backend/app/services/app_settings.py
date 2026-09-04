@@ -1,9 +1,13 @@
-"""Umumiy sozlamalarni o'qish/yozish + sotuv muddat chegarasi.
+"""Umumiy sozlamalar: sotuv muddat chegarasi va EXPIRED zona qoidasi.
 
-Chegara: muddati shu sanadan OLDIN tugaydigan lotlar oddiy sotuvga chiqmaydi
-(ajratish tanlamaydi, muqobil joy sifatida taklif qilinmaydi). None — qoida
-o'chiq. Promo/aksiya kanali chegaraga bo'ysunmaydi (qisqa muddatlilarni sotish
-yo'li ochiq qoladi).
+Sotuv muddat chegarasi: muddati shu sanadan OLDIN tugaydigan lotlar oddiy
+sotuvga chiqmaydi (ajratish tanlamaydi, muqobil joy sifatida taklif qilinmaydi).
+None — qoida o'chiq. Promo/aksiya kanali chegaraga bo'ysunmaydi.
+
+EXPIRED zona oddiy buyurtmalarda: yoqilsa oddiy qatorlar ham EXPIRED zonadagi
+zaxiradan ajratiladi (NORMAL'dan oldin — qisqa muddatli tezroq chiqsin). Muddati
+o'tgan tovar baribir chiqmaydi: promo'dan farqli, bu yerda muddat poli
+saqlanadi. Sotuv chegarasi ham ustun qoladi.
 """
 from __future__ import annotations
 
@@ -16,12 +20,30 @@ from sqlalchemy.orm import Session
 from app.models.app_setting import AppSetting
 
 SALE_EXPIRY_CUTOFF_KEY = "sale_expiry_cutoff"
+EXPIRED_ZONE_IN_REGULAR_ORDERS_KEY = "expired_zone_in_regular_orders"
 
 
 def _get_raw(db: Session, key: str) -> Optional[str]:
     row = db.get(AppSetting, key)
     value = (row.value or "").strip() if row else ""
     return value or None
+
+
+def _set_raw(db: Session, key: str, value: Optional[str], updated_by_user_id: Optional[UUID]) -> None:
+    """Qiymatni saqlash (commit chaqiruvchida)."""
+    row = db.get(AppSetting, key)
+    if row is None:
+        row = AppSetting(key=key, value=value)
+        db.add(row)
+    else:
+        row.value = value
+    row.updated_by_user_id = updated_by_user_id
+
+
+def _get_bool(db: Session, key: str) -> bool:
+    """Bool sozlama; qiymat yo'q yoki tushunarsiz bo'lsa — False (o'chiq)."""
+    raw = (_get_raw(db, key) or "").lower()
+    return raw in ("1", "true", "yes", "on")
 
 
 def get_sale_expiry_cutoff(db: Session) -> Optional[date]:
@@ -40,14 +62,29 @@ def set_sale_expiry_cutoff(
     db: Session, cutoff: Optional[date], updated_by_user_id: Optional[UUID]
 ) -> None:
     """Chegarani saqlash; None — tozalash (qoida o'chadi). Commit chaqiruvchida."""
-    row = db.get(AppSetting, SALE_EXPIRY_CUTOFF_KEY)
-    value = cutoff.isoformat() if cutoff else None
-    if row is None:
-        row = AppSetting(key=SALE_EXPIRY_CUTOFF_KEY, value=value)
-        db.add(row)
-    else:
-        row.value = value
-    row.updated_by_user_id = updated_by_user_id
+    _set_raw(
+        db,
+        SALE_EXPIRY_CUTOFF_KEY,
+        cutoff.isoformat() if cutoff else None,
+        updated_by_user_id,
+    )
+
+
+def get_expired_zone_in_regular_orders(db: Session) -> bool:
+    """Oddiy buyurtmalar EXPIRED zonadan ham ajratilsinmi (default: yo'q)."""
+    return _get_bool(db, EXPIRED_ZONE_IN_REGULAR_ORDERS_KEY)
+
+
+def set_expired_zone_in_regular_orders(
+    db: Session, enabled: bool, updated_by_user_id: Optional[UUID]
+) -> None:
+    """Qoidani yoqish/o'chirish. Commit chaqiruvchida."""
+    _set_raw(
+        db,
+        EXPIRED_ZONE_IN_REGULAR_ORDERS_KEY,
+        "true" if enabled else "false",
+        updated_by_user_id,
+    )
 
 
 def effective_min_expiry(*candidates: Optional[date]) -> Optional[date]:

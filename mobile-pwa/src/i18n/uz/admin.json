@@ -583,5 +583,15 @@
     "saved": "Saqlandi",
     "save_failed": "Saqlanmadi",
     "load_failed": "Chegara yuklanmadi"
+  },
+  "expired_zone_rule": {
+    "title": "EXPIRED zona oddiy buyurtmalarda",
+    "subtitle": "Yoqilsa oddiy buyurtmalar ham muddati o'tkan zonadagi zaxiradan yig'iladi.",
+    "checkbox": "EXPIRED zonadan oddiy buyurtmalarga ham ajratilsin",
+    "hint": "Yoqilganda EXPIRED zona NORMAL'dan OLDIN qidiriladi — qisqa muddatli tovar tezroq chiqadi. Muddati haqiqatan o'tgan lotlar baribir ajratilmaydi (faqat promo/aksiya qatorlari ularni oladi). O'chirilganda yangi ajratishlar EXPIRED zonani ko'rmaydi; allaqachon ajratilgan hujjatlar terilaveradi.",
+    "conflict_warning": "Diqqat: sotuv muddat chegarasi ({{date}}) yoqilgan va u EXPIRED zonaga ham qo'llanadi. Chegaradan qisqa muddatli lotlar baribir chiqmaydi — bu qoida amalda ishlamasligi mumkin.",
+    "saved": "Saqlandi",
+    "save_failed": "Saqlanmadi",
+    "load_failed": "Sozlama yuklanmadi"
   }
 }

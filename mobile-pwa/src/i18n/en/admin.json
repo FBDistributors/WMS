@@ -583,5 +583,15 @@
     "saved": "Saved",
     "save_failed": "Save failed",
     "load_failed": "Failed to load the cutoff"
+  },
+  "expired_zone_rule": {
+    "title": "EXPIRED zone in regular orders",
+    "subtitle": "When on, regular orders are also picked from the short-dated zone.",
+    "checkbox": "Allocate from the EXPIRED zone for regular orders too",
+    "hint": "When enabled the EXPIRED zone is searched BEFORE NORMAL, so short-dated stock moves first. Genuinely expired lots are still never allocated (only promo/action lines take those). When disabled, new allocations ignore the zone; already allocated documents are picked as usual.",
+    "conflict_warning": "Note: the sale expiry cutoff ({{date}}) is set and applies to the EXPIRED zone as well. Lots shorter than the cutoff still will not be released, so this rule may have no effect.",
+    "saved": "Saved",
+    "save_failed": "Save failed",
+    "load_failed": "Failed to load the setting"
   }
 }

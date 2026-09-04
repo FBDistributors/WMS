@@ -216,6 +216,7 @@ def _get_lot_level_balances(
             StockLotModel.expiry_date,
             StockMovementModel.location_id,
             LocationModel.code.label("location_code"),
+            LocationModel.zone_type.label("zone_type"),
             on_hand_expr.label("on_hand"),
             reserved_expr.label("reserved"),
             (on_hand_expr - reserved_expr).label("available"),
@@ -229,6 +230,7 @@ def _get_lot_level_balances(
             StockLotModel.expiry_date,
             StockMovementModel.location_id,
             LocationModel.code,
+            LocationModel.zone_type,
         )
         .having(on_hand_expr - reserved_expr != 0        )
     )

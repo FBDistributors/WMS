@@ -54,7 +54,10 @@ from app.services.order_source_group import (
     order_source_group,
     source_group_conditions,
 )
-from app.services.app_settings import get_sale_expiry_cutoff
+from app.services.app_settings import (
+    get_expired_zone_in_regular_orders,
+    get_sale_expiry_cutoff,
+)
 from app.services.organization_labels import resolve_org_display
 from app.services.person_identity import linked_user_ids, same_person
 from app.services.stock_availability import require_sufficient_reserved
@@ -670,6 +673,7 @@ def _line_alternate_locations(
     primary_rows: list[dict],
     max_rows: int = 24,
     sale_cutoff=None,
+    allow_expired_zone: bool = False,
 ) -> List[PickingAlternateLocation]:
     """
     Muqobil joylar — DB so'rovsiz, oldindan batch yuklangan xaritalardan:
@@ -687,6 +691,17 @@ def _line_alternate_locations(
     enforce_cutoff = (
         sale_cutoff is not None and not (line_exp is not None and line_exp < sale_cutoff)
     )
+    # Qatorning O'Z joyi qaysi zonada (promo/EXPIRED'dan ajratilgan qator o'z
+    # sinfida qoladi — sozlama o'chiq bo'lsa ham EXPIRED muqobillarni ko'radi).
+    line_zone = next(
+        (
+            r.get("zone_type")
+            for r in list(rows) + list(primary_rows)
+            if r.get("lot_id") == lot_line and r.get("location_id") == lid
+        ),
+        None,
+    )
+    show_expired = allow_expired_zone or (line_zone or "") == "EXPIRED"
     out: List[PickingAlternateLocation] = []
     for r in rows:
         if len(out) >= max_rows:
@@ -694,6 +709,10 @@ def _line_alternate_locations(
         is_pri = lid is not None and lot_line is not None and r["location_id"] == lid and r["lot_id"] == lot_line
         av = float(r["available"] or 0)
         if av <= 0 and not is_pri:
+            continue
+        # EXPIRED zona: sozlama o'chiq bo'lsa terib bo'lmaydi — ro'yxatda ham
+        # ko'rsatmaymiz (aks holda bosilganda tushunarsiz xato berardi).
+        if not show_expired and not is_pri and (r.get("zone_type") or "") == "EXPIRED":
             continue
         # Taqqoslash uchun date kerak (_safe_expiry_date str qaytaradi — u API uchun).
         raw_exp = r.get("expiry_date")
@@ -859,6 +878,7 @@ def _picking_lines_with_alternates(
     _fill_pick_balances_for_pairs(db, pairs, balances)
     bd_map = _breakdown_kwargs_map_for_pairs(db, pairs, balances)
     sale_cutoff = get_sale_expiry_cutoff(db)
+    allow_expired_zone = get_expired_zone_in_regular_orders(db)
 
     out: List[PickingLine] = []
     for ln in lines:
@@ -874,6 +894,7 @@ def _picking_lines_with_alternates(
                         bd_map=bd_map,
                         primary_rows=primary_by_key.get((ln.product_id, ln.location_id), []),
                         sale_cutoff=sale_cutoff,
+                        allow_expired_zone=allow_expired_zone,
                     ),
                 )
             )
@@ -2392,7 +2413,8 @@ async def change_pick_source(
     )
     _assert_pick_zone_allowed(
         new_loc,
-        allow_expired=bool(cur_loc and cur_loc.zone_type == "EXPIRED"),
+        allow_expired=bool(cur_loc and cur_loc.zone_type == "EXPIRED")
+        or get_expired_zone_in_regular_orders(db),
     )
     assert_location_allowed_for_pick(db, payload.location_id, order=document.order)
 
