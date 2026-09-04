@@ -1051,3 +1051,150 @@ def test_zero_brand_stock_reserve_only_idempotency_no_duplicate_unallocate(
         .count()
     )
     assert unalloc_rows == 1
+
+
+def _place_one_box(db_session: Session, prod: Product, loc: Location, lot: StockLot, *, upb: int):
+    """Lot/joyga bitta yopiq quti qo'yadi va uning donalar sonini qaytaradi."""
+    from app.models.product_box import ProductBox
+    from app.services.box_location_service import place_sealed_boxes
+
+    box = ProductBox(
+        box_barcode=f"BOX-ZERO-{upb}", product_id=prod.id, units_per_box=upb, is_active=True
+    )
+    db_session.add(box)
+    db_session.commit()
+    admin = db_session.query(User).filter(User.username == "idemp_admin").one()
+    place_sealed_boxes(
+        db_session,
+        box_barcode=box.box_barcode,
+        location_id=loc.id,
+        lot_id=lot.id,
+        user=admin,
+        box_count=1,
+    )
+    db_session.commit()
+    return upb
+
+
+def _sealed_count(db_session: Session, lot: StockLot, loc: Location) -> int:
+    from app.services.box_location_service import _units_in_boxes_for_lot_location
+
+    box_count, _units, _sealed = _units_in_boxes_for_lot_location(db_session, lot.id, loc.id)
+    return box_count
+
+
+def test_zeroing_adjust_clears_sealed_boxes(
+    client: TestClient,
+    db_session: Session,
+    admin_user: User,
+    prod: Product,
+    bin_loc: Location,
+) -> None:
+    """Qoldiq aynan nolga tushsa quti yozuvlari ham yopiladi (409 emas).
+
+    "0 dona ⇒ 0 quti" yagona to'g'ri holat; rad etish operatorni behuda to'sardi.
+    """
+    from app.services.box_location_service import box_invariant_holds
+
+    lot = _seed_receipt(db_session, prod, bin_loc, qty="30")
+    _place_one_box(db_session, prod, bin_loc, lot, upb=12)
+    assert _sealed_count(db_session, lot, bin_loc) == 1
+
+    app.dependency_overrides[get_current_user] = lambda: admin_user
+    try:
+        res = client.post(
+            "/api/v1/inventory/movements",
+            json={
+                "product_id": str(prod.id),
+                "lot_id": str(lot.id),
+                "location_id": str(bin_loc.id),
+                "qty_change": "-30",
+                "movement_type": "adjust",
+                "reason_code": "inventory_shortage",
+            },
+            headers={"Idempotency-Key": "adj-zero-1"},
+        )
+        assert res.status_code == 201, res.text
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    db_session.expire_all()
+    assert _sealed_count(db_session, lot, bin_loc) == 0
+    assert box_invariant_holds(db_session, lot.id, bin_loc.id)
+
+
+def test_zeroing_adjust_without_boxes_unchanged(
+    client: TestClient,
+    db_session: Session,
+    admin_user: User,
+    prod: Product,
+    bin_loc: Location,
+) -> None:
+    """Regressiya: quti yo'q bo'lsa nollash hozirgidek ishlaydi."""
+    from app.services.box_location_service import box_invariant_holds
+
+    lot = _seed_receipt(db_session, prod, bin_loc, qty="30")
+
+    app.dependency_overrides[get_current_user] = lambda: admin_user
+    try:
+        res = client.post(
+            "/api/v1/inventory/movements",
+            json={
+                "product_id": str(prod.id),
+                "lot_id": str(lot.id),
+                "location_id": str(bin_loc.id),
+                "qty_change": "-30",
+                "movement_type": "adjust",
+                "reason_code": "inventory_shortage",
+            },
+            headers={"Idempotency-Key": "adj-zero-nobox"},
+        )
+        assert res.status_code == 201, res.text
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    assert box_invariant_holds(db_session, lot.id, bin_loc.id)
+
+
+def test_zeroing_blocked_by_reserve_leaves_boxes_intact(
+    client: TestClient,
+    db_session: Session,
+    admin_user: User,
+    prod: Product,
+    bin_loc: Location,
+) -> None:
+    """Rezerv himoyasi ustun: nollash rad etiladi va quti yozuvi tegilmaydi."""
+    lot = _seed_receipt(db_session, prod, bin_loc, qty="30")
+    _place_one_box(db_session, prod, bin_loc, lot, upb=12)
+    db_session.add(
+        StockMovement(
+            product_id=prod.id,
+            lot_id=lot.id,
+            location_id=bin_loc.id,
+            qty_change=Decimal("5"),
+            movement_type="allocate",
+        )
+    )
+    db_session.commit()
+
+    app.dependency_overrides[get_current_user] = lambda: admin_user
+    try:
+        res = client.post(
+            "/api/v1/inventory/movements",
+            json={
+                "product_id": str(prod.id),
+                "lot_id": str(lot.id),
+                "location_id": str(bin_loc.id),
+                "qty_change": "-30",
+                "movement_type": "adjust",
+                "reason_code": "inventory_shortage",
+            },
+            headers={"Idempotency-Key": "adj-zero-reserved"},
+        )
+        assert res.status_code == 409, res.text
+        assert "band tovar" in res.text
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    db_session.expire_all()
+    assert _sealed_count(db_session, lot, bin_loc) == 1

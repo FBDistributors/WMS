@@ -1639,6 +1639,10 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
     setState(() => _invSubmitting = true);
     bool hadError = false;
     bool forbidden = false;
+    // Serverning aniq sababi (masalan "qutida 104 dona — avval sanoqni ishlating")
+    // operatorga yetib borishi kerak: umumiy "ayrim qatorlar" xabari bilan u
+    // nima qilishni bilmay qolardi.
+    String? firstErrorText;
     final Set<String> sent = <String>{};
     try {
       final MovementsRepository repo = ref.read(movementsRepositoryProvider);
@@ -1668,8 +1672,10 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
           );
         } on StockMovementForbiddenException {
           forbidden = true;
-        } on Exception {
+        } on Exception catch (e) {
           hadError = true;
+          firstErrorText ??=
+              '${item.productCode}: ${localizeApiErrorMessage(locale, e)}';
         }
       }
       if (mounted) {
@@ -1679,9 +1685,14 @@ class _KirimFormScreenState extends ConsumerState<KirimFormScreen> {
             SnackBar(content: Text(StringLookup.t(locale, 'inventoryPermissionDenied'))),
           );
         } else if (hadError) {
+          final String base = StringLookup.t(locale, 'inventorySomeRowsFailed');
+          final String detail = firstErrorText ?? '';
           showAppSnackBar(
-        context,
-            SnackBar(content: Text(StringLookup.t(locale, 'inventorySomeRowsFailed'))),
+            context,
+            SnackBar(
+              content: Text(detail.isEmpty ? base : '$base\n$detail'),
+              duration: const Duration(seconds: 6),
+            ),
           );
         } else if (sent.isNotEmpty) {
           showAppSnackBar(

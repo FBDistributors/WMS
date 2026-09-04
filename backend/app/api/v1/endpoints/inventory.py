@@ -2306,6 +2306,13 @@ async def create_stock_movement(
         # Kamaytiruvchi tuzatish (adjust) qoldiqni quti ichidagi donadan past
         # tushirmasligi kerak — aks holda sealed chelak total'dan oshib drift bo'ladi.
         # Movement qo'shishdan oldin proyeksiya tekshiriladi.
+        #
+        # Istisno — qoldiq AYNAN nolga tushsa: u holda quti yozuvlari ham yopiladi.
+        # "0 dona ⇒ 0 quti" yagona to'g'ri holat (invariant ham shuni talab qiladi),
+        # shuning uchun rad etish operatorni behuda to'sardi. Qisman kamaytirishda
+        # esa nechta quti qolgani noaniq (20 dona = 2 quti + 4 dona ham, 0 quti +
+        # 20 dona ham) — u yerda faqat quti sanog'i (count) to'g'ri javob beradi.
+        clear_sealed_boxes = False
         if payload.movement_type == "adjust" and Decimal(str(payload.qty_change)) < 0:
             cur_on_hand, _res, _avail = compute_lot_location_balances(
                 db, payload.lot_id, payload.location_id
@@ -2313,16 +2320,30 @@ async def create_stock_movement(
             new_on_hand = Decimal(str(cur_on_hand)) + Decimal(str(payload.qty_change))
             sealed_units = units_in_boxes_at(db, payload.lot_id, payload.location_id)
             if Decimal(str(sealed_units)) > new_on_hand:
-                raise HTTPException(
-                    status_code=409,
-                    detail=(
-                        "Qoldiqni quti ichidagi donadan past tushirib bo'lmaydi "
-                        f"(qutida {sealed_units} dona). Avval qutini oching (unpack) "
-                        "yoki quti sanog'ini (count) ishlating."
-                    ),
-                )
+                if new_on_hand != 0:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "Qoldiqni quti ichidagi donadan past tushirib bo'lmaydi "
+                            f"(qutida {sealed_units} dona). Avval qutini oching (unpack) "
+                            "yoki quti sanog'ini (count) ishlating."
+                        ),
+                    )
+                clear_sealed_boxes = True
 
         db.add(movement)
+        boxes_removed = 0
+        if clear_sealed_boxes:
+            # Invariant qoldiqni ledgerdan hisoblaydi — avval movement yozilishi shart.
+            db.flush()
+            boxes_removed = remove_all_sealed_at(
+                db,
+                lot_id=payload.lot_id,
+                location_id=payload.location_id,
+                user=user,
+                reason="inventory_zero",
+            )
+            assert_box_invariant(db, payload.lot_id, payload.location_id)
         log_action(
             db,
             user_id=user.id,
@@ -2335,6 +2356,7 @@ async def create_stock_movement(
                 "location_id": str(payload.location_id),
                 "qty_change": str(payload.qty_change),
                 "movement_type": payload.movement_type,
+                **({"boxes_removed": boxes_removed} if boxes_removed else {}),
             },
             ip_address=get_client_ip(request),
         )
