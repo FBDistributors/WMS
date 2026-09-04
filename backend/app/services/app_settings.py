@@ -6,8 +6,13 @@ None — qoida o'chiq. Promo/aksiya kanali chegaraga bo'ysunmaydi.
 
 EXPIRED zona oddiy buyurtmalarda: yoqilsa oddiy qatorlar ham EXPIRED zonadagi
 zaxiradan ajratiladi (NORMAL'dan oldin — qisqa muddatli tezroq chiqsin). Muddati
-o'tgan tovar baribir chiqmaydi: promo'dan farqli, bu yerda muddat poli
-saqlanadi. Sotuv chegarasi ham ustun qoladi.
+o'tgan tovar baribir chiqmaydi: promo'dan farqli, bu yerda muddat poli saqlanadi,
+VIP talabi ham kuchida.
+
+Ikki sozlama BIR-BIRINI TO'LDIRADI: chegara NORMAL zonadagi qisqa muddatlini
+ushlab turadi, EXPIRED sozlamasi esa aynan o'sha zonani ataylab ochadi. Shuning
+uchun chegara EXPIRED zonaga qo'llanmaydi — aks holda ikkovi bir-birini bekor
+qilar va sozlama hech qachon ishlamas edi.
 """
 from __future__ import annotations
 
@@ -71,7 +76,10 @@ def set_sale_expiry_cutoff(
 
 
 def get_expired_zone_in_regular_orders(db: Session) -> bool:
-    """Oddiy buyurtmalar EXPIRED zonadan ham ajratilsinmi (default: yo'q)."""
+    """Oddiy buyurtmalar EXPIRED zonadan ham ajratilsinmi (default: yo'q).
+
+    Yoqilganda sotuv muddat chegarasi shu zonaga qo'llanmaydi (modul izohiga qarang).
+    """
     return _get_bool(db, EXPIRED_ZONE_IN_REGULAR_ORDERS_KEY)
 
 

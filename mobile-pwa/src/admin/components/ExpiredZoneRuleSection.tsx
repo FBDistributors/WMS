@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle } from 'lucide-react'
+import { Info } from 'lucide-react'
 
 import { useAppToast } from '../../feedback/useAppToast'
 import {
@@ -79,12 +79,12 @@ export function ExpiredZoneRuleSection() {
       </p>
 
       {enabled && cutoff ? (
-        <div className="mt-3 flex max-w-2xl items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-900/30">
-          <AlertTriangle
-            className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400"
+        <div className="mt-3 flex max-w-2xl items-start gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/60">
+          <Info
+            className="mt-0.5 h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400"
             aria-hidden
           />
-          <span className="text-[12px] leading-relaxed text-amber-800 dark:text-amber-200">
+          <span className="text-[12px] leading-relaxed text-slate-600 dark:text-slate-300">
             {t('admin:expired_zone_rule.conflict_warning', { date: cutoff })}
           </span>
         </div>

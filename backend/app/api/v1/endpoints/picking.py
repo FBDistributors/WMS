@@ -712,12 +712,21 @@ def _line_alternate_locations(
             continue
         # EXPIRED zona: sozlama o'chiq bo'lsa terib bo'lmaydi — ro'yxatda ham
         # ko'rsatmaymiz (aks holda bosilganda tushunarsiz xato berardi).
-        if not show_expired and not is_pri and (r.get("zone_type") or "") == "EXPIRED":
+        r_zone = (r.get("zone_type") or "NORMAL")
+        if not show_expired and not is_pri and r_zone == "EXPIRED":
             continue
         # Taqqoslash uchun date kerak (_safe_expiry_date str qaytaradi — u API uchun).
         raw_exp = r.get("expiry_date")
         r_exp = date.fromisoformat(raw_exp) if isinstance(raw_exp, str) else raw_exp
-        if enforce_cutoff and not is_pri and r_exp is not None and r_exp < sale_cutoff:
+        # Sotuv chegarasi faqat NORMAL zonaga: EXPIRED zona alohida sozlama bilan
+        # ataylab ochiladi (ajratishdagi qoida bilan bir xil).
+        if (
+            enforce_cutoff
+            and not is_pri
+            and r_zone != "EXPIRED"
+            and r_exp is not None
+            and r_exp < sale_cutoff
+        ):
             continue
         bd_kw = bd_map.get((r["lot_id"], r["location_id"]), {})
         out.append(

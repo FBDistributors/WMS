@@ -746,13 +746,16 @@ def _allocate_order(
             lot_phases = []
             if expired_zone_enabled:
                 # EXPIRED oldin — zonaning maqsadi qisqa muddatlini tezroq chiqarish.
+                # Sotuv chegarasi bu yerga QO'LLANMAYDI: chegara NORMAL zonadagi
+                # qisqa muddatlini ushlab turadi, bu sozlama esa aynan EXPIRED
+                # zonasini ataylab ochadi (aks holda ikkovi bir-birini bekor qilardi).
                 # Promo'dan farqli `skip_expiry_floor` YO'Q: muddati o'tgan tovar
-                # oddiy mijozga ketmaydi, faqat zonada turgan amaldagi lotlar.
+                # oddiy mijozga ketmaydi. VIP talabi kuchida qoladi.
                 lot_phases.append(
                     _fefo_available_lots(
                         db,
                         product_id,
-                        min_expiry_date=regular_floor,
+                        min_expiry_date=min_expiry_date,
                         zone_types=["EXPIRED"],
                         location_ids=scope_location_ids,
                     )

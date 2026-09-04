@@ -1,8 +1,9 @@
 """EXPIRED zona oddiy buyurtmalarda: sozlama yoqilganda ajratiladi.
 
-Qoidalar (reja bo'yicha): EXPIRED NORMAL'dan OLDIN; muddat poli saqlanadi
-(promo'dan farqli — muddati o'tgan tovar oddiy mijozga ketmaydi); sotuv
-chegarasi va VIP talabi ustun; o'chiq bo'lsa eski xatti-harakat.
+Qoidalar: EXPIRED NORMAL'dan OLDIN; muddat poli saqlanadi (promo'dan farqli —
+muddati o'tgan tovar oddiy mijozga ketmaydi); VIP talabi ustun; sotuv chegarasi
+esa EXPIRED zonaga QO'LLANMAYDI (chegara NORMAL zonani ushlaydi, bu sozlama
+o'sha zonani ataylab ochadi); o'chiq bo'lsa eski xatti-harakat.
 """
 from __future__ import annotations
 
@@ -134,16 +135,21 @@ def test_truly_expired_lot_never_allocated(client: TestClient, db_session: Sessi
     assert {ln.lot_id for ln in doc.lines} == {s.lot_normal.id}
 
 
-def test_sale_cutoff_wins_over_setting(client: TestClient, db_session: Session):
+def test_sale_cutoff_does_not_block_expired_zone(client: TestClient, db_session: Session):
+    """Chegara NORMAL zonaga tegishli; EXPIRED zona shu sozlama bilan ataylab ochiladi.
+
+    Ikkovi bir-birini bekor qilmasligi kerak — aks holda chegara qo'yilgan har
+    qanday holatda sozlama umuman ishlamas edi.
+    """
     s = _seed(db_session)
     set_expired_zone_in_regular_orders(db_session, True, None)
-    # Chegara EXPIRED lot muddatidan keyin — u sotuvga chiqmasligi kerak.
+    # Chegara EXPIRED lot muddatidan keyin — lekin u zonaga qo'llanmaydi.
     set_sale_expiry_cutoff(db_session, LONG, None)
     db_session.commit()
 
     doc = _allocate(client, db_session, s.order, s.picker)
 
-    assert {ln.lot_id for ln in doc.lines} == {s.lot_normal.id}
+    assert {ln.lot_id for ln in doc.lines} == {s.lot_expired.id}
 
 
 def test_promo_flow_unchanged(client: TestClient, db_session: Session):
@@ -228,3 +234,28 @@ def test_setting_api_roundtrip(client: TestClient, db_session: Session):
         assert client.get(url).json()["enabled"] is False
     finally:
         _clear()
+
+
+def test_alternates_cutoff_applies_only_to_normal_zone():
+    """Chegara: NORMAL qisqa muddatli yashiriladi, EXPIRED (ochilgan) qoladi."""
+    line = SimpleNamespace(
+        product_id=uuid.uuid4(),
+        location_id=None,
+        lot_id=None,
+        expiry_date=LONG,
+        location_code="",
+        batch="b",
+    )
+    normal_short = _alt_row(uuid.uuid4(), uuid.uuid4(), "NORMAL", expiry=SHORT_VALID)
+    expired_short = _alt_row(uuid.uuid4(), uuid.uuid4(), "EXPIRED", expiry=SHORT_VALID)
+
+    out = _line_alternate_locations(
+        line,
+        [normal_short, expired_short],
+        bd_map={},
+        primary_rows=[],
+        sale_cutoff=LONG,
+        allow_expired_zone=True,
+    )
+
+    assert [a.lot_id for a in out] == [expired_short["lot_id"]]

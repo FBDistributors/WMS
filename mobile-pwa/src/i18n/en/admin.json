@@ -588,8 +588,8 @@
     "title": "EXPIRED zone in regular orders",
     "subtitle": "When on, regular orders are also picked from the short-dated zone.",
     "checkbox": "Allocate from the EXPIRED zone for regular orders too",
-    "hint": "When enabled the EXPIRED zone is searched BEFORE NORMAL, so short-dated stock moves first. Genuinely expired lots are still never allocated (only promo/action lines take those). When disabled, new allocations ignore the zone; already allocated documents are picked as usual.",
-    "conflict_warning": "Note: the sale expiry cutoff ({{date}}) is set and applies to the EXPIRED zone as well. Lots shorter than the cutoff still will not be released, so this rule may have no effect.",
+    "hint": "When enabled the EXPIRED zone is searched BEFORE NORMAL, so short-dated stock moves first. Genuinely expired lots are still never allocated (only promo/action lines take those), and per-VIP minimums still apply. When disabled, new allocations ignore the zone; already allocated documents are picked as usual.",
+    "conflict_warning": "Note: the sale expiry cutoff ({{date}}) governs the NORMAL zone. This rule deliberately opens the EXPIRED zone — stock there is released even when shorter than the cutoff (genuinely expired lots still are not).",
     "saved": "Saved",
     "save_failed": "Save failed",
     "load_failed": "Failed to load the setting"
