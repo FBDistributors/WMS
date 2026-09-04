@@ -73,8 +73,15 @@ final RegExp _receivingInsufficientStockUz = RegExp(
   r'Qabul qilingan qoldiq yetarli emas \(kerak (\d+), mavjud (\d+)\)',
 );
 
+/// Server matni: `Yetarli qoldiq yo'q (lot/joy: mavjud X, so'ralgan Y)`.
+/// Apostrof serverda ASCII, ilova matnlarida `’` — ikkalasi ham mos kelsin.
 final RegExp _stockInsufficientAvailable = RegExp(
-  r"Yetarli qoldiq yo'q \(lot\\joy: mavjud ([\d.,]+), so'ralgan ([\d.,]+)\)",
+  r"Yetarli qoldiq yo.q \(lot/joy: mavjud ([\d.,]+), so.ralgan ([\d.,]+)\)",
+);
+
+/// `reconcile_count`: sanoqni rezervdan past tushirib bo'lmaydi.
+final RegExp _countBelowReserved = RegExp(
+  r'Rezervlangan (\d+) dona bor . sanoqni (\d+) donaga tushirib bo.lmaydi',
 );
 
 final RegExp _boxInvariantViolated = RegExp(
@@ -284,6 +291,22 @@ String localizeApiErrorMessage(AppLocale loc, Object error) {
   }
 
   // --- Quti / inventarizatsiya xatolari ---
+  if (raw.contains('Joyda buyurtma uchun band tovar bor')) {
+    return StringLookup.t(loc, 'errInventoryLocationReserved');
+  }
+
+  final RegExpMatch? countBelowReserved = _countBelowReserved.firstMatch(raw);
+  if (countBelowReserved != null) {
+    return StringLookup.tParams(
+      loc,
+      'errCountBelowReserved',
+      <String, String>{
+        'reserved': countBelowReserved.group(1)!,
+        'target': countBelowReserved.group(2)!,
+      },
+    );
+  }
+
   final RegExpMatch? belowBoxed = _belowBoxedUnits.firstMatch(raw);
   if (belowBoxed != null) {
     return StringLookup.tParams(

@@ -79,9 +79,12 @@ void main() {
     });
 
     test('insufficient available with params', () {
+      // Server aynan shunday yozadi (stock_availability.py) — ilgari bu yerda ham,
+      // qoidada ham teskari chiziq bo'lgani uchun xabar hech qachon tarjima
+      // qilinmagan va foydalanuvchiga o'zbekcha ko'rinib turgan.
       final String uz = localizeApiErrorMessage(
         AppLocale.uz,
-        Exception("Yetarli qoldiq yo'q (lot\\joy: mavjud 12, so'ralgan 20)"),
+        Exception("Yetarli qoldiq yo'q (lot/joy: mavjud 12, so'ralgan 20)"),
       );
       expect(uz, contains('12'));
       expect(uz, contains('20'));
@@ -480,6 +483,51 @@ void main() {
       );
       expect(uz, contains('3'));
       expect(uz, contains('1'));
+    });
+  });
+
+  group("inventarizatsiya rezerv/sanoq xatolari toliq tarjima qilinadi", () {
+    const String reservedLocation =
+        "Joyda buyurtma uchun band tovar bor — inventarizatsiya qilib bo'lmaydi";
+
+    test('band joy xabari rus tilida lotin harfsiz chiqadi', () {
+      final String ru =
+          localizeApiErrorMessage(AppLocale.ru, Exception(reservedLocation));
+      expect(ru, contains('зарезервирован'));
+      expect(ru, isNot(contains('inventarizatsiya')));
+      expect(ru, isNot(contains('bo')));
+    });
+
+    test('band joy xabari ingliz tilida ham tarjima qilinadi', () {
+      final String en =
+          localizeApiErrorMessage(AppLocale.en, Exception(reservedLocation));
+      expect(en, contains('reserved'));
+      expect(en, isNot(contains('Joyda')));
+    });
+
+    test('sanoq rezervdan past: sonlar saqlanadi, matn ruscha', () {
+      final String ru = localizeApiErrorMessage(
+        AppLocale.ru,
+        Exception(
+          "Rezervlangan 12 dona bor — sanoqni 0 donaga tushirib bo'lmaydi. "
+          "Avval buyurtma yig'ishni yakunlang yoki rezervni bo'shating.",
+        ),
+      );
+      expect(ru, contains('12'));
+      expect(ru, contains('0'));
+      expect(ru, isNot(contains('Rezervlangan')));
+    });
+
+    test("yetarli qoldiq yo'q xabari tarjima qilinadi (regex tuzatildi)", () {
+      // Ilgari qoida `lot/joy` o'rniga teskari chiziqni kutgani uchun hech qachon
+      // mos kelmagan va foydalanuvchi o'zbekcha matnni ko'rgan.
+      final String ru = localizeApiErrorMessage(
+        AppLocale.ru,
+        Exception("Yetarli qoldiq yo'q (lot/joy: mavjud 5, so'ralgan 9)"),
+      );
+      expect(ru, contains('5'));
+      expect(ru, contains('9'));
+      expect(ru, isNot(contains('Yetarli')));
     });
   });
 }
