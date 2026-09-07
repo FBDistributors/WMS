@@ -98,6 +98,13 @@ def post_broadcast_push(
 _PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=uz.fbwarehouse.wms"
 
 
+APP_UPDATE_DEFAULT_TITLE = "Ilova yangilandi / Приложение обновлено"
+APP_UPDATE_DEFAULT_BODY = (
+    "Yangi versiya chiqdi. Yangilash uchun bosing.\n"
+    "Вышла новая версия. Нажмите, чтобы обновить."
+)
+
+
 class AppUpdatePushRequest(BaseModel):
     # Ixtiyoriy: admin o'z matnini bersa; bo'sh bo'lsa standart matn ishlatiladi.
     title: str = Field(default="", max_length=200)
@@ -115,11 +122,10 @@ def post_app_update_push(
     db: Session = Depends(get_db),
     _user: User = Depends(require_permission("admin:access")),
 ) -> BroadcastPushResponse:
-    title = payload.title.strip() or "Ilova yangilandi"
-    body = (
-        payload.body.strip()
-        or "Yangi versiya chiqdi. Yangilash uchun bosing."
-    )
+    # Standart matn ikki tilda: broadcast hamma qurilmaga bir xil ketadi, xodimning
+    # tili esa bu yerda ma'lum emas — ruszabon xodim ham tushunishi kerak.
+    title = payload.title.strip() or APP_UPDATE_DEFAULT_TITLE
+    body = payload.body.strip() or APP_UPDATE_DEFAULT_BODY
     url = payload.url.strip() or _PLAY_STORE_URL
     total, ok, bad = send_push_broadcast(
         db,

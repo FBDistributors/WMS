@@ -259,6 +259,9 @@ class FcmService {
         importance: Importance.high,
         priority: Priority.high,
         icon: '@mipmap/ic_launcher',
+        // Ikki tilli (o'zbek + rus) matn ikki qator — kengaytirilganda to'liq
+        // ko'rinsin, aks holda Android bir qatorga qisqartiradi.
+        styleInformation: BigTextStyleInformation(body),
       ),
       iOS: const DarwinNotificationDetails(presentAlert: true, presentBadge: true, presentSound: true),
     );
