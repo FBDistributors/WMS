@@ -215,6 +215,9 @@ class ConsolidatedLineItem(BaseModel):
     pick_sequence: Optional[int] = None
     expiry_date: Optional[str] = None
     is_vip_expiry_informational: bool = False
+    # Qator manbasi (product/gift/action): ilova bir buyurtmaning oddiy va aksiya
+    # qatorlarini ajratib ko'rsatadi — aks holda bitta buyurtma ikki marta chiqardi.
+    line_source: Optional[str] = None
 
 
 class ConsolidatedProduct(BaseModel):
@@ -1501,6 +1504,7 @@ def _build_consolidated_response(db: Session, doc_ids: list) -> ConsolidatedView
                 pick_sequence=pick_seq_int,
                 expiry_date=_safe_expiry_date(line.expiry_date),
                 is_vip_expiry_informational=_line_is_vip_expiry_informational(line),
+                line_source=(getattr(line, "line_source", None) or "product").strip(),
             )
         )
     # Fallback barcode from Product when document_line has none

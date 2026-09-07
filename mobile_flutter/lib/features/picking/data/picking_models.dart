@@ -465,6 +465,7 @@ class ConsolidatedLineItem {
     required this.locationCode,
     required this.pickSequence,
     required this.expiryDate,
+    this.lineSource,
   });
 
   final String documentId;
@@ -476,6 +477,16 @@ class ConsolidatedLineItem {
   final int? pickSequence;
   final String? expiryDate;
 
+  /// Qator manbasi: `product` (oddiy), `gift`/`action` (aksiya). Eski server
+  /// yubormasa null — oddiy deb qaraladi.
+  final String? lineSource;
+
+  /// Aksiya/sovg'a qatori — buyurtma bo'yicha matnda alohida belgilanadi.
+  bool get isPromoLine {
+    final String s = (lineSource ?? '').trim().toLowerCase();
+    return s.isNotEmpty && s != 'product';
+  }
+
   factory ConsolidatedLineItem.fromJson(Map<String, Object?> json) {
     return ConsolidatedLineItem(
       documentId: json['document_id']! as String,
@@ -486,6 +497,7 @@ class ConsolidatedLineItem {
       locationCode: json['location_code']! as String,
       pickSequence: (json['pick_sequence'] as num?)?.toInt(),
       expiryDate: json['expiry_date'] as String?,
+      lineSource: json['line_source'] as String?,
     );
   }
 
@@ -498,6 +510,7 @@ class ConsolidatedLineItem {
         'location_code': locationCode,
         'pick_sequence': pickSequence,
         'expiry_date': expiryDate,
+        'line_source': lineSource,
       };
 }
 

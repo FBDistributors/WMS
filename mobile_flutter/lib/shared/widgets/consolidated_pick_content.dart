@@ -58,6 +58,31 @@ PickingAlternateLocation? _alternateLocationForDropdownValue(
   return null;
 }
 
+/// Joriy terish joyiga mos dropdown qiymati.
+///
+/// Ro'yxat merge qatorlari (joy + muddat) vakillaridan tuziladi, shuning uchun
+/// qiymat ham vakil orqali olinadi — aks holda boshqa partiya id'si ro'yxatda
+/// bo'lmay, dropdown bo'sh qolardi.
+String? _primaryAlternateDropdownValue(
+  ConsolidatedProduct product,
+  PickingAlternateLocation? active,
+) {
+  if (active == null) {
+    return null;
+  }
+  final String code = active.locationCode.trim().toLowerCase();
+  final String exp = (active.expiryDate ?? '').trim();
+  for (final MergedAlternateLocationRow row
+      in mergeAlternateLocationsForDisplay(product.alternateLocations)) {
+    final PickingAlternateLocation rep = row.representative;
+    if (rep.locationCode.trim().toLowerCase() == code &&
+        (rep.expiryDate ?? '').trim() == exp) {
+      return _alternateLocationDropdownValue(rep);
+    }
+  }
+  return null;
+}
+
 /// RN `ConsolidatedPickContent` — mahsulotlar ro‘yxati, pozitsiya bosilganda modal + skaner.
 class ConsolidatedPickContent extends ConsumerStatefulWidget {
   const ConsolidatedPickContent({
@@ -274,6 +299,8 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
       product.alternateLocations,
       locationCode: pickLocationCode,
     );
+    final String? primaryDropdownValue =
+        _primaryAlternateDropdownValue(product, activeAlternate);
     int? unitsPerBox = hybridUnitsPerBoxHint(
       unitsPerBox: null,
       activeAlternate: activeAlternate,
@@ -392,11 +419,23 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                         fontFamily: 'monospace',
                       ),
                     ),
+                    // Joy qatori — oddiy buyurtma sheet'idagi kabi. Ilgari sheet
+                    // joyni umuman ko'rsatmasdi: yig'uvchi qaysi javonga borishini
+                    // orqadagi kartochkadan eslab qolishi kerak edi.
+                    const SizedBox(height: 8),
+                    Text(
+                      consolidatedLocationQtyLine(product.lines),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                     if (product.alternateLocations.isNotEmpty) ...<Widget>[
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
                         isExpanded: true,
-                        initialValue: null,
+                        // Joriy joy tanlangan holda ko'rinadi (oddiy buyurtmadagi
+                        // yashil galochka kabi); null bo'lsa faqat placeholder chiqardi.
+                        initialValue: primaryDropdownValue,
                         decoration: InputDecoration(
                           labelText: StringLookup.t(loc, 'alternateLocations'),
                           hintText: StringLookup.t(loc, 'alternateLocationHint'),
@@ -427,6 +466,10 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                                 final PickingAlternateLocation? alt =
                                     _alternateLocationForDropdownValue(product, key);
                                 if (alt == null) {
+                                  return;
+                                }
+                                // Joriy joyni qayta tanlash — almashtirish emas.
+                                if (key == primaryDropdownValue) {
                                   return;
                                 }
                                 await _switchConsolidatedPickToAlternate(
@@ -890,7 +933,7 @@ class _ConsolidatedPickContentState extends ConsumerState<ConsolidatedPickConten
                           2) ...<Widget>[
                         const SizedBox(height: 4),
                         Text(
-                          '${StringLookup.t(loc, 'consolidatedProductByOrder')}: ${consolidatedOpenLinesByOrderText(lines: p.lines, countTaLabel: StringLookup.t(loc, 'countTa').trim())}',
+                          '${StringLookup.t(loc, 'consolidatedProductByOrder')}: ${consolidatedOpenLinesByOrderText(lines: p.lines, countTaLabel: StringLookup.t(loc, 'countTa').trim(), promoLabel: StringLookup.t(loc, 'lineSourceAction'))}',
                           style: TextStyle(
                             fontSize: 12,
                             color: cs.onSurfaceVariant,

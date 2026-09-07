@@ -517,19 +517,84 @@ String? consolidatedPickPlanHintMessage({
 }
 
 /// Buyurtma bo'yicha ochiq qatorlar matni.
+///
+/// Bir buyurtmada bir mahsulotning oddiy va aksiya qatorlari bo'lishi mumkin —
+/// ular buyurtma raqami bo'yicha yig'iladi (aks holda "106916: 7, 106916: 8"
+/// deb bir raqam ikki marta chiqardi), aksiya ulushi qavsda ko'rsatiladi.
 String consolidatedOpenLinesByOrderText({
   required List<ConsolidatedLineItem> lines,
   required String countTaLabel,
+  String promoLabel = '',
 }) {
-  final List<ConsolidatedLineItem> openLines = lines
+  final List<String> order = <String>[];
+  final Map<String, int> total = <String, int>{};
+  final Map<String, int> promo = <String, int>{};
+  for (final ConsolidatedLineItem l in lines) {
+    if (l.qtyPicked >= l.qtyRequired) {
+      continue;
+    }
+    final int rem = (l.qtyRequired - l.qtyPicked).round();
+    final String ref = l.referenceNumber;
+    if (!total.containsKey(ref)) {
+      order.add(ref);
+      total[ref] = 0;
+      promo[ref] = 0;
+    }
+    total[ref] = total[ref]! + rem;
+    if (l.isPromoLine) {
+      promo[ref] = promo[ref]! + rem;
+    }
+  }
+  return order.map((String ref) {
+    final int t = total[ref]!;
+    final int p = promo[ref]!;
+    final String base = '$ref: $t $countTaLabel';
+    // Aksiya ulushi faqat aralash buyurtmada ma'noli; label bo'lmasa ko'rsatilmaydi.
+    if (p > 0 && p < t && promoLabel.trim().isNotEmpty) {
+      return '$base ($p — ${promoLabel.trim()})';
+    }
+    return base;
+  }).join(', ');
+}
+
+/// Umumiy yig'ish sheet'i uchun joy qatori — oddiy buyurtma sheet'idagi
+/// `pickerLocationQtyLine` formatida: `P-Y-05 · 0/15`; bir necha joy bo'lsa
+/// `P-Y-05: 0/8 · P-Y-07: 0/7`. Miqdorlar mahsulot darajasida (barcha
+/// buyurtma qatorlari yig'indisi). Ochiq qator bo'lmasa hamma qator hisoblanadi.
+String consolidatedLocationQtyLine(List<ConsolidatedLineItem> lines) {
+  if (lines.isEmpty) {
+    return '—';
+  }
+  final List<ConsolidatedLineItem> open = lines
       .where((ConsolidatedLineItem l) => l.qtyPicked < l.qtyRequired)
       .toList(growable: false);
-  return openLines
-      .map(
-        (ConsolidatedLineItem l) =>
-            '${l.referenceNumber}: ${(l.qtyRequired - l.qtyPicked).round()} $countTaLabel',
-      )
-      .join(', ');
+  final List<ConsolidatedLineItem> src = open.isNotEmpty ? open : lines;
+  final List<String> codes = <String>[];
+  final Map<String, double> req = <String, double>{};
+  final Map<String, double> picked = <String, double>{};
+  for (final ConsolidatedLineItem l in src) {
+    final String c = l.locationCode.trim();
+    if (c.isEmpty) {
+      continue;
+    }
+    if (!req.containsKey(c)) {
+      codes.add(c);
+      req[c] = 0;
+      picked[c] = 0;
+    }
+    req[c] = req[c]! + l.qtyRequired;
+    picked[c] = picked[c]! + l.qtyPicked;
+  }
+  if (codes.isEmpty) {
+    return '—';
+  }
+  if (codes.length == 1) {
+    final String c = codes.first;
+    return '$c · ${formatPickQty(picked[c]!)}/${formatPickQty(req[c]!)}';
+  }
+  return codes
+      .map((String c) => '$c: ${formatPickQty(picked[c]!)}/${formatPickQty(req[c]!)}')
+      .join(' · ');
 }
 
 /// Umumiy yig'ish: buyurtma bo'yicha ro'yxat va terish rejasi.
@@ -557,6 +622,7 @@ class ConsolidatedPickPlanBanner extends StatelessWidget {
     final String byOrder = consolidatedOpenLinesByOrderText(
       lines: product.lines,
       countTaLabel: StringLookup.t(loc, 'countTa').trim(),
+      promoLabel: StringLookup.t(loc, 'lineSourceAction'),
     );
     final String? planHint = consolidatedPickPlanHintMessage(
       loc: loc,
