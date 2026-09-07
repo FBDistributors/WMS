@@ -18,10 +18,14 @@ final authControllerProvider =
     AsyncNotifierProvider<AuthController, AuthSession>(AuthController.new);
 
 class AuthSession {
-  const AuthSession.unauthenticated() : me = null;
-  const AuthSession.authenticated(this.me);
+  const AuthSession.unauthenticated({this.sessionExpired = false}) : me = null;
+  const AuthSession.authenticated(this.me) : sessionExpired = false;
 
   final MeResponse? me;
+
+  /// Mehmon holatiga sessiya tugagani (server 401) sababli tushildi — login
+  /// ekrani buni "qayta kiring" deb tushuntiradi.
+  final bool sessionExpired;
 
   bool get isAuthenticated => me != null;
 }
@@ -33,6 +37,16 @@ class AuthController extends AsyncNotifier<AuthSession> {
 
   @override
   Future<AuthSession> build() async {
+    // Ish jarayonida 401 kelsa (token muddati tugadi / boshqa qurilmadan
+    // kirildi) darhol mehmon holatiga o'tamiz — router login'ga yo'naltiradi.
+    ref.listen<int>(sessionExpiredTickProvider, (int? prev, int next) {
+      final AuthSession? cur = state.value;
+      if (cur != null && cur.isAuthenticated) {
+        state = const AsyncData<AuthSession>(
+          AuthSession.unauthenticated(sessionExpired: true),
+        );
+      }
+    });
     final AuthTokenStorage storage = ref.read(authTokenStorageProvider);
     final String? token = storage.readToken();
     if (token == null || token.isEmpty) {

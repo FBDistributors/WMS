@@ -1,6 +1,7 @@
 import '../../features/product_boxes/data/box_location_models.dart';
 import '../app_state/app_locale.dart';
 import '../../l10n/string_lookup.dart';
+import '../network/app_dio.dart' show unauthorizedMessage;
 
 final RegExp _pickInsufficientLooseUz = RegExp(
   r'Qutisiz qoldiq yetarli emas \(kerak (\d+), mavjud (\d+)\)',
@@ -119,6 +120,12 @@ String _stripExceptionPrefix(String message) {
 /// Backend API xabarlarini foydalanuvchi tiliga moslashtirish.
 String localizeApiErrorMessage(AppLocale loc, Object error) {
   final String raw = _stripExceptionPrefix(error.toString());
+
+  // 401 — interceptor tokenni o'chirib shu belgini qaytaradi. Texnik so'z
+  // ekranga chiqmasin: xodimga nima qilish kerakligi aytilsin.
+  if (raw == unauthorizedMessage) {
+    return StringLookup.t(loc, 'sessionExpiredRelogin');
+  }
 
   if (isBreakdownInconsistentMessage(raw)) {
     return StringLookup.t(loc, 'pickDataInconsistent');

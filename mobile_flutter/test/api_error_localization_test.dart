@@ -530,4 +530,14 @@ void main() {
       expect(ru, isNot(contains('Yetarli')));
     });
   });
+
+  group('401 sessiya tugashi tushunarli xabarga aylanadi', () {
+    test("UNAUTHORIZED belgisi uch tilda qayta-kiring xabari boladi", () {
+      for (final AppLocale l in AppLocale.values) {
+        final String out = localizeApiErrorMessage(l, Exception('UNAUTHORIZED'));
+        expect(out, isNot(contains('UNAUTHORIZED')));
+        expect(out, StringLookup.t(l, 'sessionExpiredRelogin'));
+      }
+    });
+  });
 }

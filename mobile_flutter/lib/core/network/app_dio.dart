@@ -7,6 +7,13 @@ import '../storage/shared_preferences_provider.dart';
 
 const String unauthorizedMessage = 'UNAUTHORIZED';
 
+/// Sessiya tugaganini (401) bildiruvchi hisoblagich. Dio interceptor'i tokenni
+/// o'chirgach shuni oshiradi; auth controller uni tinglab holatni "mehmon"ga
+/// o'tkazadi — shunda router login ekraniga olib chiqadi. Ilgari token jimgina
+/// o'chirilar, ekran esa o'z joyida qolar edi: xodim 20+ daqiqa "UNAUTHORIZED"
+/// ko'rib bosaverardi.
+final sessionExpiredTickProvider = StateProvider<int>((Ref ref) => 0);
+
 final authTokenStorageProvider = Provider<AuthTokenStorage>((Ref ref) {
   return AuthTokenStorage(ref.watch(sharedPreferencesProvider));
 });
@@ -37,6 +44,12 @@ final appDioProvider = Provider<Dio>((Ref ref) {
       onError: (DioException err, ErrorInterceptorHandler handler) async {
         if (err.response?.statusCode == 401) {
           await storage.writeToken(null);
+          // Login'dagi 401 — noto'g'ri parol, sessiya tugashi emas; u login
+          // ekranining o'zida ko'rsatiladi.
+          final bool isLogin = err.requestOptions.path.endsWith('/auth/login');
+          if (!isLogin) {
+            ref.read(sessionExpiredTickProvider.notifier).state++;
+          }
           return handler.reject(
             DioException(
               requestOptions: err.requestOptions,

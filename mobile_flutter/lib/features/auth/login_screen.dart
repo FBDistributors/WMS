@@ -129,10 +129,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final AsyncValue<AuthSession> auth = ref.watch(authControllerProvider);
     final ThemeData theme = Theme.of(context);
     final bool isDark = theme.brightness == Brightness.dark;
+    // Sessiya tugab shu ekranga tushilgan bo'lsa — sababini aytamiz, aks holda
+    // xodim "nega yana login?" deb qoladi.
+    final AuthSession? session = auth.value;
+    final String? notice =
+        session != null && !session.isAuthenticated && session.sessionExpired
+            ? StringLookup.t(loc, 'sessionExpiredRelogin')
+            : null;
 
     return auth.when(
-      loading: () => _form(context, loc, isDark),
-      error: (_, __) => _form(context, loc, isDark),
+      loading: () => _form(context, loc, isDark, notice: notice),
+      error: (_, __) => _form(context, loc, isDark, notice: notice),
       data: (AuthSession s) {
         if (s.isAuthenticated) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -141,12 +148,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             }
           });
         }
-        return _form(context, loc, isDark);
+        return _form(context, loc, isDark, notice: notice);
       },
     );
   }
 
-  Widget _form(BuildContext context, AppLocale loc, bool isDark) {
+  Widget _form(BuildContext context, AppLocale loc, bool isDark, {String? notice}) {
     final bool busy = _submitting;
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF5F5F5),
@@ -234,6 +241,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             : Text(StringLookup.t(loc, 'loginButton')),
                       ),
                     ),
+                    if (notice != null && _submitError == null) ...<Widget>[
+                      const SizedBox(height: 12),
+                      Text(
+                        notice,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: isDark ? const Color(0xFFFCD34D) : const Color(0xFFB45309),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                     if (_submitError != null) ...<Widget>[
                       const SizedBox(height: 12),
                       Text(
