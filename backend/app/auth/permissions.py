@@ -52,6 +52,10 @@ PERM_WAVES_MANAGE = "waves:manage"
 PERM_WAVES_PICK = "waves:pick"
 PERM_WAVES_SORT = "waves:sort"
 
+# Diller ombor qoldig'i sanovi (WMS ledgeridan alohida hujjatlar)
+PERM_DEALER_COUNTS_READ = "dealer_counts:read"
+PERM_DEALER_COUNTS_WRITE = "dealer_counts:write"
+
 # All permissions set (includes legacy names used in endpoints)
 PERMISSIONS: set[str] = {
     PERM_PICKING_READ,
@@ -84,6 +88,8 @@ PERMISSIONS: set[str] = {
     PERM_WAVES_MANAGE,
     PERM_WAVES_PICK,
     PERM_WAVES_SORT,
+    PERM_DEALER_COUNTS_READ,
+    PERM_DEALER_COUNTS_WRITE,
     # Legacy names (still used in endpoint Depends; granted via expansion)
     "admin:access",
     "users:manage",
@@ -149,6 +155,8 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         PERM_PRODUCTS_READ,
         PERM_LOCATIONS_READ,
         PERM_MOVEMENTS_READ,
+        PERM_DEALER_COUNTS_READ,
+        PERM_DEALER_COUNTS_WRITE,
     ],
     "warehouse_admin": [
         PERM_PICKING_READ,
@@ -181,6 +189,8 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         PERM_WAVES_MANAGE,
         PERM_WAVES_PICK,
         PERM_WAVES_SORT,
+        PERM_DEALER_COUNTS_READ,
+        PERM_DEALER_COUNTS_WRITE,
         "admin:access",
     ],
     # Backward compat: supervisor = controller
@@ -203,6 +213,8 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         PERM_LOCATIONS_READ,
         PERM_MOVEMENTS_READ,
         PERM_BRANDS_MANAGE,
+        PERM_DEALER_COUNTS_READ,
+        PERM_DEALER_COUNTS_WRITE,
         "admin:access",
     ],
 }

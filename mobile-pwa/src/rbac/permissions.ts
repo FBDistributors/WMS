@@ -41,12 +41,16 @@ export type PermissionKey =
   | 'waves:create'
   | 'waves:manage'
   | 'waves:sort'
+  | 'dealer_counts:read'
+  | 'dealer_counts:write'
   // Legacy (backend expands from new names)
   | 'documents:edit_status'
   | 'users:manage'
   | 'locations:manage'
 
 export const PERMISSION_KEYS: PermissionKey[] = [
+  'dealer_counts:read',
+  'dealer_counts:write',
   'picking:read',
   'picking:write',
   'inventory:read',

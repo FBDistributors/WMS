@@ -29,7 +29,8 @@
     "kamomat": "Инвентаризация",
     "integrations": "Интеграции",
     "smartup_orders": "Заказы Smartup",
-    "profile": "Профиль"
+    "profile": "Профиль",
+    "dealer_counts": "Остатки у дилеров"
   },
   "movement_page": {
     "do_button": "Выполнить перемещение",
@@ -593,5 +594,38 @@
     "saved": "Сохранено",
     "save_failed": "Не сохранилось",
     "load_failed": "Не удалось загрузить настройку"
+  },
+  "dealer_counts": {
+    "title": "Остатки у дилеров",
+    "details_title": "Подсчёт у дилера",
+    "filter_dealer": "Дилер",
+    "all_dealers": "Все дилеры",
+    "filter_status": "Статус",
+    "status_all": "Все",
+    "status_submitted": "Отправлен",
+    "status_draft": "Черновик",
+    "filter_from": "С даты",
+    "filter_to": "По дату",
+    "total": "Всего: {{count}}",
+    "empty": "Подсчётов нет",
+    "load_failed": "Не удалось загрузить подсчёты",
+    "not_found": "Подсчёт не найден",
+    "col_dealer": "Дилер",
+    "col_date": "Дата",
+    "col_by": "Считал",
+    "col_lines": "Строк",
+    "col_units": "Шт",
+    "col_status": "Статус",
+    "col_seq": "#",
+    "col_product": "Товар",
+    "col_barcode": "Штрих-код",
+    "col_qty": "Шт",
+    "col_expiry": "Срок",
+    "started_at": "Начато",
+    "submitted_at": "Отправлено",
+    "note": "Комментарий",
+    "unknown_barcode": "Неизвестный штрих-код",
+    "unknown_hint": "{{count}} строк с неизвестным штрих-кодом — товар не найден в базе.",
+    "no_lines": "Строк нет"
   }
 }

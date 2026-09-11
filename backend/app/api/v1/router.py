@@ -9,6 +9,7 @@ from app.api.v1.endpoints import (
     customer_returns,
     waves,
     dashboard,
+    dealer_counts,
     documents,
     integrations,
     general_customers,
@@ -50,6 +51,7 @@ router.include_router(receiving.router, prefix="/receiving", tags=["receiving"])
 router.include_router(customer_returns.router, prefix="/customer-returns", tags=["customer-returns"])
 router.include_router(reports.router, prefix="/reports", tags=["reports"])
 router.include_router(general_customers.router, prefix="/general-customers", tags=["general-customers"])
+router.include_router(dealer_counts.router, prefix="/dealer-counts", tags=["dealer-counts"])
 router.include_router(picking.router, prefix="/picking", tags=["picking"])
 router.include_router(products.router, prefix="/products", tags=["products"])
 router.include_router(product_boxes.router, prefix="/product-boxes", tags=["product-boxes"])

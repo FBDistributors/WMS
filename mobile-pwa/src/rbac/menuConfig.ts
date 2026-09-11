@@ -40,6 +40,7 @@ export const ADMIN_MENU: MenuItem[] = [
   { path: '/admin/inventory', labelKey: 'menu.inventory', permissions: ['inventory:read'] },
   { path: '/admin/movement', labelKey: 'menu.movement', permissions: ['movements:read'] },
   { path: '/admin/receiving', labelKey: 'menu.receiving', permissions: ['receiving:read'] },
+  { path: '/admin/dealer-counts', labelKey: 'menu.dealer_counts', permissions: ['dealer_counts:read'] },
   { path: '/admin/locations', labelKey: 'menu.locations', permissions: ['locations:read', 'locations:manage'] },
   { path: '/admin/products', labelKey: 'menu.products', permissions: ['products:read'] },
   { path: '/admin/product-boxes', labelKey: 'menu.product_boxes', permissions: ['products:read'] },

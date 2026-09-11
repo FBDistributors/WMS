@@ -29,7 +29,8 @@
     "kamomat": "Inventory count",
     "integrations": "Integrations",
     "smartup_orders": "Smartup Orders",
-    "profile": "Profile"
+    "profile": "Profile",
+    "dealer_counts": "Dealer stock"
   },
   "movement_page": {
     "do_button": "Do movement",
@@ -593,5 +594,38 @@
     "saved": "Saved",
     "save_failed": "Save failed",
     "load_failed": "Failed to load the setting"
+  },
+  "dealer_counts": {
+    "title": "Dealer stock counts",
+    "details_title": "Dealer count",
+    "filter_dealer": "Dealer",
+    "all_dealers": "All dealers",
+    "filter_status": "Status",
+    "status_all": "All",
+    "status_submitted": "Submitted",
+    "status_draft": "Draft",
+    "filter_from": "From",
+    "filter_to": "To",
+    "total": "Total: {{count}}",
+    "empty": "No counts",
+    "load_failed": "Failed to load counts",
+    "not_found": "Count not found",
+    "col_dealer": "Dealer",
+    "col_date": "Date",
+    "col_by": "Counted by",
+    "col_lines": "Lines",
+    "col_units": "Units",
+    "col_status": "Status",
+    "col_seq": "#",
+    "col_product": "Product",
+    "col_barcode": "Barcode",
+    "col_qty": "Units",
+    "col_expiry": "Expiry",
+    "started_at": "Started",
+    "submitted_at": "Submitted",
+    "note": "Note",
+    "unknown_barcode": "Unknown barcode",
+    "unknown_hint": "{{count}} line(s) have an unknown barcode — product not found in the catalogue.",
+    "no_lines": "No lines"
   }
 }

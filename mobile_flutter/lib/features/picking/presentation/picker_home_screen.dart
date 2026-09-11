@@ -15,6 +15,7 @@ import '../../../core/offline/offline_providers.dart';
 import '../../../l10n/string_lookup.dart';
 import '../../../shared/widgets/picker_footer.dart';
 import '../../../shared/widgets/picker_tab_app_header.dart';
+import '../../auth/presentation/auth_providers.dart';
 import '../domain/profile_type_param.dart';
 import '../picking_providers.dart';
 import '../data/picking_models.dart';
@@ -159,6 +160,22 @@ class _PickerHomeScreenState extends ConsumerState<PickerHomeScreen> {
                             subtitle: StringLookup.t(loc, 'kirimCardReturnsQueueSubtitle'),
                             isDark: isDark,
                             onTap: () => context.pushNamed('customerReturnsQueue'),
+                          ),
+                        // Diller sanovi — ruxsat bo'yicha (nazoratchi/supervisor/admin),
+                        // profil turidan qat'i nazar.
+                        if (ref
+                            .watch(authControllerProvider)
+                            .maybeWhen(
+                              data: (AuthSession s) =>
+                                  s.me?.permissions.contains('dealer_counts:write') ?? false,
+                              orElse: () => false,
+                            ))
+                          _HomeCard(
+                            icon: Icons.store_mall_directory_outlined,
+                            title: StringLookup.t(loc, 'dealerCountsTitle'),
+                            subtitle: StringLookup.t(loc, 'dealerCountsSubtitle'),
+                            isDark: isDark,
+                            onTap: () => context.pushNamed('dealerCounts'),
                           ),
                         // Navbat "Boshqalar" bo'limiga ko'chdi — bu yerda faqat
                         // kutayotgan yozuv bo'lsa ko'rinadi.

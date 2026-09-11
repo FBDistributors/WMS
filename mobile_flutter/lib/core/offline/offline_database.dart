@@ -26,8 +26,14 @@ class OfflineDatabase {
     final String path = p.join(dir, _name);
     final Database db = await openDatabase(
       path,
-      version: 1,
+      version: 2,
+      onUpgrade: (Database db, int oldV, int newV) async {
+        if (oldV < 2) {
+          await _createDealerDraftsTable(db);
+        }
+      },
       onCreate: (Database db, int v) async {
+        await _createDealerDraftsTable(db);
         await db.execute('''
           CREATE TABLE IF NOT EXISTS cached_pick_tasks (
             id TEXT PRIMARY KEY,
@@ -66,6 +72,55 @@ class OfflineDatabase {
     );
     _instance = OfflineDatabase._(db);
     return _instance!;
+  }
+
+  /// Diller sanovi draftlari: viloyatda internet bo'lmasa ham sanov telefonda
+  /// qoladi, "Yuborish" keyin. Butun hujjat bitta JSON — qatorlar kam (yuzlab),
+  /// alohida jadval ortiqcha.
+  static Future<void> _createDealerDraftsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS dealer_count_drafts (
+        id TEXT PRIMARY KEY,
+        data_json TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+    ''');
+  }
+
+  Future<List<Map<String, Object?>>> dealerDraftsAll() async {
+    final List<Map<String, Object?>> rows = await _db.query(
+      'dealer_count_drafts',
+      columns: <String>['data_json'],
+      orderBy: 'updated_at DESC',
+    );
+    final List<Map<String, Object?>> out = <Map<String, Object?>>[];
+    for (final Map<String, Object?> r in rows) {
+      final Object? j = r['data_json'];
+      if (j is! String) {
+        continue;
+      }
+      final Object? dec = jsonDecode(j);
+      if (dec is Map) {
+        out.add(Map<String, Object?>.from(dec));
+      }
+    }
+    return out;
+  }
+
+  Future<void> dealerDraftSave(String id, Map<String, Object?> data) async {
+    await _db.insert(
+      'dealer_count_drafts',
+      <String, Object?>{
+        'id': id,
+        'data_json': jsonEncode(data),
+        'updated_at': DateTime.now().millisecondsSinceEpoch,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> dealerDraftDelete(String id) async {
+    await _db.delete('dealer_count_drafts', where: 'id = ?', whereArgs: <Object?>[id]);
   }
 
   Future<void> saveCachedPickTasks(List<Map<String, Object?>> tasks) async {

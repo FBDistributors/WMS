@@ -29,7 +29,8 @@
     "kamomat": "Inventarizatsiya",
     "integrations": "Integratsiyalar",
     "smartup_orders": "Smartup buyurtmalar",
-    "profile": "Profil"
+    "profile": "Profil",
+    "dealer_counts": "Diller qoldig'i"
   },
   "movement_page": {
     "do_button": "Ko'chirish qilish",
@@ -593,5 +594,38 @@
     "saved": "Saqlandi",
     "save_failed": "Saqlanmadi",
     "load_failed": "Sozlama yuklanmadi"
+  },
+  "dealer_counts": {
+    "title": "Diller qoldig'i",
+    "details_title": "Diller sanovi",
+    "filter_dealer": "Diller",
+    "all_dealers": "Barcha dillerlar",
+    "filter_status": "Holat",
+    "status_all": "Hammasi",
+    "status_submitted": "Yuborilgan",
+    "status_draft": "Draft",
+    "filter_from": "Sanadan",
+    "filter_to": "Sanagacha",
+    "total": "Jami: {{count}}",
+    "empty": "Sanovlar yo'q",
+    "load_failed": "Sanovlarni yuklab bo'lmadi",
+    "not_found": "Sanov topilmadi",
+    "col_dealer": "Diller",
+    "col_date": "Sana",
+    "col_by": "Sanadi",
+    "col_lines": "Qatorlar",
+    "col_units": "Dona",
+    "col_status": "Holat",
+    "col_seq": "#",
+    "col_product": "Mahsulot",
+    "col_barcode": "Shtrix-kod",
+    "col_qty": "Dona",
+    "col_expiry": "Muddat",
+    "started_at": "Boshlandi",
+    "submitted_at": "Yuborildi",
+    "note": "Izoh",
+    "unknown_barcode": "Tanilmagan shtrix-kod",
+    "unknown_hint": "{{count}} ta qator tanilmagan shtrix-kod bilan — mahsulot bazada topilmadi.",
+    "no_lines": "Qatorlar yo'q"
   }
 }

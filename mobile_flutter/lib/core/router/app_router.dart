@@ -17,6 +17,9 @@ import '../../features/kirim/presentation/kirim_hub_screen.dart';
 import '../../features/kirim/presentation/kirim_new_screen.dart';
 import '../../features/misc/presentation/stub_screens.dart';
 import '../../features/movements/presentation/movement_screen.dart';
+import '../../features/dealer_counts/presentation/dealer_count_screen.dart';
+import '../../features/dealer_counts/presentation/dealer_count_view_screen.dart';
+import '../../features/dealer_counts/presentation/dealer_counts_list_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/picking/presentation/consolidated_pick_screen.dart';
 import '../../features/picking/presentation/pick_task_details_screen.dart';
@@ -196,6 +199,23 @@ final goRouterProvider = Provider<GoRouter>((Ref ref) {
         path: '/kirim-form',
         name: 'kirimForm',
         builder: (BuildContext context, GoRouterState state) => const KirimFormScreen(),
+      ),
+      GoRoute(
+        path: '/dealer-counts',
+        name: 'dealerCounts',
+        builder: (BuildContext context, GoRouterState state) => const DealerCountsListScreen(),
+      ),
+      GoRoute(
+        path: '/dealer-counts/draft/:draftId',
+        name: 'dealerCountDraft',
+        builder: (BuildContext context, GoRouterState state) =>
+            DealerCountScreen(draftId: state.pathParameters['draftId']!),
+      ),
+      GoRoute(
+        path: '/dealer-counts/view/:countId',
+        name: 'dealerCountView',
+        builder: (BuildContext context, GoRouterState state) =>
+            DealerCountViewScreen(countId: state.pathParameters['countId']!),
       ),
       GoRoute(
         path: '/customer-returns-queue',

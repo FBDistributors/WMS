@@ -38,6 +38,8 @@ import { SmartupReturnsPage } from '../pages/admin/SmartupReturnsPage'
 import { SmartupReturnDetailPage } from '../pages/admin/SmartupReturnDetailPage'
 import { AppFeedbackPage } from '../pages/admin/AppFeedbackPage'
 import { ReturnDetailsPage } from '../pages/admin/ReturnDetailsPage'
+import { DealerCountsPage } from '../pages/admin/DealerCountsPage'
+import { DealerCountDetailsPage } from '../pages/admin/DealerCountDetailsPage'
 import { MahsulotYoqQilishPage } from '../pages/admin/MahsulotYoqQilishPage'
 import { PickListsPage } from '../pages/admin/PickListsPage'
 import { AdminPickListDetailPage } from '../pages/admin/AdminPickListDetailPage'
@@ -609,6 +611,26 @@ export function App() {
             <RequirePermission permission="admin:access" redirectTo="/not-authorized">
               <RequirePermission permission="audit:read">
                 <AppFeedbackPage />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/dealer-counts"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="dealer_counts:read">
+                <DealerCountsPage />
+              </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/dealer-counts/:id"
+          element={
+            <RequirePermission permission="admin:access" redirectTo="/not-authorized">
+              <RequirePermission permission="dealer_counts:read">
+                <DealerCountDetailsPage />
               </RequirePermission>
             </RequirePermission>
           }
