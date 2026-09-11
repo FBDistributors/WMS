@@ -626,6 +626,21 @@
     "note": "Note",
     "unknown_barcode": "Unknown barcode",
     "unknown_hint": "{{count}} line(s) have an unknown barcode — product not found in the catalogue.",
-    "no_lines": "No lines"
+    "no_lines": "No lines",
+    "compare_button": "Compare with Smartup",
+    "compare_refresh": "Refresh from Smartup",
+    "compare_title": "Count ↔ Smartup stock",
+    "col_counted": "Counted",
+    "col_smartup": "Smartup",
+    "col_diff": "Diff",
+    "compare_source_cache": "today's cache",
+    "compare_source_live": "fetched now",
+    "compare_only_count": "only in count",
+    "compare_only_smartup": "only in Smartup",
+    "compare_unknown_excluded": "{{count}} unknown-barcode line(s) not compared",
+    "compare_failed": "Comparison failed",
+    "compare_hint_wh": "Set the dealer's Smartup warehouse code under Settings → Organizations.",
+    "compare_totals": "Total: counted {{counted}} · Smartup {{smartup}} · diff {{diff}}",
+    "compare_back": "Count lines"
   }
 }

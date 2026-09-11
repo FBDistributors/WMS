@@ -48,17 +48,24 @@ class SettingsOrganizationOut(BaseModel):
     id: UUID
     org_id: str
     name: str | None
+    smartup_warehouse_code: str | None = None
     created_at: datetime
 
 
 class SettingsOrganizationCreate(BaseModel):
     org_id: str = Field(..., min_length=1, max_length=64)
     name: str | None = Field(default=None, max_length=255)
+    smartup_warehouse_code: str | None = Field(default=None, max_length=32)
 
 
 class SettingsOrganizationUpdate(BaseModel):
     org_id: str | None = Field(default=None, min_length=1, max_length=64)
     name: str | None = Field(default=None, max_length=255)
+    smartup_warehouse_code: str | None = Field(default=None, max_length=32)
+
+
+def _clean_wh(value: str | None) -> str | None:
+    return (value or "").strip() or None
 
 
 def _to_out(item: SettingsOrganizationModel) -> SettingsOrganizationOut:
@@ -66,6 +73,7 @@ def _to_out(item: SettingsOrganizationModel) -> SettingsOrganizationOut:
         id=item.id,
         org_id=item.org_id,
         name=item.name,
+        smartup_warehouse_code=item.smartup_warehouse_code,
         created_at=item.created_at,
     )
 
@@ -119,6 +127,7 @@ async def create_settings_organization(
         item = SettingsOrganizationModel(
             org_id=oid,
             name=payload.name.strip() if payload.name else None,
+            smartup_warehouse_code=_clean_wh(payload.smartup_warehouse_code),
         )
         db.add(item)
         db.flush()
@@ -128,7 +137,11 @@ async def create_settings_organization(
             action=ACTION_CREATE,
             entity_type="settings_organization",
             entity_id=str(item.id),
-            new_data={"org_id": item.org_id, "name": item.name},
+            new_data={
+                "org_id": item.org_id,
+                "name": item.name,
+                "smartup_warehouse_code": item.smartup_warehouse_code,
+            },
             ip_address=get_client_ip(request),
         )
         db.commit()
@@ -158,7 +171,11 @@ async def update_settings_organization(
         )
         if not item:
             raise HTTPException(status_code=404, detail="Organization not found")
-        old_data = {"org_id": item.org_id, "name": item.name}
+        old_data = {
+            "org_id": item.org_id,
+            "name": item.name,
+            "smartup_warehouse_code": item.smartup_warehouse_code,
+        }
         if payload.org_id is not None:
             oid = payload.org_id.strip()
             if oid != item.org_id:
@@ -177,6 +194,9 @@ async def update_settings_organization(
                 item.org_id = oid
         if payload.name is not None:
             item.name = payload.name.strip() if payload.name else None
+        # Maydon yuborilgan bo'lsa (bo'sh satr ham) — yangilanadi; None — tegilmaydi.
+        if "smartup_warehouse_code" in payload.model_fields_set:
+            item.smartup_warehouse_code = _clean_wh(payload.smartup_warehouse_code)
         log_action(
             db,
             user_id=user.id,
@@ -184,7 +204,11 @@ async def update_settings_organization(
             entity_type="settings_organization",
             entity_id=str(item_id),
             old_data=old_data,
-            new_data={"org_id": item.org_id, "name": item.name},
+            new_data={
+                "org_id": item.org_id,
+                "name": item.name,
+                "smartup_warehouse_code": item.smartup_warehouse_code,
+            },
             ip_address=get_client_ip(request),
         )
         db.commit()

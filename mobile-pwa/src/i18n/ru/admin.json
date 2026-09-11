@@ -626,6 +626,21 @@
     "note": "Комментарий",
     "unknown_barcode": "Неизвестный штрих-код",
     "unknown_hint": "{{count}} строк с неизвестным штрих-кодом — товар не найден в базе.",
-    "no_lines": "Строк нет"
+    "no_lines": "Строк нет",
+    "compare_button": "Сверить со Smartup",
+    "compare_refresh": "Обновить из Smartup",
+    "compare_title": "Подсчёт ↔ остаток Smartup",
+    "col_counted": "Посчитано",
+    "col_smartup": "Smartup",
+    "col_diff": "Разница",
+    "compare_source_cache": "кэш за сегодня",
+    "compare_source_live": "получено сейчас",
+    "compare_only_count": "только в подсчёте",
+    "compare_only_smartup": "только в Smartup",
+    "compare_unknown_excluded": "{{count}} строк с неизвестным кодом не сверялись",
+    "compare_failed": "Не удалось сверить",
+    "compare_hint_wh": "Код склада Smartup для дилера вводится в Настройки → Организации.",
+    "compare_totals": "Итого: посчитано {{counted}} · Smartup {{smartup}} · разница {{diff}}",
+    "compare_back": "Строки подсчёта"
   }
 }

@@ -18,11 +18,14 @@
   },
   "fields": {
     "org_id": "Id",
-    "name": "Organizatsiya nomi"
+    "name": "Organizatsiya nomi",
+    "smartup_warehouse_code": "Smartup ombor kodi",
+    "smartup_warehouse_code_hint": "balance$export uchun (masalan wh30). Diller sanovini Smartup bilan solishtirish shunga bog'liq."
   },
   "columns": {
     "org_id": "Id",
     "name": "Organizatsiya nomi",
-    "actions": "Amallar"
+    "actions": "Amallar",
+    "smartup_warehouse_code": "Smartup ombor"
   }
 }

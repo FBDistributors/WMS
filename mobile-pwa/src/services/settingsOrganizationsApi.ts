@@ -4,17 +4,21 @@ export type SettingsOrganization = {
   id: string
   org_id: string
   name: string | null
+  /** Smartup `balance$export` uchun diller ombor kodi (masalan `wh30`). */
+  smartup_warehouse_code: string | null
   created_at: string
 }
 
 export type SettingsOrganizationCreateInput = {
   org_id: string
   name?: string | null
+  smartup_warehouse_code?: string | null
 }
 
 export type SettingsOrganizationUpdateInput = {
   org_id?: string | null
   name?: string | null
+  smartup_warehouse_code?: string | null
 }
 
 export async function getSettingsOrganizations(search?: string, limit = 100, offset = 0) {

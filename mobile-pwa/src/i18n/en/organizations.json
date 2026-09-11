@@ -18,11 +18,14 @@
   },
   "fields": {
     "org_id": "Id",
-    "name": "Organization name"
+    "name": "Organization name",
+    "smartup_warehouse_code": "Smartup warehouse code",
+    "smartup_warehouse_code_hint": "For balance$export (e.g. wh30). Required to compare a dealer count with Smartup."
   },
   "columns": {
     "org_id": "Id",
     "name": "Organization name",
-    "actions": "Actions"
+    "actions": "Actions",
+    "smartup_warehouse_code": "Smartup wh"
   }
 }

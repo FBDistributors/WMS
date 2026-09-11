@@ -626,6 +626,21 @@
     "note": "Izoh",
     "unknown_barcode": "Tanilmagan shtrix-kod",
     "unknown_hint": "{{count}} ta qator tanilmagan shtrix-kod bilan — mahsulot bazada topilmadi.",
-    "no_lines": "Qatorlar yo'q"
+    "no_lines": "Qatorlar yo'q",
+    "compare_button": "Smartup bilan solishtirish",
+    "compare_refresh": "Smartup'dan yangilash",
+    "compare_title": "Sanov ↔ Smartup qoldig'i",
+    "col_counted": "Sanaldi",
+    "col_smartup": "Smartup",
+    "col_diff": "Farq",
+    "compare_source_cache": "bugungi kesh",
+    "compare_source_live": "hozir olindi",
+    "compare_only_count": "faqat sanovda",
+    "compare_only_smartup": "faqat Smartup'da",
+    "compare_unknown_excluded": "{{count}} ta tanilmagan qator solishtirilmadi",
+    "compare_failed": "Solishtirib bo'lmadi",
+    "compare_hint_wh": "Diller uchun Smartup ombor kodi Sozlamalar → Organizatsiya bo'limida kiritiladi.",
+    "compare_totals": "Jami: sanaldi {{counted}} · Smartup {{smartup}} · farq {{diff}}",
+    "compare_back": "Sanov qatorlari"
   }
 }

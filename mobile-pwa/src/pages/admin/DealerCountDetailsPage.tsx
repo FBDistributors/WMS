@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowLeft, Download, Store } from 'lucide-react'
+import { ArrowLeft, Download, GitCompareArrows, RefreshCw, Store } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
@@ -10,7 +10,13 @@ import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
-import { getDealerCount, type DealerCountOut } from '../../services/dealerCountsApi'
+import { useAppToast } from '../../feedback/useAppToast'
+import {
+  compareDealerCount,
+  getDealerCount,
+  type DealerCountCompareOut,
+  type DealerCountOut,
+} from '../../services/dealerCountsApi'
 import { writeExcelFile } from '../../utils/exportExcel'
 
 function fmtUnits(v: number | string) {
@@ -35,9 +41,29 @@ export function DealerCountDetailsPage() {
   const { t } = useTranslation(['admin', 'common'])
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { showError } = useAppToast()
   const [item, setItem] = useState<DealerCountOut | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  // Smartup bilan solishtirish — tugma bosilganda yuklanadi (Smartup API'ga
+  // avtomatik so'rov yo'q); bugungi javob serverda keshlanadi.
+  const [compare, setCompare] = useState<DealerCountCompareOut | null>(null)
+  const [compareBusy, setCompareBusy] = useState(false)
+  const [showCompare, setShowCompare] = useState(false)
+
+  const runCompare = async (refresh: boolean) => {
+    if (!id) return
+    setCompareBusy(true)
+    try {
+      setCompare(await compareDealerCount(id, refresh))
+      setShowCompare(true)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : t('admin:dealer_counts.compare_failed')
+      showError(msg.includes('ombor kodi') ? `${msg}. ${t('admin:dealer_counts.compare_hint_wh')}` : msg)
+    } finally {
+      setCompareBusy(false)
+    }
+  }
 
   const load = useCallback(async () => {
     if (!id) {
@@ -63,6 +89,20 @@ export function DealerCountDetailsPage() {
 
   const exportExcel = async () => {
     if (!item) return
+    if (showCompare && compare) {
+      const cmpRows = compare.rows.map((r) => ({
+        SKU: r.sku,
+        [t('admin:dealer_counts.col_product')]: r.product_name ?? '',
+        [t('admin:dealer_counts.col_counted')]: r.counted,
+        [t('admin:dealer_counts.col_smartup')]: r.smartup,
+        [t('admin:dealer_counts.col_diff')]: r.diff,
+      }))
+      const wsC = XLSX.utils.json_to_sheet(cmpRows)
+      const wbC = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wbC, wsC, 'Smartup')
+      await writeExcelFile(wbC, `diller_sanov_smartup_${item.dealer_org_id}_${compare.balance_date}.xlsx`)
+      return
+    }
     const rows = item.lines.map((ln) => ({
       [t('admin:dealer_counts.col_seq')]: ln.seq,
       SKU: ln.sku ?? '',
@@ -115,6 +155,22 @@ export function DealerCountDetailsPage() {
             <ArrowLeft size={16} className="mr-1" />
             {t('common:buttons.back')}
           </Button>
+          {showCompare ? (
+            <>
+              <Button variant="ghost" onClick={() => setShowCompare(false)}>
+                {t('admin:dealer_counts.compare_back')}
+              </Button>
+              <Button variant="ghost" disabled={compareBusy} onClick={() => runCompare(true)}>
+                <RefreshCw size={16} className="mr-1" />
+                {t('admin:dealer_counts.compare_refresh')}
+              </Button>
+            </>
+          ) : (
+            <Button variant="ghost" disabled={compareBusy} onClick={() => (compare ? setShowCompare(true) : runCompare(false))}>
+              <GitCompareArrows size={16} className="mr-1" />
+              {t('admin:dealer_counts.compare_button')}
+            </Button>
+          )}
           <Button onClick={exportExcel}>
             <Download size={16} className="mr-1" />
             Excel
@@ -170,6 +226,81 @@ export function DealerCountDetailsPage() {
         ) : null}
       </Card>
 
+      {showCompare && compare ? (
+        <Card className="relative p-0">
+          {compareBusy ? <LoadingOverlay label={t('common:messages.loading')} /> : null}
+          <div className="border-b border-slate-200 px-4 py-3 text-sm dark:border-slate-800">
+            <div className="font-semibold">{t('admin:dealer_counts.compare_title')}</div>
+            <div className="mt-1 text-xs text-slate-500">
+              {compare.warehouse_code} · {compare.balance_date} ·{' '}
+              {compare.source === 'live'
+                ? t('admin:dealer_counts.compare_source_live')
+                : t('admin:dealer_counts.compare_source_cache')}
+            </div>
+            <div className="mt-1 text-xs tabular-nums">
+              {t('admin:dealer_counts.compare_totals', {
+                counted: fmtUnits(compare.totals.counted),
+                smartup: fmtUnits(compare.totals.smartup),
+                diff: fmtUnits(compare.totals.diff),
+              })}
+              {' · '}
+              {compare.totals.only_in_count} {t('admin:dealer_counts.compare_only_count')}
+              {' · '}
+              {compare.totals.only_in_smartup} {t('admin:dealer_counts.compare_only_smartup')}
+            </div>
+            {compare.unknown_lines > 0 ? (
+              <div className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                {t('admin:dealer_counts.compare_unknown_excluded', { count: compare.unknown_lines })}
+              </div>
+            ) : null}
+          </div>
+          <TableScrollArea>
+            <table className="w-full text-sm">
+              <thead className="text-xs uppercase text-slate-500">
+                <tr className="border-b border-slate-200 dark:border-slate-800">
+                  <th className="px-3 py-3 text-left sm:px-4">SKU</th>
+                  <th className="px-3 py-3 text-left sm:px-4">{t('admin:dealer_counts.col_product')}</th>
+                  <th className="px-3 py-3 text-right sm:px-4">{t('admin:dealer_counts.col_counted')}</th>
+                  <th className="px-3 py-3 text-right sm:px-4">{t('admin:dealer_counts.col_smartup')}</th>
+                  <th className="px-3 py-3 text-right sm:px-4">{t('admin:dealer_counts.col_diff')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {compare.rows.map((r) => (
+                  <tr key={r.sku} className="border-b border-slate-100 dark:border-slate-800">
+                    <td className="whitespace-nowrap px-3 py-2 font-mono sm:px-4">{r.sku}</td>
+                    <td className="px-3 py-2 sm:px-4">
+                      {r.product_name ?? '—'}
+                      {r.only_in ? (
+                        <span className="ml-2 text-xs text-slate-400">
+                          {r.only_in === 'count'
+                            ? t('admin:dealer_counts.compare_only_count')
+                            : t('admin:dealer_counts.compare_only_smartup')}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums sm:px-4">{fmtUnits(r.counted)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums sm:px-4">{fmtUnits(r.smartup)}</td>
+                    <td
+                      className={
+                        'px-3 py-2 text-right font-semibold tabular-nums sm:px-4 ' +
+                        (r.diff === 0
+                          ? 'text-slate-400'
+                          : r.diff > 0
+                            ? 'text-emerald-700 dark:text-emerald-300'
+                            : 'text-rose-700 dark:text-rose-300')
+                      }
+                    >
+                      {r.diff > 0 ? '+' : ''}
+                      {fmtUnits(r.diff)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableScrollArea>
+        </Card>
+      ) : (
       <Card className="p-0">
         {item.lines.length === 0 ? (
           <EmptyState title={t('admin:dealer_counts.no_lines')} />
@@ -214,6 +345,7 @@ export function DealerCountDetailsPage() {
           </TableScrollArea>
         )}
       </Card>
+      )}
     </AdminLayout>
   )
 }

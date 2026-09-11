@@ -68,3 +68,37 @@ export async function listDealerCounts(query: DealerCountListQuery = {}) {
 export async function getDealerCount(id: string) {
   return fetchJSON<DealerCountOut>(`/api/v1/dealer-counts/${encodeURIComponent(id)}`)
 }
+
+export type DealerCountCompareRow = {
+  sku: string
+  product_name: string | null
+  counted: number
+  smartup: number
+  diff: number
+  only_in: 'count' | 'smartup' | null
+}
+
+export type DealerCountCompareOut = {
+  dealer_org_id: string
+  warehouse_code: string
+  source: 'cache' | 'live'
+  balance_date: string
+  loaded_at: string
+  unknown_lines: number
+  totals: {
+    counted: number
+    smartup: number
+    diff: number
+    only_in_count: number
+    only_in_smartup: number
+    rows: number
+  }
+  rows: DealerCountCompareRow[]
+}
+
+/** Sanov ↔ Smartup qoldig'i (diller filiali + ombor kodi). `refresh` — API'dan qayta. */
+export async function compareDealerCount(id: string, refresh = false) {
+  return fetchJSON<DealerCountCompareOut>(`/api/v1/dealer-counts/${encodeURIComponent(id)}/compare`, {
+    query: refresh ? { refresh: 'true' } : undefined,
+  })
+}

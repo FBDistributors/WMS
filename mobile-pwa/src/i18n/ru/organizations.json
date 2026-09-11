@@ -18,11 +18,14 @@
   },
   "fields": {
     "org_id": "Id",
-    "name": "Название организации"
+    "name": "Название организации",
+    "smartup_warehouse_code": "Код склада Smartup",
+    "smartup_warehouse_code_hint": "Для balance$export (например wh30). Нужен для сверки подсчёта у дилера со Smartup."
   },
   "columns": {
     "org_id": "Id",
     "name": "Название организации",
-    "actions": "Действия"
+    "actions": "Действия",
+    "smartup_warehouse_code": "Склад Smartup"
   }
 }

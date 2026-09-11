@@ -66,6 +66,7 @@ export function OrganizationsSection({
         id: x.id,
         org_id: x.org_id,
         name: x.name,
+        smartup_warehouse_code: x.smartup_warehouse_code,
       })),
     [items],
   )
@@ -133,6 +134,9 @@ export function OrganizationsSection({
                     {t('organizations:columns.org_id')}
                   </th>
                   <th className="px-3 py-3 text-left sm:px-4">{t('organizations:columns.name')}</th>
+                  <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">
+                    {t('organizations:columns.smartup_warehouse_code')}
+                  </th>
                   {canManage ? (
                     <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">
                       {t('organizations:columns.actions')}
@@ -147,6 +151,9 @@ export function OrganizationsSection({
                       {row.org_id}
                     </td>
                     <td className="px-3 py-3 text-slate-800 dark:text-slate-200 sm:px-4">{row.name ?? '—'}</td>
+                    <td className="whitespace-nowrap px-3 py-3 font-mono text-slate-700 dark:text-slate-300 sm:px-4">
+                      {row.smartup_warehouse_code ?? '—'}
+                    </td>
                     {canManage ? (
                       <td className="px-3 py-3 sm:px-4">
                         <div className="flex gap-1">
@@ -231,14 +238,16 @@ function OrganizationDialog({ mode, target, onClose, onSaved }: DialogProps) {
   const { showError } = useAppToast()
   const [orgId, setOrgId] = useState(target?.org_id ?? '')
   const [name, setName] = useState(target?.name ?? '')
+  const [whCode, setWhCode] = useState(target?.smartup_warehouse_code ?? '')
   const [validationError, setValidationError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     setOrgId(target?.org_id ?? '')
     setName(target?.name ?? '')
+    setWhCode(target?.smartup_warehouse_code ?? '')
     setValidationError(null)
-  }, [mode, target?.id, target?.org_id, target?.name])
+  }, [mode, target?.id, target?.org_id, target?.name, target?.smartup_warehouse_code])
 
   const handleSubmit = async () => {
     if (!orgId.trim()) {
@@ -252,11 +261,13 @@ function OrganizationDialog({ mode, target, onClose, onSaved }: DialogProps) {
         await createSettingsOrganization({
           org_id: orgId.trim(),
           name: name.trim() || null,
+          smartup_warehouse_code: whCode.trim() || null,
         })
       } else if (target) {
         await updateSettingsOrganization(target.id, {
           org_id: orgId.trim(),
           name: name.trim() || null,
+          smartup_warehouse_code: whCode.trim() || null,
         })
       }
       onSaved()
@@ -307,6 +318,18 @@ function OrganizationDialog({ mode, target, onClose, onSaved }: DialogProps) {
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
+          </label>
+          <label className="text-sm text-slate-600 dark:text-slate-300">
+            {t('organizations:fields.smartup_warehouse_code')}
+            <input
+              className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+              value={whCode}
+              placeholder="wh30"
+              onChange={(e) => setWhCode(e.target.value)}
+            />
+            <span className="mt-1 block text-xs text-slate-400">
+              {t('organizations:fields.smartup_warehouse_code_hint')}
+            </span>
           </label>
         </div>
         <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-6 py-4 dark:border-slate-800">

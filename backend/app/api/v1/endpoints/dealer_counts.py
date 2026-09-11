@@ -31,6 +31,7 @@ from app.services.audit_service import (
     get_client_ip,
     log_action,
 )
+from app.services.dealer_count_compare import compare_dealer_count
 from app.services.product_scan_resolve import resolve_product_scan
 
 router = APIRouter()
@@ -458,6 +459,19 @@ def delete_count(
     db.delete(item)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/{count_id}/compare",
+    summary="Sanovni Smartup qoldig'i bilan solishtirish (filial + ombor kodi, kunlik kesh)",
+)
+def compare_count(
+    count_id: UUID,
+    refresh: bool = Query(default=False, description="Smartup'dan qayta so'rash"),
+    db: Session = Depends(get_db),
+    _user: User = Depends(require_permission(PERM_DEALER_COUNTS_READ)),
+) -> dict:
+    return compare_dealer_count(db, _load(db, count_id), refresh=refresh)
 
 
 @router.get("/{count_id}/export.xlsx", summary="Sanovni Excel'ga eksport")
