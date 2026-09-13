@@ -69,6 +69,45 @@ export async function getDealerCount(id: string) {
   return fetchJSON<DealerCountOut>(`/api/v1/dealer-counts/${encodeURIComponent(id)}`)
 }
 
+// --- web'dan yaratish / tahrirlash (draft) ---
+
+export type DealerCountLineIn = {
+  product_id?: string
+  scanned_barcode: string
+  qty: number
+  expiry_date?: string
+}
+
+export type DealerCountCreateIn = {
+  client_uuid: string
+  dealer_org_id: string
+  note?: string
+  lines: DealerCountLineIn[]
+  submit?: boolean
+}
+
+export async function createDealerCount(payload: DealerCountCreateIn) {
+  return fetchJSON<DealerCountOut>('/api/v1/dealer-counts', { method: 'POST', body: payload })
+}
+
+export async function updateDealerCount(id: string, payload: { note?: string; lines: DealerCountLineIn[] }) {
+  return fetchJSON<DealerCountOut>(`/api/v1/dealer-counts/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: payload,
+  })
+}
+
+export async function submitDealerCount(id: string) {
+  return fetchJSON<DealerCountOut>(`/api/v1/dealer-counts/${encodeURIComponent(id)}/submit`, {
+    method: 'POST',
+    body: {},
+  })
+}
+
+export async function deleteDealerCount(id: string) {
+  return fetchJSON<void>(`/api/v1/dealer-counts/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
 export type DealerCountCompareRow = {
   sku: string
   product_name: string | null

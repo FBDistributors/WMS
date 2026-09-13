@@ -129,6 +129,8 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     'products:read',
     'locations:read',
     'movements:read',
+    'dealer_counts:read',
+    'dealer_counts:write',
   ],
   warehouse_admin: [
     'picking:read',
@@ -158,6 +160,8 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     'movements:read',
     'brands:manage',
     'admin:access',
+    'dealer_counts:read',
+    'dealer_counts:write',
     'waves:read',
     'waves:pick',
     'waves:create',
@@ -188,6 +192,8 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionKey[]> = {
     'movements:read',
     'brands:manage',
     'admin:access',
+    'dealer_counts:read',
+    'dealer_counts:write',
   ],
 }
 

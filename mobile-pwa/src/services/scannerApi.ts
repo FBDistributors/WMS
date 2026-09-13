@@ -20,6 +20,9 @@ export type ScannerResolveResult = {
   entity_id?: string | null
   display_label?: string | null
   message?: string | null
+  /** `box` — quti shtrix-kodi skanerlandi; `units_per_scan` — qutidagi dona. */
+  scan_kind?: string | null
+  units_per_scan?: number | null
 }
 
 export async function resolveBarcode(barcode: string): Promise<ScannerResolveResult> {

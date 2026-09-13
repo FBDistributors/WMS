@@ -40,6 +40,7 @@ import { AppFeedbackPage } from '../pages/admin/AppFeedbackPage'
 import { ReturnDetailsPage } from '../pages/admin/ReturnDetailsPage'
 import { DealerCountsPage } from '../pages/admin/DealerCountsPage'
 import { DealerCountDetailsPage } from '../pages/admin/DealerCountDetailsPage'
+import { DealerCountEditPage } from '../pages/admin/DealerCountEditPage'
 import { MahsulotYoqQilishPage } from '../pages/admin/MahsulotYoqQilishPage'
 import { PickListsPage } from '../pages/admin/PickListsPage'
 import { AdminPickListDetailPage } from '../pages/admin/AdminPickListDetailPage'
@@ -622,6 +623,22 @@ export function App() {
               <RequirePermission permission="dealer_counts:read">
                 <DealerCountsPage />
               </RequirePermission>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/dealer-counts/new"
+          element={
+            <RequirePermission permission="dealer_counts:write" redirectTo="/not-authorized">
+              <DealerCountEditPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/dealer-counts/:id/edit"
+          element={
+            <RequirePermission permission="dealer_counts:write" redirectTo="/not-authorized">
+              <DealerCountEditPage />
             </RequirePermission>
           }
         />

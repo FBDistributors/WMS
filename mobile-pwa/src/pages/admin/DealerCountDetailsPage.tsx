@@ -155,6 +155,11 @@ export function DealerCountDetailsPage() {
             <ArrowLeft size={16} className="mr-1" />
             {t('common:buttons.back')}
           </Button>
+          {item.status === 'draft' ? (
+            <Button variant="ghost" onClick={() => navigate(`/admin/dealer-counts/${item.id}/edit`)}>
+              {t('admin:dealer_counts.edit_button')}
+            </Button>
+          ) : null}
           {showCompare ? (
             <>
               <Button variant="ghost" onClick={() => setShowCompare(false)}>

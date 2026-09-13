@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Store } from 'lucide-react'
+import { Plus, Store } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+
+import { useAuth } from '../../rbac/AuthProvider'
 
 import { AdminLayout } from '../../admin/components/AdminLayout'
 import { TableScrollArea } from '../../components/TableScrollArea'
@@ -37,6 +39,7 @@ function fmtDate(v: string | null | undefined) {
 export function DealerCountsPage() {
   const { t } = useTranslation(['admin', 'common'])
   const navigate = useNavigate()
+  const { has } = useAuth()
   const { showError } = useAppToast()
   const [dealers, setDealers] = useState<DealerOut[]>([])
   const [dealerId, setDealerId] = useState('')
@@ -90,6 +93,14 @@ export function DealerCountsPage() {
           <Store size={18} />
           <span className="text-sm font-semibold">{t('admin:dealer_counts.title')}</span>
         </div>
+      }
+      actionSlot={
+        has('dealer_counts:write') ? (
+          <Button onClick={() => navigate('/admin/dealer-counts/new')}>
+            <Plus size={16} className="mr-1" />
+            {t('admin:dealer_counts.new_button')}
+          </Button>
+        ) : null
       }
     >
       <Card className="mb-4 p-4">
@@ -185,7 +196,13 @@ export function DealerCountsPage() {
                   <tr
                     key={row.id}
                     className="cursor-pointer border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40"
-                    onClick={() => navigate(`/admin/dealer-counts/${row.id}`)}
+                    onClick={() =>
+                      navigate(
+                        row.status === 'draft' && has('dealer_counts:write')
+                          ? `/admin/dealer-counts/${row.id}/edit`
+                          : `/admin/dealer-counts/${row.id}`,
+                      )
+                    }
                   >
                     <td className="px-3 py-3 text-slate-900 dark:text-slate-100 sm:px-4">
                       {row.dealer_name ?? row.dealer_org_id}
