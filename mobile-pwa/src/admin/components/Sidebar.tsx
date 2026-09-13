@@ -14,6 +14,7 @@ import {
   ClipboardCheck,
   ArrowLeftRight,
   Undo2,
+  Store,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
@@ -41,6 +42,9 @@ const MENU_ITEMS: Array<MenuItem & { key: string }> = [
   { key: 'users', label: 'Users & Access', path: '/admin/users', icon: Users, required: 'users:manage' },
   { key: 'audit', label: 'Audit Logs', path: '/admin/audit', icon: History, required: 'audit:read' },
   { key: 'kamomat', label: 'Inventarizatsiya', path: '/admin/kamomat', icon: ClipboardCheck, required: 'movements:read' },
+  // Diller ombor qoldig'i sanovlari — admin sidebar `menuConfig.ts` dan emas, shu
+  // ro'yxatdan chiziladi; shuning uchun band shu yerda ham bo'lishi shart.
+  { key: 'dealer_counts', label: "Diller qoldig'i", path: '/admin/dealer-counts', icon: Store, required: 'dealer_counts:read' },
   { key: 'settings', label: 'Sozlamalar', path: '/admin/settings', icon: Settings, required: 'orders:read' },
 ]
 
