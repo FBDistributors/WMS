@@ -41,6 +41,7 @@ import {
   totals,
   type EditRow,
 } from '../../utils/dealerCountRows'
+import { useDealerCountAutoRefresh } from './dealerCountAutoRefresh'
 
 const inputCls =
   'w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'
@@ -118,6 +119,8 @@ export function DealerCountEditPage() {
   const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const qtyRefs = useRef<Record<string, HTMLInputElement | null>>({})
   const codeRefs = useRef<Record<string, HTMLInputElement | null>>({})
+  // Har saqlash oshiradi: fonda kelgan eskiroq server javobi yangi o'zgarish ustidan yozilmasin.
+  const mutationSeq = useRef(0)
 
   const sum = useMemo(() => totals(rows), [rows])
   const saved = useMemo(() => savedOf(count), [count])
@@ -176,6 +179,7 @@ export function DealerCountEditPage() {
   }, [countId, dealerId])
 
   const run = async (fn: () => Promise<void>) => {
+    mutationSeq.current += 1
     setBusy(true)
     try {
       await fn()
@@ -340,6 +344,7 @@ export function DealerCountEditPage() {
       setRows((prev) => prev.map((r) => (r.key === row.key ? { ...r, editing: false } : r)))
       return
     }
+    mutationSeq.current += 1
     setSavingKey(row.key)
     try {
       const c = await patchDealerCountLine(countId, row.lineId, patch)
@@ -358,6 +363,7 @@ export function DealerCountEditPage() {
       return
     }
     if (!countId) return
+    mutationSeq.current += 1
     setSavingKey(row.key)
     try {
       apply(await deleteDealerCountLine(countId, row.lineId))
@@ -410,6 +416,14 @@ export function DealerCountEditPage() {
   }
 
   const closed = count !== null && !count.is_active
+
+  // Telefonlarda sanalayotganini kuzatish: saqlash yoki oyna ochiq paytida kutib turadi.
+  const checkedAt = useDealerCountAutoRefresh({
+    count,
+    enabled: !busy && savingKey === null && !importOpen && !prefillOpen && !confirmDelete && !confirmReplace,
+    onChanged: apply,
+    mutationSeq,
+  })
 
   return (
     <AdminLayout
@@ -492,6 +506,11 @@ export function DealerCountEditPage() {
               </span>
             ) : null}
             {countId ? <span className="ml-2 text-emerald-700 dark:text-emerald-300">{t('admin:dealer_counts.autosave_hint')}</span> : null}
+            {countId ? (
+              <span className="ml-2 text-slate-400" title={t('admin:dealer_counts.auto_refresh_title')}>
+                · {t('admin:dealer_counts.auto_refresh_hint', { time: checkedAt ? checkedAt.toLocaleTimeString() : '—' })}
+              </span>
+            ) : null}
           </div>
           {!countId && activeExisting ? (
             <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-200">

@@ -673,6 +673,8 @@
     "open_exists_button": "Ochiq ro'yxatni ochish",
     "active_exists": "Bu dillerda faol sanov bor ({{done}}/{{total}} sanalgan). Yangi sanov yaratilsa, eskisi telefonlardan yo'qoladi (web'da qoladi).",
     "autosave_hint": "Har o'zgarish darhol saqlanadi",
+    "auto_refresh_hint": "avtomatik yangilanadi · {{time}}",
+    "auto_refresh_title": "Telefonlarda sanalganlar har 20 soniyada tekshiriladi va o'zgarsa jadvalga qo'shiladi",
     "closed_banner": "Bu sanov yopilgan — shu dillerga yangisi yaratilgan, telefonlarda ko'rinmaydi. Ko'rish va tahrirlash mumkin.",
     "closed_short": "yopilgan",
     "col_counted_by": "Kim sanadi",

@@ -19,6 +19,7 @@ import {
   type DealerCountOut,
 } from '../../services/dealerCountsApi'
 import { writeExcelFile } from '../../utils/exportExcel'
+import { useDealerCountAutoRefresh } from './dealerCountAutoRefresh'
 
 function fmtUnits(v: number | string | null) {
   if (v == null) return '—'
@@ -88,6 +89,9 @@ export function DealerCountDetailsPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  // Telefonlarda sanalayotgani jadvalda o'zi yangilanadi (solishtiruv ochiq bo'lmasa).
+  useDealerCountAutoRefresh({ count: item, enabled: !showCompare && !compareBusy, onChanged: setItem })
 
   const exportExcel = async () => {
     if (!item) return

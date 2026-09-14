@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Plus, Store, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
@@ -23,6 +23,7 @@ import {
 } from '../../services/dealerCountsApi'
 
 const PAGE = 50
+const LIST_REFRESH_MS = 30_000
 
 const inputCls =
   'rounded-xl border border-slate-200/90 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100'
@@ -62,8 +63,8 @@ export function DealerCountsPage() {
       .catch(() => setDealers([]))
   }, [])
 
-  const load = useCallback(async () => {
-    setIsLoading(true)
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setIsLoading(true)
     setHasError(false)
     try {
       const r = await listDealerCounts({
@@ -76,15 +77,34 @@ export function DealerCountsPage() {
       setItems(r.items)
       setTotal(r.total)
     } catch (err) {
-      showError(getApiErrorMessage(err, t('admin:dealer_counts.load_failed')))
-      setHasError(true)
+      // Fondagi yangilash xatosi jim — keyingi safar yana urinadi, jadval o'z joyida qoladi.
+      if (!silent) {
+        showError(getApiErrorMessage(err, t('admin:dealer_counts.load_failed')))
+        setHasError(true)
+      }
     } finally {
-      setIsLoading(false)
+      if (!silent) setIsLoading(false)
     }
   }, [dealerId, dateFrom, dateTo, offset, showError, t])
 
   useEffect(() => {
     void load()
+  }, [load])
+
+  // "Sanaldi X/Y" va "Oxirgi sanash" telefonlardan kelib turadi: fonda yangilanadi
+  // (tab ko'rinmasa yoki o'chirish oynasi ochiq bo'lsa — kutadi).
+  const pausedRef = useRef(false)
+  pausedRef.current = toDelete !== null
+  useEffect(() => {
+    const tick = () => {
+      if (document.visibilityState === 'visible' && !pausedRef.current) void load(true)
+    }
+    const timer = window.setInterval(tick, LIST_REFRESH_MS)
+    document.addEventListener('visibilitychange', tick)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', tick)
+    }
   }, [load])
 
   const resetPage = () => setOffset(0)
@@ -183,7 +203,7 @@ export function DealerCountsPage() {
           <EmptyState
             title={t('admin:dealer_counts.load_failed')}
             actionLabel={t('common:buttons.retry')}
-            onAction={load}
+            onAction={() => void load()}
           />
         ) : !isLoading && items.length === 0 ? (
           <EmptyState title={t('admin:dealer_counts.empty')} />
