@@ -197,7 +197,14 @@ export function DealerCountDetailsPage() {
           </div>
           <div>
             <dt className="text-xs text-slate-500">{t('admin:dealer_counts.col_by')}</dt>
-            <dd className="font-medium">{item.counted_by_name ?? '—'}</dd>
+            <dd className="font-medium">
+              {item.assigned_to_name ?? item.counted_by_name ?? '—'}
+              {item.assigned_to_name && item.counted_by_name && item.assigned_to_name !== item.counted_by_name ? (
+                <div className="text-xs font-normal text-slate-400">
+                  {t('admin:dealer_counts.created_by', { name: item.counted_by_name })}
+                </div>
+              ) : null}
+            </dd>
           </div>
           <div>
             <dt className="text-xs text-slate-500">{t('admin:dealer_counts.col_status')}</dt>

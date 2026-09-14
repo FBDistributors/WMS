@@ -10,11 +10,7 @@ final dealerCountsRepositoryProvider = Provider<DealerCountsRepository>((Ref ref
   return DealerCountsRepository(ref.watch(appDioProvider));
 });
 
-final dealersProvider = FutureProvider<List<Dealer>>((Ref ref) {
-  return ref.watch(dealerCountsRepositoryProvider).listDealers();
-});
-
-/// Telefondagi draftlar (sqflite). Har saqlashdan keyin `invalidate` qilinadi.
+/// Telefondagi eski bo'sh draftlar (sqflite) — o'tish davri, yangisi yaratilmaydi.
 final dealerCountDraftsProvider = FutureProvider<List<DealerCountDraft>>((Ref ref) async {
   final OfflineDatabase? db = await ref.watch(offlineDatabaseProvider.future);
   if (db == null) {

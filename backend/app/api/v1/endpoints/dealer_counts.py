@@ -304,7 +304,7 @@ def _same_day_warning(db: Session, item: DealerStockCount) -> Optional[str]:
     )
     if not other:
         return None
-    who = _display_name(db.get(User, other.counted_by_user_id)) or "—"
+    who = _display_name(db.get(User, other.assigned_to_user_id or other.counted_by_user_id)) or "—"
     return f"Bu diller bugun allaqachon sanalgan ({who})"
 
 
@@ -320,10 +320,24 @@ def _load(db: Session, count_id: UUID) -> DealerStockCount:
     return item
 
 
+#: Ro'yxat (sanov hujjati) faqat web'da yaratiladi va to'ldiriladi; telefon faqat sanaydi.
+WEB_ONLY_DETAIL = "Sanov ro'yxati faqat web'da yaratiladi"
+
+
+def _is_admin(user: User) -> bool:
+    return "admin:access" in get_effective_permissions(user)
+
+
+def _require_web_user(user: User) -> None:
+    """Web (admin panel) foydalanuvchisi — `admin:access`. Telefondagi sanovchida u yo'q."""
+    if not _is_admin(user):
+        raise HTTPException(status_code=403, detail=WEB_ONLY_DETAIL)
+
+
 def _require_owner_or_admin(item: DealerStockCount, user: User) -> None:
     if item.counted_by_user_id == user.id:
         return
-    if "admin:access" in get_effective_permissions(user):
+    if _is_admin(user):
         return
     raise HTTPException(status_code=403, detail="Bu sanov sizga tegishli emas")
 
@@ -384,6 +398,11 @@ def create_count(
     db: Session = Depends(get_db),
     user: User = Depends(require_permission(PERM_DEALER_COUNTS_WRITE)),
 ) -> DealerCountOut:
+    # O'tish davri: telefonda qolgan eski bo'sh draft (noldan skan) bir so'rovda
+    # yaratilib yuboriladi — viloyatdagi sanov yo'qolmasin. Qolgan hamma yaratish — web.
+    legacy_upload = payload.submit and payload.source == "mobile"
+    if not legacy_upload:
+        _require_web_user(user)
     existing = (
         db.query(DealerStockCount)
         .options(selectinload(DealerStockCount.lines))
@@ -430,6 +449,9 @@ def create_count(
             "status": item.status,
             "lines_count": item.lines_count,
             "total_units": str(item.total_units),
+            "source": item.source,
+            # Audit logdan o'tish davri tugaganini tekshirish uchun.
+            "legacy_mobile_upload": legacy_upload,
         },
         ip_address=get_client_ip(request),
     )
@@ -463,7 +485,13 @@ def list_counts(
     if counted_by_user_id:
         query = query.filter(DealerStockCount.counted_by_user_id == counted_by_user_id)
     if mine:
-        query = query.filter(DealerStockCount.counted_by_user_id == user.id)
+        # Ro'yxatni web yaratadi (counted_by), telefonda sanagan xodim — assigned_to.
+        query = query.filter(
+            or_(
+                DealerStockCount.counted_by_user_id == user.id,
+                DealerStockCount.assigned_to_user_id == user.id,
+            )
+        )
     if date_from:
         query = query.filter(func.date(DealerStockCount.created_at) >= date_from)
     if date_to:
@@ -519,10 +547,12 @@ def submit_count(
     user: User = Depends(require_permission(PERM_DEALER_COUNTS_WRITE)),
 ) -> DealerCountOut:
     item = _load(db, count_id)
-    if item.status == "in_progress":
-        _require_counter_or_admin(item, user)
-    else:
+    if item.status == "draft":
         _require_owner_or_admin(item, user)
+    else:
+        # in_progress — olgan xodim; submitted — `_submit` 409 qaytaradi (403 emas:
+        # ro'yxatni web yaratgan, telefondagi sanovchi uning egasi emas).
+        _require_counter_or_admin(item, user)
     uncounted_n = _submit(item, uncounted=uncounted)
     log_action(
         db,
@@ -556,7 +586,7 @@ def prefill_count(
     user: User = Depends(require_permission(PERM_DEALER_COUNTS_WRITE)),
 ) -> PrefillOut:
     item = _load(db, count_id)
-    _require_owner_or_admin(item, user)
+    _require_web_user(user)
     result = prefill_sheet(db, item, sources=payload.sources, months=payload.months, refresh=payload.refresh)
     _recount(item)
     log_action(
@@ -660,7 +690,7 @@ def delete_count(
     item = _load(db, count_id)
     if item.status == "submitted":
         # Keraksiz/xato yuborilgan hujjatni tozalash; ledgerga ta'siri yo'q, audit qoladi.
-        if "admin:access" not in get_effective_permissions(user):
+        if not _is_admin(user):
             raise HTTPException(status_code=403, detail="Yuborilgan sanovni faqat admin o'chira oladi")
     else:
         _require_owner_or_admin(item, user)
@@ -712,7 +742,9 @@ def export_count_xlsx(
     ws.title = "Sanov"
     ws.append(["Diller", out.dealer_name or out.dealer_org_id])
     ws.append(["Diller ID", out.dealer_org_id])
-    ws.append(["Sanadi", out.counted_by_name or ""])
+    # Ro'yxatni web'da biri yaratadi, telefonda boshqasi sanaydi.
+    ws.append(["Sanadi", out.assigned_to_name or out.counted_by_name or ""])
+    ws.append(["Yaratdi", out.counted_by_name or ""])
     ws.append(["Holat", out.status])
     ws.append(["Boshlandi", out.started_at.strftime("%Y-%m-%d %H:%M")])
     ws.append(["Yuborildi", out.submitted_at.strftime("%Y-%m-%d %H:%M") if out.submitted_at else ""])
@@ -726,7 +758,8 @@ def export_count_xlsx(
                 ln.sku or "",
                 ln.product_name or "(tanilmagan shtrix-kod)",
                 ln.scanned_barcode,
-                float(ln.qty),
+                # "Sanalmagan qoldirsin" bilan yuborilgan qatorda qty yo'q.
+                float(ln.qty) if ln.qty is not None else "",
                 ln.expiry_date.strftime("%Y-%m") if ln.expiry_date else "",
             ]
         )

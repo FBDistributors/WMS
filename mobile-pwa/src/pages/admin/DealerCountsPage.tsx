@@ -37,7 +37,13 @@ function fmtDate(v: string | null | undefined) {
   return Number.isNaN(d.getTime()) ? v : d.toLocaleString()
 }
 
-/** Diller qoldig'i: xodimlar viloyatda skanerlab yuborgan sanovlar ro'yxati. */
+/** Kim sanadi: telefonda olgan xodim; olinmagan draftda hali hech kim; web'da
+ *  kiritilgan yoki eski mobil sanovda — hujjat egasi. Yaratgan alohida ko'rsatiladi. */
+function counterName(row: DealerCountOut) {
+  return row.assigned_to_name ?? (row.status === 'draft' ? null : row.counted_by_name)
+}
+
+/** Diller qoldig'i: ro'yxat shu yerda yaratiladi, xodim telefonda skanerlab sanaydi. */
 export function DealerCountsPage() {
   const { t } = useTranslation(['admin', 'common'])
   const navigate = useNavigate()
@@ -195,6 +201,7 @@ export function DealerCountsPage() {
             {t('admin:dealer_counts.total', { count: total })}
           </span>
         </div>
+        <p className="mt-3 text-xs text-slate-500">{t('admin:dealer_counts.web_only_hint')}</p>
       </Card>
 
       <Card className="relative p-0">
@@ -239,7 +246,14 @@ export function DealerCountsPage() {
                       <div className="font-mono text-xs text-slate-400">{row.dealer_org_id}</div>
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 sm:px-4">{fmtDate(row.submitted_at ?? row.started_at)}</td>
-                    <td className="px-3 py-3 sm:px-4">{row.counted_by_name ?? '—'}</td>
+                    <td className="px-3 py-3 sm:px-4">
+                      {counterName(row) ?? '—'}
+                      {row.counted_by_name && row.counted_by_name !== counterName(row) ? (
+                        <div className="text-xs text-slate-400">
+                          {t('admin:dealer_counts.created_by', { name: row.counted_by_name })}
+                        </div>
+                      ) : null}
+                    </td>
                     <td className="px-3 py-3 text-right tabular-nums sm:px-4">
                       {row.status === 'submitted' ? row.lines_count : `${row.counted_lines}/${row.sheet_lines}`}
                     </td>

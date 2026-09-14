@@ -21,7 +21,11 @@ import '../data/dealer_counts_models.dart';
 import 'dealer_qty_sheet.dart';
 import '../dealer_counts_providers.dart';
 
-/// Diller sanovi — draftni skanerlab to'ldirish va yuborish.
+/// Diller sanovi — eski bo'sh draftni skanerlab to'ldirish va yuborish.
+///
+/// O'tish davri: faqat 1.0.44 dan oldin telefonda boshlangan draftlar ochiladi —
+/// yangi draft yaratish yo'li yo'q (ro'yxat web'da tuziladi). Hamma telefon
+/// yangilangach ekran, route va `DealerCountDraft` o'chiriladi.
 ///
 /// Har o'zgarish darhol telefonga (sqflite) yoziladi: viloyatda internet
 /// uzilsa ham sanov yo'qolmaydi. Serverga faqat "Yuborish" da boradi.

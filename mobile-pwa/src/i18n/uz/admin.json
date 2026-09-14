@@ -657,6 +657,8 @@
     "delete": "O'chirish",
     "delete_submitted_confirm": "{{dealer}} — {{date}} sanovi butunlay o'chiriladi. Qayta tiklab bo'lmaydi (audit logda qoladi). Davom etilsinmi?",
     "delete_failed": "O'chirib bo'lmadi",
+    "created_by": "Yaratdi: {{name}}",
+    "web_only_hint": "Sanov ro'yxati shu yerda yaratiladi (Yangi sanov → diller → ro'yxatni to'ldirish → saqlash). Xodim telefonda ro'yxatni ochib, skanerlab sanaydi va yuboradi.",
     "col_code": "SKU / shtrix-kod",
     "code_placeholder": "Skanerlang yoki yozing",
     "add_row": "Qator qo'shish",

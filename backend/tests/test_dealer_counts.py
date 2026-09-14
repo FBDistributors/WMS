@@ -97,7 +97,7 @@ def test_picker_cannot_create(client: TestClient, db_session: Session):
 
 def test_submit_empty_rejected_and_submitted_is_frozen(client: TestClient, db_session: Session):
     org, product = _seed(db_session)
-    _as(_mk_user(db_session, "inventory_controller"))
+    _as(_mk_user(db_session, "warehouse_admin"))
     try:
         empty = client.post(URL, json=_payload(org, product, lines=[]))
         assert empty.status_code == 200, empty.text
@@ -112,7 +112,11 @@ def test_submit_empty_rejected_and_submitted_is_frozen(client: TestClient, db_se
         assert client.post(f"{URL}/{cid}/submit").status_code == 200
 
         assert client.put(f"{URL}/{cid}", json={"lines": []}).status_code == 409
-        # Yuborilganni faqat admin o'chiradi — egasi ham emas.
+    finally:
+        _clear()
+    # Yuborilganni faqat admin o'chiradi.
+    _as(_mk_user(db_session, "inventory_controller"))
+    try:
         assert client.delete(f"{URL}/{cid}").status_code == 403
     finally:
         _clear()
@@ -131,7 +135,7 @@ def test_admin_can_delete_submitted(client: TestClient, db_session: Session):
 
 def test_barcode_resolved_server_side_and_lines_merged(client: TestClient, db_session: Session):
     org, product = _seed(db_session)
-    _as(_mk_user(db_session, "inventory_controller"))
+    _as(_mk_user(db_session, "warehouse_admin"))
     try:
         res = client.post(
             URL,
@@ -173,7 +177,7 @@ def test_count_never_touches_stock_ledger(client: TestClient, db_session: Sessio
 
 def test_other_user_cannot_edit_but_admin_can(client: TestClient, db_session: Session):
     org, product = _seed(db_session)
-    owner = _mk_user(db_session, "inventory_controller")
+    owner = _mk_user(db_session, "supervisor")
     other = _mk_user(db_session, "inventory_controller")
     admin = _mk_user(db_session, "warehouse_admin")
     _as(owner)
@@ -189,6 +193,20 @@ def test_other_user_cannot_edit_but_admin_can(client: TestClient, db_session: Se
     _as(admin)
     try:
         assert client.delete(f"{URL}/{cid}").status_code == 204
+    finally:
+        _clear()
+
+
+def test_counter_can_still_upload_legacy_phone_draft(client: TestClient, db_session: Session):
+    """O'tish davri: telefonda qolgan eski bo'sh draft (source=mobile) bir so'rovda yuboriladi."""
+    org, product = _seed(db_session)
+    _as(_mk_user(db_session, "inventory_controller"))
+    try:
+        ok = client.post(URL, json=_payload(org, product, submit=True))
+        assert ok.status_code == 200, ok.text
+        assert ok.json()["status"] == "submitted"
+        # Yubormasdan draft yaratish — endi faqat web'da.
+        assert client.post(URL, json=_payload(org, product, submit=False)).status_code == 403
     finally:
         _clear()
 

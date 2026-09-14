@@ -151,12 +151,16 @@ def test_counts_are_idempotent_and_can_add_new_products(client: TestClient, db_s
     a, b, extra = _product(db_session, "A"), _product(db_session, "B"), _product(db_session, "E")
     _patch_smartup(monkeypatch, {a.sku: 10, b.sku: 5})
     u = _mk_user(db_session, "inventory_controller")
-    _as(u)
+    _as(_mk_user(db_session, "warehouse_admin"))
     try:
         cid = _new_sheet(client, org)
         client.post(f"{URL}/{cid}/prefill", json={"sources": ["smartup"]})
+    finally:
+        _clear()
+    _as(u)
+    try:
         client.post(f"{URL}/{cid}/claim")
-        entries = [{"product_id": str(a.id), "qty": 7}, {"product_id": str(extra.id), "qty": 2}]
+        entries =[{"product_id": str(a.id), "qty": 7}, {"product_id": str(extra.id), "qty": 2}]
         r1 = client.put(f"{URL}/{cid}/counts", json={"entries": entries})
         assert r1.status_code == 200, r1.text
         assert (r1.json()["updated"], r1.json()["added"]) == (1, 1)
@@ -175,21 +179,27 @@ def test_counts_are_idempotent_and_can_add_new_products(client: TestClient, db_s
 # --- submit: uncounted zero / keep -----------------------------------------------
 
 
-def _sheet_with_one_counted(client, db_session, monkeypatch):
+def _sheet_with_one_counted(client, db_session, monkeypatch, counter):
+    """Ro'yxatni web (admin) tayyorlaydi, `counter` telefonda oladi va bitta qatorni sanaydi.
+    Qaytganda `counter` nomidan so'rov yuborilmoqda (chaqiruvchi `_clear()` qiladi)."""
     org = _org(db_session, wh="wh30")
     a, b, c = _product(db_session, "A"), _product(db_session, "B"), _product(db_session, "C")
     _patch_smartup(monkeypatch, {a.sku: 10, b.sku: 5, c.sku: 2})
-    cid = _new_sheet(client, org)
-    client.post(f"{URL}/{cid}/prefill", json={"sources": ["smartup"]})
+    _as(_mk_user(db_session, "warehouse_admin"))
+    try:
+        cid = _new_sheet(client, org)
+        client.post(f"{URL}/{cid}/prefill", json={"sources": ["smartup"]})
+    finally:
+        _clear()
+    _as(counter)
     client.post(f"{URL}/{cid}/claim")
     client.put(f"{URL}/{cid}/counts", json={"entries": [{"product_id": str(a.id), "qty": 8}]})
     return cid, a, b, c
 
 
 def test_submit_uncounted_zero_keeps_counted_at_empty(client: TestClient, db_session: Session, monkeypatch):
-    _as(_mk_user(db_session, "inventory_controller"))
     try:
-        cid, a, b, c = _sheet_with_one_counted(client, db_session, monkeypatch)
+        cid, a, b, c = _sheet_with_one_counted(client, db_session, monkeypatch, _mk_user(db_session, "inventory_controller"))
         r = client.post(f"{URL}/{cid}/submit", params={"uncounted": "zero"})
         assert r.status_code == 200, r.text
         body = r.json()
@@ -209,9 +219,8 @@ def test_submit_uncounted_zero_keeps_counted_at_empty(client: TestClient, db_ses
 
 
 def test_submit_uncounted_keep_leaves_null(client: TestClient, db_session: Session, monkeypatch):
-    _as(_mk_user(db_session, "inventory_controller"))
     try:
-        cid, a, b, _c = _sheet_with_one_counted(client, db_session, monkeypatch)
+        cid, a, b, _c = _sheet_with_one_counted(client, db_session, monkeypatch, _mk_user(db_session, "inventory_controller"))
         r = client.post(f"{URL}/{cid}/submit", params={"uncounted": "keep"})
         assert r.status_code == 200, r.text
         by = {ln["sku"]: ln for ln in r.json()["lines"]}
@@ -237,9 +246,8 @@ def test_submit_rejects_sheet_with_nothing_counted(client: TestClient, db_sessio
 
 def test_sheet_flow_never_touches_stock_ledger(client: TestClient, db_session: Session, monkeypatch):
     before = db_session.query(StockMovement).count()
-    _as(_mk_user(db_session, "warehouse_admin"))
     try:
-        cid, _a, _b, _c = _sheet_with_one_counted(client, db_session, monkeypatch)
+        cid, _a, _b, _c = _sheet_with_one_counted(client, db_session, monkeypatch, _mk_user(db_session, "warehouse_admin"))
         assert client.post(f"{URL}/{cid}/submit").status_code == 200
     finally:
         _clear()
@@ -256,6 +264,54 @@ def test_mobile_created_count_marks_lines_counted(client: TestClient, db_session
         assert r.status_code == 200, r.text
         assert r.json()["source"] == "mobile" and r.json()["counted_lines"] == 1
         assert r.json()["lines"][0]["counted_at"] is not None
+    finally:
+        _clear()
+
+
+def test_counter_cannot_create_or_prefill_sheet(client: TestClient, db_session: Session, monkeypatch):
+    """Ro'yxat faqat web'da: telefondagi sanovchi yaratolmaydi va to'ldirolmaydi."""
+    org = _org(db_session, wh="wh30")
+    a = _product(db_session, "A")
+    _patch_smartup(monkeypatch, {a.sku: 1})
+    _as(_mk_user(db_session, "warehouse_admin"))
+    try:
+        cid = _new_sheet(client, org)
+    finally:
+        _clear()
+    _as(_mk_user(db_session, "inventory_controller"))
+    try:
+        for body in (
+            {"source": "sheet", "lines": []},
+            {"source": "mobile", "lines": []},
+            # submit bilan ham, lekin mobil draft emas — web yo'li.
+            {"source": "web", "submit": True, "lines": [{"product_id": str(a.id), "qty": 1}]},
+        ):
+            r = client.post(URL, json={"client_uuid": str(uuid.uuid4()), "dealer_org_id": org.org_id, **body})
+            assert r.status_code == 403, body
+            assert "faqat web" in r.text
+        assert client.post(f"{URL}/{cid}/prefill", json={"sources": ["smartup"]}).status_code == 403
+    finally:
+        _clear()
+
+
+def test_mine_includes_sheets_counted_by_me_and_export_names_counter(
+    client: TestClient, db_session: Session, monkeypatch
+):
+    counter = _mk_user(db_session, "inventory_controller")
+    try:
+        cid, _a, _b, _c = _sheet_with_one_counted(client, db_session, monkeypatch, counter)
+        assert client.post(f"{URL}/{cid}/submit", params={"uncounted": "keep"}).status_code == 200
+        mine = client.get(URL, params={"mine": True}).json()
+        assert cid in {it["id"] for it in mine["items"]}
+
+        res = client.get(f"{URL}/{cid}/export.xlsx")  # sanalmagan (qty yo'q) qatorlar bilan
+        assert res.status_code == 200, res.text
+        from io import BytesIO
+
+        from openpyxl import load_workbook
+
+        rows = {r[0]: r[1] for r in load_workbook(BytesIO(res.content)).active.iter_rows(values_only=True) if r}
+        assert rows["Sanadi"] == (counter.full_name or counter.username)
     finally:
         _clear()
 

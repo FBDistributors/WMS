@@ -1,8 +1,8 @@
 /// Diller ombor qoldig'i sanovi — modellar.
 ///
-/// Server hujjati (`DealerCount`) va telefondagi draft (`DealerCountDraft`)
-/// alohida: draft yuborilguncha faqat telefonda yashaydi, server esa uni
-/// `client_uuid` bo'yicha bir marta qabul qiladi.
+/// Ro'yxat (`DealerCount`) faqat web'da yaratiladi; telefon uni oladi va
+/// `DealerSheetDraft` nusxasida sanaydi. `DealerCountDraft` — 1.0.44 dan oldin
+/// telefonda boshlangan bo'sh draftlar (o'tish davri, yangisi yaratilmaydi).
 library;
 
 double _num(Object? v) {
@@ -13,18 +13,6 @@ double _num(Object? v) {
     return double.tryParse(v) ?? 0;
   }
   return 0;
-}
-
-class Dealer {
-  const Dealer({required this.orgId, required this.name});
-
-  final String orgId;
-  final String name;
-
-  factory Dealer.fromJson(Map<String, Object?> json) => Dealer(
-        orgId: json['org_id']! as String,
-        name: (json['name'] as String?) ?? (json['org_id']! as String),
-      );
 }
 
 class DealerCountLine {
