@@ -67,7 +67,7 @@ def test_dealers_list_hides_head_office(client: TestClient, db_session: Session)
 
 def test_create_is_idempotent_by_client_uuid(client: TestClient, db_session: Session):
     org, product = _seed(db_session)
-    _as(_mk_user(db_session, "inventory_controller"))
+    _as(_mk_user(db_session, "warehouse_admin"))
     try:
         cu = uuid.uuid4()
         a = client.post(URL, json=_payload(org, product, submit=True, client_uuid=cu))
@@ -197,23 +197,40 @@ def test_other_user_cannot_edit_but_admin_can(client: TestClient, db_session: Se
         _clear()
 
 
-def test_counter_can_still_upload_legacy_phone_draft(client: TestClient, db_session: Session):
-    """O'tish davri: telefonda qolgan eski bo'sh draft (source=mobile) bir so'rovda yuboriladi."""
+def test_counter_cannot_create_even_submitted(client: TestClient, db_session: Session):
+    """Telefondan yaratish butunlay yopiq — eski bo'sh draftni yuborish ham (o'tish davri yo'q)."""
     org, product = _seed(db_session)
     _as(_mk_user(db_session, "inventory_controller"))
     try:
-        ok = client.post(URL, json=_payload(org, product, submit=True))
-        assert ok.status_code == 200, ok.text
-        assert ok.json()["status"] == "submitted"
-        # Yubormasdan draft yaratish — endi faqat web'da.
-        assert client.post(URL, json=_payload(org, product, submit=False)).status_code == 403
+        for submit in (True, False):
+            r = client.post(URL, json=_payload(org, product, submit=submit))
+            assert r.status_code == 403, r.text
+    finally:
+        _clear()
+
+
+def test_one_open_list_per_dealer(client: TestClient, db_session: Session):
+    org, product = _seed(db_session)
+    _as(_mk_user(db_session, "warehouse_admin"))
+    try:
+        first = client.post(URL, json=_payload(org, product))
+        assert first.status_code == 200, first.text
+        second = client.post(URL, json=_payload(org, product))
+        assert second.status_code == 409 and "ochiq ro'yxat" in second.text
+        # Takroriy so'rov (o'sha client_uuid) — xato emas, o'sha hujjat.
+        same = client.post(URL, json={**_payload(org, product), "client_uuid": first.json()["client_uuid"]})
+        assert same.status_code == 200 and same.json()["id"] == first.json()["id"]
+        # Yuborilgach — keyingi sanov uchun yangisi yaratiladi.
+        cid = first.json()["id"]
+        assert client.post(f"{URL}/{cid}/submit").status_code == 200
+        assert client.post(URL, json=_payload(org, product)).status_code == 200
     finally:
         _clear()
 
 
 def test_export_xlsx(client: TestClient, db_session: Session):
     org, product = _seed(db_session)
-    _as(_mk_user(db_session, "inventory_controller"))
+    _as(_mk_user(db_session, "warehouse_admin"))
     try:
         cid = client.post(URL, json=_payload(org, product, submit=True)).json()["id"]
         res = client.get(f"{URL}/{cid}/export.xlsx")

@@ -18,6 +18,7 @@ import '../../picking/data/picking_models.dart' show formatPickQty;
 import '../../scanner/data/scanner_repository.dart';
 import '../../scanner/scanner_providers.dart';
 import '../data/dealer_counts_models.dart';
+import '../data/dealer_counts_repository.dart' show DealerSheetGoneException;
 import '../dealer_counts_providers.dart';
 import 'dealer_qty_sheet.dart';
 
@@ -71,6 +72,8 @@ class _DealerSheetScreenState extends ConsumerState<DealerSheetScreen> {
           _loading = false;
         });
       }
+      // Internet bo'lsa — ro'yxat web'dan o'chirilmaganini tekshirish (oflaynda jim).
+      unawaited(_checkStillOnServer());
       return;
     }
     try {
@@ -94,6 +97,34 @@ class _DealerSheetScreenState extends ConsumerState<DealerSheetScreen> {
         });
       }
     }
+  }
+
+  Future<void> _checkStillOnServer() async {
+    try {
+      await ref.read(dealerCountsRepositoryProvider).get(widget.countId);
+    } on DealerSheetGoneException {
+      await _handleGone();
+    } on Exception {
+      // internet yo'q / boshqa xato — nusxa bilan ishlashda davom etiladi
+    }
+  }
+
+  /// Admin ro'yxatni web'dan o'chirgan: telefondagi nusxani yuborib bo'lmaydi —
+  /// o'chiriladi, aks holda "Tayyor ro'yxatlar"da abadiy osilib qoladi.
+  Future<void> _handleGone() async {
+    final OfflineDatabase? db = await ref.read(offlineDatabaseProvider.future);
+    await db?.dealerDraftDelete(DealerSheetDraft.storageKey(widget.countId));
+    ref.invalidate(dealerSheetDraftsProvider);
+    ref.invalidate(dealerSheetsProvider);
+    if (!mounted) {
+      return;
+    }
+    showAppSnackBar(
+      context,
+      SnackBar(content: Text(StringLookup.t(_loc, 'dealerSheetDeletedOnServer'))),
+      type: AppToastType.warning,
+    );
+    context.pop();
   }
 
   Future<void> _persist() async {
@@ -299,6 +330,8 @@ class _DealerSheetScreenState extends ConsumerState<DealerSheetScreen> {
       final String msg = StringLookup.t(_loc, 'dealerCountSubmitted');
       showAppSnackBar(context, SnackBar(content: Text(saved.warning != null ? '$msg\n${saved.warning}' : msg)), type: AppToastType.success);
       context.pop();
+    } on DealerSheetGoneException {
+      await _handleGone();
     } on Exception catch (e) {
       if (!mounted) {
         return;

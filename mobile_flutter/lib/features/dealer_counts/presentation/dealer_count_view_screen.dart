@@ -11,6 +11,7 @@ import '../../customer_returns/data/customer_return_display_datetime.dart';
 import '../../picking/data/picking_models.dart' show formatPickQty;
 import '../data/dealer_counts_models.dart';
 import '../dealer_counts_providers.dart';
+import 'dealer_counts_history_screen.dart' show dealerCountSummary;
 
 /// Serverga yuborilgan sanov — faqat o'qish.
 class DealerCountViewScreen extends ConsumerWidget {
@@ -36,11 +37,11 @@ class DealerCountViewScreen extends ConsumerWidget {
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Text(
-                  '${StringLookup.t(loc, 'dealerCountBy')}: ${c.countedByName ?? '—'}\n'
+                  // Ro'yxatni web'da biri yaratadi, telefonda boshqasi sanaydi.
+                  '${StringLookup.t(loc, 'dealerCountBy')}: ${c.assignedToName ?? c.countedByName ?? '—'}\n'
                   '${StringLookup.t(loc, 'dealerCountStartedAt')}: ${formatCustomerReturnApiDateTime(c.startedAt)}\n'
                   '${StringLookup.t(loc, 'dealerCountsSent')}: ${c.submittedAt != null ? formatCustomerReturnApiDateTime(c.submittedAt!) : '—'}\n'
-                  '${StringLookup.t(loc, 'dealerCountLines')}: ${c.linesCount} · '
-                  '${StringLookup.t(loc, 'dealerCountTotalUnits')}: ${formatPickQty(c.totalUnits)}'
+                  '${dealerCountSummary(loc, c)}'
                   '${c.note != null && c.note!.trim().isNotEmpty ? '\n${c.note}' : ''}',
                   style: TextStyle(color: cs.onSurfaceVariant),
                 ),

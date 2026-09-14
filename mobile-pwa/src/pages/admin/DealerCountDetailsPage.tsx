@@ -11,6 +11,7 @@ import { Card } from '../../components/ui/card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { useAppToast } from '../../feedback/useAppToast'
+import { getApiErrorMessage } from '../../services/apiClient'
 import {
   compareDealerCount,
   getDealerCount,
@@ -59,7 +60,7 @@ export function DealerCountDetailsPage() {
       setCompare(await compareDealerCount(id, refresh))
       setShowCompare(true)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : t('admin:dealer_counts.compare_failed')
+      const msg = getApiErrorMessage(err, t('admin:dealer_counts.compare_failed'))
       showError(msg.includes('ombor kodi') ? `${msg}. ${t('admin:dealer_counts.compare_hint_wh')}` : msg)
     } finally {
       setCompareBusy(false)
@@ -77,7 +78,7 @@ export function DealerCountDetailsPage() {
     try {
       setItem(await getDealerCount(id))
     } catch (err) {
-      setLoadError(err instanceof Error ? err.message : t('admin:dealer_counts.load_failed'))
+      setLoadError(getApiErrorMessage(err, t('admin:dealer_counts.load_failed')))
       setItem(null)
     } finally {
       setIsLoading(false)
@@ -225,7 +226,7 @@ export function DealerCountDetailsPage() {
           <div>
             <dt className="text-xs text-slate-500">{t('admin:dealer_counts.col_lines')} / {t('admin:dealer_counts.col_units')}</dt>
             <dd className="tabular-nums">
-              {item.lines_count} / {fmtUnits(item.total_units)}
+              {item.counted_lines}/{item.sheet_lines} · {fmtUnits(item.total_units)}
             </dd>
           </div>
           {item.note ? (

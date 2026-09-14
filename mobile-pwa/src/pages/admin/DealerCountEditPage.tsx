@@ -12,11 +12,13 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { useAppToast } from '../../feedback/useAppToast'
 import { useAuth } from '../../rbac/AuthProvider'
+import { getApiErrorMessage } from '../../services/apiClient'
 import {
   createDealerCount,
   deleteDealerCount,
   getDealerCount,
   getDealers,
+  listDealerCounts,
   prefillDealerCount,
   releaseDealerCount,
   submitDealerCount,
@@ -77,6 +79,8 @@ export function DealerCountEditPage() {
   const [countId, setCountId] = useState<string | null>(id ?? null)
   const [status, setStatus] = useState<DealerCountStatus>('draft')
   const [assignedName, setAssignedName] = useState<string | null>(null)
+  // Yangi sanovda tanlangan dillerning ochiq ro'yxati — bitta diller, bitta ochiq ro'yxat.
+  const [openExisting, setOpenExisting] = useState<DealerCountOut | null>(null)
   const [prefillOpen, setPrefillOpen] = useState(false)
   const [prefillSources, setPrefillSources] = useState<PrefillSource[]>(['smartup'])
   // Yuborishda sanalmagan qatorlar: 0 deb yozish (standart) yoki bo'sh qoldirish.
@@ -112,9 +116,35 @@ export function DealerCountEditPage() {
         setAssignedName(c.assigned_to_name)
         setRows([...rowsFromCount(c), emptyRow()])
       })
-      .catch((err) => showError(err instanceof Error ? err.message : t('admin:dealer_counts.load_failed')))
+      .catch((err) => showError(getApiErrorMessage(err, t('admin:dealer_counts.load_failed'))))
       .finally(() => setLoading(false))
   }, [id, showError, t])
+
+  useEffect(() => {
+    if (countId || !dealerId) {
+      setOpenExisting(null)
+      return
+    }
+    let cancelled = false
+    listDealerCounts({ dealer_org_id: dealerId, status: 'draft,in_progress', limit: 1 })
+      .then((r) => {
+        if (!cancelled) setOpenExisting(r.items[0] ?? null)
+      })
+      .catch(() => {
+        if (!cancelled) setOpenExisting(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [countId, dealerId])
+
+  const openExistingList = () => {
+    if (!openExisting) return
+    // Yangi va tahrir sahifasi bitta komponent — holat qo'lda almashtiriladi.
+    setDirty(false)
+    setCountId(openExisting.id)
+    navigate(`/admin/dealer-counts/${openExisting.id}/edit`, { replace: true })
+  }
 
   // Saqlanmagan o'zgarish bilan sahifani yopish/yangilashdan ogohlantirish.
   useEffect(() => {
@@ -261,7 +291,7 @@ export function DealerCountEditPage() {
       showSuccess(t('admin:dealer_counts.saved'))
       return saved.id
     } catch (err) {
-      showError(err instanceof Error ? err.message : t('admin:dealer_counts.save_failed'))
+      showError(getApiErrorMessage(err, t('admin:dealer_counts.save_failed')))
       return null
     } finally {
       setBusy(false)
@@ -279,7 +309,7 @@ export function DealerCountEditPage() {
       showSuccess(res.warning ? `${t('admin:dealer_counts.submit_ok')} — ${res.warning}` : t('admin:dealer_counts.submit_ok'))
       navigate(`/admin/dealer-counts/${savedId}`)
     } catch (err) {
-      showError(err instanceof Error ? err.message : t('admin:dealer_counts.save_failed'))
+      showError(getApiErrorMessage(err, t('admin:dealer_counts.save_failed')))
     } finally {
       setBusy(false)
     }
@@ -297,7 +327,7 @@ export function DealerCountEditPage() {
       setDirty(false)
       navigate('/admin/dealer-counts')
     } catch (err) {
-      showError(err instanceof Error ? err.message : t('admin:dealer_counts.save_failed'))
+      showError(getApiErrorMessage(err, t('admin:dealer_counts.save_failed')))
     } finally {
       setBusy(false)
     }
@@ -320,7 +350,7 @@ export function DealerCountEditPage() {
       setDirty(false)
       showSuccess(t('admin:dealer_counts.prefill_result', { added: r.added, skipped: r.skipped, missing: r.not_in_catalog }))
     } catch (err) {
-      showError(err instanceof Error ? err.message : t('admin:dealer_counts.save_failed'))
+      showError(getApiErrorMessage(err, t('admin:dealer_counts.save_failed')))
     } finally {
       setBusy(false)
     }
@@ -336,7 +366,7 @@ export function DealerCountEditPage() {
       setAssignedName(null)
       setRows([...rowsFromCount(c), emptyRow()])
     } catch (err) {
-      showError(err instanceof Error ? err.message : t('admin:dealer_counts.save_failed'))
+      showError(getApiErrorMessage(err, t('admin:dealer_counts.save_failed')))
     } finally {
       setBusy(false)
     }
@@ -345,6 +375,8 @@ export function DealerCountEditPage() {
   const dealerName = dealers.find((d) => d.org_id === dealerId)?.name ?? ''
   const locked = status === 'in_progress'
   const frozen = status === 'submitted' || locked
+  // Bu dillerda ochiq ro'yxat bor — ikkinchisi yaratilmaydi (server ham rad etadi).
+  const blocked = !countId && openExisting !== null
 
   return (
     <AdminLayout
@@ -367,7 +399,7 @@ export function DealerCountEditPage() {
           ) : null}
           {!frozen ? (
             <>
-              <Button variant="ghost" disabled={busy || !dealerId} onClick={() => setPrefillOpen(true)}>
+              <Button variant="ghost" disabled={busy || !dealerId || blocked} onClick={() => setPrefillOpen(true)}>
                 <ListPlus size={16} className="mr-1" />
                 {t('admin:dealer_counts.prefill_button')}
               </Button>
@@ -380,11 +412,11 @@ export function DealerCountEditPage() {
                 {t('admin:dealer_counts.delete_draft')}
               </Button>
               {/* To'ldirish/saqlashdan keyin hujjat serverda — o'chiq tugma "ishlamayapti" deb o'qilmasin. */}
-              <Button variant="ghost" disabled={busy || !dirty} onClick={() => void save()}>
+              <Button variant="ghost" disabled={busy || !dirty || blocked} onClick={() => void save()}>
                 {countId && !dirty ? <Check size={16} className="mr-1" /> : <Save size={16} className="mr-1" />}
                 {countId && !dirty ? t('admin:dealer_counts.saved') : t('admin:dealer_counts.save')}
               </Button>
-              <Button disabled={busy || sum.lines === 0 || !dealerId} onClick={() => setConfirmSubmit(true)}>
+              <Button disabled={busy || sum.lines === 0 || !dealerId || blocked} onClick={() => setConfirmSubmit(true)}>
                 <Send size={16} className="mr-1" />
                 {t('admin:dealer_counts.submit')}
               </Button>
@@ -457,7 +489,23 @@ export function DealerCountEditPage() {
               <span className="ml-2 text-emerald-700 dark:text-emerald-300">{t('admin:dealer_counts.saved_on_server')}</span>
             ) : null}
           </div>
-          {!countId ? (
+          {blocked && openExisting ? (
+            <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-200">
+              <span>
+                {t('admin:dealer_counts.open_exists', {
+                  done: openExisting.counted_lines,
+                  total: openExisting.sheet_lines,
+                  status:
+                    openExisting.status === 'in_progress'
+                      ? `${t('admin:dealer_counts.status_in_progress')} · ${openExisting.assigned_to_name ?? ''}`
+                      : t('admin:dealer_counts.status_draft'),
+                })}
+              </span>
+              <Button variant="ghost" onClick={openExistingList}>
+                {t('admin:dealer_counts.open_exists_button')}
+              </Button>
+            </div>
+          ) : !countId ? (
             <div className="mt-2 text-xs text-indigo-600 dark:text-indigo-300">
               {dealerId ? t('admin:dealer_counts.new_next_step') : t('admin:dealer_counts.new_pick_dealer')}
             </div>

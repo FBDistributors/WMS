@@ -10,36 +10,31 @@ final dealerCountsRepositoryProvider = Provider<DealerCountsRepository>((Ref ref
   return DealerCountsRepository(ref.watch(appDioProvider));
 });
 
-/// Telefondagi eski bo'sh draftlar (sqflite) — o'tish davri, yangisi yaratilmaydi.
-final dealerCountDraftsProvider = FutureProvider<List<DealerCountDraft>>((Ref ref) async {
-  final OfflineDatabase? db = await ref.watch(offlineDatabaseProvider.future);
-  if (db == null) {
-    return const <DealerCountDraft>[];
-  }
-  final List<Map<String, Object?>> rows = await db.dealerDraftsAll();
-  // Tayyor ro'yxat nusxalari (`kind: sheet`) alohida provayderda.
-  return rows
-      .where((Map<String, Object?> r) => r['kind'] != DealerSheetDraft.kind)
-      .map(DealerCountDraft.fromJson)
-      .toList(growable: false);
-});
-
-/// Serverdagi ochiq tayyor ro'yxatlar (hamma sanovchiga).
+/// Menga ochiq ro'yxatlar (web'da yaratilgan): olinmagan + men olgan.
 final dealerSheetsProvider = FutureProvider<List<DealerCount>>((Ref ref) {
   return ref.watch(dealerCountsRepositoryProvider).listSheets();
 });
 
 /// Telefonga yuklab olingan ro'yxatlar (sqflite).
+///
+/// 1.0.45 gacha telefonda noldan boshlangan bo'sh draftlar ham shu jadvalda edi
+/// (`kind` yo'q, kalit — `client_uuid`). Telefondan sanov yaratish yopilgan,
+/// ular endi yuborilmaydi — shu yerda bir marta tozalanadi.
 final dealerSheetDraftsProvider = FutureProvider<List<DealerSheetDraft>>((Ref ref) async {
   final OfflineDatabase? db = await ref.watch(offlineDatabaseProvider.future);
   if (db == null) {
     return const <DealerSheetDraft>[];
   }
   final List<Map<String, Object?>> rows = await db.dealerDraftsAll();
-  return rows
-      .where((Map<String, Object?> r) => r['kind'] == DealerSheetDraft.kind)
-      .map(DealerSheetDraft.fromJson)
-      .toList(growable: false);
+  final List<DealerSheetDraft> sheets = <DealerSheetDraft>[];
+  for (final Map<String, Object?> r in rows) {
+    if (r['kind'] == DealerSheetDraft.kind) {
+      sheets.add(DealerSheetDraft.fromJson(r));
+    } else if (r['client_uuid'] is String) {
+      await db.dealerDraftDelete(r['client_uuid']! as String);
+    }
+  }
+  return sheets;
 });
 
 final dealerSheetDraftProvider =
@@ -53,18 +48,7 @@ final dealerSheetDraftProvider =
   return null;
 });
 
-final dealerCountDraftProvider =
-    FutureProvider.family<DealerCountDraft?, String>((Ref ref, String clientUuid) async {
-  final List<DealerCountDraft> all = await ref.watch(dealerCountDraftsProvider.future);
-  for (final DealerCountDraft d in all) {
-    if (d.clientUuid == clientUuid) {
-      return d;
-    }
-  }
-  return null;
-});
-
-/// Mening serverga yuborilgan sanovlarim (oxirgilari).
+/// Mening yuborgan sanovlarim (Tarix).
 final myDealerCountsProvider = FutureProvider<List<DealerCount>>((Ref ref) {
   return ref.watch(dealerCountsRepositoryProvider).listMine();
 });

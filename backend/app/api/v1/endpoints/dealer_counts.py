@@ -1,8 +1,8 @@
 """Diller ombor qoldig'i sanovi — WMS ledgeridan alohida hujjatlar.
 
-Xodim viloyatda diller omboridagi tovarni skanerlab sanaydi va ilova hujjatni
-bir so'rovda yuboradi (`client_uuid` bilan idempotent). Bu yerda hech qanday
-`stock_movements` yozilmaydi: diller ombori bizniki emas.
+Ro'yxat faqat web'da yaratiladi (bitta dillerga bitta ochiq ro'yxat); xodim
+telefonda uni oladi, diller omboridagi tovarni skanerlab sanaydi va yuboradi.
+Bu yerda hech qanday `stock_movements` yozilmaydi: diller ombori bizniki emas.
 """
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth.deps import get_effective_permissions, require_permission
@@ -328,6 +328,23 @@ def _is_admin(user: User) -> bool:
     return "admin:access" in get_effective_permissions(user)
 
 
+OPEN_EXISTS_DETAIL = "Bu diller uchun ochiq ro'yxat bor — o'shani oching yoki o'chiring"
+OPEN_STATUSES = ("draft", "in_progress")
+
+
+def _open_count(db: Session, dealer_org_id: str) -> Optional[DealerStockCount]:
+    """Dillerning yuborilmagan (ochiq) ro'yxati, bo'lsa."""
+    return (
+        db.query(DealerStockCount)
+        .filter(
+            DealerStockCount.dealer_org_id == dealer_org_id,
+            DealerStockCount.status.in_(OPEN_STATUSES),
+        )
+        .order_by(DealerStockCount.created_at.desc())
+        .first()
+    )
+
+
 def _require_web_user(user: User) -> None:
     """Web (admin panel) foydalanuvchisi — `admin:access`. Telefondagi sanovchida u yo'q."""
     if not _is_admin(user):
@@ -398,11 +415,7 @@ def create_count(
     db: Session = Depends(get_db),
     user: User = Depends(require_permission(PERM_DEALER_COUNTS_WRITE)),
 ) -> DealerCountOut:
-    # O'tish davri: telefonda qolgan eski bo'sh draft (noldan skan) bir so'rovda
-    # yaratilib yuboriladi — viloyatdagi sanov yo'qolmasin. Qolgan hamma yaratish — web.
-    legacy_upload = payload.submit and payload.source == "mobile"
-    if not legacy_upload:
-        _require_web_user(user)
+    _require_web_user(user)
     existing = (
         db.query(DealerStockCount)
         .options(selectinload(DealerStockCount.lines))
@@ -420,6 +433,9 @@ def create_count(
     )
     if not org or org.org_id == HEAD_OFFICE_ORG_ID:
         raise HTTPException(status_code=400, detail="Diller topilmadi")
+    # Bitta diller — bitta ochiq ro'yxat: telefonda xodim bitta ro'yxatni ko'radi va sanaydi.
+    if not payload.submit and _open_count(db, org.org_id) is not None:
+        raise HTTPException(status_code=409, detail=OPEN_EXISTS_DETAIL)
 
     item = DealerStockCount(
         client_uuid=payload.client_uuid,
@@ -450,8 +466,6 @@ def create_count(
             "lines_count": item.lines_count,
             "total_units": str(item.total_units),
             "source": item.source,
-            # Audit logdan o'tish davri tugaganini tekshirish uchun.
-            "legacy_mobile_upload": legacy_upload,
         },
         ip_address=get_client_ip(request),
     )
@@ -468,6 +482,10 @@ def list_counts(
     status_filter: Optional[str] = Query(default=None, alias="status"),
     counted_by_user_id: Optional[UUID] = Query(default=None),
     mine: bool = Query(default=False, description="Faqat mening sanovlarim"),
+    available: bool = Query(
+        default=False,
+        description="Telefon uchun: ochiq (draft) + men olgan (in_progress); boshqalar olgani emas",
+    ),
     date_from: Optional[date] = Query(default=None),
     date_to: Optional[date] = Query(default=None),
     limit: int = Query(default=50, ge=1, le=500),
@@ -490,6 +508,16 @@ def list_counts(
             or_(
                 DealerStockCount.counted_by_user_id == user.id,
                 DealerStockCount.assigned_to_user_id == user.id,
+            )
+        )
+    if available:
+        query = query.filter(
+            or_(
+                DealerStockCount.status == "draft",
+                and_(
+                    DealerStockCount.status == "in_progress",
+                    DealerStockCount.assigned_to_user_id == user.id,
+                ),
             )
         )
     if date_from:
@@ -679,7 +707,7 @@ def put_counts(
 @router.delete(
     "/{count_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Sanovni o'chirish (draft — egasi yoki admin; yuborilgan — faqat admin)",
+    summary="Sanovni o'chirish (draft — egasi yoki admin; telefonda / yuborilgan — faqat admin)",
 )
 def delete_count(
     count_id: UUID,
@@ -692,9 +720,13 @@ def delete_count(
         # Keraksiz/xato yuborilgan hujjatni tozalash; ledgerga ta'siri yo'q, audit qoladi.
         if not _is_admin(user):
             raise HTTPException(status_code=403, detail="Yuborilgan sanovni faqat admin o'chira oladi")
+    elif item.status == "in_progress":
+        # Telefon olgan ro'yxat — xodimning telefondagi sanalganlari ham yo'qoladi, shuning
+        # uchun faqat admin. Telefon keyingi so'rovda 404 oladi va nusxasini o'chiradi.
+        if not _is_admin(user):
+            raise HTTPException(status_code=409, detail=LOCK_DETAIL)
     else:
         _require_owner_or_admin(item, user)
-        _require_draft(item)
     log_action(
         db,
         user_id=user.id,
@@ -704,6 +736,7 @@ def delete_count(
         old_data={
             "dealer_org_id": item.dealer_org_id,
             "status": item.status,
+            "assigned_to_user_id": str(item.assigned_to_user_id) if item.assigned_to_user_id else None,
             "lines_count": item.lines_count,
             "total_units": str(item.total_units),
         },

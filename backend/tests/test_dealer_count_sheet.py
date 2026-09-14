@@ -160,7 +160,7 @@ def test_counts_are_idempotent_and_can_add_new_products(client: TestClient, db_s
     _as(u)
     try:
         client.post(f"{URL}/{cid}/claim")
-        entries =[{"product_id": str(a.id), "qty": 7}, {"product_id": str(extra.id), "qty": 2}]
+        entries = [{"product_id": str(a.id), "qty": 7}, {"product_id": str(extra.id), "qty": 2}]
         r1 = client.put(f"{URL}/{cid}/counts", json={"entries": entries})
         assert r1.status_code == 200, r1.text
         assert (r1.json()["updated"], r1.json()["added"]) == (1, 1)
@@ -257,7 +257,7 @@ def test_sheet_flow_never_touches_stock_ledger(client: TestClient, db_session: S
 def test_mobile_created_count_marks_lines_counted(client: TestClient, db_session: Session):
     org = _org(db_session, wh=None)
     a = _product(db_session, "A")
-    _as(_mk_user(db_session, "inventory_controller"))
+    _as(_mk_user(db_session, "warehouse_admin"))
     try:
         r = client.post(URL, json={"client_uuid": str(uuid.uuid4()), "dealer_org_id": org.org_id, "submit": True,
                                    "lines": [{"product_id": str(a.id), "qty": 3}]})
@@ -312,6 +312,57 @@ def test_mine_includes_sheets_counted_by_me_and_export_names_counter(
 
         rows = {r[0]: r[1] for r in load_workbook(BytesIO(res.content)).active.iter_rows(values_only=True) if r}
         assert rows["Sanadi"] == (counter.full_name or counter.username)
+    finally:
+        _clear()
+
+
+def test_only_admin_deletes_sheet_taken_by_phone(client: TestClient, db_session: Session, monkeypatch):
+    counter = _mk_user(db_session, "inventory_controller")
+    try:
+        cid, _a, _b, _c = _sheet_with_one_counted(client, db_session, monkeypatch, counter)
+        # Sanovchi o'zi olgan ro'yxatni ham o'chirolmaydi (web qulf qoidasi).
+        assert client.delete(f"{URL}/{cid}").status_code == 409
+    finally:
+        _clear()
+    _as(_mk_user(db_session, "warehouse_admin"))
+    try:
+        assert client.delete(f"{URL}/{cid}").status_code == 204
+    finally:
+        _clear()
+    _as(counter)
+    try:
+        # Telefon keyingi so'rovda 404 oladi — nusxasini o'chirish belgisi.
+        assert client.put(f"{URL}/{cid}/counts", json={"entries": []}).status_code == 404
+        assert client.post(f"{URL}/{cid}/submit").status_code == 404
+    finally:
+        _clear()
+
+
+def test_available_hides_sheets_taken_by_others(client: TestClient, db_session: Session, monkeypatch):
+    """Telefon ro'yxati: ochiq + men olgan; boshqa xodim olgani ko'rinmaydi."""
+    a = _product(db_session, "A")
+    _patch_smartup(monkeypatch, {a.sku: 1})
+    org_free, org_mine, org_other = _org(db_session, wh="wh30"), _org(db_session, wh="wh30"), _org(db_session, wh="wh30")
+    me, other = _mk_user(db_session, "inventory_controller"), _mk_user(db_session, "inventory_controller")
+    ids = {}
+    _as(_mk_user(db_session, "warehouse_admin"))
+    try:
+        for key, org in (("free", org_free), ("mine", org_mine), ("other", org_other)):
+            ids[key] = _new_sheet(client, org)
+            client.post(f"{URL}/{ids[key]}/prefill", json={"sources": ["smartup"]})
+    finally:
+        _clear()
+    _as(other)
+    try:
+        assert client.post(f"{URL}/{ids['other']}/claim").status_code == 200
+    finally:
+        _clear()
+    _as(me)
+    try:
+        assert client.post(f"{URL}/{ids['mine']}/claim").status_code == 200
+        got = {it["id"] for it in client.get(URL, params={"status": "draft,in_progress", "available": True, "limit": 500}).json()["items"]}
+        assert ids["free"] in got and ids["mine"] in got
+        assert ids["other"] not in got
     finally:
         _clear()
 

@@ -13,6 +13,7 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { useAppToast } from '../../feedback/useAppToast'
+import { getApiErrorMessage } from '../../services/apiClient'
 import {
   deleteDealerCount,
   getDealers,
@@ -83,7 +84,7 @@ export function DealerCountsPage() {
       setItems(r.items)
       setTotal(r.total)
     } catch (err) {
-      showError(err instanceof Error ? err.message : t('admin:dealer_counts.load_failed'))
+      showError(getApiErrorMessage(err, t('admin:dealer_counts.load_failed')))
       setHasError(true)
     } finally {
       setIsLoading(false)
@@ -96,12 +97,11 @@ export function DealerCountsPage() {
 
   const resetPage = () => setOffset(0)
 
-  // Backend qoidasi bilan bir xil: draft — egasi yoki admin; yuborilgan — faqat admin;
-  // telefonda sanalayotgan (in_progress) — avval qulfni ochish kerak.
+  // Backend qoidasi bilan bir xil: draft — egasi yoki admin; telefonda sanalayotgan
+  // va yuborilgan — faqat admin.
   const isAdmin = has('admin:access')
   const canDelete = (row: DealerCountOut) =>
-    has('dealer_counts:write') &&
-    (row.status === 'submitted' ? isAdmin : row.status === 'draft' && (isAdmin || row.counted_by_user_id === user?.id))
+    has('dealer_counts:write') && (isAdmin || (row.status === 'draft' && row.counted_by_user_id === user?.id))
 
   const confirmDelete = async () => {
     if (!toDelete) return
@@ -113,7 +113,7 @@ export function DealerCountsPage() {
       if (items.length === 1 && offset > 0) setOffset(Math.max(0, offset - PAGE))
       else void load()
     } catch (err) {
-      showError(err instanceof Error ? err.message : t('admin:dealer_counts.delete_failed'))
+      showError(getApiErrorMessage(err, t('admin:dealer_counts.delete_failed')))
     } finally {
       setDeleting(false)
     }
@@ -255,7 +255,8 @@ export function DealerCountsPage() {
                       ) : null}
                     </td>
                     <td className="px-3 py-3 text-right tabular-nums sm:px-4">
-                      {row.status === 'submitted' ? row.lines_count : `${row.counted_lines}/${row.sheet_lines}`}
+                      {/* Haqiqatan sanalgan / jami — "0 deb hisobla" qatorlari sanalgan emas. */}
+                      {`${row.counted_lines}/${row.sheet_lines}`}
                     </td>
                     <td className="px-3 py-3 text-right tabular-nums sm:px-4">{fmtUnits(row.total_units)}</td>
                     <td className="px-3 py-3 sm:px-4">
@@ -319,8 +320,16 @@ export function DealerCountsPage() {
             ? t(
                 toDelete.status === 'submitted'
                   ? 'admin:dealer_counts.delete_submitted_confirm'
-                  : 'admin:dealer_counts.delete_confirm',
-                { dealer: toDelete.dealer_name ?? toDelete.dealer_org_id, date: fmtDate(toDelete.submitted_at ?? toDelete.started_at) },
+                  : toDelete.status === 'in_progress'
+                    ? 'admin:dealer_counts.delete_in_progress_confirm'
+                    : 'admin:dealer_counts.delete_confirm',
+                {
+                  dealer: toDelete.dealer_name ?? toDelete.dealer_org_id,
+                  date: fmtDate(toDelete.submitted_at ?? toDelete.started_at),
+                  name: toDelete.assigned_to_name ?? '—',
+                  done: toDelete.counted_lines,
+                  total: toDelete.sheet_lines,
+                },
               )
             : ''
         }

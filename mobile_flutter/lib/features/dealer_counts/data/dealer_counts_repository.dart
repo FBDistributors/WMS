@@ -3,36 +3,37 @@ import 'package:dio/dio.dart';
 import '../../../core/network/app_dio.dart';
 import 'dealer_counts_models.dart';
 
+/// Ro'yxat serverda yo'q (admin web'dan o'chirgan) — telefondagi nusxa endi keraksiz.
+class DealerSheetGoneException implements Exception {
+  const DealerSheetGoneException(this.message);
+
+  /// Server matni ("Sanov topilmadi") — oddiy xato sifatida ko'rsatilsa ham tushunarli.
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+/// 404 — alohida (nusxani tozalash uchun), qolgani oddiy xabar.
+Never _rethrow(DioException e) {
+  if (e.response?.statusCode == 404) {
+    throw DealerSheetGoneException(mapDioExceptionToMessage(e));
+  }
+  throw Exception(mapDioExceptionToMessage(e));
+}
+
 class DealerCountsRepository {
   DealerCountsRepository(this._dio);
 
   static const String _path = '/dealer-counts';
   final Dio _dio;
 
-  /// Eski (1.0.44 dan oldin boshlangan) bo'sh draftni serverga yuborish — o'tish davri.
-  /// Yangi hujjat telefonda yaratilmaydi: ro'yxat faqat web'da tuziladi.
-  /// `client_uuid` bo'yicha idempotent — tarmoq uzilib qayta urinilsa ikkinchi hujjat bo'lmaydi.
-  Future<DealerCount> create(DealerCountDraft draft, {required bool submit}) async {
-    try {
-      final Response<Object?> res = await _dio.post<Object?>(
-        _path,
-        data: draft.toApiJson(submit: submit),
-      );
-      final Object? data = res.data;
-      if (data is! Map) {
-        throw const FormatException('dealer count');
-      }
-      return DealerCount.fromJson(Map<String, Object?>.from(data));
-    } on DioException catch (e) {
-      throw Exception(mapDioExceptionToMessage(e));
-    }
-  }
-
+  /// Men sanab yuborgan sanovlar (Tarix).
   Future<List<DealerCount>> listMine({int limit = 50}) async {
     try {
       final Response<Object?> res = await _dio.get<Object?>(
         _path,
-        queryParameters: <String, Object?>{'mine': true, 'limit': limit},
+        queryParameters: <String, Object?>{'mine': true, 'status': 'submitted', 'limit': limit},
       );
       final Object? data = res.data;
       if (data is! Map) {
@@ -60,18 +61,19 @@ class DealerCountsRepository {
       }
       return DealerCount.fromJson(Map<String, Object?>.from(data));
     } on DioException catch (e) {
-      throw Exception(mapDioExceptionToMessage(e));
+      _rethrow(e);
     }
   }
 
   // --- tayyor ro'yxat (ведомость): web'da tuziladi, telefon oladi va sanaydi ---
 
-  /// Serverdagi ochiq ro'yxatlar (draft + telefonda) — barcha sanovchilarga ko'rinadi.
+  /// Menga ochiq ro'yxatlar: hali olinmagan (draft) + men olgan (in_progress).
+  /// Boshqa xodim olgani qaytmaydi — uni baribir ochib bo'lmaydi.
   Future<List<DealerCount>> listSheets({int limit = 50}) async {
     try {
       final Response<Object?> res = await _dio.get<Object?>(
         _path,
-        queryParameters: <String, Object?>{'status': 'draft,in_progress', 'limit': limit},
+        queryParameters: <String, Object?>{'status': 'draft,in_progress', 'available': true, 'limit': limit},
       );
       final Object? data = res.data;
       if (data is! Map) {
@@ -101,7 +103,7 @@ class DealerCountsRepository {
       }
       return DealerCount.fromJson(Map<String, Object?>.from(data));
     } on DioException catch (e) {
-      throw Exception(mapDioExceptionToMessage(e));
+      _rethrow(e);
     }
   }
 
@@ -118,7 +120,7 @@ class DealerCountsRepository {
       }
       return DealerCount.fromJson(Map<String, Object?>.from(data['count'] as Map));
     } on DioException catch (e) {
-      throw Exception(mapDioExceptionToMessage(e));
+      _rethrow(e);
     }
   }
 
@@ -135,7 +137,7 @@ class DealerCountsRepository {
       }
       return DealerCount.fromJson(Map<String, Object?>.from(data));
     } on DioException catch (e) {
-      throw Exception(mapDioExceptionToMessage(e));
+      _rethrow(e);
     }
   }
 }
