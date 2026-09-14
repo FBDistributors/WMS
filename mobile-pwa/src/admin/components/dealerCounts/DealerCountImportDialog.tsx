@@ -108,13 +108,13 @@ export function DealerCountImportDialog({ open, onClose, onAdd }: Props) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       <button type="button" className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={onClose} aria-label={t('common:buttons.close')} />
       <div
-        className="relative flex max-h-[min(92dvh,800px)] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950"
+        className="relative flex max-h-[min(92dvh,800px)] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white text-slate-900 shadow-2xl dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
         role="dialog"
         aria-modal="true"
       >
         <div className="border-b border-slate-200 px-6 py-4 dark:border-slate-800">
           <div className="text-base font-semibold">{t('admin:dealer_counts.import_title')}</div>
-          <div className="mt-1 text-xs text-slate-500">{t('admin:dealer_counts.import_hint')}</div>
+          <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('admin:dealer_counts.import_hint')}</div>
         </div>
         <div className="flex-1 overflow-auto px-6 py-4 text-sm">
           <input

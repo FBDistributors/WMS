@@ -605,9 +605,9 @@ export function DealerCountEditPage() {
       {prefillOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
           <button type="button" className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={() => setPrefillOpen(false)} aria-label={t('common:buttons.close')} />
-          <div className="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-950" role="dialog" aria-modal="true">
+          <div className="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 text-slate-900 shadow-2xl dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100" role="dialog" aria-modal="true">
             <div className="text-base font-semibold">{t('admin:dealer_counts.prefill_title')}</div>
-            <p className="mt-1 text-xs text-slate-500">{t('admin:dealer_counts.prefill_hint')}</p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('admin:dealer_counts.prefill_hint')}</p>
             <div className="mt-4 space-y-2 text-sm">
               {(['smartup', 'shipped', 'all'] as PrefillSource[]).map((src) => (
                 <label key={src} className="flex items-center gap-2">
@@ -636,7 +636,7 @@ export function DealerCountEditPage() {
       {confirmSubmit && sum.missingQty > 0 ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
           <button type="button" className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={() => setConfirmSubmit(false)} aria-label={t('common:buttons.close')} />
-          <div className="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-950" role="dialog" aria-modal="true">
+          <div className="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 text-slate-900 shadow-2xl dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100" role="dialog" aria-modal="true">
             <div className="text-base font-semibold">{t('admin:dealer_counts.submit')}</div>
             <p className="mt-2 text-sm">
               {t('admin:dealer_counts.submit_confirm', { dealer: dealerName, lines: sum.lines, units: fmtUnits(sum.units) })}
