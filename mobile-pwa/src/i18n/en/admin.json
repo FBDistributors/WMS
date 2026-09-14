@@ -665,6 +665,8 @@
     "resolving": "Looking up…",
     "dealer_required": "Choose a dealer first",
     "unsaved": "unsaved changes",
+    "new_pick_dealer": "Step 1: choose a dealer.",
+    "new_next_step": "Step 2: click “Fill the list” (Smartup stock or shipped products) or enter rows by hand / from Excel and click “Save”. A saved list appears on the phone.",
     "import_excel": "Import from Excel",
     "import_title": "Import rows from Excel",
     "import_hint": "Columns: SKU or barcode · units · expiry (optional, YYYY-MM). Read by header name if present, otherwise by column order.",

@@ -665,6 +665,8 @@
     "resolving": "Qidirilmoqda…",
     "dealer_required": "Avval dillerni tanlang",
     "unsaved": "saqlanmagan o'zgarishlar bor",
+    "new_pick_dealer": "1-qadam: dillerni tanlang.",
+    "new_next_step": "2-qadam: «Ro'yxatni to'ldirish» bosing (Smartup qoldig'i yoki jo'natilgan tovarlar) yoki qatorlarni qo'lda / Excel'dan kiritib «Saqlash» bosing. Saqlangan ro'yxat telefonda ko'rinadi.",
     "import_excel": "Excel'dan yuklash",
     "import_title": "Excel'dan qatorlar yuklash",
     "import_hint": "Ustunlar: SKU yoki shtrix-kod · dona · muddat (ixtiyoriy, YYYY-MM). Sarlavha bo'lsa ustun nomi bo'yicha, bo'lmasa tartib bo'yicha o'qiladi.",

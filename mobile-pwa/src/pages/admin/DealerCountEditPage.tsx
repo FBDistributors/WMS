@@ -448,8 +448,16 @@ export function DealerCountEditPage() {
                 {t('admin:dealer_counts.uncounted_rows', { count: sum.missingQty, total: sum.sheet })}
               </span>
             ) : null}
-            {dirty ? <span className="ml-2 text-rose-600">{t('admin:dealer_counts.unsaved')}</span> : null}
+            {/* Yangi hujjatda diller tanlash — birinchi qadam, xato emas: keyingi qadamni aytamiz. */}
+            {dirty && countId ? (
+              <span className="ml-2 text-amber-700 dark:text-amber-300">{t('admin:dealer_counts.unsaved')}</span>
+            ) : null}
           </div>
+          {!countId ? (
+            <div className="mt-2 text-xs text-indigo-600 dark:text-indigo-300">
+              {dealerId ? t('admin:dealer_counts.new_next_step') : t('admin:dealer_counts.new_pick_dealer')}
+            </div>
+          ) : null}
         </Card>
 
         <Card className="p-0">
