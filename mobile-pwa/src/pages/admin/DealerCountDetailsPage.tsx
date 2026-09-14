@@ -110,6 +110,7 @@ export function DealerCountDetailsPage() {
       SKU: ln.sku ?? '',
       [t('admin:dealer_counts.col_product')]: ln.product_name ?? t('admin:dealer_counts.unknown_barcode'),
       [t('admin:dealer_counts.col_barcode')]: ln.scanned_barcode,
+      [t('admin:dealer_counts.col_location')]: ln.location_code ?? '',
       [t('admin:dealer_counts.col_snapshot')]: ln.snapshot_qty == null ? '' : Number(ln.snapshot_qty),
       [t('admin:dealer_counts.col_qty')]: ln.qty == null ? '' : Number(ln.qty),
       [t('admin:dealer_counts.col_state')]: ln.counted_at
@@ -118,11 +119,12 @@ export function DealerCountDetailsPage() {
           ? t('admin:dealer_counts.state_uncounted')
           : t('admin:dealer_counts.state_zeroed'),
       [t('admin:dealer_counts.col_expiry')]: ln.expiry_date ? ln.expiry_date.slice(0, 7) : '',
+      [t('admin:dealer_counts.col_counted_by')]: ln.counted_by_name ?? '',
     }))
     const ws = XLSX.utils.json_to_sheet(rows)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Sanov')
-    const day = (item.submitted_at ?? item.started_at).slice(0, 10)
+    const day = item.created_at.slice(0, 10)
     await writeExcelFile(wb, `diller_sanov_${item.dealer_org_id}_${day}.xlsx`)
   }
 
@@ -160,11 +162,9 @@ export function DealerCountDetailsPage() {
       backTo="/admin/dealer-counts"
       actionSlot={
         <div className="flex gap-2">
-          {item.status !== 'submitted' ? (
-            <Button variant="ghost" onClick={() => navigate(`/admin/dealer-counts/${item.id}/edit`)}>
-              {t('admin:dealer_counts.edit_button')}
-            </Button>
-          ) : null}
+          <Button variant="ghost" onClick={() => navigate(`/admin/dealer-counts/${item.id}/edit`)}>
+            {t('admin:dealer_counts.edit_button')}
+          </Button>
           {showCompare ? (
             <>
               <Button variant="ghost" onClick={() => setShowCompare(false)}>
@@ -197,31 +197,19 @@ export function DealerCountDetailsPage() {
             </dd>
           </div>
           <div>
-            <dt className="text-xs text-slate-500">{t('admin:dealer_counts.col_by')}</dt>
-            <dd className="font-medium">
-              {item.assigned_to_name ?? item.counted_by_name ?? '—'}
-              {item.assigned_to_name && item.counted_by_name && item.assigned_to_name !== item.counted_by_name ? (
-                <div className="text-xs font-normal text-slate-400">
-                  {t('admin:dealer_counts.created_by', { name: item.counted_by_name })}
-                </div>
-              ) : null}
+            <dt className="text-xs text-slate-500">{t('admin:dealer_counts.col_created_by')}</dt>
+            <dd className="font-medium">{item.created_by_name ?? '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-slate-500">{t('admin:dealer_counts.col_date')}</dt>
+            <dd>
+              {fmtDate(item.created_at)}
+              {item.is_active ? null : <span className="ml-2 text-xs text-slate-400">· {t('admin:dealer_counts.closed_short')}</span>}
             </dd>
           </div>
           <div>
-            <dt className="text-xs text-slate-500">{t('admin:dealer_counts.col_status')}</dt>
-            <dd className="font-medium">
-              {item.status === 'submitted'
-                ? t('admin:dealer_counts.status_submitted')
-                : t('admin:dealer_counts.status_draft')}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs text-slate-500">{t('admin:dealer_counts.started_at')}</dt>
-            <dd>{fmtDate(item.started_at)}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-slate-500">{t('admin:dealer_counts.submitted_at')}</dt>
-            <dd>{fmtDate(item.submitted_at)}</dd>
+            <dt className="text-xs text-slate-500">{t('admin:dealer_counts.col_last_counted')}</dt>
+            <dd>{item.last_counted_at ? `${fmtDate(item.last_counted_at)} · ${item.last_counted_by_name ?? '—'}` : '—'}</dd>
           </div>
           <div>
             <dt className="text-xs text-slate-500">{t('admin:dealer_counts.col_lines')} / {t('admin:dealer_counts.col_units')}</dt>
@@ -338,10 +326,12 @@ export function DealerCountDetailsPage() {
                   <th className="px-3 py-3 text-left sm:px-4">SKU</th>
                   <th className="px-3 py-3 text-left sm:px-4">{t('admin:dealer_counts.col_product')}</th>
                   <th className="px-3 py-3 text-left sm:px-4">{t('admin:dealer_counts.col_barcode')}</th>
+                  <th className="px-3 py-3 text-left sm:px-4">{t('admin:dealer_counts.col_location')}</th>
                   <th className="px-3 py-3 text-right sm:px-4">{t('admin:dealer_counts.col_snapshot')}</th>
                   <th className="px-3 py-3 text-right sm:px-4">{t('admin:dealer_counts.col_qty')}</th>
                   <th className="px-3 py-3 text-left sm:px-4">{t('admin:dealer_counts.col_state')}</th>
                   <th className="px-3 py-3 text-left sm:px-4">{t('admin:dealer_counts.col_expiry')}</th>
+                  <th className="px-3 py-3 text-left sm:px-4">{t('admin:dealer_counts.col_counted_by')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -363,6 +353,7 @@ export function DealerCountDetailsPage() {
                       )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 font-mono text-xs sm:px-4">{ln.scanned_barcode}</td>
+                    <td className="whitespace-nowrap px-3 py-2 font-mono text-xs sm:px-4">{ln.location_code ?? ''}</td>
                     <td className="px-3 py-2 text-right tabular-nums text-slate-400 sm:px-4">
                       {ln.snapshot_qty == null ? '' : fmtUnits(ln.snapshot_qty)}
                     </td>
@@ -379,6 +370,10 @@ export function DealerCountDetailsPage() {
                       )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 sm:px-4">{fmtExpiry(ln.expiry_date)}</td>
+                    <td className="whitespace-nowrap px-3 py-2 text-xs sm:px-4">
+                      {ln.counted_by_name ?? ''}
+                      {ln.counted_at ? <div className="text-slate-400">{fmtDate(ln.counted_at)}</div> : null}
+                    </td>
                   </tr>
                 ))}
               </tbody>

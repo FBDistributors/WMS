@@ -1,20 +1,21 @@
 """Diller ombor qoldig'i sanovi — WMS ledgeridan alohida hujjatlar.
 
-Ro'yxat faqat web'da yaratiladi (bitta dillerga bitta ochiq ro'yxat); xodim
-telefonda uni oladi, diller omboridagi tovarni skanerlab sanaydi va yuboradi.
+Holatsiz: sanov (ro'yxat) web'da yaratiladi, bir yoki bir necha xodim telefonda uni ochib
+diller omboridagi tovarni skanerlab sanaydi — har kiritilgan miqdor darhol yoziladi. Qulf,
+"yuborish" yo'q. Dillerning faol sanovi bitta (ichki `open`); yangisi yaratilsa eskisi `closed`.
 Bu yerda hech qanday `stock_movements` yozilmaydi: diller ombori bizniki emas.
 """
 from __future__ import annotations
 
 import io
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field
-from sqlalchemy import and_, func, or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth.deps import get_effective_permissions, require_permission
@@ -33,19 +34,23 @@ from app.services.audit_service import (
 )
 from app.services.dealer_count_compare import compare_dealer_count
 from app.services.dealer_count_sheet import (
-    LOCK_DETAIL,
+    LOCATION_MAX,
+    add_lines,
     apply_counts,
-    claim_sheet,
-    finalize_uncounted,
+    patch_line,
     prefill_sheet,
-    release_sheet,
+    recount,
 )
-from app.services.product_scan_resolve import resolve_product_scan
 
 router = APIRouter()
 
 #: Bosh ofis — diller emas, tanlov ro'yxatiga kirmaydi.
 HEAD_OFFICE_ORG_ID = "3788131"
+
+WEB_ONLY_DETAIL = "Sanov ro'yxati faqat web'da yaratiladi va tahrirlanadi"
+ACTIVE_EXISTS_DETAIL = "Bu dillerda faol sanov bor — yangisi yaratilsa, eskisi telefonlardan yo'qoladi"
+#: 1.0.47 gacha ilovalar ro'yxatni "olib" (claim), oxirida "yuborardi" — endi bunday qadam yo'q.
+UPDATE_APP_DETAIL = "Ilovani yangilang: diller sanovi yangi tartibda ishlaydi"
 
 
 # --- sxemalar -----------------------------------------------------------------
@@ -59,29 +64,34 @@ class DealerOut(BaseModel):
 class DealerCountLineIn(BaseModel):
     product_id: Optional[UUID] = None
     scanned_barcode: str = Field(default="", max_length=64)
-    #: None — tayyor ro'yxatdagi hali sanalmagan qator; 0 — "dillerda yo'q".
+    #: None — sanalmagan qator (ro'yxat); 0 — "dillerda yo'q".
     qty: Optional[Decimal] = Field(default=None, ge=0)
-    #: Web draft qatorni qayta yuborganda snapshot yo'qolmasin.
     snapshot_qty: Optional[Decimal] = Field(default=None, ge=0)
     expiry_date: Optional[date] = None
-    scanned_at: Optional[datetime] = None
+    location_code: Optional[str] = Field(default=None, max_length=LOCATION_MAX)
 
 
 class DealerCountCreate(BaseModel):
     client_uuid: UUID
     dealer_org_id: str = Field(..., min_length=1, max_length=64)
     note: Optional[str] = Field(default=None, max_length=2000)
-    started_at: Optional[datetime] = None
     lines: list[DealerCountLineIn] = Field(default_factory=list)
-    #: True — yaratish bilan birga yuborish (ilova "Yuborish" tugmasi).
-    submit: bool = False
-    #: mobile / web / sheet — hisobot uchun.
-    source: str = Field(default="mobile", max_length=16)
+    #: Dillerda faol sanov bo'lsa — eskisini yopib yangisini yaratish (web tasdig'idan keyin).
+    replace: bool = False
+    #: web (jadval) / sheet (tayyor ro'yxat) — hisobot uchun.
+    source: str = Field(default="web", max_length=16)
 
 
-class DealerCountUpdate(BaseModel):
-    note: Optional[str] = Field(default=None, max_length=2000)
+class LinesIn(BaseModel):
     lines: list[DealerCountLineIn] = Field(default_factory=list)
+
+
+class LinePatch(BaseModel):
+    """Faqat yuborilgan maydonlar o'zgaradi; `qty: null` — "sanalmagan"ga qaytarish."""
+
+    qty: Optional[Decimal] = Field(default=None, ge=0)
+    expiry_date: Optional[date] = None
+    location_code: Optional[str] = Field(default=None, max_length=LOCATION_MAX)
 
 
 class DealerCountLineOut(BaseModel):
@@ -93,8 +103,9 @@ class DealerCountLineOut(BaseModel):
     qty: Optional[Decimal]
     snapshot_qty: Optional[Decimal] = None
     expiry_date: Optional[date]
-    scanned_at: Optional[datetime]
+    location_code: Optional[str] = None
     counted_at: Optional[datetime] = None
+    counted_by_name: Optional[str] = None
     seq: int
 
 
@@ -103,25 +114,20 @@ class DealerCountOut(BaseModel):
     client_uuid: UUID
     dealer_org_id: str
     dealer_name: Optional[str]
-    counted_by_user_id: UUID
-    counted_by_name: Optional[str]
-    status: str
-    source: str = "mobile"
-    started_at: datetime
-    submitted_at: Optional[datetime]
+    created_by_user_id: UUID
+    created_by_name: Optional[str]
+    #: Dillerning faol sanovi — telefonlarda ko'rinadi. Yangisi yaratilsa false.
+    is_active: bool
+    source: str = "web"
+    created_at: datetime
     note: Optional[str]
     lines_count: int
     total_units: Decimal
     #: Ro'yxatdagi jami qatorlar va ulardan sanalganlari ("45/693").
     sheet_lines: int = 0
     counted_lines: int = 0
-    assigned_to_user_id: Optional[UUID] = None
-    assigned_to_name: Optional[str] = None
-    claimed_at: Optional[datetime] = None
-    uncounted_policy: Optional[str] = None
-    created_at: datetime
-    #: Masalan "bu diller bugun allaqachon sanalgan" — rad etmaydi, ogohlantiradi.
-    warning: Optional[str] = None
+    last_counted_at: Optional[datetime] = None
+    last_counted_by_name: Optional[str] = None
     lines: list[DealerCountLineOut] = Field(default_factory=list)
 
 
@@ -145,6 +151,9 @@ class CountEntryIn(BaseModel):
     scanned_barcode: str = Field(default="", max_length=64)
     qty: Decimal = Field(..., ge=0)
     expiry_date: Optional[date] = None
+    location_code: Optional[str] = Field(default=None, max_length=LOCATION_MAX)
+    #: Telefonda sanalgan payt — bir qatorni ikki xodim sanasa, keyingisi qoladi.
+    counted_at: Optional[datetime] = None
     scanned_at: Optional[datetime] = None
 
 
@@ -155,6 +164,14 @@ class CountsIn(BaseModel):
 class CountsOut(BaseModel):
     updated: int
     added: int
+    #: Serverda shu qator keyinroq sanalgan — telefondagi eski qiymat yozilmadi.
+    stale: int
+    count: DealerCountOut
+
+
+class LinesOut(BaseModel):
+    added: int
+    updated: int
     count: DealerCountOut
 
 
@@ -172,140 +189,64 @@ def _display_name(user: User | None) -> Optional[str]:
     return (user.full_name and user.full_name.strip()) or (user.username and user.username.strip()) or None
 
 
-def _to_line_out(line: DealerStockCountLine, product: ProductModel | None) -> DealerCountLineOut:
-    return DealerCountLineOut(
-        id=line.id,
-        product_id=line.product_id,
-        sku=product.sku if product else None,
-        product_name=product.name if product else None,
-        scanned_barcode=line.scanned_barcode or "",
-        qty=line.qty,
-        snapshot_qty=line.snapshot_qty,
-        expiry_date=line.expiry_date,
-        scanned_at=line.scanned_at,
-        counted_at=line.counted_at,
-        seq=line.seq,
+def _names(db: Session, ids: set) -> dict:
+    ids = {i for i in ids if i}
+    if not ids:
+        return {}
+    return {u.id: _display_name(u) for u in db.query(User).filter(User.id.in_(ids)).all()}
+
+
+def _to_out(db: Session, item: DealerStockCount, *, with_lines: bool) -> DealerCountOut:
+    last = max((ln for ln in item.lines if ln.counted_at is not None), key=lambda ln: ln.counted_at, default=None)
+    names = _names(
+        db,
+        {item.counted_by_user_id}
+        | ({ln.counted_by_user_id for ln in item.lines} if with_lines else set())
+        | ({last.counted_by_user_id} if last else set()),
     )
-
-
-def _to_out(
-    db: Session,
-    item: DealerStockCount,
-    *,
-    with_lines: bool,
-    warning: Optional[str] = None,
-) -> DealerCountOut:
-    counted_by = db.get(User, item.counted_by_user_id)
-    assigned_to = db.get(User, item.assigned_to_user_id) if item.assigned_to_user_id else None
     lines_out: list[DealerCountLineOut] = []
     if with_lines:
         pids = {ln.product_id for ln in item.lines if ln.product_id}
         products = (
-            {p.id: p for p in db.query(ProductModel).filter(ProductModel.id.in_(pids)).all()}
-            if pids
-            else {}
+            {p.id: p for p in db.query(ProductModel).filter(ProductModel.id.in_(pids)).all()} if pids else {}
         )
-        lines_out = [_to_line_out(ln, products.get(ln.product_id)) for ln in item.lines]
+        for ln in item.lines:
+            p = products.get(ln.product_id)
+            lines_out.append(
+                DealerCountLineOut(
+                    id=ln.id,
+                    product_id=ln.product_id,
+                    sku=p.sku if p else None,
+                    product_name=p.name if p else None,
+                    scanned_barcode=ln.scanned_barcode or "",
+                    qty=ln.qty,
+                    snapshot_qty=ln.snapshot_qty,
+                    expiry_date=ln.expiry_date,
+                    location_code=ln.location_code,
+                    counted_at=ln.counted_at,
+                    counted_by_name=names.get(ln.counted_by_user_id),
+                    seq=ln.seq,
+                )
+            )
     return DealerCountOut(
         id=item.id,
         client_uuid=item.client_uuid,
         dealer_org_id=item.dealer_org_id,
         dealer_name=item.dealer_name,
-        counted_by_user_id=item.counted_by_user_id,
-        counted_by_name=_display_name(counted_by),
-        status=item.status,
-        source=item.source or "mobile",
-        started_at=item.started_at,
-        submitted_at=item.submitted_at,
+        created_by_user_id=item.counted_by_user_id,
+        created_by_name=names.get(item.counted_by_user_id),
+        is_active=item.status == "open",
+        source=item.source or "web",
+        created_at=item.created_at,
         note=item.note,
         lines_count=item.lines_count,
         total_units=item.total_units,
         sheet_lines=len(item.lines),
-        # Haqiqatan sanalganlar — "0 deb hisobla" bilan to'ldirilganlar bunga kirmaydi.
         counted_lines=sum(1 for ln in item.lines if ln.counted_at is not None),
-        assigned_to_user_id=item.assigned_to_user_id,
-        assigned_to_name=_display_name(assigned_to),
-        claimed_at=item.claimed_at,
-        uncounted_policy=item.uncounted_policy,
-        created_at=item.created_at,
-        warning=warning,
+        last_counted_at=last.counted_at if last else None,
+        last_counted_by_name=names.get(last.counted_by_user_id) if last else None,
         lines=lines_out,
     )
-
-
-def _month_start(d: Optional[date]) -> Optional[date]:
-    return d.replace(day=1) if d else None
-
-
-def _build_lines(db: Session, payload_lines: list[DealerCountLineIn]) -> list[DealerStockCountLine]:
-    """Kiruvchi qatorlarni normallashtirish: skanni resolve qilish, bir xil
-    mahsulot+muddatni yig'ish, tartibni saqlash."""
-    merged: dict[tuple, DealerStockCountLine] = {}
-    order: list[tuple] = []
-    seq = 0
-    now = datetime.now(timezone.utc)
-    for raw in payload_lines:
-        product_id = raw.product_id
-        barcode = (raw.scanned_barcode or "").strip()
-        if product_id is None and barcode:
-            resolved = resolve_product_scan(db, barcode)
-            if resolved:
-                product_id = resolved.product_id
-        elif product_id is not None and not db.get(ProductModel, product_id):
-            raise HTTPException(status_code=400, detail=f"Mahsulot topilmadi: {product_id}")
-        expiry = _month_start(raw.expiry_date)
-        # Tanilmagan skan har doim alohida qator — unga qo'shib bo'lmaydi.
-        key = (product_id, expiry) if product_id is not None else ("raw", barcode, seq)
-        qty = Decimal(str(raw.qty)) if raw.qty is not None else None
-        if key in merged:
-            cur = merged[key]
-            if qty is not None:
-                cur.qty = (Decimal(str(cur.qty)) if cur.qty is not None else Decimal("0")) + qty
-                cur.counted_at = cur.counted_at or now
-            if raw.snapshot_qty is not None and cur.snapshot_qty is None:
-                cur.snapshot_qty = Decimal(str(raw.snapshot_qty))
-            continue
-        seq += 1
-        line = DealerStockCountLine(
-            product_id=product_id,
-            scanned_barcode=barcode,
-            qty=qty,
-            snapshot_qty=Decimal(str(raw.snapshot_qty)) if raw.snapshot_qty is not None else None,
-            expiry_date=expiry,
-            scanned_at=raw.scanned_at,
-            # Miqdor bor — bu sanalgan qator; ro'yxat qatori (None) esa keyin telefonda sanaladi.
-            counted_at=now if qty is not None else None,
-            seq=seq,
-        )
-        merged[key] = line
-        order.append(key)
-    return [merged[k] for k in order]
-
-
-def _recount(item: DealerStockCount) -> None:
-    """Faqat sanalgan (qty bor) qatorlar hisobga olinadi; ro'yxatning sanalmaganlari emas."""
-    counted = [ln for ln in item.lines if ln.qty is not None]
-    item.lines_count = len(counted)
-    item.total_units = sum((Decimal(str(ln.qty)) for ln in counted), Decimal("0"))
-
-
-def _same_day_warning(db: Session, item: DealerStockCount) -> Optional[str]:
-    """Shu diller bugun boshqa hujjatda allaqachon yuborilgan bo'lsa — ogohlantirish."""
-    today = datetime.now(timezone.utc).date()
-    other = (
-        db.query(DealerStockCount)
-        .filter(
-            DealerStockCount.dealer_org_id == item.dealer_org_id,
-            DealerStockCount.status == "submitted",
-            DealerStockCount.id != item.id,
-            func.date(DealerStockCount.submitted_at) == today,
-        )
-        .first()
-    )
-    if not other:
-        return None
-    who = _display_name(db.get(User, other.assigned_to_user_id or other.counted_by_user_id)) or "—"
-    return f"Bu diller bugun allaqachon sanalgan ({who})"
 
 
 def _load(db: Session, count_id: UUID) -> DealerStockCount:
@@ -320,29 +261,15 @@ def _load(db: Session, count_id: UUID) -> DealerStockCount:
     return item
 
 
-#: Ro'yxat (sanov hujjati) faqat web'da yaratiladi va to'ldiriladi; telefon faqat sanaydi.
-WEB_ONLY_DETAIL = "Sanov ro'yxati faqat web'da yaratiladi"
+def _load_line(item: DealerStockCount, line_id: UUID) -> DealerStockCountLine:
+    line = next((ln for ln in item.lines if ln.id == line_id), None)
+    if line is None:
+        raise HTTPException(status_code=404, detail="Qator topilmadi")
+    return line
 
 
 def _is_admin(user: User) -> bool:
     return "admin:access" in get_effective_permissions(user)
-
-
-OPEN_EXISTS_DETAIL = "Bu diller uchun ochiq ro'yxat bor — o'shani oching yoki o'chiring"
-OPEN_STATUSES = ("draft", "in_progress")
-
-
-def _open_count(db: Session, dealer_org_id: str) -> Optional[DealerStockCount]:
-    """Dillerning yuborilmagan (ochiq) ro'yxati, bo'lsa."""
-    return (
-        db.query(DealerStockCount)
-        .filter(
-            DealerStockCount.dealer_org_id == dealer_org_id,
-            DealerStockCount.status.in_(OPEN_STATUSES),
-        )
-        .order_by(DealerStockCount.created_at.desc())
-        .first()
-    )
 
 
 def _require_web_user(user: User) -> None:
@@ -351,41 +278,33 @@ def _require_web_user(user: User) -> None:
         raise HTTPException(status_code=403, detail=WEB_ONLY_DETAIL)
 
 
-def _require_owner_or_admin(item: DealerStockCount, user: User) -> None:
-    if item.counted_by_user_id == user.id:
-        return
-    if _is_admin(user):
-        return
-    raise HTTPException(status_code=403, detail="Bu sanov sizga tegishli emas")
+def _active_count(db: Session, dealer_org_id: str) -> Optional[DealerStockCount]:
+    return (
+        db.query(DealerStockCount)
+        .filter(DealerStockCount.dealer_org_id == dealer_org_id, DealerStockCount.status == "open")
+        .order_by(DealerStockCount.created_at.desc())
+        .first()
+    )
 
 
-def _require_draft(item: DealerStockCount) -> None:
-    if item.status == "in_progress":
-        raise HTTPException(status_code=409, detail=LOCK_DETAIL)
-    if item.status != "draft":
-        raise HTTPException(status_code=409, detail="Sanov allaqachon yuborilgan — o'zgartirib bo'lmaydi")
+def _audit(db: Session, request: Request, user: User, item: DealerStockCount, action: str, data: dict) -> None:
+    log_action(
+        db,
+        user_id=user.id,
+        action=action,
+        entity_type="dealer_stock_count",
+        entity_id=str(item.id),
+        new_data=data if action != ACTION_DELETE else None,
+        old_data=data if action == ACTION_DELETE else None,
+        ip_address=get_client_ip(request),
+    )
 
 
-def _require_counter_or_admin(item: DealerStockCount, user: User) -> None:
-    """Telefonda ro'yxatni olgan xodim (yoki admin) sanalganlarni yozadi / yuboradi."""
-    if item.status == "in_progress" and item.assigned_to_user_id not in (None, user.id):
-        if "admin:access" not in get_effective_permissions(user):
-            raise HTTPException(status_code=403, detail="Ro'yxatni boshqa xodim olgan")
-
-
-def _submit(item: DealerStockCount, *, uncounted: str = "zero") -> int:
-    """Yuborish. Sanalmagan qatorlar: zero → 0 (counted_at bo'sh), keep → NULL. Qaytaradi: ularning soni."""
-    if item.status == "submitted":
-        raise HTTPException(status_code=409, detail="Sanov allaqachon yuborilgan")
-    if not item.lines:
-        raise HTTPException(status_code=400, detail="Bo'sh sanovni yuborib bo'lmaydi")
-    uncounted_n = finalize_uncounted(item, uncounted)
-    if not any(ln.qty is not None for ln in item.lines):
-        raise HTTPException(status_code=400, detail="Sanovda birorta sanalgan qator yo'q")
-    _recount(item)
-    item.status = "submitted"
-    item.submitted_at = datetime.now(timezone.utc)
-    return uncounted_n
+def _save(db: Session, item: DealerStockCount) -> DealerCountOut:
+    recount(item)
+    db.commit()
+    db.refresh(item)
+    return _to_out(db, item, with_lines=True)
 
 
 # --- endpointlar ---------------------------------------------------------------
@@ -407,7 +326,7 @@ def list_dealers(
     return [DealerOut(org_id=r.org_id, name=r.name or r.org_id) for r in rows]
 
 
-@router.post("", response_model=DealerCountOut, summary="Sanovni yaratish (client_uuid bo'yicha idempotent)")
+@router.post("", response_model=DealerCountOut, summary="Sanovni yaratish (web; client_uuid bo'yicha idempotent)")
 @router.post("/", response_model=DealerCountOut, include_in_schema=False)
 def create_count(
     payload: DealerCountCreate,
@@ -433,99 +352,72 @@ def create_count(
     )
     if not org or org.org_id == HEAD_OFFICE_ORG_ID:
         raise HTTPException(status_code=400, detail="Diller topilmadi")
-    # Bitta diller — bitta ochiq ro'yxat: telefonda xodim bitta ro'yxatni ko'radi va sanaydi.
-    if not payload.submit and _open_count(db, org.org_id) is not None:
-        raise HTTPException(status_code=409, detail=OPEN_EXISTS_DETAIL)
+    active = _active_count(db, org.org_id)
+    if active is not None:
+        if not payload.replace:
+            raise HTTPException(status_code=409, detail=ACTIVE_EXISTS_DETAIL)
+        # Dillerda bitta faol sanov: eskisi yopiladi (telefonlardan yo'qoladi, web'da qoladi).
+        db.query(DealerStockCount).filter(
+            DealerStockCount.dealer_org_id == org.org_id, DealerStockCount.status == "open"
+        ).update({DealerStockCount.status: "closed"}, synchronize_session=False)
 
     item = DealerStockCount(
         client_uuid=payload.client_uuid,
         dealer_org_id=org.org_id,
         dealer_name=org.name,
         counted_by_user_id=user.id,
-        status="draft",
+        status="open",
         note=(payload.note or "").strip() or None,
-        source=payload.source if payload.source in ("mobile", "web", "sheet") else "mobile",
+        source=payload.source if payload.source in ("web", "sheet") else "web",
     )
-    if payload.started_at:
-        item.started_at = payload.started_at
-    item.lines = _build_lines(db, payload.lines)
-    _recount(item)
-    if payload.submit:
-        _submit(item)
     db.add(item)
+    add_lines(db, item, user, [ln.model_dump() for ln in payload.lines])
+    recount(item)
     db.flush()
-    log_action(
+    _audit(
         db,
-        user_id=user.id,
-        action=ACTION_CREATE,
-        entity_type="dealer_stock_count",
-        entity_id=str(item.id),
-        new_data={
+        request,
+        user,
+        item,
+        ACTION_CREATE,
+        {
             "dealer_org_id": item.dealer_org_id,
-            "status": item.status,
             "lines_count": item.lines_count,
-            "total_units": str(item.total_units),
-            "source": item.source,
+            "closed_previous": str(active.id) if active else None,
         },
-        ip_address=get_client_ip(request),
     )
-    db.commit()
-    db.refresh(item)
-    warning = _same_day_warning(db, item) if item.status == "submitted" else None
-    return _to_out(db, item, with_lines=True, warning=warning)
+    return _save(db, item)
 
 
 @router.get("", response_model=DealerCountListOut, summary="Sanovlar ro'yxati")
 @router.get("/", response_model=DealerCountListOut, include_in_schema=False)
 def list_counts(
     dealer_org_id: Optional[str] = Query(default=None),
-    status_filter: Optional[str] = Query(default=None, alias="status"),
-    counted_by_user_id: Optional[UUID] = Query(default=None),
-    mine: bool = Query(default=False, description="Faqat mening sanovlarim"),
-    available: bool = Query(
-        default=False,
-        description="Telefon uchun: ochiq (draft) + men olgan (in_progress); boshqalar olgani emas",
-    ),
+    active: Optional[bool] = Query(default=None, description="true — faol sanovlar (telefon ro'yxati)"),
     date_from: Optional[date] = Query(default=None),
     date_to: Optional[date] = Query(default=None),
     limit: int = Query(default=50, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-    user: User = Depends(require_permission(PERM_DEALER_COUNTS_READ)),
+    _user: User = Depends(require_permission(PERM_DEALER_COUNTS_READ)),
 ) -> DealerCountListOut:
     query = db.query(DealerStockCount)
     if dealer_org_id:
         query = query.filter(DealerStockCount.dealer_org_id == dealer_org_id.strip())
-    if status_filter:
-        # Bitta yoki vergul bilan bir nechta: `draft,in_progress` (telefon uchun tayyor ro'yxatlar).
-        statuses = [s.strip() for s in status_filter.split(",") if s.strip()]
-        query = query.filter(DealerStockCount.status.in_(statuses))
-    if counted_by_user_id:
-        query = query.filter(DealerStockCount.counted_by_user_id == counted_by_user_id)
-    if mine:
-        # Ro'yxatni web yaratadi (counted_by), telefonda sanagan xodim — assigned_to.
-        query = query.filter(
-            or_(
-                DealerStockCount.counted_by_user_id == user.id,
-                DealerStockCount.assigned_to_user_id == user.id,
-            )
-        )
-    if available:
-        query = query.filter(
-            or_(
-                DealerStockCount.status == "draft",
-                and_(
-                    DealerStockCount.status == "in_progress",
-                    DealerStockCount.assigned_to_user_id == user.id,
-                ),
-            )
-        )
+    if active is not None:
+        query = query.filter(DealerStockCount.status == ("open" if active else "closed"))
     if date_from:
         query = query.filter(func.date(DealerStockCount.created_at) >= date_from)
     if date_to:
         query = query.filter(func.date(DealerStockCount.created_at) <= date_to)
     total = query.count()
-    rows = query.order_by(DealerStockCount.created_at.desc()).offset(offset).limit(limit).all()
+    rows = (
+        query.options(selectinload(DealerStockCount.lines))
+        .order_by(DealerStockCount.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
     return DealerCountListOut(items=[_to_out(db, r, with_lines=False) for r in rows], total=total)
 
 
@@ -538,71 +430,56 @@ def get_count(
     return _to_out(db, _load(db, count_id), with_lines=True)
 
 
-@router.put("/{count_id}", response_model=DealerCountOut, summary="Draft sanovni to'liq yangilash")
-def update_count(
+# --- web: qator darajasidagi tahrir (telefon sanaganiga tegmaydi) ----------------
+
+
+@router.post("/{count_id}/lines", response_model=LinesOut, summary="Qator(lar) qo'shish — web jadval / Excel")
+def add_count_lines(
     count_id: UUID,
-    payload: DealerCountUpdate,
+    payload: LinesIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(PERM_DEALER_COUNTS_WRITE)),
+) -> LinesOut:
+    _require_web_user(user)
+    item = _load(db, count_id)
+    result = add_lines(db, item, user, [ln.model_dump() for ln in payload.lines])
+    _audit(db, request, user, item, ACTION_UPDATE, {"lines": result})
+    return LinesOut(**result, count=_save(db, item))
+
+
+@router.patch("/{count_id}/lines/{line_id}", response_model=DealerCountOut, summary="Qatorni o'zgartirish — web")
+def update_count_line(
+    count_id: UUID,
+    line_id: UUID,
+    payload: LinePatch,
     request: Request,
     db: Session = Depends(get_db),
     user: User = Depends(require_permission(PERM_DEALER_COUNTS_WRITE)),
 ) -> DealerCountOut:
+    _require_web_user(user)
     item = _load(db, count_id)
-    _require_owner_or_admin(item, user)
-    _require_draft(item)
-    item.note = (payload.note or "").strip() or None
-    item.lines = _build_lines(db, payload.lines)
-    _recount(item)
-    log_action(
-        db,
-        user_id=user.id,
-        action=ACTION_UPDATE,
-        entity_type="dealer_stock_count",
-        entity_id=str(item.id),
-        new_data={"lines_count": item.lines_count, "total_units": str(item.total_units)},
-        ip_address=get_client_ip(request),
-    )
-    db.commit()
-    db.refresh(item)
-    return _to_out(db, item, with_lines=True)
+    line = _load_line(item, line_id)
+    fields = payload.model_dump(include=payload.model_fields_set)
+    patch_line(item, line, user, fields)
+    _audit(db, request, user, item, ACTION_UPDATE, {"line": str(line_id), **{k: str(v) for k, v in fields.items()}})
+    return _save(db, item)
 
 
-@router.post("/{count_id}/submit", response_model=DealerCountOut, summary="Sanovni yuborish")
-def submit_count(
+@router.delete("/{count_id}/lines/{line_id}", response_model=DealerCountOut, summary="Qatorni o'chirish — web")
+def delete_count_line(
     count_id: UUID,
+    line_id: UUID,
     request: Request,
-    uncounted: str = Query(default="zero", description="Sanalmagan qatorlar: zero (0 deb) | keep (NULL)"),
     db: Session = Depends(get_db),
     user: User = Depends(require_permission(PERM_DEALER_COUNTS_WRITE)),
 ) -> DealerCountOut:
+    _require_web_user(user)
     item = _load(db, count_id)
-    if item.status == "draft":
-        _require_owner_or_admin(item, user)
-    else:
-        # in_progress — olgan xodim; submitted — `_submit` 409 qaytaradi (403 emas:
-        # ro'yxatni web yaratgan, telefondagi sanovchi uning egasi emas).
-        _require_counter_or_admin(item, user)
-    uncounted_n = _submit(item, uncounted=uncounted)
-    log_action(
-        db,
-        user_id=user.id,
-        action=ACTION_UPDATE,
-        entity_type="dealer_stock_count",
-        entity_id=str(item.id),
-        new_data={
-            "status": "submitted",
-            "lines_count": item.lines_count,
-            "total_units": str(item.total_units),
-            "uncounted": uncounted,
-            "uncounted_lines": uncounted_n,
-        },
-        ip_address=get_client_ip(request),
-    )
-    db.commit()
-    db.refresh(item)
-    return _to_out(db, item, with_lines=True, warning=_same_day_warning(db, item))
-
-
-# --- tayyor ro'yxat (ведомость) --------------------------------------------------
+    line = _load_line(item, line_id)
+    item.lines.remove(line)
+    _audit(db, request, user, item, ACTION_UPDATE, {"deleted_line": str(line_id)})
+    return _save(db, item)
 
 
 @router.post("/{count_id}/prefill", response_model=PrefillOut, summary="Ro'yxatni to'ldirish (smartup/shipped/all)")
@@ -613,69 +490,14 @@ def prefill_count(
     db: Session = Depends(get_db),
     user: User = Depends(require_permission(PERM_DEALER_COUNTS_WRITE)),
 ) -> PrefillOut:
-    item = _load(db, count_id)
     _require_web_user(user)
+    item = _load(db, count_id)
     result = prefill_sheet(db, item, sources=payload.sources, months=payload.months, refresh=payload.refresh)
-    _recount(item)
-    log_action(
-        db,
-        user_id=user.id,
-        action=ACTION_UPDATE,
-        entity_type="dealer_stock_count",
-        entity_id=str(item.id),
-        new_data={"prefill": result},
-        ip_address=get_client_ip(request),
-    )
-    db.commit()
-    db.refresh(item)
-    return PrefillOut(**result, count=_to_out(db, item, with_lines=True))
+    _audit(db, request, user, item, ACTION_UPDATE, {"prefill": result})
+    return PrefillOut(**result, count=_save(db, item))
 
 
-@router.post("/{count_id}/claim", response_model=DealerCountOut, summary="Telefon ro'yxatni oladi (in_progress, web qulf)")
-def claim_count(
-    count_id: UUID,
-    request: Request,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_permission(PERM_DEALER_COUNTS_WRITE)),
-) -> DealerCountOut:
-    item = _load(db, count_id)
-    claim_sheet(item, user)
-    log_action(
-        db,
-        user_id=user.id,
-        action=ACTION_UPDATE,
-        entity_type="dealer_stock_count",
-        entity_id=str(item.id),
-        new_data={"status": "in_progress", "assigned_to_user_id": str(user.id)},
-        ip_address=get_client_ip(request),
-    )
-    db.commit()
-    db.refresh(item)
-    return _to_out(db, item, with_lines=True)
-
-
-@router.post("/{count_id}/release", response_model=DealerCountOut, summary="Qulfni ochish (olgan xodim yoki admin)")
-def release_count(
-    count_id: UUID,
-    request: Request,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_permission(PERM_DEALER_COUNTS_WRITE)),
-) -> DealerCountOut:
-    item = _load(db, count_id)
-    _require_counter_or_admin(item, user)
-    release_sheet(item)
-    log_action(
-        db,
-        user_id=user.id,
-        action=ACTION_UPDATE,
-        entity_type="dealer_stock_count",
-        entity_id=str(item.id),
-        new_data={"status": "draft", "released": True},
-        ip_address=get_client_ip(request),
-    )
-    db.commit()
-    db.refresh(item)
-    return _to_out(db, item, with_lines=True)
+# --- telefon: sanalganlarni yozish ------------------------------------------------
 
 
 @router.put("/{count_id}/counts", response_model=CountsOut, summary="Sanalgan qatorlarni yozish (telefon, idempotent)")
@@ -687,27 +509,23 @@ def put_counts(
     user: User = Depends(require_permission(PERM_DEALER_COUNTS_WRITE)),
 ) -> CountsOut:
     item = _load(db, count_id)
-    _require_counter_or_admin(item, user)
+    # Yopilgan sanovga ham yoziladi: oflayn telefon kech ulansa sanalgani yo'qolmasin.
     result = apply_counts(db, item, user, [e.model_dump() for e in payload.entries])
-    _recount(item)
-    log_action(
-        db,
-        user_id=user.id,
-        action=ACTION_UPDATE,
-        entity_type="dealer_stock_count",
-        entity_id=str(item.id),
-        new_data={"counts": result},
-        ip_address=get_client_ip(request),
-    )
-    db.commit()
-    db.refresh(item)
-    return CountsOut(**result, count=_to_out(db, item, with_lines=True))
+    _audit(db, request, user, item, ACTION_UPDATE, {"counts": result})
+    return CountsOut(**result, count=_save(db, item))
+
+
+@router.post("/{count_id}/claim", include_in_schema=False)
+@router.post("/{count_id}/release", include_in_schema=False)
+@router.post("/{count_id}/submit", include_in_schema=False)
+def legacy_flow(count_id: UUID) -> None:
+    raise HTTPException(status_code=410, detail=UPDATE_APP_DETAIL)
 
 
 @router.delete(
     "/{count_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Sanovni o'chirish (draft — egasi yoki admin; telefonda / yuborilgan — faqat admin)",
+    summary="Sanovni o'chirish (yaratgan yoki admin)",
 )
 def delete_count(
     count_id: UUID,
@@ -716,31 +534,21 @@ def delete_count(
     user: User = Depends(require_permission(PERM_DEALER_COUNTS_WRITE)),
 ) -> Response:
     item = _load(db, count_id)
-    if item.status == "submitted":
-        # Keraksiz/xato yuborilgan hujjatni tozalash; ledgerga ta'siri yo'q, audit qoladi.
-        if not _is_admin(user):
-            raise HTTPException(status_code=403, detail="Yuborilgan sanovni faqat admin o'chira oladi")
-    elif item.status == "in_progress":
-        # Telefon olgan ro'yxat — xodimning telefondagi sanalganlari ham yo'qoladi, shuning
-        # uchun faqat admin. Telefon keyingi so'rovda 404 oladi va nusxasini o'chiradi.
-        if not _is_admin(user):
-            raise HTTPException(status_code=409, detail=LOCK_DETAIL)
-    else:
-        _require_owner_or_admin(item, user)
-    log_action(
+    if item.counted_by_user_id != user.id and not _is_admin(user):
+        raise HTTPException(status_code=403, detail="Bu sanov sizga tegishli emas")
+    _audit(
         db,
-        user_id=user.id,
-        action=ACTION_DELETE,
-        entity_type="dealer_stock_count",
-        entity_id=str(item.id),
-        old_data={
+        request,
+        user,
+        item,
+        ACTION_DELETE,
+        {
             "dealer_org_id": item.dealer_org_id,
-            "status": item.status,
-            "assigned_to_user_id": str(item.assigned_to_user_id) if item.assigned_to_user_id else None,
-            "lines_count": item.lines_count,
+            "active": item.status == "open",
+            "lines": len(item.lines),
+            "counted_lines": sum(1 for ln in item.lines if ln.counted_at is not None),
             "total_units": str(item.total_units),
         },
-        ip_address=get_client_ip(request),
     )
     db.delete(item)
     db.commit()
@@ -768,22 +576,18 @@ def export_count_xlsx(
 ) -> Response:
     from openpyxl import Workbook
 
-    item = _load(db, count_id)
-    out = _to_out(db, item, with_lines=True)
+    out = _to_out(db, _load(db, count_id), with_lines=True)
     wb = Workbook()
     ws = wb.active
     ws.title = "Sanov"
     ws.append(["Diller", out.dealer_name or out.dealer_org_id])
     ws.append(["Diller ID", out.dealer_org_id])
-    # Ro'yxatni web'da biri yaratadi, telefonda boshqasi sanaydi.
-    ws.append(["Sanadi", out.assigned_to_name or out.counted_by_name or ""])
-    ws.append(["Yaratdi", out.counted_by_name or ""])
-    ws.append(["Holat", out.status])
-    ws.append(["Boshlandi", out.started_at.strftime("%Y-%m-%d %H:%M")])
-    ws.append(["Yuborildi", out.submitted_at.strftime("%Y-%m-%d %H:%M") if out.submitted_at else ""])
+    ws.append(["Yaratdi", out.created_by_name or ""])
+    ws.append(["Yaratildi", out.created_at.strftime("%Y-%m-%d %H:%M")])
+    ws.append(["Sanaldi", f"{out.counted_lines}/{out.sheet_lines}"])
     ws.append(["Izoh", out.note or ""])
     ws.append([])
-    ws.append(["#", "SKU", "Mahsulot", "Shtrix-kod", "Dona", "Muddat"])
+    ws.append(["#", "SKU", "Mahsulot", "Shtrix-kod", "Joy", "Dona", "Muddat", "Kim sanadi", "Qachon"])
     for ln in out.lines:
         ws.append(
             [
@@ -791,16 +595,19 @@ def export_count_xlsx(
                 ln.sku or "",
                 ln.product_name or "(tanilmagan shtrix-kod)",
                 ln.scanned_barcode,
-                # "Sanalmagan qoldirsin" bilan yuborilgan qatorda qty yo'q.
+                ln.location_code or "",
+                # Sanalmagan qatorda miqdor yo'q.
                 float(ln.qty) if ln.qty is not None else "",
                 ln.expiry_date.strftime("%Y-%m") if ln.expiry_date else "",
+                ln.counted_by_name or "",
+                ln.counted_at.strftime("%Y-%m-%d %H:%M") if ln.counted_at else "",
             ]
         )
     ws.append([])
-    ws.append(["Jami qatorlar", out.lines_count, "", "Jami dona", float(out.total_units), ""])
+    ws.append(["Jami sanalgan qatorlar", out.counted_lines, "", "", "Jami dona", float(out.total_units)])
     buf = io.BytesIO()
     wb.save(buf)
-    fname = f"diller_sanov_{out.dealer_org_id}_{out.started_at.strftime('%Y%m%d')}.xlsx"
+    fname = f"diller_sanov_{out.dealer_org_id}_{out.created_at.strftime('%Y%m%d')}.xlsx"
     return Response(
         content=buf.getvalue(),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

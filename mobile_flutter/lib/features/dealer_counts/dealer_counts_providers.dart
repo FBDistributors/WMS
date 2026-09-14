@@ -11,11 +11,10 @@ final dealerCountsRepositoryProvider = Provider<DealerCountsRepository>((Ref ref
   return DealerCountsRepository(ref.watch(appDioProvider));
 });
 
-/// Telefonga yuklab olingan ro'yxatlar (sqflite).
+/// Telefonga yuklab olingan sanovlar (sqflite).
 ///
 /// 1.0.45 gacha telefonda noldan boshlangan bo'sh draftlar ham shu jadvalda edi
-/// (`kind` yo'q, kalit — `client_uuid`). Telefondan sanov yaratish yopilgan,
-/// ular endi yuborilmaydi — shu yerda bir marta tozalanadi.
+/// (`kind` yo'q, kalit — `client_uuid`). Ular endi yuborilmaydi — shu yerda tozalanadi.
 final dealerSheetDraftsProvider = FutureProvider<List<DealerSheetDraft>>((Ref ref) async {
   final OfflineDatabase? db = await ref.watch(offlineDatabaseProvider.future);
   if (db == null) {
@@ -33,22 +32,22 @@ final dealerSheetDraftsProvider = FutureProvider<List<DealerSheetDraft>>((Ref re
   return sheets;
 });
 
-/// Ro'yxat ekrani uchun: serverdagi menga ochiq ro'yxatlar + telefondagi nusxalarim.
+/// Ro'yxat ekrani: faol sanovlar + telefondagi nusxalarim.
 class DealerSheetsView {
   const DealerSheetsView({required this.server, required this.local, this.error});
 
   final List<DealerCount> server;
 
-  /// Joriy xodimning nusxalari (serverda hali ochiq, yoki server javob bermadi).
+  /// Joriy xodimning nusxalari: serverda faol, yoki hali yuborilmagan qatori bor
+  /// (sanov yopilgan/o'chirilgan bo'lsa ham — ichiga kirilganda yuboriladi yoki tozalanadi).
   final List<DealerSheetDraft> local;
 
   /// Server ro'yxati ochilmadi (internet yo'q) — faqat telefondagi nusxalar.
   final Object? error;
 }
 
-/// Server javob bersa — unda yo'q nusxalarim eskirgan (web'da o'chirilgan, yuborilgan
-/// yoki qulf ochilib boshqa xodim olgan): ularni yuborib bo'lmaydi, telefondan o'chiriladi.
-/// Aks holda "Tayyor ro'yxatlar"da serverda yo'q ro'yxat ko'rinib turadi.
+/// Server javob bersa — faol bo'lmagan va yuborilmagan qatori yo'q nusxalar o'chiriladi
+/// (sanov yopilgan yoki o'chirilgan): aks holda ro'yxatda serverda yo'q sanov osilib qoladi.
 final dealerSheetsViewProvider = FutureProvider<DealerSheetsView>((Ref ref) async {
   final String? me = ref.watch(authControllerProvider).valueOrNull?.me?.id;
   final List<DealerSheetDraft> mine = (await ref.watch(dealerSheetDraftsProvider.future))
@@ -56,23 +55,25 @@ final dealerSheetsViewProvider = FutureProvider<DealerSheetsView>((Ref ref) asyn
       .toList(growable: false);
   final List<DealerCount> server;
   try {
-    server = await ref.watch(dealerCountsRepositoryProvider).listSheets();
+    server = await ref.watch(dealerCountsRepositoryProvider).listActive();
   } on Exception catch (e) {
     return DealerSheetsView(server: const <DealerCount>[], local: mine, error: e);
   }
-  final Set<String> open = server.map((DealerCount c) => c.id).toSet();
-  final List<DealerSheetDraft> stale = mine.where((DealerSheetDraft d) => !open.contains(d.countId)).toList();
+  final Set<String> active = server.map((DealerCount c) => c.id).toSet();
+  final List<DealerSheetDraft> stale = mine
+      .where((DealerSheetDraft d) => !active.contains(d.countId) && d.pendingCount == 0)
+      .toList(growable: false);
   if (stale.isNotEmpty) {
     final OfflineDatabase? db = await ref.read(offlineDatabaseProvider.future);
     for (final DealerSheetDraft d in stale) {
       await db?.dealerDraftDelete(DealerSheetDraft.storageKey(d.countId));
     }
-    // Keyingi o'qishda (ro'yxat ekrani, ro'yxat ichi) o'chirilganlar qaytmasin.
+    // Keyingi o'qishda (ro'yxat ekrani, sanov ichi) o'chirilganlar qaytmasin.
     Future<void>.microtask(() => ref.invalidate(dealerSheetDraftsProvider));
   }
   return DealerSheetsView(
     server: server,
-    local: mine.where((DealerSheetDraft d) => open.contains(d.countId)).toList(growable: false),
+    local: mine.where((DealerSheetDraft d) => !stale.contains(d)).toList(growable: false),
   );
 });
 
@@ -85,14 +86,4 @@ final dealerSheetDraftProvider =
     }
   }
   return null;
-});
-
-/// Mening yuborgan sanovlarim (Tarix).
-final myDealerCountsProvider = FutureProvider<List<DealerCount>>((Ref ref) {
-  return ref.watch(dealerCountsRepositoryProvider).listMine();
-});
-
-final dealerCountDetailProvider =
-    FutureProvider.family<DealerCount, String>((Ref ref, String id) {
-  return ref.watch(dealerCountsRepositoryProvider).get(id);
 });

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, FileSpreadsheet, ListPlus, LockOpen, Plus, Save, Send, Store, Trash2, X } from 'lucide-react'
+import { Eye, FileSpreadsheet, ListPlus, Plus, RefreshCw, Store, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 
@@ -11,20 +11,20 @@ import { Card } from '../../components/ui/card'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { useAppToast } from '../../feedback/useAppToast'
-import { useAuth } from '../../rbac/AuthProvider'
 import { getApiErrorMessage } from '../../services/apiClient'
 import {
+  addDealerCountLines,
   createDealerCount,
   deleteDealerCount,
+  deleteDealerCountLine,
   getDealerCount,
   getDealers,
   listDealerCounts,
+  patchDealerCountLine,
   prefillDealerCount,
-  releaseDealerCount,
-  submitDealerCount,
-  updateDealerCount,
+  type DealerCountLineIn,
+  type DealerCountLinePatch,
   type DealerCountOut,
-  type DealerCountStatus,
   type DealerOut,
   type PrefillSource,
 } from '../../services/dealerCountsApi'
@@ -32,10 +32,12 @@ import { getProducts, type Product } from '../../services/productsApi'
 import { resolveBarcode } from '../../services/scannerApi'
 import {
   emptyRow,
-  mergeResolvedRow,
+  expiryToApi,
+  normLocation,
   parseQty,
+  qtyValue,
+  rowToLineIn,
   rowsFromCount,
-  rowsToApiLines,
   totals,
   type EditRow,
 } from '../../utils/dealerCountRows'
@@ -57,40 +59,60 @@ function clientUuid(): string {
   }
 }
 
-function fmtUnits(v: number) {
-  return v.toLocaleString('en-US')
+function fmtUnits(v: number | string) {
+  const n = typeof v === 'string' ? Number(v) : v
+  return Number.isFinite(n) ? n.toLocaleString('en-US') : '—'
+}
+
+function fmtTime(v: string | null | undefined) {
+  if (!v) return ''
+  const d = new Date(v)
+  return Number.isNaN(d.getTime()) ? v : d.toLocaleString()
+}
+
+/** Serverdagi qiymat — o'zgargan-o'zgarmaganini bilish uchun. */
+type Saved = { qty: number | null; expiry: string | null; location: string }
+
+function savedOf(c: DealerCountOut | null): Map<string, Saved> {
+  const m = new Map<string, Saved>()
+  for (const ln of c?.lines ?? []) {
+    m.set(ln.id, {
+      qty: ln.qty == null ? null : Number(ln.qty),
+      expiry: ln.expiry_date ?? null,
+      location: ln.location_code ?? '',
+    })
+  }
+  return m
 }
 
 /**
- * Diller sanovini web'da jadvalda kiritish (yangi yoki draft tahriri).
- * Serverdagi qoidalar mobil bilan bir xil; draft serverda saqlanadi.
+ * Diller sanovi sahifasi (yangi yoki mavjud). Holat yo'q: ro'yxat shu yerda tuziladi,
+ * xodimlar telefonda sanaydi. Har qator o'zgarishi darhol serverga alohida yoziladi —
+ * telefon sanagan boshqa qatorlarga tegilmaydi.
  */
 export function DealerCountEditPage() {
   const { t } = useTranslation(['admin', 'common'])
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { showError, showSuccess } = useAppToast()
-  const { has } = useAuth()
 
   const [dealers, setDealers] = useState<DealerOut[]>([])
   const [dealerId, setDealerId] = useState('')
   const [note, setNote] = useState('')
-  const [rows, setRows] = useState<EditRow[]>(() => [emptyRow()])
   const [countId, setCountId] = useState<string | null>(id ?? null)
-  const [status, setStatus] = useState<DealerCountStatus>('draft')
-  const [assignedName, setAssignedName] = useState<string | null>(null)
-  // Yangi sanovda tanlangan dillerning ochiq ro'yxati — bitta diller, bitta ochiq ro'yxat.
-  const [openExisting, setOpenExisting] = useState<DealerCountOut | null>(null)
-  const [prefillOpen, setPrefillOpen] = useState(false)
-  const [prefillSources, setPrefillSources] = useState<PrefillSource[]>(['smartup'])
-  // Yuborishda sanalmagan qatorlar: 0 deb yozish (standart) yoki bo'sh qoldirish.
-  const [uncountedPolicy, setUncountedPolicy] = useState<'zero' | 'keep'>('zero')
+  const [count, setCount] = useState<DealerCountOut | null>(null)
+  const [rows, setRows] = useState<EditRow[]>(() => [emptyRow()])
+  // Yangi sanovda tanlangan dillerning faol sanovi — yangisi yaratilsa u yopiladi.
+  const [activeExisting, setActiveExisting] = useState<DealerCountOut | null>(null)
   const [loading, setLoading] = useState(Boolean(id))
   const [busy, setBusy] = useState(false)
-  const [dirty, setDirty] = useState(false)
+  const [savingKey, setSavingKey] = useState<string | null>(null)
+  const [prefillOpen, setPrefillOpen] = useState(false)
+  const [prefillSources, setPrefillSources] = useState<PrefillSource[]>(['smartup'])
   const [importOpen, setImportOpen] = useState(false)
-  const [confirmSubmit, setConfirmSubmit] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmReplace, setConfirmReplace] = useState(false)
+  const pendingAction = useRef<((cid: string) => Promise<void>) | null>(null)
   const [highlight, setHighlight] = useState<string | null>(null)
   const [suggest, setSuggest] = useState<{ key: string; items: Product[] } | null>(null)
   const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -98,6 +120,22 @@ export function DealerCountEditPage() {
   const codeRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   const sum = useMemo(() => totals(rows), [rows])
+  const saved = useMemo(() => savedOf(count), [count])
+
+  /** Server javobini jadvalga: qatorlar kaliti — server id, shuning uchun fokus saqlanadi. */
+  const apply = useCallback((c: DealerCountOut) => {
+    setCount(c)
+    setRows((prev) => {
+      const editing = new Map(prev.filter((r) => r.lineId && r.editing).map((r) => [r.lineId as string, r]))
+      const fresh = rowsFromCount(c).map((r) => {
+        const e = r.lineId ? editing.get(r.lineId) : undefined
+        // Hali saqlanmagan (yozilayotgan) qiymat ustidan yozilmasin.
+        return { ...r, key: r.lineId as string, ...(e ? { qty: e.qty, location: e.location, editing: true } : {}) }
+      })
+      const pendingNew = prev.filter((r) => !r.lineId && (r.code.trim() || r.status === 'resolving'))
+      return [...fresh, ...(pendingNew.length ? pendingNew : [emptyRow()])]
+    })
+  }, [])
 
   useEffect(() => {
     getDealers()
@@ -107,110 +145,157 @@ export function DealerCountEditPage() {
 
   useEffect(() => {
     if (!id) return
+    setCountId(id)
     setLoading(true)
     getDealerCount(id)
-      .then((c: DealerCountOut) => {
+      .then((c) => {
         setDealerId(c.dealer_org_id)
         setNote(c.note ?? '')
-        setStatus(c.status)
-        setAssignedName(c.assigned_to_name)
-        setRows([...rowsFromCount(c), emptyRow()])
+        apply(c)
       })
       .catch((err) => showError(getApiErrorMessage(err, t('admin:dealer_counts.load_failed'))))
       .finally(() => setLoading(false))
-  }, [id, showError, t])
+  }, [id, apply, showError, t])
 
   useEffect(() => {
     if (countId || !dealerId) {
-      setOpenExisting(null)
+      setActiveExisting(null)
       return
     }
     let cancelled = false
-    listDealerCounts({ dealer_org_id: dealerId, status: 'draft,in_progress', limit: 1 })
+    listDealerCounts({ dealer_org_id: dealerId, active: true, limit: 1 })
       .then((r) => {
-        if (!cancelled) setOpenExisting(r.items[0] ?? null)
+        if (!cancelled) setActiveExisting(r.items[0] ?? null)
       })
       .catch(() => {
-        if (!cancelled) setOpenExisting(null)
+        if (!cancelled) setActiveExisting(null)
       })
     return () => {
       cancelled = true
     }
   }, [countId, dealerId])
 
-  const openExistingList = () => {
-    if (!openExisting) return
-    // Yangi va tahrir sahifasi bitta komponent — holat qo'lda almashtiriladi.
-    setDirty(false)
-    setCountId(openExisting.id)
-    navigate(`/admin/dealer-counts/${openExisting.id}/edit`, { replace: true })
+  const run = async (fn: () => Promise<void>) => {
+    setBusy(true)
+    try {
+      await fn()
+    } catch (err) {
+      showError(getApiErrorMessage(err, t('admin:dealer_counts.save_failed')))
+    } finally {
+      setBusy(false)
+    }
   }
 
-  // Saqlanmagan o'zgarish bilan sahifani yopish/yangilashdan ogohlantirish.
-  useEffect(() => {
-    if (!dirty) return
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault()
-      e.returnValue = ''
+  const create = async (replace: boolean): Promise<string> => {
+    const c = await createDealerCount({
+      client_uuid: clientUuid(),
+      dealer_org_id: dealerId,
+      note: note.trim() || undefined,
+      replace,
+      source: 'web',
+    })
+    try {
+      sessionStorage.removeItem(CLIENT_UUID_KEY)
+    } catch {
+      /* ignore */
     }
-    window.addEventListener('beforeunload', handler)
-    return () => window.removeEventListener('beforeunload', handler)
-  }, [dirty])
+    setCountId(c.id)
+    apply(c)
+    navigate(`/admin/dealer-counts/${c.id}/edit`, { replace: true })
+    return c.id
+  }
 
-  const patchRow = useCallback((key: string, patch: Partial<EditRow>) => {
-    setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)))
-    setDirty(true)
-  }, [])
+  /** Hujjat kerak bo'lgan amal: yangi sanovda avval yaratiladi (faol sanov bo'lsa — tasdiq bilan). */
+  const withCount = async (action: (cid: string) => Promise<void>) => {
+    if (countId) {
+      await run(() => action(countId))
+      return
+    }
+    if (!dealerId) {
+      showError(t('admin:dealer_counts.dealer_required'))
+      return
+    }
+    if (activeExisting) {
+      pendingAction.current = action
+      setConfirmReplace(true)
+      return
+    }
+    await run(async () => action(await create(false)))
+  }
 
-  const ensureTrailingEmpty = useCallback((list: EditRow[]) => {
-    const last = list[list.length - 1]
-    return last && last.status === 'empty' && !last.code ? list : [...list, emptyRow()]
-  }, [])
+  const confirmReplaceGo = async () => {
+    setConfirmReplace(false)
+    const action = pendingAction.current
+    pendingAction.current = null
+    await run(async () => {
+      const cid = await create(true)
+      if (action) await action(cid)
+    })
+  }
 
-  const focusQty = (key: string) => {
-    requestAnimationFrame(() => qtyRefs.current[key]?.focus())
+  const focusLine = (pred: (r: EditRow) => boolean) => {
+    requestAnimationFrame(() => {
+      setRows((prev) => {
+        const hit = prev.find((r) => r.lineId && pred(r))
+        if (hit) {
+          qtyRefs.current[hit.key]?.focus()
+          setHighlight(hit.key)
+          setTimeout(() => setHighlight(null), 1500)
+        }
+        return prev
+      })
+    })
+  }
+
+  /** Yangi (pastki) qator tanildi → serverga qo'shiladi; shu mahsulot+muddat+joy bor bo'lsa — o'shanga o'tiladi. */
+  const addResolved = async (resolved: EditRow) => {
+    // "Qidirilmoqda" holatidan chiqariladi — tasdiq bekor qilinsa ham qator tahrirlanadigan qoladi.
+    setRows((prev) => prev.map((r) => (r.key === resolved.key ? resolved : r)))
+    const same = (r: EditRow) =>
+      r.productId === resolved.productId &&
+      r.expiry === resolved.expiry &&
+      normLocation(r.location) === normLocation(resolved.location)
+    if (resolved.productId && rows.some((r) => r.lineId && same(r))) {
+      setRows((prev) => prev.map((r) => (r.key === resolved.key ? emptyRow() : r)))
+      focusLine(same)
+      return
+    }
+    const line = rowToLineIn(resolved)
+    if (!line) return
+    await withCount(async (cid) => {
+      const res = await addDealerCountLines(cid, [line])
+      setRows((prev) => prev.filter((r) => r.key !== resolved.key))
+      apply(res.count)
+      if (resolved.productId) focusLine(same)
+    })
   }
 
   /** Kod → mahsulot: skaner (quti kodi ham), keyin SKU/nom bo'yicha aniq mos. */
   const resolveRow = async (row: EditRow, codeOverride?: string) => {
     const code = (codeOverride ?? row.code).trim()
-    if (!code) return
+    if (!code || row.lineId) return
     setSuggest(null)
-    patchRow(row.key, { code, status: 'resolving' })
-    // Fakt qoldiqni xodim o'zi yozadi — "1" yoki quti hajmi avtomatik qo'yilmaydi
-    // (tasodifan saqlab yuborish xavfi). Quti kodi bo'lsa hajm faqat maslahat tugmasi.
-    let resolved: EditRow = { ...row, code, status: 'unknown', productId: null, sku: null, name: null, boxUnits: undefined }
+    setRows((prev) => prev.map((r) => (r.key === row.key ? { ...r, code, status: 'resolving' } : r)))
+    let resolved: EditRow = { ...row, code, status: 'unknown', productId: null, sku: null, name: null }
     try {
       const r = await resolveBarcode(code)
       if (r.type === 'PRODUCT' && r.product) {
         resolved = { ...resolved, productId: r.product.id, name: r.product.name, status: 'ok' }
-        if (r.scan_kind === 'box' && (r.units_per_scan ?? 0) > 0) resolved = { ...resolved, boxUnits: r.units_per_scan as number }
       } else {
         const list = await getProducts({ search: code, limit: 5 })
         const exact = list.items.find((p) => p.sku.toLowerCase() === code.toLowerCase() || p.barcode === code)
         if (exact) resolved = { ...resolved, productId: exact.id, sku: exact.sku, name: exact.name, status: 'ok' }
       }
     } catch {
-      // internet yo'q / xato — tanilmagan sifatida qoladi, server yuborishda yana urinadi
+      // internet yo'q / xato — tanilmagan sifatida qo'shiladi, server ham urinib ko'radi
     }
-    setRows((prev) => {
-      const { rows: next, mergedInto } = mergeResolvedRow(prev, resolved)
-      if (mergedInto) {
-        setHighlight(mergedInto)
-        setTimeout(() => setHighlight(null), 1500)
-        const withEmpty = ensureTrailingEmpty(next)
-        const emptyKey = withEmpty[withEmpty.length - 1].key
-        requestAnimationFrame(() => codeRefs.current[emptyKey]?.focus())
-        return withEmpty
-      }
-      focusQty(resolved.key)
-      return ensureTrailingEmpty(next)
-    })
-    setDirty(true)
+    await addResolved(resolved)
   }
 
   const onCodeChange = (row: EditRow, value: string) => {
-    patchRow(row.key, { code: value, status: value.trim() ? row.status : 'empty' })
+    setRows((prev) =>
+      prev.map((r) => (r.key === row.key ? { ...r, code: value, status: value.trim() ? r.status : 'empty' } : r)),
+    )
     if (suggestTimer.current) clearTimeout(suggestTimer.current)
     const q = value.trim()
     if (q.length < 2) {
@@ -226,93 +311,85 @@ export function DealerCountEditPage() {
 
   const pickSuggestion = (row: EditRow, p: Product) => {
     setSuggest(null)
-    const resolved: EditRow = { ...row, code: p.sku, productId: p.id, sku: p.sku, name: p.name, status: 'ok', boxUnits: undefined }
-    setRows((prev) => {
-      const { rows: next, mergedInto } = mergeResolvedRow(prev, resolved)
-      if (mergedInto) {
-        setHighlight(mergedInto)
-        setTimeout(() => setHighlight(null), 1500)
-        return ensureTrailingEmpty(next)
+    void addResolved({ ...row, code: p.sku, productId: p.id, sku: p.sku, name: p.name, status: 'ok' })
+  }
+
+  const editRow = (key: string, patch: Partial<EditRow>) =>
+    setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch, editing: true } : r)))
+
+  /** Saqlangan qatorni o'zgartirish — faqat haqiqatan o'zgargan maydon yuboriladi. */
+  const commitRow = async (row: EditRow, field: 'qty' | 'expiry' | 'location', value?: string) => {
+    if (!countId || !row.lineId) return
+    const s = saved.get(row.lineId)
+    const patch: DealerCountLinePatch = {}
+    if (field === 'qty') {
+      const q = qtyValue(row.qty)
+      if (q === undefined) {
+        showError(t('admin:dealer_counts.invalid_qty'))
+        return
       }
-      focusQty(resolved.key)
-      return ensureTrailingEmpty(next)
-    })
-    setDirty(true)
+      if (q !== s?.qty) patch.qty = q
+    } else if (field === 'expiry') {
+      const e = expiryToApi(value ?? row.expiry) ?? null
+      if (e !== s?.expiry) patch.expiry_date = e
+    } else {
+      const l = normLocation(row.location)
+      if (l !== (s?.location ?? '')) patch.location_code = l || null
+    }
+    if (Object.keys(patch).length === 0) {
+      setRows((prev) => prev.map((r) => (r.key === row.key ? { ...r, editing: false } : r)))
+      return
+    }
+    setSavingKey(row.key)
+    try {
+      const c = await patchDealerCountLine(countId, row.lineId, patch)
+      setRows((prev) => prev.map((r) => (r.key === row.key ? { ...r, editing: false } : r)))
+      apply(c)
+    } catch (err) {
+      showError(getApiErrorMessage(err, t('admin:dealer_counts.save_failed')))
+    } finally {
+      setSavingKey(null)
+    }
   }
 
-  const onQtyEnter = (row: EditRow) => {
-    setRows((prev) => {
-      const next = ensureTrailingEmpty(prev)
-      const idx = next.findIndex((r) => r.key === row.key)
-      const target = next[idx + 1] ?? next[next.length - 1]
-      requestAnimationFrame(() => codeRefs.current[target.key]?.focus())
-      return next
-    })
-  }
-
-  const removeRow = (key: string) => {
-    setRows((prev) => ensureTrailingEmpty(prev.filter((r) => r.key !== key)))
-    setDirty(true)
+  const removeRow = async (row: EditRow) => {
+    if (!row.lineId) {
+      setRows((prev) => prev.filter((r) => r.key !== row.key))
+      return
+    }
+    if (!countId) return
+    setSavingKey(row.key)
+    try {
+      apply(await deleteDealerCountLine(countId, row.lineId))
+    } catch (err) {
+      showError(getApiErrorMessage(err, t('admin:dealer_counts.save_failed')))
+    } finally {
+      setSavingKey(null)
+    }
   }
 
   const addImported = (imported: EditRow[]) => {
-    setRows((prev) => {
-      let next = prev.filter((r) => r.status !== 'empty' || r.code)
-      for (const r of imported) next = mergeResolvedRow(next, r).rows
-      return ensureTrailingEmpty(next)
+    const lines = imported.map(rowToLineIn).filter((x): x is DealerCountLineIn => x !== null)
+    if (lines.length === 0) return
+    void withCount(async (cid) => {
+      const res = await addDealerCountLines(cid, lines)
+      apply(res.count)
+      showSuccess(t('admin:dealer_counts.lines_added', { added: res.added, updated: res.updated }))
     })
-    setDirty(true)
   }
 
-  /** Saqlash: birinchi marta POST (client_uuid), keyin PUT. Qaytaradi: server id. */
-  const save = async (): Promise<string | null> => {
-    if (!dealerId) {
-      showError(t('admin:dealer_counts.dealer_required'))
-      return null
-    }
-    const lines = rowsToApiLines(rows)
-    setBusy(true)
-    try {
-      let saved: DealerCountOut
-      if (countId) {
-        saved = await updateDealerCount(countId, { note: note.trim() || undefined, lines })
-      } else {
-        saved = await createDealerCount({ client_uuid: clientUuid(), dealer_org_id: dealerId, note: note.trim() || undefined, lines, submit: false, source: 'web' })
-        setCountId(saved.id)
-        try {
-          sessionStorage.removeItem(CLIENT_UUID_KEY)
-        } catch {
-          /* ignore */
-        }
-        navigate(`/admin/dealer-counts/${saved.id}/edit`, { replace: true })
-      }
-      setRows([...rowsFromCount(saved), emptyRow()])
-      setDirty(false)
-      showSuccess(t('admin:dealer_counts.saved'))
-      return saved.id
-    } catch (err) {
-      showError(getApiErrorMessage(err, t('admin:dealer_counts.save_failed')))
-      return null
-    } finally {
-      setBusy(false)
-    }
+  const prefill = () => {
+    setPrefillOpen(false)
+    void withCount(async (cid) => {
+      const r = await prefillDealerCount(cid, prefillSources)
+      apply(r.count)
+      showSuccess(t('admin:dealer_counts.prefill_result', { added: r.added, skipped: r.skipped, missing: r.not_in_catalog }))
+    })
   }
 
-  const submit = async () => {
-    setConfirmSubmit(false)
-    const savedId = await save()
-    if (!savedId) return
-    setBusy(true)
-    try {
-      const res = await submitDealerCount(savedId, uncountedPolicy)
-      setDirty(false)
-      showSuccess(res.warning ? `${t('admin:dealer_counts.submit_ok')} — ${res.warning}` : t('admin:dealer_counts.submit_ok'))
-      navigate(`/admin/dealer-counts/${savedId}`)
-    } catch (err) {
-      showError(getApiErrorMessage(err, t('admin:dealer_counts.save_failed')))
-    } finally {
-      setBusy(false)
-    }
+  const refresh = () => {
+    if (!countId) return
+    void run(async () => apply(await getDealerCount(countId)))
   }
 
   const remove = async () => {
@@ -321,62 +398,18 @@ export function DealerCountEditPage() {
       navigate('/admin/dealer-counts')
       return
     }
-    setBusy(true)
-    try {
+    await run(async () => {
       await deleteDealerCount(countId)
-      setDirty(false)
       navigate('/admin/dealer-counts')
-    } catch (err) {
-      showError(getApiErrorMessage(err, t('admin:dealer_counts.save_failed')))
-    } finally {
-      setBusy(false)
-    }
+    })
   }
 
-  /** Ro'yxatni manbalardan to'ldirish (serverda) — mavjud qatorlarga tegmaydi. */
-  const prefill = async () => {
-    setPrefillOpen(false)
-    let cid = countId
-    if (!cid) {
-      // Avval hujjat bo'lishi kerak — bo'sh draft yaratiladi.
-      cid = await save()
-      if (!cid) return
-    }
-    setBusy(true)
-    try {
-      const r = await prefillDealerCount(cid, prefillSources)
-      setStatus(r.count.status)
-      setRows([...rowsFromCount(r.count), emptyRow()])
-      setDirty(false)
-      showSuccess(t('admin:dealer_counts.prefill_result', { added: r.added, skipped: r.skipped, missing: r.not_in_catalog }))
-    } catch (err) {
-      showError(getApiErrorMessage(err, t('admin:dealer_counts.save_failed')))
-    } finally {
-      setBusy(false)
-    }
+  const openActive = () => {
+    if (!activeExisting) return
+    navigate(`/admin/dealer-counts/${activeExisting.id}/edit`, { replace: true })
   }
 
-  /** Telefon qulfini ochish (admin): in_progress → draft. */
-  const release = async () => {
-    if (!countId) return
-    setBusy(true)
-    try {
-      const c = await releaseDealerCount(countId)
-      setStatus(c.status)
-      setAssignedName(null)
-      setRows([...rowsFromCount(c), emptyRow()])
-    } catch (err) {
-      showError(getApiErrorMessage(err, t('admin:dealer_counts.save_failed')))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const dealerName = dealers.find((d) => d.org_id === dealerId)?.name ?? ''
-  const locked = status === 'in_progress'
-  const frozen = status === 'submitted' || locked
-  // Bu dillerda ochiq ro'yxat bor — ikkinchisi yaratilmaydi (server ham rad etadi).
-  const blocked = !countId && openExisting !== null
+  const closed = count !== null && !count.is_active
 
   return (
     <AdminLayout
@@ -384,41 +417,34 @@ export function DealerCountEditPage() {
         <div className="flex items-center gap-2">
           <Store size={18} />
           <span className="text-sm font-semibold">
-            {countId ? t('admin:dealer_counts.edit_title') : t('admin:dealer_counts.new_title')}
+            {countId ? (count?.dealer_name ?? t('admin:dealer_counts.edit_title')) : t('admin:dealer_counts.new_title')}
           </span>
         </div>
       }
       backTo="/admin/dealer-counts"
       actionSlot={
         <div className="flex flex-wrap gap-2">
-          {locked && has('admin:access') ? (
-            <Button variant="ghost" disabled={busy} onClick={() => void release()}>
-              <LockOpen size={16} className="mr-1" />
-              {t('admin:dealer_counts.release')}
-            </Button>
-          ) : null}
-          {!frozen ? (
+          <Button variant="ghost" disabled={busy || !dealerId} onClick={() => setPrefillOpen(true)}>
+            <ListPlus size={16} className="mr-1" />
+            {t('admin:dealer_counts.prefill_button')}
+          </Button>
+          <Button variant="ghost" disabled={busy || !dealerId} onClick={() => setImportOpen(true)}>
+            <FileSpreadsheet size={16} className="mr-1" />
+            {t('admin:dealer_counts.import_excel')}
+          </Button>
+          {countId ? (
             <>
-              <Button variant="ghost" disabled={busy || !dealerId || blocked} onClick={() => setPrefillOpen(true)}>
-                <ListPlus size={16} className="mr-1" />
-                {t('admin:dealer_counts.prefill_button')}
+              <Button variant="ghost" disabled={busy} onClick={refresh} title={t('admin:dealer_counts.refresh_hint')}>
+                <RefreshCw size={16} className="mr-1" />
+                {t('admin:dealer_counts.refresh')}
               </Button>
-              <Button variant="ghost" disabled={busy} onClick={() => setImportOpen(true)}>
-                <FileSpreadsheet size={16} className="mr-1" />
-                {t('admin:dealer_counts.import_excel')}
+              <Button variant="ghost" onClick={() => navigate(`/admin/dealer-counts/${countId}`)}>
+                <Eye size={16} className="mr-1" />
+                {t('admin:dealer_counts.view_compare')}
               </Button>
               <Button variant="ghost" disabled={busy} onClick={() => setConfirmDelete(true)}>
                 <Trash2 size={16} className="mr-1" />
-                {t('admin:dealer_counts.delete_draft')}
-              </Button>
-              {/* To'ldirish/saqlashdan keyin hujjat serverda — o'chiq tugma "ishlamayapti" deb o'qilmasin. */}
-              <Button variant="ghost" disabled={busy || !dirty || blocked} onClick={() => void save()}>
-                {countId && !dirty ? <Check size={16} className="mr-1" /> : <Save size={16} className="mr-1" />}
-                {countId && !dirty ? t('admin:dealer_counts.saved') : t('admin:dealer_counts.save')}
-              </Button>
-              <Button disabled={busy || sum.lines === 0 || !dealerId || blocked} onClick={() => setConfirmSubmit(true)}>
-                <Send size={16} className="mr-1" />
-                {t('admin:dealer_counts.submit')}
+                {t('admin:dealer_counts.delete')}
               </Button>
             </>
           ) : null}
@@ -428,9 +454,9 @@ export function DealerCountEditPage() {
       <div className="relative">
         {loading || busy ? <LoadingOverlay label={t('common:messages.loading')} /> : null}
 
-        {locked ? (
-          <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-200">
-            {t('admin:dealer_counts.locked_banner', { name: assignedName ?? '—' })}
+        {closed ? (
+          <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
+            {t('admin:dealer_counts.closed_banner')}
           </div>
         ) : null}
 
@@ -438,15 +464,7 @@ export function DealerCountEditPage() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <label className="flex flex-col gap-1 text-xs text-slate-500">
               {t('admin:dealer_counts.col_dealer')}
-              <select
-                className={inputCls}
-                value={dealerId}
-                disabled={Boolean(countId) || frozen}
-                onChange={(e) => {
-                  setDealerId(e.target.value)
-                  setDirty(true)
-                }}
-              >
+              <select className={inputCls} value={dealerId} disabled={Boolean(countId)} onChange={(e) => setDealerId(e.target.value)}>
                 <option value="">—</option>
                 {dealers.map((d) => (
                   <option key={d.org_id} value={d.org_id}>
@@ -457,51 +475,33 @@ export function DealerCountEditPage() {
             </label>
             <label className="flex flex-col gap-1 text-xs text-slate-500 sm:col-span-2">
               {t('admin:dealer_counts.note')}
-              <input
-                className={inputCls}
-                value={note}
-                disabled={frozen}
-                onChange={(e) => {
-                  setNote(e.target.value)
-                  setDirty(true)
-                }}
-              />
+              <input className={inputCls} value={note} disabled={Boolean(countId)} onChange={(e) => setNote(e.target.value)} />
             </label>
           </div>
           <div className="mt-3 text-xs text-slate-500">
-            {t('admin:dealer_counts.col_lines')}: <b>{sum.lines}</b> · {t('admin:dealer_counts.col_units')}:{' '}
-            <b>{fmtUnits(sum.units)}</b>
+            {t('admin:dealer_counts.col_counted_lines')}: <b>{count ? `${count.counted_lines}/${count.sheet_lines}` : '0/0'}</b> ·{' '}
+            {t('admin:dealer_counts.col_units')}: <b>{fmtUnits(count?.total_units ?? 0)}</b>
+            {count?.last_counted_at ? (
+              <span className="ml-2">
+                · {t('admin:dealer_counts.last_counted', { time: fmtTime(count.last_counted_at), name: count.last_counted_by_name ?? '—' })}
+              </span>
+            ) : null}
             {sum.unknown > 0 ? (
               <span className="ml-2 text-amber-700 dark:text-amber-300">
                 {t('admin:dealer_counts.unknown_hint', { count: sum.unknown })}
               </span>
             ) : null}
-            {sum.missingQty > 0 ? (
-              <span className="ml-2 text-amber-700 dark:text-amber-300">
-                {t('admin:dealer_counts.uncounted_rows', { count: sum.missingQty, total: sum.sheet })}
-              </span>
-            ) : null}
-            {/* Yangi hujjatda diller tanlash — birinchi qadam, xato emas: keyingi qadamni aytamiz. */}
-            {dirty && countId ? (
-              <span className="ml-2 text-amber-700 dark:text-amber-300">{t('admin:dealer_counts.unsaved')}</span>
-            ) : null}
-            {!dirty && countId && status === 'draft' ? (
-              <span className="ml-2 text-emerald-700 dark:text-emerald-300">{t('admin:dealer_counts.saved_on_server')}</span>
-            ) : null}
+            {countId ? <span className="ml-2 text-emerald-700 dark:text-emerald-300">{t('admin:dealer_counts.autosave_hint')}</span> : null}
           </div>
-          {blocked && openExisting ? (
+          {!countId && activeExisting ? (
             <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-200">
               <span>
-                {t('admin:dealer_counts.open_exists', {
-                  done: openExisting.counted_lines,
-                  total: openExisting.sheet_lines,
-                  status:
-                    openExisting.status === 'in_progress'
-                      ? `${t('admin:dealer_counts.status_in_progress')} · ${openExisting.assigned_to_name ?? ''}`
-                      : t('admin:dealer_counts.status_draft'),
+                {t('admin:dealer_counts.active_exists', {
+                  done: activeExisting.counted_lines,
+                  total: activeExisting.sheet_lines,
                 })}
               </span>
-              <Button variant="ghost" onClick={openExistingList}>
+              <Button variant="ghost" onClick={openActive}>
                 {t('admin:dealer_counts.open_exists_button')}
               </Button>
             </div>
@@ -518,13 +518,15 @@ export function DealerCountEditPage() {
               <thead className="text-xs uppercase text-slate-500">
                 <tr className="border-b border-slate-200 dark:border-slate-800">
                   <th className="w-10 px-2 py-2 text-left">#</th>
-                  <th className="w-56 px-2 py-2 text-left">{t('admin:dealer_counts.col_code')}</th>
+                  <th className="w-48 px-2 py-2 text-left">{t('admin:dealer_counts.col_code')}</th>
                   <th className="px-2 py-2 text-left">{t('admin:dealer_counts.col_product')}</th>
-                  <th className="w-24 px-2 py-2 text-right" title={t('admin:dealer_counts.col_snapshot_hint')}>
+                  <th className="w-20 px-2 py-2 text-right" title={t('admin:dealer_counts.col_snapshot_hint')}>
                     {t('admin:dealer_counts.col_snapshot')}
                   </th>
-                  <th className="w-28 px-2 py-2 text-left">{t('admin:dealer_counts.col_qty')}</th>
-                  <th className="w-40 px-2 py-2 text-left">{t('admin:dealer_counts.col_expiry')}</th>
+                  <th className="w-28 px-2 py-2 text-left">{t('admin:dealer_counts.col_location')}</th>
+                  <th className="w-24 px-2 py-2 text-left">{t('admin:dealer_counts.col_qty')}</th>
+                  <th className="w-36 px-2 py-2 text-left">{t('admin:dealer_counts.col_expiry')}</th>
+                  <th className="w-40 px-2 py-2 text-left">{t('admin:dealer_counts.col_counted_by')}</th>
                   <th className="w-10 px-2 py-2" />
                 </tr>
               </thead>
@@ -535,35 +537,35 @@ export function DealerCountEditPage() {
                     className={
                       'border-b border-slate-100 dark:border-slate-800 ' +
                       (highlight === r.key ? 'bg-emerald-50 dark:bg-emerald-900/20 ' : '') +
-                      (r.status === 'unknown' ? 'bg-amber-50/60 dark:bg-amber-900/10' : '')
+                      (r.status === 'unknown' ? 'bg-amber-50/60 dark:bg-amber-900/10 ' : '') +
+                      (savingKey === r.key ? 'opacity-60' : '')
                     }
                   >
                     <td className="px-2 py-1.5 text-slate-400">{i + 1}</td>
                     <td className="relative px-2 py-1.5">
-                      <input
-                        ref={(el) => {
-                          codeRefs.current[r.key] = el
-                        }}
-                        className={inputCls + ' font-mono'}
-                        value={r.code}
-                        disabled={frozen}
-                        placeholder={t('admin:dealer_counts.code_placeholder')}
-                        onChange={(e) => onCodeChange(r, e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault()
-                            void resolveRow(r)
-                          }
-                          if (e.key === 'Escape') setSuggest(null)
-                        }}
-                        onBlur={() => {
-                          if (r.code.trim() && r.status !== 'ok' && r.status !== 'resolving') {
-                            setTimeout(() => void resolveRow(r), 150)
-                          }
-                        }}
-                      />
+                      {r.lineId ? (
+                        <span className="font-mono text-xs text-slate-500">{r.code}</span>
+                      ) : (
+                        <input
+                          ref={(el) => {
+                            codeRefs.current[r.key] = el
+                          }}
+                          className={inputCls + ' font-mono'}
+                          value={r.code}
+                          disabled={!dealerId || r.status === 'resolving'}
+                          placeholder={t('admin:dealer_counts.code_placeholder')}
+                          onChange={(e) => onCodeChange(r, e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              void resolveRow(r)
+                            }
+                            if (e.key === 'Escape') setSuggest(null)
+                          }}
+                        />
+                      )}
                       {suggest && suggest.key === r.key && suggest.items.length > 0 ? (
-                        <div className="absolute left-2 top-full z-20 mt-1 w-[28rem] max-w-[80vw] rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                        <div className="absolute left-2 top-full z-20 mt-1 w-[28rem] max-w-[80vw] rounded-xl border border-slate-200 bg-white text-slate-900 shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
                           {suggest.items.map((p) => (
                             <button
                               key={p.id}
@@ -595,27 +597,44 @@ export function DealerCountEditPage() {
                     </td>
                     <td className="px-2 py-1.5">
                       <input
+                        className={inputCls + ' font-mono uppercase'}
+                        value={r.location ?? ''}
+                        disabled={!r.lineId}
+                        maxLength={32}
+                        onChange={(e) => editRow(r.key, { location: e.target.value })}
+                        onBlur={() => void commitRow(r, 'location')}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                        }}
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <input
                         ref={(el) => {
                           qtyRefs.current[r.key] = el
                         }}
                         className={inputCls + ' text-right tabular-nums'}
-                        inputMode="numeric"
+                        inputMode="decimal"
                         value={r.qty}
-                        disabled={frozen || r.status === 'empty'}
-                        onChange={(e) => patchRow(r.key, { qty: e.target.value })}
+                        disabled={!r.lineId}
+                        placeholder="—"
+                        onChange={(e) => editRow(r.key, { qty: e.target.value })}
+                        onBlur={() => void commitRow(r, 'qty')}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault()
-                            onQtyEnter(r)
+                            ;(e.target as HTMLInputElement).blur()
+                            const next = rows[i + 1]
+                            if (next) requestAnimationFrame(() => (next.lineId ? qtyRefs.current[next.key] : codeRefs.current[next.key])?.focus())
                           }
                         }}
                       />
-                      {r.boxUnits && !frozen ? (
+                      {r.boxUnits && r.lineId ? (
                         <button
                           type="button"
                           className="mt-1 text-xs text-indigo-600 hover:underline dark:text-indigo-300"
                           title={t('admin:dealer_counts.box_units_hint', { n: r.boxUnits })}
-                          onClick={() => patchRow(r.key, { qty: String(parseQty(r.qty) + (r.boxUnits ?? 0)) })}
+                          onClick={() => editRow(r.key, { qty: String(parseQty(r.qty) + (r.boxUnits ?? 0)) })}
                         >
                           +{r.boxUnits}
                         </button>
@@ -626,13 +645,33 @@ export function DealerCountEditPage() {
                         type="month"
                         className={inputCls}
                         value={r.expiry}
-                        disabled={frozen || r.status === 'empty'}
-                        onChange={(e) => patchRow(r.key, { expiry: e.target.value })}
+                        disabled={!r.lineId}
+                        onChange={(e) => {
+                          editRow(r.key, { expiry: e.target.value })
+                          void commitRow(r, 'expiry', e.target.value)
+                        }}
                       />
                     </td>
+                    <td className="px-2 py-1.5 text-xs text-slate-500">
+                      {r.countedAt ? (
+                        <>
+                          <div className="text-slate-700 dark:text-slate-200">{r.countedBy ?? '—'}</div>
+                          <div>{fmtTime(r.countedAt)}</div>
+                        </>
+                      ) : r.lineId ? (
+                        <span className="text-amber-700 dark:text-amber-300">{t('admin:dealer_counts.state_uncounted')}</span>
+                      ) : null}
+                    </td>
                     <td className="px-2 py-1.5">
-                      {r.status !== 'empty' && !frozen ? (
-                        <button type="button" className="p-1 text-slate-400 hover:text-rose-600" onClick={() => removeRow(r.key)} aria-label={t('common:buttons.close')}>
+                      {r.status !== 'empty' ? (
+                        <button
+                          type="button"
+                          className="p-1 text-slate-400 hover:text-rose-600"
+                          disabled={savingKey === r.key}
+                          onClick={() => void removeRow(r)}
+                          aria-label={t('admin:dealer_counts.remove_line')}
+                          title={t('admin:dealer_counts.remove_line')}
+                        >
                           <X size={16} />
                         </button>
                       ) : null}
@@ -642,14 +681,20 @@ export function DealerCountEditPage() {
               </tbody>
             </table>
           </TableScrollArea>
-          {!frozen ? (
-            <div className="border-t border-slate-100 px-3 py-2 dark:border-slate-800">
-              <Button variant="ghost" onClick={() => setRows((prev) => [...prev, emptyRow()])}>
-                <Plus size={16} className="mr-1" />
-                {t('admin:dealer_counts.add_row')}
-              </Button>
-            </div>
-          ) : null}
+          <div className="border-t border-slate-100 px-3 py-2 dark:border-slate-800">
+            <Button
+              variant="ghost"
+              disabled={!dealerId}
+              onClick={() => {
+                const row = emptyRow()
+                setRows((prev) => [...prev, row])
+                requestAnimationFrame(() => codeRefs.current[row.key]?.focus())
+              }}
+            >
+              <Plus size={16} className="mr-1" />
+              {t('admin:dealer_counts.add_row')}
+            </Button>
+          </div>
         </Card>
       </div>
 
@@ -678,60 +723,38 @@ export function DealerCountEditPage() {
               <Button variant="ghost" onClick={() => setPrefillOpen(false)}>
                 {t('common:buttons.cancel')}
               </Button>
-              <Button disabled={prefillSources.length === 0} onClick={() => void prefill()}>
+              <Button disabled={prefillSources.length === 0} onClick={prefill}>
                 {t('admin:dealer_counts.prefill_button')}
               </Button>
             </div>
           </div>
         </div>
       ) : null}
-      {confirmSubmit && sum.missingQty > 0 ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
-          <button type="button" className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={() => setConfirmSubmit(false)} aria-label={t('common:buttons.close')} />
-          <div className="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 text-slate-900 shadow-2xl dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100" role="dialog" aria-modal="true">
-            <div className="text-base font-semibold">{t('admin:dealer_counts.submit')}</div>
-            <p className="mt-2 text-sm">
-              {t('admin:dealer_counts.submit_confirm', { dealer: dealerName, lines: sum.lines, units: fmtUnits(sum.units) })}
-            </p>
-            <p className="mt-3 text-sm font-medium text-amber-700 dark:text-amber-300">
-              {t('admin:dealer_counts.uncounted_question', { count: sum.missingQty })}
-            </p>
-            <div className="mt-2 space-y-2 text-sm">
-              <label className="flex items-start gap-2">
-                <input type="radio" name="uncounted" checked={uncountedPolicy === 'zero'} onChange={() => setUncountedPolicy('zero')} />
-                <span>{t('admin:dealer_counts.uncounted_zero')}</span>
-              </label>
-              <label className="flex items-start gap-2">
-                <input type="radio" name="uncounted" checked={uncountedPolicy === 'keep'} onChange={() => setUncountedPolicy('keep')} />
-                <span>{t('admin:dealer_counts.uncounted_keep')}</span>
-              </label>
-            </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => setConfirmSubmit(false)}>
-                {t('common:buttons.cancel')}
-              </Button>
-              <Button disabled={busy} onClick={() => void submit()}>
-                {t('admin:dealer_counts.submit')}
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
       <ConfirmDialog
-        open={confirmSubmit && sum.missingQty === 0}
-        title={t('admin:dealer_counts.submit')}
-        message={t('admin:dealer_counts.submit_confirm', { dealer: dealerName, lines: sum.lines, units: fmtUnits(sum.units) })}
-        confirmLabel={t('admin:dealer_counts.submit')}
+        open={confirmReplace}
+        title={t('admin:dealer_counts.replace_title')}
+        message={t('admin:dealer_counts.replace_confirm', {
+          done: activeExisting?.counted_lines ?? 0,
+          total: activeExisting?.sheet_lines ?? 0,
+        })}
+        confirmLabel={t('admin:dealer_counts.replace_button')}
         cancelLabel={t('common:buttons.cancel')}
-        onConfirm={submit}
-        onCancel={() => setConfirmSubmit(false)}
+        onConfirm={confirmReplaceGo}
+        onCancel={() => {
+          pendingAction.current = null
+          setConfirmReplace(false)
+        }}
+        variant="danger"
         loading={busy}
       />
       <ConfirmDialog
         open={confirmDelete}
-        title={t('admin:dealer_counts.delete_draft')}
-        message={t('admin:dealer_counts.delete_confirm')}
-        confirmLabel={t('admin:dealer_counts.delete_draft')}
+        title={t('admin:dealer_counts.delete')}
+        message={t('admin:dealer_counts.delete_count_confirm', {
+          done: count?.counted_lines ?? 0,
+          total: count?.sheet_lines ?? 0,
+        })}
+        confirmLabel={t('admin:dealer_counts.delete')}
         cancelLabel={t('common:buttons.cancel')}
         onConfirm={remove}
         onCancel={() => setConfirmDelete(false)}

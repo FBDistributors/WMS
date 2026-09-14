@@ -1,7 +1,9 @@
 /// Diller ombor qoldig'i sanovi — modellar.
 ///
-/// Ro'yxat (`DealerCount`) faqat web'da yaratiladi; telefon uni oladi va
-/// `DealerSheetDraft` nusxasida (sqflite, internetsiz) sanaydi.
+/// Holatsiz: sanov (`DealerCount`) web'da yaratiladi, bir yoki bir necha xodim telefonda
+/// uni ochib sanaydi. Telefondagi nusxa (`DealerSheetDraft`, sqflite) internetsiz ishlaydi;
+/// sanalgan qatorlar "yuborilmagan" (`dirty`) bo'lib turadi va internet bo'lganda serverga
+/// ketadi, serverdan esa boshqalar sanagani qo'shiladi.
 library;
 
 double _num(Object? v) {
@@ -12,6 +14,15 @@ double _num(Object? v) {
     return double.tryParse(v) ?? 0;
   }
   return 0;
+}
+
+/// Joy kodi — server bilan bir xil: bo'shliqlar qisqaradi, katta harf, 32 belgi.
+String? normLocation(String? v) {
+  final String s = (v ?? '').trim().split(RegExp(r'\s+')).where((String p) => p.isNotEmpty).join(' ').toUpperCase();
+  if (s.isEmpty) {
+    return null;
+  }
+  return s.length > 32 ? s.substring(0, 32) : s;
 }
 
 class DealerCountLine {
@@ -25,7 +36,9 @@ class DealerCountLine {
     required this.expiryDate,
     required this.seq,
     this.snapshotQty,
+    this.locationCode,
     this.countedAt,
+    this.countedByName,
   });
 
   final String id;
@@ -33,12 +46,13 @@ class DealerCountLine {
   final String? sku;
   final String? productName;
   final String scannedBarcode;
-  /// null — tayyor ro'yxatdagi hali sanalmagan qator.
+  /// null — sanalmagan qator.
   final double? qty;
   /// Ro'yxat to'ldirilgandagi Smartup soni.
   final double? snapshotQty;
-  /// Xodim haqiqatan sanagan payt; "0 deb hisobla" qatorlarida null.
+  final String? locationCode;
   final String? countedAt;
+  final String? countedByName;
   final String? expiryDate;
   final int seq;
 
@@ -50,7 +64,9 @@ class DealerCountLine {
         scannedBarcode: (json['scanned_barcode'] as String?) ?? '',
         qty: json['qty'] == null ? null : _num(json['qty']),
         snapshotQty: json['snapshot_qty'] == null ? null : _num(json['snapshot_qty']),
+        locationCode: json['location_code'] as String?,
         countedAt: json['counted_at'] as String?,
+        countedByName: json['counted_by_name'] as String?,
         expiryDate: json['expiry_date'] as String?,
         seq: (json['seq'] as num?)?.toInt() ?? 0,
       );
@@ -59,62 +75,39 @@ class DealerCountLine {
 class DealerCount {
   const DealerCount({
     required this.id,
-    required this.clientUuid,
     required this.dealerOrgId,
     required this.dealerName,
-    required this.countedByName,
-    required this.status,
-    required this.startedAt,
-    required this.submittedAt,
-    required this.note,
-    required this.linesCount,
+    required this.isActive,
+    required this.createdAt,
     required this.totalUnits,
-    required this.warning,
     required this.lines,
     this.sheetLines = 0,
     this.countedLines = 0,
-    this.assignedToUserId,
-    this.assignedToName,
-    this.source = 'mobile',
+    this.note,
   });
 
   final String id;
-  final String clientUuid;
   final String dealerOrgId;
   final String? dealerName;
-  final String? countedByName;
-  final String status;
-  final String startedAt;
-  final String? submittedAt;
-  final String? note;
-  final int linesCount;
+  /// Dillerning faol sanovi — telefonlarda ko'rinadi; yangisi yaratilsa false.
+  final bool isActive;
+  final String createdAt;
   final double totalUnits;
-  final String? warning;
   final List<DealerCountLine> lines;
-  /// Tayyor ro'yxat: jami qatorlar va haqiqatan sanalganlari ("45/693").
+  /// Ro'yxatdagi jami qatorlar va haqiqatan sanalganlari ("45/693").
   final int sheetLines;
   final int countedLines;
-  final String? assignedToUserId;
-  final String? assignedToName;
-  final String source;
-
-  bool get isSheetOpen => status == 'draft' || status == 'in_progress';
+  final String? note;
 
   factory DealerCount.fromJson(Map<String, Object?> json) {
     final Object? rawLines = json['lines'];
     return DealerCount(
       id: json['id']! as String,
-      clientUuid: json['client_uuid']! as String,
       dealerOrgId: json['dealer_org_id']! as String,
       dealerName: json['dealer_name'] as String?,
-      countedByName: json['counted_by_name'] as String?,
-      status: (json['status'] as String?) ?? 'draft',
-      startedAt: (json['started_at'] as String?) ?? '',
-      submittedAt: json['submitted_at'] as String?,
-      note: json['note'] as String?,
-      linesCount: (json['lines_count'] as num?)?.toInt() ?? 0,
+      isActive: json['is_active'] != false,
+      createdAt: (json['created_at'] as String?) ?? '',
       totalUnits: _num(json['total_units']),
-      warning: json['warning'] as String?,
       lines: rawLines is List
           ? rawLines
               .whereType<Map>()
@@ -123,9 +116,7 @@ class DealerCount {
           : const <DealerCountLine>[],
       sheetLines: (json['sheet_lines'] as num?)?.toInt() ?? 0,
       countedLines: (json['counted_lines'] as num?)?.toInt() ?? 0,
-      assignedToUserId: json['assigned_to_user_id'] as String?,
-      assignedToName: json['assigned_to_name'] as String?,
-      source: (json['source'] as String?) ?? 'mobile',
+      note: json['note'] as String?,
     );
   }
 }
@@ -134,9 +125,9 @@ class DealerCount {
 String monthStartIso(DateTime d) =>
     '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-01';
 
-// --- Tayyor ro'yxat (ведомость) — telefondagi nusxa ---------------------------
+// --- Telefondagi nusxa ---------------------------------------------------------
 
-/// Ro'yxat qatori: serverdan kelgan (`lineId` bor) yoki telefonda qo'shilgan.
+/// Nusxa qatori: serverdan kelgan (`lineId` bor) yoki telefonda qo'shilgan (hali yuborilmagan).
 class DealerSheetLine {
   DealerSheetLine({
     required this.key,
@@ -149,11 +140,14 @@ class DealerSheetLine {
     required this.qty,
     required this.expiryDate,
     required this.countedAt,
-    this.added = false,
+    this.locationCode,
+    this.countedByName,
+    this.dirty = false,
+    this.version = 0,
   });
 
   final String key;
-  final String? lineId;
+  String? lineId;
   final String? productId;
   final String? sku;
   final String? productName;
@@ -162,11 +156,18 @@ class DealerSheetLine {
   /// null — hali sanalmagan; 0 — "dillerda yo'q".
   double? qty;
   String? expiryDate;
+  String? locationCode;
   String? countedAt;
-  /// Ro'yxatda yo'q edi — javonda topilib qo'shildi.
-  final bool added;
+  String? countedByName;
+  /// Telefonda o'zgartirilgan, serverga hali yetmagan.
+  bool dirty;
+  /// Har tahrirda oshadi: yuborish paytidagi holatdan keyin o'zgargan qator "yuborilgan" deb belgilanmasin.
+  int version;
 
   bool get isCounted => qty != null;
+
+  /// Mahsulot + muddat + joy — server bilan bir xil qator kaliti.
+  String get identity => '${productId ?? 'raw:$barcode'}|${expiryDate ?? ''}|${locationCode ?? ''}';
 
   bool matches(String q) {
     final String s = q.trim().toLowerCase();
@@ -175,7 +176,8 @@ class DealerSheetLine {
     }
     return (productName ?? '').toLowerCase().contains(s) ||
         (sku ?? '').toLowerCase().contains(s) ||
-        barcode.toLowerCase().contains(s);
+        barcode.toLowerCase().contains(s) ||
+        (locationCode ?? '').toLowerCase().contains(s);
   }
 
   Map<String, Object?> toJson() => <String, Object?>{
@@ -188,8 +190,11 @@ class DealerSheetLine {
         'snapshot_qty': snapshotQty,
         'qty': qty,
         'expiry_date': expiryDate,
+        'location_code': locationCode,
         'counted_at': countedAt,
-        'added': added,
+        'counted_by_name': countedByName,
+        'dirty': dirty,
+        'version': version,
       };
 
   factory DealerSheetLine.fromJson(Map<String, Object?> json) => DealerSheetLine(
@@ -202,25 +207,44 @@ class DealerSheetLine {
         snapshotQty: json['snapshot_qty'] == null ? null : _num(json['snapshot_qty']),
         qty: json['qty'] == null ? null : _num(json['qty']),
         expiryDate: json['expiry_date'] as String?,
+        locationCode: json['location_code'] as String?,
         countedAt: json['counted_at'] as String?,
-        added: json['added'] == true,
+        countedByName: json['counted_by_name'] as String?,
+        // 1.0.47 gacha nusxalarda `dirty` yo'q: sanalgan, lekin yuborilmagan qatorlar edi.
+        dirty: json['dirty'] as bool? ?? (json['qty'] != null && json['counted_at'] != null),
+        version: (json['version'] as num?)?.toInt() ?? 0,
       );
 
-  /// `PUT /dealer-counts/{id}/counts` uchun yozuv (faqat sanalganlar).
+  factory DealerSheetLine.fromServer(DealerCountLine l) => DealerSheetLine(
+        key: 'srv-${l.id}',
+        lineId: l.id,
+        productId: l.productId,
+        sku: l.sku,
+        productName: l.productName,
+        barcode: l.scannedBarcode,
+        snapshotQty: l.snapshotQty,
+        qty: l.qty,
+        expiryDate: l.expiryDate,
+        locationCode: l.locationCode,
+        countedAt: l.countedAt,
+        countedByName: l.countedByName,
+      );
+
+  /// `PUT /dealer-counts/{id}/counts` uchun yozuv.
   Map<String, Object?> toCountEntry() => <String, Object?>{
         if (lineId != null) 'line_id': lineId,
         if (productId != null) 'product_id': productId,
         'scanned_barcode': barcode,
         'qty': qty,
         if (expiryDate != null) 'expiry_date': expiryDate,
-        if (countedAt != null) 'scanned_at': countedAt,
+        if (locationCode != null) 'location_code': locationCode,
+        if (countedAt != null) 'counted_at': countedAt,
       };
 }
 
 enum SheetFilter { uncounted, counted, all }
 
-/// Serverdan olingan ro'yxatning telefondagi nusxasi. Sanov tugaguncha shu yerda
-/// yashaydi (sqflite, `kind: sheet`), internet shart emas.
+/// Serverdagi sanovning telefondagi nusxasi (sqflite, `kind: sheet`), internet shart emas.
 class DealerSheetDraft {
   DealerSheetDraft({
     required this.countId,
@@ -229,6 +253,7 @@ class DealerSheetDraft {
     required this.downloadedAt,
     required this.lines,
     this.ownerUserId,
+    this.currentLocation,
   });
 
   static const String kind = 'sheet';
@@ -237,19 +262,22 @@ class DealerSheetDraft {
   final String countId;
   final String dealerOrgId;
   final String dealerName;
-  final String downloadedAt;
-  final List<DealerSheetLine> lines;
+  String downloadedAt;
+  List<DealerSheetLine> lines;
 
-  /// Ro'yxatni olgan xodim. Telefon bir necha kishida bo'lsa, boshqaning nusxasiga
+  /// Nusxani yuklab olgan xodim. Telefon bir necha kishida bo'lsa, boshqaning nusxasiga
   /// tegilmaydi. 1.0.46 gacha yuklangan nusxalarda yo'q (null — joriy xodimniki deb olinadi).
   final String? ownerUserId;
+
+  /// Hozirgi joy (javon / zona): keyingi skanlar shu joyga yoziladi.
+  String? currentLocation;
 
   bool belongsTo(String? userId) => ownerUserId == null || ownerUserId == userId;
 
   int get countedCount => lines.where((DealerSheetLine l) => l.isCounted).length;
   int get uncountedCount => lines.length - countedCount;
-  double get countedUnits =>
-      lines.fold<double>(0, (double s, DealerSheetLine l) => s + (l.qty ?? 0));
+  int get pendingCount => lines.where((DealerSheetLine l) => l.dirty).length;
+  double get countedUnits => lines.fold<double>(0, (double s, DealerSheetLine l) => s + (l.qty ?? 0));
 
   List<DealerSheetLine> filtered(SheetFilter f, String query) {
     return lines.where((DealerSheetLine l) {
@@ -272,35 +300,88 @@ class DealerSheetDraft {
     return null;
   }
 
+  /// Skanerlangan tovar uchun qator (server `apply_counts` bilan bir xil tartibda):
+  /// shu joydagi qator → ro'yxatdagi hali sanalmagan joysiz qator → null (yangi qator kerak).
+  DealerSheetLine? lineForScan(bool Function(DealerSheetLine) isProduct, String? location) {
+    final String? loc = normLocation(location);
+    for (final DealerSheetLine l in lines) {
+      if (isProduct(l) && l.locationCode == loc) {
+        return l;
+      }
+    }
+    for (final DealerSheetLine l in lines) {
+      if (isProduct(l) && !l.isCounted && l.locationCode == null) {
+        return l;
+      }
+    }
+    return null;
+  }
+
+  /// Sanalgan qiymatni yozish: yuborilmagan bo'ladi, vaqti — hozir.
+  void markCounted(DealerSheetLine l, {required double qty, required String? expiry, required String? location}) {
+    l.qty = qty;
+    l.expiryDate = expiry;
+    l.locationCode = normLocation(location);
+    l.countedAt = DateTime.now().toUtc().toIso8601String();
+    l.countedByName = null;
+    l.dirty = true;
+    l.version += 1;
+  }
+
+  /// Serverga yuboriladigan qatorlar (faqat yuborilmaganlari) va ularning holati.
+  ({List<Map<String, Object?>> entries, Map<String, int> versions}) pendingSnapshot() {
+    final List<DealerSheetLine> p = lines.where((DealerSheetLine l) => l.dirty && l.isCounted).toList();
+    return (
+      entries: p.map((DealerSheetLine l) => l.toCountEntry()).toList(growable: false),
+      versions: <String, int>{for (final DealerSheetLine l in p) l.key: l.version},
+    );
+  }
+
+  /// Serverga yetgan qatorlar yuborilgan deb belgilanadi — yuborish paytida yana
+  /// o'zgartirilganlari (versiya oshgan) yuborilmagan bo'lib qoladi.
+  void markSynced(Map<String, int> versions) {
+    for (final DealerSheetLine l in lines) {
+      if (versions[l.key] == l.version) {
+        l.dirty = false;
+      }
+    }
+  }
+
+  /// Serverdagi holat + telefondagi yuborilmaganlar. Boshqa xodimlar sanagani keladi,
+  /// yuborilmagan o'z o'zgarishlari esa ustida qoladi (server qatoriga mahsulot+muddat+joy
+  /// bo'yicha bog'lanadi, shunda ikki marta ko'rinmaydi).
+  void mergeServer(DealerCount c) {
+    final List<DealerSheetLine> fresh = c.lines.map(DealerSheetLine.fromServer).toList();
+    final Map<String, int> byId = <String, int>{
+      for (int i = 0; i < fresh.length; i++) fresh[i].lineId!: i,
+    };
+    final Map<String, int> byIdentity = <String, int>{
+      for (int i = 0; i < fresh.length; i++) fresh[i].identity: i,
+    };
+    final List<DealerSheetLine> extra = <DealerSheetLine>[];
+    for (final DealerSheetLine l in lines.where((DealerSheetLine l) => l.dirty)) {
+      final int? i = (l.lineId != null ? byId[l.lineId] : null) ?? byIdentity[l.identity];
+      if (i != null) {
+        l.lineId ??= fresh[i].lineId;
+        fresh[i] = l;
+      } else if (l.lineId == null) {
+        extra.add(l);
+      }
+      // lineId bor, lekin serverda yo'q (web'dan o'chirilgan qator) — yuborilmagani ham tashlanadi.
+    }
+    lines = <DealerSheetLine>[...fresh, ...extra];
+    downloadedAt = DateTime.now().toUtc().toIso8601String();
+  }
+
   /// Serverdan kelgan sanov → telefon nusxasi.
-  factory DealerSheetDraft.fromCount(DealerCount c) => DealerSheetDraft(
+  factory DealerSheetDraft.fromCount(DealerCount c, {String? ownerUserId}) => DealerSheetDraft(
         countId: c.id,
         dealerOrgId: c.dealerOrgId,
         dealerName: c.dealerName ?? c.dealerOrgId,
         downloadedAt: DateTime.now().toUtc().toIso8601String(),
-        ownerUserId: c.assignedToUserId,
-        lines: c.lines
-            .map(
-              (DealerCountLine l) => DealerSheetLine(
-                key: 'srv-${l.id}',
-                lineId: l.id,
-                productId: l.productId,
-                sku: l.sku,
-                productName: l.productName,
-                barcode: l.scannedBarcode,
-                snapshotQty: l.snapshotQty,
-                qty: l.qty,
-                expiryDate: l.expiryDate,
-                countedAt: l.countedAt,
-              ),
-            )
-            .toList(),
+        ownerUserId: ownerUserId,
+        lines: c.lines.map(DealerSheetLine.fromServer).toList(),
       );
-
-  List<Map<String, Object?>> countEntries() => lines
-      .where((DealerSheetLine l) => l.isCounted)
-      .map((DealerSheetLine l) => l.toCountEntry())
-      .toList(growable: false);
 
   Map<String, Object?> toJson() => <String, Object?>{
         'kind': kind,
@@ -309,6 +390,7 @@ class DealerSheetDraft {
         'dealer_name': dealerName,
         'downloaded_at': downloadedAt,
         if (ownerUserId != null) 'owner_user_id': ownerUserId,
+        if (currentLocation != null) 'current_location': currentLocation,
         'lines': lines.map((DealerSheetLine l) => l.toJson()).toList(growable: false),
       };
 
@@ -320,6 +402,7 @@ class DealerSheetDraft {
       dealerName: (json['dealer_name'] as String?) ?? (json['dealer_org_id']! as String),
       downloadedAt: (json['downloaded_at'] as String?) ?? '',
       ownerUserId: json['owner_user_id'] as String?,
+      currentLocation: json['current_location'] as String?,
       lines: raw is List
           ? raw.whereType<Map>().map((Map m) => DealerSheetLine.fromJson(Map<String, Object?>.from(m))).toList()
           : <DealerSheetLine>[],

@@ -17,8 +17,6 @@ import '../../features/kirim/presentation/kirim_hub_screen.dart';
 import '../../features/kirim/presentation/kirim_new_screen.dart';
 import '../../features/misc/presentation/stub_screens.dart';
 import '../../features/movements/presentation/movement_screen.dart';
-import '../../features/dealer_counts/presentation/dealer_counts_history_screen.dart';
-import '../../features/dealer_counts/presentation/dealer_count_view_screen.dart';
 import '../../features/dealer_counts/presentation/dealer_counts_list_screen.dart';
 import '../../features/dealer_counts/presentation/dealer_sheet_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
@@ -207,21 +205,10 @@ final goRouterProvider = Provider<GoRouter>((Ref ref) {
         builder: (BuildContext context, GoRouterState state) => const DealerCountsListScreen(),
       ),
       GoRoute(
-        path: '/dealer-counts/history',
-        name: 'dealerCountsHistory',
-        builder: (BuildContext context, GoRouterState state) => const DealerCountsHistoryScreen(),
-      ),
-      GoRoute(
         path: '/dealer-counts/sheet/:countId',
         name: 'dealerSheet',
         builder: (BuildContext context, GoRouterState state) =>
             DealerSheetScreen(countId: state.pathParameters['countId']!),
-      ),
-      GoRoute(
-        path: '/dealer-counts/view/:countId',
-        name: 'dealerCountView',
-        builder: (BuildContext context, GoRouterState state) =>
-            DealerCountViewScreen(countId: state.pathParameters['countId']!),
       ),
       GoRoute(
         path: '/customer-returns-queue',

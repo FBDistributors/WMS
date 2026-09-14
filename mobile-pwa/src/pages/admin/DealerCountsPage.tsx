@@ -38,12 +38,6 @@ function fmtDate(v: string | null | undefined) {
   return Number.isNaN(d.getTime()) ? v : d.toLocaleString()
 }
 
-/** Kim sanadi: telefonda olgan xodim; olinmagan draftda hali hech kim; web'da
- *  kiritilgan yoki eski mobil sanovda — hujjat egasi. Yaratgan alohida ko'rsatiladi. */
-function counterName(row: DealerCountOut) {
-  return row.assigned_to_name ?? (row.status === 'draft' ? null : row.counted_by_name)
-}
-
 /** Diller qoldig'i: ro'yxat shu yerda yaratiladi, xodim telefonda skanerlab sanaydi. */
 export function DealerCountsPage() {
   const { t } = useTranslation(['admin', 'common'])
@@ -54,7 +48,6 @@ export function DealerCountsPage() {
   const [deleting, setDeleting] = useState(false)
   const [dealers, setDealers] = useState<DealerOut[]>([])
   const [dealerId, setDealerId] = useState('')
-  const [status, setStatus] = useState<string>('submitted')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [items, setItems] = useState<DealerCountOut[]>([])
@@ -75,7 +68,6 @@ export function DealerCountsPage() {
     try {
       const r = await listDealerCounts({
         dealer_org_id: dealerId || undefined,
-        status: status || undefined,
         date_from: dateFrom || undefined,
         date_to: dateTo || undefined,
         limit: PAGE,
@@ -89,7 +81,7 @@ export function DealerCountsPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [dealerId, status, dateFrom, dateTo, offset, showError, t])
+  }, [dealerId, dateFrom, dateTo, offset, showError, t])
 
   useEffect(() => {
     void load()
@@ -97,11 +89,9 @@ export function DealerCountsPage() {
 
   const resetPage = () => setOffset(0)
 
-  // Backend qoidasi bilan bir xil: draft — egasi yoki admin; telefonda sanalayotgan
-  // va yuborilgan — faqat admin.
-  const isAdmin = has('admin:access')
+  // Backend qoidasi bilan bir xil: yaratgan yoki admin.
   const canDelete = (row: DealerCountOut) =>
-    has('dealer_counts:write') && (isAdmin || (row.status === 'draft' && row.counted_by_user_id === user?.id))
+    has('dealer_counts:write') && (has('admin:access') || row.created_by_user_id === user?.id)
 
   const confirmDelete = async () => {
     if (!toDelete) return
@@ -157,23 +147,6 @@ export function DealerCountsPage() {
             </select>
           </label>
           <label className="flex flex-col gap-1 text-xs text-slate-500">
-            {t('admin:dealer_counts.filter_status')}
-            <select
-              className={inputCls}
-              value={status}
-              onChange={(e) => {
-                setStatus(e.target.value)
-                resetPage()
-              }}
-            >
-              <option value="">{t('admin:dealer_counts.status_all')}</option>
-              <option value="submitted">{t('admin:dealer_counts.status_submitted')}</option>
-              <option value="draft,in_progress">{t('admin:dealer_counts.status_open')}</option>
-              <option value="draft">{t('admin:dealer_counts.status_draft')}</option>
-              <option value="in_progress">{t('admin:dealer_counts.status_in_progress')}</option>
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-xs text-slate-500">
             {t('admin:dealer_counts.filter_from')}
             <input
               type="date"
@@ -221,10 +194,10 @@ export function DealerCountsPage() {
                 <tr className="border-b border-slate-200 dark:border-slate-800">
                   <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('admin:dealer_counts.col_dealer')}</th>
                   <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('admin:dealer_counts.col_date')}</th>
-                  <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('admin:dealer_counts.col_by')}</th>
-                  <th className="whitespace-nowrap px-3 py-3 text-right sm:px-4">{t('admin:dealer_counts.col_lines')}</th>
+                  <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('admin:dealer_counts.col_created_by')}</th>
+                  <th className="whitespace-nowrap px-3 py-3 text-right sm:px-4">{t('admin:dealer_counts.col_counted_lines')}</th>
                   <th className="whitespace-nowrap px-3 py-3 text-right sm:px-4">{t('admin:dealer_counts.col_units')}</th>
-                  <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('admin:dealer_counts.col_status')}</th>
+                  <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('admin:dealer_counts.col_last_counted')}</th>
                   <th className="w-12 px-2 py-3" aria-label={t('admin:dealer_counts.delete')} />
                 </tr>
               </thead>
@@ -232,47 +205,33 @@ export function DealerCountsPage() {
                 {items.map((row) => (
                   <tr
                     key={row.id}
-                    className="cursor-pointer border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40"
-                    onClick={() =>
-                      navigate(
-                        row.status !== 'submitted' && has('dealer_counts:write')
-                          ? `/admin/dealer-counts/${row.id}/edit`
-                          : `/admin/dealer-counts/${row.id}`,
-                      )
+                    className={
+                      'cursor-pointer border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40' +
+                      // Yopilgan (shu dillerga yangisi yaratilgan) sanov — telefonlarda ko'rinmaydi.
+                      (row.is_active ? '' : ' opacity-60')
                     }
+                    onClick={() => navigate(`/admin/dealer-counts/${row.id}/edit`)}
                   >
                     <td className="px-3 py-3 text-slate-900 dark:text-slate-100 sm:px-4">
                       {row.dealer_name ?? row.dealer_org_id}
-                      <div className="font-mono text-xs text-slate-400">{row.dealer_org_id}</div>
+                      <div className="font-mono text-xs text-slate-400">
+                        {row.dealer_org_id}
+                        {row.is_active ? null : <span className="ml-2 font-sans">· {t('admin:dealer_counts.closed_short')}</span>}
+                      </div>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-3 sm:px-4">{fmtDate(row.submitted_at ?? row.started_at)}</td>
-                    <td className="px-3 py-3 sm:px-4">
-                      {counterName(row) ?? '—'}
-                      {row.counted_by_name && row.counted_by_name !== counterName(row) ? (
-                        <div className="text-xs text-slate-400">
-                          {t('admin:dealer_counts.created_by', { name: row.counted_by_name })}
-                        </div>
-                      ) : null}
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums sm:px-4">
-                      {/* Haqiqatan sanalgan / jami — "0 deb hisobla" qatorlari sanalgan emas. */}
-                      {`${row.counted_lines}/${row.sheet_lines}`}
-                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 sm:px-4">{fmtDate(row.created_at)}</td>
+                    <td className="px-3 py-3 sm:px-4">{row.created_by_name ?? '—'}</td>
+                    <td className="px-3 py-3 text-right tabular-nums sm:px-4">{`${row.counted_lines}/${row.sheet_lines}`}</td>
                     <td className="px-3 py-3 text-right tabular-nums sm:px-4">{fmtUnits(row.total_units)}</td>
-                    <td className="px-3 py-3 sm:px-4">
-                      <span
-                        className={
-                          row.status === 'submitted'
-                            ? 'rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                            : 'rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300'
-                        }
-                      >
-                        {row.status === 'submitted'
-                          ? t('admin:dealer_counts.status_submitted')
-                          : row.status === 'in_progress'
-                            ? `${t('admin:dealer_counts.status_in_progress')} · ${row.assigned_to_name ?? ''}`
-                            : t('admin:dealer_counts.status_draft')}
-                      </span>
+                    <td className="px-3 py-3 text-xs sm:px-4">
+                      {row.last_counted_at ? (
+                        <>
+                          <div className="text-slate-700 dark:text-slate-200">{row.last_counted_by_name ?? '—'}</div>
+                          <div className="text-slate-400">{fmtDate(row.last_counted_at)}</div>
+                        </>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
                     </td>
                     <td className="px-2 py-2 text-right">
                       {canDelete(row) ? (
@@ -317,20 +276,12 @@ export function DealerCountsPage() {
         title={t('admin:dealer_counts.delete')}
         message={
           toDelete
-            ? t(
-                toDelete.status === 'submitted'
-                  ? 'admin:dealer_counts.delete_submitted_confirm'
-                  : toDelete.status === 'in_progress'
-                    ? 'admin:dealer_counts.delete_in_progress_confirm'
-                    : 'admin:dealer_counts.delete_confirm',
-                {
-                  dealer: toDelete.dealer_name ?? toDelete.dealer_org_id,
-                  date: fmtDate(toDelete.submitted_at ?? toDelete.started_at),
-                  name: toDelete.assigned_to_name ?? '—',
-                  done: toDelete.counted_lines,
-                  total: toDelete.sheet_lines,
-                },
-              )
+            ? t(toDelete.counted_lines > 0 ? 'admin:dealer_counts.delete_counted_confirm' : 'admin:dealer_counts.delete_empty_confirm', {
+                dealer: toDelete.dealer_name ?? toDelete.dealer_org_id,
+                date: fmtDate(toDelete.created_at),
+                done: toDelete.counted_lines,
+                total: toDelete.sheet_lines,
+              })
             : ''
         }
         confirmLabel={t('admin:dealer_counts.delete')}

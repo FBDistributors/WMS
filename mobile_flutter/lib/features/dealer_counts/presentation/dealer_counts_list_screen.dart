@@ -9,10 +9,8 @@ import '../../../l10n/string_lookup.dart';
 import '../data/dealer_counts_models.dart';
 import '../dealer_counts_providers.dart';
 
-/// Diller sanovi: web'da yaratilgan ro'yxat(lar) — xodim ichiga kirib sanaydi.
-///
-/// Telefon hujjat yaratmaydi. Bu yerda faqat menga ochiq ro'yxatlar (olinmagan +
-/// men olgan) va telefonga yuklangan nusxalar; yuborilganlar — "Tarix"da.
+/// Diller sanovi: web'da yaratilgan faol sanovlar (har dillerda bitta) — xodim ichiga
+/// kirib sanaydi. Telefon sanov yaratmaydi; natija web'da ko'rinadi.
 class DealerCountsListScreen extends ConsumerWidget {
   const DealerCountsListScreen({super.key});
 
@@ -26,13 +24,6 @@ class DealerCountsListScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text(StringLookup.t(loc, 'dealerCountsTitle')),
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
-        actions: <Widget>[
-          IconButton(
-            icon: const Icon(Icons.history),
-            tooltip: StringLookup.t(loc, 'dealerCountsHistory'),
-            onPressed: () => context.pushNamed('dealerCountsHistory'),
-          ),
-        ],
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -68,9 +59,11 @@ class DealerCountsListScreen extends ConsumerWidget {
     Widget localTile(DealerSheetDraft d) => _SheetTile(
           title: d.dealerName,
           progress: progress(d.countedCount, d.lines.length),
-          extra: StringLookup.t(loc, 'dealerSheetOnPhone'),
-          icon: Icons.download_done,
-          color: Colors.green,
+          extra: d.pendingCount > 0
+              ? StringLookup.tParams(loc, 'dealerSheetPending', <String, String>{'n': '${d.pendingCount}'})
+              : StringLookup.t(loc, 'dealerSheetOnPhone'),
+          icon: d.pendingCount > 0 ? Icons.cloud_upload_outlined : Icons.download_done,
+          color: d.pendingCount > 0 ? Colors.orange : Colors.green,
           onTap: () => open(d.countId),
         );
 
@@ -80,6 +73,7 @@ class DealerCountsListScreen extends ConsumerWidget {
         ...v.local.map(localTile),
       ];
     }
+    final Set<String> active = v.server.map((DealerCount c) => c.id).toSet();
     final List<Widget> tiles = <Widget>[
       for (final DealerCount c in v.server)
         if (byId[c.id] != null)
@@ -94,6 +88,9 @@ class DealerCountsListScreen extends ConsumerWidget {
             color: cs.primary,
             onTap: () => open(c.id),
           ),
+      // Sanov yopilgan/o'chirilgan, lekin telefonda yuborilmagan qatorlari bor — ichiga kirilganda yuboriladi.
+      for (final DealerSheetDraft d in v.local)
+        if (!active.contains(d.countId)) localTile(d),
     ];
     return tiles.isEmpty ? <Widget>[_Empty(StringLookup.t(loc, 'dealerSheetsEmpty'))] : tiles;
   }

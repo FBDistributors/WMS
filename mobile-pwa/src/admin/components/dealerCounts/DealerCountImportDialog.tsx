@@ -69,6 +69,7 @@ export function DealerCountImportDialog({ open, onClose, onAdd }: Props) {
             name: null,
             qty: String(item.qty),
             expiry: item.expiry,
+            location: item.location,
             status: 'unknown',
           }
           try {

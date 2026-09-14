@@ -3,8 +3,9 @@ import type { DealerCountLineIn, DealerCountOut } from '../services/dealerCounts
 /**
  * Diller sanovi — web jadval qatorlari (UI'siz sof mantiq).
  *
- * Qoidalar mobil ilova bilan bir xil: bir mahsulot + bir muddat = bitta qator
- * (miqdor qo'shiladi), tanilmagan kod har doim alohida qator, muddat oy boshi.
+ * Qoidalar server va mobil ilova bilan bir xil: mahsulot + muddat + joy = bitta qator,
+ * tanilmagan kod har doim alohida qator, muddat oy boshi. Har qator serverda alohida
+ * saqlanadi (qo'shish / o'zgartirish / o'chirish) — telefon sanaganiga tegilmaydi.
  */
 
 export type RowStatus = 'empty' | 'resolving' | 'ok' | 'unknown'
@@ -26,6 +27,13 @@ export type EditRow = {
   /** Tayyor ro'yxat: Smartup soni (snapshot) va haqiqatan sanalgan payt. */
   snapshotQty?: number | null
   countedAt?: string | null
+  /** Serverdagi qator (yo'q — hali qo'shilmagan yangi qator). */
+  lineId?: string | null
+  /** Diller omboridagi joy (javon / zona). */
+  location?: string
+  countedBy?: string | null
+  /** UI: foydalanuvchi hozir yozmoqda — server javobi bu qiymat ustidan yozmasin. */
+  editing?: boolean
 }
 
 let _seq = 0
@@ -35,12 +43,25 @@ export function newRowKey(): string {
 }
 
 export function emptyRow(): EditRow {
-  return { key: newRowKey(), code: '', productId: null, sku: null, name: null, qty: '', expiry: '', status: 'empty' }
+  return { key: newRowKey(), code: '', productId: null, sku: null, name: null, qty: '', expiry: '', location: '', status: 'empty' }
 }
 
 export function parseQty(raw: string): number {
   const n = Number(String(raw ?? '').trim().replace(',', '.'))
   return Number.isFinite(n) && n > 0 ? n : 0
+}
+
+/** Kiritilgan miqdor: bo'sh — null (sanalmagan), aks holda >= 0 son; noto'g'ri — undefined. */
+export function qtyValue(raw: string): number | null | undefined {
+  const s = String(raw ?? '').trim().replace(',', '.')
+  if (s === '') return null
+  const n = Number(s)
+  return Number.isFinite(n) && n >= 0 ? n : undefined
+}
+
+/** Joy kodi — server bilan bir xil: bo'shliqlar qisqaradi, katta harf. */
+export function normLocation(raw: string | null | undefined): string {
+  return String(raw ?? '').split(/\s+/).filter(Boolean).join(' ').toUpperCase().slice(0, 32)
 }
 
 /** `YYYY-MM` → `YYYY-MM-01`; boshqa formatlar (`2027-03-15`, `03.2027`) ham oy boshiga. */
@@ -67,7 +88,12 @@ export function expiryFromApi(raw: string | null | undefined): string {
 export function mergeResolvedRow(rows: EditRow[], incoming: EditRow): { rows: EditRow[]; mergedInto: string | null } {
   if (incoming.productId) {
     const idx = rows.findIndex(
-      (r) => r.key !== incoming.key && r.productId === incoming.productId && r.expiry === incoming.expiry && r.status === 'ok',
+      (r) =>
+        r.key !== incoming.key &&
+        r.productId === incoming.productId &&
+        r.expiry === incoming.expiry &&
+        normLocation(r.location) === normLocation(incoming.location) &&
+        r.status === 'ok',
     )
     if (idx >= 0) {
       const target = rows[idx]
@@ -81,26 +107,21 @@ export function mergeResolvedRow(rows: EditRow[], incoming: EditRow): { rows: Ed
   return { rows: exists ? rows.map((r) => (r.key === incoming.key ? incoming : r)) : [...rows, incoming], mergedInto: null }
 }
 
-/** Serverga yuboriladigan qatorlar: bo'sh/nol miqdorli qatorlar tashlab ketiladi. */
-export function rowsToApiLines(rows: EditRow[]): DealerCountLineIn[] {
-  const out: DealerCountLineIn[] = []
-  for (const r of rows) {
-    const qty = parseQty(r.qty)
-    const code = r.code.trim()
-    if (!r.productId && !code) continue
-    // Tanilmagan kod faqat miqdor bilan ma'noli; tanilgan mahsulot esa miqdorsiz ham
-    // ro'yxat qatori sifatida saqlanadi (telefonda sanaladi).
-    if (!r.productId && qty <= 0) continue
-    const exp = expiryToApi(r.expiry)
-    out.push({
-      ...(r.productId ? { product_id: r.productId } : {}),
-      scanned_barcode: code.slice(0, 64),
-      ...(qty > 0 || r.qty.trim() !== '' ? { qty } : {}),
-      ...(r.snapshotQty != null ? { snapshot_qty: r.snapshotQty } : {}),
-      ...(exp ? { expiry_date: exp } : {}),
-    })
+/** Yangi qator → server qatori (qo'shish uchun). Tanilmagan kod ham saqlanadi — admin ko'radi. */
+export function rowToLineIn(r: EditRow): DealerCountLineIn | null {
+  const code = r.code.trim()
+  if (!r.productId && !code) return null
+  const qty = qtyValue(r.qty)
+  const exp = expiryToApi(r.expiry)
+  const loc = normLocation(r.location)
+  return {
+    ...(r.productId ? { product_id: r.productId } : {}),
+    scanned_barcode: code.slice(0, 64),
+    ...(qty != null ? { qty } : {}),
+    ...(r.snapshotQty != null ? { snapshot_qty: r.snapshotQty } : {}),
+    ...(exp ? { expiry_date: exp } : {}),
+    ...(loc ? { location_code: loc } : {}),
   }
-  return out
 }
 
 export function rowsFromCount(count: DealerCountOut): EditRow[] {
@@ -115,6 +136,9 @@ export function rowsFromCount(count: DealerCountOut): EditRow[] {
     status: ln.product_id ? 'ok' : 'unknown',
     snapshotQty: ln.snapshot_qty == null ? null : Number(ln.snapshot_qty),
     countedAt: ln.counted_at ?? null,
+    lineId: ln.id,
+    location: ln.location_code ?? '',
+    countedBy: ln.counted_by_name ?? null,
   }))
 }
 
@@ -129,7 +153,7 @@ export function totals(rows: EditRow[]): { lines: number; units: number; unknown
     sheet += 1
     const q = parseQty(r.qty)
     if (r.qty.trim() === '') {
-      // Ro'yxat qatori — hali sanalmagan; yuborishda zero/keep rejimi hal qiladi.
+      // Ro'yxat qatori — hali sanalmagan.
       missingQty += 1
       continue
     }
@@ -142,7 +166,7 @@ export function totals(rows: EditRow[]): { lines: number; units: number; unknown
 
 // --- Excel ---
 
-export type ImportedRow = { code: string; qty: number; expiry: string; rowNo: number }
+export type ImportedRow = { code: string; qty: number; expiry: string; location: string; rowNo: number }
 
 function normHeader(h: string): string {
   return String(h ?? '').trim().toLowerCase()
@@ -151,10 +175,11 @@ function normHeader(h: string): string {
 const CODE_HEADERS = ['sku', 'barcode', 'shtrix', 'штрих', 'код', 'kod', 'product_code', 'артикул']
 const QTY_HEADERS = ['qty', 'dona', 'кол', 'quantity', 'miqdor', 'шт', 'count']
 const EXP_HEADERS = ['expiry', 'muddat', 'срок', 'exp']
+const LOC_HEADERS = ['joy', 'location', 'место', 'ячейка', 'полка', 'javon', 'zona']
 
 /**
  * Excel varag'i (`sheet_to_json` header:1) → qatorlar. Sarlavha bo'lsa ustunlar nomi
- * bo'yicha, bo'lmasa tartib: 1-kod, 2-dona, 3-muddat.
+ * bo'yicha, bo'lmasa tartib: 1-kod, 2-dona, 3-muddat, 4-joy.
  */
 export function parseExcelRows(sheet: string[][]): ImportedRow[] {
   if (sheet.length === 0) return []
@@ -163,11 +188,13 @@ export function parseExcelRows(sheet: string[][]): ImportedRow[] {
   let ci = find(CODE_HEADERS)
   let qi = find(QTY_HEADERS)
   let ei = find(EXP_HEADERS)
+  let li = find(LOC_HEADERS)
   const hasHeader = ci >= 0 && qi >= 0
   if (!hasHeader) {
     ci = 0
     qi = 1
     ei = 2
+    li = 3
   }
   const out: ImportedRow[] = []
   for (let i = hasHeader ? 1 : 0; i < sheet.length; i++) {
@@ -177,7 +204,8 @@ export function parseExcelRows(sheet: string[][]): ImportedRow[] {
     if (!code || qty <= 0) continue
     const expRaw = ei >= 0 ? String(row[ei] ?? '').trim() : ''
     const exp = expiryToApi(expRaw)
-    out.push({ code, qty, expiry: exp ? exp.slice(0, 7) : '', rowNo: i + 1 })
+    const location = li >= 0 ? normLocation(String(row[li] ?? '')) : ''
+    out.push({ code, qty, expiry: exp ? exp.slice(0, 7) : '', location, rowNo: i + 1 })
   }
   return out
 }
