@@ -14,6 +14,7 @@ import '../../../core/offline/offline_providers.dart';
 import '../../../core/router/scanner_args.dart';
 import '../../../l10n/string_lookup.dart';
 import '../../../shared/feedback/app_top_snackbar.dart';
+import '../../auth/presentation/auth_providers.dart';
 import '../../picking/data/picking_models.dart' show formatPickQty;
 import '../../scanner/data/scanner_repository.dart';
 import '../../scanner/scanner_providers.dart';
@@ -82,7 +83,7 @@ class _DealerSheetScreenState extends ConsumerState<DealerSheetScreen> {
       final OfflineDatabase? db = await ref.read(offlineDatabaseProvider.future);
       await db?.dealerDraftSave(DealerSheetDraft.storageKey(sheet.countId), sheet.toJson());
       ref.invalidate(dealerSheetDraftsProvider);
-      ref.invalidate(dealerSheetsProvider);
+      ref.invalidate(dealerSheetsViewProvider);
       if (mounted) {
         setState(() {
           _sheet = sheet;
@@ -99,9 +100,17 @@ class _DealerSheetScreenState extends ConsumerState<DealerSheetScreen> {
     }
   }
 
+  /// Nusxa hali ishlaydimi: ro'yxat web'dan o'chirilgan, allaqachon yuborilgan yoki
+  /// qulf ochilib boshqa xodim olgan bo'lsa — telefondagi sanalganlarni yuborib bo'lmaydi.
   Future<void> _checkStillOnServer() async {
     try {
-      await ref.read(dealerCountsRepositoryProvider).get(widget.countId);
+      final DealerCount c = await ref.read(dealerCountsRepositoryProvider).get(widget.countId);
+      final String? me = ref.read(authControllerProvider).valueOrNull?.me?.id;
+      if (c.status == 'submitted') {
+        await _handleGone('dealerSheetAlreadySubmitted');
+      } else if (c.status == 'in_progress' && me != null && c.assignedToUserId != null && c.assignedToUserId != me) {
+        await _handleGone('dealerSheetTakenByOther');
+      }
     } on DealerSheetGoneException {
       await _handleGone();
     } on Exception {
@@ -109,19 +118,18 @@ class _DealerSheetScreenState extends ConsumerState<DealerSheetScreen> {
     }
   }
 
-  /// Admin ro'yxatni web'dan o'chirgan: telefondagi nusxani yuborib bo'lmaydi —
-  /// o'chiriladi, aks holda "Tayyor ro'yxatlar"da abadiy osilib qoladi.
-  Future<void> _handleGone() async {
+  /// Nusxa endi yaroqsiz: o'chiriladi, aks holda "Tayyor ro'yxatlar"da abadiy osilib qoladi.
+  Future<void> _handleGone([String messageKey = 'dealerSheetDeletedOnServer']) async {
     final OfflineDatabase? db = await ref.read(offlineDatabaseProvider.future);
     await db?.dealerDraftDelete(DealerSheetDraft.storageKey(widget.countId));
     ref.invalidate(dealerSheetDraftsProvider);
-    ref.invalidate(dealerSheetsProvider);
+    ref.invalidate(dealerSheetsViewProvider);
     if (!mounted) {
       return;
     }
     showAppSnackBar(
       context,
-      SnackBar(content: Text(StringLookup.t(_loc, 'dealerSheetDeletedOnServer'))),
+      SnackBar(content: Text(StringLookup.t(_loc, messageKey))),
       type: AppToastType.warning,
     );
     context.pop();
@@ -322,7 +330,7 @@ class _DealerSheetScreenState extends ConsumerState<DealerSheetScreen> {
       final OfflineDatabase? db = await ref.read(offlineDatabaseProvider.future);
       await db?.dealerDraftDelete(DealerSheetDraft.storageKey(s.countId));
       ref.invalidate(dealerSheetDraftsProvider);
-      ref.invalidate(dealerSheetsProvider);
+      ref.invalidate(dealerSheetsViewProvider);
       ref.invalidate(myDealerCountsProvider);
       if (!mounted) {
         return;

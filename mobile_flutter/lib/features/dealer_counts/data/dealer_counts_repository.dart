@@ -69,7 +69,7 @@ class DealerCountsRepository {
 
   /// Menga ochiq ro'yxatlar: hali olinmagan (draft) + men olgan (in_progress).
   /// Boshqa xodim olgani qaytmaydi — uni baribir ochib bo'lmaydi.
-  Future<List<DealerCount>> listSheets({int limit = 50}) async {
+  Future<List<DealerCount>> listSheets({int limit = 500}) async {
     try {
       final Response<Object?> res = await _dio.get<Object?>(
         _path,

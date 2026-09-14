@@ -19,8 +19,7 @@ class DealerCountsListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AppLocale loc = ref.watch(appLocaleProvider);
-    final AsyncValue<List<DealerCount>> sheets = ref.watch(dealerSheetsProvider);
-    final List<DealerSheetDraft> local = ref.watch(dealerSheetDraftsProvider).valueOrNull ?? const <DealerSheetDraft>[];
+    final AsyncValue<DealerSheetsView> view = ref.watch(dealerSheetsViewProvider);
     final ColorScheme cs = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -38,13 +37,19 @@ class DealerCountsListScreen extends ConsumerWidget {
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(dealerSheetDraftsProvider);
-          ref.invalidate(dealerSheetsProvider);
+          ref.invalidate(dealerSheetsViewProvider);
         },
         child: ListView(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
           children: <Widget>[
             _Hint(StringLookup.t(loc, 'dealerSheetsHint')),
-            ..._sheetTiles(context, loc, cs, sheets, local),
+            ...view.when(
+              data: (DealerSheetsView v) => _sheetTiles(context, loc, cs, v),
+              loading: () => const <Widget>[
+                Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator())),
+              ],
+              error: (Object e, _) => <Widget>[_Empty(localizeApiErrorMessage(loc, e))],
+            ),
           ],
         ),
       ),
@@ -53,15 +58,9 @@ class DealerCountsListScreen extends ConsumerWidget {
 
   /// Serverdagi ro'yxatlar + telefonga yuklanganlar. Internet bo'lmasa server
   /// ro'yxati ochilmaydi — dillerda yuklab olingan ro'yxat baribir ochilishi kerak.
-  List<Widget> _sheetTiles(
-    BuildContext context,
-    AppLocale loc,
-    ColorScheme cs,
-    AsyncValue<List<DealerCount>> sheets,
-    List<DealerSheetDraft> local,
-  ) {
+  List<Widget> _sheetTiles(BuildContext context, AppLocale loc, ColorScheme cs, DealerSheetsView v) {
     final Map<String, DealerSheetDraft> byId = <String, DealerSheetDraft>{
-      for (final DealerSheetDraft d in local) d.countId: d,
+      for (final DealerSheetDraft d in v.local) d.countId: d,
     };
     void open(String countId) => context.pushNamed('dealerSheet', pathParameters: <String, String>{'countId': countId});
     String progress(int done, int total) =>
@@ -75,38 +74,28 @@ class DealerCountsListScreen extends ConsumerWidget {
           onTap: () => open(d.countId),
         );
 
-    return sheets.when(
-      data: (List<DealerCount> list) {
-        final Set<String> serverIds = list.map((DealerCount c) => c.id).toSet();
-        final List<Widget> tiles = <Widget>[
-          for (final DealerCount c in list)
-            if (byId[c.id] != null)
-              // Telefondagi nusxa — sanalganlar shu yerda, server hali bilmaydi.
-              localTile(byId[c.id]!)
-            else
-              _SheetTile(
-                title: c.dealerName ?? c.dealerOrgId,
-                progress: progress(c.countedLines, c.sheetLines),
-                extra: null,
-                icon: Icons.list_alt,
-                color: cs.primary,
-                onTap: () => open(c.id),
-              ),
-          // Serverda endi ko'rinmaydi (o'chirilgan / qulf ochilgan) — ochilganda tekshiriladi.
-          for (final DealerSheetDraft d in local)
-            if (!serverIds.contains(d.countId)) localTile(d),
-        ];
-        return tiles.isEmpty ? <Widget>[_Empty(StringLookup.t(loc, 'dealerSheetsEmpty'))] : tiles;
-      },
-      loading: () => <Widget>[
-        ...local.map(localTile),
-        const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator())),
-      ],
-      error: (Object e, _) => <Widget>[
-        _Empty(local.isEmpty ? localizeApiErrorMessage(loc, e) : StringLookup.t(loc, 'dealerSheetsOffline')),
-        ...local.map(localTile),
-      ],
-    );
+    if (v.error != null) {
+      return <Widget>[
+        _Empty(v.local.isEmpty ? localizeApiErrorMessage(loc, v.error!) : StringLookup.t(loc, 'dealerSheetsOffline')),
+        ...v.local.map(localTile),
+      ];
+    }
+    final List<Widget> tiles = <Widget>[
+      for (final DealerCount c in v.server)
+        if (byId[c.id] != null)
+          // Telefondagi nusxa — sanalganlar shu yerda, server hali bilmaydi.
+          localTile(byId[c.id]!)
+        else
+          _SheetTile(
+            title: c.dealerName ?? c.dealerOrgId,
+            progress: progress(c.countedLines, c.sheetLines),
+            extra: null,
+            icon: Icons.list_alt,
+            color: cs.primary,
+            onTap: () => open(c.id),
+          ),
+    ];
+    return tiles.isEmpty ? <Widget>[_Empty(StringLookup.t(loc, 'dealerSheetsEmpty'))] : tiles;
   }
 }
 

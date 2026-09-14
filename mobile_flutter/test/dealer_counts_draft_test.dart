@@ -25,6 +25,24 @@ void _sheetTests() {
       );
 
   group('DealerSheetDraft', () {
+    test('egasi saqlanadi: boshqa xodimning nusxasi "meniki" emas', () {
+      final DealerSheetDraft d = DealerSheetDraft(
+        countId: 'c9',
+        dealerOrgId: 'o',
+        dealerName: 'D',
+        downloadedAt: '',
+        lines: <DealerSheetLine>[],
+        ownerUserId: 'u1',
+      );
+      final DealerSheetDraft back = DealerSheetDraft.fromJson(d.toJson());
+      expect(back.ownerUserId, 'u1');
+      expect(back.belongsTo('u1'), isTrue);
+      expect(back.belongsTo('u2'), isFalse);
+      // 1.0.46 gacha yuklangan nusxa — egasi yo'q, joriy xodimniki deb olinadi.
+      final Map<String, Object?> old = d.toJson()..remove('owner_user_id');
+      expect(DealerSheetDraft.fromJson(old).belongsTo('u2'), isTrue);
+    });
+
     test('progress va filtrlar', () {
       final DealerSheetDraft s = DealerSheetDraft(
         countId: 'c1',

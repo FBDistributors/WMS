@@ -228,6 +228,7 @@ class DealerSheetDraft {
     required this.dealerName,
     required this.downloadedAt,
     required this.lines,
+    this.ownerUserId,
   });
 
   static const String kind = 'sheet';
@@ -238,6 +239,12 @@ class DealerSheetDraft {
   final String dealerName;
   final String downloadedAt;
   final List<DealerSheetLine> lines;
+
+  /// Ro'yxatni olgan xodim. Telefon bir necha kishida bo'lsa, boshqaning nusxasiga
+  /// tegilmaydi. 1.0.46 gacha yuklangan nusxalarda yo'q (null — joriy xodimniki deb olinadi).
+  final String? ownerUserId;
+
+  bool belongsTo(String? userId) => ownerUserId == null || ownerUserId == userId;
 
   int get countedCount => lines.where((DealerSheetLine l) => l.isCounted).length;
   int get uncountedCount => lines.length - countedCount;
@@ -271,6 +278,7 @@ class DealerSheetDraft {
         dealerOrgId: c.dealerOrgId,
         dealerName: c.dealerName ?? c.dealerOrgId,
         downloadedAt: DateTime.now().toUtc().toIso8601String(),
+        ownerUserId: c.assignedToUserId,
         lines: c.lines
             .map(
               (DealerCountLine l) => DealerSheetLine(
@@ -300,6 +308,7 @@ class DealerSheetDraft {
         'dealer_org_id': dealerOrgId,
         'dealer_name': dealerName,
         'downloaded_at': downloadedAt,
+        if (ownerUserId != null) 'owner_user_id': ownerUserId,
         'lines': lines.map((DealerSheetLine l) => l.toJson()).toList(growable: false),
       };
 
@@ -310,6 +319,7 @@ class DealerSheetDraft {
       dealerOrgId: json['dealer_org_id']! as String,
       dealerName: (json['dealer_name'] as String?) ?? (json['dealer_org_id']! as String),
       downloadedAt: (json['downloaded_at'] as String?) ?? '',
+      ownerUserId: json['owner_user_id'] as String?,
       lines: raw is List
           ? raw.whereType<Map>().map((Map m) => DealerSheetLine.fromJson(Map<String, Object?>.from(m))).toList()
           : <DealerSheetLine>[],
