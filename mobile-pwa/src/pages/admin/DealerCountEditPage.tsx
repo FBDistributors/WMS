@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { FileSpreadsheet, ListPlus, LockOpen, Plus, Save, Send, Store, Trash2, X } from 'lucide-react'
+import { Check, FileSpreadsheet, ListPlus, LockOpen, Plus, Save, Send, Store, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 
@@ -379,9 +379,10 @@ export function DealerCountEditPage() {
                 <Trash2 size={16} className="mr-1" />
                 {t('admin:dealer_counts.delete_draft')}
               </Button>
+              {/* To'ldirish/saqlashdan keyin hujjat serverda — o'chiq tugma "ishlamayapti" deb o'qilmasin. */}
               <Button variant="ghost" disabled={busy || !dirty} onClick={() => void save()}>
-                <Save size={16} className="mr-1" />
-                {t('admin:dealer_counts.save')}
+                {countId && !dirty ? <Check size={16} className="mr-1" /> : <Save size={16} className="mr-1" />}
+                {countId && !dirty ? t('admin:dealer_counts.saved') : t('admin:dealer_counts.save')}
               </Button>
               <Button disabled={busy || sum.lines === 0 || !dealerId} onClick={() => setConfirmSubmit(true)}>
                 <Send size={16} className="mr-1" />
@@ -451,6 +452,9 @@ export function DealerCountEditPage() {
             {/* Yangi hujjatda diller tanlash — birinchi qadam, xato emas: keyingi qadamni aytamiz. */}
             {dirty && countId ? (
               <span className="ml-2 text-amber-700 dark:text-amber-300">{t('admin:dealer_counts.unsaved')}</span>
+            ) : null}
+            {!dirty && countId && status === 'draft' ? (
+              <span className="ml-2 text-emerald-700 dark:text-emerald-300">{t('admin:dealer_counts.saved_on_server')}</span>
             ) : null}
           </div>
           {!countId ? (
