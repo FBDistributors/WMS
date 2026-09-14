@@ -646,7 +646,11 @@ def put_counts(
     return CountsOut(**result, count=_to_out(db, item, with_lines=True))
 
 
-@router.delete("/{count_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Draft sanovni o'chirish")
+@router.delete(
+    "/{count_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Sanovni o'chirish (draft — egasi yoki admin; yuborilgan — faqat admin)",
+)
 def delete_count(
     count_id: UUID,
     request: Request,
@@ -654,15 +658,25 @@ def delete_count(
     user: User = Depends(require_permission(PERM_DEALER_COUNTS_WRITE)),
 ) -> Response:
     item = _load(db, count_id)
-    _require_owner_or_admin(item, user)
-    _require_draft(item)
+    if item.status == "submitted":
+        # Keraksiz/xato yuborilgan hujjatni tozalash; ledgerga ta'siri yo'q, audit qoladi.
+        if "admin:access" not in get_effective_permissions(user):
+            raise HTTPException(status_code=403, detail="Yuborilgan sanovni faqat admin o'chira oladi")
+    else:
+        _require_owner_or_admin(item, user)
+        _require_draft(item)
     log_action(
         db,
         user_id=user.id,
         action=ACTION_DELETE,
         entity_type="dealer_stock_count",
         entity_id=str(item.id),
-        old_data={"dealer_org_id": item.dealer_org_id, "lines_count": item.lines_count},
+        old_data={
+            "dealer_org_id": item.dealer_org_id,
+            "status": item.status,
+            "lines_count": item.lines_count,
+            "total_units": str(item.total_units),
+        },
         ip_address=get_client_ip(request),
     )
     db.delete(item)

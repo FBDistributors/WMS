@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Store } from 'lucide-react'
+import { Plus, Store, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
@@ -9,10 +9,12 @@ import { AdminLayout } from '../../admin/components/AdminLayout'
 import { TableScrollArea } from '../../components/TableScrollArea'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { useAppToast } from '../../feedback/useAppToast'
 import {
+  deleteDealerCount,
   getDealers,
   listDealerCounts,
   type DealerCountOut,
@@ -39,8 +41,10 @@ function fmtDate(v: string | null | undefined) {
 export function DealerCountsPage() {
   const { t } = useTranslation(['admin', 'common'])
   const navigate = useNavigate()
-  const { has } = useAuth()
+  const { has, user } = useAuth()
   const { showError } = useAppToast()
+  const [toDelete, setToDelete] = useState<DealerCountOut | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [dealers, setDealers] = useState<DealerOut[]>([])
   const [dealerId, setDealerId] = useState('')
   const [status, setStatus] = useState<string>('submitted')
@@ -85,6 +89,29 @@ export function DealerCountsPage() {
   }, [load])
 
   const resetPage = () => setOffset(0)
+
+  // Backend qoidasi bilan bir xil: draft — egasi yoki admin; yuborilgan — faqat admin;
+  // telefonda sanalayotgan (in_progress) — avval qulfni ochish kerak.
+  const isAdmin = has('admin:access')
+  const canDelete = (row: DealerCountOut) =>
+    has('dealer_counts:write') &&
+    (row.status === 'submitted' ? isAdmin : row.status === 'draft' && (isAdmin || row.counted_by_user_id === user?.id))
+
+  const confirmDelete = async () => {
+    if (!toDelete) return
+    setDeleting(true)
+    try {
+      await deleteDealerCount(toDelete.id)
+      setToDelete(null)
+      // Sahifadagi oxirgi qator o'chsa — oldingi sahifaga.
+      if (items.length === 1 && offset > 0) setOffset(Math.max(0, offset - PAGE))
+      else void load()
+    } catch (err) {
+      showError(err instanceof Error ? err.message : t('admin:dealer_counts.delete_failed'))
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   return (
     <AdminLayout
@@ -191,6 +218,7 @@ export function DealerCountsPage() {
                   <th className="whitespace-nowrap px-3 py-3 text-right sm:px-4">{t('admin:dealer_counts.col_lines')}</th>
                   <th className="whitespace-nowrap px-3 py-3 text-right sm:px-4">{t('admin:dealer_counts.col_units')}</th>
                   <th className="whitespace-nowrap px-3 py-3 text-left sm:px-4">{t('admin:dealer_counts.col_status')}</th>
+                  <th className="w-12 px-2 py-3" aria-label={t('admin:dealer_counts.delete')} />
                 </tr>
               </thead>
               <tbody>
@@ -231,6 +259,22 @@ export function DealerCountsPage() {
                             : t('admin:dealer_counts.status_draft')}
                       </span>
                     </td>
+                    <td className="px-2 py-2 text-right">
+                      {canDelete(row) ? (
+                        <Button
+                          variant="ghost"
+                          className="text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+                          aria-label={t('admin:dealer_counts.delete')}
+                          title={t('admin:dealer_counts.delete')}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setToDelete(row)
+                          }}
+                        >
+                          <Trash2 size={16} />
+                        </Button>
+                      ) : null}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -252,6 +296,27 @@ export function DealerCountsPage() {
           </Button>
         </div>
       ) : null}
+
+      <ConfirmDialog
+        open={toDelete !== null}
+        title={t('admin:dealer_counts.delete')}
+        message={
+          toDelete
+            ? t(
+                toDelete.status === 'submitted'
+                  ? 'admin:dealer_counts.delete_submitted_confirm'
+                  : 'admin:dealer_counts.delete_confirm',
+                { dealer: toDelete.dealer_name ?? toDelete.dealer_org_id, date: fmtDate(toDelete.submitted_at ?? toDelete.started_at) },
+              )
+            : ''
+        }
+        confirmLabel={t('admin:dealer_counts.delete')}
+        cancelLabel={t('common:buttons.cancel')}
+        onConfirm={confirmDelete}
+        onCancel={() => setToDelete(null)}
+        variant="danger"
+        loading={deleting}
+      />
     </AdminLayout>
   )
 }

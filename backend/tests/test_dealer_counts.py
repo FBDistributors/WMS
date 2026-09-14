@@ -112,7 +112,19 @@ def test_submit_empty_rejected_and_submitted_is_frozen(client: TestClient, db_se
         assert client.post(f"{URL}/{cid}/submit").status_code == 200
 
         assert client.put(f"{URL}/{cid}", json={"lines": []}).status_code == 409
-        assert client.delete(f"{URL}/{cid}").status_code == 409
+        # Yuborilganni faqat admin o'chiradi — egasi ham emas.
+        assert client.delete(f"{URL}/{cid}").status_code == 403
+    finally:
+        _clear()
+
+
+def test_admin_can_delete_submitted(client: TestClient, db_session: Session):
+    org, product = _seed(db_session)
+    _as(_mk_user(db_session, "warehouse_admin"))
+    try:
+        cid = client.post(URL, json=_payload(org, product, submit=True)).json()["id"]
+        assert client.delete(f"{URL}/{cid}").status_code == 204
+        assert client.get(f"{URL}/{cid}").status_code == 404
     finally:
         _clear()
 
