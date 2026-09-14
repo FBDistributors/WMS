@@ -77,33 +77,48 @@ def build_compare_rows(
     return rows
 
 
-def compare_dealer_count(db: Session, item: DealerStockCount, *, refresh: bool) -> dict:
+def dealer_warehouse_code(db: Session, dealer_org_id: str) -> Optional[str]:
     org = (
         db.query(SettingsOrganization)
-        .filter(SettingsOrganization.org_id == item.dealer_org_id)
+        .filter(SettingsOrganization.org_id == dealer_org_id)
         .one_or_none()
     )
     wh = (org.smartup_warehouse_code or "").strip() if org else ""
+    return wh or None
+
+
+def load_dealer_balance(db: Session, dealer_org_id: str, *, refresh: bool) -> tuple[dict[str, float], str, str]:
+    """Dillerning Smartup qoldig'i SKU bo'yicha: (sku→dona, manba cache|live, ombor kodi).
+
+    Ombor kodi kiritilmagan bo'lsa 400, Smartup xatosi 502. Tayyor ro'yxat (prefill) va
+    solishtirish ikkalasi shu yerdan oladi — bir kun ichida bitta so'rov.
+    """
+    wh = dealer_warehouse_code(db, dealer_org_id)
     if not wh:
         raise HTTPException(status_code=400, detail=NO_WAREHOUSE_CODE_DETAIL)
-
     today = date.today().isoformat()
-    payload: Optional[dict] = None if refresh else read_balance_cache(today, wh, item.dealer_org_id)
+    payload: Optional[dict] = None if refresh else read_balance_cache(today, wh, dealer_org_id)
     source = "cache"
     if payload is None:
         try:
-            payload = fetch_balance_from_smartup(item.dealer_org_id, wh)
+            payload = fetch_balance_from_smartup(dealer_org_id, wh)
         except RuntimeError as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
         try:
-            write_balance_cache(today, wh, item.dealer_org_id, payload)
+            write_balance_cache(today, wh, dealer_org_id, payload)
         except OSError:
             pass
         source = "live"
     balance_rows = payload.get("balance", []) if isinstance(payload, dict) else []
-    smartup = aggregate_balance_by_sku(balance_rows if isinstance(balance_rows, list) else [])
+    return aggregate_balance_by_sku(balance_rows if isinstance(balance_rows, list) else []), source, wh
+
+
+def compare_dealer_count(db: Session, item: DealerStockCount, *, refresh: bool) -> dict:
+    smartup, source, wh = load_dealer_balance(db, item.dealer_org_id, refresh=refresh)
+    today = date.today().isoformat()
 
     # Sanov qatorlari → SKU bo'yicha (muddatlar yig'iladi); tanilmaganlar solishtirilmaydi.
+    # Sanalmagan (qty NULL) qator 0 deb olinadi, lekin SKU "sanalmagan" deb belgilanadi.
     pids = {ln.product_id for ln in item.lines if ln.product_id}
     products = (
         {p.id: p for p in db.query(ProductModel).filter(ProductModel.id.in_(pids)).all()}
@@ -112,14 +127,17 @@ def compare_dealer_count(db: Session, item: DealerStockCount, *, refresh: bool) 
     )
     counted: dict[str, float] = {}
     names: dict[str, str] = {}
+    counted_flag: dict[str, bool] = {}
     unknown_lines = 0
     for ln in item.lines:
         p = products.get(ln.product_id) if ln.product_id else None
         if not p:
             unknown_lines += 1
             continue
-        counted[p.sku] = counted.get(p.sku, 0.0) + float(Decimal(str(ln.qty)))
+        qty = float(Decimal(str(ln.qty))) if ln.qty is not None else 0.0
+        counted[p.sku] = counted.get(p.sku, 0.0) + qty
         names[p.sku] = p.name
+        counted_flag[p.sku] = counted_flag.get(p.sku, False) or ln.counted_at is not None
     # Smartup'da bor, sanovda yo'q mahsulotlarning nomi bizning katalogdan.
     missing = [s for s in smartup if s not in names]
     if missing:
@@ -127,6 +145,10 @@ def compare_dealer_count(db: Session, item: DealerStockCount, *, refresh: bool) 
             names[p.sku] = p.name
 
     rows = build_compare_rows(counted, smartup, names)
+    # `counted` — sanalgan miqdor; `is_counted` — xodim haqiqatan sanaganmi (ro'yxatdagi
+    # sanalmagan qator 0 deb olinadi, lekin bu bayroq bilan ajralib turadi).
+    for r in rows:
+        r["is_counted"] = counted_flag.get(r["sku"], False)
     loaded_at = cache_loaded_at(today, wh, item.dealer_org_id) if source == "cache" else None
     return {
         "dealer_org_id": item.dealer_org_id,
@@ -135,6 +157,7 @@ def compare_dealer_count(db: Session, item: DealerStockCount, *, refresh: bool) 
         "balance_date": today,
         "loaded_at": loaded_at or datetime.now(timezone.utc).isoformat(),
         "unknown_lines": unknown_lines,
+        "uncounted_skus": sum(1 for r in rows if not r["is_counted"] and r["sku"] in counted),
         "totals": {
             "counted": sum(counted.values()),
             "smartup": sum(smartup.values()),

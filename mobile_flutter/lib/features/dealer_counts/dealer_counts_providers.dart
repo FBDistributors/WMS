@@ -21,7 +21,40 @@ final dealerCountDraftsProvider = FutureProvider<List<DealerCountDraft>>((Ref re
     return const <DealerCountDraft>[];
   }
   final List<Map<String, Object?>> rows = await db.dealerDraftsAll();
-  return rows.map(DealerCountDraft.fromJson).toList(growable: false);
+  // Tayyor ro'yxat nusxalari (`kind: sheet`) alohida provayderda.
+  return rows
+      .where((Map<String, Object?> r) => r['kind'] != DealerSheetDraft.kind)
+      .map(DealerCountDraft.fromJson)
+      .toList(growable: false);
+});
+
+/// Serverdagi ochiq tayyor ro'yxatlar (hamma sanovchiga).
+final dealerSheetsProvider = FutureProvider<List<DealerCount>>((Ref ref) {
+  return ref.watch(dealerCountsRepositoryProvider).listSheets();
+});
+
+/// Telefonga yuklab olingan ro'yxatlar (sqflite).
+final dealerSheetDraftsProvider = FutureProvider<List<DealerSheetDraft>>((Ref ref) async {
+  final OfflineDatabase? db = await ref.watch(offlineDatabaseProvider.future);
+  if (db == null) {
+    return const <DealerSheetDraft>[];
+  }
+  final List<Map<String, Object?>> rows = await db.dealerDraftsAll();
+  return rows
+      .where((Map<String, Object?> r) => r['kind'] == DealerSheetDraft.kind)
+      .map(DealerSheetDraft.fromJson)
+      .toList(growable: false);
+});
+
+final dealerSheetDraftProvider =
+    FutureProvider.family<DealerSheetDraft?, String>((Ref ref, String countId) async {
+  final List<DealerSheetDraft> all = await ref.watch(dealerSheetDraftsProvider.future);
+  for (final DealerSheetDraft d in all) {
+    if (d.countId == countId) {
+      return d;
+    }
+  }
+  return null;
 });
 
 final dealerCountDraftProvider =

@@ -29,7 +29,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
 
-DEALER_COUNT_STATUSES = ("draft", "submitted")
+#: draft — tayyorlanmoqda (web/telefon); in_progress — telefon ro'yxatni oldi (web qulf);
+#: submitted — yuborilgan, o'zgarmaydi.
+DEALER_COUNT_STATUSES = ("draft", "in_progress", "submitted")
+#: Yuborishda sanalmagan qatorlar: zero — 0 deb yoziladi, keep — NULL qoladi.
+UNCOUNTED_POLICIES = ("zero", "keep")
 
 
 class DealerStockCount(Base):
@@ -53,6 +57,14 @@ class DealerStockCount(Base):
     #: Ro'yxatda tez ko'rsatish uchun; saqlashda va submit'da qayta hisoblanadi.
     lines_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     total_units: Mapped[Decimal] = mapped_column(Numeric(14, 3), nullable=False, default=0)
+    #: Qayerda yaratildi: mobile (noldan skan) / web (jadval) / sheet (tayyor ro'yxat).
+    source: Mapped[str] = mapped_column(String(16), nullable=False, default="mobile")
+    #: Telefonda ro'yxatni olgan xodim — shu paytdan web tahriri qulflanadi.
+    assigned_to_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    uncounted_policy: Mapped[str | None] = mapped_column(String(8), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -87,16 +99,24 @@ class DealerStockCountLine(Base):
         UUID(as_uuid=True), ForeignKey("products.id", ondelete="SET NULL"), nullable=True
     )
     scanned_barcode: Mapped[str] = mapped_column(String(64), nullable=False, default="")
-    qty: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
+    #: NULL — tayyor ro'yxatdagi hali sanalmagan qator; 0 — "dillerda yo'q" deb sanaldi.
+    qty: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
+    #: Ro'yxat to'ldirilgandagi Smartup soni — telefonda internet bo'lmasa ham farq ko'rinsin.
+    snapshot_qty: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
     #: Oy boshi (YYYY-MM-01) — tizimdagi lot muddatlari bilan bir xil konvensiya.
     expiry_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     scanned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: Xodim haqiqatan sanagan payt; "0 deb hisobla" bilan to'ldirilgan qatorlarda bo'sh qoladi.
+    counted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    counted_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     seq: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     count: Mapped[DealerStockCount] = relationship("DealerStockCount", back_populates="lines")
 
     __table_args__ = (
-        CheckConstraint("qty > 0", name="ck_dealer_stock_count_lines_qty_positive"),
+        CheckConstraint("qty IS NULL OR qty >= 0", name="ck_dealer_stock_count_lines_qty_nonneg"),
         Index("ix_dealer_stock_count_lines_count_id", "count_id"),
         Index("ix_dealer_stock_count_lines_product_id", "product_id"),
         # Bir mahsulot + bir muddat = bitta qator (tanilmagan skanlar bundan mustasno).

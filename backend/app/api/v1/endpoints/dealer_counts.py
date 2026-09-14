@@ -32,6 +32,14 @@ from app.services.audit_service import (
     log_action,
 )
 from app.services.dealer_count_compare import compare_dealer_count
+from app.services.dealer_count_sheet import (
+    LOCK_DETAIL,
+    apply_counts,
+    claim_sheet,
+    finalize_uncounted,
+    prefill_sheet,
+    release_sheet,
+)
 from app.services.product_scan_resolve import resolve_product_scan
 
 router = APIRouter()
@@ -51,7 +59,10 @@ class DealerOut(BaseModel):
 class DealerCountLineIn(BaseModel):
     product_id: Optional[UUID] = None
     scanned_barcode: str = Field(default="", max_length=64)
-    qty: Decimal = Field(..., gt=0)
+    #: None — tayyor ro'yxatdagi hali sanalmagan qator; 0 — "dillerda yo'q".
+    qty: Optional[Decimal] = Field(default=None, ge=0)
+    #: Web draft qatorni qayta yuborganda snapshot yo'qolmasin.
+    snapshot_qty: Optional[Decimal] = Field(default=None, ge=0)
     expiry_date: Optional[date] = None
     scanned_at: Optional[datetime] = None
 
@@ -64,6 +75,8 @@ class DealerCountCreate(BaseModel):
     lines: list[DealerCountLineIn] = Field(default_factory=list)
     #: True — yaratish bilan birga yuborish (ilova "Yuborish" tugmasi).
     submit: bool = False
+    #: mobile / web / sheet — hisobot uchun.
+    source: str = Field(default="mobile", max_length=16)
 
 
 class DealerCountUpdate(BaseModel):
@@ -77,9 +90,11 @@ class DealerCountLineOut(BaseModel):
     sku: Optional[str]
     product_name: Optional[str]
     scanned_barcode: str
-    qty: Decimal
+    qty: Optional[Decimal]
+    snapshot_qty: Optional[Decimal] = None
     expiry_date: Optional[date]
     scanned_at: Optional[datetime]
+    counted_at: Optional[datetime] = None
     seq: int
 
 
@@ -91,15 +106,56 @@ class DealerCountOut(BaseModel):
     counted_by_user_id: UUID
     counted_by_name: Optional[str]
     status: str
+    source: str = "mobile"
     started_at: datetime
     submitted_at: Optional[datetime]
     note: Optional[str]
     lines_count: int
     total_units: Decimal
+    #: Ro'yxatdagi jami qatorlar va ulardan sanalganlari ("45/693").
+    sheet_lines: int = 0
+    counted_lines: int = 0
+    assigned_to_user_id: Optional[UUID] = None
+    assigned_to_name: Optional[str] = None
+    claimed_at: Optional[datetime] = None
+    uncounted_policy: Optional[str] = None
     created_at: datetime
     #: Masalan "bu diller bugun allaqachon sanalgan" — rad etmaydi, ogohlantiradi.
     warning: Optional[str] = None
     lines: list[DealerCountLineOut] = Field(default_factory=list)
+
+
+class PrefillIn(BaseModel):
+    sources: list[str] = Field(default_factory=lambda: ["smartup"])
+    months: int = Field(default=6, ge=1, le=24)
+    refresh: bool = False
+
+
+class PrefillOut(BaseModel):
+    added: int
+    skipped: int
+    not_in_catalog: int
+    sources: list[str]
+    count: DealerCountOut
+
+
+class CountEntryIn(BaseModel):
+    line_id: Optional[UUID] = None
+    product_id: Optional[UUID] = None
+    scanned_barcode: str = Field(default="", max_length=64)
+    qty: Decimal = Field(..., ge=0)
+    expiry_date: Optional[date] = None
+    scanned_at: Optional[datetime] = None
+
+
+class CountsIn(BaseModel):
+    entries: list[CountEntryIn] = Field(default_factory=list)
+
+
+class CountsOut(BaseModel):
+    updated: int
+    added: int
+    count: DealerCountOut
 
 
 class DealerCountListOut(BaseModel):
@@ -124,8 +180,10 @@ def _to_line_out(line: DealerStockCountLine, product: ProductModel | None) -> De
         product_name=product.name if product else None,
         scanned_barcode=line.scanned_barcode or "",
         qty=line.qty,
+        snapshot_qty=line.snapshot_qty,
         expiry_date=line.expiry_date,
         scanned_at=line.scanned_at,
+        counted_at=line.counted_at,
         seq=line.seq,
     )
 
@@ -138,6 +196,7 @@ def _to_out(
     warning: Optional[str] = None,
 ) -> DealerCountOut:
     counted_by = db.get(User, item.counted_by_user_id)
+    assigned_to = db.get(User, item.assigned_to_user_id) if item.assigned_to_user_id else None
     lines_out: list[DealerCountLineOut] = []
     if with_lines:
         pids = {ln.product_id for ln in item.lines if ln.product_id}
@@ -155,11 +214,19 @@ def _to_out(
         counted_by_user_id=item.counted_by_user_id,
         counted_by_name=_display_name(counted_by),
         status=item.status,
+        source=item.source or "mobile",
         started_at=item.started_at,
         submitted_at=item.submitted_at,
         note=item.note,
         lines_count=item.lines_count,
         total_units=item.total_units,
+        sheet_lines=len(item.lines),
+        # Haqiqatan sanalganlar — "0 deb hisobla" bilan to'ldirilganlar bunga kirmaydi.
+        counted_lines=sum(1 for ln in item.lines if ln.counted_at is not None),
+        assigned_to_user_id=item.assigned_to_user_id,
+        assigned_to_name=_display_name(assigned_to),
+        claimed_at=item.claimed_at,
+        uncounted_policy=item.uncounted_policy,
         created_at=item.created_at,
         warning=warning,
         lines=lines_out,
@@ -176,6 +243,7 @@ def _build_lines(db: Session, payload_lines: list[DealerCountLineIn]) -> list[De
     merged: dict[tuple, DealerStockCountLine] = {}
     order: list[tuple] = []
     seq = 0
+    now = datetime.now(timezone.utc)
     for raw in payload_lines:
         product_id = raw.product_id
         barcode = (raw.scanned_barcode or "").strip()
@@ -188,16 +256,25 @@ def _build_lines(db: Session, payload_lines: list[DealerCountLineIn]) -> list[De
         expiry = _month_start(raw.expiry_date)
         # Tanilmagan skan har doim alohida qator — unga qo'shib bo'lmaydi.
         key = (product_id, expiry) if product_id is not None else ("raw", barcode, seq)
+        qty = Decimal(str(raw.qty)) if raw.qty is not None else None
         if key in merged:
-            merged[key].qty = Decimal(str(merged[key].qty)) + Decimal(str(raw.qty))
+            cur = merged[key]
+            if qty is not None:
+                cur.qty = (Decimal(str(cur.qty)) if cur.qty is not None else Decimal("0")) + qty
+                cur.counted_at = cur.counted_at or now
+            if raw.snapshot_qty is not None and cur.snapshot_qty is None:
+                cur.snapshot_qty = Decimal(str(raw.snapshot_qty))
             continue
         seq += 1
         line = DealerStockCountLine(
             product_id=product_id,
             scanned_barcode=barcode,
-            qty=Decimal(str(raw.qty)),
+            qty=qty,
+            snapshot_qty=Decimal(str(raw.snapshot_qty)) if raw.snapshot_qty is not None else None,
             expiry_date=expiry,
             scanned_at=raw.scanned_at,
+            # Miqdor bor — bu sanalgan qator; ro'yxat qatori (None) esa keyin telefonda sanaladi.
+            counted_at=now if qty is not None else None,
             seq=seq,
         )
         merged[key] = line
@@ -206,8 +283,10 @@ def _build_lines(db: Session, payload_lines: list[DealerCountLineIn]) -> list[De
 
 
 def _recount(item: DealerStockCount) -> None:
-    item.lines_count = len(item.lines)
-    item.total_units = sum((Decimal(str(ln.qty)) for ln in item.lines), Decimal("0"))
+    """Faqat sanalgan (qty bor) qatorlar hisobga olinadi; ro'yxatning sanalmaganlari emas."""
+    counted = [ln for ln in item.lines if ln.qty is not None]
+    item.lines_count = len(counted)
+    item.total_units = sum((Decimal(str(ln.qty)) for ln in counted), Decimal("0"))
 
 
 def _same_day_warning(db: Session, item: DealerStockCount) -> Optional[str]:
@@ -250,16 +329,32 @@ def _require_owner_or_admin(item: DealerStockCount, user: User) -> None:
 
 
 def _require_draft(item: DealerStockCount) -> None:
+    if item.status == "in_progress":
+        raise HTTPException(status_code=409, detail=LOCK_DETAIL)
     if item.status != "draft":
         raise HTTPException(status_code=409, detail="Sanov allaqachon yuborilgan — o'zgartirib bo'lmaydi")
 
 
-def _submit(item: DealerStockCount) -> None:
+def _require_counter_or_admin(item: DealerStockCount, user: User) -> None:
+    """Telefonda ro'yxatni olgan xodim (yoki admin) sanalganlarni yozadi / yuboradi."""
+    if item.status == "in_progress" and item.assigned_to_user_id not in (None, user.id):
+        if "admin:access" not in get_effective_permissions(user):
+            raise HTTPException(status_code=403, detail="Ro'yxatni boshqa xodim olgan")
+
+
+def _submit(item: DealerStockCount, *, uncounted: str = "zero") -> int:
+    """Yuborish. Sanalmagan qatorlar: zero → 0 (counted_at bo'sh), keep → NULL. Qaytaradi: ularning soni."""
+    if item.status == "submitted":
+        raise HTTPException(status_code=409, detail="Sanov allaqachon yuborilgan")
     if not item.lines:
         raise HTTPException(status_code=400, detail="Bo'sh sanovni yuborib bo'lmaydi")
+    uncounted_n = finalize_uncounted(item, uncounted)
+    if not any(ln.qty is not None for ln in item.lines):
+        raise HTTPException(status_code=400, detail="Sanovda birorta sanalgan qator yo'q")
     _recount(item)
     item.status = "submitted"
     item.submitted_at = datetime.now(timezone.utc)
+    return uncounted_n
 
 
 # --- endpointlar ---------------------------------------------------------------
@@ -314,6 +409,7 @@ def create_count(
         counted_by_user_id=user.id,
         status="draft",
         note=(payload.note or "").strip() or None,
+        source=payload.source if payload.source in ("mobile", "web", "sheet") else "mobile",
     )
     if payload.started_at:
         item.started_at = payload.started_at
@@ -361,7 +457,9 @@ def list_counts(
     if dealer_org_id:
         query = query.filter(DealerStockCount.dealer_org_id == dealer_org_id.strip())
     if status_filter:
-        query = query.filter(DealerStockCount.status == status_filter.strip())
+        # Bitta yoki vergul bilan bir nechta: `draft,in_progress` (telefon uchun tayyor ro'yxatlar).
+        statuses = [s.strip() for s in status_filter.split(",") if s.strip()]
+        query = query.filter(DealerStockCount.status.in_(statuses))
     if counted_by_user_id:
         query = query.filter(DealerStockCount.counted_by_user_id == counted_by_user_id)
     if mine:
@@ -416,25 +514,136 @@ def update_count(
 def submit_count(
     count_id: UUID,
     request: Request,
+    uncounted: str = Query(default="zero", description="Sanalmagan qatorlar: zero (0 deb) | keep (NULL)"),
     db: Session = Depends(get_db),
     user: User = Depends(require_permission(PERM_DEALER_COUNTS_WRITE)),
 ) -> DealerCountOut:
     item = _load(db, count_id)
-    _require_owner_or_admin(item, user)
-    _require_draft(item)
-    _submit(item)
+    if item.status == "in_progress":
+        _require_counter_or_admin(item, user)
+    else:
+        _require_owner_or_admin(item, user)
+    uncounted_n = _submit(item, uncounted=uncounted)
     log_action(
         db,
         user_id=user.id,
         action=ACTION_UPDATE,
         entity_type="dealer_stock_count",
         entity_id=str(item.id),
-        new_data={"status": "submitted", "lines_count": item.lines_count, "total_units": str(item.total_units)},
+        new_data={
+            "status": "submitted",
+            "lines_count": item.lines_count,
+            "total_units": str(item.total_units),
+            "uncounted": uncounted,
+            "uncounted_lines": uncounted_n,
+        },
         ip_address=get_client_ip(request),
     )
     db.commit()
     db.refresh(item)
     return _to_out(db, item, with_lines=True, warning=_same_day_warning(db, item))
+
+
+# --- tayyor ro'yxat (ведомость) --------------------------------------------------
+
+
+@router.post("/{count_id}/prefill", response_model=PrefillOut, summary="Ro'yxatni to'ldirish (smartup/shipped/all)")
+def prefill_count(
+    count_id: UUID,
+    payload: PrefillIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(PERM_DEALER_COUNTS_WRITE)),
+) -> PrefillOut:
+    item = _load(db, count_id)
+    _require_owner_or_admin(item, user)
+    result = prefill_sheet(db, item, sources=payload.sources, months=payload.months, refresh=payload.refresh)
+    _recount(item)
+    log_action(
+        db,
+        user_id=user.id,
+        action=ACTION_UPDATE,
+        entity_type="dealer_stock_count",
+        entity_id=str(item.id),
+        new_data={"prefill": result},
+        ip_address=get_client_ip(request),
+    )
+    db.commit()
+    db.refresh(item)
+    return PrefillOut(**result, count=_to_out(db, item, with_lines=True))
+
+
+@router.post("/{count_id}/claim", response_model=DealerCountOut, summary="Telefon ro'yxatni oladi (in_progress, web qulf)")
+def claim_count(
+    count_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(PERM_DEALER_COUNTS_WRITE)),
+) -> DealerCountOut:
+    item = _load(db, count_id)
+    claim_sheet(item, user)
+    log_action(
+        db,
+        user_id=user.id,
+        action=ACTION_UPDATE,
+        entity_type="dealer_stock_count",
+        entity_id=str(item.id),
+        new_data={"status": "in_progress", "assigned_to_user_id": str(user.id)},
+        ip_address=get_client_ip(request),
+    )
+    db.commit()
+    db.refresh(item)
+    return _to_out(db, item, with_lines=True)
+
+
+@router.post("/{count_id}/release", response_model=DealerCountOut, summary="Qulfni ochish (olgan xodim yoki admin)")
+def release_count(
+    count_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(PERM_DEALER_COUNTS_WRITE)),
+) -> DealerCountOut:
+    item = _load(db, count_id)
+    _require_counter_or_admin(item, user)
+    release_sheet(item)
+    log_action(
+        db,
+        user_id=user.id,
+        action=ACTION_UPDATE,
+        entity_type="dealer_stock_count",
+        entity_id=str(item.id),
+        new_data={"status": "draft", "released": True},
+        ip_address=get_client_ip(request),
+    )
+    db.commit()
+    db.refresh(item)
+    return _to_out(db, item, with_lines=True)
+
+
+@router.put("/{count_id}/counts", response_model=CountsOut, summary="Sanalgan qatorlarni yozish (telefon, idempotent)")
+def put_counts(
+    count_id: UUID,
+    payload: CountsIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(PERM_DEALER_COUNTS_WRITE)),
+) -> CountsOut:
+    item = _load(db, count_id)
+    _require_counter_or_admin(item, user)
+    result = apply_counts(db, item, user, [e.model_dump() for e in payload.entries])
+    _recount(item)
+    log_action(
+        db,
+        user_id=user.id,
+        action=ACTION_UPDATE,
+        entity_type="dealer_stock_count",
+        entity_id=str(item.id),
+        new_data={"counts": result},
+        ip_address=get_client_ip(request),
+    )
+    db.commit()
+    db.refresh(item)
+    return CountsOut(**result, count=_to_out(db, item, with_lines=True))
 
 
 @router.delete("/{count_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Draft sanovni o'chirish")

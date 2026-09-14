@@ -20,6 +20,7 @@ import '../../features/movements/presentation/movement_screen.dart';
 import '../../features/dealer_counts/presentation/dealer_count_screen.dart';
 import '../../features/dealer_counts/presentation/dealer_count_view_screen.dart';
 import '../../features/dealer_counts/presentation/dealer_counts_list_screen.dart';
+import '../../features/dealer_counts/presentation/dealer_sheet_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/picking/presentation/consolidated_pick_screen.dart';
 import '../../features/picking/presentation/pick_task_details_screen.dart';
@@ -210,6 +211,12 @@ final goRouterProvider = Provider<GoRouter>((Ref ref) {
         name: 'dealerCountDraft',
         builder: (BuildContext context, GoRouterState state) =>
             DealerCountScreen(draftId: state.pathParameters['draftId']!),
+      ),
+      GoRoute(
+        path: '/dealer-counts/sheet/:countId',
+        name: 'dealerSheet',
+        builder: (BuildContext context, GoRouterState state) =>
+            DealerSheetScreen(countId: state.pathParameters['countId']!),
       ),
       GoRoute(
         path: '/dealer-counts/view/:countId',

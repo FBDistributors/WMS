@@ -15,9 +15,14 @@ export type DealerCountLineOut = {
   sku: string | null
   product_name: string | null
   scanned_barcode: string
-  qty: number | string
+  /** null — tayyor ro'yxatdagi hali sanalmagan qator. */
+  qty: number | string | null
+  /** Ro'yxat to'ldirilgandagi Smartup soni. */
+  snapshot_qty: number | string | null
   expiry_date: string | null
   scanned_at: string | null
+  /** Xodim haqiqatan sanagan payt; "0 deb hisobla" qatorlarida null. */
+  counted_at: string | null
   seq: number
 }
 
@@ -28,16 +33,26 @@ export type DealerCountOut = {
   dealer_name: string | null
   counted_by_user_id: string
   counted_by_name: string | null
-  status: 'draft' | 'submitted'
+  status: DealerCountStatus
+  source: 'mobile' | 'web' | 'sheet'
   started_at: string
   submitted_at: string | null
   note: string | null
   lines_count: number
   total_units: number | string
+  /** Ro'yxatdagi jami qatorlar va haqiqatan sanalganlari ("45/693"). */
+  sheet_lines: number
+  counted_lines: number
+  assigned_to_user_id: string | null
+  assigned_to_name: string | null
+  claimed_at: string | null
+  uncounted_policy: 'zero' | 'keep' | null
   created_at: string
   warning?: string | null
   lines: DealerCountLineOut[]
 }
+
+export type DealerCountStatus = 'draft' | 'in_progress' | 'submitted'
 
 export type DealerCountListOut = {
   items: DealerCountOut[]
@@ -46,7 +61,8 @@ export type DealerCountListOut = {
 
 export type DealerCountListQuery = {
   dealer_org_id?: string
-  status?: 'draft' | 'submitted'
+  /** Bitta yoki vergul bilan: `draft,in_progress`. */
+  status?: string
   date_from?: string
   date_to?: string
   limit?: number
@@ -74,7 +90,9 @@ export async function getDealerCount(id: string) {
 export type DealerCountLineIn = {
   product_id?: string
   scanned_barcode: string
-  qty: number
+  /** Yo'q — ro'yxat qatori (sanalmagan) saqlanadi. */
+  qty?: number
+  snapshot_qty?: number
   expiry_date?: string
 }
 
@@ -84,6 +102,7 @@ export type DealerCountCreateIn = {
   note?: string
   lines: DealerCountLineIn[]
   submit?: boolean
+  source?: 'mobile' | 'web' | 'sheet'
 }
 
 export async function createDealerCount(payload: DealerCountCreateIn) {
@@ -97,8 +116,36 @@ export async function updateDealerCount(id: string, payload: { note?: string; li
   })
 }
 
-export async function submitDealerCount(id: string) {
+/** `uncounted`: sanalmagan qatorlar — `zero` (0 deb yoziladi) yoki `keep` (bo'sh qoladi). */
+export async function submitDealerCount(id: string, uncounted: 'zero' | 'keep' = 'zero') {
   return fetchJSON<DealerCountOut>(`/api/v1/dealer-counts/${encodeURIComponent(id)}/submit`, {
+    method: 'POST',
+    body: {},
+    query: { uncounted },
+  })
+}
+
+// --- tayyor ro'yxat (ведомость) ---
+
+export type PrefillSource = 'smartup' | 'shipped' | 'all'
+
+export type PrefillOut = {
+  added: number
+  skipped: number
+  not_in_catalog: number
+  sources: PrefillSource[]
+  count: DealerCountOut
+}
+
+export async function prefillDealerCount(id: string, sources: PrefillSource[], months = 6) {
+  return fetchJSON<PrefillOut>(`/api/v1/dealer-counts/${encodeURIComponent(id)}/prefill`, {
+    method: 'POST',
+    body: { sources, months },
+  })
+}
+
+export async function releaseDealerCount(id: string) {
+  return fetchJSON<DealerCountOut>(`/api/v1/dealer-counts/${encodeURIComponent(id)}/release`, {
     method: 'POST',
     body: {},
   })
@@ -115,6 +162,8 @@ export type DealerCountCompareRow = {
   smartup: number
   diff: number
   only_in: 'count' | 'smartup' | null
+  /** Xodim haqiqatan sanaganmi (ro'yxatdagi sanalmagan qator 0 deb olinadi). */
+  is_counted: boolean
 }
 
 export type DealerCountCompareOut = {
@@ -124,6 +173,7 @@ export type DealerCountCompareOut = {
   balance_date: string
   loaded_at: string
   unknown_lines: number
+  uncounted_skus: number
   totals: {
     counted: number
     smartup: number

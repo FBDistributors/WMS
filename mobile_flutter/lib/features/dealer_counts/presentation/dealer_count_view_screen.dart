@@ -59,7 +59,10 @@ class DealerCountViewScreen extends ConsumerWidget {
                     '${l.expiryDate != null ? ' · ${formatExpiryMonthYear(l.expiryDate)}' : ''}',
                     style: const TextStyle(fontFamily: 'monospace'),
                   ),
-                  trailing: Text(formatPickQty(l.qty), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                  trailing: Text(
+                    l.qty == null ? '—' : formatPickQty(l.qty!),
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                  ),
                 ),
               ),
             ),

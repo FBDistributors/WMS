@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, FileSpreadsheet, Plus, Save, Send, Store, Trash2, X } from 'lucide-react'
+import { FileSpreadsheet, ListPlus, LockOpen, Plus, Save, Send, Store, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 
@@ -11,15 +11,20 @@ import { Card } from '../../components/ui/card'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { LoadingOverlay } from '../../components/ui/LoadingOverlay'
 import { useAppToast } from '../../feedback/useAppToast'
+import { useAuth } from '../../rbac/AuthProvider'
 import {
   createDealerCount,
   deleteDealerCount,
   getDealerCount,
   getDealers,
+  prefillDealerCount,
+  releaseDealerCount,
   submitDealerCount,
   updateDealerCount,
   type DealerCountOut,
+  type DealerCountStatus,
   type DealerOut,
+  type PrefillSource,
 } from '../../services/dealerCountsApi'
 import { getProducts, type Product } from '../../services/productsApi'
 import { resolveBarcode } from '../../services/scannerApi'
@@ -63,13 +68,19 @@ export function DealerCountEditPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { showError, showSuccess } = useAppToast()
+  const { has } = useAuth()
 
   const [dealers, setDealers] = useState<DealerOut[]>([])
   const [dealerId, setDealerId] = useState('')
   const [note, setNote] = useState('')
   const [rows, setRows] = useState<EditRow[]>(() => [emptyRow()])
   const [countId, setCountId] = useState<string | null>(id ?? null)
-  const [status, setStatus] = useState<'draft' | 'submitted'>('draft')
+  const [status, setStatus] = useState<DealerCountStatus>('draft')
+  const [assignedName, setAssignedName] = useState<string | null>(null)
+  const [prefillOpen, setPrefillOpen] = useState(false)
+  const [prefillSources, setPrefillSources] = useState<PrefillSource[]>(['smartup'])
+  // Yuborishda sanalmagan qatorlar: 0 deb yozish (standart) yoki bo'sh qoldirish.
+  const [uncountedPolicy, setUncountedPolicy] = useState<'zero' | 'keep'>('zero')
   const [loading, setLoading] = useState(Boolean(id))
   const [busy, setBusy] = useState(false)
   const [dirty, setDirty] = useState(false)
@@ -98,6 +109,7 @@ export function DealerCountEditPage() {
         setDealerId(c.dealer_org_id)
         setNote(c.note ?? '')
         setStatus(c.status)
+        setAssignedName(c.assigned_to_name)
         setRows([...rowsFromCount(c), emptyRow()])
       })
       .catch((err) => showError(err instanceof Error ? err.message : t('admin:dealer_counts.load_failed')))
@@ -235,7 +247,7 @@ export function DealerCountEditPage() {
       if (countId) {
         saved = await updateDealerCount(countId, { note: note.trim() || undefined, lines })
       } else {
-        saved = await createDealerCount({ client_uuid: clientUuid(), dealer_org_id: dealerId, note: note.trim() || undefined, lines, submit: false })
+        saved = await createDealerCount({ client_uuid: clientUuid(), dealer_org_id: dealerId, note: note.trim() || undefined, lines, submit: false, source: 'web' })
         setCountId(saved.id)
         try {
           sessionStorage.removeItem(CLIENT_UUID_KEY)
@@ -262,7 +274,7 @@ export function DealerCountEditPage() {
     if (!savedId) return
     setBusy(true)
     try {
-      const res = await submitDealerCount(savedId)
+      const res = await submitDealerCount(savedId, uncountedPolicy)
       setDirty(false)
       showSuccess(res.warning ? `${t('admin:dealer_counts.submit_ok')} — ${res.warning}` : t('admin:dealer_counts.submit_ok'))
       navigate(`/admin/dealer-counts/${savedId}`)
@@ -291,8 +303,48 @@ export function DealerCountEditPage() {
     }
   }
 
+  /** Ro'yxatni manbalardan to'ldirish (serverda) — mavjud qatorlarga tegmaydi. */
+  const prefill = async () => {
+    setPrefillOpen(false)
+    let cid = countId
+    if (!cid) {
+      // Avval hujjat bo'lishi kerak — bo'sh draft yaratiladi.
+      cid = await save()
+      if (!cid) return
+    }
+    setBusy(true)
+    try {
+      const r = await prefillDealerCount(cid, prefillSources)
+      setStatus(r.count.status)
+      setRows([...rowsFromCount(r.count), emptyRow()])
+      setDirty(false)
+      showSuccess(t('admin:dealer_counts.prefill_result', { added: r.added, skipped: r.skipped, missing: r.not_in_catalog }))
+    } catch (err) {
+      showError(err instanceof Error ? err.message : t('admin:dealer_counts.save_failed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** Telefon qulfini ochish (admin): in_progress → draft. */
+  const release = async () => {
+    if (!countId) return
+    setBusy(true)
+    try {
+      const c = await releaseDealerCount(countId)
+      setStatus(c.status)
+      setAssignedName(null)
+      setRows([...rowsFromCount(c), emptyRow()])
+    } catch (err) {
+      showError(err instanceof Error ? err.message : t('admin:dealer_counts.save_failed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const dealerName = dealers.find((d) => d.org_id === dealerId)?.name ?? ''
-  const frozen = status === 'submitted'
+  const locked = status === 'in_progress'
+  const frozen = status === 'submitted' || locked
 
   return (
     <AdminLayout
@@ -304,14 +356,21 @@ export function DealerCountEditPage() {
           </span>
         </div>
       }
+      backTo="/admin/dealer-counts"
       actionSlot={
         <div className="flex flex-wrap gap-2">
-          <Button variant="ghost" onClick={() => navigate('/admin/dealer-counts')}>
-            <ArrowLeft size={16} className="mr-1" />
-            {t('common:buttons.back')}
-          </Button>
+          {locked && has('admin:access') ? (
+            <Button variant="ghost" disabled={busy} onClick={() => void release()}>
+              <LockOpen size={16} className="mr-1" />
+              {t('admin:dealer_counts.release')}
+            </Button>
+          ) : null}
           {!frozen ? (
             <>
+              <Button variant="ghost" disabled={busy || !dealerId} onClick={() => setPrefillOpen(true)}>
+                <ListPlus size={16} className="mr-1" />
+                {t('admin:dealer_counts.prefill_button')}
+              </Button>
               <Button variant="ghost" disabled={busy} onClick={() => setImportOpen(true)}>
                 <FileSpreadsheet size={16} className="mr-1" />
                 {t('admin:dealer_counts.import_excel')}
@@ -324,7 +383,7 @@ export function DealerCountEditPage() {
                 <Save size={16} className="mr-1" />
                 {t('admin:dealer_counts.save')}
               </Button>
-              <Button disabled={busy || sum.lines === 0 || sum.missingQty > 0 || !dealerId} onClick={() => setConfirmSubmit(true)}>
+              <Button disabled={busy || sum.lines === 0 || !dealerId} onClick={() => setConfirmSubmit(true)}>
                 <Send size={16} className="mr-1" />
                 {t('admin:dealer_counts.submit')}
               </Button>
@@ -335,6 +394,12 @@ export function DealerCountEditPage() {
     >
       <div className="relative">
         {loading || busy ? <LoadingOverlay label={t('common:messages.loading')} /> : null}
+
+        {locked ? (
+          <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-200">
+            {t('admin:dealer_counts.locked_banner', { name: assignedName ?? '—' })}
+          </div>
+        ) : null}
 
         <Card className="mb-4 p-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -379,7 +444,9 @@ export function DealerCountEditPage() {
               </span>
             ) : null}
             {sum.missingQty > 0 ? (
-              <span className="ml-2 text-rose-600">{t('admin:dealer_counts.qty_missing', { count: sum.missingQty })}</span>
+              <span className="ml-2 text-amber-700 dark:text-amber-300">
+                {t('admin:dealer_counts.uncounted_rows', { count: sum.missingQty, total: sum.sheet })}
+              </span>
             ) : null}
             {dirty ? <span className="ml-2 text-rose-600">{t('admin:dealer_counts.unsaved')}</span> : null}
           </div>
@@ -393,6 +460,9 @@ export function DealerCountEditPage() {
                   <th className="w-10 px-2 py-2 text-left">#</th>
                   <th className="w-56 px-2 py-2 text-left">{t('admin:dealer_counts.col_code')}</th>
                   <th className="px-2 py-2 text-left">{t('admin:dealer_counts.col_product')}</th>
+                  <th className="w-24 px-2 py-2 text-right" title={t('admin:dealer_counts.col_snapshot_hint')}>
+                    {t('admin:dealer_counts.col_snapshot')}
+                  </th>
                   <th className="w-28 px-2 py-2 text-left">{t('admin:dealer_counts.col_qty')}</th>
                   <th className="w-40 px-2 py-2 text-left">{t('admin:dealer_counts.col_expiry')}</th>
                   <th className="w-10 px-2 py-2" />
@@ -460,6 +530,9 @@ export function DealerCountEditPage() {
                         </span>
                       )}
                     </td>
+                    <td className="px-2 py-1.5 text-right tabular-nums text-slate-400">
+                      {r.snapshotQty != null ? fmtUnits(r.snapshotQty) : ''}
+                    </td>
                     <td className="px-2 py-1.5">
                       <input
                         ref={(el) => {
@@ -521,8 +594,71 @@ export function DealerCountEditPage() {
       </div>
 
       <DealerCountImportDialog open={importOpen} onClose={() => setImportOpen(false)} onAdd={addImported} />
+      {prefillOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+          <button type="button" className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={() => setPrefillOpen(false)} aria-label={t('common:buttons.close')} />
+          <div className="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-950" role="dialog" aria-modal="true">
+            <div className="text-base font-semibold">{t('admin:dealer_counts.prefill_title')}</div>
+            <p className="mt-1 text-xs text-slate-500">{t('admin:dealer_counts.prefill_hint')}</p>
+            <div className="mt-4 space-y-2 text-sm">
+              {(['smartup', 'shipped', 'all'] as PrefillSource[]).map((src) => (
+                <label key={src} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={prefillSources.includes(src)}
+                    onChange={(e) =>
+                      setPrefillSources((prev) => (e.target.checked ? [...prev, src] : prev.filter((s) => s !== src)))
+                    }
+                  />
+                  <span>{t(`admin:dealer_counts.prefill_src_${src}`)}</span>
+                </label>
+              ))}
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setPrefillOpen(false)}>
+                {t('common:buttons.cancel')}
+              </Button>
+              <Button disabled={prefillSources.length === 0} onClick={() => void prefill()}>
+                {t('admin:dealer_counts.prefill_button')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {confirmSubmit && sum.missingQty > 0 ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+          <button type="button" className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={() => setConfirmSubmit(false)} aria-label={t('common:buttons.close')} />
+          <div className="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-950" role="dialog" aria-modal="true">
+            <div className="text-base font-semibold">{t('admin:dealer_counts.submit')}</div>
+            <p className="mt-2 text-sm">
+              {t('admin:dealer_counts.submit_confirm', { dealer: dealerName, lines: sum.lines, units: fmtUnits(sum.units) })}
+            </p>
+            <p className="mt-3 text-sm font-medium text-amber-700 dark:text-amber-300">
+              {t('admin:dealer_counts.uncounted_question', { count: sum.missingQty })}
+            </p>
+            <div className="mt-2 space-y-2 text-sm">
+              <label className="flex items-start gap-2">
+                <input type="radio" name="uncounted" checked={uncountedPolicy === 'zero'} onChange={() => setUncountedPolicy('zero')} />
+                <span>{t('admin:dealer_counts.uncounted_zero')}</span>
+              </label>
+              <label className="flex items-start gap-2">
+                <input type="radio" name="uncounted" checked={uncountedPolicy === 'keep'} onChange={() => setUncountedPolicy('keep')} />
+                <span>{t('admin:dealer_counts.uncounted_keep')}</span>
+              </label>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setConfirmSubmit(false)}>
+                {t('common:buttons.cancel')}
+              </Button>
+              <Button disabled={busy} onClick={() => void submit()}>
+                {t('admin:dealer_counts.submit')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <ConfirmDialog
-        open={confirmSubmit}
+        open={confirmSubmit && sum.missingQty === 0}
         title={t('admin:dealer_counts.submit')}
         message={t('admin:dealer_counts.submit_confirm', { dealer: dealerName, lines: sum.lines, units: fmtUnits(sum.units) })}
         confirmLabel={t('admin:dealer_counts.submit')}

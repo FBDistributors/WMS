@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowLeft, Download, GitCompareArrows, RefreshCw, Store } from 'lucide-react'
+import { Download, GitCompareArrows, RefreshCw, Store } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
@@ -19,7 +19,8 @@ import {
 } from '../../services/dealerCountsApi'
 import { writeExcelFile } from '../../utils/exportExcel'
 
-function fmtUnits(v: number | string) {
+function fmtUnits(v: number | string | null) {
+  if (v == null) return '—'
   const n = typeof v === 'string' ? Number(v) : v
   return Number.isFinite(n) ? n.toLocaleString('en-US') : '—'
 }
@@ -108,7 +109,13 @@ export function DealerCountDetailsPage() {
       SKU: ln.sku ?? '',
       [t('admin:dealer_counts.col_product')]: ln.product_name ?? t('admin:dealer_counts.unknown_barcode'),
       [t('admin:dealer_counts.col_barcode')]: ln.scanned_barcode,
-      [t('admin:dealer_counts.col_qty')]: Number(ln.qty),
+      [t('admin:dealer_counts.col_snapshot')]: ln.snapshot_qty == null ? '' : Number(ln.snapshot_qty),
+      [t('admin:dealer_counts.col_qty')]: ln.qty == null ? '' : Number(ln.qty),
+      [t('admin:dealer_counts.col_state')]: ln.counted_at
+        ? t('admin:dealer_counts.state_counted')
+        : ln.qty == null
+          ? t('admin:dealer_counts.state_uncounted')
+          : t('admin:dealer_counts.state_zeroed'),
       [t('admin:dealer_counts.col_expiry')]: ln.expiry_date ? ln.expiry_date.slice(0, 7) : '',
     }))
     const ws = XLSX.utils.json_to_sheet(rows)
@@ -149,13 +156,10 @@ export function DealerCountDetailsPage() {
           <span className="text-sm font-semibold">{item.dealer_name ?? item.dealer_org_id}</span>
         </div>
       }
+      backTo="/admin/dealer-counts"
       actionSlot={
         <div className="flex gap-2">
-          <Button variant="ghost" onClick={() => navigate('/admin/dealer-counts')}>
-            <ArrowLeft size={16} className="mr-1" />
-            {t('common:buttons.back')}
-          </Button>
-          {item.status === 'draft' ? (
+          {item.status !== 'submitted' ? (
             <Button variant="ghost" onClick={() => navigate(`/admin/dealer-counts/${item.id}/edit`)}>
               {t('admin:dealer_counts.edit_button')}
             </Button>
@@ -252,6 +256,11 @@ export function DealerCountDetailsPage() {
               {compare.totals.only_in_count} {t('admin:dealer_counts.compare_only_count')}
               {' · '}
               {compare.totals.only_in_smartup} {t('admin:dealer_counts.compare_only_smartup')}
+              {compare.uncounted_skus > 0 ? (
+                <span className="ml-2 text-amber-700 dark:text-amber-300">
+                  {t('admin:dealer_counts.compare_uncounted', { count: compare.uncounted_skus })}
+                </span>
+              ) : null}
             </div>
             {compare.unknown_lines > 0 ? (
               <div className="mt-1 text-xs text-amber-700 dark:text-amber-300">
@@ -282,6 +291,9 @@ export function DealerCountDetailsPage() {
                             ? t('admin:dealer_counts.compare_only_count')
                             : t('admin:dealer_counts.compare_only_smartup')}
                         </span>
+                      ) : null}
+                      {!r.is_counted && r.only_in !== 'smartup' ? (
+                        <span className="ml-2 text-xs text-amber-700 dark:text-amber-300">{t('admin:dealer_counts.state_uncounted')}</span>
                       ) : null}
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums sm:px-4">{fmtUnits(r.counted)}</td>
@@ -318,7 +330,9 @@ export function DealerCountDetailsPage() {
                   <th className="px-3 py-3 text-left sm:px-4">SKU</th>
                   <th className="px-3 py-3 text-left sm:px-4">{t('admin:dealer_counts.col_product')}</th>
                   <th className="px-3 py-3 text-left sm:px-4">{t('admin:dealer_counts.col_barcode')}</th>
+                  <th className="px-3 py-3 text-right sm:px-4">{t('admin:dealer_counts.col_snapshot')}</th>
                   <th className="px-3 py-3 text-right sm:px-4">{t('admin:dealer_counts.col_qty')}</th>
+                  <th className="px-3 py-3 text-left sm:px-4">{t('admin:dealer_counts.col_state')}</th>
                   <th className="px-3 py-3 text-left sm:px-4">{t('admin:dealer_counts.col_expiry')}</th>
                 </tr>
               </thead>
@@ -341,7 +355,21 @@ export function DealerCountDetailsPage() {
                       )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 font-mono text-xs sm:px-4">{ln.scanned_barcode}</td>
-                    <td className="px-3 py-2 text-right tabular-nums font-semibold sm:px-4">{fmtUnits(ln.qty)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-slate-400 sm:px-4">
+                      {ln.snapshot_qty == null ? '' : fmtUnits(ln.snapshot_qty)}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums font-semibold sm:px-4">
+                      {ln.qty == null ? '—' : fmtUnits(ln.qty)}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-xs sm:px-4">
+                      {ln.counted_at ? (
+                        <span className="text-emerald-700 dark:text-emerald-300">{t('admin:dealer_counts.state_counted')}</span>
+                      ) : ln.qty == null ? (
+                        <span className="text-amber-700 dark:text-amber-300">{t('admin:dealer_counts.state_uncounted')}</span>
+                      ) : (
+                        <span className="text-slate-400">{t('admin:dealer_counts.state_zeroed')}</span>
+                      )}
+                    </td>
                     <td className="whitespace-nowrap px-3 py-2 sm:px-4">{fmtExpiry(ln.expiry_date)}</td>
                   </tr>
                 ))}

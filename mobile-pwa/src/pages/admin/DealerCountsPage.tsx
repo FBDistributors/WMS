@@ -43,7 +43,7 @@ export function DealerCountsPage() {
   const { showError } = useAppToast()
   const [dealers, setDealers] = useState<DealerOut[]>([])
   const [dealerId, setDealerId] = useState('')
-  const [status, setStatus] = useState<'' | 'draft' | 'submitted'>('submitted')
+  const [status, setStatus] = useState<string>('submitted')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [items, setItems] = useState<DealerCountOut[]>([])
@@ -129,13 +129,15 @@ export function DealerCountsPage() {
               className={inputCls}
               value={status}
               onChange={(e) => {
-                setStatus(e.target.value as '' | 'draft' | 'submitted')
+                setStatus(e.target.value)
                 resetPage()
               }}
             >
               <option value="">{t('admin:dealer_counts.status_all')}</option>
               <option value="submitted">{t('admin:dealer_counts.status_submitted')}</option>
+              <option value="draft,in_progress">{t('admin:dealer_counts.status_open')}</option>
               <option value="draft">{t('admin:dealer_counts.status_draft')}</option>
+              <option value="in_progress">{t('admin:dealer_counts.status_in_progress')}</option>
             </select>
           </label>
           <label className="flex flex-col gap-1 text-xs text-slate-500">
@@ -198,7 +200,7 @@ export function DealerCountsPage() {
                     className="cursor-pointer border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40"
                     onClick={() =>
                       navigate(
-                        row.status === 'draft' && has('dealer_counts:write')
+                        row.status !== 'submitted' && has('dealer_counts:write')
                           ? `/admin/dealer-counts/${row.id}/edit`
                           : `/admin/dealer-counts/${row.id}`,
                       )
@@ -210,7 +212,9 @@ export function DealerCountsPage() {
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 sm:px-4">{fmtDate(row.submitted_at ?? row.started_at)}</td>
                     <td className="px-3 py-3 sm:px-4">{row.counted_by_name ?? '—'}</td>
-                    <td className="px-3 py-3 text-right tabular-nums sm:px-4">{row.lines_count}</td>
+                    <td className="px-3 py-3 text-right tabular-nums sm:px-4">
+                      {row.status === 'submitted' ? row.lines_count : `${row.counted_lines}/${row.sheet_lines}`}
+                    </td>
                     <td className="px-3 py-3 text-right tabular-nums sm:px-4">{fmtUnits(row.total_units)}</td>
                     <td className="px-3 py-3 sm:px-4">
                       <span
@@ -222,7 +226,9 @@ export function DealerCountsPage() {
                       >
                         {row.status === 'submitted'
                           ? t('admin:dealer_counts.status_submitted')
-                          : t('admin:dealer_counts.status_draft')}
+                          : row.status === 'in_progress'
+                            ? `${t('admin:dealer_counts.status_in_progress')} · ${row.assigned_to_name ?? ''}`
+                            : t('admin:dealer_counts.status_draft')}
                       </span>
                     </td>
                   </tr>

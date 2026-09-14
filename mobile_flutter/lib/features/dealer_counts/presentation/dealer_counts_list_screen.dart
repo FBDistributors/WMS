@@ -51,6 +51,7 @@ class DealerCountsListScreen extends ConsumerWidget {
     final AppLocale loc = ref.watch(appLocaleProvider);
     final AsyncValue<List<DealerCountDraft>> drafts = ref.watch(dealerCountDraftsProvider);
     final AsyncValue<List<DealerCount>> sent = ref.watch(myDealerCountsProvider);
+    final AsyncValue<List<DealerCount>> sheets = ref.watch(dealerSheetsProvider);
     final ColorScheme cs = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -67,6 +68,7 @@ class DealerCountsListScreen extends ConsumerWidget {
         onRefresh: () async {
           ref.invalidate(dealerCountDraftsProvider);
           ref.invalidate(myDealerCountsProvider);
+          ref.invalidate(dealerSheetsProvider);
         },
         child: ListView(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
@@ -92,6 +94,44 @@ class DealerCountsListScreen extends ConsumerWidget {
                                 onTap: () => context.pushNamed(
                                   'dealerCountDraft',
                                   pathParameters: <String, String>{'draftId': d.clientUuid},
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(growable: false),
+                    ),
+              loading: () => const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              error: (Object e, _) => _Empty(localizeApiErrorMessage(loc, e)),
+            ),
+            const SizedBox(height: 16),
+            // Serverda tayyorlangan ro'yxatlar (web'da to'ldirilgan) — ochilganda telefonga
+            // yuklanadi va qulflanadi; boshqa xodim olgan bo'lsa kim olgani ko'rinadi.
+            _SectionTitle(StringLookup.t(loc, 'dealerSheetsTitle')),
+            sheets.when(
+              data: (List<DealerCount> list) => list.isEmpty
+                  ? _Empty(StringLookup.t(loc, 'dealerCountsEmpty'))
+                  : Column(
+                      children: list
+                          .map(
+                            (DealerCount c) => Card(
+                              child: ListTile(
+                                leading: Icon(
+                                  c.status == 'in_progress' ? Icons.phone_android : Icons.list_alt,
+                                  color: c.status == 'in_progress' ? Colors.orange : cs.primary,
+                                ),
+                                title: Text(c.dealerName ?? c.dealerOrgId),
+                                subtitle: Text(
+                                  '${StringLookup.tParams(loc, 'dealerSheetProgress', <String, String>{'done': '${c.countedLines}', 'total': '${c.sheetLines}'})}'
+                                  '${c.status == 'in_progress' && c.assignedToName != null ? '\n${StringLookup.tParams(loc, 'dealerSheetLockedBy', <String, String>{'name': c.assignedToName!})}' : ''}',
+                                ),
+                                isThreeLine: c.status == 'in_progress' && c.assignedToName != null,
+                                trailing: const Icon(Icons.chevron_right),
+                                onTap: () => context.pushNamed(
+                                  'dealerSheet',
+                                  pathParameters: <String, String>{'countId': c.id},
                                 ),
                               ),
                             ),

@@ -23,6 +23,9 @@ export type EditRow = {
   status: RowStatus
   /** Quti kodi skanerlangan bo'lsa — hajm (faqat maslahat, avtomatik yozilmaydi). */
   boxUnits?: number
+  /** Tayyor ro'yxat: Smartup soni (snapshot) va haqiqatan sanalgan payt. */
+  snapshotQty?: number | null
+  countedAt?: string | null
 }
 
 let _seq = 0
@@ -84,12 +87,16 @@ export function rowsToApiLines(rows: EditRow[]): DealerCountLineIn[] {
   for (const r of rows) {
     const qty = parseQty(r.qty)
     const code = r.code.trim()
-    if (qty <= 0 || (!r.productId && !code)) continue
+    if (!r.productId && !code) continue
+    // Tanilmagan kod faqat miqdor bilan ma'noli; tanilgan mahsulot esa miqdorsiz ham
+    // ro'yxat qatori sifatida saqlanadi (telefonda sanaladi).
+    if (!r.productId && qty <= 0) continue
     const exp = expiryToApi(r.expiry)
     out.push({
       ...(r.productId ? { product_id: r.productId } : {}),
       scanned_barcode: code.slice(0, 64),
-      qty,
+      ...(qty > 0 || r.qty.trim() !== '' ? { qty } : {}),
+      ...(r.snapshotQty != null ? { snapshot_qty: r.snapshotQty } : {}),
       ...(exp ? { expiry_date: exp } : {}),
     })
   }
@@ -103,22 +110,26 @@ export function rowsFromCount(count: DealerCountOut): EditRow[] {
     productId: ln.product_id,
     sku: ln.sku,
     name: ln.product_name,
-    qty: String(Number(ln.qty)),
+    qty: ln.qty == null ? '' : String(Number(ln.qty)),
     expiry: expiryFromApi(ln.expiry_date),
     status: ln.product_id ? 'ok' : 'unknown',
+    snapshotQty: ln.snapshot_qty == null ? null : Number(ln.snapshot_qty),
+    countedAt: ln.counted_at ?? null,
   }))
 }
 
-export function totals(rows: EditRow[]): { lines: number; units: number; unknown: number; missingQty: number } {
+export function totals(rows: EditRow[]): { lines: number; units: number; unknown: number; missingQty: number; sheet: number } {
   let lines = 0
   let units = 0
   let unknown = 0
   let missingQty = 0
+  let sheet = 0
   for (const r of rows) {
     if (r.status === 'empty' || r.status === 'resolving') continue
+    sheet += 1
     const q = parseQty(r.qty)
-    if (q <= 0) {
-      // Mahsulot tanilgan, lekin fakt qoldiq yozilmagan — yuborishga yo'l qo'yilmaydi.
+    if (r.qty.trim() === '') {
+      // Ro'yxat qatori — hali sanalmagan; yuborishda zero/keep rejimi hal qiladi.
       missingQty += 1
       continue
     }
@@ -126,7 +137,7 @@ export function totals(rows: EditRow[]): { lines: number; units: number; unknown
     units += q
     if (r.status === 'unknown') unknown += 1
   }
-  return { lines, units, unknown, missingQty }
+  return { lines, units, unknown, missingQty, sheet }
 }
 
 // --- Excel ---
