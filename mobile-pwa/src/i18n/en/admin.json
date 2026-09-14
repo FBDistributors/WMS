@@ -668,6 +668,8 @@
     "import_failed": "Could not read the file",
     "import_found": "Found: {{known}} products, {{unknown}} unknown codes",
     "import_include_unknown": "Also add unknown codes (as raw codes)",
-    "import_add": "Add to table ({{count}})"
+    "import_add": "Add to table ({{count}})",
+    "qty_missing": "{{count}} row(s) have no actual stock entered",
+    "box_units_hint": "Add box size ({{n}} units)"
   }
 }

@@ -135,13 +135,14 @@ export function DealerCountEditPage() {
     if (!code) return
     setSuggest(null)
     patchRow(row.key, { code, status: 'resolving' })
-    let resolved: EditRow = { ...row, code, status: 'unknown', productId: null, sku: null, name: null }
-    let boxUnits: number | null = null
+    // Fakt qoldiqni xodim o'zi yozadi — "1" yoki quti hajmi avtomatik qo'yilmaydi
+    // (tasodifan saqlab yuborish xavfi). Quti kodi bo'lsa hajm faqat maslahat tugmasi.
+    let resolved: EditRow = { ...row, code, status: 'unknown', productId: null, sku: null, name: null, boxUnits: undefined }
     try {
       const r = await resolveBarcode(code)
       if (r.type === 'PRODUCT' && r.product) {
         resolved = { ...resolved, productId: r.product.id, name: r.product.name, status: 'ok' }
-        if (r.scan_kind === 'box' && (r.units_per_scan ?? 0) > 0) boxUnits = r.units_per_scan as number
+        if (r.scan_kind === 'box' && (r.units_per_scan ?? 0) > 0) resolved = { ...resolved, boxUnits: r.units_per_scan as number }
       } else {
         const list = await getProducts({ search: code, limit: 5 })
         const exact = list.items.find((p) => p.sku.toLowerCase() === code.toLowerCase() || p.barcode === code)
@@ -150,8 +151,6 @@ export function DealerCountEditPage() {
     } catch {
       // internet yo'q / xato — tanilmagan sifatida qoladi, server yuborishda yana urinadi
     }
-    if (boxUnits && !parseQty(resolved.qty)) resolved = { ...resolved, qty: String(boxUnits) }
-    if (!parseQty(resolved.qty) && resolved.status === 'ok') resolved = { ...resolved, qty: '1' }
     setRows((prev) => {
       const { rows: next, mergedInto } = mergeResolvedRow(prev, resolved)
       if (mergedInto) {
@@ -185,7 +184,7 @@ export function DealerCountEditPage() {
 
   const pickSuggestion = (row: EditRow, p: Product) => {
     setSuggest(null)
-    const resolved: EditRow = { ...row, code: p.sku, productId: p.id, sku: p.sku, name: p.name, status: 'ok', qty: row.qty || '1' }
+    const resolved: EditRow = { ...row, code: p.sku, productId: p.id, sku: p.sku, name: p.name, status: 'ok', boxUnits: undefined }
     setRows((prev) => {
       const { rows: next, mergedInto } = mergeResolvedRow(prev, resolved)
       if (mergedInto) {
@@ -325,7 +324,7 @@ export function DealerCountEditPage() {
                 <Save size={16} className="mr-1" />
                 {t('admin:dealer_counts.save')}
               </Button>
-              <Button disabled={busy || sum.lines === 0 || !dealerId} onClick={() => setConfirmSubmit(true)}>
+              <Button disabled={busy || sum.lines === 0 || sum.missingQty > 0 || !dealerId} onClick={() => setConfirmSubmit(true)}>
                 <Send size={16} className="mr-1" />
                 {t('admin:dealer_counts.submit')}
               </Button>
@@ -378,6 +377,9 @@ export function DealerCountEditPage() {
               <span className="ml-2 text-amber-700 dark:text-amber-300">
                 {t('admin:dealer_counts.unknown_hint', { count: sum.unknown })}
               </span>
+            ) : null}
+            {sum.missingQty > 0 ? (
+              <span className="ml-2 text-rose-600">{t('admin:dealer_counts.qty_missing', { count: sum.missingQty })}</span>
             ) : null}
             {dirty ? <span className="ml-2 text-rose-600">{t('admin:dealer_counts.unsaved')}</span> : null}
           </div>
@@ -475,6 +477,16 @@ export function DealerCountEditPage() {
                           }
                         }}
                       />
+                      {r.boxUnits && !frozen ? (
+                        <button
+                          type="button"
+                          className="mt-1 text-xs text-indigo-600 hover:underline dark:text-indigo-300"
+                          title={t('admin:dealer_counts.box_units_hint', { n: r.boxUnits })}
+                          onClick={() => patchRow(r.key, { qty: String(parseQty(r.qty) + (r.boxUnits ?? 0)) })}
+                        >
+                          +{r.boxUnits}
+                        </button>
+                      ) : null}
                     </td>
                     <td className="px-2 py-1.5">
                       <input

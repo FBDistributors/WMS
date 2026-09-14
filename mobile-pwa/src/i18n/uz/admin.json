@@ -668,6 +668,8 @@
     "import_failed": "Faylni o'qib bo'lmadi",
     "import_found": "Topildi: {{known}} ta mahsulot, {{unknown}} ta tanilmagan kod",
     "import_include_unknown": "Tanilmagan kodlarni ham qo'shish (xom kod bilan)",
-    "import_add": "Jadvalga qo'shish ({{count}})"
+    "import_add": "Jadvalga qo'shish ({{count}})",
+    "qty_missing": "{{count}} ta qatorda fakt qoldiq kiritilmagan",
+    "box_units_hint": "Quti hajmini qo'shish ({{n}} dona)"
   }
 }

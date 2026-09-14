@@ -21,6 +21,8 @@ export type EditRow = {
   /** `YYYY-MM` yoki bo'sh. */
   expiry: string
   status: RowStatus
+  /** Quti kodi skanerlangan bo'lsa — hajm (faqat maslahat, avtomatik yozilmaydi). */
+  boxUnits?: number
 }
 
 let _seq = 0
@@ -107,18 +109,24 @@ export function rowsFromCount(count: DealerCountOut): EditRow[] {
   }))
 }
 
-export function totals(rows: EditRow[]): { lines: number; units: number; unknown: number } {
+export function totals(rows: EditRow[]): { lines: number; units: number; unknown: number; missingQty: number } {
   let lines = 0
   let units = 0
   let unknown = 0
+  let missingQty = 0
   for (const r of rows) {
+    if (r.status === 'empty' || r.status === 'resolving') continue
     const q = parseQty(r.qty)
-    if (q <= 0 || r.status === 'empty' || r.status === 'resolving') continue
+    if (q <= 0) {
+      // Mahsulot tanilgan, lekin fakt qoldiq yozilmagan — yuborishga yo'l qo'yilmaydi.
+      missingQty += 1
+      continue
+    }
     lines += 1
     units += q
     if (r.status === 'unknown') unknown += 1
   }
-  return { lines, units, unknown }
+  return { lines, units, unknown, missingQty }
 }
 
 // --- Excel ---

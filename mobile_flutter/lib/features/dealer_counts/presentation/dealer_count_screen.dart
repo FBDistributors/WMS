@@ -95,8 +95,10 @@ class _DealerCountScreenState extends ConsumerState<DealerCountScreen> {
     setState(() => _busy = true);
     String? productId;
     String? productName;
-    double defaultQty = 1;
-    String? boxHint;
+    // Fakt qoldiqni xodim o'zi yozadi — tizim "1" yoki quti hajmini oldindan
+    // qo'ymaydi (tasodifan tasdiqlab yuborish xavfi). Quti kodi bo'lsa hajm faqat
+    // maslahat: bitta bosishda qo'yiladi.
+    int? boxUnits;
     bool resolveFailed = false;
     try {
       final ScannerResolveOut r = await ref.read(scannerRepositoryProvider).resolveBarcode(code);
@@ -104,8 +106,7 @@ class _DealerCountScreenState extends ConsumerState<DealerCountScreen> {
         productId = r.productId;
         productName = r.productName;
         if ((r.scanKind ?? '').toLowerCase() == 'box' && (r.unitsPerScan ?? 0) > 0) {
-          defaultQty = r.unitsPerScan!.toDouble();
-          boxHint = StringLookup.tParams(_loc, 'dealerCountBoxHint', <String, String>{'n': '${r.unitsPerScan}'});
+          boxUnits = r.unitsPerScan;
         }
       } else {
         resolveFailed = true;
@@ -137,9 +138,9 @@ class _DealerCountScreenState extends ConsumerState<DealerCountScreen> {
     final _QtyResult? q = await _askQty(
       title: productName ?? StringLookup.t(_loc, 'dealerCountUnknownBarcode'),
       subtitle: code,
-      initialQty: defaultQty,
+      initialQty: null,
       initialExpiry: null,
-      hint: boxHint,
+      boxUnits: boxUnits,
     );
     if (q == null || !mounted) {
       return;
@@ -165,7 +166,7 @@ class _DealerCountScreenState extends ConsumerState<DealerCountScreen> {
       subtitle: line.scannedBarcode,
       initialQty: line.qty,
       initialExpiry: line.expiryDate,
-      hint: null,
+      boxUnits: null,
       allowDelete: true,
     );
     if (q == null || !mounted) {
@@ -185,9 +186,9 @@ class _DealerCountScreenState extends ConsumerState<DealerCountScreen> {
   Future<_QtyResult?> _askQty({
     required String title,
     required String subtitle,
-    required double initialQty,
+    required double? initialQty,
     required String? initialExpiry,
-    required String? hint,
+    required int? boxUnits,
     bool allowDelete = false,
   }) {
     return showModalBottomSheet<_QtyResult>(
@@ -199,7 +200,7 @@ class _DealerCountScreenState extends ConsumerState<DealerCountScreen> {
         subtitle: subtitle,
         initialQty: initialQty,
         initialExpiry: initialExpiry,
-        hint: hint,
+        boxUnits: boxUnits,
         allowDelete: allowDelete,
       ),
     );
@@ -436,16 +437,18 @@ class _QtySheet extends StatefulWidget {
     required this.subtitle,
     required this.initialQty,
     required this.initialExpiry,
-    required this.hint,
+    required this.boxUnits,
     required this.allowDelete,
   });
 
   final AppLocale loc;
   final String title;
   final String subtitle;
-  final double initialQty;
+  /// null — maydon bo'sh ochiladi (yangi skan); tahrirda joriy son.
+  final double? initialQty;
   final String? initialExpiry;
-  final String? hint;
+  /// Quti kodi skanerlangan bo'lsa — hajm (faqat maslahat tugmasi).
+  final int? boxUnits;
   final bool allowDelete;
 
   @override
@@ -455,13 +458,25 @@ class _QtySheet extends StatefulWidget {
 class _QtySheetState extends State<_QtySheet> {
   late final TextEditingController _qty;
   String? _expiry;
+  bool _canConfirm = false;
 
   @override
   void initState() {
     super.initState();
-    _qty = TextEditingController(text: formatPickQty(widget.initialQty));
+    _qty = TextEditingController(
+      text: widget.initialQty != null ? formatPickQty(widget.initialQty!) : '',
+    );
+    _canConfirm = _parsedQty() > 0;
+    _qty.addListener(() {
+      final bool ok = _parsedQty() > 0;
+      if (ok != _canConfirm) {
+        setState(() => _canConfirm = ok);
+      }
+    });
     _expiry = widget.initialExpiry;
   }
+
+  double _parsedQty() => double.tryParse(_qty.text.trim().replaceAll(',', '.')) ?? 0;
 
   @override
   void dispose() {
@@ -497,10 +512,6 @@ class _QtySheetState extends State<_QtySheet> {
             Text(widget.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
             const SizedBox(height: 2),
             Text(widget.subtitle, style: TextStyle(color: cs.onSurfaceVariant, fontFamily: 'monospace', fontSize: 13)),
-            if (widget.hint != null) ...<Widget>[
-              const SizedBox(height: 8),
-              Text(widget.hint!, style: TextStyle(color: cs.primary, fontSize: 13)),
-            ],
             const SizedBox(height: 14),
             TextField(
               controller: _qty,
@@ -508,9 +519,28 @@ class _QtySheetState extends State<_QtySheet> {
               keyboardType: const TextInputType.numberWithOptions(decimal: false),
               decoration: InputDecoration(
                 labelText: StringLookup.t(loc, 'dealerCountQtyTitle'),
+                hintText: StringLookup.t(loc, 'dealerCountQtyHint'),
                 border: const OutlineInputBorder(),
               ),
             ),
+            if (widget.boxUnits != null) ...<Widget>[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: ActionChip(
+                  avatar: const Icon(Icons.inventory_2_outlined, size: 16),
+                  label: Text(
+                    StringLookup.tParams(loc, 'dealerCountBoxHint', <String, String>{'n': '${widget.boxUnits}'}),
+                  ),
+                  onPressed: () {
+                    // Bosilganda: bo'sh bo'lsa hajm qo'yiladi, aks holda hajm qo'shiladi
+                    // (2 quti skanerlangan bo'lsa ikki marta bosadi).
+                    final double cur = _parsedQty();
+                    _qty.text = formatPickQty(cur + widget.boxUnits!);
+                  },
+                ),
+              ),
+            ],
             const SizedBox(height: 10),
             OutlinedButton.icon(
               onPressed: _pickExpiry,
@@ -537,13 +567,15 @@ class _QtySheetState extends State<_QtySheet> {
                   ),
                 const Spacer(),
                 FilledButton(
-                  onPressed: () {
-                    final double q = double.tryParse(_qty.text.trim().replaceAll(',', '.')) ?? 0;
-                    if (q <= 0) {
-                      return;
-                    }
-                    Navigator.of(context).pop(_QtyResult(qty: q, expiryIso: _expiry));
-                  },
+                  onPressed: !_canConfirm
+                      ? null
+                      : () {
+                          final double q = _parsedQty();
+                          if (q <= 0) {
+                            return;
+                          }
+                          Navigator.of(context).pop(_QtyResult(qty: q, expiryIso: _expiry));
+                        },
                   child: Text(StringLookup.t(loc, 'confirmButton')),
                 ),
               ],
