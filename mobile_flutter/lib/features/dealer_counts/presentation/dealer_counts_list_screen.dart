@@ -28,8 +28,43 @@ class DealerCountsListScreen extends ConsumerWidget {
     if (dealer == null || !context.mounted) {
       return;
     }
+    // Rejim: bo'sh ro'yxat (skan bilan noldan) yoki serverdan tayyor ro'yxat
+    // (Smartup qoldig'i, ombor kodi bo'lmasa jo'natilgan tovarlar).
+    final bool? withSheet = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext ctx) => SimpleDialog(
+        title: Text(StringLookup.t(loc, 'dealerNewModeTitle')),
+        children: <Widget>[
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: ListTile(
+              leading: const Icon(Icons.list_alt),
+              title: Text(StringLookup.t(loc, 'dealerNewModeSheet')),
+              subtitle: Text(StringLookup.t(loc, 'dealerNewModeSheetHint')),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: ListTile(
+              leading: const Icon(Icons.qr_code_scanner),
+              title: Text(StringLookup.t(loc, 'dealerNewModeBlank')),
+              subtitle: Text(StringLookup.t(loc, 'dealerNewModeBlankHint')),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+        ],
+      ),
+    );
+    if (withSheet == null || !context.mounted) {
+      return;
+    }
     final OfflineDatabase? db = await ref.read(offlineDatabaseProvider.future);
     if (db == null) {
+      return;
+    }
+    if (withSheet) {
+      await _startSheet(context, ref, loc, dealer, db);
       return;
     }
     final DealerCountDraft draft = DealerCountDraft(
@@ -43,6 +78,46 @@ class DealerCountsListScreen extends ConsumerWidget {
     ref.invalidate(dealerCountDraftsProvider);
     if (context.mounted) {
       context.pushNamed('dealerCountDraft', pathParameters: <String, String>{'draftId': draft.clientUuid});
+    }
+  }
+
+  /// Serverda ro'yxat yaratib to'ldiradi, oladi (claim) va telefonga yuklaydi.
+  Future<void> _startSheet(
+    BuildContext context,
+    WidgetRef ref,
+    AppLocale loc,
+    Dealer dealer,
+    OfflineDatabase db,
+  ) async {
+    showAppSnackBar(context, SnackBar(content: Text(StringLookup.t(loc, 'dealerSheetPreparing'))));
+    try {
+      final repo = ref.read(dealerCountsRepositoryProvider);
+      final DealerCount created = await repo.createSheet(dealerOrgId: dealer.orgId, clientUuid: const Uuid().v4());
+      final int added = await repo.prefill(created.id);
+      final DealerCount claimed = await repo.claim(created.id);
+      final DealerSheetDraft sheet = DealerSheetDraft.fromCount(claimed);
+      await db.dealerDraftSave(DealerSheetDraft.storageKey(sheet.countId), sheet.toJson());
+      ref.invalidate(dealerSheetDraftsProvider);
+      ref.invalidate(dealerSheetsProvider);
+      if (!context.mounted) {
+        return;
+      }
+      showAppSnackBar(
+        context,
+        SnackBar(
+          content: Text(
+            added > 0
+                ? StringLookup.tParams(loc, 'dealerSheetPrepared', <String, String>{'n': '$added'})
+                : StringLookup.t(loc, 'dealerSheetPrepareEmpty'),
+          ),
+        ),
+        type: added > 0 ? AppToastType.success : AppToastType.warning,
+      );
+      context.pushNamed('dealerSheet', pathParameters: <String, String>{'countId': sheet.countId});
+    } on Exception catch (e) {
+      if (context.mounted) {
+        showAppSnackBar(context, SnackBar(content: Text(localizeApiErrorMessage(loc, e))), type: AppToastType.error);
+      }
     }
   }
 

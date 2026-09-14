@@ -84,6 +84,46 @@ class DealerCountsRepository {
 
   // --- tayyor ro'yxat (ведомость) ---
 
+  /// Telefondan bo'sh ro'yxat hujjatini yaratish (keyin `prefill` + `claim`).
+  Future<DealerCount> createSheet({required String dealerOrgId, required String clientUuid}) async {
+    try {
+      final Response<Object?> res = await _dio.post<Object?>(
+        _path,
+        data: <String, Object?>{
+          'client_uuid': clientUuid,
+          'dealer_org_id': dealerOrgId,
+          'source': 'sheet',
+          'lines': <Object?>[],
+        },
+      );
+      final Object? data = res.data;
+      if (data is! Map) {
+        throw const FormatException('create sheet');
+      }
+      return DealerCount.fromJson(Map<String, Object?>.from(data));
+    } on DioException catch (e) {
+      throw Exception(mapDioExceptionToMessage(e));
+    }
+  }
+
+  /// Ro'yxatni serverda to'ldirish (Smartup → kod bo'lmasa jo'natilganlar).
+  /// Qaytaradi: qo'shilgan qatorlar soni.
+  Future<int> prefill(String id, {List<String> sources = const <String>['smartup']}) async {
+    try {
+      final Response<Object?> res = await _dio.post<Object?>(
+        '$_path/$id/prefill',
+        data: <String, Object?>{'sources': sources},
+      );
+      final Object? data = res.data;
+      if (data is! Map) {
+        throw const FormatException('prefill');
+      }
+      return (data['added'] as num?)?.toInt() ?? 0;
+    } on DioException catch (e) {
+      throw Exception(mapDioExceptionToMessage(e));
+    }
+  }
+
   /// Serverdagi ochiq ro'yxatlar (draft + telefonda) — barcha sanovchilarga ko'rinadi.
   Future<List<DealerCount>> listSheets({int limit = 50}) async {
     try {
