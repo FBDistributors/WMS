@@ -3,9 +3,14 @@
 Holat va qulf yo'q: sanov web'da yaratiladi va to'ldiriladi (miqdor bo'sh, Smartup soni
 snapshot), bir yoki bir necha xodim telefonda uni sanaydi. Har qator — mahsulot + muddat +
 joy (javon/zona); `qty IS NULL` — sanalmagan, 0 — "dillerda yo'q" deb sanaldi.
+
+Har kiritish tarixda (`DealerStockCountEntry`): `set` — jami, `add` — qayta skanda ustiga
+qo'shildi. Qo'shish telefondan son sifatida emas, qo'shimcha sifatida keladi — ikki xodim bir
+qatorga qo'shsa ham, oflayn telefon kech ulansa ham hech qaysi qo'shish yo'qolmaydi.
 """
 from __future__ import annotations
 
+import uuid
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
@@ -14,7 +19,7 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.models.dealer_stock_count import DealerStockCount, DealerStockCountLine
+from app.models.dealer_stock_count import DealerStockCount, DealerStockCountEntry, DealerStockCountLine
 from app.models.order import Order as OrderModel, OrderLine as OrderLineModel
 from app.models.product import Product as ProductModel
 from app.models.user import User
@@ -46,6 +51,44 @@ def recount(item: DealerStockCount) -> None:
     counted = [ln for ln in item.lines if ln.qty is not None]
     item.lines_count = len(counted)
     item.total_units = sum((Decimal(str(ln.qty)) for ln in counted), Decimal("0"))
+
+
+def _fmt(q: Decimal) -> str:
+    return format(Decimal(str(q)).normalize(), "f")
+
+
+def entries_brief(line: DealerStockCountLine) -> Optional[str]:
+    """Oxirgi jami yozuvidan beri kiritishlar: "12 + 5 + 3". Bitta kiritish bo'lsa — None."""
+    parts: list[Decimal] = []
+    for en in line.entries:
+        if en.kind == "set":
+            parts = [Decimal(str(en.qty))]
+        elif en.kind == "add":
+            parts.append(Decimal(str(en.qty)))
+        else:
+            parts = []
+    return " + ".join(_fmt(p) for p in parts) if len(parts) > 1 else None
+
+
+def _record(
+    line: DealerStockCountLine,
+    kind: str,
+    qty: Optional[Decimal],
+    user_id,
+    at: datetime,
+    op_id: Optional[UUID] = None,
+) -> None:
+    # created_at — serverda qo'llangan payt (tarix tartibi); counted_at — telefonda sanalgan payt.
+    line.entries.append(
+        DealerStockCountEntry(
+            id=op_id or uuid.uuid4(),
+            kind=kind,
+            qty=qty,
+            user_id=user_id,
+            counted_at=at,
+            created_at=datetime.now(timezone.utc),
+        )
+    )
 
 
 def _next_seq(item: DealerStockCount) -> int:
@@ -175,6 +218,7 @@ def add_lines(db: Session, item: DealerStockCount, user: User, lines: list[dict]
                 line.qty = qty
                 line.counted_at = now
                 line.counted_by_user_id = user.id
+                _record(line, "set", qty, user.id, now)
                 updated += 1
             continue
         snap = raw.get("snapshot_qty")
@@ -190,6 +234,8 @@ def add_lines(db: Session, item: DealerStockCount, user: User, lines: list[dict]
             seq=_next_seq(item),
         )
         item.lines.append(line)
+        if qty is not None:
+            _record(line, "set", qty, user.id, now)
         if pid:
             by_key[line_key(pid, expiry, loc)] = line
         added += 1
@@ -216,33 +262,70 @@ def patch_line(item: DealerStockCount, line: DealerStockCountLine, user: User, f
     line.location_code = new_loc
     if "qty" in fields:
         qty = fields["qty"]
+        now = datetime.now(timezone.utc)
         if qty is None:
             line.qty = None
             line.counted_at = None
             line.counted_by_user_id = None
+            _record(line, "clear", None, user.id, now)
         else:
+            # Web'dagi o'zgartirish — "tuzatish": jami yoziladi, tarixda ko'rinadi.
             line.qty = Decimal(str(qty))
-            line.counted_at = datetime.now(timezone.utc)
+            line.counted_at = now
             line.counted_by_user_id = user.id
+            _record(line, "set", line.qty, user.id, now)
 
 
 def apply_counts(db: Session, item: DealerStockCount, user: User, entries: list[dict]) -> dict:
-    """Telefondan sanalgan qatorlar (idempotent, bir necha xodim bir vaqtda).
+    """Telefondan kiritishlar (bir necha xodim bir vaqtda, oflayn navbat bilan).
 
-    entries: [{line_id?, product_id?, scanned_barcode?, qty, expiry_date?, location_code?, counted_at?}].
+    entries: [{op_id?, mode: set|add|undo, qty?, undo_op_id?, line_id?, product_id?, scanned_barcode?,
+    expiry_date?, location_code?, counted_at?}].
+
+    - `set` — jami yoziladi. Kelgan `counted_at` serverdagidan eski bo'lsa yozilmaydi (kech ulangan
+      telefon boshqaning yangi sanaganini bosib ketmasin). `mode` bo'lmasa (1.0.48 ilova) — `set`.
+    - `add` — joriy songa qo'shiladi (qayta skan). Tartibga bog'liq emas: kech kelsa ham qo'shiladi.
+    - `undo` — `undo_op_id` qo'shishini bekor qiladi (qo'shilgan son ayiriladi, yozuv o'chadi).
+    - `op_id` bo'yicha idempotent: bir kiritish ikki marta qo'llanmaydi.
+
     Qator: `line_id` bo'yicha, bo'lmasa mahsulot+muddat+joy, bo'lmasa ro'yxatdagi shu mahsulotning
     hali sanalmagan joysiz qatori; topilmasa — yangi qator (javonda bor, ro'yxatda yo'q tovar).
-    Kelgan `counted_at` serverdagidan eski bo'lsa yozilmaydi — kech ulangan telefon boshqaning
-    yangi sanaganini bosib ketmasin.
     """
     now = datetime.now(timezone.utc)
+    op_ids = [e["op_id"] for e in entries if e.get("op_id")]
+    seen: set = (
+        {r[0] for r in db.query(DealerStockCountEntry.id).filter(DealerStockCountEntry.id.in_(op_ids)).all()}
+        if op_ids
+        else set()
+    )
     by_id = {ln.id: ln for ln in item.lines}
     by_key = {line_key(ln.product_id, ln.expiry_date, ln.location_code): ln for ln in item.lines if ln.product_id}
-    updated = added = stale = 0
+    updated = added = stale = duplicate = undone = 0
     for e in entries:
-        qty = Decimal(str(e.get("qty") if e.get("qty") is not None else 0))
-        if qty < 0:
-            raise HTTPException(status_code=400, detail="Miqdor manfiy bo'lmasligi kerak")
+        op_id = e.get("op_id")
+        if op_id is not None:
+            if op_id in seen:
+                duplicate += 1
+                continue
+            seen.add(op_id)
+        mode = e.get("mode") or "set"
+
+        if mode == "undo":
+            target = db.get(DealerStockCountEntry, e["undo_op_id"]) if e.get("undo_op_id") else None
+            if target is None or target.kind != "add" or target.line.count_id != item.id:
+                continue  # allaqachon bekor qilingan yoki topilmadi — takror yuborish zararsiz
+            ln = target.line
+            left = Decimal(str(ln.qty or 0)) - Decimal(str(target.qty))
+            ln.qty = left if left > 0 else Decimal("0")
+            ln.entries.remove(target)
+            undone += 1
+            continue
+
+        if e.get("qty") is None:
+            raise HTTPException(status_code=400, detail="Miqdor berilmagan")
+        qty = Decimal(str(e["qty"]))
+        if qty < 0 or (mode == "add" and qty == 0):
+            raise HTTPException(status_code=400, detail="Qo'shiladigan son musbat bo'lishi kerak")
         expiry = month_start(e.get("expiry_date"))
         loc = norm_location(e.get("location_code"))
         at = e.get("counted_at") or now
@@ -282,19 +365,27 @@ def apply_counts(db: Session, item: DealerStockCount, user: User, entries: list[
             prev = line.counted_at
             if prev is not None and prev.tzinfo is None:
                 prev = prev.replace(tzinfo=timezone.utc)
-            if prev is not None and at < prev:
+            if mode == "set" and prev is not None and at < prev:
                 stale += 1
                 continue
             updated += 1
         if line.product_id:
             by_key.pop(line_key(line.product_id, line.expiry_date, line.location_code), None)
-        line.qty = qty
+        prev = line.counted_at
+        if prev is not None and prev.tzinfo is None:
+            prev = prev.replace(tzinfo=timezone.utc)
+        if mode == "add":
+            line.qty = Decimal(str(line.qty or 0)) + qty
+            line.counted_at = max(prev, at) if prev is not None else at
+        else:
+            line.qty = qty
+            line.counted_at = at
         line.expiry_date = expiry
         line.location_code = loc
-        line.counted_at = at
         line.counted_by_user_id = user.id
         if e.get("scanned_at"):
             line.scanned_at = e["scanned_at"]
+        _record(line, "add" if mode == "add" else "set", qty, user.id, at, op_id)
         if line.product_id:
             by_key[line_key(line.product_id, expiry, loc)] = line
-    return {"updated": updated, "added": added, "stale": stale}
+    return {"updated": updated, "added": added, "stale": stale, "duplicate": duplicate, "undone": undone}

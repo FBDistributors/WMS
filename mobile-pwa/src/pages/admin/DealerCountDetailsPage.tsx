@@ -124,6 +124,7 @@ export function DealerCountDetailsPage() {
           : t('admin:dealer_counts.state_zeroed'),
       [t('admin:dealer_counts.col_expiry')]: ln.expiry_date ? ln.expiry_date.slice(0, 7) : '',
       [t('admin:dealer_counts.col_counted_by')]: ln.counted_by_name ?? '',
+      [t('admin:dealer_counts.col_entries')]: ln.entries_brief ?? '',
     }))
     const ws = XLSX.utils.json_to_sheet(rows)
     const wb = XLSX.utils.book_new()
@@ -363,6 +364,7 @@ export function DealerCountDetailsPage() {
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums font-semibold sm:px-4">
                       {ln.qty == null ? '—' : fmtUnits(ln.qty)}
+                      {ln.entries_brief ? <div className="text-xs font-normal text-slate-400">{ln.entries_brief}</div> : null}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-xs sm:px-4">
                       {ln.counted_at ? (

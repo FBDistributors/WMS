@@ -1,10 +1,14 @@
 /// Diller ombor qoldig'i sanovi — modellar.
 ///
 /// Holatsiz: sanov (`DealerCount`) web'da yaratiladi, bir yoki bir necha xodim telefonda
-/// uni ochib sanaydi. Telefondagi nusxa (`DealerSheetDraft`, sqflite) internetsiz ishlaydi;
-/// sanalgan qatorlar "yuborilmagan" (`dirty`) bo'lib turadi va internet bo'lganda serverga
-/// ketadi, serverdan esa boshqalar sanagani qo'shiladi.
+/// uni ochib sanaydi. Telefondagi nusxa (`DealerSheetDraft`, sqflite) internetsiz ishlaydi.
+/// Har kiritish (`PendingOp`: jami / qayta skanda qo'shish / qo'shishni bekor qilish) o'z
+/// `op_id`si bilan navbatda turadi va internet bo'lganda serverga ketadi — server bir
+/// kiritishni bir marta qo'llaydi, qo'shishni esa joriy songa qo'shadi (ikki xodim bir qatorga
+/// qo'shsa ham hech biri yo'qolmaydi). Serverdan boshqalar sanagani qo'shiladi.
 library;
+
+import 'package:uuid/uuid.dart';
 
 double _num(Object? v) {
   if (v is num) {
@@ -15,6 +19,9 @@ double _num(Object? v) {
   }
   return 0;
 }
+
+/// 12.0 → "12", 1.5 → "1.5".
+String fmtQty(double v) => v == v.roundToDouble() ? v.toInt().toString() : v.toString();
 
 /// Joy kodi — server bilan bir xil: bo'shliqlar qisqaradi, katta harf, 32 belgi.
 String? normLocation(String? v) {
@@ -39,6 +46,7 @@ class DealerCountLine {
     this.locationCode,
     this.countedAt,
     this.countedByName,
+    this.entriesBrief,
   });
 
   final String id;
@@ -53,6 +61,8 @@ class DealerCountLine {
   final String? locationCode;
   final String? countedAt;
   final String? countedByName;
+  /// Oxirgi jamidan beri kiritishlar ("12 + 5"); bitta kiritish bo'lsa null.
+  final String? entriesBrief;
   final String? expiryDate;
   final int seq;
 
@@ -67,6 +77,7 @@ class DealerCountLine {
         locationCode: json['location_code'] as String?,
         countedAt: json['counted_at'] as String?,
         countedByName: json['counted_by_name'] as String?,
+        entriesBrief: json['entries_brief'] as String?,
         expiryDate: json['expiry_date'] as String?,
         seq: (json['seq'] as num?)?.toInt() ?? 0,
       );
@@ -127,6 +138,35 @@ String monthStartIso(DateTime d) =>
 
 // --- Telefondagi nusxa ---------------------------------------------------------
 
+/// Serverga hali yetmagan bitta kiritish.
+class PendingOp {
+  PendingOp({required this.opId, required this.mode, required this.qty, required this.countedAt, this.undoOpId});
+
+  final String opId;
+  /// set — jami (birinchi sanash / tuzatish); add — qayta skanda qo'shish; undo — qo'shishni bekor qilish.
+  final String mode;
+  /// set: jami; add: qo'shilgan son; undo: bekor qilinayotgan qo'shish soni (faqat ko'rsatish uchun).
+  final double qty;
+  final String countedAt;
+  final String? undoOpId;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+        'op_id': opId,
+        'mode': mode,
+        'qty': qty,
+        'counted_at': countedAt,
+        if (undoOpId != null) 'undo_op_id': undoOpId,
+      };
+
+  factory PendingOp.fromJson(Map<String, Object?> j) => PendingOp(
+        opId: j['op_id']! as String,
+        mode: (j['mode'] as String?) ?? 'set',
+        qty: _num(j['qty']),
+        countedAt: (j['counted_at'] as String?) ?? '',
+        undoOpId: j['undo_op_id'] as String?,
+      );
+}
+
 /// Nusxa qatori: serverdan kelgan (`lineId` bor) yoki telefonda qo'shilgan (hali yuborilmagan).
 class DealerSheetLine {
   DealerSheetLine({
@@ -137,14 +177,17 @@ class DealerSheetLine {
     required this.productName,
     required this.barcode,
     required this.snapshotQty,
-    required this.qty,
+    required double? qty,
     required this.expiryDate,
     required this.countedAt,
     this.locationCode,
     this.countedByName,
-    this.dirty = false,
-    this.version = 0,
-  });
+    this.entriesBrief,
+    List<PendingOp>? pending,
+  })  : baseQty = qty,
+        pending = pending ?? <PendingOp>[] {
+    _recompute();
+  }
 
   final String key;
   String? lineId;
@@ -153,18 +196,62 @@ class DealerSheetLine {
   final String? productName;
   final String barcode;
   final double? snapshotQty;
-  /// null — hali sanalmagan; 0 — "dillerda yo'q".
+  /// Serverdagi son (oxirgi yangilanishda).
+  double? baseQty;
+  /// Ko'rinadigan son = serverdagi + navbatdagi kiritishlar. null — hali sanalmagan; 0 — "dillerda yo'q".
   double? qty;
   String? expiryDate;
   String? locationCode;
   String? countedAt;
   String? countedByName;
-  /// Telefonda o'zgartirilgan, serverga hali yetmagan.
-  bool dirty;
-  /// Har tahrirda oshadi: yuborish paytidagi holatdan keyin o'zgargan qator "yuborilgan" deb belgilanmasin.
-  int version;
+  String? entriesBrief;
+  /// Serverga hali yetmagan kiritishlar (tartib bilan).
+  List<PendingOp> pending;
 
   bool get isCounted => qty != null;
+  bool get dirty => pending.isNotEmpty;
+
+  void _recompute() {
+    double? v = baseQty;
+    for (final PendingOp op in pending) {
+      switch (op.mode) {
+        case 'set':
+          v = op.qty;
+        case 'add':
+          v = (v ?? 0) + op.qty;
+        case 'undo':
+          final double left = (v ?? 0) - op.qty;
+          v = left > 0 ? left : 0;
+      }
+    }
+    qty = v;
+  }
+
+  /// Ko'rinish: "12 + 5" — oxirgi jamidan beri qo'shishlar (server + telefondagi navbat).
+  String? get breakdown {
+    final List<String> parts = <String>[];
+    final String? brief = entriesBrief;
+    if (brief != null && brief.contains('+')) {
+      parts.addAll(brief.split('+').map((String p) => p.trim()));
+    } else if (baseQty != null) {
+      parts.add(fmtQty(baseQty!));
+    }
+    for (final PendingOp op in pending) {
+      switch (op.mode) {
+        case 'set':
+          parts
+            ..clear()
+            ..add(fmtQty(op.qty));
+        case 'add':
+          parts.add(fmtQty(op.qty));
+        case 'undo':
+          if (parts.length > 1) {
+            parts.removeLast();
+          }
+      }
+    }
+    return parts.length > 1 ? parts.join(' + ') : null;
+  }
 
   /// Mahsulot + muddat + joy — server bilan bir xil qator kaliti.
   String get identity => '${productId ?? 'raw:$barcode'}|${expiryDate ?? ''}|${locationCode ?? ''}';
@@ -188,32 +275,52 @@ class DealerSheetLine {
         'product_name': productName,
         'barcode': barcode,
         'snapshot_qty': snapshotQty,
-        'qty': qty,
+        'base_qty': baseQty,
         'expiry_date': expiryDate,
         'location_code': locationCode,
         'counted_at': countedAt,
         'counted_by_name': countedByName,
-        'dirty': dirty,
-        'version': version,
+        'entries_brief': entriesBrief,
+        'pending': pending.map((PendingOp o) => o.toJson()).toList(growable: false),
       };
 
-  factory DealerSheetLine.fromJson(Map<String, Object?> json) => DealerSheetLine(
-        key: json['key']! as String,
-        lineId: json['line_id'] as String?,
-        productId: json['product_id'] as String?,
-        sku: json['sku'] as String?,
-        productName: json['product_name'] as String?,
-        barcode: (json['barcode'] as String?) ?? '',
-        snapshotQty: json['snapshot_qty'] == null ? null : _num(json['snapshot_qty']),
-        qty: json['qty'] == null ? null : _num(json['qty']),
-        expiryDate: json['expiry_date'] as String?,
-        locationCode: json['location_code'] as String?,
-        countedAt: json['counted_at'] as String?,
-        countedByName: json['counted_by_name'] as String?,
-        // 1.0.47 gacha nusxalarda `dirty` yo'q: sanalgan, lekin yuborilmagan qatorlar edi.
-        dirty: json['dirty'] as bool? ?? (json['qty'] != null && json['counted_at'] != null),
-        version: (json['version'] as num?)?.toInt() ?? 0,
-      );
+  factory DealerSheetLine.fromJson(Map<String, Object?> json) {
+    final Object? rawPending = json['pending'];
+    List<PendingOp> pending = rawPending is List
+        ? rawPending.whereType<Map>().map((Map m) => PendingOp.fromJson(Map<String, Object?>.from(m))).toList()
+        : <PendingOp>[];
+    double? base = json.containsKey('base_qty')
+        ? (json['base_qty'] == null ? null : _num(json['base_qty']))
+        : (json['qty'] == null ? null : _num(json['qty']));
+    // 1.0.48 gacha nusxa: `dirty` — sanalgan, yuborilmagan jami. Navbatga "jami" kiritishi bo'lib o'tadi.
+    if (rawPending == null && json['dirty'] == true && base != null) {
+      pending = <PendingOp>[
+        PendingOp(
+          opId: const Uuid().v4(),
+          mode: 'set',
+          qty: base,
+          countedAt: (json['counted_at'] as String?) ?? DateTime.now().toUtc().toIso8601String(),
+        ),
+      ];
+      base = null;
+    }
+    return DealerSheetLine(
+      key: json['key']! as String,
+      lineId: json['line_id'] as String?,
+      productId: json['product_id'] as String?,
+      sku: json['sku'] as String?,
+      productName: json['product_name'] as String?,
+      barcode: (json['barcode'] as String?) ?? '',
+      snapshotQty: json['snapshot_qty'] == null ? null : _num(json['snapshot_qty']),
+      qty: base,
+      expiryDate: json['expiry_date'] as String?,
+      locationCode: json['location_code'] as String?,
+      countedAt: json['counted_at'] as String?,
+      countedByName: json['counted_by_name'] as String?,
+      entriesBrief: json['entries_brief'] as String?,
+      pending: pending,
+    );
+  }
 
   factory DealerSheetLine.fromServer(DealerCountLine l) => DealerSheetLine(
         key: 'srv-${l.id}',
@@ -228,18 +335,25 @@ class DealerSheetLine {
         locationCode: l.locationCode,
         countedAt: l.countedAt,
         countedByName: l.countedByName,
+        entriesBrief: l.entriesBrief,
       );
 
-  /// `PUT /dealer-counts/{id}/counts` uchun yozuv.
-  Map<String, Object?> toCountEntry() => <String, Object?>{
-        if (lineId != null) 'line_id': lineId,
-        if (productId != null) 'product_id': productId,
-        'scanned_barcode': barcode,
-        'qty': qty,
-        if (expiryDate != null) 'expiry_date': expiryDate,
-        if (locationCode != null) 'location_code': locationCode,
-        if (countedAt != null) 'counted_at': countedAt,
-      };
+  /// `PUT /dealer-counts/{id}/counts` uchun yozuvlar — navbatdagi har kiritish alohida.
+  List<Map<String, Object?>> toCountEntries() => pending
+      .map(
+        (PendingOp op) => <String, Object?>{
+          'op_id': op.opId,
+          'mode': op.mode,
+          if (op.mode == 'undo') 'undo_op_id': op.undoOpId else 'qty': op.qty,
+          if (lineId != null) 'line_id': lineId,
+          if (productId != null) 'product_id': productId,
+          'scanned_barcode': barcode,
+          if (expiryDate != null) 'expiry_date': expiryDate,
+          if (locationCode != null) 'location_code': locationCode,
+          'counted_at': op.countedAt,
+        },
+      )
+      .toList(growable: false);
 }
 
 enum SheetFilter { uncounted, counted, all }
@@ -276,6 +390,7 @@ class DealerSheetDraft {
 
   int get countedCount => lines.where((DealerSheetLine l) => l.isCounted).length;
   int get uncountedCount => lines.length - countedCount;
+  /// Yuborilmagan kiritishi bor qatorlar soni.
   int get pendingCount => lines.where((DealerSheetLine l) => l.dirty).length;
   double get countedUnits => lines.fold<double>(0, (double s, DealerSheetLine l) => s + (l.qty ?? 0));
 
@@ -317,39 +432,70 @@ class DealerSheetDraft {
     return null;
   }
 
-  /// Sanalgan qiymatni yozish: yuborilmagan bo'ladi, vaqti — hozir.
-  void markCounted(DealerSheetLine l, {required double qty, required String? expiry, required String? location}) {
-    l.qty = qty;
+  /// Kiritish: `set` — jami (birinchi sanash / tuzatish), `add` — ustiga qo'shish (qayta skan).
+  PendingOp addOp(
+    DealerSheetLine l, {
+    required String mode,
+    required double qty,
+    required String? expiry,
+    required String? location,
+  }) {
+    final String now = DateTime.now().toUtc().toIso8601String();
+    final PendingOp op = PendingOp(opId: const Uuid().v4(), mode: mode, qty: qty, countedAt: now);
+    l.pending.add(op);
     l.expiryDate = expiry;
     l.locationCode = normLocation(location);
-    l.countedAt = DateTime.now().toUtc().toIso8601String();
+    l.countedAt = now;
     l.countedByName = null;
-    l.dirty = true;
-    l.version += 1;
+    l._recompute();
+    return op;
   }
 
-  /// Serverga yuboriladigan qatorlar (faqat yuborilmaganlari) va ularning holati.
-  ({List<Map<String, Object?>> entries, Map<String, int> versions}) pendingSnapshot() {
-    final List<DealerSheetLine> p = lines.where((DealerSheetLine l) => l.dirty && l.isCounted).toList();
-    return (
-      entries: p.map((DealerSheetLine l) => l.toCountEntry()).toList(growable: false),
-      versions: <String, int>{for (final DealerSheetLine l in p) l.key: l.version},
-    );
-  }
-
-  /// Serverga yetgan qatorlar yuborilgan deb belgilanadi — yuborish paytida yana
-  /// o'zgartirilganlari (versiya oshgan) yuborilmagan bo'lib qoladi.
-  void markSynced(Map<String, int> versions) {
-    for (final DealerSheetLine l in lines) {
-      if (versions[l.key] == l.version) {
-        l.dirty = false;
+  /// Qo'shishni bekor qilish: hali yuborilmagan bo'lsa — navbatdan olinadi; yuborilgan bo'lsa —
+  /// serverga "bekor qilish" kiritishi ketadi (server aynan shu qo'shishni ayiradi).
+  void undoAdd(DealerSheetLine l, PendingOp add) {
+    if (l.pending.remove(add)) {
+      l._recompute();
+      if (l.lineId == null && l.pending.isEmpty && l.baseQty == null) {
+        lines.remove(l);
       }
+      return;
+    }
+    l.pending.add(
+      PendingOp(
+        opId: const Uuid().v4(),
+        mode: 'undo',
+        qty: add.qty,
+        undoOpId: add.opId,
+        countedAt: DateTime.now().toUtc().toIso8601String(),
+      ),
+    );
+    l._recompute();
+  }
+
+  /// Serverga yuboriladigan kiritishlar va ularning id lari.
+  ({List<Map<String, Object?>> entries, Set<String> opIds}) pendingSnapshot() {
+    final List<Map<String, Object?>> entries = <Map<String, Object?>>[];
+    final Set<String> ids = <String>{};
+    for (final DealerSheetLine l in lines) {
+      if (l.dirty) {
+        entries.addAll(l.toCountEntries());
+        ids.addAll(l.pending.map((PendingOp o) => o.opId));
+      }
+    }
+    return (entries: entries, opIds: ids);
+  }
+
+  /// Server qabul qilgan kiritishlar navbatdan olinadi (yuborish paytida qo'shilganlari qoladi).
+  void markSynced(Set<String> opIds) {
+    for (final DealerSheetLine l in lines) {
+      l.pending.removeWhere((PendingOp o) => opIds.contains(o.opId));
     }
   }
 
-  /// Serverdagi holat + telefondagi yuborilmaganlar. Boshqa xodimlar sanagani keladi,
-  /// yuborilmagan o'z o'zgarishlari esa ustida qoladi (server qatoriga mahsulot+muddat+joy
-  /// bo'yicha bog'lanadi, shunda ikki marta ko'rinmaydi).
+  /// Serverdagi holat + telefondagi yuborilmagan kiritishlar. Boshqa xodimlar sanagani keladi,
+  /// navbatdagilar ustiga qo'llanadi (server qatoriga mahsulot+muddat+joy bo'yicha bog'lanadi,
+  /// shunda ikki marta ko'rinmaydi).
   void mergeServer(DealerCount c) {
     final List<DealerSheetLine> fresh = c.lines.map(DealerSheetLine.fromServer).toList();
     final Map<String, int> byId = <String, int>{
@@ -362,7 +508,13 @@ class DealerSheetDraft {
     for (final DealerSheetLine l in lines.where((DealerSheetLine l) => l.dirty)) {
       final int? i = (l.lineId != null ? byId[l.lineId] : null) ?? byIdentity[l.identity];
       if (i != null) {
-        l.lineId ??= fresh[i].lineId;
+        final DealerSheetLine srv = fresh[i];
+        l
+          ..lineId = srv.lineId
+          ..baseQty = srv.baseQty
+          ..countedByName = srv.countedByName
+          ..entriesBrief = srv.entriesBrief;
+        l._recompute();
         fresh[i] = l;
       } else if (l.lineId == null) {
         extra.add(l);

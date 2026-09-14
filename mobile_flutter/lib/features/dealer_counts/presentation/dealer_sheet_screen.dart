@@ -15,6 +15,7 @@ import '../../../core/router/scanner_args.dart';
 import '../../../l10n/string_lookup.dart';
 import '../../../shared/feedback/app_top_snackbar.dart';
 import '../../auth/presentation/auth_providers.dart';
+import '../../customer_returns/data/customer_return_display_datetime.dart';
 import '../../picking/data/picking_models.dart' show formatPickQty;
 import '../../scanner/data/scanner_repository.dart';
 import '../../scanner/scanner_providers.dart';
@@ -142,9 +143,9 @@ class _DealerSheetScreenState extends ConsumerState<DealerSheetScreen> {
     try {
       do {
         _syncAgain = false;
-        final ({List<Map<String, Object?>> entries, Map<String, int> versions}) snap = s.pendingSnapshot();
+        final ({List<Map<String, Object?>> entries, Set<String> opIds}) snap = s.pendingSnapshot();
         final CountsResult res = await ref.read(dealerCountsRepositoryProvider).putCounts(s.countId, snap.entries);
-        s.markSynced(snap.versions);
+        s.markSynced(snap.opIds);
         s.mergeServer(res.count);
         await _persist();
         _offline = false;
@@ -321,7 +322,8 @@ class _DealerSheetScreenState extends ConsumerState<DealerSheetScreen> {
   }
 
   /// Miqdor kiritish. `location` — skandan: hozirgi joy; ro'yxatdan bosilganda: qatorning
-  /// joyi (sanalmagan joysiz qator hozirgi joyni oladi).
+  /// joyi (sanalmagan joysiz qator hozirgi joyni oladi). Qator allaqachon sanalgan bo'lsa oyna
+  /// "qo'shish" rejimida ochiladi — oldingi son saqlanib, yangi topilgani ustiga qo'shiladi.
   Future<void> _countLine(DealerSheetLine line, {int? boxUnits, String? location}) async {
     final DealerSheetDraft? s = _sheet;
     if (s == null) {
@@ -341,12 +343,17 @@ class _DealerSheetScreenState extends ConsumerState<DealerSheetScreen> {
         loc: _loc,
         title: line.productName ?? StringLookup.t(_loc, 'dealerCountUnknownBarcode'),
         subtitle: sub.join(' · '),
-        initialQty: line.qty,
+        previousQty: line.qty,
+        previousBy: line.dirty
+            ? StringLookup.t(_loc, 'dealerQtyThisPhone')
+            : <String>[
+                if (line.countedByName != null) line.countedByName!,
+                if (line.countedAt != null) formatCustomerReturnApiDateTime(line.countedAt!),
+              ].join(' · '),
         initialExpiry: line.expiryDate,
         boxUnits: boxUnits,
         // Faqat telefonda qo'shilgan, hali serverga yetmagan qatorni olib tashlash mumkin.
-        allowDelete: line.lineId == null,
-        allowZero: true,
+        allowDelete: line.lineId == null && !line.isCounted,
       ),
     );
     if (!mounted) {
@@ -367,14 +374,50 @@ class _DealerSheetScreenState extends ConsumerState<DealerSheetScreen> {
     if (live == null) {
       return;
     }
+    PendingOp? op;
+    final double? before = live.qty;
     setState(() {
       if (q.delete) {
         s.lines.remove(live);
       } else {
-        s.markCounted(live, qty: q.qty, expiry: q.expiryIso, location: loc);
+        op = s.addOp(live, mode: q.mode, qty: q.qty, expiry: q.expiryIso, location: loc);
       }
     });
     _search.clear();
+    await _persist();
+    _scheduleSync();
+    final PendingOp? added = op;
+    if (added != null && added.mode == 'add' && before != null && mounted) {
+      showAppSnackBar(
+        context,
+        SnackBar(
+          duration: const Duration(seconds: 5),
+          content: Text(
+            StringLookup.tParams(_loc, 'dealerQtyAdded', <String, String>{
+              'prev': formatPickQty(before),
+              'add': formatPickQty(added.qty),
+              'total': formatPickQty(live.qty ?? 0),
+            }),
+          ),
+          action: SnackBarAction(label: StringLookup.t(_loc, 'dealerQtyUndo'), onPressed: () => unawaited(_undo(live, added))),
+        ),
+        type: AppToastType.success,
+      );
+    }
+  }
+
+  /// Qo'shishni bekor qilish (xabardagi tugma): yuborilmagan bo'lsa navbatdan olinadi,
+  /// yuborilgan bo'lsa serverga aynan shu qo'shishni ayiruvchi kiritish ketadi.
+  Future<void> _undo(DealerSheetLine line, PendingOp add) async {
+    final DealerSheetDraft? s = _sheet;
+    if (s == null || !mounted) {
+      return;
+    }
+    final DealerSheetLine target = s.lines.firstWhere(
+      (DealerSheetLine l) => identical(l, line) || l.key == line.key || (line.lineId != null && l.lineId == line.lineId),
+      orElse: () => line,
+    );
+    setState(() => s.undoAdd(target, add));
     await _persist();
     _scheduleSync();
   }
@@ -546,8 +589,10 @@ class _DealerSheetScreenState extends ConsumerState<DealerSheetScreen> {
                       itemCount: shown.length,
                       itemBuilder: (BuildContext ctx, int i) {
                         final DealerSheetLine l = shown[i];
+                        final String? breakdown = l.breakdown;
                         final List<String> meta = <String>[
                           l.sku ?? l.barcode,
+                          if (breakdown != null) '($breakdown)',
                           if (l.expiryDate != null) formatExpiryMonthYear(l.expiryDate),
                           if (l.locationCode != null) '📍 ${l.locationCode}',
                           if (l.snapshotQty != null)

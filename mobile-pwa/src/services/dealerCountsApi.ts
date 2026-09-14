@@ -24,7 +24,19 @@ export type DealerCountLineOut = {
   location_code: string | null
   counted_at: string | null
   counted_by_name: string | null
+  /** Kiritishlar soni va oxirgi jamidan beri ko'rinishi ("12 + 5") — qayta skanda qo'shilgan. */
+  entries_count: number
+  entries_brief: string | null
   seq: number
+}
+
+/** Qatorga bitta kiritish: set — jami yozildi, add — qo'shildi, clear — tozalandi. */
+export type DealerCountEntryOut = {
+  id: string
+  kind: 'set' | 'add' | 'clear'
+  qty: number | string | null
+  user_name: string | null
+  counted_at: string
 }
 
 /** Holatsiz sanov: web'da yaratiladi, telefonda sanaladi. `is_active` — dillerning faol sanovi. */
@@ -124,6 +136,12 @@ export async function patchDealerCountLine(id: string, lineId: string, patch: De
   return fetchJSON<DealerCountOut>(
     `/api/v1/dealer-counts/${encodeURIComponent(id)}/lines/${encodeURIComponent(lineId)}`,
     { method: 'PATCH', body: patch },
+  )
+}
+
+export async function getDealerCountLineEntries(id: string, lineId: string) {
+  return fetchJSON<DealerCountEntryOut[]>(
+    `/api/v1/dealer-counts/${encodeURIComponent(id)}/lines/${encodeURIComponent(lineId)}/entries`,
   )
 }
 

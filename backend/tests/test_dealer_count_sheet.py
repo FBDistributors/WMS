@@ -209,3 +209,86 @@ def test_closed_sheet_still_accepts_late_counts(client: TestClient, db_session: 
         assert cid not in {c["id"] for c in active} and len(active) == 1
     finally:
         _clear()
+
+
+# --- qayta skan: qo'shish, takror yuborish, bekor qilish, tarix ---------------------
+
+
+def test_rescan_adds_from_two_workers_and_keeps_history(client: TestClient, db_session: Session, monkeypatch):
+    """Ikki xodim bir qatorga qo'shsa — ikkalasi ham qo'shiladi (jami yuborilmaydi, qo'shimcha keladi)."""
+    org = _org(db_session, wh="wh30")
+    a = _product(db_session, "A")
+    _patch_smartup(monkeypatch, {a.sku: 10})
+    cid = _sheet(client, db_session, org, [a.sku])
+    u1, u2 = _mk_user(db_session, "inventory_controller"), _mk_user(db_session, "inventory_controller")
+    _as(u1)
+    try:
+        r = client.put(f"{URL}/{cid}/counts", json={"entries": [{"op_id": str(uuid.uuid4()), "mode": "set", "product_id": str(a.id), "qty": 4}]})
+        line_id = r.json()["count"]["lines"][0]["id"]
+        client.put(f"{URL}/{cid}/counts", json={"entries": [{"op_id": str(uuid.uuid4()), "mode": "add", "line_id": line_id, "product_id": str(a.id), "qty": 3}]})
+    finally:
+        _clear()
+    _as(u2)
+    try:
+        # Oflayn telefon: nusxasida hali 4 edi, kech ulandi — baribir qo'shiladi.
+        r = client.put(f"{URL}/{cid}/counts", json={"entries": [{"op_id": str(uuid.uuid4()), "mode": "add", "line_id": line_id, "product_id": str(a.id), "qty": 2, "counted_at": _at(30)}]})
+        ln = r.json()["count"]["lines"][0]
+        assert float(ln["qty"]) == 9
+        assert ln["entries_count"] == 3 and ln["entries_brief"] == "4 + 3 + 2"
+        hist = client.get(f"{URL}/{cid}/lines/{line_id}/entries").json()
+        assert [h["kind"] for h in hist] == ["set", "add", "add"]
+        assert all(h["user_name"] for h in hist)
+    finally:
+        _clear()
+
+
+def test_same_op_sent_twice_is_applied_once_and_undo(client: TestClient, db_session: Session, monkeypatch):
+    org = _org(db_session, wh="wh30")
+    a = _product(db_session, "A")
+    _patch_smartup(monkeypatch, {a.sku: 10})
+    cid = _sheet(client, db_session, org, [a.sku])
+    _as(_mk_user(db_session, "inventory_controller"))
+    try:
+        base = client.put(f"{URL}/{cid}/counts", json={"entries": [{"op_id": str(uuid.uuid4()), "product_id": str(a.id), "qty": 12}]})
+        line_id = base.json()["count"]["lines"][0]["id"]
+        add = {"op_id": str(uuid.uuid4()), "mode": "add", "line_id": line_id, "product_id": str(a.id), "qty": 5}
+        first = client.put(f"{URL}/{cid}/counts", json={"entries": [add]})
+        again = client.put(f"{URL}/{cid}/counts", json={"entries": [add]})  # javob yo'qolib qayta yuborildi
+        assert again.json()["duplicate"] == 1
+        assert float(again.json()["count"]["lines"][0]["qty"]) == 17
+        assert float(first.json()["count"]["lines"][0]["qty"]) == 17
+        undo = {"op_id": str(uuid.uuid4()), "mode": "undo", "undo_op_id": add["op_id"]}
+        u = client.put(f"{URL}/{cid}/counts", json={"entries": [undo]})
+        assert u.json()["undone"] == 1 and float(u.json()["count"]["lines"][0]["qty"]) == 12
+        assert u.json()["count"]["lines"][0]["entries_brief"] is None
+        # Bekor qilishni qayta yuborish zararsiz.
+        u2 = client.put(f"{URL}/{cid}/counts", json={"entries": [{**undo, "op_id": str(uuid.uuid4())}]})
+        assert u2.json()["undone"] == 0 and float(u2.json()["count"]["lines"][0]["qty"]) == 12
+        # Qo'shish 0 yoki manfiy bo'lmaydi (kamaytirish — faqat tuzatish).
+        bad = client.put(f"{URL}/{cid}/counts", json={"entries": [{"op_id": str(uuid.uuid4()), "mode": "add", "line_id": line_id, "qty": 0}]})
+        assert bad.status_code == 400
+    finally:
+        _clear()
+
+
+def test_web_correction_is_recorded_and_resets_brief(client: TestClient, db_session: Session, monkeypatch):
+    org = _org(db_session, wh="wh30")
+    a = _product(db_session, "A")
+    _patch_smartup(monkeypatch, {a.sku: 10})
+    cid = _sheet(client, db_session, org, [a.sku])
+    _as(_mk_user(db_session, "inventory_controller"))
+    try:
+        r = client.put(f"{URL}/{cid}/counts", json={"entries": [{"op_id": str(uuid.uuid4()), "product_id": str(a.id), "qty": 4}]})
+        line_id = r.json()["count"]["lines"][0]["id"]
+        client.put(f"{URL}/{cid}/counts", json={"entries": [{"op_id": str(uuid.uuid4()), "mode": "add", "line_id": line_id, "qty": 3}]})
+    finally:
+        _clear()
+    _as(_mk_user(db_session, "warehouse_admin"))
+    try:
+        p = client.patch(f"{URL}/{cid}/lines/{line_id}", json={"qty": 6})
+        ln = p.json()["lines"][0]
+        assert float(ln["qty"]) == 6 and ln["entries_count"] == 3 and ln["entries_brief"] is None
+        kinds = [h["kind"] for h in client.get(f"{URL}/{cid}/lines/{line_id}/entries").json()]
+        assert kinds.count("set") == 2 and kinds.count("add") == 1
+    finally:
+        _clear()

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Eye, FileSpreadsheet, ListPlus, Plus, RefreshCw, Store, Trash2, X } from 'lucide-react'
+import { Eye, FileSpreadsheet, History, ListPlus, Plus, RefreshCw, Store, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 
@@ -18,10 +18,12 @@ import {
   deleteDealerCount,
   deleteDealerCountLine,
   getDealerCount,
+  getDealerCountLineEntries,
   getDealers,
   listDealerCounts,
   patchDealerCountLine,
   prefillDealerCount,
+  type DealerCountEntryOut,
   type DealerCountLineIn,
   type DealerCountLinePatch,
   type DealerCountOut,
@@ -115,6 +117,8 @@ export function DealerCountEditPage() {
   const [confirmReplace, setConfirmReplace] = useState(false)
   const pendingAction = useRef<((cid: string) => Promise<void>) | null>(null)
   const [highlight, setHighlight] = useState<string | null>(null)
+  // Qator kiritishlari tarixi (kim qancha sanadi / qo'shdi / tuzatdi).
+  const [history, setHistory] = useState<{ title: string; items: DealerCountEntryOut[] | null } | null>(null)
   const [suggest, setSuggest] = useState<{ key: string; items: Product[] } | null>(null)
   const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const qtyRefs = useRef<Record<string, HTMLInputElement | null>>({})
@@ -410,6 +414,18 @@ export function DealerCountEditPage() {
     })
   }
 
+  const openHistory = async (row: EditRow) => {
+    if (!countId || !row.lineId) return
+    setHistory({ title: row.name ?? row.code, items: null })
+    try {
+      const items = await getDealerCountLineEntries(countId, row.lineId)
+      setHistory({ title: row.name ?? row.code, items })
+    } catch (err) {
+      setHistory(null)
+      showError(getApiErrorMessage(err, t('admin:dealer_counts.load_failed')))
+    }
+  }
+
   const openActive = () => {
     if (!activeExisting) return
     navigate(`/admin/dealer-counts/${activeExisting.id}/edit`, { replace: true })
@@ -420,7 +436,7 @@ export function DealerCountEditPage() {
   // Telefonlarda sanalayotganini kuzatish: saqlash yoki oyna ochiq paytida kutib turadi.
   const checkedAt = useDealerCountAutoRefresh({
     count,
-    enabled: !busy && savingKey === null && !importOpen && !prefillOpen && !confirmDelete && !confirmReplace,
+    enabled: !busy && savingKey === null && !importOpen && !prefillOpen && !confirmDelete && !confirmReplace && history === null,
     onChanged: apply,
     mutationSeq,
   })
@@ -648,6 +664,17 @@ export function DealerCountEditPage() {
                           }
                         }}
                       />
+                      {r.lineId && (r.entriesCount ?? 0) > 0 ? (
+                        <button
+                          type="button"
+                          className="mt-1 flex items-center gap-1 text-xs text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-300"
+                          title={t('admin:dealer_counts.history_title')}
+                          onClick={() => void openHistory(r)}
+                        >
+                          <History size={12} />
+                          {r.entriesBrief ?? t('admin:dealer_counts.history_button')}
+                        </button>
+                      ) : null}
                       {r.boxUnits && r.lineId ? (
                         <button
                           type="button"
@@ -744,6 +771,49 @@ export function DealerCountEditPage() {
               </Button>
               <Button disabled={prefillSources.length === 0} onClick={prefill}>
                 {t('admin:dealer_counts.prefill_button')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {history ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+          <button type="button" className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={() => setHistory(null)} aria-label={t('common:buttons.close')} />
+          <div className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 text-slate-900 shadow-2xl dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100" role="dialog" aria-modal="true">
+            <div className="text-base font-semibold">{t('admin:dealer_counts.history_title')}</div>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{history.title}</p>
+            {history.items === null ? (
+              <p className="mt-4 text-sm text-slate-500">{t('common:messages.loading')}</p>
+            ) : (
+              <ul className="mt-4 space-y-2 text-sm">
+                {history.items.map((en) => (
+                  <li key={en.id} className="flex items-baseline justify-between gap-3 border-b border-slate-100 pb-2 dark:border-slate-800">
+                    <span>
+                      <span
+                        className={
+                          en.kind === 'add'
+                            ? 'font-semibold text-emerald-700 dark:text-emerald-300'
+                            : en.kind === 'clear'
+                              ? 'text-slate-400'
+                              : 'font-semibold'
+                        }
+                      >
+                        {en.kind === 'add' ? '+' : ''}
+                        {en.qty == null ? '—' : fmtUnits(en.qty)}
+                      </span>{' '}
+                      <span className="text-xs text-slate-500">{t(`admin:dealer_counts.entry_${en.kind}`)}</span>
+                    </span>
+                    <span className="text-right text-xs text-slate-500">
+                      {en.user_name ?? '—'}
+                      <div>{fmtTime(en.counted_at)}</div>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="mt-5 flex justify-end">
+              <Button variant="ghost" onClick={() => setHistory(null)}>
+                {t('common:buttons.close')}
               </Button>
             </div>
           </div>

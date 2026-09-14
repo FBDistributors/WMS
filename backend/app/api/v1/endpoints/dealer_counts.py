@@ -1,8 +1,8 @@
 """Diller ombor qoldig'i sanovi — WMS ledgeridan alohida hujjatlar.
 
 Holatsiz: sanov (ro'yxat) web'da yaratiladi, bir yoki bir necha xodim telefonda uni ochib
-diller omboridagi tovarni skanerlab sanaydi — har kiritilgan miqdor darhol yoziladi. Qulf,
-"yuborish" yo'q. Dillerning faol sanovi bitta (ichki `open`); yangisi yaratilsa eskisi `closed`.
+diller omboridagi tovarni skanerlab sanaydi — har kiritilgan miqdor darhol yoziladi, qayta
+skanda ustiga qo'shiladi (kiritishlar tarixda). Qulf, "yuborish" yo'q. Dillerning faol sanovi bitta (ichki `open`); yangisi yaratilsa eskisi `closed`.
 Bu yerda hech qanday `stock_movements` yozilmaydi: diller ombori bizniki emas.
 """
 from __future__ import annotations
@@ -10,7 +10,7 @@ from __future__ import annotations
 import io
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Literal, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.auth.deps import get_effective_permissions, require_permission
 from app.auth.permissions import PERM_DEALER_COUNTS_READ, PERM_DEALER_COUNTS_WRITE
 from app.db import get_db
-from app.models.dealer_stock_count import DealerStockCount, DealerStockCountLine
+from app.models.dealer_stock_count import DealerStockCount, DealerStockCountEntry, DealerStockCountLine
 from app.models.product import Product as ProductModel
 from app.models.settings_organization import SettingsOrganization
 from app.models.user import User
@@ -37,6 +37,7 @@ from app.services.dealer_count_sheet import (
     LOCATION_MAX,
     add_lines,
     apply_counts,
+    entries_brief,
     patch_line,
     prefill_sheet,
     recount,
@@ -106,7 +107,18 @@ class DealerCountLineOut(BaseModel):
     location_code: Optional[str] = None
     counted_at: Optional[datetime] = None
     counted_by_name: Optional[str] = None
+    #: Kiritishlar soni va oxirgi jamidan beri ko'rinishi ("12 + 5") — qayta skanda qo'shilgan.
+    entries_count: int = 0
+    entries_brief: Optional[str] = None
     seq: int
+
+
+class DealerCountEntryOut(BaseModel):
+    id: UUID
+    kind: str
+    qty: Optional[Decimal]
+    user_name: Optional[str]
+    counted_at: datetime
 
 
 class DealerCountOut(BaseModel):
@@ -146,10 +158,15 @@ class PrefillOut(BaseModel):
 
 
 class CountEntryIn(BaseModel):
+    #: Telefon beradi — bir kiritish ikki marta qo'llanmaydi (tarmoq uzilib qayta yuborilsa).
+    op_id: Optional[UUID] = None
+    #: set — jami; add — ustiga qo'shish (qayta skan); undo — `undo_op_id` qo'shishini bekor qilish.
+    mode: Literal["set", "add", "undo"] = "set"
+    undo_op_id: Optional[UUID] = None
     line_id: Optional[UUID] = None
     product_id: Optional[UUID] = None
     scanned_barcode: str = Field(default="", max_length=64)
-    qty: Decimal = Field(..., ge=0)
+    qty: Optional[Decimal] = Field(default=None, ge=0)
     expiry_date: Optional[date] = None
     location_code: Optional[str] = Field(default=None, max_length=LOCATION_MAX)
     #: Telefonda sanalgan payt — bir qatorni ikki xodim sanasa, keyingisi qoladi.
@@ -166,6 +183,9 @@ class CountsOut(BaseModel):
     added: int
     #: Serverda shu qator keyinroq sanalgan — telefondagi eski qiymat yozilmadi.
     stale: int
+    #: Allaqachon qabul qilingan kiritishlar (takror yuborish) va bekor qilingan qo'shishlar.
+    duplicate: int = 0
+    undone: int = 0
     count: DealerCountOut
 
 
@@ -225,6 +245,8 @@ def _to_out(db: Session, item: DealerStockCount, *, with_lines: bool) -> DealerC
                     location_code=ln.location_code,
                     counted_at=ln.counted_at,
                     counted_by_name=names.get(ln.counted_by_user_id),
+                    entries_count=len(ln.entries),
+                    entries_brief=entries_brief(ln),
                     seq=ln.seq,
                 )
             )
@@ -252,7 +274,7 @@ def _to_out(db: Session, item: DealerStockCount, *, with_lines: bool) -> DealerC
 def _load(db: Session, count_id: UUID) -> DealerStockCount:
     item = (
         db.query(DealerStockCount)
-        .options(selectinload(DealerStockCount.lines))
+        .options(selectinload(DealerStockCount.lines).selectinload(DealerStockCountLine.entries))
         .filter(DealerStockCount.id == count_id)
         .one_or_none()
     )
@@ -466,6 +488,25 @@ def update_count_line(
     return _save(db, item)
 
 
+@router.get(
+    "/{count_id}/lines/{line_id}/entries",
+    response_model=list[DealerCountEntryOut],
+    summary="Qatorga kiritishlar tarixi (kim qancha sanadi / qo'shdi / tuzatdi)",
+)
+def list_line_entries(
+    count_id: UUID,
+    line_id: UUID,
+    db: Session = Depends(get_db),
+    _user: User = Depends(require_permission(PERM_DEALER_COUNTS_READ)),
+) -> list[DealerCountEntryOut]:
+    line = _load_line(_load(db, count_id), line_id)
+    names = _names(db, {en.user_id for en in line.entries})
+    return [
+        DealerCountEntryOut(id=en.id, kind=en.kind, qty=en.qty, user_name=names.get(en.user_id), counted_at=en.counted_at)
+        for en in line.entries
+    ]
+
+
 @router.delete("/{count_id}/lines/{line_id}", response_model=DealerCountOut, summary="Qatorni o'chirish — web")
 def delete_count_line(
     count_id: UUID,
@@ -587,7 +628,7 @@ def export_count_xlsx(
     ws.append(["Sanaldi", f"{out.counted_lines}/{out.sheet_lines}"])
     ws.append(["Izoh", out.note or ""])
     ws.append([])
-    ws.append(["#", "SKU", "Mahsulot", "Shtrix-kod", "Joy", "Dona", "Muddat", "Kim sanadi", "Qachon"])
+    ws.append(["#", "SKU", "Mahsulot", "Shtrix-kod", "Joy", "Dona", "Muddat", "Kim sanadi", "Qachon", "Kiritishlar"])
     for ln in out.lines:
         ws.append(
             [
@@ -601,6 +642,7 @@ def export_count_xlsx(
                 ln.expiry_date.strftime("%Y-%m") if ln.expiry_date else "",
                 ln.counted_by_name or "",
                 ln.counted_at.strftime("%Y-%m-%d %H:%M") if ln.counted_at else "",
+                ln.entries_brief or "",
             ]
         )
     ws.append([])

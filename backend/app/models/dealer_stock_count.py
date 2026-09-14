@@ -33,6 +33,9 @@ from app.models.base import Base
 #: Ichki belgi, foydalanuvchiga ko'rsatilmaydi: open — dillerning faol (oxirgi) sanovi,
 #: telefonlarda ko'rinadi; closed — shu dillerga yangi sanov yaratilgach eskisi.
 DEALER_COUNT_STATUSES = ("open", "closed")
+#: Qatorga kiritish turi: set — jami yozildi (birinchi sanash / tuzatish), add — ustiga qo'shildi,
+#: clear — web'da "sanalmagan"ga qaytarildi.
+DEALER_COUNT_ENTRY_KINDS = ("set", "add", "clear")
 
 
 class DealerStockCount(Base):
@@ -115,6 +118,12 @@ class DealerStockCountLine(Base):
     seq: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     count: Mapped[DealerStockCount] = relationship("DealerStockCount", back_populates="lines")
+    entries: Mapped[list["DealerStockCountEntry"]] = relationship(
+        "DealerStockCountEntry",
+        back_populates="line",
+        cascade="all, delete-orphan",
+        order_by="DealerStockCountEntry.created_at",
+    )
 
     __table_args__ = (
         CheckConstraint("qty IS NULL OR qty >= 0", name="ck_dealer_stock_count_lines_qty_nonneg"),
@@ -130,4 +139,33 @@ class DealerStockCountLine(Base):
             unique=True,
             postgresql_where=text("product_id IS NOT NULL"),
         ),
+    )
+
+
+class DealerStockCountEntry(Base):
+    """Qatorga bitta kiritish (tarix). `id` — telefon bergan `op_id`: tarmoq uzilib qayta
+    yuborilsa ham bir kiritish bir marta qo'llanadi. Qatordagi `qty` — shu yozuvlar natijasi."""
+
+    __tablename__ = "dealer_stock_count_entries"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    line_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("dealer_stock_count_lines.id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(8), nullable=False)
+    #: set — yozilgan jami; add — qo'shilgan son; clear — bo'sh.
+    qty: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    counted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    line: Mapped[DealerStockCountLine] = relationship("DealerStockCountLine", back_populates="entries")
+
+    __table_args__ = (
+        CheckConstraint(f"kind IN {DEALER_COUNT_ENTRY_KINDS}", name="ck_dealer_stock_count_entries_kind"),
+        Index("ix_dealer_stock_count_entries_line_id", "line_id"),
     )

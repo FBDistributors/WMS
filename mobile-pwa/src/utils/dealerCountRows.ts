@@ -32,6 +32,9 @@ export type EditRow = {
   /** Diller omboridagi joy (javon / zona). */
   location?: string
   countedBy?: string | null
+  /** Qatorga kiritishlar soni va ko'rinishi ("12 + 5"). */
+  entriesCount?: number
+  entriesBrief?: string | null
   /** UI: foydalanuvchi hozir yozmoqda — server javobi bu qiymat ustidan yozmasin. */
   editing?: boolean
 }
@@ -139,6 +142,8 @@ export function rowsFromCount(count: DealerCountOut): EditRow[] {
     lineId: ln.id,
     location: ln.location_code ?? '',
     countedBy: ln.counted_by_name ?? null,
+    entriesCount: ln.entries_count ?? 0,
+    entriesBrief: ln.entries_brief ?? null,
   }))
 }
 
