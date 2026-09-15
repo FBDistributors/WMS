@@ -560,41 +560,7 @@ class _DealerSheetScreenState extends ConsumerState<DealerSheetScreen> with Widg
               ),
             ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-            child: Row(
-              children: <Widget>[
-                Expanded(
-                  child: TextField(
-                    controller: _search,
-                    enabled: !_busy,
-                    decoration: InputDecoration(
-                      hintText: StringLookup.t(loc, 'dealerSheetSearchHint'),
-                      prefixIcon: const Icon(Icons.search),
-                      border: const OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (String v) {
-                      // Enter — kod sifatida qabul qilinadi (USB skaner / qo'lda kiritish).
-                      if (v.trim().isNotEmpty) {
-                        _handleCode(v.trim());
-                      }
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: _busy ? null : _scan,
-                  style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14)),
-                  child: _busy
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Icons.qr_code_scanner),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
             child: Align(
               alignment: Alignment.centerLeft,
               child: ActionChip(
@@ -697,13 +663,53 @@ class _DealerSheetScreenState extends ConsumerState<DealerSheetScreen> with Widg
                     ),
             ),
           ),
+          // Qidiruv va skan pastda — telefonni bir qo'lda ushlab, bosh barmoq bilan yetadi.
           SafeArea(
             top: false,
-            child: Padding(
+            child: Container(
+              decoration: BoxDecoration(border: Border(top: BorderSide(color: cs.outlineVariant))),
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-              child: Text(
-                '${StringLookup.t(loc, 'dealerCountTotalUnits')}: ${formatPickQty(s.countedUnits)}',
-                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    '${StringLookup.t(loc, 'dealerCountTotalUnits')}: ${formatPickQty(s.countedUnits)}',
+                    style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: TextField(
+                          controller: _search,
+                          enabled: !_busy,
+                          decoration: InputDecoration(
+                            hintText: StringLookup.t(loc, 'dealerSheetSearchHint'),
+                            prefixIcon: const Icon(Icons.search),
+                            border: const OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (String v) {
+                            // Enter — kod sifatida qabul qilinadi (USB skaner / qo'lda kiritish).
+                            if (v.trim().isNotEmpty) {
+                              _handleCode(v.trim());
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: _busy ? null : _scan,
+                        style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14)),
+                        child: _busy
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.qr_code_scanner),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),
