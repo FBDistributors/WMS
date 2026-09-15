@@ -292,3 +292,62 @@ def test_web_correction_is_recorded_and_resets_brief(client: TestClient, db_sess
         assert kinds.count("set") == 2 and kinds.count("add") == 1
     finally:
         _clear()
+
+
+# --- onlayn telefon: yengil javob va o'zgarganlar -----------------------------------
+
+
+def test_light_response_and_changed_since(client: TestClient, db_session: Session, monkeypatch):
+    org = _org(db_session, wh="wh30")
+    a, b, c = _product(db_session, "A"), _product(db_session, "B"), _product(db_session, "C")
+    _patch_smartup(monkeypatch, {a.sku: 1, b.sku: 1, c.sku: 1})
+    cid = _sheet(client, db_session, org, [a.sku, b.sku, c.sku])
+    # Ro'yxat bir soat oldin tayyorlangan bo'lsin (server_time dagi 5 s zaxiraga tushmasin).
+    from app.models.dealer_stock_count import DealerStockCountLine
+
+    db_session.query(DealerStockCountLine).update(
+        {DealerStockCountLine.updated_at: datetime.now(timezone.utc) - timedelta(hours=1)}, synchronize_session=False
+    )
+    db_session.commit()
+    u1, u2 = _mk_user(db_session, "inventory_controller"), _mk_user(db_session, "inventory_controller")
+    _as(u1)
+    try:
+        full = client.get(f"{URL}/{cid}/lines").json()  # changed_since yo'q — hammasi
+        assert len(full["lines"]) == 3 and full["is_active"] is True
+        since = full["server_time"]
+        r = client.put(
+            f"{URL}/{cid}/counts",
+            params={"lines": "changed"},
+            json={"entries": [{"op_id": str(uuid.uuid4()), "product_id": str(a.id), "qty": 4}]},
+        )
+        body = r.json()["count"]
+        assert [ln["sku"] for ln in body["lines"]] == [a.sku]  # faqat tekkan qator
+        assert body["sheet_lines"] == 3 and body["counted_lines"] == 1
+        a_line = body["lines"][0]["id"]
+        # Standart javob — hozirgidek to'liq (1.0.49 ilova).
+        r2 = client.put(f"{URL}/{cid}/counts", json={"entries": []})
+        assert len(r2.json()["count"]["lines"]) == 3
+    finally:
+        _clear()
+    _as(u2)
+    try:
+        add = {"op_id": str(uuid.uuid4()), "mode": "add", "line_id": a_line, "qty": 2}
+        client.put(f"{URL}/{cid}/counts", params={"lines": "changed"}, json={"entries": [add]})
+        client.put(f"{URL}/{cid}/counts", params={"lines": "changed"}, json={"entries": [{"op_id": str(uuid.uuid4()), "product_id": str(b.id), "qty": 0}]})
+    finally:
+        _clear()
+    _as(u1)
+    try:
+        ch = client.get(f"{URL}/{cid}/lines", params={"changed_since": since}).json()
+        got = {ln["sku"]: ln for ln in ch["lines"]}
+        assert set(got) == {a.sku, b.sku}  # c o'zgarmagan — qaytmaydi
+        assert float(got[a.sku]["qty"]) == 6 and got[a.sku]["entries_brief"] == "4 + 2"
+        assert ch["counted_lines"] == 2
+        # Bekor qilish ham "o'zgarish" — keyingi so'rovda qaytadi.
+        since2 = ch["server_time"]
+        client.put(f"{URL}/{cid}/counts", json={"entries": [{"op_id": str(uuid.uuid4()), "mode": "undo", "undo_op_id": add["op_id"]}]})
+        ch2 = client.get(f"{URL}/{cid}/lines", params={"changed_since": since2}).json()
+        a2 = next(ln for ln in ch2["lines"] if ln["sku"] == a.sku)
+        assert float(a2["qty"]) == 4
+    finally:
+        _clear()

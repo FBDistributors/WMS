@@ -8,7 +8,7 @@ Bu yerda hech qanday `stock_movements` yozilmaydi: diller ombori bizniki emas.
 from __future__ import annotations
 
 import io
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Literal, Optional
 from uuid import UUID
@@ -200,6 +200,22 @@ class DealerCountListOut(BaseModel):
     total: int
 
 
+class ChangedLinesOut(BaseModel):
+    """Ochiq sanovda o'zgarganlar (telefon har 20 s): jami ko'rsatkichlar + o'zgargan qatorlar.
+    `changed_since` siz — hamma qator (telefon sanovni shu bilan ochadi)."""
+
+    id: UUID
+    dealer_org_id: str
+    dealer_name: Optional[str]
+    is_active: bool
+    sheet_lines: int
+    counted_lines: int
+    total_units: Decimal
+    #: Keyingi so'rov uchun `changed_since` (server vaqti, kichik zaxira bilan).
+    server_time: datetime
+    lines: list[DealerCountLineOut] = Field(default_factory=list)
+
+
 # --- yordamchilar --------------------------------------------------------------
 
 
@@ -216,7 +232,13 @@ def _names(db: Session, ids: set) -> dict:
     return {u.id: _display_name(u) for u in db.query(User).filter(User.id.in_(ids)).all()}
 
 
-def _to_out(db: Session, item: DealerStockCount, *, with_lines: bool) -> DealerCountOut:
+def _to_out(
+    db: Session,
+    item: DealerStockCount,
+    *,
+    with_lines: bool,
+    only_line_ids: Optional[set] = None,
+) -> DealerCountOut:
     last = max((ln for ln in item.lines if ln.counted_at is not None), key=lambda ln: ln.counted_at, default=None)
     names = _names(
         db,
@@ -226,11 +248,12 @@ def _to_out(db: Session, item: DealerStockCount, *, with_lines: bool) -> DealerC
     )
     lines_out: list[DealerCountLineOut] = []
     if with_lines:
-        pids = {ln.product_id for ln in item.lines if ln.product_id}
+        shown = [ln for ln in item.lines if only_line_ids is None or ln.id in only_line_ids]
+        pids = {ln.product_id for ln in shown if ln.product_id}
         products = (
             {p.id: p for p in db.query(ProductModel).filter(ProductModel.id.in_(pids)).all()} if pids else {}
         )
-        for ln in item.lines:
+        for ln in shown:
             p = products.get(ln.product_id)
             lines_out.append(
                 DealerCountLineOut(
@@ -546,14 +569,64 @@ def put_counts(
     count_id: UUID,
     payload: CountsIn,
     request: Request,
+    lines: Literal["all", "changed"] = Query(
+        default="all", description="changed — javobda faqat shu so'rov tekkan qatorlar (telefon, yengil)"
+    ),
     db: Session = Depends(get_db),
     user: User = Depends(require_permission(PERM_DEALER_COUNTS_WRITE)),
 ) -> CountsOut:
     item = _load(db, count_id)
     # Yopilgan sanovga ham yoziladi: oflayn telefon kech ulansa sanalgani yo'qolmasin.
     result = apply_counts(db, item, user, [e.model_dump() for e in payload.entries])
+    touched = result.pop("touched")
     _audit(db, request, user, item, ACTION_UPDATE, {"counts": result})
-    return CountsOut(**result, count=_save(db, item))
+    recount(item)
+    db.commit()
+    db.refresh(item)
+    only = {ln.id for ln in touched} if lines == "changed" else None
+    return CountsOut(**result, count=_to_out(db, item, with_lines=True, only_line_ids=only))
+
+
+@router.get(
+    "/{count_id}/lines",
+    response_model=ChangedLinesOut,
+    summary="O'zgargan qatorlar (`changed_since` dan beri) — ochiq sanovni yangilash",
+)
+def changed_lines(
+    count_id: UUID,
+    changed_since: Optional[datetime] = Query(default=None, description="Oldingi javobdagi server_time"),
+    db: Session = Depends(get_db),
+    _user: User = Depends(require_permission(PERM_DEALER_COUNTS_READ)),
+) -> ChangedLinesOut:
+    # So'rov boshlanishidan biroz oldingi vaqt: shu paytda yozilayotgan qatorlar keyingi safar
+    # ham qaytadi (takror kelsa zararsiz), lekin tushib qolmaydi.
+    server_time = datetime.now(timezone.utc) - timedelta(seconds=5)
+    item = _load(db, count_id)
+    since = changed_since
+    if since is not None and since.tzinfo is None:
+        since = since.replace(tzinfo=timezone.utc)
+
+    def _changed(ln: DealerStockCountLine) -> bool:
+        if since is None:
+            return True
+        at = ln.updated_at
+        if at is not None and at.tzinfo is None:
+            at = at.replace(tzinfo=timezone.utc)
+        return at is not None and at >= since
+
+    only = {ln.id for ln in item.lines if _changed(ln)}
+    out = _to_out(db, item, with_lines=True, only_line_ids=only)
+    return ChangedLinesOut(
+        id=out.id,
+        dealer_org_id=out.dealer_org_id,
+        dealer_name=out.dealer_name,
+        is_active=out.is_active,
+        sheet_lines=out.sheet_lines,
+        counted_lines=out.counted_lines,
+        total_units=out.total_units,
+        server_time=server_time,
+        lines=out.lines,
+    )
 
 
 @router.post("/{count_id}/claim", include_in_schema=False)

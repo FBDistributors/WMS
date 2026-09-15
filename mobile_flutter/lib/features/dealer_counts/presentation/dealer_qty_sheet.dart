@@ -8,19 +8,24 @@ import '../data/dealer_counts_models.dart' show monthStartIso;
 
 /// Diller sanovi — miqdor/muddat kiritish oynasi natijasi.
 class DealerQtyResult {
-  const DealerQtyResult({required this.qty, required this.expiryIso, this.mode = 'set', this.delete = false});
+  const DealerQtyResult({required this.qty, required this.expiryIso, this.mode = 'set'});
 
   /// `set`: jami; `add`: ustiga qo'shiladigan son.
   final double qty;
   final String? expiryIso;
   /// set — birinchi sanash yoki tuzatish; add — qayta skanda qo'shish.
   final String mode;
-  final bool delete;
 }
+
+/// Serverga saqlash: null — saqlandi (oyna yopiladi), matn — xato (oyna ochiq qoladi, son saqlanadi).
+typedef DealerQtySave = Future<String?> Function(DealerQtyResult result);
 
 /// Miqdor oynasi. Qator hali sanalmagan bo'lsa — bitta "Fakt qoldiq" maydoni. Sanalgan bo'lsa
 /// (qayta skan) — oldingi son ko'rinadi va fokus "Qo'shish (+)" maydonida: oldingi son saqlanib,
 /// yangisi ustiga qo'shiladi. Oldingi son xato bo'lsa — "Umumiy sonni tuzatish" (jami yoziladi).
+///
+/// Onlayn: "Saqlash" bosilganda oyna o'zi serverga yozadi (`onSave`); internet yo'q bo'lsa
+/// oyna yopilmaydi — xato ko'rinadi va "Qayta urinish".
 class DealerQtySheet extends StatefulWidget {
   const DealerQtySheet({
     super.key,
@@ -30,7 +35,7 @@ class DealerQtySheet extends StatefulWidget {
     required this.previousQty,
     required this.initialExpiry,
     required this.boxUnits,
-    required this.allowDelete,
+    required this.onSave,
     this.previousBy,
   });
 
@@ -44,7 +49,7 @@ class DealerQtySheet extends StatefulWidget {
   final String? initialExpiry;
   /// Quti kodi skanerlangan bo'lsa — hajm (faqat maslahat tugmasi).
   final int? boxUnits;
-  final bool allowDelete;
+  final DealerQtySave onSave;
 
   @override
   State<DealerQtySheet> createState() => DealerQtySheetState();
@@ -54,6 +59,8 @@ class DealerQtySheetState extends State<DealerQtySheet> {
   final TextEditingController _qty = TextEditingController();
   late bool _addMode;
   String? _expiry;
+  bool _saving = false;
+  String? _error;
 
   @override
   void initState() {
@@ -71,7 +78,31 @@ class DealerQtySheetState extends State<DealerQtySheet> {
   /// Qo'shishda son musbat bo'lishi kerak (kamaytirish — faqat tuzatish orqali); jamida 0 ham javob.
   bool get _canConfirm {
     final double? v = _parsed();
-    return v != null && (_addMode ? v > 0 : v >= 0);
+    return !_saving && v != null && (_addMode ? v > 0 : v >= 0);
+  }
+
+  Future<void> _save() async {
+    final double? v = _parsed();
+    if (v == null) {
+      return;
+    }
+    final DealerQtyResult r = DealerQtyResult(qty: v, expiryIso: _expiry, mode: _addMode ? 'add' : 'set');
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    final String? err = await widget.onSave(r);
+    if (!mounted) {
+      return;
+    }
+    if (err == null) {
+      Navigator.of(context).pop(r);
+      return;
+    }
+    setState(() {
+      _saving = false;
+      _error = err;
+    });
   }
 
   void _toggleMode() {
@@ -148,6 +179,7 @@ class DealerQtySheetState extends State<DealerQtySheet> {
             TextField(
               controller: _qty,
               autofocus: true,
+              enabled: !_saving,
               keyboardType: const TextInputType.numberWithOptions(decimal: false),
               decoration: InputDecoration(
                 labelText: StringLookup.t(loc, _addMode ? 'dealerQtyAddLabel' : (prev != null ? 'dealerQtyTotalLabel' : 'dealerCountQtyTitle')),
@@ -207,27 +239,35 @@ class DealerQtySheetState extends State<DealerQtySheet> {
                   child: Text(StringLookup.t(loc, _addMode ? 'dealerQtyCorrect' : 'dealerQtyBackToAdd')),
                 ),
               ),
+            if (_error != null) ...<Widget>[
+              const SizedBox(height: 8),
+              Row(
+                children: <Widget>[
+                  Icon(Icons.wifi_off, size: 18, color: cs.error),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(_error!, style: TextStyle(color: cs.error, fontSize: 13))),
+                ],
+              ),
+            ],
             const SizedBox(height: 8),
             Row(
               children: <Widget>[
-                if (widget.allowDelete)
-                  TextButton.icon(
-                    onPressed: () => Navigator.of(context).pop(const DealerQtyResult(qty: 0, expiryIso: null, delete: true)),
-                    icon: const Icon(Icons.delete_outline, color: Colors.red),
-                    label: Text(StringLookup.t(loc, 'dealerCountRemoveLine'), style: const TextStyle(color: Colors.red)),
-                  ),
+                TextButton(
+                  onPressed: _saving ? null : () => Navigator.of(context).pop(),
+                  child: Text(StringLookup.t(loc, 'cancel')),
+                ),
                 const Spacer(),
                 FilledButton(
-                  onPressed: !_canConfirm
-                      ? null
-                      : () => Navigator.of(context).pop(
-                            DealerQtyResult(qty: v!, expiryIso: _expiry, mode: _addMode ? 'add' : 'set'),
-                          ),
-                  child: Text(
-                    _addMode
-                        ? StringLookup.tParams(loc, 'dealerQtyAddButton', <String, String>{'n': v != null && v > 0 ? formatPickQty(v) : ''})
-                        : StringLookup.t(loc, 'confirmButton'),
-                  ),
+                  onPressed: _canConfirm ? _save : null,
+                  child: _saving
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : Text(
+                          _error != null
+                              ? StringLookup.t(loc, 'dealerSaveRetry')
+                              : _addMode
+                                  ? StringLookup.tParams(loc, 'dealerQtyAddButton', <String, String>{'n': v != null && v > 0 ? formatPickQty(v) : ''})
+                                  : StringLookup.t(loc, 'confirmButton'),
+                        ),
                 ),
               ],
             ),

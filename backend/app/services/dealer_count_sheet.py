@@ -301,6 +301,7 @@ def apply_counts(db: Session, item: DealerStockCount, user: User, entries: list[
     by_id = {ln.id: ln for ln in item.lines}
     by_key = {line_key(ln.product_id, ln.expiry_date, ln.location_code): ln for ln in item.lines if ln.product_id}
     updated = added = stale = duplicate = undone = 0
+    touched: list[DealerStockCountLine] = []
     for e in entries:
         op_id = e.get("op_id")
         if op_id is not None:
@@ -318,6 +319,7 @@ def apply_counts(db: Session, item: DealerStockCount, user: User, entries: list[
             left = Decimal(str(ln.qty or 0)) - Decimal(str(target.qty))
             ln.qty = left if left > 0 else Decimal("0")
             ln.entries.remove(target)
+            touched.append(ln)
             undone += 1
             continue
 
@@ -386,6 +388,15 @@ def apply_counts(db: Session, item: DealerStockCount, user: User, entries: list[
         if e.get("scanned_at"):
             line.scanned_at = e["scanned_at"]
         _record(line, "add" if mode == "add" else "set", qty, user.id, at, op_id)
+        touched.append(line)
         if line.product_id:
             by_key[line_key(line.product_id, expiry, loc)] = line
-    return {"updated": updated, "added": added, "stale": stale, "duplicate": duplicate, "undone": undone}
+    return {
+        "updated": updated,
+        "added": added,
+        "stale": stale,
+        "duplicate": duplicate,
+        "undone": undone,
+        # Javobda faqat shu qatorlar qaytishi uchun (telefon: `?lines=changed`).
+        "touched": touched,
+    }

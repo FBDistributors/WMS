@@ -9,7 +9,7 @@ UMUMAN tegmaydi — alohida hujjat. Diller = `settings_organizations.org_id`
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import (
@@ -116,6 +116,15 @@ class DealerStockCountLine(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     seq: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    #: Oxirgi o'zgarish (sanash, qo'shish, bekor qilish, web tahriri) — telefon ochiq sanovda
+    #: faqat o'zgargan qatorlarni so'raydi (`changed_since`).
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
+        nullable=False,
+    )
 
     count: Mapped[DealerStockCount] = relationship("DealerStockCount", back_populates="lines")
     entries: Mapped[list["DealerStockCountEntry"]] = relationship(
@@ -129,6 +138,7 @@ class DealerStockCountLine(Base):
         CheckConstraint("qty IS NULL OR qty >= 0", name="ck_dealer_stock_count_lines_qty_nonneg"),
         Index("ix_dealer_stock_count_lines_count_id", "count_id"),
         Index("ix_dealer_stock_count_lines_product_id", "product_id"),
+        Index("ix_dealer_stock_count_lines_count_updated", "count_id", "updated_at"),
         # Bir mahsulot + muddat + joy = bitta qator (tanilmagan skanlar bundan mustasno).
         Index(
             "ux_dealer_stock_count_lines_product_expiry_loc",

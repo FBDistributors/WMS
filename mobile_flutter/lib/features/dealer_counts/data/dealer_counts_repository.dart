@@ -30,16 +30,15 @@ class CountsResult {
   final DealerCount count;
 }
 
-/// Diller sanovi API: faol sanovlar ro'yxati, sanov, sanalganlarni yozish.
-/// Telefon sanov yaratmaydi va tahrirlamaydi — bu web'da.
+/// Diller sanovi API (onlayn): faol sanovlar ro'yxati, sanov, kiritishlarni yozish, o'zgarganlarni
+/// olish. Telefon sanov yaratmaydi va tahrirlamaydi — bu web'da.
 class DealerCountsRepository {
   DealerCountsRepository(this._dio);
 
   static const String _path = '/dealer-counts';
   final Dio _dio;
 
-  /// Faol sanovlar (har dillerda bitta). 500 — hamma dillerni qamraydi; ro'yxat kesilsa
-  /// telefondagi nusxalar noto'g'ri "yopilgan" deb o'chib ketardi.
+  /// Faol sanovlar (har dillerda bitta). 500 — hamma dillerni qamraydi.
   Future<List<DealerCount>> listActive({int limit = 500}) async {
     try {
       final Response<Object?> res = await _dio.get<Object?>(
@@ -76,12 +75,13 @@ class DealerCountsRepository {
     }
   }
 
-  /// Sanalgan qatorlarni yozish (idempotent). Bo'sh ro'yxat ham yuboriladi — javobda
-  /// serverdagi so'nggi holat (boshqalar sanagani) keladi.
+  /// Kiritishlarni yozish (`op_id` bo'yicha idempotent). Javobda faqat shu kiritishlar tekkan
+  /// qatorlar + jami ko'rsatkichlar (`lines=changed`) — 3808 qatorli sanov har safar tortilmaydi.
   Future<CountsResult> putCounts(String id, List<Map<String, Object?>> entries) async {
     try {
       final Response<Object?> res = await _dio.put<Object?>(
         '$_path/$id/counts',
+        queryParameters: <String, Object?>{'lines': 'changed'},
         data: <String, Object?>{'entries': entries},
       );
       final Object? data = res.data;
@@ -92,6 +92,24 @@ class DealerCountsRepository {
         stale: (data['stale'] as num?)?.toInt() ?? 0,
         count: DealerCount.fromJson(Map<String, Object?>.from(data['count'] as Map)),
       );
+    } on DioException catch (e) {
+      _rethrow(e);
+    }
+  }
+
+  /// Ochiq sanovda `since` dan beri o'zgargan qatorlar (boshqa xodimlar sanagani).
+  /// `since` null — hamma qator.
+  Future<DealerChangedLines> changedLines(String id, {String? since}) async {
+    try {
+      final Response<Object?> res = await _dio.get<Object?>(
+        '$_path/$id/lines',
+        queryParameters: <String, Object?>{if (since != null && since.isNotEmpty) 'changed_since': since},
+      );
+      final Object? data = res.data;
+      if (data is! Map) {
+        throw const FormatException('changed lines');
+      }
+      return DealerChangedLines.fromJson(Map<String, Object?>.from(data));
     } on DioException catch (e) {
       _rethrow(e);
     }
