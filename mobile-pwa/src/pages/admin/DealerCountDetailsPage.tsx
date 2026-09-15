@@ -18,6 +18,7 @@ import {
   type DealerCountCompareOut,
   type DealerCountOut,
 } from '../../services/dealerCountsApi'
+import { exportDealerCountExcel } from '../../utils/dealerCountExcel'
 import { writeExcelFile } from '../../utils/exportExcel'
 import { useDealerCountAutoRefresh } from './dealerCountAutoRefresh'
 
@@ -109,28 +110,7 @@ export function DealerCountDetailsPage() {
       await writeExcelFile(wbC, `diller_sanov_smartup_${item.dealer_org_id}_${compare.balance_date}.xlsx`)
       return
     }
-    const rows = item.lines.map((ln) => ({
-      [t('admin:dealer_counts.col_seq')]: ln.seq,
-      SKU: ln.sku ?? '',
-      [t('admin:dealer_counts.col_product')]: ln.product_name ?? t('admin:dealer_counts.unknown_barcode'),
-      [t('admin:dealer_counts.col_barcode')]: ln.scanned_barcode,
-      [t('admin:dealer_counts.col_location')]: ln.location_code ?? '',
-      [t('admin:dealer_counts.col_snapshot')]: ln.snapshot_qty == null ? '' : Number(ln.snapshot_qty),
-      [t('admin:dealer_counts.col_qty')]: ln.qty == null ? '' : Number(ln.qty),
-      [t('admin:dealer_counts.col_state')]: ln.counted_at
-        ? t('admin:dealer_counts.state_counted')
-        : ln.qty == null
-          ? t('admin:dealer_counts.state_uncounted')
-          : t('admin:dealer_counts.state_zeroed'),
-      [t('admin:dealer_counts.col_expiry')]: ln.expiry_date ? ln.expiry_date.slice(0, 7) : '',
-      [t('admin:dealer_counts.col_counted_by')]: ln.counted_by_name ?? '',
-      [t('admin:dealer_counts.col_entries')]: ln.entries_brief ?? '',
-    }))
-    const ws = XLSX.utils.json_to_sheet(rows)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Sanov')
-    const day = item.created_at.slice(0, 10)
-    await writeExcelFile(wb, `diller_sanov_${item.dealer_org_id}_${day}.xlsx`)
+    await exportDealerCountExcel(item, t)
   }
 
   if (isLoading) {

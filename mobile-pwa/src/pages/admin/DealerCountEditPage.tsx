@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Eye, FileSpreadsheet, History, ListPlus, Plus, RefreshCw, Store, Trash2, X } from 'lucide-react'
+import { Download, Eye, FileSpreadsheet, History, ListPlus, Plus, RefreshCw, Store, Trash2, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 
@@ -43,6 +43,7 @@ import {
   totals,
   type EditRow,
 } from '../../utils/dealerCountRows'
+import { exportDealerCountExcel } from '../../utils/dealerCountExcel'
 import { useDealerCountAutoRefresh } from './dealerCountAutoRefresh'
 
 const inputCls =
@@ -397,6 +398,16 @@ export function DealerCountEditPage() {
     })
   }
 
+  /** Excel'ga — telefonlarda hozirgina sanalganlar ham tushishi uchun serverdan yangi holat olinadi. */
+  const exportExcel = () => {
+    if (!countId) return
+    void run(async () => {
+      const fresh = await getDealerCount(countId)
+      apply(fresh)
+      await exportDealerCountExcel(fresh, t)
+    })
+  }
+
   const refresh = () => {
     if (!countId) return
     void run(async () => apply(await getDealerCount(countId)))
@@ -471,6 +482,10 @@ export function DealerCountEditPage() {
               <Button variant="ghost" onClick={() => navigate(`/admin/dealer-counts/${countId}`)}>
                 <Eye size={16} className="mr-1" />
                 {t('admin:dealer_counts.view_compare')}
+              </Button>
+              <Button variant="ghost" disabled={busy} onClick={exportExcel} title={t('admin:dealer_counts.export_excel_hint')}>
+                <Download size={16} className="mr-1" />
+                {t('admin:dealer_counts.export_excel')}
               </Button>
               <Button variant="ghost" disabled={busy} onClick={() => setConfirmDelete(true)}>
                 <Trash2 size={16} className="mr-1" />
