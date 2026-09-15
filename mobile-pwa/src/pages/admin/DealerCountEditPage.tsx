@@ -463,38 +463,6 @@ export function DealerCountEditPage() {
         </div>
       }
       backTo="/admin/dealer-counts"
-      actionSlot={
-        <div className="flex flex-wrap gap-2">
-          <Button variant="ghost" disabled={busy || !dealerId} onClick={() => setPrefillOpen(true)}>
-            <ListPlus size={16} className="mr-1" />
-            {t('admin:dealer_counts.prefill_button')}
-          </Button>
-          <Button variant="ghost" disabled={busy || !dealerId} onClick={() => setImportOpen(true)}>
-            <FileSpreadsheet size={16} className="mr-1" />
-            {t('admin:dealer_counts.import_excel')}
-          </Button>
-          {countId ? (
-            <>
-              <Button variant="ghost" disabled={busy} onClick={refresh} title={t('admin:dealer_counts.refresh_hint')}>
-                <RefreshCw size={16} className="mr-1" />
-                {t('admin:dealer_counts.refresh')}
-              </Button>
-              <Button variant="ghost" onClick={() => navigate(`/admin/dealer-counts/${countId}`)}>
-                <Eye size={16} className="mr-1" />
-                {t('admin:dealer_counts.view_compare')}
-              </Button>
-              <Button variant="ghost" disabled={busy} onClick={exportExcel} title={t('admin:dealer_counts.export_excel_hint')}>
-                <Download size={16} className="mr-1" />
-                {t('admin:dealer_counts.export_excel')}
-              </Button>
-              <Button variant="ghost" disabled={busy} onClick={() => setConfirmDelete(true)}>
-                <Trash2 size={16} className="mr-1" />
-                {t('admin:dealer_counts.delete')}
-              </Button>
-            </>
-          ) : null}
-        </div>
-      }
     >
       <div className="relative">
         {loading || busy ? <LoadingOverlay label={t('common:messages.loading')} /> : null}
@@ -563,6 +531,41 @@ export function DealerCountEditPage() {
         </Card>
 
         <Card className="p-0">
+          <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-3 py-2 dark:border-slate-800">
+            <Button variant="ghost" disabled={busy || !dealerId} onClick={() => setPrefillOpen(true)}>
+              <ListPlus size={16} className="mr-1" />
+              {t('admin:dealer_counts.prefill_button')}
+            </Button>
+            <Button variant="ghost" disabled={busy || !dealerId} onClick={() => setImportOpen(true)}>
+              <FileSpreadsheet size={16} className="mr-1" />
+              {t('admin:dealer_counts.import_excel')}
+            </Button>
+            {countId ? (
+              <>
+                <Button variant="ghost" disabled={busy} onClick={refresh} title={t('admin:dealer_counts.refresh_hint')}>
+                  <RefreshCw size={16} className="mr-1" />
+                  {t('admin:dealer_counts.refresh')}
+                </Button>
+                <Button variant="ghost" onClick={() => navigate(`/admin/dealer-counts/${countId}`)}>
+                  <Eye size={16} className="mr-1" />
+                  {t('admin:dealer_counts.view_compare')}
+                </Button>
+                <Button variant="ghost" disabled={busy} onClick={exportExcel} title={t('admin:dealer_counts.export_excel_hint')}>
+                  <Download size={16} className="mr-1" />
+                  {t('admin:dealer_counts.export_excel')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="ml-auto text-rose-600 dark:text-rose-400"
+                  disabled={busy}
+                  onClick={() => setConfirmDelete(true)}
+                >
+                  <Trash2 size={16} className="mr-1" />
+                  {t('admin:dealer_counts.delete')}
+                </Button>
+              </>
+            ) : null}
+          </div>
           <TableScrollArea>
             <table className="w-full text-sm">
               <thead className="text-xs uppercase text-slate-500">
